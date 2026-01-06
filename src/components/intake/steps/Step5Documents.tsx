@@ -3,6 +3,7 @@ import { FormField } from '../FormField';
 import { Textarea } from '@/components/ui/textarea';
 import { Upload, FileText, X } from 'lucide-react';
 import { useRef } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Step5Props {
   data: IntakeFormData;
@@ -10,6 +11,7 @@ interface Step5Props {
 }
 
 export function Step5Documents({ data, onChange }: Step5Props) {
+  const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,19 +31,17 @@ export function Step5Documents({ data, onChange }: Step5Props) {
     <div className="space-y-6 animate-fade-in">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-display font-semibold text-foreground">
-          Any supporting documents?
+          {t('step5.title')}
         </h2>
         <p className="text-muted-foreground mt-2">
-          Optional: Add relevant documents to support your case
+          {t('step5.description')}
         </p>
       </div>
 
       {/* Privacy notice */}
       <div className="bg-secondary/50 border border-border rounded-lg p-4 mb-6">
         <p className="text-sm text-muted-foreground">
-          <strong className="text-foreground">Privacy Note:</strong> Documents uploaded here 
-          are for mediation preparation only and are treated as confidential. 
-          They will not be retained after your session.
+          <strong className="text-foreground">{t('step5.privacyNote')}</strong> {t('step5.privacyNoteText')}
         </p>
       </div>
 
@@ -59,16 +59,16 @@ export function Step5Documents({ data, onChange }: Step5Props) {
           accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg"
         />
         <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-        <p className="text-foreground font-medium">Click to upload documents</p>
+        <p className="text-foreground font-medium">{t('step5.uploadClick')}</p>
         <p className="text-sm text-muted-foreground mt-1">
-          PDF, Word, Text, or Images (max 10MB each)
+          {t('step5.uploadFormats')}
         </p>
       </div>
 
       {/* Uploaded files list */}
       {data.documents.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-foreground">Uploaded files:</p>
+          <p className="text-sm font-medium text-foreground">{t('step5.uploadedFiles')}</p>
           {data.documents.map((file, index) => (
             <div
               key={index}
@@ -96,13 +96,13 @@ export function Step5Documents({ data, onChange }: Step5Props) {
       )}
 
       <FormField
-        label="Additional notes"
-        description="Any other context you'd like to share"
+        label={t('step5.additionalNotes')}
+        description={t('step5.additionalNotesDesc')}
       >
         <Textarea
           value={data.additionalNotes}
           onChange={(e) => onChange({ additionalNotes: e.target.value })}
-          placeholder="Any other information that might be helpful..."
+          placeholder={t('step5.additionalNotesPlaceholder')}
           className="min-h-[100px]"
         />
       </FormField>

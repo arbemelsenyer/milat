@@ -11,17 +11,19 @@ import {
 } from './steps';
 import StepNextStepDecision from './steps/StepNextStepDecision';
 import StepAiExploration from './steps/StepAiExploration';
+import StepMediatorScheduling from './steps/StepMediatorScheduling';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { generateCaseSummary } from '@/lib/ai-processing';
 import { useToast } from '@/hooks/use-toast';
-import type { CaseFile, NextStepChoice, AiOption } from '@/types/mediation';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageToggle } from '@/components/LanguageToggle';
+import type { CaseFile, NextStepChoice } from '@/types/mediation';
 
-const STEP_LABELS = ['Dispute Type', 'Parties', 'What Happened', 'Outcome', 'Documents'];
-
-type FlowPhase = 'intake' | 'decision' | 'ai_exploration' | 'complete';
+type FlowPhase = 'intake' | 'decision' | 'ai_exploration' | 'mediator_scheduling' | 'complete';
 
 export function IntakeForm() {
+  const { t } = useLanguage();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<IntakeFormData>(initialFormData);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -29,6 +31,14 @@ export function IntakeForm() {
   const [caseFile, setCaseFile] = useState<CaseFile | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const STEP_LABELS = [
+    t('stepLabel.disputeType'),
+    t('stepLabel.parties'),
+    t('stepLabel.whatHappened'),
+    t('stepLabel.outcome'),
+    t('stepLabel.documents'),
+  ];
 
   const updateFormData = (updates: Partial<IntakeFormData>) => {
     setFormData((prev) => ({ ...prev, ...updates }));
@@ -39,15 +49,15 @@ export function IntakeForm() {
       case 0:
         if (!formData.disputeType) {
           toast({
-            title: 'Please select a dispute type',
-            description: 'This helps us understand your situation better.',
+            title: t('toast.selectDisputeType'),
+            description: t('toast.selectDisputeTypeDesc'),
             variant: 'destructive',
           });
           return false;
         }
         if (formData.disputeType === 'other' && !formData.disputeTypeOther?.trim()) {
           toast({
-            title: 'Please describe your dispute type',
+            title: t('toast.describeDispute'),
             variant: 'destructive',
           });
           return false;
@@ -56,8 +66,8 @@ export function IntakeForm() {
       case 1:
         if (!formData.yourName.trim() || !formData.otherPartyName.trim()) {
           toast({
-            title: 'Please provide both party names',
-            description: 'We need to know who is involved.',
+            title: t('toast.provideNames'),
+            description: t('toast.provideNamesDesc'),
             variant: 'destructive',
           });
           return false;
@@ -66,8 +76,8 @@ export function IntakeForm() {
       case 2:
         if (!formData.issueDescription.trim()) {
           toast({
-            title: 'Please describe what happened',
-            description: 'Share your perspective on the situation.',
+            title: t('toast.describeHappened'),
+            description: t('toast.describeHappenedDesc'),
             variant: 'destructive',
           });
           return false;
@@ -76,8 +86,8 @@ export function IntakeForm() {
       case 3:
         if (!formData.desiredOutcome.trim()) {
           toast({
-            title: 'Please describe your desired outcome',
-            description: 'What would resolution look like for you?',
+            title: t('toast.describeOutcome'),
+            description: t('toast.describeOutcomeDesc'),
             variant: 'destructive',
           });
           return false;
@@ -98,6 +108,10 @@ export function IntakeForm() {
   };
 
   const handleBack = () => {
+    if (flowPhase === 'mediator_scheduling') {
+      setFlowPhase('decision');
+      return;
+    }
     if (flowPhase === 'ai_exploration') {
       setFlowPhase('decision');
       return;
@@ -149,8 +163,8 @@ export function IntakeForm() {
       setFlowPhase('decision');
     } catch (error) {
       toast({
-        title: 'Something went wrong',
-        description: 'Please try again.',
+        title: t('toast.error'),
+        description: t('toast.tryAgain'),
         variant: 'destructive',
       });
     } finally {
@@ -166,8 +180,8 @@ export function IntakeForm() {
     if (choice === 'ai_exploration') {
       setFlowPhase('ai_exploration');
     } else {
-      // Human mediator path - navigate to summary
-      navigate('/summary');
+      // Human mediator path - go to scheduling
+      setFlowPhase('mediator_scheduling');
     }
   };
 
@@ -177,6 +191,10 @@ export function IntakeForm() {
   };
 
   const handleAiComplete = () => {
+    navigate('/summary');
+  };
+
+  const handleMediatorComplete = () => {
     navigate('/summary');
   };
 
@@ -199,7 +217,7 @@ export function IntakeForm() {
 
   const isLastStep = currentStep === STEP_LABELS.length - 1;
 
-  // Render decision or AI exploration phases
+  // Render decision phase
   if (flowPhase === 'decision' && caseFile) {
     return (
       <div className="min-h-screen bg-background">
@@ -210,9 +228,12 @@ export function IntakeForm() {
                 onClick={() => navigate('/')}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                ← Back to home
+                {t('nav.backToHome')}
               </button>
-              <span className="text-sm text-muted-foreground">Decision</span>
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-muted-foreground">{t('nav.decision')}</span>
+                <LanguageToggle />
+              </div>
             </div>
           </div>
         </header>
@@ -227,6 +248,7 @@ export function IntakeForm() {
     );
   }
 
+  // Render AI exploration phase
   if (flowPhase === 'ai_exploration' && caseFile) {
     return (
       <div className="min-h-screen bg-background">
@@ -237,9 +259,12 @@ export function IntakeForm() {
                 onClick={() => navigate('/')}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                ← Back to home
+                {t('nav.backToHome')}
               </button>
-              <span className="text-sm text-muted-foreground">AI Exploration</span>
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-muted-foreground">{t('nav.aiExploration')}</span>
+                <LanguageToggle />
+              </div>
             </div>
           </div>
         </header>
@@ -248,6 +273,37 @@ export function IntakeForm() {
             caseFile={caseFile}
             onFeedbackChange={handleAiFeedback}
             onComplete={handleAiComplete}
+            onBack={handleBack}
+          />
+        </main>
+      </div>
+    );
+  }
+
+  // Render mediator scheduling phase
+  if (flowPhase === 'mediator_scheduling' && caseFile) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+          <div className="container max-w-3xl py-4">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => navigate('/')}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t('nav.backToHome')}
+              </button>
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-muted-foreground">{t('nav.scheduling')}</span>
+                <LanguageToggle />
+              </div>
+            </div>
+          </div>
+        </header>
+        <main className="container max-w-2xl py-8 px-4">
+          <StepMediatorScheduling
+            caseFile={caseFile}
+            onComplete={handleMediatorComplete}
             onBack={handleBack}
           />
         </main>
@@ -265,11 +321,14 @@ export function IntakeForm() {
               onClick={() => navigate('/')}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              ← Back to home
+              {t('nav.backToHome')}
             </button>
-            <span className="text-sm text-muted-foreground">
-              Step {currentStep + 1} of {STEP_LABELS.length}
-            </span>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-muted-foreground">
+                {t('nav.step')} {currentStep + 1} {t('nav.of')} {STEP_LABELS.length}
+              </span>
+              <LanguageToggle />
+            </div>
           </div>
           <StepIndicator
             currentStep={currentStep}
@@ -292,7 +351,7 @@ export function IntakeForm() {
             className="gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back
+            {t('common.back')}
           </Button>
 
           {isLastStep ? (
@@ -304,15 +363,15 @@ export function IntakeForm() {
               {isProcessing ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Processing...
+                  {t('common.processing')}
                 </>
               ) : (
-                'Submit Intake'
+                t('common.submitIntake')
               )}
             </Button>
           ) : (
             <Button onClick={handleNext} className="gap-2">
-              Continue
+              {t('common.continue')}
               <ArrowRight className="w-4 h-4" />
             </Button>
           )}

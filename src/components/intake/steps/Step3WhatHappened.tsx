@@ -1,6 +1,7 @@
 import { IntakeFormData } from '@/types/intake';
 import { FormField } from '../FormField';
 import { Textarea } from '@/components/ui/textarea';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Step3Props {
   data: IntakeFormData;
@@ -8,59 +9,59 @@ interface Step3Props {
 }
 
 export function Step3WhatHappened({ data, onChange }: Step3Props) {
+  const { t } = useLanguage();
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-display font-semibold text-foreground">
-          Tell us what happened
+          {t('step3.title')}
         </h2>
         <p className="text-muted-foreground mt-2">
-          Share your perspective. Focus on facts and feelings.
+          {t('step3.description')}
         </p>
       </div>
 
       {/* Calming guidance box */}
       <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mb-6">
         <p className="text-sm text-foreground">
-          <strong className="text-primary">Guidance:</strong> Try to describe what happened 
-          from your point of view. It's okay to express how you felt. 
-          We'll help present this information in a balanced way.
+          <strong className="text-primary">{t('step3.guidance')}</strong> {t('step3.guidanceText')}
         </p>
       </div>
 
       <FormField
-        label="What happened?"
-        description="Describe the situation that led to this dispute"
+        label={t('step3.whatHappened')}
+        description={t('step3.whatHappenedDesc')}
         required
       >
         <Textarea
           value={data.issueDescription}
           onChange={(e) => onChange({ issueDescription: e.target.value })}
-          placeholder="Describe the events and circumstances that led to this dispute..."
+          placeholder={t('step3.whatHappenedPlaceholder')}
           className="min-h-[150px]"
         />
       </FormField>
 
       <FormField
-        label="When did this happen?"
-        description="Approximate timeline or key dates"
+        label={t('step3.when')}
+        description={t('step3.whenDesc')}
       >
         <Textarea
           value={data.timeline}
           onChange={(e) => onChange({ timeline: e.target.value })}
-          placeholder="e.g., Started in January 2024, escalated in March..."
+          placeholder={t('step3.whenPlaceholder')}
           className="min-h-[80px]"
         />
       </FormField>
 
       <FormField
-        label="Have you tried to resolve this before?"
-        description="Any previous attempts at resolution"
+        label={t('step3.previousAttempts')}
+        description={t('step3.previousAttemptsDesc')}
       >
         <Textarea
           value={data.attemptedResolution}
           onChange={(e) => onChange({ attemptedResolution: e.target.value })}
-          placeholder="Describe any conversations, emails, or other attempts to resolve this..."
+          placeholder={t('step3.previousAttemptsPlaceholder')}
           className="min-h-[100px]"
         />
       </FormField>

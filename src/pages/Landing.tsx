@@ -1,8 +1,12 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Shield, Users, MessageCircle, Lock } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageToggle } from '@/components/LanguageToggle';
 
 export default function Landing() {
+  const { t } = useLanguage();
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -16,13 +20,14 @@ export default function Landing() {
               MediationPath
             </span>
           </div>
-          <nav className="hidden sm:flex items-center gap-6">
-            <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              How It Works
+          <nav className="flex items-center gap-4 sm:gap-6">
+            <a href="#how-it-works" className="hidden sm:block text-sm text-muted-foreground hover:text-foreground transition-colors">
+              {t('landing.howItWorks')}
             </a>
-            <a href="#privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Privacy
+            <a href="#privacy" className="hidden sm:block text-sm text-muted-foreground hover:text-foreground transition-colors">
+              {t('landing.privacy')}
             </a>
+            <LanguageToggle />
           </nav>
         </div>
       </header>
@@ -31,36 +36,34 @@ export default function Landing() {
       <section className="py-16 md:py-24">
         <div className="container max-w-4xl px-4 text-center">
           <div className="inline-block bg-primary/10 text-primary text-sm font-medium px-4 py-1.5 rounded-full mb-6 animate-fade-in">
-            Pre-Mediation Intake Tool
+            {t('landing.badge')}
           </div>
           
           <h1 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 animate-fade-in-up">
-            Find clarity before
-            <span className="text-primary block">finding resolution</span>
+            {t('landing.heroTitle1')}
+            <span className="text-primary block">{t('landing.heroTitle2')}</span>
           </h1>
           
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-            Structure your dispute and prepare for mediation with our calm, 
-            neutral intake process. Be heard. Find understanding.
+            {t('landing.heroDescription')}
           </p>
 
           {/* Important disclaimer */}
           <div className="bg-secondary/50 border border-border rounded-lg p-4 mb-8 max-w-xl mx-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             <p className="text-sm text-muted-foreground">
-              <strong className="text-foreground">Important:</strong> This is a mediation intake tool, 
-              not legal advice. We help you prepare for resolution, not litigation.
+              {t('landing.disclaimer')}
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
             <Button asChild size="lg" className="gap-2 text-base px-8">
               <Link to="/intake">
-                Start Your Intake
+                {t('landing.startIntake')}
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="text-base">
-              <a href="#how-it-works">Learn More</a>
+              <a href="#how-it-works">{t('landing.learnMore')}</a>
             </Button>
           </div>
         </div>
@@ -70,29 +73,29 @@ export default function Landing() {
       <section id="how-it-works" className="py-16 bg-card border-y border-border">
         <div className="container max-w-5xl px-4">
           <h2 className="font-display text-3xl font-bold text-center text-foreground mb-4">
-            How It Works
+            {t('landing.howItWorks')}
           </h2>
           <p className="text-muted-foreground text-center max-w-xl mx-auto mb-12">
-            A simple, respectful process to help you prepare for mediation
+            {t('landing.howItWorksDesc')}
           </p>
 
           <div className="grid md:grid-cols-3 gap-8">
             <FeatureCard
               icon={<MessageCircle className="w-6 h-6" />}
-              title="Share Your Story"
-              description="Answer guided questions about your dispute. We help you articulate what happened and what you need."
+              title={t('landing.shareStory')}
+              description={t('landing.shareStoryDesc')}
               step={1}
             />
             <FeatureCard
               icon={<Users className="w-6 h-6" />}
-              title="Get Clarity"
-              description="Receive a neutral summary that identifies core issues without accusation or bias."
+              title={t('landing.getClarity')}
+              description={t('landing.getClarityDesc')}
               step={2}
             />
             <FeatureCard
               icon={<Shield className="w-6 h-6" />}
-              title="Choose Your Path"
-              description="Decide whether to proceed with a human mediator or explore AI-assisted options."
+              title={t('landing.choosePath')}
+              description={t('landing.choosePathDesc')}
               step={3}
             />
           </div>
@@ -106,29 +109,28 @@ export default function Landing() {
             <Lock className="w-7 h-7 text-primary" />
           </div>
           <h2 className="font-display text-3xl font-bold text-foreground mb-4">
-            Your Privacy Matters
+            {t('landing.privacyTitle')}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto mb-8">
-            Confidentiality is a core principle of mediation. Your information is treated 
-            with the utmost care and is not retained beyond your session.
+            {t('landing.privacyDesc')}
           </p>
           <div className="grid sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
             <div className="bg-card border border-border rounded-lg p-4">
-              <p className="font-medium text-foreground">No Data Retention</p>
+              <p className="font-medium text-foreground">{t('landing.noDataRetention')}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Your intake data is not stored permanently
+                {t('landing.noDataRetentionDesc')}
               </p>
             </div>
             <div className="bg-card border border-border rounded-lg p-4">
-              <p className="font-medium text-foreground">Neutral Processing</p>
+              <p className="font-medium text-foreground">{t('landing.neutralProcessing')}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                AI helps structure, never judges
+                {t('landing.neutralProcessingDesc')}
               </p>
             </div>
             <div className="bg-card border border-border rounded-lg p-4">
-              <p className="font-medium text-foreground">Confidential</p>
+              <p className="font-medium text-foreground">{t('landing.confidential')}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Your information stays between parties
+                {t('landing.confidentialDesc')}
               </p>
             </div>
           </div>
@@ -139,14 +141,14 @@ export default function Landing() {
       <section className="py-16 bg-primary/5">
         <div className="container max-w-3xl px-4 text-center">
           <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground mb-4">
-            Ready to take the first step?
+            {t('landing.readyTitle')}
           </h2>
           <p className="text-muted-foreground mb-8">
-            Start your pre-mediation intake in about 10 minutes.
+            {t('landing.readyDesc')}
           </p>
           <Button asChild size="lg" className="gap-2">
             <Link to="/intake">
-              Begin Intake Process
+              {t('landing.beginIntake')}
               <ArrowRight className="w-4 h-4" />
             </Link>
           </Button>
@@ -164,7 +166,7 @@ export default function Landing() {
               <span className="font-display font-medium text-foreground">MediationPath</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              This tool provides mediation preparation, not legal advice.
+              {t('landing.footerDisclaimer')}
             </p>
           </div>
         </div>
