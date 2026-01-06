@@ -8,7 +8,7 @@ type FeedbackType = "good" | "maybe" | "no";
 
 type Props = {
   caseFile: CaseFile;
-  onFeedback: (optionId: string, feedback: FeedbackType) => void;
+  onFeedbackChange: (feedback: Record<string, FeedbackType>) => void;
   onComplete: () => void;
   onBack?: () => void;
 };
@@ -80,10 +80,14 @@ const feedbackConfig = {
   }
 };
 
-export default function StepAiExploration({ caseFile, onFeedback, onComplete, onBack }: Props) {
+export default function StepAiExploration({ caseFile, onFeedbackChange, onComplete, onBack }: Props) {
   const options = generateMockOptions(caseFile);
   const feedback = caseFile.aiFeedback || {};
   
+  const handleFeedback = (optionId: string, type: FeedbackType) => {
+    onFeedbackChange({ ...feedback, [optionId]: type });
+  };
+
   const allRated = options.every(opt => feedback[opt.id]);
   const hasAnyFeedback = Object.keys(feedback).length > 0;
 
@@ -162,7 +166,7 @@ export default function StepAiExploration({ caseFile, onFeedback, onComplete, on
                           key={type}
                           variant="outline"
                           size="sm"
-                          onClick={() => onFeedback(option.id, type)}
+                          onClick={() => handleFeedback(option.id, type)}
                           className={`gap-2 transition-all ${isActive ? config.activeClass : ''}`}
                         >
                           <Icon className="w-4 h-4" />
