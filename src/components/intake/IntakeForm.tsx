@@ -9,17 +9,24 @@ import {
   Step4DesiredOutcome,
   Step5Documents,
 } from './steps';
+import StepNextStepDecision from './steps/StepNextStepDecision';
+import StepAiExploration from './steps/StepAiExploration';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { generateCaseSummary } from '@/lib/ai-processing';
 import { useToast } from '@/hooks/use-toast';
+import type { CaseFile, NextStepChoice, AiOption } from '@/types/mediation';
 
 const STEP_LABELS = ['Dispute Type', 'Parties', 'What Happened', 'Outcome', 'Documents'];
+
+type FlowPhase = 'intake' | 'decision' | 'ai_exploration' | 'complete';
 
 export function IntakeForm() {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<IntakeFormData>(initialFormData);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [flowPhase, setFlowPhase] = useState<FlowPhase>('intake');
+  const [caseFile, setCaseFile] = useState<CaseFile | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -91,6 +98,15 @@ export function IntakeForm() {
   };
 
   const handleBack = () => {
+    if (flowPhase === 'ai_exploration') {
+      setFlowPhase('decision');
+      return;
+    }
+    if (flowPhase === 'decision') {
+      setFlowPhase('intake');
+      setCurrentStep(STEP_LABELS.length - 1);
+      return;
+    }
     if (currentStep > 0) {
       setCurrentStep((prev) => prev - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -100,15 +116,37 @@ export function IntakeForm() {
   const handleSubmit = async () => {
     setIsProcessing(true);
 
-    // Simulate AI processing delay
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     try {
       const summary = generateCaseSummary(formData);
-      // Store in sessionStorage for the summary page
+      
+      // Create CaseFile for the decision flow
+      const newCaseFile: CaseFile = {
+        intake: {
+          disputeType: formData.disputeType as CaseFile['intake']['disputeType'],
+          parties: {
+            selfName: formData.yourName,
+            otherName: formData.otherPartyName,
+            relationship: formData.relationship,
+          },
+          narrative: formData.issueDescription,
+          desiredOutcomes: [formData.desiredOutcome],
+        },
+        summary: {
+          neutralSummary: summary.neutralSummary,
+          themes: summary.coreThemes,
+          needs: summary.keyIssues,
+          clarifyingQuestions: summary.potentialPathways,
+        },
+        status: 'structured',
+      };
+      
+      setCaseFile(newCaseFile);
       sessionStorage.setItem('caseSummary', JSON.stringify(summary));
       sessionStorage.setItem('intakeData', JSON.stringify(formData));
-      navigate('/summary');
+      
+      setFlowPhase('decision');
     } catch (error) {
       toast({
         title: 'Something went wrong',
@@ -118,6 +156,28 @@ export function IntakeForm() {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleNextStepChoice = (choice: NextStepChoice) => {
+    if (!caseFile) return;
+    
+    setCaseFile({ ...caseFile, chosenPath: choice, status: 'decision' });
+    
+    if (choice === 'ai_exploration') {
+      setFlowPhase('ai_exploration');
+    } else {
+      // Human mediator path - navigate to summary
+      navigate('/summary');
+    }
+  };
+
+  const handleAiFeedback = (feedback: Record<string, 'good' | 'maybe' | 'no'>) => {
+    if (!caseFile) return;
+    setCaseFile({ ...caseFile, aiFeedback: feedback, status: 'ai_done' });
+  };
+
+  const handleAiComplete = () => {
+    navigate('/summary');
   };
 
   const renderStep = () => {
@@ -138,6 +198,62 @@ export function IntakeForm() {
   };
 
   const isLastStep = currentStep === STEP_LABELS.length - 1;
+
+  // Render decision or AI exploration phases
+  if (flowPhase === 'decision' && caseFile) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+          <div className="container max-w-3xl py-4">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => navigate('/')}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                ← Back to home
+              </button>
+              <span className="text-sm text-muted-foreground">Decision</span>
+            </div>
+          </div>
+        </header>
+        <main className="container max-w-2xl py-8 px-4">
+          <StepNextStepDecision
+            caseFile={caseFile}
+            onChoose={handleNextStepChoice}
+            onBack={handleBack}
+          />
+        </main>
+      </div>
+    );
+  }
+
+  if (flowPhase === 'ai_exploration' && caseFile) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+          <div className="container max-w-3xl py-4">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => navigate('/')}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                ← Back to home
+              </button>
+              <span className="text-sm text-muted-foreground">AI Exploration</span>
+            </div>
+          </div>
+        </header>
+        <main className="container max-w-2xl py-8 px-4">
+          <StepAiExploration
+            caseFile={caseFile}
+            onFeedbackChange={handleAiFeedback}
+            onComplete={handleAiComplete}
+            onBack={handleBack}
+          />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
