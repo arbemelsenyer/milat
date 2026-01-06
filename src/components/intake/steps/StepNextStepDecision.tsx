@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { CaseFile, NextStepChoice } from "@/types/mediation";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type Props = {
   caseFile: CaseFile;
@@ -10,6 +11,7 @@ type Props = {
 };
 
 export default function StepNextStepDecision({ caseFile, onChoose, onBack }: Props) {
+  const { t } = useLanguage();
   const hasSummary = Boolean(caseFile.summary?.neutralSummary);
 
   return (
@@ -20,21 +22,21 @@ export default function StepNextStepDecision({ caseFile, onChoose, onBack }: Pro
       className="space-y-4"
     >
       <div>
-        <h2 className="text-xl font-semibold">Bir sonraki adımınızı seçin</h2>
+        <h2 className="text-xl font-semibold">{t('decision.title')}</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Aşağıda iki ilerleme yolu bulunmaktadır. Her ikisi de bağlayıcı değildir ve arabuluculuk ilkelerine uygundur.
+          {t('decision.description')}
         </p>
       </div>
 
       {!hasSummary && (
         <Card className="p-4 border-destructive/20">
           <p className="text-sm">
-            Devam etmek için önce yapılandırılmış nötr özet oluşturulmalıdır.
+            {t('decision.needSummary')}
           </p>
           {onBack && (
             <div className="mt-3">
               <Button variant="secondary" onClick={onBack}>
-                Intake'a geri dön
+                {t('decision.backToIntake')}
               </Button>
             </div>
           )}
@@ -46,20 +48,20 @@ export default function StepNextStepDecision({ caseFile, onChoose, onBack }: Pro
           {/* Option 1: AI exploration (Primary) */}
           <Card className="p-5">
             <div className="space-y-2">
-              <h3 className="text-lg font-semibold">AI ile Çözüm Seçeneklerini Keşfet</h3>
+              <h3 className="text-lg font-semibold">{t('decision.aiTitle')}</h3>
               <p className="text-sm text-muted-foreground">
-                Uyuşmazlık bağlayıcı olmadan analiz edilir; olası çözüm senaryoları üretilir. Karar verilmez, taraf tutulmaz.
+                {t('decision.aiDesc')}
               </p>
               <ul className="text-sm list-disc pl-5 text-muted-foreground">
-                <li>3–5 çözüm senaryosu</li>
-                <li>Ortak zemin önerileri</li>
-                <li>Kısa geri bildirim ile iterasyon</li>
+                <li>{t('decision.aiFeature1')}</li>
+                <li>{t('decision.aiFeature2')}</li>
+                <li>{t('decision.aiFeature3')}</li>
               </ul>
             </div>
 
             <div className="mt-4">
               <Button onClick={() => onChoose("ai_exploration")} className="w-full">
-                AI ile devam et
+                {t('decision.aiButton')}
               </Button>
             </div>
           </Card>
@@ -67,19 +69,19 @@ export default function StepNextStepDecision({ caseFile, onChoose, onBack }: Pro
           {/* Option 2: Human mediator (Secondary) */}
           <Card className="p-5">
             <div className="space-y-2">
-              <h3 className="text-lg font-semibold">Bir Arabulucu ile Devam Et</h3>
+              <h3 className="text-lg font-semibold">{t('decision.mediatorTitle')}</h3>
               <p className="text-sm text-muted-foreground">
-                Dosyanız arabulucuya iletilir. Ön başvuru özeti paylaşılır ve süreç insan odaklı yürütülür.
+                {t('decision.mediatorDesc')}
               </p>
               <ul className="text-sm list-disc pl-5 text-muted-foreground">
-                <li>MVP: "arabulucu atansın" yaklaşımı</li>
-                <li>Özetin dışa aktarımı (PDF/JSON)</li>
+                <li>{t('decision.mediatorFeature1')}</li>
+                <li>{t('decision.mediatorFeature2')}</li>
               </ul>
             </div>
 
             <div className="mt-4">
               <Button variant="secondary" onClick={() => onChoose("human_mediator")} className="w-full">
-                Arabulucuya ilet
+                {t('decision.mediatorButton')}
               </Button>
             </div>
           </Card>
@@ -87,7 +89,7 @@ export default function StepNextStepDecision({ caseFile, onChoose, onBack }: Pro
       )}
 
       <p className="text-xs text-muted-foreground">
-        Bu platform hukuki danışmanlık sunmaz. AI çıktıları bağlayıcı değildir ve karar niteliği taşımaz.
+        {t('decision.disclaimer')}
       </p>
     </motion.div>
   );

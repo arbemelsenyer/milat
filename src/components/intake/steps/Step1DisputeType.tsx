@@ -1,8 +1,9 @@
-import { IntakeFormData, DISPUTE_TYPES } from '@/types/intake';
+import { IntakeFormData } from '@/types/intake';
 import { FormField } from '../FormField';
 import { SelectableCard } from '../SelectableCard';
 import { Textarea } from '@/components/ui/textarea';
 import { Briefcase, Lightbulb, Heart, HelpCircle } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Step1Props {
   data: IntakeFormData;
@@ -17,19 +18,28 @@ const disputeIcons = {
 };
 
 export function Step1DisputeType({ data, onChange }: Step1Props) {
+  const { t } = useLanguage();
+
+  const disputeTypes = [
+    { value: 'commercial' as const, label: t('step1.commercial'), description: t('step1.commercialDesc') },
+    { value: 'ip' as const, label: t('step1.ip'), description: t('step1.ipDesc') },
+    { value: 'healthcare' as const, label: t('step1.healthcare'), description: t('step1.healthcareDesc') },
+    { value: 'other' as const, label: t('step1.other'), description: t('step1.otherDesc') },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-display font-semibold text-foreground">
-          What type of dispute are you facing?
+          {t('step1.title')}
         </h2>
         <p className="text-muted-foreground mt-2">
-          Select the category that best describes your situation
+          {t('step1.description')}
         </p>
       </div>
 
       <div className="grid gap-3">
-        {DISPUTE_TYPES.map((type) => {
+        {disputeTypes.map((type) => {
           const Icon = disputeIcons[type.value];
           return (
             <SelectableCard
@@ -46,13 +56,13 @@ export function Step1DisputeType({ data, onChange }: Step1Props) {
 
       {data.disputeType === 'other' && (
         <FormField
-          label="Please describe your dispute type"
+          label={t('step1.describeDispute')}
           required
         >
           <Textarea
             value={data.disputeTypeOther || ''}
             onChange={(e) => onChange({ disputeTypeOther: e.target.value })}
-            placeholder="Briefly describe the nature of your dispute..."
+            placeholder={t('step1.describePlaceholder')}
             className="min-h-[80px]"
           />
         </FormField>
