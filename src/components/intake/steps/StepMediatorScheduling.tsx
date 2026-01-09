@@ -7,8 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FormField } from '../FormField';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Calendar, Clock, Mail, Phone, CheckCircle } from 'lucide-react';
+import { Calendar, Clock, Mail, CheckCircle, Loader2 } from 'lucide-react';
 import type { CaseFile } from '@/types/mediation';
+import { sendMediatorRequest } from '@/lib/ai';
+import { useToast } from '@/hooks/use-toast';
 
 interface Props {
   caseFile: CaseFile;
@@ -23,12 +25,14 @@ interface TimeSlot {
 }
 
 export default function StepMediatorScheduling({ caseFile, onComplete, onBack }: Props) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const timeSlots: TimeSlot[] = [
     { id: 'weekday-morning', label: t('scheduling.morning'), period: 'weekday' },
@@ -44,10 +48,55 @@ export default function StepMediatorScheduling({ caseFile, onComplete, onBack }:
     );
   };
 
-  const handleSubmit = () => {
-    // MVP: Just mark as submitted
-    setIsSubmitted(true);
-    // In production: send to backend
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    
+    try {
+      // Prepare case summary for email
+      const caseSummary = {
+        disputeType: caseFile.intake.disputeType || 'Belirtilmemiş',
+        parties: {
+          initiator: caseFile.intake.parties?.selfName || '',
+          respondent: caseFile.intake.parties?.otherName || '',
+        },
+        neutralSummary: caseFile.summary.neutralSummary,
+        coreThemes: caseFile.summary.themes,
+      };
+
+      const result = await sendMediatorRequest(
+        email,
+        phone,
+        selectedSlots,
+        notes,
+        caseSummary,
+        language
+      );
+
+      if (result.success) {
+        setIsSubmitted(true);
+        toast({
+          title: language === 'tr' ? 'Başarılı!' : 'Success!',
+          description: language === 'tr' 
+            ? 'Talebiniz gönderildi. E-postanızı kontrol edin.' 
+            : 'Your request has been sent. Check your email.',
+        });
+      } else {
+        toast({
+          title: language === 'tr' ? 'Hata' : 'Error',
+          description: result.error || (language === 'tr' ? 'Bir hata oluştu' : 'An error occurred'),
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to send mediator request:', error);
+      toast({
+        title: language === 'tr' ? 'Hata' : 'Error',
+        description: language === 'tr' ? 'Talep gönderilemedi. Lütfen tekrar deneyin.' : 'Failed to send request. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isValid = email.trim() && selectedSlots.length >= 2;
@@ -69,6 +118,11 @@ export default function StepMediatorScheduling({ caseFile, onComplete, onBack }:
           </h2>
           <p className="text-muted-foreground max-w-md mx-auto">
             {t('scheduling.successDesc')}
+          </p>
+          <p className="text-sm text-muted-foreground mt-4">
+            {language === 'tr' 
+              ? `Onay e-postası ${email} adresine gönderildi.`
+              : `Confirmation email sent to ${email}.`}
           </p>
           <Button onClick={onComplete} className="mt-8">
             {t('common.continue')}
@@ -195,8 +249,19 @@ export default function StepMediatorScheduling({ caseFile, onComplete, onBack }:
             {t('common.back')}
           </Button>
         )}
-        <Button onClick={handleSubmit} disabled={!isValid} className="ml-auto">
-          {t('scheduling.submit')}
+        <Button 
+          onClick={handleSubmit} 
+          disabled={!isValid || isSubmitting} 
+          className="ml-auto gap-2"
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              {language === 'tr' ? 'Gönderiliyor...' : 'Sending...'}
+            </>
+          ) : (
+            t('scheduling.submit')
+          )}
         </Button>
       </div>
     </motion.div>
