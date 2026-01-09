@@ -6,6 +6,7 @@ import { ThumbsUp, Minus, ThumbsDown, ArrowLeft, Loader2, Sparkles, ArrowRight }
 import type { CaseFile, AiOption } from '@/types/mediation';
 import { generateOptions } from '@/lib/ai';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useToast } from '@/hooks/use-toast';
 
 interface Props {
   caseFile: CaseFile;
@@ -43,25 +44,34 @@ export default function StepAiExploration({
   onComplete,
   onBack,
 }: Props) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { toast } = useToast();
   const [options, setOptions] = useState<AiOption[]>([]);
   const [feedback, setFeedback] = useState<Record<string, FeedbackType>>(caseFile.aiFeedback || {});
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadOptions = async () => {
       setIsLoading(true);
+      setError(null);
       try {
-        const generatedOptions = await generateOptions(caseFile.summary);
+        const generatedOptions = await generateOptions(caseFile.summary, language);
         setOptions(generatedOptions);
-      } catch (error) {
-        console.error('Failed to generate options:', error);
+      } catch (err) {
+        console.error('Failed to generate options:', err);
+        setError(err instanceof Error ? err.message : 'Failed to generate options');
+        toast({
+          title: language === 'tr' ? 'AI önerileri yüklenemedi' : 'Failed to load AI suggestions',
+          description: language === 'tr' ? 'Varsayılan öneriler gösteriliyor.' : 'Showing default suggestions.',
+          variant: 'destructive',
+        });
       } finally {
         setIsLoading(false);
       }
     };
     loadOptions();
-  }, [caseFile.summary]);
+  }, [caseFile.summary, language, toast]);
 
   const handleFeedback = (optionId: string, type: FeedbackType) => {
     const newFeedback = { ...feedback, [optionId]: type };

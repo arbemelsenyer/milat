@@ -10,11 +10,22 @@ import {
   ArrowRight,
   Download,
   MessageCircle,
+  FileDown,
 } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageToggle } from '@/components/LanguageToggle';
+import { exportToPdf, downloadAsHtml } from '@/lib/pdf-export';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function SummaryPage() {
   const [summary, setSummary] = useState<CaseSummary | null>(null);
   const navigate = useNavigate();
+  const { t, language } = useLanguage();
 
   useEffect(() => {
     const stored = sessionStorage.getItem('caseSummary');
@@ -27,10 +38,76 @@ export default function SummaryPage() {
     }
   }, [navigate]);
 
+  const handleExportPdf = () => {
+    if (summary) {
+      exportToPdf(summary, language);
+    }
+  };
+
+  const handleDownloadHtml = () => {
+    if (summary) {
+      downloadAsHtml(summary, language);
+    }
+  };
+
+  const labels = language === 'en'
+    ? {
+        loading: 'Loading...',
+        intakeComplete: 'Intake Complete',
+        intakeCompleteDesc: 'Your case has been structured neutrally. Review the summary below.',
+        caseId: 'Case ID',
+        neutralSummary: 'Neutral Case Summary',
+        disputeType: 'Dispute Type',
+        partiesInvolved: 'Parties Involved',
+        initiatingParty: 'Initiating Party',
+        otherParty: 'Other Party',
+        coreThemes: 'Core Themes Identified',
+        neutralSummaryLabel: 'Neutral Summary',
+        keyIssues: 'Key Issues to Address',
+        potentialPathways: 'Potential Resolution Pathways',
+        whatNext: 'What would you like to do next?',
+        connectMediator: 'Connect with a Mediator',
+        connectMediatorDesc: 'Proceed with a trained human mediator who will facilitate dialogue between parties.',
+        requestMediator: 'Request Mediator',
+        exploreAi: 'Explore AI Options',
+        exploreAiDesc: 'Continue with AI-assisted option exploration. Non-binding suggestions to consider.',
+        exploreOptions: 'Explore Options',
+        downloadSummary: 'Download Summary',
+        printPdf: 'Print / Save as PDF',
+        downloadHtml: 'Download as HTML',
+        disclaimer: 'Reminder: This summary is a preparation tool, not legal advice. Any resolution reached through mediation is the decision of the parties involved.',
+      }
+    : {
+        loading: 'Yükleniyor...',
+        intakeComplete: 'Başvuru Tamamlandı',
+        intakeCompleteDesc: 'Davanız tarafsız olarak yapılandırıldı. Aşağıdaki özeti inceleyin.',
+        caseId: 'Dosya No',
+        neutralSummary: 'Tarafsız Dava Özeti',
+        disputeType: 'Uyuşmazlık Türü',
+        partiesInvolved: 'Taraflar',
+        initiatingParty: 'Başvuran Taraf',
+        otherParty: 'Diğer Taraf',
+        coreThemes: 'Temel Temalar',
+        neutralSummaryLabel: 'Tarafsız Özet',
+        keyIssues: 'Ele Alınacak Konular',
+        potentialPathways: 'Potansiyel Çözüm Yolları',
+        whatNext: 'Şimdi ne yapmak istersiniz?',
+        connectMediator: 'Arabulucu ile Devam Et',
+        connectMediatorDesc: 'Eğitimli bir arabulucu taraflar arasında diyalog sürecini yönetecektir.',
+        requestMediator: 'Arabulucu Talep Et',
+        exploreAi: 'AI Seçeneklerini Keşfet',
+        exploreAiDesc: 'AI destekli seçenek keşfine devam edin. Bağlayıcı olmayan öneriler.',
+        exploreOptions: 'Seçenekleri Keşfet',
+        downloadSummary: 'Özeti İndir',
+        printPdf: 'Yazdır / PDF Olarak Kaydet',
+        downloadHtml: 'HTML Olarak İndir',
+        disclaimer: 'Hatırlatma: Bu özet bir hazırlık aracıdır, hukuki danışmanlık değildir. Arabuluculuk yoluyla ulaşılan herhangi bir çözüm, ilgili tarafların kararıdır.',
+      };
+
   if (!summary) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
+        <div className="animate-pulse text-muted-foreground">{labels.loading}</div>
       </div>
     );
   }
@@ -48,6 +125,7 @@ export default function SummaryPage() {
               MediationPath
             </span>
           </Link>
+          <LanguageToggle />
         </div>
       </header>
 
@@ -60,13 +138,13 @@ export default function SummaryPage() {
             </div>
             <div>
               <h1 className="font-display text-2xl font-bold text-foreground mb-1">
-                Intake Complete
+                {labels.intakeComplete}
               </h1>
               <p className="text-muted-foreground">
-                Your case has been structured neutrally. Review the summary below.
+                {labels.intakeCompleteDesc}
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                Case ID: <span className="font-mono text-foreground">{summary.id}</span>
+                {labels.caseId}: <span className="font-mono text-foreground">{summary.id}</span>
               </p>
             </div>
           </div>
@@ -77,7 +155,7 @@ export default function SummaryPage() {
           <div className="border-b border-border px-6 py-4 bg-secondary/30">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <FileText className="w-4 h-4" />
-              <span>Neutral Case Summary</span>
+              <span>{labels.neutralSummary}</span>
             </div>
           </div>
 
@@ -85,7 +163,7 @@ export default function SummaryPage() {
             {/* Dispute type */}
             <div>
               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                Dispute Type
+                {labels.disputeType}
               </h3>
               <p className="text-foreground font-medium">{summary.disputeType}</p>
             </div>
@@ -93,15 +171,15 @@ export default function SummaryPage() {
             {/* Parties */}
             <div>
               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                Parties Involved
+                {labels.partiesInvolved}
               </h3>
               <div className="flex gap-4">
                 <div className="flex-1 bg-secondary/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground mb-1">Initiating Party</p>
+                  <p className="text-xs text-muted-foreground mb-1">{labels.initiatingParty}</p>
                   <p className="font-medium text-foreground">{summary.parties.initiator}</p>
                 </div>
                 <div className="flex-1 bg-secondary/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground mb-1">Other Party</p>
+                  <p className="text-xs text-muted-foreground mb-1">{labels.otherParty}</p>
                   <p className="font-medium text-foreground">{summary.parties.respondent}</p>
                 </div>
               </div>
@@ -110,7 +188,7 @@ export default function SummaryPage() {
             {/* Core themes */}
             <div>
               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                Core Themes Identified
+                {labels.coreThemes}
               </h3>
               <div className="flex flex-wrap gap-2">
                 {summary.coreThemes.map((theme, index) => (
@@ -127,7 +205,7 @@ export default function SummaryPage() {
             {/* Neutral summary */}
             <div>
               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                Neutral Summary
+                {labels.neutralSummaryLabel}
               </h3>
               <div className="bg-secondary/30 rounded-lg p-4 border border-border">
                 <p className="text-foreground leading-relaxed">{summary.neutralSummary}</p>
@@ -137,7 +215,7 @@ export default function SummaryPage() {
             {/* Key issues */}
             <div>
               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                Key Issues to Address
+                {labels.keyIssues}
               </h3>
               <ul className="space-y-2">
                 {summary.keyIssues.map((issue, index) => (
@@ -154,7 +232,7 @@ export default function SummaryPage() {
             {/* Potential pathways */}
             <div>
               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                Potential Resolution Pathways
+                {labels.potentialPathways}
               </h3>
               <ul className="space-y-2">
                 {summary.potentialPathways.map((pathway, index) => (
@@ -174,50 +252,53 @@ export default function SummaryPage() {
         {/* Decision node */}
         <div className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
           <h2 className="font-display text-xl font-semibold text-foreground mb-4 text-center">
-            What would you like to do next?
+            {labels.whatNext}
           </h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <DecisionCard
               icon={<Users className="w-6 h-6" />}
-              title="Connect with a Mediator"
-              description="Proceed with a trained human mediator who will facilitate dialogue between parties."
-              buttonText="Request Mediator"
-              onClick={() => {
-                // In production, this would route to mediator booking
-                alert('Mediator request feature coming soon!');
-              }}
+              title={labels.connectMediator}
+              description={labels.connectMediatorDesc}
+              buttonText={labels.requestMediator}
+              onClick={() => navigate('/intake')}
               primary
             />
             <DecisionCard
               icon={<Bot className="w-6 h-6" />}
-              title="Explore AI Options"
-              description="Continue with AI-assisted option exploration. Non-binding suggestions to consider."
-              buttonText="Explore Options"
-              onClick={() => {
-                // In production, this would route to AI option generation
-                alert('AI option exploration coming soon!');
-              }}
+              title={labels.exploreAi}
+              description={labels.exploreAiDesc}
+              buttonText={labels.exploreOptions}
+              onClick={() => navigate('/intake')}
             />
           </div>
         </div>
 
-        {/* Download/print option */}
+        {/* Download/export options */}
         <div className="mt-8 text-center">
-          <Button
-            variant="ghost"
-            className="gap-2 text-muted-foreground"
-            onClick={() => window.print()}
-          >
-            <Download className="w-4 h-4" />
-            Download Summary
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Download className="w-4 h-4" />
+                {labels.downloadSummary}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center">
+              <DropdownMenuItem onClick={handleExportPdf} className="gap-2 cursor-pointer">
+                <FileDown className="w-4 h-4" />
+                {labels.printPdf}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDownloadHtml} className="gap-2 cursor-pointer">
+                <FileText className="w-4 h-4" />
+                {labels.downloadHtml}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Disclaimer */}
         <div className="mt-8 pt-8 border-t border-border">
           <p className="text-sm text-muted-foreground text-center">
-            <strong>Reminder:</strong> This summary is a preparation tool, not legal advice. 
-            Any resolution reached through mediation is the decision of the parties involved.
+            <strong>{language === 'tr' ? 'Hatırlatma:' : 'Reminder:'}</strong> {labels.disclaimer.replace('Reminder: ', '').replace('Hatırlatma: ', '')}
           </p>
         </div>
       </main>
