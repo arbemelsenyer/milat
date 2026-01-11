@@ -1,11 +1,11 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Shield, Users, MessageCircle, Lock } from 'lucide-react';
+import { ArrowRight, Shield, Users, MessageCircle, Lock, LogIn } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageToggle } from '@/components/LanguageToggle';
 
 export default function Landing() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   return (
     <div className="min-h-screen bg-background">
@@ -28,6 +28,12 @@ export default function Landing() {
               {t('landing.privacy')}
             </a>
             <LanguageToggle />
+            <Button asChild variant="outline" size="sm">
+              <Link to="/auth">
+                <LogIn className="w-4 h-4 mr-2" />
+                {language === 'tr' ? 'Giriş' : 'Login'}
+              </Link>
+            </Button>
           </nav>
         </div>
       </header>

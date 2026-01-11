@@ -7,6 +7,9 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import Landing from "./pages/Landing";
 import IntakePage from "./pages/Intake";
 import SummaryPage from "./pages/Summary";
+import AuthPage from "./pages/Auth";
+import Dashboard from "./pages/Dashboard";
+import MediatorDashboard from "./pages/MediatorDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,6 +23,9 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Landing />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/mediator" element={<MediatorDashboard />} />
             <Route path="/intake" element={<IntakePage />} />
             <Route path="/summary" element={<SummaryPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
