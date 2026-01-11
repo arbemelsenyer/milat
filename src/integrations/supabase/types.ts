@@ -14,16 +14,194 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cases: {
+        Row: {
+          additional_notes: string | null
+          ai_summary: Json | null
+          attempted_resolution: string | null
+          created_at: string
+          desired_outcome: string | null
+          dispute_type: string | null
+          dispute_type_other: string | null
+          id: string
+          issue_description: string | null
+          open_to_compromise: boolean | null
+          other_party_name: string | null
+          other_party_role: string | null
+          priorities: string[] | null
+          relationship: string | null
+          status: string
+          timeline: string | null
+          updated_at: string
+          user_id: string
+          your_name: string | null
+          your_role: string | null
+        }
+        Insert: {
+          additional_notes?: string | null
+          ai_summary?: Json | null
+          attempted_resolution?: string | null
+          created_at?: string
+          desired_outcome?: string | null
+          dispute_type?: string | null
+          dispute_type_other?: string | null
+          id?: string
+          issue_description?: string | null
+          open_to_compromise?: boolean | null
+          other_party_name?: string | null
+          other_party_role?: string | null
+          priorities?: string[] | null
+          relationship?: string | null
+          status?: string
+          timeline?: string | null
+          updated_at?: string
+          user_id: string
+          your_name?: string | null
+          your_role?: string | null
+        }
+        Update: {
+          additional_notes?: string | null
+          ai_summary?: Json | null
+          attempted_resolution?: string | null
+          created_at?: string
+          desired_outcome?: string | null
+          dispute_type?: string | null
+          dispute_type_other?: string | null
+          id?: string
+          issue_description?: string | null
+          open_to_compromise?: boolean | null
+          other_party_name?: string | null
+          other_party_role?: string | null
+          priorities?: string[] | null
+          relationship?: string | null
+          status?: string
+          timeline?: string | null
+          updated_at?: string
+          user_id?: string
+          your_name?: string | null
+          your_role?: string | null
+        }
+        Relationships: []
+      }
+      mediator_requests: {
+        Row: {
+          case_id: string
+          created_at: string
+          id: string
+          mediator_id: string | null
+          notes: string | null
+          preferred_dates: string[] | null
+          preferred_time: string | null
+          scheduled_date: string | null
+          session_type: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          id?: string
+          mediator_id?: string | null
+          notes?: string | null
+          preferred_dates?: string[] | null
+          preferred_time?: string | null
+          scheduled_date?: string | null
+          session_type?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          id?: string
+          mediator_id?: string | null
+          notes?: string | null
+          preferred_dates?: string[] | null
+          preferred_time?: string | null
+          scheduled_date?: string | null
+          session_type?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mediator_requests_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "user" | "mediator" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +328,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["user", "mediator", "admin"],
+    },
   },
 } as const
