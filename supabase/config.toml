@@ -1,1 +1,10 @@
 project_id = "oijdnfibboiinogdmlcj"
+
+[functions.generate-options]
+verify_jwt = false
+
+[functions.send-mediator-request]
+verify_jwt = false
+
+[functions.send-session-notification]
+verify_jwt = false
