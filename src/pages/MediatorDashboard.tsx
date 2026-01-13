@@ -105,36 +105,55 @@ export default function MediatorDashboard() {
     if (!selectedRequest || !scheduleDate) return;
 
     setIsScheduling(true);
+    const scheduledDateISO = new Date(scheduleDate).toISOString();
+    
     const { error } = await supabase
       .from('mediator_requests')
       .update({
         status: 'scheduled',
-        scheduled_date: new Date(scheduleDate).toISOString(),
+        scheduled_date: scheduledDateISO,
         notes: scheduleNotes || selectedRequest.notes,
         mediator_id: user?.id,
       })
       .eq('id', selectedRequest.id);
 
-    setIsScheduling(false);
-
     if (error) {
+      setIsScheduling(false);
       toast({
         variant: 'destructive',
         title: language === 'tr' ? 'Hata' : 'Error',
         description: error.message,
       });
-    } else {
-      toast({
-        title: language === 'tr' ? 'Oturum planlandı' : 'Session scheduled',
-        description: language === 'tr' 
-          ? 'Kullanıcıya bildirim gönderilecektir.' 
-          : 'The user will be notified.',
-      });
-      setSelectedRequest(null);
-      setScheduleDate('');
-      setScheduleNotes('');
-      fetchRequests();
+      return;
     }
+
+    // Send email notification to user
+    try {
+      await supabase.functions.invoke('send-session-notification', {
+        body: {
+          requestId: selectedRequest.id,
+          scheduledDate: scheduledDateISO,
+          mediatorNotes: scheduleNotes || undefined,
+          language,
+        },
+      });
+      console.log('Session notification sent successfully');
+    } catch (notificationError) {
+      console.error('Failed to send notification:', notificationError);
+      // Don't fail the whole operation if notification fails
+    }
+
+    setIsScheduling(false);
+    toast({
+      title: language === 'tr' ? 'Oturum planlandı' : 'Session scheduled',
+      description: language === 'tr' 
+        ? 'Kullanıcıya e-posta bildirimi gönderildi.' 
+        : 'Email notification sent to the user.',
+    });
+    setSelectedRequest(null);
+    setScheduleDate('');
+    setScheduleNotes('');
+    fetchRequests();
   };
 
   const handleUpdateStatus = async (requestId: string, status: string) => {

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IntakeFormData, initialFormData } from '@/types/intake';
 import { StepIndicator } from './StepIndicator';
 import {
@@ -13,24 +13,74 @@ import StepNextStepDecision from './steps/StepNextStepDecision';
 import StepAiExploration from './steps/StepAiExploration';
 import StepMediatorScheduling from './steps/StepMediatorScheduling';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Save } from 'lucide-react';
 import { generateCaseSummary } from '@/lib/ai-processing';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { useAuth } from '@/hooks/useAuth';
+import { useCaseStorage } from '@/hooks/useCaseStorage';
 import type { CaseFile, NextStepChoice } from '@/types/mediation';
 
 type FlowPhase = 'intake' | 'decision' | 'ai_exploration' | 'mediator_scheduling' | 'complete';
 
 export function IntakeForm() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { user } = useAuth();
+  const { caseId, setCaseId, isSaving, createCase, loadCase, saveCase, saveSummary, submitMediatorRequest } = useCaseStorage();
+  const [searchParams] = useSearchParams();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<IntakeFormData>(initialFormData);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [flowPhase, setFlowPhase] = useState<FlowPhase>('intake');
   const [caseFile, setCaseFile] = useState<CaseFile | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Load existing case if resuming
+  useEffect(() => {
+    const resumeCaseId = searchParams.get('resume');
+    if (resumeCaseId && user) {
+      loadCase(resumeCaseId).then((loadedData) => {
+        if (loadedData) {
+          setFormData((prev) => ({ ...prev, ...loadedData }));
+          toast({
+            title: language === 'tr' ? 'Başvuru yüklendi' : 'Application loaded',
+            description: language === 'tr' 
+              ? 'Kaldığınız yerden devam edebilirsiniz.' 
+              : 'You can continue where you left off.',
+          });
+        }
+      });
+    }
+  }, [searchParams, user]);
+
+  // Create case when logged-in user starts intake
+  useEffect(() => {
+    if (user && !caseId && flowPhase === 'intake' && !searchParams.get('resume')) {
+      createCase(user.id);
+    }
+  }, [user, caseId, flowPhase]);
+
+  // Auto-save when form data changes (debounced)
+  const autoSave = useCallback(async () => {
+    if (!user || !caseId || flowPhase !== 'intake') return;
+    
+    setIsAutoSaving(true);
+    await saveCase(caseId, formData);
+    setIsAutoSaving(false);
+  }, [user, caseId, formData, flowPhase, saveCase]);
+
+  useEffect(() => {
+    if (!user || !caseId || flowPhase !== 'intake') return;
+    
+    const timeoutId = setTimeout(() => {
+      autoSave();
+    }, 2000); // Auto-save after 2 seconds of inactivity
+    
+    return () => clearTimeout(timeoutId);
+  }, [formData, autoSave]);
 
   const STEP_LABELS = [
     t('stepLabel.disputeType'),
@@ -40,8 +90,43 @@ export function IntakeForm() {
     t('stepLabel.documents'),
   ];
 
-  const updateFormData = (updates: Partial<IntakeFormData>) => {
+  const updateFormData = async (updates: Partial<IntakeFormData>) => {
     setFormData((prev) => ({ ...prev, ...updates }));
+  };
+
+  // Manual save function
+  const handleManualSave = async () => {
+    if (!user || !caseId) {
+      toast({
+        title: language === 'tr' ? 'Giriş yapın' : 'Please login',
+        description: language === 'tr' 
+          ? 'Başvurunuzu kaydetmek için giriş yapmanız gerekiyor.' 
+          : 'You need to login to save your application.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setIsAutoSaving(true);
+    const success = await saveCase(caseId, formData);
+    setIsAutoSaving(false);
+    
+    if (success) {
+      toast({
+        title: language === 'tr' ? 'Kaydedildi' : 'Saved',
+        description: language === 'tr' 
+          ? 'Başvurunuz başarıyla kaydedildi.' 
+          : 'Your application has been saved.',
+      });
+    } else {
+      toast({
+        title: language === 'tr' ? 'Hata' : 'Error',
+        description: language === 'tr' 
+          ? 'Kaydetme sırasında bir hata oluştu.' 
+          : 'An error occurred while saving.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const validateStep = (): boolean => {
@@ -156,9 +241,16 @@ export function IntakeForm() {
         status: 'structured',
       };
       
+      // Save to database if user is logged in
+      if (user && caseId) {
+        await saveCase(caseId, formData, 'submitted');
+        await saveSummary(caseId, summary as unknown as import('@/integrations/supabase/types').Json);
+      }
+      
       setCaseFile(newCaseFile);
       sessionStorage.setItem('caseSummary', JSON.stringify(summary));
       sessionStorage.setItem('intakeData', JSON.stringify(formData));
+      sessionStorage.setItem('currentCaseId', caseId || '');
       
       setFlowPhase('decision');
     } catch (error) {
@@ -324,6 +416,20 @@ export function IntakeForm() {
               {t('nav.backToHome')}
             </button>
             <div className="flex items-center gap-4">
+              {user && (
+                <button
+                  onClick={handleManualSave}
+                  disabled={isAutoSaving || isSaving}
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                >
+                  {isAutoSaving || isSaving ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Save className="w-3 h-3" />
+                  )}
+                  {isAutoSaving ? (language === 'tr' ? 'Kaydediliyor...' : 'Saving...') : (language === 'tr' ? 'Kaydet' : 'Save')}
+                </button>
+              )}
               <span className="text-sm text-muted-foreground">
                 {t('nav.step')} {currentStep + 1} {t('nav.of')} {STEP_LABELS.length}
               </span>
