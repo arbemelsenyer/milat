@@ -6,9 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Camera, Loader2, Save, User } from 'lucide-react';
+import { UserAvatar } from '@/components/UserAvatar';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function Profile() {
@@ -212,10 +212,6 @@ export default function Profile() {
     );
   }
 
-  const initials = fullName
-    ? fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    : user?.email?.[0].toUpperCase() || 'U';
-
   return (
     <div className="min-h-screen bg-background">
       <div className="container max-w-2xl py-8 px-4">
@@ -240,12 +236,12 @@ export default function Profile() {
             {/* Avatar Section */}
             <div className="flex flex-col items-center gap-4">
               <div className="relative">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src={avatarUrl || undefined} alt={fullName} />
-                  <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar 
+                  avatarUrl={avatarUrl} 
+                  fullName={fullName} 
+                  email={user?.email}
+                  size="lg"
+                />
                 <Button
                   size="icon"
                   variant="secondary"
