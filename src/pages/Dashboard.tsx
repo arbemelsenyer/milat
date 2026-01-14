@@ -7,9 +7,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { supabase } from '@/integrations/supabase/client';
-import { MessageCircle, Plus, FileText, Clock, CheckCircle, AlertCircle, LogOut, Shield, Loader2, User } from 'lucide-react';
+import { MessageCircle, Plus, FileText, Clock, CheckCircle, AlertCircle, LogOut, Shield, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { tr, enUS } from 'date-fns/locale';
+import { UserAvatar } from '@/components/UserAvatar';
+import { NotificationBell } from '@/components/NotificationBell';
+import { SessionCalendar } from '@/components/SessionCalendar';
 
 interface Case {
   id: string;
@@ -106,13 +109,16 @@ export default function Dashboard() {
                 </Link>
               </Button>
             )}
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/profile">
-                <User className="w-4 h-4 mr-2" />
-                {language === 'tr' ? 'Profil' : 'Profile'}
-              </Link>
-            </Button>
+            <NotificationBell />
             <LanguageToggle />
+            <Link to="/profile" className="hover:opacity-80 transition-opacity">
+              <UserAvatar 
+                avatarUrl={profile?.avatar_url} 
+                fullName={profile?.full_name} 
+                email={user?.email}
+                size="sm"
+              />
+            </Link>
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
               <LogOut className="w-4 h-4 mr-2" />
               {language === 'tr' ? 'Çıkış' : 'Logout'}
@@ -217,6 +223,11 @@ export default function Dashboard() {
             })}
           </div>
         )}
+
+        {/* Session Calendar */}
+        <div className="mt-8">
+          <SessionCalendar />
+        </div>
       </div>
     </div>
   );

@@ -188,6 +188,23 @@ serve(async (req) => {
 
     console.log("Session notification email sent:", emailResponse);
 
+    // Create in-app notification
+    const { error: notifError } = await supabase
+      .from("notifications")
+      .insert({
+        user_id: requestData.user_id,
+        title: isEnglish ? "Session Scheduled" : "Oturum Planlandı",
+        message: isEnglish 
+          ? `Your mediation session is scheduled for ${formattedDate} at ${formattedTime}`
+          : `Arabuluculuk oturumunuz ${formattedDate} ${formattedTime} için planlandı`,
+        type: "success",
+        link: "/dashboard",
+      });
+
+    if (notifError) {
+      console.error("Error creating notification:", notifError);
+    }
+
     return new Response(
       JSON.stringify({ success: true, message: "Notification sent successfully" }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
