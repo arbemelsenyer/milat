@@ -11,6 +11,40 @@ type Message = {
   content: string;
 };
 
+type QuickReply = {
+  labelEn: string;
+  labelTr: string;
+  messageEn: string;
+  messageTr: string;
+};
+
+const QUICK_REPLIES: QuickReply[] = [
+  {
+    labelEn: 'What is mediation?',
+    labelTr: 'Arabuluculuk nedir?',
+    messageEn: 'What is mediation and how does it work?',
+    messageTr: 'Arabuluculuk nedir ve nasıl çalışır?',
+  },
+  {
+    labelEn: 'How long does it take?',
+    labelTr: 'Ne kadar sürer?',
+    messageEn: 'How long does the mediation process typically take?',
+    messageTr: 'Arabuluculuk süreci genellikle ne kadar sürer?',
+  },
+  {
+    labelEn: 'Is it confidential?',
+    labelTr: 'Gizli mi?',
+    messageEn: 'Is the mediation process confidential?',
+    messageTr: 'Arabuluculuk süreci gizli mi?',
+  },
+  {
+    labelEn: 'What are the costs?',
+    labelTr: 'Maliyetler neler?',
+    messageEn: 'What are the costs involved in mediation?',
+    messageTr: 'Arabuluculuğun maliyetleri nelerdir?',
+  },
+];
+
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/intake-chat`;
 
 export function IntakeChat() {
@@ -38,12 +72,13 @@ export function IntakeChat() {
     }
   }, [isOpen]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+  const sendMessage = async (messageOverride?: string) => {
+    const messageText = messageOverride || input.trim();
+    if (!messageText || isLoading) return;
 
-    const userMessage: Message = { role: 'user', content: input.trim() };
+    const userMessage: Message = { role: 'user', content: messageText };
     setMessages(prev => [...prev, userMessage]);
-    setInput('');
+    if (!messageOverride) setInput('');
     setIsLoading(true);
 
     let assistantContent = '';
@@ -171,13 +206,24 @@ export function IntakeChat() {
           {/* Messages */}
           <ScrollArea className="flex-1 p-4" ref={scrollRef}>
             {messages.length === 0 && (
-              <div className="text-center text-muted-foreground py-8">
-                <MessageCircle className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">
+              <div className="text-center py-6">
+                <MessageCircle className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground mb-4">
                   {language === 'tr' 
                     ? 'Başvuru süreciyle ilgili sorularınızı sorabilirsiniz.'
                     : 'Ask any questions about the application process.'}
                 </p>
+                <div className="flex flex-wrap gap-2 justify-center px-2">
+                  {QUICK_REPLIES.map((qr, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => sendMessage(language === 'tr' ? qr.messageTr : qr.messageEn)}
+                      className="text-xs px-3 py-1.5 rounded-full border bg-secondary/50 hover:bg-secondary text-secondary-foreground transition-colors"
+                    >
+                      {language === 'tr' ? qr.labelTr : qr.labelEn}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             <div className="space-y-4">
@@ -224,7 +270,7 @@ export function IntakeChat() {
                 className="flex-1"
               />
               <Button 
-                onClick={sendMessage} 
+                onClick={() => sendMessage()} 
                 disabled={!input.trim() || isLoading}
                 size="icon"
               >
