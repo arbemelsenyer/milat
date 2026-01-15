@@ -12,6 +12,7 @@ import {
 import StepNextStepDecision from './steps/StepNextStepDecision';
 import StepAiExploration from './steps/StepAiExploration';
 import StepMediatorScheduling from './steps/StepMediatorScheduling';
+import { IntakeChat } from './IntakeChat';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Loader2, Save } from 'lucide-react';
 import { generateCaseSummary } from '@/lib/ai-processing';
@@ -483,6 +484,9 @@ export function IntakeForm() {
           )}
         </div>
       </main>
+      
+      {/* AI Chatbot */}
+      <IntakeChat />
     </div>
   );
 }

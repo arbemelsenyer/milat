@@ -3,6 +3,9 @@ project_id = "oijdnfibboiinogdmlcj"
 [functions.generate-options]
 verify_jwt = false
 
+[functions.intake-chat]
+verify_jwt = false
+
 [functions.send-mediator-request]
 verify_jwt = false
 
