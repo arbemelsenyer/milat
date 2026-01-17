@@ -82,38 +82,19 @@ serve(async (req) => {
 
     const { email, phone, selectedSlots, notes, caseSummary, language = "tr" } = await req.json() as MediatorRequest;
 
-    // Input validation
-    if (!email || typeof email !== "string" || !email.includes("@") || email.length > 255) {
-      return new Response(
-        JSON.stringify({ error: "Invalid email address" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Input validation - use generic error messages to avoid information leakage
+    const isValidEmail = email && typeof email === "string" && email.includes("@") && email.length <= 255;
+    const isValidPhone = !phone || (typeof phone === "string" && phone.length <= 20);
+    const isValidSlots = Array.isArray(selectedSlots) && selectedSlots.length > 0;
+    const isValidNotes = !notes || (typeof notes === "string" && notes.length <= 2000);
+    const isValidCaseSummary = caseSummary && typeof caseSummary === "object";
 
-    if (phone && (typeof phone !== "string" || phone.length > 20)) {
+    if (!isValidEmail || !isValidPhone || !isValidSlots || !isValidNotes || !isValidCaseSummary) {
+      console.error("Invalid input data received", { 
+        email: isValidEmail, phone: isValidPhone, slots: isValidSlots, notes: isValidNotes, summary: isValidCaseSummary 
+      });
       return new Response(
-        JSON.stringify({ error: "Invalid phone number" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!Array.isArray(selectedSlots) || selectedSlots.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "At least one time slot is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (notes && (typeof notes !== "string" || notes.length > 2000)) {
-      return new Response(
-        JSON.stringify({ error: "Notes too long (max 2000 characters)" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!caseSummary || typeof caseSummary !== "object") {
-      return new Response(
-        JSON.stringify({ error: "Case summary is required" }),
+        JSON.stringify({ error: "Invalid request data" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -239,7 +220,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in send-mediator-request:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "An error occurred. Please try again." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
