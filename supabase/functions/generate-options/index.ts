@@ -50,25 +50,13 @@ serve(async (req) => {
 
     const { summary, language = "tr" } = await req.json() as { summary: StructuredSummary; language?: string };
     
-    // Input validation
-    if (!summary || typeof summary !== "object") {
+    // Input validation - use generic error messages
+    if (!summary || typeof summary !== "object" || 
+        !summary.neutralSummary || typeof summary.neutralSummary !== "string" ||
+        summary.neutralSummary.length > 10000) {
+      console.error("Invalid input data received");
       return new Response(
-        JSON.stringify({ error: "Summary is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!summary.neutralSummary || typeof summary.neutralSummary !== "string") {
-      return new Response(
-        JSON.stringify({ error: "Neutral summary is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Limit input size to prevent abuse
-    if (summary.neutralSummary.length > 10000) {
-      return new Response(
-        JSON.stringify({ error: "Summary too long (max 10000 characters)" }),
+        JSON.stringify({ error: "Invalid request data" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -76,7 +64,8 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+      console.error("LOVABLE_API_KEY is not configured");
+      throw new Error("Service configuration error");
     }
 
     const systemPrompt = language === "tr" 
@@ -230,7 +219,7 @@ Please suggest 3-4 resolution scenarios appropriate for this situation.`;
   } catch (error) {
     console.error("Error in generate-options:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "An error occurred. Please try again." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

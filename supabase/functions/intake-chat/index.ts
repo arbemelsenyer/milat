@@ -43,42 +43,26 @@ serve(async (req) => {
 
     const { messages, language = 'tr' } = await req.json();
     
-    // Input validation
-    if (!Array.isArray(messages)) {
+    // Input validation - use generic error messages
+    const isValidMessages = Array.isArray(messages) && 
+      messages.length <= 50 && 
+      messages.every((msg: { role?: string; content?: string }) => 
+        msg.role && msg.content && typeof msg.content === "string" && msg.content.length <= 5000
+      );
+
+    if (!isValidMessages) {
+      console.error("Invalid messages input received");
       return new Response(
-        JSON.stringify({ error: "Messages must be an array" }),
+        JSON.stringify({ error: "Invalid request data" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    }
-
-    // Limit message count to prevent abuse
-    if (messages.length > 50) {
-      return new Response(
-        JSON.stringify({ error: "Too many messages (max 50)" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Validate each message
-    for (const msg of messages) {
-      if (!msg.role || !msg.content) {
-        return new Response(
-          JSON.stringify({ error: "Invalid message format" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (typeof msg.content !== "string" || msg.content.length > 5000) {
-        return new Response(
-          JSON.stringify({ error: "Message content too long (max 5000 characters)" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+      console.error('LOVABLE_API_KEY is not configured');
+      throw new Error('Service configuration error');
     }
 
     const systemPrompt = language === 'tr' 
@@ -136,7 +120,7 @@ Keep your answers brief, clear, and helpful. Don't give legal advice, only provi
     });
   } catch (error) {
     console.error('Intake chat error:', error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
+    return new Response(JSON.stringify({ error: 'An error occurred. Please try again.' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
