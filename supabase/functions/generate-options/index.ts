@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,7 +19,60 @@ serve(async (req) => {
   }
 
   try {
+    // Validate authentication
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Create Supabase client with user's auth context
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    // Verify the user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error("Auth error:", authError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Authenticated user:", user.id);
+
     const { summary, language = "tr" } = await req.json() as { summary: StructuredSummary; language?: string };
+    
+    // Input validation
+    if (!summary || typeof summary !== "object") {
+      return new Response(
+        JSON.stringify({ error: "Summary is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!summary.neutralSummary || typeof summary.neutralSummary !== "string") {
+      return new Response(
+        JSON.stringify({ error: "Neutral summary is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Limit input size to prevent abuse
+    if (summary.neutralSummary.length > 10000) {
+      return new Response(
+        JSON.stringify({ error: "Summary too long (max 10000 characters)" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
@@ -65,17 +119,17 @@ Respond in JSON format:
       ? `Uyuşmazlık Özeti:
 ${summary.neutralSummary}
 
-Temel Temalar: ${summary.themes.join(", ")}
+Temel Temalar: ${(summary.themes || []).join(", ")}
 
-Tarafların İhtiyaçları: ${summary.needs.join(", ")}
+Tarafların İhtiyaçları: ${(summary.needs || []).join(", ")}
 
 Lütfen bu duruma uygun 3-4 çözüm senaryosu öner.`
       : `Dispute Summary:
 ${summary.neutralSummary}
 
-Core Themes: ${summary.themes.join(", ")}
+Core Themes: ${(summary.themes || []).join(", ")}
 
-Party Needs: ${summary.needs.join(", ")}
+Party Needs: ${(summary.needs || []).join(", ")}
 
 Please suggest 3-4 resolution scenarios appropriate for this situation.`;
 

@@ -44,12 +44,80 @@ serve(async (req) => {
   }
 
   try {
+    // Validate authentication
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Create Supabase client with user's auth context
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseUserClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    // Verify the user is authenticated
+    const { data: { user }, error: authError } = await supabaseUserClient.auth.getUser();
+    if (authError || !user) {
+      console.error("Auth error:", authError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Verify user has mediator role
+    const { data: isMediator, error: roleError } = await supabaseUserClient
+      .rpc("has_role", { _user_id: user.id, _role: "mediator" });
+
+    if (roleError || !isMediator) {
+      console.error("Role check failed:", roleError, "isMediator:", isMediator);
+      return new Response(
+        JSON.stringify({ error: "Forbidden: Mediator role required" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { requestId, scheduledDate, mediatorNotes, language = "tr" } = await req.json() as SessionNotificationRequest;
 
-    console.log("Sending session notification for request:", requestId);
+    // Validate input
+    if (!requestId || typeof requestId !== "string") {
+      return new Response(
+        JSON.stringify({ error: "Invalid requestId" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    if (!scheduledDate || typeof scheduledDate !== "string") {
+      return new Response(
+        JSON.stringify({ error: "Invalid scheduledDate" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Sending session notification for request:", requestId, "by mediator:", user.id);
+
+    // Verify the request exists and mediator has access (via RLS)
+    const { data: requestCheck, error: requestError } = await supabaseUserClient
+      .from("mediator_requests")
+      .select("id")
+      .eq("id", requestId)
+      .single();
+
+    if (requestError || !requestCheck) {
+      console.error("Request not found or access denied:", requestError);
+      return new Response(
+        JSON.stringify({ error: "Request not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Use service role for operations that need elevated privileges
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
