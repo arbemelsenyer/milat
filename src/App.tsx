@@ -10,6 +10,7 @@ import SummaryPage from "./pages/Summary";
 import AuthPage from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import MediatorDashboard from "./pages/MediatorDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/mediator" element={<MediatorDashboard />} />
+            <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/intake" element={<IntakePage />} />
             <Route path="/summary" element={<SummaryPage />} />

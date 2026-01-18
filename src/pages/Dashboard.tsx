@@ -40,7 +40,7 @@ const disputeTypeLabels: Record<string, { tr: string; en: string }> = {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user, profile, isLoading: authLoading, isMediator, signOut } = useAuth();
+  const { user, profile, isLoading: authLoading, isMediator, isAdmin, signOut } = useAuth();
   const { language } = useLanguage();
   const [cases, setCases] = useState<Case[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -101,6 +101,14 @@ export default function Dashboard() {
             </span>
           </Link>
           <div className="flex items-center gap-4">
+            {isAdmin && (
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/admin">
+                  <Shield className="w-4 h-4 mr-2" />
+                  {language === 'tr' ? 'Yönetici Paneli' : 'Admin Panel'}
+                </Link>
+              </Button>
+            )}
             {isMediator && (
               <Button variant="outline" size="sm" asChild>
                 <Link to="/mediator">
