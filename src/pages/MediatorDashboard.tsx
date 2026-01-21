@@ -10,6 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { NotificationBell } from '@/components/NotificationBell';
+import { MediatorAvailabilityCalendar } from '@/components/MediatorAvailabilityCalendar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { MessageCircle, LogOut, Calendar, User, Clock, CheckCircle, XCircle, Loader2, ArrowLeft } from 'lucide-react';
@@ -200,6 +202,7 @@ export default function MediatorDashboard() {
             </span>
           </Link>
           <div className="flex items-center gap-4">
+            <NotificationBell />
             <LanguageToggle />
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
               <LogOut className="w-4 h-4 mr-2" />
@@ -404,6 +407,11 @@ export default function MediatorDashboard() {
             })}
           </div>
         )}
+
+        {/* Availability Calendar */}
+        <div className="mt-8">
+          <MediatorAvailabilityCalendar />
+        </div>
       </div>
     </div>
   );
