@@ -240,6 +240,20 @@ export default function AdminDashboard() {
         description: language === 'tr' ? 'Rol eklenemedi' : 'Failed to add role',
       });
     } else {
+      // Send notification to the user
+      try {
+        await supabase.functions.invoke('send-role-notification', {
+          body: {
+            targetUserId: userId,
+            role: role,
+            action: 'added',
+            language: language,
+          },
+        });
+      } catch (notifError) {
+        console.error('Error sending role notification:', notifError);
+      }
+      
       toast({
         title: language === 'tr' ? 'Rol Eklendi' : 'Role Added',
         description: language === 'tr' 
@@ -273,6 +287,20 @@ export default function AdminDashboard() {
         description: language === 'tr' ? 'Rol kaldırılamadı' : 'Failed to remove role',
       });
     } else {
+      // Send notification to the user
+      try {
+        await supabase.functions.invoke('send-role-notification', {
+          body: {
+            targetUserId: userId,
+            role: role,
+            action: 'removed',
+            language: language,
+          },
+        });
+      } catch (notifError) {
+        console.error('Error sending role notification:', notifError);
+      }
+      
       toast({
         title: language === 'tr' ? 'Rol Kaldırıldı' : 'Role Removed',
         description: language === 'tr' 
