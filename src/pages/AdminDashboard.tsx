@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { NotificationBell } from '@/components/NotificationBell';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { MessageCircle, LogOut, Calendar, User, Clock, Users, Shield, Loader2, ArrowLeft, UserPlus, Search, UserCog, Trash2, Plus } from 'lucide-react';
@@ -372,6 +373,7 @@ export default function AdminDashboard() {
               <Shield className="w-3 h-3" />
               Admin
             </Badge>
+            <NotificationBell />
             <LanguageToggle />
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
               <LogOut className="w-4 h-4 mr-2" />
