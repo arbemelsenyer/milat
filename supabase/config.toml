@@ -9,5 +9,8 @@ verify_jwt = false
 [functions.send-mediator-request]
 verify_jwt = false
 
+[functions.send-role-notification]
+verify_jwt = false
+
 [functions.send-session-notification]
 verify_jwt = false
