@@ -12,6 +12,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { NotificationBell } from '@/components/NotificationBell';
 import { MediatorAvailabilityCalendar } from '@/components/MediatorAvailabilityCalendar';
+import { WeeklyCalendarView } from '@/components/WeeklyCalendarView';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { MessageCircle, LogOut, Calendar, User, Clock, CheckCircle, XCircle, Loader2, ArrowLeft } from 'lucide-react';
@@ -407,6 +408,11 @@ export default function MediatorDashboard() {
             })}
           </div>
         )}
+
+        {/* Weekly Calendar View */}
+        <div className="mt-8">
+          <WeeklyCalendarView />
+        </div>
 
         {/* Availability Calendar */}
         <div className="mt-8">
