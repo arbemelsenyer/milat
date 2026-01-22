@@ -119,6 +119,36 @@ export type Database = {
         }
         Relationships: []
       }
+      mediator_blocked_dates: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          mediator_id: string
+          reason: string | null
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          mediator_id: string
+          reason?: string | null
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          mediator_id?: string
+          reason?: string | null
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       mediator_requests: {
         Row: {
           case_id: string
@@ -128,6 +158,8 @@ export type Database = {
           notes: string | null
           preferred_dates: string[] | null
           preferred_time: string | null
+          room_name: string | null
+          room_url: string | null
           scheduled_date: string | null
           session_type: string | null
           status: string
@@ -142,6 +174,8 @@ export type Database = {
           notes?: string | null
           preferred_dates?: string[] | null
           preferred_time?: string | null
+          room_name?: string | null
+          room_url?: string | null
           scheduled_date?: string | null
           session_type?: string | null
           status?: string
@@ -156,6 +190,8 @@ export type Database = {
           notes?: string | null
           preferred_dates?: string[] | null
           preferred_time?: string | null
+          room_name?: string | null
+          room_url?: string | null
           scheduled_date?: string | null
           session_type?: string | null
           status?: string
