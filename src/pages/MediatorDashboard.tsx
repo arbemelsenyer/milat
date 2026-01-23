@@ -12,10 +12,12 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { NotificationBell } from '@/components/NotificationBell';
 import { MediatorAvailabilityCalendar } from '@/components/MediatorAvailabilityCalendar';
+import { MediatorBlockedDates } from '@/components/MediatorBlockedDates';
 import { WeeklyCalendarView } from '@/components/WeeklyCalendarView';
+import { VideoCallButton } from '@/components/VideoCallButton';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { MessageCircle, LogOut, Calendar, User, Clock, CheckCircle, XCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { MessageCircle, LogOut, Calendar, User, Clock, CheckCircle, XCircle, Loader2, ArrowLeft, BarChart3 } from 'lucide-react';
 import { format } from 'date-fns';
 import { tr, enUS } from 'date-fns/locale';
 
@@ -29,6 +31,8 @@ interface MediatorRequest {
   session_type: string | null;
   notes: string | null;
   scheduled_date: string | null;
+  room_url: string | null;
+  room_name: string | null;
   created_at: string;
   cases: {
     dispute_type: string | null;
@@ -203,6 +207,12 @@ export default function MediatorDashboard() {
             </span>
           </Link>
           <div className="flex items-center gap-4">
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/analytics">
+                <BarChart3 className="w-4 h-4 mr-2" />
+                {language === 'tr' ? 'Analitik' : 'Analytics'}
+              </Link>
+            </Button>
             <NotificationBell />
             <LanguageToggle />
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
@@ -375,14 +385,21 @@ export default function MediatorDashboard() {
                       )}
                       
                       {request.status === 'scheduled' && (
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleUpdateStatus(request.id, 'completed')}
-                        >
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          {language === 'tr' ? 'Tamamlandı' : 'Mark Complete'}
-                        </Button>
+                        <>
+                          <VideoCallButton 
+                            requestId={request.id} 
+                            existingRoomUrl={request.room_url}
+                            sessionType={request.session_type}
+                          />
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleUpdateStatus(request.id, 'completed')}
+                          >
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            {language === 'tr' ? 'Tamamlandı' : 'Mark Complete'}
+                          </Button>
+                        </>
                       )}
 
                       {(request.status === 'pending' || request.status === 'scheduled') && (
@@ -414,8 +431,9 @@ export default function MediatorDashboard() {
           <WeeklyCalendarView />
         </div>
 
-        {/* Availability Calendar */}
-        <div className="mt-8">
+        {/* Blocked Dates & Availability Calendar */}
+        <div className="mt-8 grid gap-6 lg:grid-cols-2">
+          <MediatorBlockedDates />
           <MediatorAvailabilityCalendar />
         </div>
       </div>
