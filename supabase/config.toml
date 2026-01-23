@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.send-session-reminders]
 verify_jwt = false
+
+[functions.create-video-room]
+verify_jwt = false
