@@ -13,6 +13,9 @@ import { tr, enUS } from 'date-fns/locale';
 import { UserAvatar } from '@/components/UserAvatar';
 import { NotificationBell } from '@/components/NotificationBell';
 import { SessionCalendar } from '@/components/SessionCalendar';
+import { RescheduleRequest } from '@/components/RescheduleRequest';
+import { SessionFeedback } from '@/components/SessionFeedback';
+import { CaseDocuments } from '@/components/CaseDocuments';
 
 interface Case {
   id: string;
@@ -43,6 +46,7 @@ export default function Dashboard() {
   const { user, profile, isLoading: authLoading, isMediator, isAdmin, signOut } = useAuth();
   const { language } = useLanguage();
   const [cases, setCases] = useState<Case[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -54,6 +58,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (user) {
       fetchCases();
+      fetchSessions();
     }
   }, [user]);
 
@@ -68,6 +73,14 @@ export default function Dashboard() {
       setCases(data);
     }
     setIsLoading(false);
+  };
+
+  const fetchSessions = async () => {
+    const { data } = await supabase
+      .from('mediator_requests')
+      .select('id, status, scheduled_date, case_id')
+      .order('created_at', { ascending: false });
+    if (data) setSessions(data);
   };
 
   const handleSignOut = async () => {
@@ -229,6 +242,50 @@ export default function Dashboard() {
                 </Card>
               );
             })}
+          </div>
+        )}
+
+        {/* Scheduled sessions with reschedule & feedback */}
+        {sessions.filter(s => s.status === 'scheduled' || s.status === 'completed').length > 0 && (
+          <div className="mt-8 space-y-3">
+            <h2 className="text-xl font-display font-semibold text-foreground">
+              {language === 'tr' ? 'Oturumlarınız' : 'Your Sessions'}
+            </h2>
+            {sessions.filter(s => s.status === 'scheduled' || s.status === 'completed').map((session) => (
+              <div key={session.id} className="flex items-center justify-between border border-border rounded-lg p-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {session.scheduled_date
+                      ? format(new Date(session.scheduled_date), 'PPp', { locale: language === 'tr' ? tr : enUS })
+                      : (language === 'tr' ? 'Tarih belirlenmedi' : 'Date not set')}
+                  </p>
+                  <Badge variant={session.status === 'completed' ? 'outline' : 'default'} className="mt-1">
+                    {session.status === 'completed' ? (language === 'tr' ? 'Tamamlandı' : 'Completed') : (language === 'tr' ? 'Planlandı' : 'Scheduled')}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  {session.status === 'scheduled' && (
+                    <RescheduleRequest
+                      requestId={session.id}
+                      currentDate={session.scheduled_date}
+                      onSuccess={fetchSessions}
+                    />
+                  )}
+                  {session.status === 'completed' && (
+                    <SessionFeedback requestId={session.id} />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Case Documents */}
+        {cases.length > 0 && (
+          <div className="mt-8 space-y-4">
+            {cases.filter(c => c.status !== 'draft').map((c) => (
+              <CaseDocuments key={c.id} caseId={c.id} />
+            ))}
           </div>
         )}
 

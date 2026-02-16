@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      case_documents: {
+        Row: {
+          case_id: string
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          uploaded_by: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          uploaded_by: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_documents_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cases: {
         Row: {
           additional_notes: string | null
@@ -273,6 +314,91 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      reschedule_requests: {
+        Row: {
+          created_at: string
+          id: string
+          mediator_request_id: string
+          proposed_date: string
+          reason: string | null
+          requested_by: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mediator_request_id: string
+          proposed_date: string
+          reason?: string | null
+          requested_by: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mediator_request_id?: string
+          proposed_date?: string
+          reason?: string | null
+          requested_by?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reschedule_requests_mediator_request_id_fkey"
+            columns: ["mediator_request_id"]
+            isOneToOne: false
+            referencedRelation: "mediator_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_feedback: {
+        Row: {
+          comments: string | null
+          created_at: string
+          fairness_rating: number | null
+          id: string
+          mediator_rating: number | null
+          mediator_request_id: string
+          overall_rating: number
+          user_id: string
+          would_recommend: boolean | null
+        }
+        Insert: {
+          comments?: string | null
+          created_at?: string
+          fairness_rating?: number | null
+          id?: string
+          mediator_rating?: number | null
+          mediator_request_id: string
+          overall_rating: number
+          user_id: string
+          would_recommend?: boolean | null
+        }
+        Update: {
+          comments?: string | null
+          created_at?: string
+          fairness_rating?: number | null
+          id?: string
+          mediator_rating?: number | null
+          mediator_request_id?: string
+          overall_rating?: number
+          user_id?: string
+          would_recommend?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_feedback_mediator_request_id_fkey"
+            columns: ["mediator_request_id"]
+            isOneToOne: false
+            referencedRelation: "mediator_requests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
