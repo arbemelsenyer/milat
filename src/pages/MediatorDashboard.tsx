@@ -17,6 +17,7 @@ import { WeeklyCalendarView } from '@/components/WeeklyCalendarView';
 import { VideoCallButton } from '@/components/VideoCallButton';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { RescheduleApproval } from '@/components/RescheduleApproval';
 import { MessageCircle, LogOut, Calendar, User, Clock, CheckCircle, XCircle, Loader2, ArrowLeft, BarChart3 } from 'lucide-react';
 import { format } from 'date-fns';
 import { tr, enUS } from 'date-fns/locale';
@@ -243,6 +244,11 @@ export default function MediatorDashboard() {
               ? 'Gelen talepleri görüntüleyin ve oturumları planlayın' 
               : 'View incoming requests and schedule sessions'}
           </p>
+        </div>
+
+        {/* Reschedule Requests */}
+        <div className="mb-6">
+          <RescheduleApproval />
         </div>
 
         {isLoading ? (
