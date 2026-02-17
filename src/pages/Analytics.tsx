@@ -14,7 +14,7 @@ import {
 } from 'recharts';
 import { 
   ArrowLeft, BarChart3, PieChart as PieChartIcon, TrendingUp, 
-  Calendar, CheckCircle2, Clock, Users, Loader2, FileText
+  Calendar, CheckCircle2, Clock, Users, Loader2, FileText, Star, ThumbsUp
 } from 'lucide-react';
 import { format, subDays, differenceInDays, parseISO } from 'date-fns';
 
@@ -34,6 +34,15 @@ interface RequestData {
   session_type: string | null;
 }
 
+interface FeedbackData {
+  id: string;
+  overall_rating: number;
+  mediator_rating: number | null;
+  fairness_rating: number | null;
+  would_recommend: boolean | null;
+  created_at: string;
+}
+
 export default function Analytics() {
   const { user, isAdmin, isMediator, isLoading: authLoading } = useAuth();
   const { language } = useLanguage();
@@ -41,6 +50,7 @@ export default function Analytics() {
   
   const [cases, setCases] = useState<CaseData[]>([]);
   const [requests, setRequests] = useState<RequestData[]>([]);
+  const [feedback, setFeedback] = useState<FeedbackData[]>([]);
   const [loading, setLoading] = useState(true);
 
   const labels = {
@@ -79,6 +89,13 @@ export default function Analytics() {
       other: 'Diğer',
       last30Days: 'Son 30 Gün',
       last7Days: 'Son 7 Gün',
+      feedback: 'Geri Bildirim',
+      avgOverall: 'Ort. Genel Puan',
+      avgMediator: 'Ort. Arabulucu Puanı',
+      avgFairness: 'Ort. Adillik Puanı',
+      recommendRate: 'Tavsiye Oranı',
+      ratingDistribution: 'Puan Dağılımı',
+      totalFeedback: 'Toplam Geri Bildirim',
     },
     en: {
       title: 'Analytics Dashboard',
@@ -115,6 +132,13 @@ export default function Analytics() {
       other: 'Other',
       last30Days: 'Last 30 Days',
       last7Days: 'Last 7 Days',
+      feedback: 'Feedback',
+      avgOverall: 'Avg. Overall Rating',
+      avgMediator: 'Avg. Mediator Rating',
+      avgFairness: 'Avg. Fairness Rating',
+      recommendRate: 'Recommendation Rate',
+      ratingDistribution: 'Rating Distribution',
+      totalFeedback: 'Total Feedback',
     }
   };
 
@@ -156,13 +180,15 @@ export default function Analytics() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [casesRes, requestsRes] = await Promise.all([
+      const [casesRes, requestsRes, feedbackRes] = await Promise.all([
         supabase.from('cases').select('id, status, dispute_type, created_at, updated_at'),
-        supabase.from('mediator_requests').select('id, status, created_at, scheduled_date, session_type')
+        supabase.from('mediator_requests').select('id, status, created_at, scheduled_date, session_type'),
+        supabase.from('session_feedback').select('id, overall_rating, mediator_rating, fairness_rating, would_recommend, created_at')
       ]);
 
       if (casesRes.data) setCases(casesRes.data);
       if (requestsRes.data) setRequests(requestsRes.data);
+      if (feedbackRes.data) setFeedback(feedbackRes.data as FeedbackData[]);
     } catch (error) {
       console.error('Error fetching analytics data:', error);
     } finally {
@@ -246,6 +272,27 @@ export default function Analytics() {
   ).map(([name, value]) => ({
     name: statusLabels[name] || name,
     value
+  }));
+
+  // Feedback metrics
+  const totalFeedback = feedback.length;
+  const avgOverall = totalFeedback > 0
+    ? (feedback.reduce((s, f) => s + f.overall_rating, 0) / totalFeedback).toFixed(1)
+    : '0';
+  const mediatorRatings = feedback.filter(f => f.mediator_rating != null);
+  const avgMediator = mediatorRatings.length > 0
+    ? (mediatorRatings.reduce((s, f) => s + (f.mediator_rating || 0), 0) / mediatorRatings.length).toFixed(1)
+    : '0';
+  const fairnessRatings = feedback.filter(f => f.fairness_rating != null);
+  const avgFairness = fairnessRatings.length > 0
+    ? (fairnessRatings.reduce((s, f) => s + (f.fairness_rating || 0), 0) / fairnessRatings.length).toFixed(1)
+    : '0';
+  const recommendCount = feedback.filter(f => f.would_recommend === true).length;
+  const recommendRate = totalFeedback > 0 ? Math.round((recommendCount / totalFeedback) * 100) : 0;
+
+  const ratingDistribution = [1, 2, 3, 4, 5].map(star => ({
+    name: `${star} ⭐`,
+    value: feedback.filter(f => f.overall_rating === star).length,
   }));
 
   const COLORS = [
@@ -348,6 +395,7 @@ export default function Analytics() {
             <TabsTrigger value="overview">{t.overview}</TabsTrigger>
             <TabsTrigger value="cases">{t.cases}</TabsTrigger>
             <TabsTrigger value="sessions">{t.sessions}</TabsTrigger>
+            <TabsTrigger value="feedback">{t.feedback}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -542,6 +590,104 @@ export default function Analytics() {
                       <Users className="h-16 w-16 mx-auto text-primary/30 mb-4" />
                       <p className="text-6xl font-bold text-primary">{activeMediation}</p>
                       <p className="text-muted-foreground mt-2">{t.activeMediation}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="feedback" className="space-y-6">
+            {/* Feedback stat cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t.avgOverall}</p>
+                      <p className="text-3xl font-bold">{avgOverall}<span className="text-base font-normal text-muted-foreground">/5</span></p>
+                    </div>
+                    <Star className="h-10 w-10 text-accent/30" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t.avgMediator}</p>
+                      <p className="text-3xl font-bold">{avgMediator}<span className="text-base font-normal text-muted-foreground">/5</span></p>
+                    </div>
+                    <Star className="h-10 w-10 text-primary/30" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t.avgFairness}</p>
+                      <p className="text-3xl font-bold">{avgFairness}<span className="text-base font-normal text-muted-foreground">/5</span></p>
+                    </div>
+                    <Star className="h-10 w-10 text-success/30" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t.recommendRate}</p>
+                      <p className="text-3xl font-bold">{recommendRate}%</p>
+                    </div>
+                    <ThumbsUp className="h-10 w-10 text-primary/30" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Rating distribution */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">{t.ratingDistribution}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {totalFeedback > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={ratingDistribution}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                        <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--card))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px'
+                          }}
+                        />
+                        <Bar dataKey="value" fill="hsl(38, 92%, 50%)" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                      {t.noData}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Total feedback count */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">{t.totalFeedback}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-center h-[300px]">
+                    <div className="text-center">
+                      <Star className="h-16 w-16 mx-auto text-accent/30 mb-4" />
+                      <p className="text-6xl font-bold text-accent">{totalFeedback}</p>
+                      <p className="text-muted-foreground mt-2">{t.totalFeedback}</p>
                     </div>
                   </div>
                 </CardContent>
