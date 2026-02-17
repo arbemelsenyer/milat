@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.create-video-room]
 verify_jwt = false
+
+[functions.send-reschedule-notification]
+verify_jwt = false

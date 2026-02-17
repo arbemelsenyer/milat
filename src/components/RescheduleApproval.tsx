@@ -66,6 +66,11 @@ export function RescheduleApproval() {
         .eq('id', mediatorRequestId);
     }
 
+    // Send email notification to user
+    supabase.functions.invoke('send-reschedule-notification', {
+      body: { rescheduleRequestId: id, action: approved ? 'approved' : 'rejected', language },
+    }).catch(console.error);
+
     toast({
       title: approved
         ? (language === 'tr' ? 'Onaylandı' : 'Approved')

@@ -29,14 +29,16 @@ export function RescheduleRequest({ requestId, currentDate, onSuccess }: Resched
     if (!proposedDate || !user) return;
 
     setIsSubmitting(true);
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('reschedule_requests')
       .insert({
         mediator_request_id: requestId,
         requested_by: user.id,
         proposed_date: new Date(proposedDate).toISOString(),
         reason: reason || null,
-      });
+      })
+      .select('id')
+      .single();
 
     setIsSubmitting(false);
 
@@ -55,6 +57,12 @@ export function RescheduleRequest({ requestId, currentDate, onSuccess }: Resched
         ? 'Yeniden planlama talebiniz arabulucuya iletildi.'
         : 'Your reschedule request has been sent to the mediator.',
     });
+
+    // Send email notification to mediator
+    supabase.functions.invoke('send-reschedule-notification', {
+      body: { rescheduleRequestId: data?.id || requestId, action: 'submitted', language },
+    }).catch(console.error);
+
     setOpen(false);
     setProposedDate('');
     setReason('');
