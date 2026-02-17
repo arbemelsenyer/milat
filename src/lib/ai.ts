@@ -1,12 +1,16 @@
 import type { AiOption, StructuredSummary } from "@/types/mediation";
+import { supabase } from "@/integrations/supabase/client";
 
 export async function generateOptions(summary: StructuredSummary, language: string = 'tr'): Promise<AiOption[]> {
   try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-options`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ summary, language }),
     });
