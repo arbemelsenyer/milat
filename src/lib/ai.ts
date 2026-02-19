@@ -87,11 +87,14 @@ export async function sendMediatorRequest(
   language: string = 'tr'
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-mediator-request`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
         email,
