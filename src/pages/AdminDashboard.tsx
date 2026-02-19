@@ -211,6 +211,19 @@ export default function AdminDashboard() {
         description: language === 'tr' ? 'Arabulucu atanamadı' : 'Failed to assign mediator',
       });
     } else {
+      // Send assignment notification email
+      try {
+        await supabase.functions.invoke('send-assignment-notification', {
+          body: {
+            requestId: selectedRequest.id,
+            mediatorId: selectedMediatorId,
+            language,
+          },
+        });
+      } catch (notifError) {
+        console.error('Error sending assignment notification:', notifError);
+      }
+
       toast({
         title: language === 'tr' ? 'Arabulucu Atandı' : 'Mediator Assigned',
         description: language === 'tr' 
