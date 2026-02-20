@@ -9,37 +9,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { LanguageToggle } from '@/components/LanguageToggle';
-import { NotificationBell } from '@/components/NotificationBell';
+import { AppNavbar } from '@/components/AppNavbar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { MessageCircle, LogOut, Calendar, User, Clock, Users, Shield, Loader2, ArrowLeft, UserPlus, Search, UserCog, Trash2, Plus } from 'lucide-react';
-import { format } from 'date-fns';
-import { tr, enUS } from 'date-fns/locale';
+import { Loader2, Search, UserCog, Calendar, UserPlus, Trash2 } from 'lucide-react';
 
-interface MediatorRequest {
+interface CaseRow {
   id: string;
-  case_id: string;
-  user_id: string;
-  mediator_id: string | null;
   status: string;
-  preferred_dates: string[] | null;
-  preferred_time: string | null;
-  session_type: string | null;
-  notes: string | null;
-  scheduled_date: string | null;
+  title: string | null;
+  category: string | null;
+  dispute_type: string | null;
+  your_name: string | null;
+  other_party_name: string | null;
+  ai_summary: any;
+  assigned_mediator_id: string | null;
   created_at: string;
-  cases: {
-    dispute_type: string | null;
-    your_name: string | null;
-    other_party_name: string | null;
-    issue_description: string | null;
-  } | null;
-  profiles: {
-    full_name: string | null;
-    email: string | null;
-    phone: string | null;
-  } | null;
 }
 
 interface Mediator {
@@ -55,43 +40,26 @@ interface UserWithRoles {
   roles: string[];
 }
 
-const statusConfig: Record<string, { label: { tr: string; en: string }; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
-  pending: { label: { tr: 'Beklemede', en: 'Pending' }, variant: 'secondary' },
-  scheduled: { label: { tr: 'Planlandı', en: 'Scheduled' }, variant: 'default' },
-  completed: { label: { tr: 'Tamamlandı', en: 'Completed' }, variant: 'outline' },
-  cancelled: { label: { tr: 'İptal', en: 'Cancelled' }, variant: 'destructive' },
-};
-
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { user, isLoading: authLoading, isAdmin, signOut } = useAuth();
+  const { user, isLoading: authLoading, isAdmin } = useAuth();
   const { language } = useLanguage();
   const { toast } = useToast();
-  
-  // Requests state
-  const [requests, setRequests] = useState<MediatorRequest[]>([]);
+
+  const [cases, setCases] = useState<CaseRow[]>([]);
   const [mediators, setMediators] = useState<Mediator[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedRequest, setSelectedRequest] = useState<MediatorRequest | null>(null);
-  const [selectedMediatorId, setSelectedMediatorId] = useState<string>('');
-  const [isAssigning, setIsAssigning] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'assigned'>('pending');
-  
-  // Users state
   const [allUsers, setAllUsers] = useState<UserWithRoles[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedCase, setSelectedCase] = useState<CaseRow | null>(null);
+  const [selectedMediatorId, setSelectedMediatorId] = useState('');
+  const [isAssigning, setIsAssigning] = useState(false);
   const [userSearch, setUserSearch] = useState('');
-  const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null);
-  const [roleToAdd, setRoleToAdd] = useState<string>('');
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
 
   useEffect(() => {
     if (!authLoading) {
-      if (!user) {
-        navigate('/auth');
-      } else if (!isAdmin) {
-        navigate('/dashboard');
-      }
+      if (!user) navigate('/auth');
+      else if (!isAdmin) navigate('/dashboard');
     }
   }, [authLoading, user, isAdmin, navigate]);
 
@@ -104,261 +72,134 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     setIsLoading(true);
-    
-    // Fetch all requests
-    const { data: requestsData, error: requestsError } = await supabase
-      .from('mediator_requests')
-      .select(`
-        *,
-        cases (
-          dispute_type,
-          your_name,
-          other_party_name,
-          issue_description
-        ),
-        profiles!mediator_requests_user_id_fkey (
-          full_name,
-          email,
-          phone
-        )
-      `)
+
+    const { data: casesData } = await supabase
+      .from('cases')
+      .select('id, status, title, category, dispute_type, your_name, other_party_name, ai_summary, assigned_mediator_id, created_at')
+      .in('status', ['submitted', 'assigned', 'scheduled'])
       .order('created_at', { ascending: false });
 
-    if (!requestsError && requestsData) {
-      setRequests(requestsData as unknown as MediatorRequest[]);
-    }
+    setCases(casesData || []);
 
-    // Fetch all mediators (users with mediator role)
-    const { data: mediatorRoles, error: rolesError } = await supabase
+    // Fetch mediators
+    const { data: mediatorRoles } = await supabase
       .from('user_roles')
       .select('user_id')
       .eq('role', 'mediator');
 
-    if (!rolesError && mediatorRoles) {
-      const mediatorIds = mediatorRoles.map(r => r.user_id);
-      
-      if (mediatorIds.length > 0) {
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('user_id, full_name, email')
-          .in('user_id', mediatorIds);
-
-        if (profilesData) {
-          setMediators(profilesData);
-        }
-      }
+    if (mediatorRoles && mediatorRoles.length > 0) {
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email')
+        .in('user_id', mediatorRoles.map(r => r.user_id));
+      setMediators(profilesData || []);
     }
 
     setIsLoading(false);
   };
 
   const fetchAllUsers = async () => {
-    setUsersLoading(true);
-    
-    // Fetch all profiles
-    const { data: profilesData, error: profilesError } = await supabase
+    const { data: profilesData } = await supabase
       .from('profiles')
       .select('user_id, full_name, email')
       .order('created_at', { ascending: false });
 
-    if (profilesError) {
-      console.error('Error fetching profiles:', profilesError);
-      setUsersLoading(false);
-      return;
-    }
-
-    // Fetch all user roles
-    const { data: rolesData, error: rolesError } = await supabase
+    const { data: rolesData } = await supabase
       .from('user_roles')
       .select('user_id, role');
 
-    if (rolesError) {
-      console.error('Error fetching roles:', rolesError);
-      setUsersLoading(false);
-      return;
-    }
-
-    // Combine profiles with their roles
-    const usersWithRoles: UserWithRoles[] = (profilesData || []).map(profile => {
-      const userRoles = (rolesData || [])
-        .filter(r => r.user_id === profile.user_id)
-        .map(r => r.role);
-      
-      return {
-        ...profile,
-        roles: userRoles
-      };
-    });
+    const usersWithRoles: UserWithRoles[] = (profilesData || []).map(p => ({
+      ...p,
+      roles: (rolesData || []).filter(r => r.user_id === p.user_id).map(r => r.role),
+    }));
 
     setAllUsers(usersWithRoles);
-    setUsersLoading(false);
   };
 
   const handleAssignMediator = async () => {
-    if (!selectedRequest || !selectedMediatorId) return;
-
+    if (!selectedCase || !selectedMediatorId) return;
     setIsAssigning(true);
-    
+
+    // Update case
     const { error } = await supabase
-      .from('mediator_requests')
-      .update({ mediator_id: selectedMediatorId })
-      .eq('id', selectedRequest.id);
+      .from('cases')
+      .update({ assigned_mediator_id: selectedMediatorId, status: 'assigned' })
+      .eq('id', selectedCase.id);
 
     if (error) {
-      toast({
-        variant: 'destructive',
-        title: language === 'tr' ? 'Hata' : 'Error',
-        description: language === 'tr' ? 'Arabulucu atanamadı' : 'Failed to assign mediator',
-      });
-    } else {
-      // Send assignment notification email
-      try {
-        await supabase.functions.invoke('send-assignment-notification', {
-          body: {
-            requestId: selectedRequest.id,
-            mediatorId: selectedMediatorId,
-            language,
-          },
-        });
-      } catch (notifError) {
-        console.error('Error sending assignment notification:', notifError);
-      }
-
-      toast({
-        title: language === 'tr' ? 'Arabulucu Atandı' : 'Mediator Assigned',
-        description: language === 'tr' 
-          ? 'Arabulucu başarıyla davaya atandı.' 
-          : 'Mediator has been successfully assigned to the case.',
-      });
-      fetchData();
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+      setIsAssigning(false);
+      return;
     }
 
+    // Insert assignment record
+    await supabase.from('case_assignments').insert({
+      case_id: selectedCase.id,
+      mediator_id: selectedMediatorId,
+      assigned_by: user!.id,
+    });
+
+    // Notify case owner + mediator
+    try {
+      await supabase.functions.invoke('send-assignment-notification', {
+        body: { caseId: selectedCase.id, mediatorId: selectedMediatorId, language },
+      });
+    } catch (e) {
+      console.error('Notification error:', e);
+    }
+
+    toast({
+      title: language === 'tr' ? 'Arabulucu Atandı' : 'Mediator Assigned',
+      description: language === 'tr' ? 'Bildirimler gönderildi.' : 'Notifications sent.',
+    });
+
     setIsAssigning(false);
-    setSelectedRequest(null);
+    setSelectedCase(null);
     setSelectedMediatorId('');
+    fetchData();
   };
 
   const handleAddRole = async (userId: string, role: string) => {
-    if (role !== 'user' && role !== 'mediator' && role !== 'admin') return;
-    
     setIsUpdatingRole(true);
-    
-    const { error } = await supabase
-      .from('user_roles')
-      .insert({ user_id: userId, role: role });
-
-    if (error) {
-      toast({
-        variant: 'destructive',
-        title: language === 'tr' ? 'Hata' : 'Error',
-        description: language === 'tr' ? 'Rol eklenemedi' : 'Failed to add role',
-      });
-    } else {
-      // Send notification to the user
+    const { error } = await supabase.from('user_roles').insert({ user_id: userId, role: role as 'admin' | 'mediator' | 'user' });
+    if (!error) {
       try {
         await supabase.functions.invoke('send-role-notification', {
-          body: {
-            targetUserId: userId,
-            role: role,
-            action: 'added',
-            language: language,
-          },
+          body: { targetUserId: userId, role, action: 'added', language },
         });
-      } catch (notifError) {
-        console.error('Error sending role notification:', notifError);
-      }
-      
-      toast({
-        title: language === 'tr' ? 'Rol Eklendi' : 'Role Added',
-        description: language === 'tr' 
-          ? `${role} rolü başarıyla eklendi.` 
-          : `${role} role has been added successfully.`,
-      });
+      } catch {}
+      toast({ title: language === 'tr' ? 'Rol Eklendi' : 'Role Added' });
       fetchAllUsers();
-      fetchData(); // Refresh mediators list
+      fetchData();
     }
-
     setIsUpdatingRole(false);
-    setSelectedUser(null);
-    setRoleToAdd('');
   };
 
   const handleRemoveRole = async (userId: string, role: string) => {
-    if (role !== 'user' && role !== 'mediator' && role !== 'admin') return;
-    
     setIsUpdatingRole(true);
-    
-    const { error } = await supabase
-      .from('user_roles')
-      .delete()
-      .eq('user_id', userId)
-      .eq('role', role);
-
-    if (error) {
-      toast({
-        variant: 'destructive',
-        title: language === 'tr' ? 'Hata' : 'Error',
-        description: language === 'tr' ? 'Rol kaldırılamadı' : 'Failed to remove role',
+    await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', role as 'admin' | 'mediator' | 'user');
+    try {
+      await supabase.functions.invoke('send-role-notification', {
+        body: { targetUserId: userId, role, action: 'removed', language },
       });
-    } else {
-      // Send notification to the user
-      try {
-        await supabase.functions.invoke('send-role-notification', {
-          body: {
-            targetUserId: userId,
-            role: role,
-            action: 'removed',
-            language: language,
-          },
-        });
-      } catch (notifError) {
-        console.error('Error sending role notification:', notifError);
-      }
-      
-      toast({
-        title: language === 'tr' ? 'Rol Kaldırıldı' : 'Role Removed',
-        description: language === 'tr' 
-          ? `${role} rolü başarıyla kaldırıldı.` 
-          : `${role} role has been removed successfully.`,
-      });
-      fetchAllUsers();
-      fetchData(); // Refresh mediators list
-    }
-
+    } catch {}
+    toast({ title: language === 'tr' ? 'Rol Kaldırıldı' : 'Role Removed' });
+    fetchAllUsers();
+    fetchData();
     setIsUpdatingRole(false);
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
+  const getMediatorName = (id: string | null) => {
+    if (!id) return null;
+    const m = mediators.find(m => m.user_id === id);
+    return m?.full_name || m?.email || id.slice(0, 8);
   };
-
-  const filteredRequests = requests.filter(request => {
-    if (filter === 'pending') return !request.mediator_id;
-    if (filter === 'assigned') return !!request.mediator_id;
-    return true;
-  });
 
   const filteredUsers = allUsers.filter(u => {
     if (!userSearch) return true;
-    const search = userSearch.toLowerCase();
-    return (
-      u.full_name?.toLowerCase().includes(search) ||
-      u.email?.toLowerCase().includes(search)
-    );
+    const s = userSearch.toLowerCase();
+    return u.full_name?.toLowerCase().includes(s) || u.email?.toLowerCase().includes(s);
   });
-
-  const getMediatorName = (mediatorId: string | null) => {
-    if (!mediatorId) return null;
-    const mediator = mediators.find(m => m.user_id === mediatorId);
-    return mediator?.full_name || mediator?.email || mediatorId;
-  };
-
-  const getRoleBadgeVariant = (role: string): 'default' | 'secondary' | 'outline' => {
-    if (role === 'admin') return 'default';
-    if (role === 'mediator') return 'secondary';
-    return 'outline';
-  };
 
   if (authLoading || !isAdmin) {
     return (
@@ -370,449 +211,167 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border">
-        <div className="container max-w-6xl py-4 px-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <MessageCircle className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-display font-semibold text-xl text-foreground">
-              MediationPath
-            </span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Badge variant="outline" className="gap-1">
-              <Shield className="w-3 h-3" />
-              Admin
-            </Badge>
-            <NotificationBell />
-            <LanguageToggle />
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              {language === 'tr' ? 'Çıkış' : 'Logout'}
-            </Button>
-          </div>
-        </div>
-      </header>
+      <AppNavbar />
 
-      {/* Content */}
       <div className="container max-w-6xl py-8 px-4">
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/dashboard">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              {language === 'tr' ? 'Panele Dön' : 'Back to Dashboard'}
-            </Link>
-          </Button>
-        </div>
+        <h1 className="text-3xl font-display font-bold text-foreground mb-2">
+          {language === 'tr' ? 'Yönetici Paneli' : 'Admin Dashboard'}
+        </h1>
 
-        <div className="mb-8">
-          <h1 className="text-3xl font-display font-bold text-foreground">
-            {language === 'tr' ? 'Yönetici Paneli' : 'Admin Dashboard'}
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            {language === 'tr' 
-              ? 'Talepleri, arabulucuları ve kullanıcı rollerini yönetin' 
-              : 'Manage requests, mediators, and user roles'}
-          </p>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 mt-6">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'tr' ? 'Toplam Talep' : 'Total Requests'}
-              </CardTitle>
+              <CardTitle className="text-sm text-muted-foreground">{language === 'tr' ? 'Toplam Dava' : 'Total Cases'}</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{requests.length}</div>
-            </CardContent>
+            <CardContent><div className="text-2xl font-bold">{cases.length}</div></CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'tr' ? 'Atanmamış' : 'Unassigned'}
-              </CardTitle>
+              <CardTitle className="text-sm text-muted-foreground">{language === 'tr' ? 'Atanmamış' : 'Unassigned'}</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-500">
-                {requests.filter(r => !r.mediator_id).length}
-              </div>
-            </CardContent>
+            <CardContent><div className="text-2xl font-bold text-orange-500">{cases.filter(c => c.status === 'submitted').length}</div></CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'tr' ? 'Aktif Arabulucular' : 'Active Mediators'}
-              </CardTitle>
+              <CardTitle className="text-sm text-muted-foreground">{language === 'tr' ? 'Arabulucular' : 'Mediators'}</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-500">{mediators.length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'tr' ? 'Toplam Kullanıcı' : 'Total Users'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-500">{allUsers.length}</div>
-            </CardContent>
+            <CardContent><div className="text-2xl font-bold text-green-500">{mediators.length}</div></CardContent>
           </Card>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="requests" className="space-y-6">
+        <Tabs defaultValue="cases" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="requests" className="gap-2">
+            <TabsTrigger value="cases" className="gap-2">
               <Calendar className="w-4 h-4" />
-              {language === 'tr' ? 'Talepler' : 'Requests'}
+              {language === 'tr' ? 'Davalar' : 'Cases'}
             </TabsTrigger>
             <TabsTrigger value="users" className="gap-2">
               <UserCog className="w-4 h-4" />
-              {language === 'tr' ? 'Kullanıcı Rolleri' : 'User Roles'}
+              {language === 'tr' ? 'Kullanıcılar' : 'Users'}
             </TabsTrigger>
           </TabsList>
 
-          {/* Requests Tab */}
-          <TabsContent value="requests" className="space-y-6">
-            {/* Filters */}
-            <div className="flex gap-2">
-              <Button 
-                variant={filter === 'pending' ? 'default' : 'outline'} 
-                size="sm"
-                onClick={() => setFilter('pending')}
-              >
-                {language === 'tr' ? 'Atanmamış' : 'Unassigned'}
-              </Button>
-              <Button 
-                variant={filter === 'assigned' ? 'default' : 'outline'} 
-                size="sm"
-                onClick={() => setFilter('assigned')}
-              >
-                {language === 'tr' ? 'Atanmış' : 'Assigned'}
-              </Button>
-              <Button 
-                variant={filter === 'all' ? 'default' : 'outline'} 
-                size="sm"
-                onClick={() => setFilter('all')}
-              >
-                {language === 'tr' ? 'Tümü' : 'All'}
-              </Button>
-            </div>
-
+          <TabsContent value="cases" className="space-y-4">
             {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              </div>
-            ) : filteredRequests.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Calendar className="w-12 h-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium text-foreground mb-2">
-                    {language === 'tr' ? 'Talep bulunamadı' : 'No requests found'}
-                  </h3>
-                  <p className="text-muted-foreground text-center">
-                    {filter === 'pending' 
-                      ? (language === 'tr' ? 'Atanmamış talep yok.' : 'No unassigned requests.')
-                      : (language === 'tr' ? 'Bu filtre için talep yok.' : 'No requests for this filter.')}
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+            ) : cases.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">{language === 'tr' ? 'Dava bulunamadı' : 'No cases found'}</p>
             ) : (
-              <div className="grid gap-4">
-                {filteredRequests.map((request) => {
-                  const status = statusConfig[request.status] || statusConfig.pending;
-                  const assignedMediator = getMediatorName(request.mediator_id);
-
-                  return (
-                    <Card key={request.id}>
-                      <CardHeader className="pb-2">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <CardTitle className="text-lg flex items-center gap-2">
-                              <User className="w-4 h-4" />
-                              {request.profiles?.full_name || (language === 'tr' ? 'Anonim Kullanıcı' : 'Anonymous User')}
-                            </CardTitle>
-                            <CardDescription className="mt-1">
-                              {request.cases?.your_name && request.cases?.other_party_name 
-                                ? `${request.cases.your_name} vs ${request.cases.other_party_name}`
-                                : request.cases?.dispute_type || (language === 'tr' ? 'Uyuşmazlık bilgisi yok' : 'No dispute info')}
-                            </CardDescription>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {assignedMediator ? (
-                              <Badge variant="outline" className="gap-1">
-                                <Users className="w-3 h-3" />
-                                {assignedMediator}
-                              </Badge>
-                            ) : (
-                              <Badge variant="destructive" className="gap-1">
-                                {language === 'tr' ? 'Atanmamış' : 'Unassigned'}
-                              </Badge>
-                            )}
-                            <Badge variant={status.variant}>
-                              {status.label[language]}
-                            </Badge>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        {request.cases?.issue_description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {request.cases.issue_description}
-                          </p>
-                        )}
-
-                        <div className="flex flex-wrap gap-2 text-sm">
-                          {request.preferred_time && (
-                            <Badge variant="outline">
-                              <Clock className="w-3 h-3 mr-1" />
-                              {request.preferred_time}
-                            </Badge>
-                          )}
-                          {request.session_type && (
-                            <Badge variant="outline">
-                              {request.session_type === 'video' 
-                                ? (language === 'tr' ? 'Video' : 'Video')
-                                : request.session_type === 'phone'
-                                ? (language === 'tr' ? 'Telefon' : 'Phone')
-                                : (language === 'tr' ? 'Yüz yüze' : 'In-person')}
-                            </Badge>
-                          )}
-                          <Badge variant="outline">
-                            {format(new Date(request.created_at), 'PP', { 
-                              locale: language === 'tr' ? tr : enUS 
-                            })}
-                          </Badge>
-                        </div>
-
-                        {request.scheduled_date && (
-                          <p className="text-sm text-primary font-medium">
-                            {language === 'tr' ? 'Planlanan: ' : 'Scheduled: '}
-                            {format(new Date(request.scheduled_date), 'PPp', { 
-                              locale: language === 'tr' ? tr : enUS 
-                            })}
-                          </p>
-                        )}
-
-                        <div className="flex items-center gap-2 pt-2">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button 
-                                size="sm"
-                                variant={request.mediator_id ? 'outline' : 'default'}
-                                onClick={() => {
-                                  setSelectedRequest(request);
-                                  setSelectedMediatorId(request.mediator_id || '');
-                                }}
-                              >
-                                <UserPlus className="w-4 h-4 mr-2" />
-                                {request.mediator_id 
-                                  ? (language === 'tr' ? 'Arabulucu Değiştir' : 'Change Mediator')
-                                  : (language === 'tr' ? 'Arabulucu Ata' : 'Assign Mediator')}
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>
-                                  {language === 'tr' ? 'Arabulucu Ata' : 'Assign Mediator'}
-                                </DialogTitle>
-                                <DialogDescription>
-                                  {language === 'tr' 
-                                    ? 'Bu davayı üstlenecek bir arabulucu seçin.' 
-                                    : 'Select a mediator to handle this case.'}
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                  <Select
-                                    value={selectedMediatorId}
-                                    onValueChange={setSelectedMediatorId}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder={language === 'tr' ? 'Arabulucu seçin...' : 'Select mediator...'} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {mediators.map((mediator) => (
-                                        <SelectItem key={mediator.user_id} value={mediator.user_id}>
-                                          {mediator.full_name || mediator.email || mediator.user_id}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                {mediators.length === 0 && (
-                                  <p className="text-sm text-muted-foreground">
-                                    {language === 'tr' 
-                                      ? 'Henüz kayıtlı arabulucu yok. Kullanıcı Rolleri sekmesinden arabulucu atayabilirsiniz.' 
-                                      : 'No mediators registered yet. You can assign mediator role from User Roles tab.'}
-                                  </p>
-                                )}
-                              </div>
-                              <DialogFooter>
-                                <Button 
-                                  onClick={handleAssignMediator} 
-                                  disabled={!selectedMediatorId || isAssigning}
-                                >
-                                  {isAssigning && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                  {language === 'tr' ? 'Ata' : 'Assign'}
-                                </Button>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
-
-                          <Button variant="outline" size="sm" asChild className="ml-auto">
-                            <Link to={`/summary?case=${request.case_id}`}>
-                              {language === 'tr' ? 'Detayları Gör' : 'View Details'}
-                            </Link>
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Users Tab */}
-          <TabsContent value="users" className="space-y-6">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder={language === 'tr' ? 'Kullanıcı ara...' : 'Search users...'}
-                value={userSearch}
-                onChange={(e) => setUserSearch(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-
-            {usersLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              </div>
-            ) : filteredUsers.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Users className="w-12 h-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium text-foreground mb-2">
-                    {language === 'tr' ? 'Kullanıcı bulunamadı' : 'No users found'}
-                  </h3>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-4">
-                {filteredUsers.map((userItem) => (
-                  <Card key={userItem.user_id}>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <CardTitle className="text-lg flex items-center gap-2">
-                            <User className="w-4 h-4" />
-                            {userItem.full_name || (language === 'tr' ? 'İsimsiz' : 'Unnamed')}
-                          </CardTitle>
-                          <CardDescription className="mt-1">
-                            {userItem.email}
-                          </CardDescription>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap justify-end">
-                          {userItem.roles.map((role) => (
-                            <Badge 
-                              key={role} 
-                              variant={getRoleBadgeVariant(role)}
-                              className="gap-1"
-                            >
-                              {role}
-                              {role !== 'user' && (
-                                <button
-                                  onClick={() => handleRemoveRole(userItem.user_id, role)}
-                                  disabled={isUpdatingRole}
-                                  className="ml-1 hover:text-destructive transition-colors"
-                                  title={language === 'tr' ? 'Rolü kaldır' : 'Remove role'}
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              )}
-                            </Badge>
-                          ))}
-                        </div>
+              cases.map(c => (
+                <Card key={c.id}>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="text-lg">{c.title || c.dispute_type || 'Case'}</CardTitle>
+                        <CardDescription>
+                          {c.your_name && c.other_party_name ? `${c.your_name} vs ${c.other_party_name}` : 'Parties pending'}
+                        </CardDescription>
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center gap-2">
+                      <Badge variant={c.status === 'submitted' ? 'default' : 'outline'}>{c.status}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {c.ai_summary && (
+                      <details className="text-sm">
+                        <summary className="cursor-pointer text-primary font-medium">
+                          {language === 'tr' ? 'AI Özeti' : 'AI Summary'}
+                        </summary>
+                        <p className="mt-2 text-muted-foreground whitespace-pre-wrap">
+                          {typeof c.ai_summary === 'object' && c.ai_summary !== null
+                            ? (c.ai_summary as any).neutralSummary || JSON.stringify(c.ai_summary)
+                            : String(c.ai_summary)}
+                        </p>
+                      </details>
+                    )}
+
+                    <div className="flex items-center gap-3">
+                      {c.assigned_mediator_id ? (
+                        <Badge variant="secondary">
+                          {language === 'tr' ? 'Arabulucu: ' : 'Mediator: '}{getMediatorName(c.assigned_mediator_id)}
+                        </Badge>
+                      ) : (
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => setSelectedUser(userItem)}
-                            >
-                              <Plus className="w-4 h-4 mr-2" />
-                              {language === 'tr' ? 'Rol Ekle' : 'Add Role'}
+                            <Button size="sm" onClick={() => setSelectedCase(c)}>
+                              <UserPlus className="w-4 h-4 mr-1" />
+                              {language === 'tr' ? 'Arabulucu Ata' : 'Assign Mediator'}
                             </Button>
                           </DialogTrigger>
                           <DialogContent>
                             <DialogHeader>
-                              <DialogTitle>
-                                {language === 'tr' ? 'Rol Ekle' : 'Add Role'}
-                              </DialogTitle>
-                              <DialogDescription>
-                                {language === 'tr' 
-                                  ? `${userItem.full_name || userItem.email} için yeni bir rol seçin.` 
-                                  : `Select a new role for ${userItem.full_name || userItem.email}.`}
-                              </DialogDescription>
+                              <DialogTitle>{language === 'tr' ? 'Arabulucu Ata' : 'Assign Mediator'}</DialogTitle>
+                              <DialogDescription>{language === 'tr' ? 'Bu dava için bir arabulucu seçin' : 'Select a mediator for this case'}</DialogDescription>
                             </DialogHeader>
-                            <div className="space-y-4 py-4">
-                              <Select
-                                value={roleToAdd}
-                                onValueChange={setRoleToAdd}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder={language === 'tr' ? 'Rol seçin...' : 'Select role...'} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {!userItem.roles.includes('mediator') && (
-                                    <SelectItem value="mediator">
-                                      {language === 'tr' ? 'Arabulucu' : 'Mediator'}
-                                    </SelectItem>
-                                  )}
-                                  {!userItem.roles.includes('admin') && (
-                                    <SelectItem value="admin">
-                                      {language === 'tr' ? 'Yönetici' : 'Admin'}
-                                    </SelectItem>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                              {userItem.roles.includes('mediator') && userItem.roles.includes('admin') && (
-                                <p className="text-sm text-muted-foreground">
-                                  {language === 'tr' 
-                                    ? 'Bu kullanıcı tüm rollere sahip.' 
-                                    : 'This user has all available roles.'}
-                                </p>
-                              )}
-                            </div>
+                            <Select value={selectedMediatorId} onValueChange={setSelectedMediatorId}>
+                              <SelectTrigger><SelectValue placeholder={language === 'tr' ? 'Arabulucu seçin' : 'Select mediator'} /></SelectTrigger>
+                              <SelectContent>
+                                {mediators.map(m => (
+                                  <SelectItem key={m.user_id} value={m.user_id}>
+                                    {m.full_name || m.email}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <DialogFooter>
-                              <Button 
-                                onClick={() => handleAddRole(userItem.user_id, roleToAdd)}
-                                disabled={!roleToAdd || isUpdatingRole}
-                              >
-                                {isUpdatingRole && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                {language === 'tr' ? 'Ekle' : 'Add'}
+                              <Button onClick={handleAssignMediator} disabled={!selectedMediatorId || isAssigning}>
+                                {isAssigning && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                {language === 'tr' ? 'Ata' : 'Assign'}
                               </Button>
                             </DialogFooter>
                           </DialogContent>
                         </Dialog>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
             )}
+          </TabsContent>
+
+          <TabsContent value="users" className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+              <Input
+                className="pl-10"
+                placeholder={language === 'tr' ? 'Kullanıcı ara...' : 'Search users...'}
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+              />
+            </div>
+            {filteredUsers.map(u => (
+              <Card key={u.user_id}>
+                <CardContent className="py-4 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{u.full_name || 'No name'}</p>
+                    <p className="text-sm text-muted-foreground">{u.email}</p>
+                    <div className="flex gap-1 mt-1">
+                      {u.roles.map(r => (
+                        <Badge key={r} variant={r === 'admin' ? 'default' : r === 'mediator' ? 'secondary' : 'outline'} className="text-xs">
+                          {r}
+                          {r !== 'user' && (
+                            <button className="ml-1" onClick={() => handleRemoveRole(u.user_id, r)} disabled={isUpdatingRole}>
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {!u.roles.includes('mediator') && (
+                      <Button size="sm" variant="outline" onClick={() => handleAddRole(u.user_id, 'mediator')} disabled={isUpdatingRole}>
+                        + Mediator
+                      </Button>
+                    )}
+                    {!u.roles.includes('admin') && (
+                      <Button size="sm" variant="outline" onClick={() => handleAddRole(u.user_id, 'admin')} disabled={isUpdatingRole}>
+                        + Admin
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </TabsContent>
         </Tabs>
       </div>
