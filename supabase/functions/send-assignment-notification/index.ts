@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 async function sendEmail(options: { from: string; to: string[]; subject: string; html: string }) {
@@ -27,12 +27,6 @@ async function sendEmail(options: { from: string; to: string[]; subject: string;
   return response.json();
 }
 
-interface AssignmentRequest {
-  requestId: string;
-  mediatorId: string;
-  language?: string;
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -41,10 +35,7 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -54,50 +45,38 @@ serve(async (req) => {
     });
 
     // Verify caller is admin
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabaseUserClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const { data: { user: callerUser } } = await supabaseUserClient.auth.getUser();
+    if (!callerUser) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const userId = claimsData.claims.sub as string;
-    const { data: isAdmin } = await supabaseUserClient.rpc("has_role", { _user_id: userId, _role: "admin" });
+    const { data: isAdmin } = await supabaseUserClient.rpc("has_role", { _user_id: callerUser.id, _role: "admin" });
     if (!isAdmin) {
-      return new Response(
-        JSON.stringify({ error: "Forbidden: Admin role required" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { requestId, mediatorId, language = "tr" } = await req.json() as AssignmentRequest;
-
-    if (!requestId || !mediatorId) {
-      return new Response(
-        JSON.stringify({ error: "Invalid request data" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const { caseId, mediatorId, language = "tr" } = await req.json();
+    if (!caseId || !mediatorId) {
+      return new Response(JSON.stringify({ error: "Invalid request" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Use service role for cross-user data access
     const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-    // Fetch request details with case and user info
-    const { data: requestData, error: fetchError } = await supabase
-      .from("mediator_requests")
-      .select(`
-        *,
-        cases (dispute_type, your_name, other_party_name),
-        profiles!mediator_requests_user_id_fkey (full_name, email)
-      `)
-      .eq("id", requestId)
+    // Fetch case
+    const { data: caseData } = await supabase
+      .from("cases")
+      .select("id, user_id, title, dispute_type, your_name, other_party_name")
+      .eq("id", caseId)
       .single();
 
-    if (fetchError || !requestData) {
-      throw new Error("Request not found");
-    }
+    if (!caseData) throw new Error("Case not found");
+
+    // Fetch case owner profile
+    const { data: ownerProfile } = await supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("user_id", caseData.user_id)
+      .single();
 
     // Fetch mediator profile
     const { data: mediatorProfile } = await supabase
@@ -106,164 +85,61 @@ serve(async (req) => {
       .eq("user_id", mediatorId)
       .single();
 
-    const isEnglish = language === "en";
-    const userEmail = requestData.profiles?.email;
-    const userName = requestData.profiles?.full_name || (isEnglish ? "Dear User" : "Değerli Kullanıcı");
-    const mediatorName = mediatorProfile?.full_name || (isEnglish ? "a mediator" : "bir arabulucu");
-    const caseInfo = requestData.cases;
+    const isEn = language === "en";
+    const ownerName = ownerProfile?.full_name || (isEn ? "Dear User" : "Değerli Kullanıcı");
+    const mediatorName = mediatorProfile?.full_name || (isEn ? "a mediator" : "bir arabulucu");
+    const caseTitle = caseData.title || `${caseData.your_name || ""} vs ${caseData.other_party_name || ""}`;
 
-    // Send email to case owner
-    if (userEmail) {
+    // Email to case owner
+    if (ownerProfile?.email) {
       await sendEmail({
         from: "MediationPath <onboarding@resend.dev>",
-        to: [userEmail],
-        subject: isEnglish
-          ? "A Mediator Has Been Assigned to Your Case"
-          : "Davanıza Bir Arabulucu Atandı",
-        html: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: #4F46E5; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
-              .content { background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; }
-              .highlight-box { background: #EEF2FF; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; }
-              .mediator-name { font-size: 22px; font-weight: bold; color: #4F46E5; }
-              .section { margin: 20px 0; }
-              .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #666; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1 style="margin: 0;">👤 ${isEnglish ? "Mediator Assigned!" : "Arabulucu Atandı!"}</h1>
-              </div>
-              <div class="content">
-                <p>${isEnglish ? "Dear" : "Sayın"} ${userName},</p>
-                <p>${isEnglish
-                  ? "A mediator has been assigned to your case. They will review your case details and contact you to schedule a session."
-                  : "Davanıza bir arabulucu atandı. Dava detaylarınızı inceleyecek ve oturum planlamak için sizinle iletişime geçecektir."
-                }</p>
-                <div class="highlight-box">
-                  <div style="font-size: 14px; color: #666; margin-bottom: 4px;">${isEnglish ? "Your Mediator" : "Arabulucunuz"}</div>
-                  <div class="mediator-name">${mediatorName}</div>
-                </div>
-                ${caseInfo ? `
-                <div class="section">
-                  <p><strong>${isEnglish ? "Case:" : "Dava:"}</strong> ${caseInfo.your_name || ""} ${caseInfo.other_party_name ? `vs ${caseInfo.other_party_name}` : ""}</p>
-                  <p><strong>${isEnglish ? "Type:" : "Tür:"}</strong> ${caseInfo.dispute_type || (isEnglish ? "General" : "Genel")}</p>
-                </div>
-                ` : ""}
-                <div class="section">
-                  <p><strong>${isEnglish ? "What's next?" : "Sırada ne var?"}</strong></p>
-                  <ul>
-                    <li>${isEnglish ? "Your mediator will review your case" : "Arabulucunuz davanızı inceleyecek"}</li>
-                    <li>${isEnglish ? "They will contact you to schedule a session" : "Oturum planlamak için sizinle iletişime geçecek"}</li>
-                    <li>${isEnglish ? "You can check your dashboard for updates" : "Güncellemeler için panelinizi kontrol edebilirsiniz"}</li>
-                  </ul>
-                </div>
-                <div class="footer">
-                  <p>${isEnglish ? "Best regards," : "Saygılarımızla,"}<br>
-                  <strong>MediationPath ${isEnglish ? "Team" : "Ekibi"}</strong></p>
-                </div>
-              </div>
-            </div>
-          </body>
-          </html>
-        `,
+        to: [ownerProfile.email],
+        subject: isEn ? "Mediator Assigned to Your Case" : "Davanıza Arabulucu Atandı",
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;">
+          <h2>${isEn ? "Mediator Assigned" : "Arabulucu Atandı"}</h2>
+          <p>${isEn ? "Dear" : "Sayın"} ${ownerName},</p>
+          <p>${isEn ? `<strong>${mediatorName}</strong> has been assigned to your case "<em>${caseTitle}</em>".` : `<strong>${mediatorName}</strong> "<em>${caseTitle}</em>" davanıza arabulucu olarak atandı.`}</p>
+          <p>${isEn ? "They will review your case and contact you." : "Davanızı inceleyecek ve sizinle iletişime geçecek."}</p>
+          <p>MediationPath</p></div>`,
       });
-      console.log("Assignment notification email sent to user:", userEmail);
     }
 
-    // Send email to mediator
+    // Email to mediator
     if (mediatorProfile?.email) {
       await sendEmail({
         from: "MediationPath <onboarding@resend.dev>",
         to: [mediatorProfile.email],
-        subject: isEnglish
-          ? "You Have Been Assigned a New Case"
-          : "Size Yeni Bir Dava Atandı",
-        html: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: #4F46E5; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
-              .content { background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; }
-              .info-box { background: white; padding: 15px; border-radius: 6px; border: 1px solid #e5e7eb; margin: 15px 0; }
-              .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #666; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1 style="margin: 0;">📋 ${isEnglish ? "New Case Assignment" : "Yeni Dava Ataması"}</h1>
-              </div>
-              <div class="content">
-                <p>${isEnglish ? "Dear" : "Sayın"} ${mediatorName},</p>
-                <p>${isEnglish
-                  ? "You have been assigned a new mediation case. Please review the details and schedule a session."
-                  : "Size yeni bir arabuluculuk davası atandı. Lütfen detayları inceleyin ve bir oturum planlayın."
-                }</p>
-                ${caseInfo ? `
-                <div class="info-box">
-                  <p><strong>${isEnglish ? "Parties:" : "Taraflar:"}</strong> ${caseInfo.your_name || ""} ${caseInfo.other_party_name ? `& ${caseInfo.other_party_name}` : ""}</p>
-                  <p><strong>${isEnglish ? "Dispute Type:" : "Uyuşmazlık Türü:"}</strong> ${caseInfo.dispute_type || (isEnglish ? "General" : "Genel")}</p>
-                </div>
-                ` : ""}
-                <p>${isEnglish
-                  ? "Please log in to your dashboard to review the full case details and schedule a session."
-                  : "Tam dava detaylarını incelemek ve oturum planlamak için lütfen panelinize giriş yapın."
-                }</p>
-                <div class="footer">
-                  <p>${isEnglish ? "Best regards," : "Saygılarımızla,"}<br>
-                  <strong>MediationPath ${isEnglish ? "Team" : "Ekibi"}</strong></p>
-                </div>
-              </div>
-            </div>
-          </body>
-          </html>
-        `,
+        subject: isEn ? "New Case Assignment" : "Yeni Dava Ataması",
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;">
+          <h2>${isEn ? "New Case Assigned" : "Yeni Dava Atandı"}</h2>
+          <p>${isEn ? "Dear" : "Sayın"} ${mediatorName},</p>
+          <p>${isEn ? `You've been assigned to case "<em>${caseTitle}</em>".` : `"<em>${caseTitle}</em>" davası size atandı.`}</p>
+          <p>${isEn ? "Please log in to review and schedule a session." : "Lütfen giriş yaparak inceleyin ve oturum planlayın."}</p>
+          <p>MediationPath</p></div>`,
       });
-      console.log("Assignment notification email sent to mediator:", mediatorProfile.email);
     }
 
-    // Create in-app notifications for both parties
-    const { error: userNotifError } = await supabase.rpc("create_notification", {
-      p_user_id: requestData.user_id,
-      p_title: isEnglish ? "Mediator Assigned" : "Arabulucu Atandı",
-      p_message: isEnglish
-        ? `${mediatorName} has been assigned as your mediator.`
-        : `${mediatorName} arabulucunuz olarak atandı.`,
-      p_type: "info",
+    // In-app notifications
+    await supabase.rpc("create_notification", {
+      p_user_id: caseData.user_id,
+      p_title: isEn ? "Mediator Assigned" : "Arabulucu Atandı",
+      p_message: isEn ? `${mediatorName} assigned to your case.` : `${mediatorName} davanıza atandı.`,
+      p_type: "mediator_assigned",
       p_link: "/dashboard",
     });
-    if (userNotifError) console.error("User notification error:", userNotifError);
 
-    const { error: mediatorNotifError } = await supabase.rpc("create_notification", {
+    await supabase.rpc("create_notification", {
       p_user_id: mediatorId,
-      p_title: isEnglish ? "New Case Assigned" : "Yeni Dava Atandı",
-      p_message: isEnglish
-        ? `You have been assigned a new mediation case.`
-        : `Size yeni bir arabuluculuk davası atandı.`,
-      p_type: "info",
+      p_title: isEn ? "New Case" : "Yeni Dava",
+      p_message: isEn ? `You've been assigned to "${caseTitle}".` : `"${caseTitle}" davası size atandı.`,
+      p_type: "mediator_assigned",
       p_link: "/mediator",
     });
-    if (mediatorNotifError) console.error("Mediator notification error:", mediatorNotifError);
 
-    return new Response(
-      JSON.stringify({ success: true }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ success: true }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
-    console.error("Error in send-assignment-notification:", error);
-    return new Response(
-      JSON.stringify({ error: "An error occurred" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    console.error("Error:", error);
+    return new Response(JSON.stringify({ error: "Internal error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });

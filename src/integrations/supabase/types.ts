@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      case_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string
+          case_id: string
+          id: string
+          mediator_id: string
+          note: string | null
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by: string
+          case_id: string
+          id?: string
+          mediator_id: string
+          note?: string | null
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string
+          case_id?: string
+          id?: string
+          mediator_id?: string
+          note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_assignments_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_documents: {
         Row: {
           case_id: string
@@ -55,11 +90,57 @@ export type Database = {
           },
         ]
       }
+      case_parties: {
+        Row: {
+          case_id: string
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          organization: string | null
+          phone: string | null
+          role: string
+          user_id: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          organization?: string | null
+          phone?: string | null
+          role: string
+          user_id?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          organization?: string | null
+          phone?: string | null
+          role?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_parties_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cases: {
         Row: {
           additional_notes: string | null
           ai_summary: Json | null
+          assigned_mediator_id: string | null
           attempted_resolution: string | null
+          category: string | null
           created_at: string
           desired_outcome: string | null
           dispute_type: string | null
@@ -73,6 +154,7 @@ export type Database = {
           relationship: string | null
           status: string
           timeline: string | null
+          title: string | null
           updated_at: string
           user_id: string
           your_name: string | null
@@ -81,7 +163,9 @@ export type Database = {
         Insert: {
           additional_notes?: string | null
           ai_summary?: Json | null
+          assigned_mediator_id?: string | null
           attempted_resolution?: string | null
+          category?: string | null
           created_at?: string
           desired_outcome?: string | null
           dispute_type?: string | null
@@ -95,6 +179,7 @@ export type Database = {
           relationship?: string | null
           status?: string
           timeline?: string | null
+          title?: string | null
           updated_at?: string
           user_id: string
           your_name?: string | null
@@ -103,7 +188,9 @@ export type Database = {
         Update: {
           additional_notes?: string | null
           ai_summary?: Json | null
+          assigned_mediator_id?: string | null
           attempted_resolution?: string | null
+          category?: string | null
           created_at?: string
           desired_outcome?: string | null
           dispute_type?: string | null
@@ -117,6 +204,7 @@ export type Database = {
           relationship?: string | null
           status?: string
           timeline?: string | null
+          title?: string | null
           updated_at?: string
           user_id?: string
           your_name?: string | null
@@ -249,8 +337,44 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          case_id: string
+          content: string
+          created_at: string
+          id: string
+          sender_id: string
+          sender_role: string | null
+        }
+        Insert: {
+          case_id: string
+          content: string
+          created_at?: string
+          id?: string
+          sender_id: string
+          sender_role?: string | null
+        }
+        Update: {
+          case_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          sender_id?: string
+          sender_role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
+          case_id: string | null
           created_at: string
           id: string
           link: string | null
@@ -261,6 +385,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          case_id?: string | null
           created_at?: string
           id?: string
           link?: string | null
@@ -271,6 +396,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          case_id?: string | null
           created_at?: string
           id?: string
           link?: string | null
@@ -280,7 +406,15 @@ export type Database = {
           type?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "notifications_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -396,6 +530,44 @@ export type Database = {
             columns: ["mediator_request_id"]
             isOneToOne: false
             referencedRelation: "mediator_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sessions: {
+        Row: {
+          case_id: string
+          created_at: string
+          created_by: string
+          duration_min: number | null
+          id: string
+          scheduled_for: string | null
+          status: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          created_by: string
+          duration_min?: number | null
+          id?: string
+          scheduled_for?: string | null
+          status?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          created_by?: string
+          duration_min?: number | null
+          id?: string
+          scheduled_for?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
             referencedColumns: ["id"]
           },
         ]

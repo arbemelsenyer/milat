@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IntakeFormData, initialFormData } from '@/types/intake';
+import { supabase } from '@/integrations/supabase/client';
 import { StepIndicator } from './StepIndicator';
 import {
   Step1DisputeType,
@@ -216,12 +217,60 @@ export function IntakeForm() {
   const handleSubmit = async () => {
     setIsProcessing(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
     try {
       const summary = generateCaseSummary(formData);
       
-      // Create CaseFile for the decision flow
+      if (user && caseId) {
+        // Save case with submitted status, title and category
+        const title = `${formData.yourName} vs ${formData.otherPartyName}`;
+        const category = formData.disputeType || 'other';
+        
+        await supabase.from('cases').update({
+          status: 'submitted',
+          title,
+          category,
+          ai_summary: summary as unknown as import('@/integrations/supabase/types').Json,
+        }).eq('id', caseId);
+
+        // Also save form fields
+        await saveCase(caseId, formData);
+
+        // Insert claimant party
+        await supabase.from('case_parties').insert({
+          case_id: caseId,
+          user_id: user.id,
+          role: 'claimant' as const,
+          full_name: formData.yourName,
+        });
+
+        // Insert respondent party
+        await supabase.from('case_parties').insert({
+          case_id: caseId,
+          role: 'respondent' as const,
+          full_name: formData.otherPartyName,
+          user_id: null,
+        });
+
+        // Create notification for creator
+        await supabase.rpc('create_notification', {
+          p_user_id: user.id,
+          p_title: language === 'tr' ? 'Başvuru Gönderildi' : 'Case Submitted',
+          p_message: language === 'tr' 
+            ? `"${title}" başvurunuz başarıyla gönderildi.`
+            : `Your case "${title}" has been submitted successfully.`,
+          p_type: 'case_submitted',
+        });
+
+        toast({
+          title: language === 'tr' ? 'Başvuru Gönderildi' : 'Case Submitted',
+          description: language === 'tr' ? 'Başvurunuz başarıyla gönderildi.' : 'Your case has been submitted.',
+        });
+
+        navigate(`/dashboard`);
+        return;
+      }
+
+      // Fallback for non-logged-in users (shouldn't happen normally)
       const newCaseFile: CaseFile = {
         intake: {
           disputeType: formData.disputeType as CaseFile['intake']['disputeType'],
@@ -242,19 +291,12 @@ export function IntakeForm() {
         status: 'structured',
       };
       
-      // Save to database if user is logged in
-      if (user && caseId) {
-        await saveCase(caseId, formData, 'submitted');
-        await saveSummary(caseId, summary as unknown as import('@/integrations/supabase/types').Json);
-      }
-      
       setCaseFile(newCaseFile);
       sessionStorage.setItem('caseSummary', JSON.stringify(summary));
       sessionStorage.setItem('intakeData', JSON.stringify(formData));
-      sessionStorage.setItem('currentCaseId', caseId || '');
-      
       setFlowPhase('decision');
     } catch (error) {
+      console.error('Submit error:', error);
       toast({
         title: t('toast.error'),
         description: t('toast.tryAgain'),
