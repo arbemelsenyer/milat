@@ -181,7 +181,7 @@ export type Database = {
           timeline?: string | null
           title?: string | null
           updated_at?: string
-          user_id: string
+          user_id?: string
           your_name?: string | null
           your_role?: string | null
         }
