@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Shield, Users, MessageCircle, Lock, LogIn } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -9,6 +10,14 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>MediationPath — Pre-Mediation Intake & Online Dispute Resolution</title>
+        <meta name="description" content="Structure your dispute with a calm, neutral pre-mediation intake. Get an AI-assisted summary and choose AI exploration or a human mediator." />
+        <link rel="canonical" href="/" />
+        <meta property="og:title" content="MediationPath — Pre-Mediation Intake & Online Dispute Resolution" />
+        <meta property="og:description" content="Structure your dispute with a calm, neutral pre-mediation intake. Choose AI exploration or a human mediator." />
+        <meta property="og:url" content="/" />
+      </Helmet>
       {/* Header */}
       <header className="border-b border-border">
         <div className="container max-w-6xl py-4 px-4 flex items-center justify-between">
@@ -69,7 +78,7 @@ export default function Landing() {
               </Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="text-base">
-              <a href="#how-it-works">{t('landing.learnMore')}</a>
+              <a href="#how-it-works">{language === 'tr' ? 'Arabuluculuk Nasıl Çalışır' : 'How Mediation Works'}</a>
             </Button>
           </div>
         </div>
