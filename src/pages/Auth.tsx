@@ -293,7 +293,7 @@ export default function AuthPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
