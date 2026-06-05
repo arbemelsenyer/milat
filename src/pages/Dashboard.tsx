@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -102,9 +103,15 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>My Cases | MediationPath Dashboard</title>
+        <meta name="description" content="View, continue, and manage your mediation cases. Track notifications and your case status in one place." />
+        <link rel="canonical" href="/dashboard" />
+        <meta name="robots" content="noindex" />
+      </Helmet>
       <AppNavbar />
 
-      <div className="container max-w-6xl py-8 px-4">
+      <main className="container max-w-6xl py-8 px-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground">
@@ -137,7 +144,7 @@ export default function Dashboard() {
                     <p className="text-sm font-medium">{n.title}</p>
                     <p className="text-xs text-muted-foreground">{n.message}</p>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => markAsRead(n.id)}>
+                  <Button variant="ghost" size="sm" onClick={() => markAsRead(n.id)} aria-label={language === 'tr' ? 'Okundu olarak işaretle' : 'Mark as read'}>
                     <Eye className="w-4 h-4" />
                   </Button>
                 </CardContent>
@@ -208,7 +215,7 @@ export default function Dashboard() {
             })}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

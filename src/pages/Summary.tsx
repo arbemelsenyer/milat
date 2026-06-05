@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { CaseSummary } from '@/types/intake';
 import { Button } from '@/components/ui/button';
 import {
@@ -114,6 +115,12 @@ export default function SummaryPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Your Neutral Case Summary | MediationPath</title>
+        <meta name="description" content="Review your AI-generated neutral case summary, key issues, and potential resolution pathways. Download as PDF or HTML." />
+        <link rel="canonical" href="/summary" />
+        <meta name="robots" content="noindex" />
+      </Helmet>
       {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="container max-w-4xl py-4 px-4 flex items-center justify-between">
@@ -160,6 +167,7 @@ export default function SummaryPage() {
           </div>
 
           <div className="p-6 space-y-6">
+            <h2 className="sr-only">{labels.neutralSummary}</h2>
             {/* Dispute type */}
             <div>
               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-1">

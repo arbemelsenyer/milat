@@ -489,6 +489,9 @@ export function IntakeForm() {
 
       {/* Form content */}
       <main className="container max-w-2xl py-8 px-4">
+        <h1 className="sr-only">
+          {language === 'tr' ? 'Arabuluculuk Başvuru Formu' : 'Mediation Intake Form'}
+        </h1>
         {renderStep()}
 
         {/* Navigation buttons */}
