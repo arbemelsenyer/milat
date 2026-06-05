@@ -598,6 +598,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_case: {
+        Args: { _case_id: string; _user_id: string }
+        Returns: boolean
+      }
       create_notification: {
         Args: {
           p_link?: string
