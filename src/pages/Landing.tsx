@@ -47,6 +47,7 @@ export default function Landing() {
         </div>
       </header>
 
+      <main>
       {/* Hero */}
       <section className="py-16 md:py-24">
         <div className="container max-w-4xl px-4 text-center">
@@ -169,6 +170,7 @@ export default function Landing() {
           </Button>
         </div>
       </section>
+      </main>
 
       {/* Footer */}
       <footer className="border-t border-border py-8">
