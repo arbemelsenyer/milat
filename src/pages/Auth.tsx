@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -108,6 +109,14 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <Helmet>
+        <title>Login or Sign Up | MediationPath</title>
+        <meta name="description" content="Log in or create a MediationPath account to save your intake, track your cases, and message your mediator." />
+        <link rel="canonical" href="/auth" />
+        <meta property="og:title" content="Login or Sign Up | MediationPath" />
+        <meta property="og:description" content="Access your MediationPath dashboard to track cases and message your mediator." />
+        <meta property="og:url" content="/auth" />
+      </Helmet>
       {/* Header */}
       <header className="border-b border-border">
         <div className="container max-w-6xl py-4 px-4 flex items-center justify-between">
@@ -124,7 +133,7 @@ export default function AuthPage() {
       </header>
 
       {/* Content */}
-      <div className="flex-1 flex items-center justify-center p-4">
+      <main className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <Link 
             to="/" 
