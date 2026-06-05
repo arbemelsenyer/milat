@@ -1,0 +1,15 @@
+# MediationPath
+
+> A calm, neutral pre-mediation intake tool that helps people structure a dispute and prepare for resolution. Available in English and Turkish. Not legal advice.
+
+MediationPath guides users through a structured intake (dispute type, parties, narrative, desired outcome, documents), produces a neutral AI-assisted case summary, and then offers two paths: AI-assisted option exploration or scheduling with a human mediator. Submitted cases are tracked through a role-based workflow (user, mediator, admin) with notifications and in-case messaging.
+
+## Pages
+
+- [Home](/): Overview of how the intake and mediation flow works, plus the privacy stance.
+- [Start Intake](/intake): Step-by-step intake form to structure a dispute and generate a neutral summary.
+- [Login / Sign Up](/auth): Authentication to save cases and access the dashboard.
+
+## Optional
+
+- [Summary](/summary): Generated neutral case summary view (requires a completed intake in the session).
