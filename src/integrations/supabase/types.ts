@@ -602,6 +602,7 @@ export type Database = {
         Args: { _case_id: string; _user_id: string }
         Returns: boolean
       }
+      can_access_realtime_topic: { Args: { _topic: string }; Returns: boolean }
       create_notification: {
         Args: {
           p_link?: string
