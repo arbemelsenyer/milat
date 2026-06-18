@@ -14,6 +14,9 @@ import AdminDashboard from "./pages/AdminDashboard";
 import Analytics from "./pages/Analytics";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import ExpertWitness from "./pages/ExpertWitness";
+import LegalPrecedents from "./pages/LegalPrecedents";
+import AgreementGenerator from "./pages/AgreementGenerator";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +37,9 @@ const App = () => (
             <Route path="/profile" element={<Profile />} />
             <Route path="/intake" element={<IntakePage />} />
             <Route path="/summary" element={<SummaryPage />} />
+          <Route path="/expert-witness" element={<ExpertWitness />} />
+<Route path="/legal-precedents" element={<LegalPrecedents />} />
+<Route path="/agreement-generator" element={<AgreementGenerator />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
