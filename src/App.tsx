@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 import ExpertWitness from "./pages/ExpertWitness";
 import LegalPrecedents from "./pages/LegalPrecedents";
 import AgreementGenerator from "./pages/AgreementGenerator";
+import LegalReasoningEngine from "./pages/LegalReasoningEngine";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
           <Route path="/expert-witness" element={<ExpertWitness />} />
 <Route path="/legal-precedents" element={<LegalPrecedents />} />
 <Route path="/agreement-generator" element={<AgreementGenerator />} />
+<Route path="/legal-reasoning" element={<LegalReasoningEngine />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
