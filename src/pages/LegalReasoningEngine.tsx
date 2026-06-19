@@ -30,8 +30,8 @@ const NIS_ALANLAR = [
   { value: 'isci_isveren', label: 'Isci-Isveren', icon: '👷' },
   { value: 'ticari', label: 'Ticari Uyusmazlik', icon: '🏢' },
   { value: 'tuketici', label: 'Tuketici', icon: '🛒' },
-  { value: 'saglik_turizmi', label: 'Saglik Turizmi', icon: '🏥' },
-  { value: 'sigorta', label: 'Sigorta Tahkim', icon: '📋' },
+ { value: 'saglik_turizmi', label: 'Sağlık Hukuku Uyuşmazlıkları', icon: '🏥' },
+ { value: 'sigorta', label: 'Sigorta Hukuku Uyuşmazlıkları', icon: '📋' },
   { value: 'insaat', label: 'Insaat & Yapi', icon: '🏗️' },
   { value: 'marka_patent', label: 'Marka & Patent', icon: '™️' },
 ];
