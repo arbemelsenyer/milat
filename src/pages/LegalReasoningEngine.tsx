@@ -71,6 +71,11 @@ export default function LegalReasoningEngine() {
   const t = (tr: string, en: string) => language === 'tr' ? tr : en;
   const [asama, setAsama] = useState<Asama>('form');
   const [nisAlan, setNisAlan] = useState('');
+  const [basvuranAd, setBasvuranAd] = useState('');
+  const [basvuranIletisim, setBasvuranIletisim] = useState('');
+  const [karsiTarafAd, setKarsiTarafAd] = useState('');
+  const [karsiTarafIletisim, setKarsiTarafIletisim] = useState('');
+  const [taraflarIliski, setTaraflarIliski] = useState('');
   const [uyusmazlik, setUyusmazlik] = useState('');
   const [maskelenmisMetin, setMaskelenmisMetin] = useState('');
   const [eslesmeler, setEslesmeler] = useState<Record<string, string>>({});
