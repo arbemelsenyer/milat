@@ -272,5 +272,3 @@ export default function LegalReasoningEngine() {
     </div>
   );
 }
-import LegalReasoningEngine from "./pages/LegalReasoningEngine";
-<Route path="/legal-reasoning" element={<LegalReasoningEngine />} />
