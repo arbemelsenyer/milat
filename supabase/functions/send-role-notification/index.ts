@@ -176,8 +176,8 @@ serve(async (req) => {
               
               ${action === "added" ? `
                 <p>${isEnglish 
-                  ? "Great news! You have been granted a new role on MediationPath:"
-                  : "Harika haber! MediationPath'te size yeni bir rol verildi:"}</p>
+                  ? "Great news! You have been granted a new role on MediPact AI:"
+                  : "Harika haber! MediPact AI'te size yeni bir rol verildi:"}</p>
                 <div style="text-align: center;">
                   <span class="role-badge">${roleLabel}</span>
                 </div>
@@ -208,7 +208,7 @@ serve(async (req) => {
               </div>
               
               <div class="footer">
-                <p>${isEnglish ? "Best regards," : "Saygılarımızla,"}<br><strong>MediationPath ${isEnglish ? "Team" : "Ekibi"}</strong></p>
+                <p>${isEnglish ? "Best regards," : "Saygılarımızla,"}<br><strong>MediPact AI ${isEnglish ? "Team" : "Ekibi"}</strong></p>
               </div>
             </div>
           </div>
@@ -224,7 +224,7 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "MediationPath <onboarding@resend.dev>",
+            from: "MediPact AI <onboarding@resend.dev>",
             to: [profile.email],
             subject: emailSubject,
             html: emailHtml,

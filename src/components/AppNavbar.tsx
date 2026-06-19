@@ -26,7 +26,7 @@ export function AppNavbar() {
             <MessageCircle className="w-4 h-4 text-primary-foreground" />
           </div>
           <span className="font-display font-semibold text-xl text-foreground">
-            MediationPath
+            MediPact AI
           </span>
         </Link>
 

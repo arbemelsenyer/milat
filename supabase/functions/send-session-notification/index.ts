@@ -237,7 +237,7 @@ serve(async (req) => {
             
             <div class="footer">
               <p>${isEnglish ? "Best regards," : "Saygılarımızla,"}<br>
-              <strong>MediationPath ${isEnglish ? "Team" : "Ekibi"}</strong></p>
+              <strong>MediPact AI ${isEnglish ? "Team" : "Ekibi"}</strong></p>
             </div>
           </div>
         </div>
@@ -246,7 +246,7 @@ serve(async (req) => {
     `;
 
     const emailResponse = await resend.emails.send({
-      from: "MediationPath <onboarding@resend.dev>",
+      from: "MediPact AI <onboarding@resend.dev>",
       to: [userEmail],
       subject: isEnglish 
         ? `Your Mediation Session is Scheduled - ${formattedDate}` 

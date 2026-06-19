@@ -93,7 +93,7 @@ serve(async (req) => {
     // Email to case owner
     if (ownerProfile?.email) {
       await sendEmail({
-        from: "MediationPath <onboarding@resend.dev>",
+        from: "MediPact AI <onboarding@resend.dev>",
         to: [ownerProfile.email],
         subject: isEn ? "Mediator Assigned to Your Case" : "Davanıza Arabulucu Atandı",
         html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;">
@@ -101,14 +101,14 @@ serve(async (req) => {
           <p>${isEn ? "Dear" : "Sayın"} ${ownerName},</p>
           <p>${isEn ? `<strong>${mediatorName}</strong> has been assigned to your case "<em>${caseTitle}</em>".` : `<strong>${mediatorName}</strong> "<em>${caseTitle}</em>" davanıza arabulucu olarak atandı.`}</p>
           <p>${isEn ? "They will review your case and contact you." : "Davanızı inceleyecek ve sizinle iletişime geçecek."}</p>
-          <p>MediationPath</p></div>`,
+          <p>MediPact AI</p></div>`,
       });
     }
 
     // Email to mediator
     if (mediatorProfile?.email) {
       await sendEmail({
-        from: "MediationPath <onboarding@resend.dev>",
+        from: "MediPact AI <onboarding@resend.dev>",
         to: [mediatorProfile.email],
         subject: isEn ? "New Case Assignment" : "Yeni Dava Ataması",
         html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;">
@@ -116,7 +116,7 @@ serve(async (req) => {
           <p>${isEn ? "Dear" : "Sayın"} ${mediatorName},</p>
           <p>${isEn ? `You've been assigned to case "<em>${caseTitle}</em>".` : `"<em>${caseTitle}</em>" davası size atandı.`}</p>
           <p>${isEn ? "Please log in to review and schedule a session." : "Lütfen giriş yaparak inceleyin ve oturum planlayın."}</p>
-          <p>MediationPath</p></div>`,
+          <p>MediPact AI</p></div>`,
       });
     }
 

@@ -1,8 +1,8 @@
-# MediationPath
+# MediPact AI
 
 > A calm, neutral pre-mediation intake tool that helps people structure a dispute and prepare for resolution. Available in English and Turkish. Not legal advice.
 
-MediationPath guides users through a structured intake (dispute type, parties, narrative, desired outcome, documents), produces a neutral AI-assisted case summary, and then offers two paths: AI-assisted option exploration or scheduling with a human mediator. Submitted cases are tracked through a role-based workflow (user, mediator, admin) with notifications and in-case messaging.
+MediPact AI guides users through a structured intake (dispute type, parties, narrative, desired outcome, documents), produces a neutral AI-assisted case summary, and then offers two paths: AI-assisted option exploration or scheduling with a human mediator. Submitted cases are tracked through a role-based workflow (user, mediator, admin) with notifications and in-case messaging.
 
 ## Pages
 

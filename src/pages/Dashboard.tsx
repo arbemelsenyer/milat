@@ -104,7 +104,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       <Helmet>
-        <title>My Cases | MediationPath Dashboard</title>
+        <title>My Cases | MediPact AI Dashboard</title>
         <meta name="description" content="View, continue, and manage your mediation cases. Track notifications and your case status in one place." />
         <link rel="canonical" href="/dashboard" />
         <meta name="robots" content="noindex" />
