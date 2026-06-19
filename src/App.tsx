@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 import ExpertWitness from "./pages/ExpertWitness";
 import LegalPrecedents from "./pages/LegalPrecedents";
 import AgreementGenerator from "./pages/AgreementGenerator";
+import LegalReasoningEngine from "./pages/LegalReasoningEngine";
 
 const queryClient = new QueryClient();
 
