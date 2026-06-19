@@ -71,6 +71,11 @@ export default function LegalReasoningEngine() {
   const t = (tr: string, en: string) => language === 'tr' ? tr : en;
   const [asama, setAsama] = useState<Asama>('form');
   const [nisAlan, setNisAlan] = useState('');
+  const [basvuranAd, setBasvuranAd] = useState('');
+  const [basvuranIletisim, setBasvuranIletisim] = useState('');
+  const [karsiTarafAd, setKarsiTarafAd] = useState('');
+  const [karsiTarafIletisim, setKarsiTarafIletisim] = useState('');
+  const [taraflarIliski, setTaraflarIliski] = useState('');
   const [uyusmazlik, setUyusmazlik] = useState('');
   const [maskelenmisMetin, setMaskelenmisMetin] = useState('');
   const [eslesmeler, setEslesmeler] = useState<Record<string, string>>({});
@@ -155,6 +160,37 @@ export default function LegalReasoningEngine() {
                     <span className={`text-sm font-medium ${nisAlan===n.value?'text-primary':''}`}>{n.label}</span>
                   </button>
                 ))}
+              </div>
+            </div>
+            <div className="border border-border rounded-lg p-4 space-y-4 bg-card">
+              <p className="text-sm font-medium">{t('Taraf Bilgileri','Party Information')}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">{t('Basvuran Adi Soyadi','Applicant Full Name')}</label>
+                  <input value={basvuranAd} onChange={e=>setBasvuranAd(e.target.value)} className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background"/>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">{t('Basvuran Iletisim','Applicant Contact')}</label>
+                  <input value={basvuranIletisim} onChange={e=>setBasvuranIletisim(e.target.value)} placeholder={t('E-posta veya telefon','Email or phone')} className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background"/>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">{t('Karsi Taraf Adi Soyadi','Counterparty Full Name')}</label>
+                  <input value={karsiTarafAd} onChange={e=>setKarsiTarafAd(e.target.value)} className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background"/>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">{t('Karsi Taraf Iletisim','Counterparty Contact')}</label>
+                  <input value={karsiTarafIletisim} onChange={e=>setKarsiTarafIletisim(e.target.value)} placeholder={t('E-posta veya telefon','Email or phone')} className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background"/>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">{t('Taraflar Arasindaki Iliski','Relationship Between Parties')}</label>
+                <select value={taraflarIliski} onChange={e=>setTaraflarIliski(e.target.value)} className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background">
+                  <option value="">{t('Seciniz','Select')}</option>
+                  <option value="is">{t('Is','Employment')}</option>
+                  <option value="ticari">{t('Ticari','Commercial')}</option>
+                  <option value="tuketici">{t('Tuketici','Consumer')}</option>
+                  <option value="diger">{t('Diger','Other')}</option>
+                </select>
               </div>
             </div>
             <div>
