@@ -116,7 +116,7 @@ export default function SummaryPage() {
   return (
     <div className="min-h-screen bg-background">
       <Helmet>
-        <title>Your Neutral Case Summary | MediationPath</title>
+        <title>Your Neutral Case Summary | MediPact AI</title>
         <meta name="description" content="Review your AI-generated neutral case summary, key issues, and potential resolution pathways. Download as PDF or HTML." />
         <link rel="canonical" href="/summary" />
         <meta name="robots" content="noindex" />
@@ -129,7 +129,7 @@ export default function SummaryPage() {
               <MessageCircle className="w-4 h-4 text-primary-foreground" />
             </div>
             <span className="font-display font-semibold text-xl text-foreground">
-              MediationPath
+              MediPact AI
             </span>
           </Link>
           <LanguageToggle />

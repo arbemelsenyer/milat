@@ -110,11 +110,11 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Helmet>
-        <title>Login or Sign Up | MediationPath</title>
-        <meta name="description" content="Log in or create a MediationPath account to save your intake, track your cases, and message your mediator." />
+        <title>Login or Sign Up | MediPact AI</title>
+        <meta name="description" content="Log in or create a MediPact AI account to save your intake, track your cases, and message your mediator." />
         <link rel="canonical" href="/auth" />
-        <meta property="og:title" content="Login or Sign Up | MediationPath" />
-        <meta property="og:description" content="Access your MediationPath dashboard to track cases and message your mediator." />
+        <meta property="og:title" content="Login or Sign Up | MediPact AI" />
+        <meta property="og:description" content="Access your MediPact AI dashboard to track cases and message your mediator." />
         <meta property="og:url" content="/auth" />
       </Helmet>
       {/* Header */}
@@ -125,7 +125,7 @@ export default function AuthPage() {
               <MessageCircle className="w-4 h-4 text-primary-foreground" />
             </div>
             <span className="font-display font-semibold text-xl text-foreground">
-              MediationPath
+              MediPact AI
             </span>
           </Link>
           <LanguageToggle />

@@ -143,7 +143,7 @@ serve(async (req) => {
           <p>${bodyText}</p>
           ${reasonBlock}
           <div class="footer">
-            <p>${isEnglish ? "Best regards," : "Saygılarımızla,"}<br><strong>MediationPath ${isEnglish ? "Team" : "Ekibi"}</strong></p>
+            <p>${isEnglish ? "Best regards," : "Saygılarımızla,"}<br><strong>MediPact AI ${isEnglish ? "Team" : "Ekibi"}</strong></p>
           </div>
         </div>
       </div>
@@ -156,7 +156,7 @@ serve(async (req) => {
         method: "POST",
         headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: "MediationPath <onboarding@resend.dev>",
+          from: "MediPact AI <onboarding@resend.dev>",
           to: [profile.email],
           subject,
           html: htmlContent,

@@ -11,10 +11,10 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background">
       <Helmet>
-        <title>MediationPath — Pre-Mediation Intake & Online Dispute Resolution</title>
+        <title>MediPact AI — Pre-Mediation Intake & Online Dispute Resolution</title>
         <meta name="description" content="Structure your dispute with a calm, neutral pre-mediation intake. Get an AI-assisted summary and choose AI exploration or a human mediator." />
         <link rel="canonical" href="/" />
-        <meta property="og:title" content="MediationPath — Pre-Mediation Intake & Online Dispute Resolution" />
+        <meta property="og:title" content="MediPact AI — Pre-Mediation Intake & Online Dispute Resolution" />
         <meta property="og:description" content="Structure your dispute with a calm, neutral pre-mediation intake. Choose AI exploration or a human mediator." />
         <meta property="og:url" content="/" />
       </Helmet>
@@ -26,7 +26,7 @@ export default function Landing() {
               <MessageCircle className="w-4 h-4 text-primary-foreground" />
             </div>
             <span className="font-display font-semibold text-xl text-foreground">
-              MediationPath
+              MediPact AI
             </span>
           </div>
           <nav className="flex items-center gap-4 sm:gap-6">
@@ -180,7 +180,7 @@ export default function Landing() {
               <div className="w-6 h-6 rounded bg-primary flex items-center justify-center">
                 <MessageCircle className="w-3 h-3 text-primary-foreground" />
               </div>
-              <span className="font-display font-medium text-foreground">MediationPath</span>
+              <span className="font-display font-medium text-foreground">MediPact AI</span>
             </div>
             <p className="text-sm text-muted-foreground">
               {t('landing.footerDisclaimer')}

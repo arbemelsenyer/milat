@@ -195,14 +195,14 @@ serve(async (req: Request): Promise<Response> => {
                 
                 <p style="color: #333; font-size: 16px; margin-top: 25px;">We look forward to seeing you!</p>
                 
-                <p style="color: #888; font-size: 14px; margin-top: 30px;">Best regards,<br>The MediationPath Team</p>
+                <p style="color: #888; font-size: 14px; margin-top: 30px;">Best regards,<br>The MediPact AI Team</p>
               </div>
             </body>
             </html>
           `;
 
           await resend.emails.send({
-            from: "MediationPath <onboarding@resend.dev>",
+            from: "MediPact AI <onboarding@resend.dev>",
             to: [userProfile.email],
             subject: `⏰ Reminder: Your Mediation Session is Tomorrow - ${formattedDate}`,
             html: userEmailHtml,
@@ -243,14 +243,14 @@ serve(async (req: Request): Promise<Response> => {
                 
                 <p style="color: #333; font-size: 16px; margin-top: 25px;">Please review the case details before the session.</p>
                 
-                <p style="color: #888; font-size: 14px; margin-top: 30px;">Best regards,<br>The MediationPath Team</p>
+                <p style="color: #888; font-size: 14px; margin-top: 30px;">Best regards,<br>The MediPact AI Team</p>
               </div>
             </body>
             </html>
           `;
 
           await resend.emails.send({
-            from: "MediationPath <onboarding@resend.dev>",
+            from: "MediPact AI <onboarding@resend.dev>",
             to: [mediatorProfile.email],
             subject: `⏰ Mediator Reminder: Session Tomorrow - ${formattedDate}`,
             html: mediatorEmailHtml,
