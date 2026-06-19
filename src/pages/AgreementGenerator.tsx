@@ -68,7 +68,8 @@ export default function AgreementGenerator() {
         await supabase.from('case_documents').insert({
           case_id: caseId,
           file_name: `${selectedDoc.label}_${today}.txt`,
-          document_type: docType,
+          file_path: `agreements/${caseId}/${Date.now()}_${docType}.txt`,
+          mime_type: 'text/plain',
           uploaded_by: user.id,
         });
       }
