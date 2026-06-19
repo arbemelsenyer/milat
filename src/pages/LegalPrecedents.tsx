@@ -1,4 +1,4 @@
-```tsx
+
 import { useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { AppNavbar } from '@/components/AppNavbar';
@@ -127,5 +127,4 @@ export default function LegalPrecedents() {
     </div>
   );
 }
-```
 
