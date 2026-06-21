@@ -114,8 +114,10 @@ export default function MediationEngine() {
           user_id: user.id,
           dispute_type: niche,
           desired_outcome: "Anlaşma",
-          // best-effort: use existing schema fields if present
-          summary_neutral: masked.slice(0, 5000),
+          issue_description: masked.slice(0, 5000),
+          your_name: partyAName || "Başvuran",
+          other_party_name: partyBName || "Karşı Taraf",
+          status: "draft",
         } as any)
         .select()
         .single();
