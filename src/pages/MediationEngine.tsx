@@ -48,7 +48,7 @@ async function callMediationAi(action: string, payload: Record<string, unknown>)
 }
 
 export default function MediationEngine() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
 
