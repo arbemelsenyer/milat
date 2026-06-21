@@ -49,8 +49,53 @@ export type Database = {
           },
         ]
       }
+      case_discovery_questions: {
+        Row: {
+          answer_text: string | null
+          case_id: string
+          created_at: string
+          detected_need: string | null
+          id: string
+          question_order: number
+          question_text: string
+          updated_at: string
+          win_win_scenario: string | null
+        }
+        Insert: {
+          answer_text?: string | null
+          case_id: string
+          created_at?: string
+          detected_need?: string | null
+          id?: string
+          question_order?: number
+          question_text: string
+          updated_at?: string
+          win_win_scenario?: string | null
+        }
+        Update: {
+          answer_text?: string | null
+          case_id?: string
+          created_at?: string
+          detected_need?: string | null
+          id?: string
+          question_order?: number
+          question_text?: string
+          updated_at?: string
+          win_win_scenario?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_discovery_questions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_documents: {
         Row: {
+          analysis_result: Json | null
           case_id: string
           created_at: string
           file_name: string
@@ -61,6 +106,7 @@ export type Database = {
           uploaded_by: string
         }
         Insert: {
+          analysis_result?: Json | null
           case_id: string
           created_at?: string
           file_name: string
@@ -71,6 +117,7 @@ export type Database = {
           uploaded_by: string
         }
         Update: {
+          analysis_result?: Json | null
           case_id?: string
           created_at?: string
           file_name?: string
@@ -92,41 +139,118 @@ export type Database = {
       }
       case_parties: {
         Row: {
+          address: string | null
+          authorized_person: string | null
+          birth_date: string | null
           case_id: string
+          company_name: string | null
           created_at: string
           email: string | null
           full_name: string | null
           id: string
+          is_individual: boolean
           organization: string | null
+          party_type: string
           phone: string | null
           role: string
+          tax_number: string | null
+          tax_office: string | null
+          tc_kimlik: string | null
+          trade_registry_no: string | null
           user_id: string | null
         }
         Insert: {
+          address?: string | null
+          authorized_person?: string | null
+          birth_date?: string | null
           case_id: string
+          company_name?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
           id?: string
+          is_individual?: boolean
           organization?: string | null
+          party_type?: string
           phone?: string | null
           role: string
+          tax_number?: string | null
+          tax_office?: string | null
+          tc_kimlik?: string | null
+          trade_registry_no?: string | null
           user_id?: string | null
         }
         Update: {
+          address?: string | null
+          authorized_person?: string | null
+          birth_date?: string | null
           case_id?: string
+          company_name?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
           id?: string
+          is_individual?: boolean
           organization?: string | null
+          party_type?: string
           phone?: string | null
           role?: string
+          tax_number?: string | null
+          tax_office?: string | null
+          tc_kimlik?: string | null
+          trade_registry_no?: string | null
           user_id?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "case_parties_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_sessions: {
+        Row: {
+          case_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          participants: Json
+          scheduled_at: string | null
+          session_type: string
+          status: string
+          updated_at: string
+          video_link: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          participants?: Json
+          scheduled_at?: string | null
+          session_type: string
+          status?: string
+          updated_at?: string
+          video_link?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          participants?: Json
+          scheduled_at?: string | null
+          session_type?: string
+          status?: string
+          updated_at?: string
+          video_link?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_sessions_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
@@ -211,6 +335,76 @@ export type Database = {
           your_role?: string | null
         }
         Relationships: []
+      }
+      cases_private_keys: {
+        Row: {
+          case_id: string
+          created_at: string
+          encrypted_value: string
+          field_type: string | null
+          id: string
+          mask_label: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          encrypted_value: string
+          field_type?: string | null
+          id?: string
+          mask_label: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          encrypted_value?: string
+          field_type?: string | null
+          id?: string
+          mask_label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cases_private_keys_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cases_vector_pool: {
+        Row: {
+          anonymized_text: string
+          case_id: string
+          created_at: string
+          embedding: string | null
+          id: string
+          niche_area: string | null
+        }
+        Insert: {
+          anonymized_text: string
+          case_id: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          niche_area?: string | null
+        }
+        Update: {
+          anonymized_text?: string
+          case_id?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          niche_area?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cases_vector_pool_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       mediator_availability: {
         Row: {
@@ -337,6 +531,63 @@ export type Database = {
           },
         ]
       }
+      mediators: {
+        Row: {
+          avg_resolution_days: number
+          bio: string | null
+          city: string | null
+          created_at: string
+          full_name: string
+          hourly_rate: number
+          id: string
+          is_available: boolean
+          languages: string[]
+          photo_url: string | null
+          rating: number
+          specializations: string[]
+          success_rate: number
+          total_cases: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          avg_resolution_days?: number
+          bio?: string | null
+          city?: string | null
+          created_at?: string
+          full_name: string
+          hourly_rate?: number
+          id?: string
+          is_available?: boolean
+          languages?: string[]
+          photo_url?: string | null
+          rating?: number
+          specializations?: string[]
+          success_rate?: number
+          total_cases?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          avg_resolution_days?: number
+          bio?: string | null
+          city?: string | null
+          created_at?: string
+          full_name?: string
+          hourly_rate?: number
+          id?: string
+          is_available?: boolean
+          languages?: string[]
+          photo_url?: string | null
+          rating?: number
+          specializations?: string[]
+          success_rate?: number
+          total_cases?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           case_id: string
@@ -415,6 +666,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pending_pool: {
+        Row: {
+          approved: boolean | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          niche_area: string | null
+          raw_content: string
+          rejection_reason: string | null
+          relevance_score: number | null
+          source_url: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved?: boolean | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          niche_area?: string | null
+          raw_content: string
+          rejection_reason?: string | null
+          relevance_score?: number | null
+          source_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved?: boolean | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          niche_area?: string | null
+          raw_content?: string
+          rejection_reason?: string | null
+          relevance_score?: number | null
+          source_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
