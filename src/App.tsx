@@ -18,6 +18,7 @@ import ExpertWitness from "./pages/ExpertWitness";
 import LegalPrecedents from "./pages/LegalPrecedents";
 import AgreementGenerator from "./pages/AgreementGenerator";
 import LegalReasoningEngine from "./pages/LegalReasoningEngine";
+import MediationEngine from "./pages/MediationEngine";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ const App = () => (
 <Route path="/legal-precedents" element={<LegalPrecedents />} />
 <Route path="/agreement-generator" element={<AgreementGenerator />} />
 <Route path="/legal-reasoning" element={<LegalReasoningEngine />} />
+<Route path="/mediation-engine" element={<MediationEngine />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
