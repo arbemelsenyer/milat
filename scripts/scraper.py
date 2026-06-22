@@ -15,10 +15,8 @@ headers_sb = {
     'Content-Type': 'application/json'
 }
 
-
 def metin_hash(metin):
     return hashlib.md5(metin.encode('utf-8')).hexdigest()
-
 
 def zaten_var_mi(h):
     url = f"{SUPABASE_URL}/rest/v1/cases_vector_pool?content_hash=eq.{h}"
@@ -30,13 +28,12 @@ def zaten_var_mi(h):
         pass
     return False
 
-
 def akilli_parcala(metin, chunk_size=1500, overlap=200):
     """Metni cümle bütünlüğünü bozmadan overlap (çakışma) ile parçalar."""
     sentences = metin.split('. ')
     chunks = []
     current_chunk = ""
-
+    
     for sentence in sentences:
         if len(current_chunk) + len(sentence) < chunk_size:
             current_chunk += sentence + ". "
@@ -44,11 +41,10 @@ def akilli_parcala(metin, chunk_size=1500, overlap=200):
             if current_chunk:
                 chunks.append(current_chunk.strip())
             current_chunk = sentence + ". "
-
+            
     if current_chunk:
         chunks.append(current_chunk.strip())
     return chunks
-
 
 def pdf_metin_ayikla(pdf_content):
     """İndirilen PDF dosyasını temiz metne dönüştürür."""
@@ -64,25 +60,28 @@ def pdf_metin_ayikla(pdf_content):
     except:
         return ""
 
-
 def dergipark_ve_pdf_isle(kaynak):
     """DergiPark veya PDF barındıran akademik linkleri derinlemesine kazır."""
     yeni, atlandi = 0, 0
     try:
         res = requests.get(kaynak['url'], timeout=30, headers={'User-Agent': 'Mozilla/5.0'})
         soup = BeautifulSoup(res.text, 'html.parser')
-
+        
+        # Makale detay sayfalarını veya doğrudan PDF linklerini topla
         linkler = set()
         for a in soup.find_all('a', href=True):
             if "/pub/" in a['href'] or "/download/" in a['href'] or "pdf" in a['href'].lower():
                 linkler.add(a['href'] if a['href'].startswith("http") else "https:" + a['href'])
-
+                
+        # İlk 3 kaynağı derinlemesine incele (Performans ve ceza yememek adına sınırlı tutuyoruz)
         for link in list(linkler)[:3]:
             try:
+                # Eğer doğrudan PDF linkiyse indir
                 if "download" in link or link.endswith(".pdf"):
                     pdf_res = requests.get(link, timeout=30, headers={'User-Agent': 'Mozilla/5.0'})
                     ham_metin = pdf_metin_ayikla(pdf_res.content)
                 else:
+                    # Detay sayfasıysa girip asıl PDF butonunu ara
                     detay = requests.get(link, timeout=20, headers={'User-Agent': 'Mozilla/5.0'})
                     d_soup = BeautifulSoup(detay.text, 'html.parser')
                     pdf_url = None
@@ -95,19 +94,17 @@ def dergipark_ve_pdf_isle(kaynak):
                         ham_metin = pdf_metin_ayikla(pdf_res.content)
                     else:
                         continue
-
-                if len(ham_metin) < 300:
-                    continue
-
+                
+                if len(ham_metin) < 300: continue
+                
                 parcalar = akilli_parcala(ham_metin)
                 for p in parcalar:
-                    if len(p) < 200:
-                        continue
+                    if len(p) < 200: continue
                     h = metin_hash(p)
                     if zaten_var_mi(h):
                         atlandi += 1
                         continue
-
+                    
                     data = {'anonymized_text': p, 'niche_area': kaynak['alan'], 'content_hash': h}
                     requests.post(f"{SUPABASE_URL}/rest/v1/cases_vector_pool", headers=headers_sb, json=data)
                     yeni += 1
@@ -117,27 +114,26 @@ def dergipark_ve_pdf_isle(kaynak):
         print(f"Hata ({kaynak['alan']}): {e}")
     return yeni, atlandi
 
-
 def standart_web_isle(kaynak):
     """Düz metin içeren kurumsal siteleri akıllıca kazır."""
     yeni, atlandi = 0, 0
     try:
         res = requests.get(kaynak['url'], timeout=30, headers={'User-Agent': 'Mozilla/5.0'})
         soup = BeautifulSoup(res.text, 'html.parser')
-
+        
         for element in soup(["script", "style", "nav", "footer", "header"]):
             element.decompose()
-
+            
         metinler = [p.get_text(strip=True) for p in soup.find_all(['p', 'div', 'td']) if len(p.get_text(strip=True)) > 300]
         tum_metin = " ".join(metinler)
         parcalar = akilli_parcala(tum_metin)
-
-        for parca in parcalar[:10]:
+        
+        for parca in parcalar[:10]: # Sayfa başına max 10 kaliteli parça
             h = metin_hash(parca)
             if zaten_var_mi(h):
                 atlandi += 1
                 continue
-
+            
             data = {'anonymized_text': parca, 'niche_area': kaynak['alan'], 'content_hash': h}
             requests.post(f"{SUPABASE_URL}/rest/v1/cases_vector_pool", headers=headers_sb, json=data)
             yeni += 1
@@ -145,7 +141,7 @@ def standart_web_isle(kaynak):
         print(f"Hata ({kaynak['alan']}): {e}")
     return yeni, atlandi
 
-
+# SENİN HAZIRLADIĞIN TÜM GENİŞ URL LİSTESİ (KORUNDU)
 kaynaklar = [
     # MAHKEME KARARLARI
     {'url': 'https://karararama.yargitay.gov.tr', 'alan': 'yargitay'},
@@ -180,42 +176,42 @@ kaynaklar = [
     {'url': 'https://tbbdergisi.barobirlik.org.tr', 'alan': 'tbb_dergi'},
     {'url': 'https://medya.barobirlik.org.tr', 'alan': 'tbb_yayinlari'},
     {'url': 'https://lawandjustice.taa.gov.tr', 'alan': 'adalet_akademisi'},
-    # ISCI-ISVEREN
+    # ISCI-ISVEREN UYUSMAZLIKLARI
     {'url': 'https://www.sgk.gov.tr', 'alan': 'sgk'},
     {'url': 'https://www.calisma.gov.tr', 'alan': 'calisma_bakanligi'},
     {'url': 'https://www.csgb.gov.tr', 'alan': 'csgb'},
     {'url': 'https://www.turkis.org.tr', 'alan': 'turkis'},
     {'url': 'https://calismahayatidergisi.gov.tr', 'alan': 'calisma_hayati_dergi'},
-    # TICARI
+    # TICARI UYUSMAZLIKLAR
     {'url': 'https://www.gtb.gov.tr', 'alan': 'ticaret_bakanligi'},
     {'url': 'https://www.tobb.org.tr', 'alan': 'tobb'},
     {'url': 'https://www.tesk.org.tr', 'alan': 'tesk'},
-    # TUKETICI
+    # TUKETICI UYUSMAZLIKLARI
     {'url': 'https://tuketici.ticaret.gov.tr', 'alan': 'tuketici'},
     {'url': 'https://www.btk.gov.tr', 'alan': 'btk'},
-    # SAGLIK
+    # SAGLIK HUKUKU
     {'url': 'https://www.saglik.gov.tr', 'alan': 'saglik_bakanligi'},
     {'url': 'https://www.titck.gov.tr', 'alan': 'titck'},
     {'url': 'https://www.ttb.org.tr', 'alan': 'ttb'},
     {'url': 'https://www.thsk.gov.tr', 'alan': 'thsk'},
-    # SIGORTA
+    # SIGORTA UYUSMAZLIKLARI
     {'url': 'https://www.tsb.org.tr', 'alan': 'sigorta_birligi'},
     {'url': 'https://www.sbm.org.tr', 'alan': 'sigorta_bilgi_merkezi'},
-    # INSAAT
+    # INSAAT & YAPI
     {'url': 'https://www.tse.org.tr', 'alan': 'tse'},
     {'url': 'https://www.csb.gov.tr', 'alan': 'cevre_bakanligi'},
     {'url': 'https://www.tmb.org.tr', 'alan': 'mimarlar_birligi'},
-    # FIKRI
+    # FIKRI SINAI MULKIYET
     {'url': 'https://www.turkpatent.gov.tr', 'alan': 'turkpatent'},
     {'url': 'https://www.wipo.int/portal/tr', 'alan': 'wipo_tr'},
-    # AKADEMIK
+    # AKADEMIK - GENEL
     {'url': 'https://dergipark.org.tr', 'alan': 'dergipark'},
     {'url': 'https://tez.yok.gov.tr', 'alan': 'yok_tez'},
     {'url': 'https://kezana.com', 'alan': 'kezana'},
     {'url': 'https://acikbilim.yok.gov.tr', 'alan': 'acik_bilim'},
     {'url': 'https://search.trdizin.gov.tr', 'alan': 'trdizin'},
     {'url': 'https://kanunum.com', 'alan': 'kanunum'},
-    # AKADEMIK DETAYLI
+    # AKADEMIK - DETAYLI SORGULAR
     {'url': 'https://dergipark.org.tr/tr/search?q=is+hukuku', 'alan': 'akademik_is_hukuku'},
     {'url': 'https://dergipark.org.tr/tr/search?q=sozyal+guvenlik', 'alan': 'akademik_sosyal_guvenlik'},
     {'url': 'https://dergipark.org.tr/tr/search?q=ticaret+hukuku', 'alan': 'akademik_ticaret'},
@@ -246,17 +242,17 @@ kaynaklar = [
     {'url': 'https://academic.oup.com/jiplp', 'alan': 'oxford_ip'},
 ]
 
-
 if __name__ == "__main__":
     toplam_yeni = 0
     toplam_atlandi = 0
-
+    
     for kaynak in kaynaklar:
+        # Link yapısına göre işleme stratejisi seçiliyor
         if "dergipark" in kaynak['url'] or "yok" in kaynak['url'] or "ssrn" in kaynak['url']:
             yeni, atlandi = dergipark_ve_pdf_isle(kaynak)
         else:
             yeni, atlandi = standart_web_isle(kaynak)
-
+            
         toplam_yeni += yeni
         toplam_atlandi += atlandi
         print(f"{kaynak['alan']}: {yeni} yeni, {atlandi} atlandı")
