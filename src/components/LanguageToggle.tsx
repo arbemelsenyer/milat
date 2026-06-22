@@ -18,7 +18,7 @@ export function LanguageToggle() {
       className="gap-2 text-muted-foreground hover:text-foreground"
     >
       <Globe className="w-4 h-4" />
-      <span className="font-medium">{language === 'tr' ? 'EN' : 'TR'}</span>
+      <span className="font-medium">{language === 'tr' ? 'TR' : 'EN'}</span>
     </Button>
   );
 }
