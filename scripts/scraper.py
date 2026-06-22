@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import os
 import json
+import hashlib
 
 SUPABASE_URL = "https://oijdnfibboiinogdmlcj.supabase.co"
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
@@ -11,6 +12,16 @@ headers_sb = {
     'Authorization': f'Bearer {SUPABASE_KEY}',
     'Content-Type': 'application/json'
 }
+
+def metin_hash(metin):
+    return hashlib.md5(metin.encode()).hexdigest()
+
+def zaten_var_mi(hash_deger):
+    r = requests.get(
+        f"{SUPABASE_URL}/rest/v1/cases_vector_pool?content_hash=eq.{hash_deger}",
+        headers=headers_sb
+    )
+    return len(r.json()) > 0
 
 kaynaklar = [
     # Türkiye — Mahkeme Kararları
@@ -50,21 +61,40 @@ kaynaklar = [
     {'url': 'https://www.nyulawglobal.org/globalex/turkey1.html', 'alan': 'nyu_turkey'},
 ]
 
+toplam_yeni = 0
+toplam_atlandi = 0
+
 for kaynak in kaynaklar:
     try:
         res = requests.get(kaynak['url'], timeout=30, headers={'User-Agent': 'Mozilla/5.0'})
         soup = BeautifulSoup(res.text, 'html.parser')
         metinler = [p.get_text(strip=True) for p in soup.find_all(['p','div','td']) if len(p.get_text(strip=True)) > 300]
-        print(f"{kaynak['alan']}: {len(metinler)} metin bulundu")
+        
+        yeni = 0
+        atlandi = 0
+        
         for metin in metinler[:20]:
-            data = {'anonymized_text': metin[:2000], 'niche_area': kaynak['alan']}
-            r = requests.post(
+            h = metin_hash(metin)
+            if zaten_var_mi(h):
+                atlandi += 1
+                continue
+            data = {
+                'anonymized_text': metin[:2000],
+                'niche_area': kaynak['alan'],
+                'content_hash': h
+            }
+            requests.post(
                 f"{SUPABASE_URL}/rest/v1/cases_vector_pool",
                 headers=headers_sb,
                 data=json.dumps(data)
             )
-        print(f"{kaynak['alan']} tamamlandi")
+            yeni += 1
+        
+        toplam_yeni += yeni
+        toplam_atlandi += atlandi
+        print(f"{kaynak['alan']}: {yeni} yeni, {atlandi} atlandı")
+        
     except Exception as e:
         print(f"Hata {kaynak['alan']}: {e}")
 
-print("Tum kaynaklar tamamlandi!")
+print(f"\nToplam: {toplam_yeni} yeni kayıt, {toplam_atlandi} duplicate atlandı")
