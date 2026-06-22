@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { AppNavbar } from '@/components/AppNavbar';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Brain, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Scale } from 'lucide-react';
 
 interface CeliskilKart { baslik: string; risk: 'yuksek'|'orta'|'dusuk'; aciklama: string; emsal: string; }
