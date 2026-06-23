@@ -277,7 +277,7 @@ export default function CaseDetail() {
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <Tabs defaultValue="timeline" className="w-full">
-              <TabsList className="grid grid-cols-4 w-full">
+              <TabsList className="grid grid-cols-5 w-full">
                 <TabsTrigger value="timeline">
                   <Calendar className="w-4 h-4 mr-1.5" />
                   {language === "tr" ? "Zaman Çizelgesi" : "Timeline"}
@@ -293,6 +293,10 @@ export default function CaseDetail() {
                 <TabsTrigger value="messages">
                   <MessageSquare className="w-4 h-4 mr-1.5" />
                   {language === "tr" ? "Mesajlar" : "Messages"}
+                </TabsTrigger>
+                <TabsTrigger value="official">
+                  <Scale className="w-4 h-4 mr-1.5" />
+                  {language === "tr" ? "Resmi Belgeler" : "Official"}
                 </TabsTrigger>
               </TabsList>
 
