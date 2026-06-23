@@ -120,15 +120,15 @@ export default function CaseDetail() {
     const [cRes, pRes, dRes, sRes, mRes] = await Promise.all([
       supabase.from("cases").select("*").eq("id", id!).maybeSingle(),
       supabase.from("case_parties").select("*").eq("case_id", id!),
-      supabase.from("case_documents").select("id,file_name,file_type,uploaded_at,ai_analysis").eq("case_id", id!).order("uploaded_at", { ascending: false }),
+      supabase.from("case_documents").select("id,file_name,mime_type,created_at,analysis_result").eq("case_id", id!).order("created_at", { ascending: false }),
       supabase.from("case_sessions").select("id,scheduled_at,status,notes").eq("case_id", id!).order("scheduled_at", { ascending: true }),
       supabase.from("messages").select("*").eq("case_id", id!).order("created_at", { ascending: true }),
     ]);
-    setC((cRes.data as CaseRow) ?? null);
-    setParties((pRes.data as PartyRow[]) ?? []);
-    setDocs((dRes.data as DocRow[]) ?? []);
-    setSessions((sRes.data as SessionRow[]) ?? []);
-    setMessages((mRes.data as MessageRow[]) ?? []);
+    setC((cRes.data as unknown as CaseRow) ?? null);
+    setParties((pRes.data as unknown as PartyRow[]) ?? []);
+    setDocs((dRes.data as unknown as DocRow[]) ?? []);
+    setSessions((sRes.data as unknown as SessionRow[]) ?? []);
+    setMessages((mRes.data as unknown as MessageRow[]) ?? []);
     setLoading(false);
   };
 
