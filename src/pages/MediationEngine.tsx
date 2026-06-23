@@ -254,15 +254,50 @@ export default function MediationEngine() {
         {/* STEP 1: Intake */}
         {step === 0 && (
           <div className="space-y-5">
-            <Card className="p-5 space-y-3">
-              <Label>Uyuşmazlık Alanı</Label>
-              <select
-                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                value={niche}
-                onChange={(e) => setNiche(e.target.value)}
-              >
-                {NICHES.map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
+            <Card className="p-5 space-y-4 border-primary/30 bg-primary/[0.03]">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-primary">Arabuluculuk Başvuru Formu (UYAP)</h3>
+                <span className="text-xs text-muted-foreground">6325 sayılı Kanun</span>
+              </div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Başvuru Numarası</Label>
+                  <div className="h-10 px-3 flex items-center rounded-md border bg-muted/40 text-sm font-mono">{basvuruNo}</div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">UYAP No</Label>
+                  <input
+                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                    placeholder="opsiyonel"
+                    value={uyapNo}
+                    onChange={(e) => setUyapNo(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Başvuru Tarihi</Label>
+                  <div className="h-10 px-3 flex items-center rounded-md border bg-muted/40 text-sm">{basvuruTarihi}</div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Dosya Türü</Label>
+                  <select
+                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                    value={dosyaTuru}
+                    onChange={(e) => setDosyaTuru(e.target.value)}
+                  >
+                    {DOSYA_TURLERI.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <Label>Uyuşmazlık Alanı</Label>
+                <select
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm mt-1"
+                  value={niche}
+                  onChange={(e) => setNiche(e.target.value)}
+                >
+                  {NICHES.map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
             </Card>
             <div className="grid md:grid-cols-2 gap-5">
               <PartyForm title="Başvuran" value={partyA} onChange={setPartyA} />
