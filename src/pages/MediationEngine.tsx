@@ -65,6 +65,10 @@ export default function MediationEngine() {
 
   // Step 1
   const [niche, setNiche] = useState(NICHES[0]);
+  const [basvuruNo] = useState(generateBasvuruNo());
+  const [uyapNo, setUyapNo] = useState("");
+  const [dosyaTuru, setDosyaTuru] = useState(DOSYA_TURLERI[0]);
+  const basvuruTarihi = new Date().toLocaleDateString("tr-TR");
   const [partyA, setPartyA] = useState<Party>(emptyParty());
   const [partyB, setPartyB] = useState<Party>(emptyParty());
   const [dispute, setDispute] = useState("");
