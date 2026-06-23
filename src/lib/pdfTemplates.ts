@@ -83,7 +83,7 @@ function partiesTable(doc: jsPDF, data: DocCaseData, startY: number) {
     headStyles: { fillColor: [45, 53, 128], textColor: 255 },
     margin: { left: 20, right: 20 },
   });
-  // @ts-expect-error autoTable injects lastAutoTable
+  
   return (doc as any).lastAutoTable.finalY + 6;
 }
 
@@ -172,7 +172,7 @@ export function generateOfficialPdf(templateId: TemplateId, data: DocCaseData): 
         headStyles: { fillColor: [45, 53, 128], textColor: 255 },
         margin: { left: 20, right: 20 },
       });
-      // @ts-expect-error
+      
       y = (doc as any).lastAutoTable.finalY + 6;
       y = body(doc, `Ucret, Adalet Bakanligi Arabuluculuk Asgari Ucret Tarifesi uyarinca hesaplanmistir.`, y);
       break;
