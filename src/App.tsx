@@ -19,6 +19,8 @@ import LegalPrecedents from "./pages/LegalPrecedents";
 import AgreementGenerator from "./pages/AgreementGenerator";
 import LegalReasoningEngine from "./pages/LegalReasoningEngine";
 import MediationEngine from "./pages/MediationEngine";
+import CaseDetail from "./pages/CaseDetail";
+
 
 const queryClient = new QueryClient();
 
