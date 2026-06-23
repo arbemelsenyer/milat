@@ -467,11 +467,59 @@ export default function AuthPage() {
                           </FormItem>
                         )}
                       />
+
+                      {/* KVKK consent checkboxes */}
+                      <div className="space-y-2.5 rounded-lg border border-border/60 bg-muted/30 p-3">
+                        <label className="flex items-start gap-2.5 cursor-pointer text-left">
+                          <Checkbox
+                            checked={kvkkRead}
+                            onCheckedChange={(v) => setKvkkRead(v === true)}
+                            className="mt-0.5"
+                          />
+                          <span className="text-xs leading-relaxed text-muted-foreground">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); setOpenModal('aydinlatma'); }}
+                              className="text-primary underline underline-offset-2 hover:opacity-80"
+                            >
+                              KVKK Aydınlatma Metni
+                            </button>
+                            {' ve '}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); setOpenModal('imha'); }}
+                              className="text-primary underline underline-offset-2 hover:opacity-80"
+                            >
+                              Veri Saklama ve İmha Politikası
+                            </button>
+                            'nı okudum, anladım.
+                          </span>
+                        </label>
+                        <label className="flex items-start gap-2.5 cursor-pointer text-left">
+                          <Checkbox
+                            checked={kvkkConsent}
+                            onCheckedChange={(v) => setKvkkConsent(v === true)}
+                            className="mt-0.5"
+                          />
+                          <span className="text-xs leading-relaxed text-muted-foreground">
+                            Arabuluculuk uyuşmazlık süreçlerindeki verilerimin yapay zeka tabanlı analiz edilmesi amacıyla işlenmesine{' '}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); setOpenModal('acikRiza'); }}
+                              className="text-primary underline underline-offset-2 hover:opacity-80"
+                            >
+                              Açık Rıza
+                            </button>
+                            {' '}veriyorum.
+                          </span>
+                        </label>
+                      </div>
+
                       <Button
                         type="submit"
                         size="lg"
                         className="w-full h-11 shadow-[var(--shadow-elegant)]"
-                        disabled={isLoading}
+                        disabled={isLoading || !kvkkRead || !kvkkConsent}
                       >
                         {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                         {language === 'tr' ? 'Hesap Oluştur' : 'Create Account'}
