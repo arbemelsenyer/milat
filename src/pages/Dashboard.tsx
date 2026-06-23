@@ -35,7 +35,7 @@ interface CaseRow {
   status: string;
   title: string | null;
   category: string | null;
-  niche: string | null;
+  
   dispute_type: string | null;
   your_name: string | null;
   other_party_name: string | null;
@@ -94,7 +94,7 @@ export default function Dashboard() {
     const [cRes, nRes, sRes] = await Promise.all([
       supabase
         .from("cases")
-        .select("id,status,title,category,niche,dispute_type,your_name,other_party_name,assigned_mediator_id,created_at,updated_at")
+        .select("id,status,title,category,dispute_type,your_name,other_party_name,assigned_mediator_id,created_at,updated_at")
         .order("updated_at", { ascending: false }),
       supabase
         .from("notifications")
@@ -129,7 +129,7 @@ export default function Dashboard() {
     // Top niche
     const niches: Record<string, number> = {};
     cases.forEach((c) => {
-      const k = c.niche || c.category || c.dispute_type || "—";
+      const k = c.category || c.dispute_type || "—";
       niches[k] = (niches[k] ?? 0) + 1;
     });
     const topNiche = Object.entries(niches).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—";
@@ -309,7 +309,7 @@ export default function Dashboard() {
                         <CountdownBadge target={next.scheduled_at} />
                       ) : (
                         <Badge variant="outline" className="text-[10px]">
-                          {c.niche || c.category || "—"}
+                          {c.category || c.dispute_type || "—"}
                         </Badge>
                       )}
                     </div>
