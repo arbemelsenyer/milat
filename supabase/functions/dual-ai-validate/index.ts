@@ -52,51 +52,62 @@ serve(async (req) => {
     const results: Array<Record<string, unknown>> = [];
 
     for (const row of pending ?? []) {
-      const text: string = (row as any).content ?? (row as any).text ?? JSON.stringify(row);
-      const niche: string = (row as any).niche ?? (row as any).alan ?? "genel";
+      const text: string = row.raw_content ?? "";
+      const niche: string = row.niche_area ?? "genel";
 
       // Stage 1: Gemini Flash pre-filter
       const flash = await aiCall(
         "google/gemini-2.5-flash",
-        "Türk hukuku ön elemesi: bu metin gerçek bir Yargıtay/BAM kararı veya hukuk doktrini midir? Sadece 'EVET' veya 'HAYIR: <kısa neden>' döndür.",
+        "Türk hukuku ön elemesi: bu metin gerçek bir Yargıtay/BAM kararı, hukuk doktrini veya mevzuat midir? Sadece 'EVET' veya 'HAYIR: <kısa neden>' döndür.",
         text.slice(0, 6000),
       );
       if (!/^EVET/i.test(flash.trim())) {
-        await sb.from("pending_pool").update({ status: "rejected", review_notes: flash }).eq("id", (row as any).id);
+        await sb.from("pending_pool").update({
+          status: "rejected",
+          approved: false,
+          rejection_reason: flash.slice(0, 500),
+        }).eq("id", row.id);
         rejected++;
-        results.push({ id: (row as any).id, stage: "flash", verdict: "rejected", reason: flash });
+        results.push({ id: row.id, stage: "flash", verdict: "rejected" });
         continue;
       }
 
       // Stage 2: Gemini Pro deep legal review
       const pro = await aiCall(
         "google/gemini-2.5-pro",
-        `Derin hukuki inceleme. Uyuşmazlık alanı: ${niche}. JSON döndür: {"approved": boolean, "summary": string, "keywords": string[], "relevance_score": 0-1, "reason": string}`,
+        `Derin hukuki inceleme. Uyuşmazlık alanı: ${niche}. Sadece JSON döndür: {"approved": boolean, "summary": string, "keywords": string[], "relevance_score": 0-1, "reason": string}`,
         text.slice(0, 12000),
       );
 
-      let parsed: any = {};
+      let parsed: { approved?: boolean; summary?: string; keywords?: string[]; relevance_score?: number; reason?: string } = {};
       try {
         const m = pro.match(/\{[\s\S]*\}/);
         parsed = m ? JSON.parse(m[0]) : {};
       } catch { parsed = {}; }
 
-      if (parsed.approved && (parsed.relevance_score ?? 0) >= 0.6) {
+      const score = parsed.relevance_score ?? 0;
+      if (parsed.approved && score >= 0.6) {
         await sb.from("cases_vector_pool").insert({
-          source_id: (row as any).id,
-          niche,
-          summary: parsed.summary ?? "",
-          keywords: parsed.keywords ?? [],
-          content: text,
-          relevance_score: parsed.relevance_score,
+          niche_area: niche,
+          anonymized_text: parsed.summary ? `${parsed.summary}\n\n---\n${text}` : text,
         });
-        await sb.from("pending_pool").update({ status: "approved", review_notes: parsed.reason ?? "" }).eq("id", (row as any).id);
+        await sb.from("pending_pool").update({
+          status: "approved",
+          approved: true,
+          relevance_score: score,
+          metadata: { keywords: parsed.keywords ?? [], reason: parsed.reason ?? "" },
+        }).eq("id", row.id);
         approved++;
-        results.push({ id: (row as any).id, stage: "pro", verdict: "approved", score: parsed.relevance_score });
+        results.push({ id: row.id, stage: "pro", verdict: "approved", score });
       } else {
-        await sb.from("pending_pool").update({ status: "rejected", review_notes: parsed.reason ?? "low relevance" }).eq("id", (row as any).id);
+        await sb.from("pending_pool").update({
+          status: "rejected",
+          approved: false,
+          relevance_score: score,
+          rejection_reason: (parsed.reason ?? "düşük alaka").slice(0, 500),
+        }).eq("id", row.id);
         rejected++;
-        results.push({ id: (row as any).id, stage: "pro", verdict: "rejected", reason: parsed.reason });
+        results.push({ id: row.id, stage: "pro", verdict: "rejected" });
       }
     }
 
