@@ -913,6 +913,20 @@ export type Database = {
         }
         Returns: boolean
       }
+      match_cases: {
+        Args: {
+          filter_niche_area: string
+          match_count: number
+          match_threshold: number
+          query_embedding: string
+        }
+        Returns: {
+          anonymized_text: string
+          id: string
+          niche_area: string
+          similarity: number
+        }[]
+      }
     }
     Enums: {
       app_role: "user" | "mediator" | "admin"
