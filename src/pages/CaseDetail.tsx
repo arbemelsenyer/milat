@@ -38,7 +38,6 @@ interface CaseRow {
   title: string | null;
   category: string | null;
   dispute_type: string | null;
-  niche: string | null;
   your_name: string | null;
   other_party_name: string | null;
   assigned_mediator_id: string | null;
@@ -51,18 +50,17 @@ interface CaseRow {
 interface PartyRow {
   id: string;
   full_name: string | null;
-  organization_name: string | null;
+  organization: string | null;
   party_type: string;
-  side: string | null;
-  position_notes?: string | null;
+  role: string | null;
 }
 
 interface DocRow {
   id: string;
   file_name: string;
-  file_type: string | null;
-  uploaded_at: string;
-  ai_analysis: any;
+  mime_type: string | null;
+  created_at: string;
+  analysis_result: any;
 }
 
 interface SessionRow {
