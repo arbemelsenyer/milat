@@ -62,6 +62,14 @@ export default function AuthPage() {
   const { user, signIn, signUp } = useAuth();
   const { language } = useLanguage();
 
+  const [kvkkRead, setKvkkRead] = useState(false);
+  const [kvkkConsent, setKvkkConsent] = useState(false);
+  const [openModal, setOpenModal] = useState<null | 'aydinlatma' | 'imha' | 'acikRiza'>(null);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user, signIn, signUp } = useAuth();
+  const { language } = useLanguage();
+
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
