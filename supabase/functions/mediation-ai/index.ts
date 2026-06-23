@@ -221,6 +221,32 @@ serve(async (req) => {
       });
     }
 
+    if (action === "chat") {
+      // body: { messages: [{role, content}], caseContext?: string, niche?: string }
+      const niche = String(body.niche ?? "");
+      const ctx = serverMask(String(body.caseContext ?? "")).slice(0, 12000);
+      const history = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
+      const safeHistory = history.map((m: any) => ({
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: serverMask(String(m.content ?? "")).slice(0, 4000),
+      }));
+      const system = `Sen MediPact AI'sın — Türk hukukunda uzman, tarafsız bir arabuluculuk asistanısın. Yargıtay kararlarına atıfta bulunur, 6325 sayılı Arabuluculuk Kanunu çerçevesinde öneriler verirsin. Hukuki tavsiye yerine STRATEJİ önerirsin. Türkçe, net, maddeler halinde yanıt ver.
+
+Dava Niş: ${niche || "belirtilmemiş"}
+Dava Bağlamı:
+${ctx || "(bağlam yok)"}
+`;
+      const r = await callAi(PRO, [
+        { role: "system", content: system },
+        ...safeHistory,
+      ]);
+      const data = await r.json();
+      const reply = data.choices?.[0]?.message?.content ?? "";
+      return new Response(JSON.stringify({ reply }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(JSON.stringify({ error: "Unknown action" }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
