@@ -26,8 +26,19 @@ const NICHES = [
   "Sağlık Hukuku Uyuşmazlıkları",
   "Sigorta Uyuşmazlıkları",
   "İnşaat",
-  "Marka-Patent",
+  "Fikri ve Sınai Mülkiyet",
 ];
+
+const DOSYA_TURLERI = [
+  "Dava Şartı Arabuluculuk",
+  "İhtiyari Arabuluculuk",
+];
+
+function generateBasvuruNo() {
+  const year = new Date().getFullYear();
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  return `${year}/${rand}`;
+}
 
 const STEPS = [
   { key: "intake", label: "Başvuru" },
@@ -54,6 +65,10 @@ export default function MediationEngine() {
 
   // Step 1
   const [niche, setNiche] = useState(NICHES[0]);
+  const [basvuruNo] = useState(generateBasvuruNo());
+  const [uyapNo, setUyapNo] = useState("");
+  const [dosyaTuru, setDosyaTuru] = useState(DOSYA_TURLERI[0]);
+  const basvuruTarihi = new Date().toLocaleDateString("tr-TR");
   const [partyA, setPartyA] = useState<Party>(emptyParty());
   const [partyB, setPartyB] = useState<Party>(emptyParty());
   const [dispute, setDispute] = useState("");
@@ -118,6 +133,9 @@ export default function MediationEngine() {
           your_name: partyAName || "Başvuran",
           other_party_name: partyBName || "Karşı Taraf",
           status: "draft",
+          title: `${basvuruNo} • ${dosyaTuru} • ${niche}`,
+          category: dosyaTuru,
+          additional_notes: uyapNo ? `UYAP No: ${uyapNo}` : null,
         } as any)
         .select()
         .single();
@@ -239,15 +257,50 @@ export default function MediationEngine() {
         {/* STEP 1: Intake */}
         {step === 0 && (
           <div className="space-y-5">
-            <Card className="p-5 space-y-3">
-              <Label>Uyuşmazlık Alanı</Label>
-              <select
-                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                value={niche}
-                onChange={(e) => setNiche(e.target.value)}
-              >
-                {NICHES.map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
+            <Card className="p-5 space-y-4 border-primary/30 bg-primary/[0.03]">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-primary">Arabuluculuk Başvuru Formu (UYAP)</h3>
+                <span className="text-xs text-muted-foreground">6325 sayılı Kanun</span>
+              </div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Başvuru Numarası</Label>
+                  <div className="h-10 px-3 flex items-center rounded-md border bg-muted/40 text-sm font-mono">{basvuruNo}</div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">UYAP No</Label>
+                  <input
+                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                    placeholder="opsiyonel"
+                    value={uyapNo}
+                    onChange={(e) => setUyapNo(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Başvuru Tarihi</Label>
+                  <div className="h-10 px-3 flex items-center rounded-md border bg-muted/40 text-sm">{basvuruTarihi}</div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Dosya Türü</Label>
+                  <select
+                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                    value={dosyaTuru}
+                    onChange={(e) => setDosyaTuru(e.target.value)}
+                  >
+                    {DOSYA_TURLERI.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <Label>Uyuşmazlık Alanı</Label>
+                <select
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm mt-1"
+                  value={niche}
+                  onChange={(e) => setNiche(e.target.value)}
+                >
+                  {NICHES.map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
             </Card>
             <div className="grid md:grid-cols-2 gap-5">
               <PartyForm title="Başvuran" value={partyA} onChange={setPartyA} />
