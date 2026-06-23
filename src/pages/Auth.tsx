@@ -561,6 +561,49 @@ export default function AuthPage() {
           </div>
         </main>
       </div>
+
+      {/* KVKK Modals */}
+      <Dialog open={openModal === 'aydinlatma'} onOpenChange={(o) => !o && setOpenModal(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>KVKK Aydınlatma Metni</DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed text-foreground/80 pt-2">
+              Medipact AI, arabuluculuk süreçlerindeki verilerin gizliliğini esas alır. Sisteme girilen uyuşmazlık özetleri ve taraflara ait kişisel veriler, akademik analiz amacıyla yapay zeka dil modelleri (Google Gemini API) üzerinden otomatik olarak anonimleştirilerek işlenmektedir. Verileriniz hiçbir reklam ve pazarlama şirketiyle paylaşılmaz.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setOpenModal(null)} className="w-full sm:w-auto">Anladım</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={openModal === 'imha'} onOpenChange={(o) => !o && setOpenModal(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Veri Saklama ve İmha Politikası</DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed text-foreground/80 pt-2">
+              Toplanan veriler yalnızca Medipact AI sisteminin çalışması için gerekli olan güvenli altyapıda (Supabase) şifrelenmiş olarak saklanır. Kullanıcı hesabını sildiği veya talep ettiği an tüm veriler kalıcı olarak imha edilir.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setOpenModal(null)} className="w-full sm:w-auto">Anladım</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={openModal === 'acikRiza'} onOpenChange={(o) => !o && setOpenModal(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Açık Rıza Beyanı</DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed text-foreground/80 pt-2">
+              Arabuluculuk Kanunu m. 4 gizlilik esaslarına uyum kapsamında; uyuşmazlıkların (İnşaat, Sağlık, Sigorta vb.) yapay zeka modelleri tarafından anlamsal olarak analiz edilmesine, emsal referanslarla eşleştirilmesine özgür irademle onay veriyorum.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setOpenModal(null)} className="w-full sm:w-auto">Anladım</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
