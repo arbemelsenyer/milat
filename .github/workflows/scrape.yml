@@ -3,25 +3,20 @@ on:
   schedule:
     - cron: '0 2 * * *'
   workflow_dispatch:
-
 jobs:
   scrape:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-          
       - name: Install dependencies
-       run: pip install requests beautifulsoup4 supabase pypdf
-        
+        run: pip install requests beautifulsoup4 supabase pypdf
       - name: Run scraper
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      - name: Run scraper
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scripts/scraper.py
