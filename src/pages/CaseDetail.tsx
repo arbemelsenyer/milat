@@ -26,6 +26,7 @@ import { AppNavbar } from "@/components/AppNavbar";
 import { CaseTimeline, type TimelineEvent } from "@/components/CaseTimeline";
 import { AiAssistantChat } from "@/components/AiAssistantChat";
 import { CountdownBadge } from "@/components/CountdownBadge";
+import { OfficialDocuments } from "@/components/OfficialDocuments";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -277,7 +278,7 @@ export default function CaseDetail() {
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <Tabs defaultValue="timeline" className="w-full">
-              <TabsList className="grid grid-cols-4 w-full">
+              <TabsList className="grid grid-cols-5 w-full">
                 <TabsTrigger value="timeline">
                   <Calendar className="w-4 h-4 mr-1.5" />
                   {language === "tr" ? "Zaman Çizelgesi" : "Timeline"}
@@ -293,6 +294,10 @@ export default function CaseDetail() {
                 <TabsTrigger value="messages">
                   <MessageSquare className="w-4 h-4 mr-1.5" />
                   {language === "tr" ? "Mesajlar" : "Messages"}
+                </TabsTrigger>
+                <TabsTrigger value="official">
+                  <Scale className="w-4 h-4 mr-1.5" />
+                  {language === "tr" ? "Resmi Belgeler" : "Official"}
                 </TabsTrigger>
               </TabsList>
 
@@ -462,6 +467,27 @@ export default function CaseDetail() {
                     </Button>
                   </div>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="official">
+                <OfficialDocuments
+                  caseData={{
+                    basvuruNo: c.title?.split("•")[0]?.trim(),
+                    dosyaTuru: c.title?.split("•")[1]?.trim(),
+                    niche: c.category ?? c.dispute_type ?? undefined,
+                    title: c.title ?? undefined,
+                    description: (c.ai_summary as any)?.summary ?? c.additional_notes ?? "",
+                    parties: parties.map((p) => ({
+                      role: (p as any).role,
+                      full_name: (p as any).full_name,
+                      organization: (p as any).organization,
+                      tc_kimlik: (p as any).tc_kimlik,
+                      address: (p as any).address,
+                      phone: (p as any).phone,
+                      email: (p as any).email,
+                    })),
+                  }}
+                />
               </TabsContent>
             </Tabs>
           </div>
