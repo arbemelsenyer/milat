@@ -191,9 +191,9 @@ export default function CaseDetail() {
     const lines = [
       `Dava ID: ${c.id}`,
       `Başlık: ${c.title ?? ""}`,
-      `Niş: ${c.niche ?? c.category ?? c.dispute_type ?? ""}`,
+      `Niş: ${c.category ?? c.dispute_type ?? ""}`,
       `Durum: ${c.status}`,
-      `Taraflar: ${parties.map((p) => p.full_name || p.organization_name).filter(Boolean).join(" / ")}`,
+      `Taraflar: ${parties.map((p) => p.full_name || p.organization).filter(Boolean).join(" / ")}`,
       `Notlar: ${(c.additional_notes ?? "").slice(0, 1200)}`,
     ];
     return lines.join("\n");
@@ -246,7 +246,7 @@ export default function CaseDetail() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 <Badge className="bg-accent text-accent-foreground border-0">
-                  {c.niche ?? c.category ?? c.dispute_type ?? "—"}
+                  {c.category ?? c.dispute_type ?? "—"}
                 </Badge>
                 <Badge variant="outline" className="border-primary-foreground/30 text-primary-foreground">
                   {c.status}
@@ -326,9 +326,9 @@ export default function CaseDetail() {
                       <div key={p.id} className="border border-border rounded-xl p-4 bg-card">
                         <div className="flex items-center justify-between mb-1">
                           <p className="font-semibold text-foreground">
-                            {p.full_name || p.organization_name || "—"}
+                            {p.full_name || p.organization || "—"}
                           </p>
-                          <Badge variant="outline">{p.side ?? p.party_type}</Badge>
+                          <Badge variant="outline">{p.role ?? p.party_type}</Badge>
                         </div>
                         {p.position_notes && (
                           <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
@@ -360,7 +360,7 @@ export default function CaseDetail() {
                       </div>
                     )}
                     {docs.map((d) => {
-                      const cards = (d.ai_analysis as any)?.cards as
+                      const cards = (d.analysis_result as any)?.cards as
                         | Array<{ title: string; riskLevel: string; description: string }>
                         | undefined;
                       return (
@@ -371,7 +371,7 @@ export default function CaseDetail() {
                               <div className="min-w-0">
                                 <p className="font-medium text-sm truncate">{d.file_name}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  {format(new Date(d.uploaded_at), "Pp", { locale })}
+                                  {format(new Date(d.created_at), "Pp", { locale })}
                                 </p>
                               </div>
                             </div>
@@ -468,7 +468,7 @@ export default function CaseDetail() {
 
           {/* Right column: AI assistant */}
           <div className="space-y-4">
-            <AiAssistantChat caseContext={caseContext} niche={c.niche ?? c.category ?? undefined} />
+            <AiAssistantChat caseContext={caseContext} niche={c.category ?? c.dispute_type ?? undefined} />
 
             <Card>
               <CardHeader className="pb-2">
