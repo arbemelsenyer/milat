@@ -91,10 +91,12 @@ export default function MediatorDetail() {
       const { error } = await supabase.from("mediator_requests").insert({
         case_id: caseId,
         mediator_id: mediator.id,
-        requester_id: u.user.id,
-        requested_session_at: requestedAt,
+        user_id: u.user.id,
+        scheduled_date: requestedAt,
+        preferred_dates: [format(date, "yyyy-MM-dd")],
+        preferred_time: slot,
         status: "pending",
-        message: `Randevu talebi: ${format(date, "d MMMM yyyy", { locale: tr })} ${slot}`,
+        notes: `Randevu talebi: ${format(date, "d MMMM yyyy", { locale: tr })} ${slot}`,
       });
       if (error) throw error;
 
