@@ -117,9 +117,14 @@ export function MediatorMarketplace({ niche, onSelect }: Props) {
                 <div className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> Ort. çözüm: {m.avg_resolution_days} gün</div>
                 <div className="flex items-center gap-1.5"><Globe className="h-3 w-3" /> {m.languages.join(", ")}</div>
               </div>
-              <div className="flex items-center justify-between pt-2 border-t">
+              <div className="flex items-center justify-between pt-2 border-t gap-2">
                 <span className="font-semibold">{Number(m.hourly_rate).toLocaleString("tr-TR")} ₺/saat</span>
-                <Button size="sm" onClick={() => onSelect(m)} disabled={!m.is_available}>Randevu Talep</Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" asChild>
+                    <a href={`/mediator/${m.id}`}>Profil</a>
+                  </Button>
+                  <Button size="sm" onClick={() => onSelect(m)} disabled={!m.is_available}>Randevu</Button>
+                </div>
               </div>
             </Card>
           ))}
