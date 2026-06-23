@@ -330,9 +330,9 @@ export default function CaseDetail() {
                           </p>
                           <Badge variant="outline">{p.role ?? p.party_type}</Badge>
                         </div>
-                        {p.position_notes && (
+                        {p.organization && p.full_name && (
                           <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-                            {p.position_notes}
+                            {p.organization}
                           </p>
                         )}
                       </div>
