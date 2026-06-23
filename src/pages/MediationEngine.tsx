@@ -26,8 +26,19 @@ const NICHES = [
   "Sağlık Hukuku Uyuşmazlıkları",
   "Sigorta Uyuşmazlıkları",
   "İnşaat",
-  "Marka-Patent",
+  "Fikri ve Sınai Mülkiyet",
 ];
+
+const DOSYA_TURLERI = [
+  "Dava Şartı Arabuluculuk",
+  "İhtiyari Arabuluculuk",
+];
+
+function generateBasvuruNo() {
+  const year = new Date().getFullYear();
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  return `${year}/${rand}`;
+}
 
 const STEPS = [
   { key: "intake", label: "Başvuru" },
