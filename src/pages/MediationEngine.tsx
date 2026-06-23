@@ -133,6 +133,9 @@ export default function MediationEngine() {
           your_name: partyAName || "Başvuran",
           other_party_name: partyBName || "Karşı Taraf",
           status: "draft",
+          title: `${basvuruNo} • ${dosyaTuru} • ${niche}`,
+          category: dosyaTuru,
+          additional_notes: uyapNo ? `UYAP No: ${uyapNo}` : null,
         } as any)
         .select()
         .single();
