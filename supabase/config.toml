@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.multi-agent-negotiation]
 verify_jwt = true
+
+[functions.legal-reasoning-gemini]
+verify_jwt = false

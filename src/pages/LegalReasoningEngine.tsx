@@ -3,6 +3,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { AppNavbar } from '@/components/AppNavbar';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 import { Loader2, Brain, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Scale } from 'lucide-react';
 
 interface CeliskilKart { baslik: string; risk: 'yuksek'|'orta'|'dusuk'; aciklama: string; emsal: string; }
@@ -98,7 +99,11 @@ Taraflarin gercek ihtiyaclarini ortaya cikaracak 5 soru uret.`);
       const sp = JSON.parse(sorularText.replace(/```json|```/g,'').trim());
       setSorular((sp.sorular||[]).map((s:string,i:number)=>({id:i+1,soru:s,cevap:''})));
       setAsama('sorular');
-    } catch(e){console.error(e);}
+    } catch(e: any){
+      console.error(e);
+      toast({ title: 'Analiz hatası', description: e?.message || 'Bilinmeyen hata', variant: 'destructive' });
+      setAsama('maskeleme');
+    }
     setLoading(false);
   }
 
@@ -116,7 +121,11 @@ Cevaplar: ${cevaplar}
 
 Kapsamli cozum raporu uret.`);
       setRapor(JSON.parse(raporText.replace(/```json|```/g,'').trim()));
-    } catch(e){console.error(e);}
+    } catch(e: any){
+      console.error(e);
+      toast({ title: 'Rapor hatası', description: e?.message || 'Bilinmeyen hata', variant: 'destructive' });
+      setAsama('sorular');
+    }
     setLoading(false);
   }
 

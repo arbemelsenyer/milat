@@ -4,9 +4,9 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const key = Deno.env.get('GEMINI_API_KEY');
+    const key = Deno.env.get('LOVABLE_API_KEY');
     if (!key) {
-      return new Response(JSON.stringify({ error: 'GEMINI_API_KEY not configured' }), {
+      return new Response(JSON.stringify({ error: 'LOVABLE_API_KEY not configured' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -20,37 +20,40 @@ Deno.serve(async (req) => {
       });
     }
 
-    const model = 'gemini-flash-latest';
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.4,
-            maxOutputTokens: 4096,
-            responseMimeType: 'application/json',
-          },
-        }),
-      }
-    );
+    const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Lovable-API-Key': key,
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: 'You are a Turkish legal expert. Always return strictly valid JSON only, no prose, no code fences.' },
+          { role: 'user', content: prompt },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.4,
+      }),
+    });
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error('Gemini error:', res.status, errText);
-      return new Response(JSON.stringify({ error: 'Gemini API error', detail: errText }), {
+      console.error('Gateway error:', res.status, errText);
+      const userMsg =
+        res.status === 429 ? 'Rate limit aşıldı. Lütfen biraz sonra tekrar deneyin.' :
+        res.status === 402 ? 'AI kredisi tükendi. Workspace ayarlarından kredi ekleyin.' :
+        'AI servisi hatası';
+      return new Response(JSON.stringify({ error: userMsg, detail: errText }), {
         status: res.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const data = await res.json();
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    console.log('Gemini raw length:', raw.length);
+    const raw: string = data.choices?.[0]?.message?.content || '';
+    console.log('AI raw length:', raw.length);
 
-    // Sanitize: strip code fences, trim to outermost JSON braces/brackets
     let text = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
     const start = text.search(/[\{\[]/);
     if (start !== -1) {
