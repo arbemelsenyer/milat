@@ -19,7 +19,7 @@ import { AgreementStreaming } from "@/components/mediation/AgreementStreaming";
 import { ExpertSelector, type Expert } from "@/components/mediation/ExpertSelector";
 import { OfficialDocsPanel } from "@/components/mediation/OfficialDocsPanel";
 import { maskText } from "@/lib/masking";
-import { Loader2, ShieldCheck, Scale, TrendingUp } from "lucide-react";
+import { Loader2, ShieldCheck, Scale, TrendingUp, Plus } from "lucide-react";
 
 const NICHES = [
   "İşçi-İşveren",
@@ -370,25 +370,22 @@ export default function MediationEngine() {
               {parties.map((p, i) => (
                 <PartyForm
                   key={i}
-                  title={partyLabel(i)}
+                  index={i}
                   value={p}
                   onChange={(np) => updateParty(i, np)}
-                  onRemove={parties.length > MIN_PARTIES ? () => removeParty(i) : undefined}
+                  onRemove={parties.length > 1 ? () => removeParty(i) : undefined}
                 />
               ))}
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {parties.length}/{MAX_PARTIES} taraf • en az {MIN_PARTIES}, en fazla {MAX_PARTIES}.
-              </p>
+              <p className="text-xs text-muted-foreground">{parties.length} taraf</p>
               <Button
                 type="button"
-                variant="outline"
-                size="sm"
                 onClick={addParty}
-                disabled={parties.length >= MAX_PARTIES}
+                className="bg-green-600 hover:bg-green-700 text-white gap-1"
+                size="sm"
               >
-                + Taraf Ekle
+                <Plus className="h-4 w-4" /> Taraf Ekle
               </Button>
             </div>
             <Card className="p-5 space-y-3">
@@ -779,6 +776,7 @@ function partyToRow(case_id: string, role: string, p: Party, displayName: string
     tax_number: p.taxNumber || null,
     trade_registry_no: p.tradeRegistryNo || null,
     authorized_person: p.authorizedPerson || null,
+    gsm: p.gsm || null,
     organization: p.partyType === "corporate" ? p.companyName : null,
   };
 }
