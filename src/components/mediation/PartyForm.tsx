@@ -44,9 +44,10 @@ interface Props {
   title: string;
   value: Party;
   onChange: (p: Party) => void;
+  onRemove?: () => void;
 }
 
-export function PartyForm({ title, value, onChange }: Props) {
+export function PartyForm({ title, value, onChange, onRemove }: Props) {
   const set = <K extends keyof Party>(k: K, v: Party[K]) => onChange({ ...value, [k]: v });
   const isInd = value.partyType === "individual";
 
@@ -54,18 +55,29 @@ export function PartyForm({ title, value, onChange }: Props) {
     <Card className="p-5 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h3 className="text-lg font-semibold">{title}</h3>
-        <RadioGroup
-          className="flex gap-4"
-          value={value.partyType}
-          onValueChange={(v) => set("partyType", v as Party["partyType"])}
-        >
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <RadioGroupItem value="individual" /> Bireysel
-          </label>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <RadioGroupItem value="corporate" /> Kurumsal
-          </label>
-        </RadioGroup>
+        <div className="flex items-center gap-3">
+          <RadioGroup
+            className="flex gap-4"
+            value={value.partyType}
+            onValueChange={(v) => set("partyType", v as Party["partyType"])}
+          >
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <RadioGroupItem value="individual" /> Bireysel
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <RadioGroupItem value="corporate" /> Kurumsal
+            </label>
+          </RadioGroup>
+          {onRemove && (
+            <button
+              type="button"
+              onClick={onRemove}
+              className="text-xs text-destructive hover:underline"
+            >
+              Kaldır
+            </button>
+          )}
+        </div>
       </div>
 
       {isInd ? (
@@ -77,7 +89,7 @@ export function PartyForm({ title, value, onChange }: Props) {
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Şirket Unvanı" value={value.companyName} onChange={(v) => set("companyName", v)} />
+          <Field label="Kurum Adı" value={value.companyName} onChange={(v) => set("companyName", v)} />
           <Field label="Vergi Dairesi" value={value.taxOffice} onChange={(v) => set("taxOffice", v)} />
           <Field label="Vergi No" value={value.taxNumber} onChange={(v) => set("taxNumber", v)} />
           <Field label="Ticaret Sicil No" value={value.tradeRegistryNo} onChange={(v) => set("tradeRegistryNo", v)} />
@@ -87,8 +99,9 @@ export function PartyForm({ title, value, onChange }: Props) {
 
       <div className="grid sm:grid-cols-2 gap-3 pt-2 border-t">
         <Field label="Adres" value={value.address} onChange={(v) => set("address", v)} className="sm:col-span-2" />
+        {isInd && <Field label="GSM (Cep Telefonu)" value={value.gsm} onChange={(v) => set("gsm", v)} />}
         <Field label="Telefon" value={value.phone} onChange={(v) => set("phone", v)} />
-        <Field label="E-posta" type="email" value={value.email} onChange={(v) => set("email", v)} />
+        <Field label="E-posta" type="email" value={value.email} onChange={(v) => set("email", v)} className={isInd ? "" : "sm:col-span-2"} />
       </div>
     </Card>
   );
