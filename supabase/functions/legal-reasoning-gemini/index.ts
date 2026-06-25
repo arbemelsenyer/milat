@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const model = 'gemini-flash-latest';
+    const model = 'gemini-2.0-flash';
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
       {
