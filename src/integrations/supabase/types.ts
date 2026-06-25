@@ -649,6 +649,50 @@ export type Database = {
           },
         ]
       }
+      expert_assignment_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_role: string | null
+          assignment_id: string | null
+          case_id: string
+          created_at: string
+          details: Json
+          expert_id: string | null
+          id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_role?: string | null
+          assignment_id?: string | null
+          case_id: string
+          created_at?: string
+          details?: Json
+          expert_id?: string | null
+          id?: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_role?: string | null
+          assignment_id?: string | null
+          case_id?: string
+          created_at?: string
+          details?: Json
+          expert_id?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expert_assignment_logs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       experts: {
         Row: {
           active: boolean
@@ -963,6 +1007,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          email_expert_updates: boolean
+          email_mediator_assignment: boolean
+          email_negotiation_updates: boolean
+          email_session_invite: boolean
+          email_session_reminder: boolean
+          id: string
+          inapp_expert_updates: boolean
+          inapp_mediator_assignment: boolean
+          inapp_negotiation_updates: boolean
+          inapp_session_invite: boolean
+          inapp_session_reminder: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_expert_updates?: boolean
+          email_mediator_assignment?: boolean
+          email_negotiation_updates?: boolean
+          email_session_invite?: boolean
+          email_session_reminder?: boolean
+          id?: string
+          inapp_expert_updates?: boolean
+          inapp_mediator_assignment?: boolean
+          inapp_negotiation_updates?: boolean
+          inapp_session_invite?: boolean
+          inapp_session_reminder?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_expert_updates?: boolean
+          email_mediator_assignment?: boolean
+          email_negotiation_updates?: boolean
+          email_session_invite?: boolean
+          email_session_reminder?: boolean
+          id?: string
+          inapp_expert_updates?: boolean
+          inapp_mediator_assignment?: boolean
+          inapp_negotiation_updates?: boolean
+          inapp_session_invite?: boolean
+          inapp_session_reminder?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       notifications: {
         Row: {

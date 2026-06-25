@@ -106,8 +106,118 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
     return `${date}T${time || "10:00"}`;
   }, [date, time]);
 
+  // ---- Conflict detection ----
+  const DURATION_MIN = 60;
+  const selectedUserIds = useMemo(
+    () => parties.filter((p) => selectedPartyIds.includes(p.id) && p.user_id).map((p) => p.user_id as string),
+    [parties, selectedPartyIds]
+  );
+
+  type Conflict = { sessionId: string; userId: string; when: string };
+  const [conflicts, setConflicts] = useState<Conflict[]>([]);
+  const [alternatives, setAlternatives] = useState<string[]>([]);
+  const [allSessions, setAllSessions] = useState<any[]>([]);
+
+  // load all sessions touching selected participants (across cases) for conflict checks
+  useEffect(() => {
+    if (selectedUserIds.length === 0) {
+      setAllSessions([]);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from("case_sessions")
+        .select("id, scheduled_at, participants, case_id")
+        .neq("status", "cancelled");
+      const rows = (data ?? []) as any[];
+      const overlapping = rows.filter((s) => {
+        const pids: string[] = ((s.participants ?? []) as any[])
+          .map((p) => p.user_id)
+          .filter(Boolean);
+        return pids.some((u) => selectedUserIds.includes(u));
+      });
+      setAllSessions(overlapping);
+    })();
+  }, [selectedUserIds.join(",")]);
+
+  const overlaps = (aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) =>
+    aStart < bEnd && bStart < aEnd;
+
+  const findConflictsFor = (startISO: string): Conflict[] => {
+    const start = new Date(startISO);
+    const end = new Date(start.getTime() + DURATION_MIN * 60_000);
+    const out: Conflict[] = [];
+    allSessions.forEach((s) => {
+      if (!s.scheduled_at) return;
+      const sStart = new Date(s.scheduled_at);
+      const sEnd = new Date(sStart.getTime() + DURATION_MIN * 60_000);
+      if (!overlaps(start, end, sStart, sEnd)) return;
+      const pids: string[] = ((s.participants ?? []) as any[])
+        .map((p) => p.user_id)
+        .filter(Boolean);
+      pids.forEach((u) => {
+        if (selectedUserIds.includes(u)) {
+          out.push({ sessionId: s.id, userId: u, when: s.scheduled_at });
+        }
+      });
+    });
+    return out;
+  };
+
+  // recompute conflicts whenever date/time/participants change
+  useEffect(() => {
+    if (!composedDateTime || selectedUserIds.length === 0) {
+      setConflicts([]);
+      setAlternatives([]);
+      return;
+    }
+    const startISO = new Date(composedDateTime).toISOString();
+    const found = findConflictsFor(startISO);
+    setConflicts(found);
+    if (found.length > 0) {
+      // propose next 3 free slots in QUICK_HOURS over the next 5 days
+      const proposals: string[] = [];
+      const base = new Date(`${date}T00:00:00`);
+      for (let d = 0; d < 7 && proposals.length < 3; d++) {
+        const day = new Date(base);
+        day.setDate(base.getDate() + d);
+        const ymd = day.toISOString().slice(0, 10);
+        for (const h of QUICK_HOURS) {
+          const iso = new Date(`${ymd}T${h}`).toISOString();
+          if (findConflictsFor(iso).length === 0) {
+            proposals.push(`${ymd}T${h}`);
+            if (proposals.length >= 3) break;
+          }
+        }
+      }
+      setAlternatives(proposals);
+    } else {
+      setAlternatives([]);
+    }
+  }, [composedDateTime, selectedUserIds.join(","), allSessions.length]);
+
+  const applyAlternative = (iso: string) => {
+    const [d, t] = iso.split("T");
+    setDate(d);
+    setTime(t.slice(0, 5));
+  };
+
+  const userLabel = (uid: string) => {
+    const p = parties.find((x) => x.user_id === uid);
+    if (!p) return uid.slice(0, 8);
+    return `Taraf ${p.party_role ?? "?"}`;
+  };
+
   const add = async () => {
     if (!composedDateTime) return;
+    if (conflicts.length > 0) {
+      toast({
+        title: "Çakışma var",
+        description: "Önce çakışmayı çözün veya alternatif zaman seçin.",
+        variant: "destructive",
+      });
+      return;
+    }
     const participants = parties
       .filter((p) => selectedPartyIds.includes(p.id))
       .map((p) => ({ party_id: p.id, user_id: p.user_id, role: p.party_role }));
@@ -123,7 +233,6 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
       toast({ title: "Hata", description: error.message, variant: "destructive" });
       return;
     }
-    // Notify invited participants
     const when = new Date(composedDateTime).toLocaleString("tr-TR");
     const title = "Yeni Toplantı Daveti";
     const msg = `${TYPES.find((t) => t.key === type)?.label ?? type} — ${when}`;
@@ -341,7 +450,39 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
             placeholder="Hazırlık notları / gündem"
           />
         </div>
-        <Button onClick={add} disabled={!date} size="sm">
+
+        {conflicts.length > 0 && (
+          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm space-y-2">
+            <div className="font-medium text-destructive">Çakışma tespit edildi</div>
+            <ul className="text-xs space-y-1">
+              {Array.from(new Set(conflicts.map((c) => c.userId))).map((uid) => (
+                <li key={uid}>
+                  • {userLabel(uid)} bu saatte başka bir toplantıda.
+                </li>
+              ))}
+            </ul>
+            {alternatives.length > 0 && (
+              <div>
+                <div className="text-xs text-muted-foreground mt-2 mb-1">Önerilen alternatifler:</div>
+                <div className="flex flex-wrap gap-2">
+                  {alternatives.map((iso) => (
+                    <Button
+                      key={iso}
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() => applyAlternative(iso)}
+                    >
+                      {new Date(iso).toLocaleString("tr-TR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <Button onClick={add} disabled={!date || conflicts.length > 0} size="sm">
           <Plus className="h-4 w-4 mr-1" /> Planla ve Davet Gönder
         </Button>
       </Card>

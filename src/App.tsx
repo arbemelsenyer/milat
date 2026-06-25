@@ -22,6 +22,8 @@ import MediationEngine from "./pages/MediationEngine";
 import CaseDetail from "./pages/CaseDetail";
 import CaseRoom from "./pages/CaseRoom";
 import MediatorDetail from "./pages/MediatorDetail";
+import NotificationSettings from "./pages/NotificationSettings";
+import PrivacyTests from "./pages/PrivacyTests";
 
 
 const queryClient = new QueryClient();
@@ -51,6 +53,8 @@ const App = () => (
 <Route path="/case/:id" element={<CaseDetail />} />
 <Route path="/case-room/:id" element={<CaseRoom />} />
 <Route path="/mediator/:id" element={<MediatorDetail />} />
+<Route path="/notification-settings" element={<NotificationSettings />} />
+<Route path="/privacy-tests" element={<PrivacyTests />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
