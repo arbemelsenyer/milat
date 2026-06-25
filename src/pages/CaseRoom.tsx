@@ -313,6 +313,26 @@ export default function CaseRoom() {
             })}
           </Card>
         </TabsContent>
+
+        <TabsContent value="sessions">
+          <SessionScheduler
+            caseId={caseId!}
+            niche={caseRow?.dispute_type ?? ""}
+            context={caseRow?.issue_description ?? caseRow?.title ?? ""}
+          />
+        </TabsContent>
+
+        <TabsContent value="experts">
+          <ExpertsTab caseId={caseId!} niche={caseRow?.dispute_type ?? ""} />
+        </TabsContent>
+
+        <TabsContent value="rounds">
+          <RoundsTab caseId={caseId!} parties={parties} />
+        </TabsContent>
+
+        <TabsContent value="agreement">
+          <AgreementTab caseRow={caseRow!} parties={parties} onChanged={loadAll} />
+        </TabsContent>
       </Tabs>
     );
   }
