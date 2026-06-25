@@ -658,8 +658,10 @@ function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string;
 
 // =================== Party-side expert approval ===================
 function PartyExpertApproval({ caseId, partyId }: { caseId: string; partyId: string }) {
+  const { user } = useAuth();
   const [assigned, setAssigned] = useState<any[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [logKey, setLogKey] = useState(0);
 
   const load = async () => {
     const { data } = await supabase
@@ -672,6 +674,7 @@ function PartyExpertApproval({ caseId, partyId }: { caseId: string; partyId: str
   useEffect(() => { load(); }, [caseId]);
 
   const decide = async (row: any, decision: "approved" | "rejected") => {
+    if (!user) return;
     setBusy(row.id);
     const approvals = { ...(row.approvals ?? {}), [partyId]: decision };
     let nextStatus = row.status;
@@ -680,6 +683,7 @@ function PartyExpertApproval({ caseId, partyId }: { caseId: string; partyId: str
     const partyIds = partyRows.map((p) => p.id);
     const anyRejected = partyIds.some((id: string) => approvals[id] === "rejected");
     const allApproved = partyIds.length > 0 && partyIds.every((id: string) => approvals[id] === "approved");
+    const prevStatus = row.status;
     if (anyRejected) nextStatus = "rejected";
     else if (allApproved) nextStatus = "approved";
     else nextStatus = "pending";
@@ -688,6 +692,21 @@ function PartyExpertApproval({ caseId, partyId }: { caseId: string; partyId: str
       .update({ approvals, status: nextStatus } as any).eq("id", row.id);
     setBusy(null);
     if (error) { toast({ title: "Hata", description: error.message, variant: "destructive" }); return; }
+
+    // Audit log: the party's decision (always) + status change (if any)
+    await logExpertAction({
+      caseId, assignmentId: row.id, expertId: row.expert_id,
+      actorId: user.id, actorRole: "party", action: decision,
+      details: { note: `Taraf kararı: ${decision === "approved" ? "onay" : "red"}` },
+    });
+    if (nextStatus !== prevStatus) {
+      await logExpertAction({
+        caseId, assignmentId: row.id, expertId: row.expert_id,
+        actorId: user.id, actorRole: "system", action: "status_changed",
+        details: { from: prevStatus, to: nextStatus },
+      });
+    }
+    setLogKey((k) => k + 1);
 
     // Notify mediator + other parties of the decision / status change
     const { data: caseRow } = await supabase.from("cases").select("assigned_mediator_id").eq("id", caseId).maybeSingle();
@@ -747,6 +766,7 @@ function PartyExpertApproval({ caseId, partyId }: { caseId: string; partyId: str
           </Card>
         );
       })}
+      <ExpertAuditLog caseId={caseId} refreshKey={logKey} />
     </div>
   );
 }
