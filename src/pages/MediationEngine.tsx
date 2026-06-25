@@ -16,8 +16,10 @@ import { ConflictCards, type ConflictCard } from "@/components/mediation/Conflic
 import { DiscoveryInterview } from "@/components/mediation/DiscoveryInterview";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { AgreementStreaming } from "@/components/mediation/AgreementStreaming";
+import { ExpertSelector, type Expert } from "@/components/mediation/ExpertSelector";
+import { OfficialDocsPanel } from "@/components/mediation/OfficialDocsPanel";
 import { maskText } from "@/lib/masking";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Loader2, ShieldCheck, Scale, TrendingUp } from "lucide-react";
 
 const NICHES = [
   "İşçi-İşveren",
@@ -58,10 +60,11 @@ const STEPS = [
   { key: "intake", label: "Başvuru" },
   { key: "mediator", label: "Arabulucu Seçimi" },
   { key: "documents", label: "Belge Analizi" },
+  { key: "expert", label: "Bilirkişi" },
   { key: "discovery", label: "İhtiyaç Tespiti" },
   { key: "sessions", label: "Görüşme Planlaması" },
   { key: "negotiation", label: "Müzakere" },
-  { key: "closure", label: "Kapanış" },
+  { key: "closure", label: "Anlaşma & Belgeler" },
 ];
 
 async function callMediationAi(action: string, payload: Record<string, unknown>) {
@@ -99,17 +102,23 @@ export default function MediationEngine() {
   const [approvals, setApprovals] = useState<boolean[]>([]);
   const [confirmingMediator, setConfirmingMediator] = useState(false);
 
-  // Step 3
+  // Step 3 — Documents
   const [docText, setDocText] = useState("");
   const [conflicts, setConflicts] = useState<ConflictCard[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [precedent, setPrecedent] = useState<any | null>(null);
+  const [comparingPrecedent, setComparingPrecedent] = useState(false);
 
-  // Step 4
+  // Step 4 — Expert
+  const [selectedExpert, setSelectedExpert] = useState<Expert | null>(null);
+  const [assigningExpert, setAssigningExpert] = useState(false);
+
+  // Step 5 — Discovery
   const [questions, setQuestions] = useState<string[]>([]);
   const [needs, setNeeds] = useState<{ needs: string[]; winWinScenarios: string[] } | null>(null);
   const [askingQs, setAskingQs] = useState(false);
 
-  // Step 6
+  // Step 7 — Negotiation
   const [transcript, setTranscript] = useState("");
   const [suggestion, setSuggestion] = useState<{ suggestions: string[]; commonGround: string; frictionPoints: string[] } | null>(null);
   const [suggesting, setSuggesting] = useState(false);
@@ -229,6 +238,41 @@ export default function MediationEngine() {
     }
   };
 
+  const comparePrecedents = async () => {
+    setComparingPrecedent(true);
+    try {
+      const r = await callMediationAi("precedent_compare", {
+        niche,
+        text: maskText(dispute, maskTerms()).masked + "\n\n" + docText.slice(0, 6000),
+      });
+      setPrecedent(r);
+    } catch (e: any) {
+      toast({ title: "Emsal karşılaştırma hatası", description: e.message, variant: "destructive" });
+    } finally {
+      setComparingPrecedent(false);
+    }
+  };
+
+  const assignExpert = async () => {
+    if (!caseId || !selectedExpert) return;
+    setAssigningExpert(true);
+    try {
+      await supabase
+        .from("cases")
+        .update({ assigned_expert_id: selectedExpert.id } as any)
+        .eq("id", caseId);
+      toast({
+        title: "Bilirkişi atandı",
+        description: `${selectedExpert.full_name} • ${selectedExpert.specialization}`,
+      });
+      setStep(4);
+    } catch (e: any) {
+      toast({ title: "Hata", description: e.message, variant: "destructive" });
+    } finally {
+      setAssigningExpert(false);
+    }
+  };
+
   const finishDiscovery = async (qa: { question: string; answer: string }[]) => {
     if (!caseId) return;
     await supabase.from("case_discovery_questions").insert(
@@ -247,7 +291,7 @@ export default function MediationEngine() {
     } catch (e: any) {
       toast({ title: "İhtiyaç çıkarma hatası", description: e.message, variant: "destructive" });
     }
-    setStep(4);
+    setStep(5);
   };
 
   const requestSuggestion = async () => {
@@ -499,38 +543,113 @@ export default function MediationEngine() {
           </div>
         )}
 
-        {/* STEP 3: Document analysis */}
+        {/* STEP 3: Document analysis + vector pool precedent comparison */}
         {step === 2 && (
           <div className="space-y-4">
             <DocumentUploader onTextExtracted={handleDocText} />
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                onClick={comparePrecedents}
+                disabled={comparingPrecedent}
+              >
+                {comparingPrecedent ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                )}
+                Emsal Karşılaştır
+              </Button>
               <Button onClick={analyzeDocs} disabled={analyzing}>
                 {analyzing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
                 Çelişki Analizi Yap
               </Button>
             </div>
             <ConflictCards cards={conflicts} />
+            {precedent && (
+              <Card className="p-5 space-y-3 border-primary/30 bg-primary/[0.03]">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Scale className="h-4 w-4 text-primary" /> Vektör Havuzu — Emsal Analizi
+                </h3>
+                <p className="text-sm text-muted-foreground">{precedent.overallTrend}</p>
+                <div className="space-y-2">
+                  {(precedent.similarCases ?? []).map((sc: any, i: number) => (
+                    <div key={i} className="rounded-md border bg-background p-3 text-sm">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <div className="font-medium">Emsal {i + 1}</div>
+                        <span className="text-xs text-muted-foreground">
+                          Benzerlik: %{Math.round((sc.similarityScore ?? 0) * 100)}
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground">{sc.summary}</p>
+                      {sc.outcomePattern && (
+                        <p className="text-xs mt-1"><b>Sonuç deseni:</b> {sc.outcomePattern}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {precedent.recommendation && (
+                  <p className="text-sm border-l-2 border-primary/40 pl-3 italic">
+                    {precedent.recommendation}
+                  </p>
+                )}
+              </Card>
+            )}
             {conflicts.length > 0 && (
               <div className="flex justify-end">
-                <Button variant="secondary" onClick={() => setStep(3)}>İhtiyaç Tespitine Geç</Button>
+                <Button variant="secondary" onClick={() => setStep(3)}>Bilirkişi Atamasına Geç</Button>
               </div>
             )}
           </div>
         )}
 
-        {/* STEP 4: Discovery interview */}
+        {/* STEP 4: Expert (Bilirkişi) assignment */}
         {step === 3 && (
           <div className="space-y-4">
+            <ExpertSelector
+              niche={niche}
+              selectedId={selectedExpert?.id}
+              onSelect={setSelectedExpert}
+            />
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" onClick={() => setStep(4)}>
+                Bilirkişi olmadan devam et
+              </Button>
+              <Button
+                onClick={assignExpert}
+                disabled={!selectedExpert || assigningExpert}
+              >
+                {assigningExpert ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : null}
+                Bilirkişiyi Ata ve Devam Et
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 5: Discovery interview */}
+        {step === 4 && (
+          <div className="space-y-4">
             {askingQs && !questions.length ? (
-              <p className="text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Sorular hazırlanıyor...</p>
+              <p className="text-muted-foreground flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Sorular hazırlanıyor...
+              </p>
+            ) : questions.length === 0 ? (
+              <Card className="p-5 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Henüz soru üretilmedi. "Belge Analizi Yap" çalıştırılırsa otomatik üretilir.
+                </p>
+                <Button variant="outline" onClick={() => setStep(5)}>Atla — Görüşme Planına Geç</Button>
+              </Card>
             ) : (
               <DiscoveryInterview questions={questions} onComplete={finishDiscovery} />
             )}
           </div>
         )}
 
-        {/* STEP 5: Sessions */}
-        {step === 4 && (
+        {/* STEP 6: Sessions with AI suggestion */}
+        {step === 5 && (
           <div className="space-y-4">
             {needs && (
               <Card className="p-5 space-y-3">
@@ -551,15 +670,24 @@ export default function MediationEngine() {
                 </div>
               </Card>
             )}
-            {caseId && <SessionScheduler caseId={caseId} />}
+            {caseId && (
+              <SessionScheduler
+                caseId={caseId}
+                niche={niche}
+                context={
+                  maskText(dispute, maskTerms()).masked +
+                  (needs ? "\n\nİhtiyaçlar: " + (needs.needs ?? []).join("; ") : "")
+                }
+              />
+            )}
             <div className="flex justify-end">
-              <Button onClick={() => setStep(5)}>Müzakereye Geç</Button>
+              <Button onClick={() => setStep(6)}>Müzakereye Geç</Button>
             </div>
           </div>
         )}
 
-        {/* STEP 6: Negotiation */}
-        {step === 5 && (
+        {/* STEP 7: Negotiation */}
+        {step === 6 && (
           <div className="space-y-4">
             <Card className="p-5 space-y-3">
               <Label>Müzakere Kaydı</Label>
@@ -592,13 +720,13 @@ export default function MediationEngine() {
               </Card>
             )}
             <div className="flex justify-end">
-              <Button onClick={() => setStep(6)}>Kapanışa Geç</Button>
+              <Button onClick={() => setStep(7)}>Kapanışa Geç</Button>
             </div>
           </div>
         )}
 
-        {/* STEP 7: Closure */}
-        {step === 6 && (
+        {/* STEP 8: Closure — agreement streaming + official PDF templates */}
+        {step === 7 && (
           <div className="space-y-4">
             <AgreementStreaming
               context={[
@@ -608,6 +736,30 @@ export default function MediationEngine() {
                 needs ? `Senaryolar: ${needs.winWinScenarios?.join("; ")}` : "",
                 suggestion ? `Ortak zemin: ${suggestion.commonGround}` : "",
               ].filter(Boolean).join("\n")}
+            />
+            <OfficialDocsPanel
+              data={{
+                basvuruNo,
+                uyapNo,
+                basvuruTarihi,
+                dosyaTuru,
+                niche,
+                title: `${basvuruNo} • ${dosyaTuru} • ${niche}`,
+                description: dispute,
+                parties: parties.map((p, i) => ({
+                  role: i === 0 ? "Başvuran" : i === 1 ? "Karşı Taraf" : `Taraf ${i + 1}`,
+                  full_name: partyDisplayName(p, i),
+                  organization: p.partyType === "corporate" ? p.companyName : undefined,
+                  tc_kimlik: p.tcKimlik,
+                  vergi_no: p.taxNumber,
+                  address: p.address,
+                  phone: p.phone,
+                  email: p.email,
+                })),
+                mediator: proposedMediator
+                  ? { full_name: proposedMediator.full_name }
+                  : undefined,
+              }}
             />
           </div>
         )}
