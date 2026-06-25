@@ -83,11 +83,21 @@ export default function MediationEngine() {
   const [uyapNo, setUyapNo] = useState("");
   const [dosyaTuru, setDosyaTuru] = useState(DOSYA_TURLERI[0]);
   const basvuruTarihi = new Date().toLocaleDateString("tr-TR");
-  const [partyA, setPartyA] = useState<Party>(emptyParty());
-  const [partyB, setPartyB] = useState<Party>(emptyParty());
+  const [parties, setParties] = useState<Party[]>([emptyParty(), emptyParty()]);
+  const updateParty = (i: number, p: Party) =>
+    setParties((prev) => prev.map((x, idx) => (idx === i ? p : x)));
+  const addParty = () =>
+    setParties((prev) => (prev.length < MAX_PARTIES ? [...prev, emptyParty()] : prev));
+  const removeParty = (i: number) =>
+    setParties((prev) => (prev.length > MIN_PARTIES ? prev.filter((_, idx) => idx !== i) : prev));
   const [dispute, setDispute] = useState("");
   const [caseId, setCaseId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+
+  // Step 2 — mediator selection & mutual approval
+  const [proposedMediator, setProposedMediator] = useState<{ id: string; full_name: string; hourly_rate: number; specializations: string[] } | null>(null);
+  const [approvals, setApprovals] = useState<boolean[]>([]);
+  const [confirmingMediator, setConfirmingMediator] = useState(false);
 
   // Step 3
   const [docText, setDocText] = useState("");
