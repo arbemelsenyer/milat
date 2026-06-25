@@ -345,10 +345,11 @@ export default function CaseRoom() {
   function PartyView() {
     return (
       <Tabs defaultValue="documents">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="documents"><Upload className="h-4 w-4 mr-1" />Belgelerim</TabsTrigger>
           <TabsTrigger value="analysis"><Brain className="h-4 w-4 mr-1" />Gizli Analizim</TabsTrigger>
           <TabsTrigger value="discovery">İhtiyaç Tespiti</TabsTrigger>
+          <TabsTrigger value="experts"><Award className="h-4 w-4 mr-1" />Bilirkişi Onayı</TabsTrigger>
         </TabsList>
 
         <TabsContent value="documents">
