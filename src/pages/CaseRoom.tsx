@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Loader2, ShieldCheck, Lock, Sparkles, Upload, FileText, Users, Brain, Lightbulb,
-  Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X,
+  Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X, History,
 } from "lucide-react";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
