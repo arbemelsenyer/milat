@@ -45,7 +45,7 @@ const ROWS: Array<{ key: keyof Prefs extends string ? string : never; label: str
 ];
 
 export default function NotificationSettings() {
-  const { user, loading } = useAuth();
+  const { user, isLoading } = useAuth();
   const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
