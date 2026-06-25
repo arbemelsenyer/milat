@@ -12,7 +12,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Loader2, ShieldCheck, Lock, Sparkles, Upload, FileText, Users, Brain, Lightbulb,
+  Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X,
 } from "lucide-react";
+import { SessionScheduler } from "@/components/mediation/SessionScheduler";
+import { ExpertSelector } from "@/components/mediation/ExpertSelector";
+import { OfficialDocsPanel } from "@/components/mediation/OfficialDocsPanel";
+import { Input } from "@/components/ui/input";
 
 interface CaseRow {
   id: string; title: string | null; application_no: string | null; uyap_no: string | null;
