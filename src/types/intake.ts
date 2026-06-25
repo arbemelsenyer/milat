@@ -8,7 +8,9 @@ export interface IntakeFormData {
   yourRole: 'individual' | 'business' | '';
   otherPartyName: string;
   otherPartyRole: 'individual' | 'business' | '';
+  additionalParties: { name: string; role: 'individual' | 'business' | '' }[];
   relationship: string;
+
 
   // Step 3: What Happened
   issueDescription: string;
@@ -62,7 +64,9 @@ export const initialFormData: IntakeFormData = {
   yourRole: '',
   otherPartyName: '',
   otherPartyRole: '',
+  additionalParties: [],
   relationship: '',
+
   issueDescription: '',
   timeline: '',
   attemptedResolution: '',
