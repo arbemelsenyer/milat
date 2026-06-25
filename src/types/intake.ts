@@ -64,7 +64,9 @@ export const initialFormData: IntakeFormData = {
   yourRole: '',
   otherPartyName: '',
   otherPartyRole: '',
+  additionalParties: [],
   relationship: '',
+
   issueDescription: '',
   timeline: '',
   attemptedResolution: '',
