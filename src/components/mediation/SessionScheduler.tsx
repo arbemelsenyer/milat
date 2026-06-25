@@ -450,7 +450,39 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
             placeholder="Hazırlık notları / gündem"
           />
         </div>
-        <Button onClick={add} disabled={!date} size="sm">
+
+        {conflicts.length > 0 && (
+          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm space-y-2">
+            <div className="font-medium text-destructive">Çakışma tespit edildi</div>
+            <ul className="text-xs space-y-1">
+              {Array.from(new Set(conflicts.map((c) => c.userId))).map((uid) => (
+                <li key={uid}>
+                  • {userLabel(uid)} bu saatte başka bir toplantıda.
+                </li>
+              ))}
+            </ul>
+            {alternatives.length > 0 && (
+              <div>
+                <div className="text-xs text-muted-foreground mt-2 mb-1">Önerilen alternatifler:</div>
+                <div className="flex flex-wrap gap-2">
+                  {alternatives.map((iso) => (
+                    <Button
+                      key={iso}
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() => applyAlternative(iso)}
+                    >
+                      {new Date(iso).toLocaleString("tr-TR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <Button onClick={add} disabled={!date || conflicts.length > 0} size="sm">
           <Plus className="h-4 w-4 mr-1" /> Planla ve Davet Gönder
         </Button>
       </Card>
