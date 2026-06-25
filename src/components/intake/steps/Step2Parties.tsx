@@ -16,6 +16,16 @@ interface Step2Props {
 export function Step2Parties({ data, onChange }: Step2Props) {
   const { t } = useLanguage();
 
+  const additional = data.additionalParties ?? [];
+  const updateAdditional = (i: number, patch: Partial<{ name: string; role: 'individual' | 'business' | '' }>) => {
+    const next = [...additional];
+    next[i] = { ...next[i], ...patch };
+    onChange({ additionalParties: next });
+  };
+  const addParty = () => onChange({ additionalParties: [...additional, { name: '', role: '' }] });
+  const removeParty = (i: number) => onChange({ additionalParties: additional.filter((_, idx) => idx !== i) });
+
+
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="text-center mb-8">
