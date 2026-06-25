@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
-import { Calendar, Plus, Sparkles, Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Calendar, Plus, Sparkles, Loader2, Users, Clock, Circle } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 const TYPES = [
@@ -12,6 +15,8 @@ const TYPES = [
   { key: "main", label: "Ana Görüşme" },
   { key: "private", label: "Özel Görüşme" },
 ] as const;
+
+const QUICK_HOURS = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"];
 
 type Suggestion = {
   sessionType: string;
@@ -22,19 +27,40 @@ type Suggestion = {
   rationale: string;
 };
 
+interface PartyLite {
+  id: string;
+  user_id: string | null;
+  party_role: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  company_name?: string | null;
+  email?: string | null;
+}
+
 interface Props {
   caseId: string;
   niche?: string;
   context?: string;
+  parties?: PartyLite[];
+  mediatorId?: string | null;
 }
 
-export function SessionScheduler({ caseId, niche, context }: Props) {
+export function SessionScheduler({ caseId, niche, context, parties = [], mediatorId }: Props) {
+  const { user } = useAuth();
   const [sessions, setSessions] = useState<any[]>([]);
   const [type, setType] = useState<(typeof TYPES)[number]["key"]>("preliminary");
-  const [scheduledAt, setScheduledAt] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("10:00");
   const [notes, setNotes] = useState("");
   const [suggesting, setSuggesting] = useState(false);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
+  const [selectedPartyIds, setSelectedPartyIds] = useState<string[]>([]);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
+
+  const partyLabel = (p: PartyLite) =>
+    `Taraf ${p.party_role ?? "?"} · ${
+      p.company_name || `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email || "—"
+    }`;
 
   const load = async () => {
     const { data } = await supabase
@@ -48,22 +74,76 @@ export function SessionScheduler({ caseId, niche, context }: Props) {
     if (caseId) load();
   }, [caseId]);
 
+  // default: invite everyone
+  useEffect(() => {
+    if (parties.length && selectedPartyIds.length === 0) {
+      setSelectedPartyIds(parties.filter((p) => p.user_id).map((p) => p.id));
+    }
+  }, [parties]);
+
+  // Realtime presence — shows who is currently in the case-room
+  useEffect(() => {
+    if (!caseId || !user) return;
+    const ch = supabase.channel(`presence:case:${caseId}`, {
+      config: { presence: { key: user.id } },
+    });
+    ch.on("presence", { event: "sync" }, () => {
+      const state = ch.presenceState() as Record<string, any[]>;
+      setOnlineUserIds(new Set(Object.keys(state)));
+    });
+    ch.subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        await ch.track({ online_at: new Date().toISOString() });
+      }
+    });
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [caseId, user?.id]);
+
+  const composedDateTime = useMemo(() => {
+    if (!date) return "";
+    return `${date}T${time || "10:00"}`;
+  }, [date, time]);
+
   const add = async () => {
-    if (!scheduledAt) return;
-    const { error } = await supabase.from("case_sessions").insert({
+    if (!composedDateTime) return;
+    const participants = parties
+      .filter((p) => selectedPartyIds.includes(p.id))
+      .map((p) => ({ party_id: p.id, user_id: p.user_id, role: p.party_role }));
+    const { data: inserted, error } = await supabase.from("case_sessions").insert({
       case_id: caseId,
       session_type: type,
-      scheduled_at: new Date(scheduledAt).toISOString(),
+      scheduled_at: new Date(composedDateTime).toISOString(),
       notes,
       status: "scheduled",
-    });
+      participants,
+    } as any).select().maybeSingle();
     if (error) {
       toast({ title: "Hata", description: error.message, variant: "destructive" });
       return;
     }
-    setScheduledAt("");
+    // Notify invited participants
+    const when = new Date(composedDateTime).toLocaleString("tr-TR");
+    const title = "Yeni Toplantı Daveti";
+    const msg = `${TYPES.find((t) => t.key === type)?.label ?? type} — ${when}`;
+    const recipients = parties
+      .filter((p) => selectedPartyIds.includes(p.id) && p.user_id)
+      .map((p) => p.user_id as string);
+    await Promise.all(
+      recipients.map((uid) =>
+        supabase.rpc("create_notification", {
+          p_user_id: uid,
+          p_title: title,
+          p_message: msg,
+          p_type: "info",
+          p_link: `/case-room/${caseId}`,
+        })
+      )
+    );
+    setDate("");
     setNotes("");
-    toast({ title: "Seans eklendi" });
+    toast({ title: "Seans planlandı", description: `${recipients.length} katılımcıya davet gönderildi` });
     load();
   };
 
@@ -90,18 +170,14 @@ export function SessionScheduler({ caseId, niche, context }: Props) {
       if (error) throw error;
       const s = data as Suggestion;
       setSuggestion(s);
-      // Pre-fill form
       if (s.sessionType && TYPES.some((t) => t.key === s.sessionType)) {
         setType(s.sessionType as any);
       }
       const d = new Date();
       d.setDate(d.getDate() + (s.suggestedDateOffsetDays ?? 7));
-      d.setHours(10, 0, 0, 0);
-      // datetime-local needs YYYY-MM-DDTHH:mm in local tz
       const pad = (n: number) => String(n).padStart(2, "0");
-      setScheduledAt(
-        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`,
-      );
+      setDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+      setTime("10:00");
       setNotes(
         `Gündem: ${(s.agenda ?? []).join(" | ")}\nHazırlık: ${(s.preparationNotes ?? []).join(" | ")}`,
       );
@@ -113,8 +189,51 @@ export function SessionScheduler({ caseId, niche, context }: Props) {
     }
   };
 
+  const toggleParty = (id: string) => {
+    setSelectedPartyIds((cur) =>
+      cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]
+    );
+  };
+
+  const presenceList: Array<{ key: string; label: string; online: boolean }> = [];
+  if (mediatorId) {
+    presenceList.push({
+      key: mediatorId,
+      label: "Arabulucu",
+      online: onlineUserIds.has(mediatorId),
+    });
+  }
+  parties.forEach((p) => {
+    if (p.user_id) {
+      presenceList.push({
+        key: p.user_id,
+        label: `Taraf ${p.party_role ?? "?"}`,
+        online: onlineUserIds.has(p.user_id),
+      });
+    }
+  });
+
   return (
     <div className="space-y-4">
+      {presenceList.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Users className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium">Şu an çevrim içi olanlar</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {presenceList.map((p) => (
+              <Badge key={p.key} variant={p.online ? "default" : "outline"} className="gap-1">
+                <Circle
+                  className={`h-2 w-2 ${p.online ? "fill-green-500 text-green-500" : "fill-muted-foreground/40 text-muted-foreground/40"}`}
+                />
+                {p.label} {p.online ? "" : "(çevrim dışı)"}
+              </Badge>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card className="p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Yeni Seans Planla</h3>
@@ -161,24 +280,69 @@ export function SessionScheduler({ caseId, niche, context }: Props) {
             </select>
           </div>
           <div>
-            <Label className="text-xs">Tarih & Saat</Label>
-            <Input
-              type="datetime-local"
-              value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
-            />
+            <Label className="text-xs">Tarih</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div>
-            <Label className="text-xs">Notlar</Label>
-            <Input
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Hazırlık notları"
-            />
+            <Label className="text-xs flex items-center gap-1">
+              <Clock className="h-3 w-3" /> Saat
+            </Label>
+            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
           </div>
         </div>
-        <Button onClick={add} disabled={!scheduledAt} size="sm">
-          <Plus className="h-4 w-4 mr-1" /> Ekle
+
+        <div className="flex flex-wrap gap-2">
+          <span className="text-xs text-muted-foreground self-center">Hızlı seç:</span>
+          {QUICK_HOURS.map((h) => (
+            <Button
+              key={h}
+              type="button"
+              size="sm"
+              variant={time === h ? "default" : "outline"}
+              className="h-7 text-xs"
+              onClick={() => setTime(h)}
+            >
+              {h}
+            </Button>
+          ))}
+        </div>
+
+        {parties.length > 0 && (
+          <div className="space-y-2">
+            <Label className="text-xs flex items-center gap-1">
+              <Users className="h-3 w-3" /> Katılımcı Davet Et
+            </Label>
+            <div className="flex flex-col gap-2">
+              {parties.map((p) => (
+                <label
+                  key={p.id}
+                  className="flex items-center gap-2 text-sm cursor-pointer"
+                >
+                  <Checkbox
+                    checked={selectedPartyIds.includes(p.id)}
+                    onCheckedChange={() => toggleParty(p.id)}
+                    disabled={!p.user_id}
+                  />
+                  <span>{partyLabel(p)}</span>
+                  {!p.user_id && (
+                    <span className="text-xs text-muted-foreground">(davet bekliyor)</span>
+                  )}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <Label className="text-xs">Notlar</Label>
+          <Input
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Hazırlık notları / gündem"
+          />
+        </div>
+        <Button onClick={add} disabled={!date} size="sm">
+          <Plus className="h-4 w-4 mr-1" /> Planla ve Davet Gönder
         </Button>
       </Card>
 
@@ -186,21 +350,33 @@ export function SessionScheduler({ caseId, niche, context }: Props) {
         {sessions.length === 0 ? (
           <p className="text-muted-foreground text-sm">Henüz planlanmış seans yok.</p>
         ) : (
-          sessions.map((s) => (
-            <Card key={s.id} className="p-4 flex items-center gap-3">
-              <Calendar className="h-4 w-4 text-primary" />
-              <div className="flex-1">
-                <div className="font-medium">
-                  {TYPES.find((t) => t.key === s.session_type)?.label ?? s.session_type}
+          sessions.map((s) => {
+            const participants = (s.participants ?? []) as any[];
+            return (
+              <Card key={s.id} className="p-4 flex items-start gap-3">
+                <Calendar className="h-4 w-4 text-primary mt-1" />
+                <div className="flex-1">
+                  <div className="font-medium">
+                    {TYPES.find((t) => t.key === s.session_type)?.label ?? s.session_type}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {s.scheduled_at ? new Date(s.scheduled_at).toLocaleString("tr-TR") : "-"}
+                  </div>
+                  {participants.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {participants.map((pp: any, i: number) => (
+                        <Badge key={i} variant="outline" className="text-[10px]">
+                          Taraf {pp.role ?? "?"}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  {s.notes && <div className="text-xs mt-1 whitespace-pre-wrap">{s.notes}</div>}
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {s.scheduled_at ? new Date(s.scheduled_at).toLocaleString("tr-TR") : "-"}
-                </div>
-                {s.notes && <div className="text-xs mt-1 whitespace-pre-wrap">{s.notes}</div>}
-              </div>
-              <span className="text-xs text-muted-foreground">{s.status}</span>
-            </Card>
-          ))
+                <span className="text-xs text-muted-foreground">{s.status}</span>
+              </Card>
+            );
+          })
         )}
       </div>
     </div>

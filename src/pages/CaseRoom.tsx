@@ -324,6 +324,8 @@ export default function CaseRoom() {
             caseId={caseId!}
             niche={caseRow?.dispute_type ?? ""}
             context={caseRow?.issue_description ?? caseRow?.title ?? ""}
+            parties={parties}
+            mediatorId={caseRow?.assigned_mediator_id}
           />
         </TabsContent>
 
@@ -455,6 +457,7 @@ function AnalysisView({ analysis }: { analysis: any }) {
 function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string; parties: any[] }) {
   const { user } = useAuth();
   const [assigned, setAssigned] = useState<any[]>([]);
+  const [showSelector, setShowSelector] = useState(true);
 
   const load = async () => {
     const { data } = await supabase
@@ -466,6 +469,22 @@ function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string;
   };
   useEffect(() => { load(); }, [caseId]);
 
+  const notifyParties = async (title: string, message: string) => {
+    await Promise.all(
+      parties
+        .filter((p) => p.user_id)
+        .map((p) =>
+          supabase.rpc("create_notification", {
+            p_user_id: p.user_id,
+            p_title: title,
+            p_message: message,
+            p_type: "info",
+            p_link: `/case-room/${caseId}`,
+          })
+        )
+    );
+  };
+
   const assign = async (expert: any) => {
     if (!user) return;
     const { error } = await supabase.from("case_expert_assignments").insert({
@@ -473,7 +492,12 @@ function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string;
       assigned_by: user.id, approvals: {},
     } as any);
     if (error) { toast({ title: "Hata", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "Bilirkişi önerildi", description: `${expert.full_name} - taraf onayları bekleniyor` });
+    await notifyParties(
+      "Yeni Bilirkişi Önerisi",
+      `Arabulucu ${expert.full_name} adlı bilirkişiyi önerdi. Onayınız bekleniyor.`
+    );
+    toast({ title: "Bilirkişi önerildi", description: `${expert.full_name} — taraflara bildirim gönderildi` });
+    setShowSelector(false);
     load();
   };
 
@@ -481,6 +505,9 @@ function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string;
     await supabase.from("case_expert_assignments").delete().eq("id", id);
     load();
   };
+
+  const hasPending = assigned.some((a) => a.status === "pending");
+  const lastRejected = assigned[0]?.status === "rejected";
 
   return (
     <div className="space-y-4">
@@ -502,7 +529,7 @@ function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string;
                       <div className="text-xs text-muted-foreground">{a.experts?.specialization}</div>
                     </div>
                     <Badge variant={a.status === "approved" ? "default" : a.status === "rejected" ? "destructive" : "outline"}>
-                      {a.status}
+                      {a.status === "approved" ? "Onaylandı" : a.status === "rejected" ? "Reddedildi" : "Beklemede"}
                     </Badge>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -510,13 +537,13 @@ function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string;
                       const st = approvals[p.id];
                       return (
                         <Badge key={p.id} variant={st === "approved" ? "default" : st === "rejected" ? "destructive" : "outline"} className="text-xs">
-                          Taraf {p.party_role}: {st ?? "bekliyor"}
+                          Taraf {p.party_role}: {st === "approved" ? "onayladı" : st === "rejected" ? "reddetti" : "bekliyor"}
                         </Badge>
                       );
                     })}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {rejected ? "Bir taraf reddetti." : `${approvedCount}/${parties.length} taraf onayladı.`}
+                    {rejected ? "Bir taraf reddetti — yeni bilirkişi önerebilirsiniz." : `${approvedCount}/${parties.length} taraf onayladı.`}
                   </div>
                   <Button size="sm" variant="ghost" onClick={() => remove(a.id)}>Kaldır</Button>
                 </li>
@@ -524,8 +551,13 @@ function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string;
             })}
           </ul>
         )}
+        {(lastRejected || (!hasPending && assigned.length > 0)) && !showSelector && (
+          <Button size="sm" variant="outline" className="mt-3" onClick={() => setShowSelector(true)}>
+            <Repeat className="h-3 w-3 mr-1" /> Yeni Bilirkişi Öner
+          </Button>
+        )}
       </Card>
-      <ExpertSelector niche={niche} onSelect={assign} />
+      {showSelector && <ExpertSelector niche={niche} onSelect={assign} />}
     </div>
   );
 }
@@ -549,9 +581,9 @@ function PartyExpertApproval({ caseId, partyId }: { caseId: string; partyId: str
     setBusy(row.id);
     const approvals = { ...(row.approvals ?? {}), [partyId]: decision };
     let nextStatus = row.status;
-    // recalculate based on all current parties (best-effort)
-    const { data: pps } = await supabase.from("case_parties").select("id").eq("case_id", caseId);
-    const partyIds = (pps ?? []).map((p: any) => p.id);
+    const { data: pps } = await supabase.from("case_parties").select("id, user_id").eq("case_id", caseId);
+    const partyRows = (pps ?? []) as any[];
+    const partyIds = partyRows.map((p) => p.id);
     const anyRejected = partyIds.some((id: string) => approvals[id] === "rejected");
     const allApproved = partyIds.length > 0 && partyIds.every((id: string) => approvals[id] === "approved");
     if (anyRejected) nextStatus = "rejected";
@@ -562,7 +594,30 @@ function PartyExpertApproval({ caseId, partyId }: { caseId: string; partyId: str
       .update({ approvals, status: nextStatus } as any).eq("id", row.id);
     setBusy(null);
     if (error) { toast({ title: "Hata", description: error.message, variant: "destructive" }); return; }
-    toast({ title: decision === "approved" ? "Onaylandı" : "Reddedildi" });
+
+    // Notify mediator + other parties of the decision / status change
+    const { data: caseRow } = await supabase.from("cases").select("assigned_mediator_id").eq("id", caseId).maybeSingle();
+    const recipients = new Set<string>();
+    if (caseRow?.assigned_mediator_id) recipients.add(caseRow.assigned_mediator_id);
+    partyRows.forEach((p) => { if (p.user_id && p.id !== partyId) recipients.add(p.user_id); });
+    const expertName = row.experts?.full_name ?? "bilirkişi";
+    const msg = nextStatus === "approved"
+      ? `Tüm taraflar ${expertName} bilirkişisini onayladı.`
+      : nextStatus === "rejected"
+        ? `${expertName} bilirkişisi reddedildi — yeni öneri bekleniyor.`
+        : `Bir taraf ${expertName} hakkındaki kararını verdi (${decision === "approved" ? "onay" : "red"}).`;
+    await Promise.all(
+      Array.from(recipients).map((uid) =>
+        supabase.rpc("create_notification", {
+          p_user_id: uid,
+          p_title: "Bilirkişi Onay Güncellemesi",
+          p_message: msg,
+          p_type: nextStatus === "rejected" ? "warning" : "info",
+          p_link: `/case-room/${caseId}`,
+        })
+      )
+    );
+    toast({ title: decision === "approved" ? "Onayladınız" : "Reddettiniz" });
     load();
   };
 
