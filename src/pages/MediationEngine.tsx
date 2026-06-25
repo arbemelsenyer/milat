@@ -238,6 +238,41 @@ export default function MediationEngine() {
     }
   };
 
+  const comparePrecedents = async () => {
+    setComparingPrecedent(true);
+    try {
+      const r = await callMediationAi("precedent_compare", {
+        niche,
+        text: maskText(dispute, maskTerms()).masked + "\n\n" + docText.slice(0, 6000),
+      });
+      setPrecedent(r);
+    } catch (e: any) {
+      toast({ title: "Emsal karşılaştırma hatası", description: e.message, variant: "destructive" });
+    } finally {
+      setComparingPrecedent(false);
+    }
+  };
+
+  const assignExpert = async () => {
+    if (!caseId || !selectedExpert) return;
+    setAssigningExpert(true);
+    try {
+      await supabase
+        .from("cases")
+        .update({ assigned_expert_id: selectedExpert.id } as any)
+        .eq("id", caseId);
+      toast({
+        title: "Bilirkişi atandı",
+        description: `${selectedExpert.full_name} • ${selectedExpert.specialization}`,
+      });
+      setStep(4);
+    } catch (e: any) {
+      toast({ title: "Hata", description: e.message, variant: "destructive" });
+    } finally {
+      setAssigningExpert(false);
+    }
+  };
+
   const finishDiscovery = async (qa: { question: string; answer: string }[]) => {
     if (!caseId) return;
     await supabase.from("case_discovery_questions").insert(
@@ -256,7 +291,7 @@ export default function MediationEngine() {
     } catch (e: any) {
       toast({ title: "İhtiyaç çıkarma hatası", description: e.message, variant: "destructive" });
     }
-    setStep(4);
+    setStep(5);
   };
 
   const requestSuggestion = async () => {
