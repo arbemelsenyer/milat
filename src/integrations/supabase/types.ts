@@ -309,6 +309,7 @@ export type Database = {
         Row: {
           additional_notes: string | null
           ai_summary: Json | null
+          assigned_expert_id: string | null
           assigned_mediator_id: string | null
           attempted_resolution: string | null
           category: string | null
@@ -334,6 +335,7 @@ export type Database = {
         Insert: {
           additional_notes?: string | null
           ai_summary?: Json | null
+          assigned_expert_id?: string | null
           assigned_mediator_id?: string | null
           attempted_resolution?: string | null
           category?: string | null
@@ -359,6 +361,7 @@ export type Database = {
         Update: {
           additional_notes?: string | null
           ai_summary?: Json | null
+          assigned_expert_id?: string | null
           assigned_mediator_id?: string | null
           attempted_resolution?: string | null
           category?: string | null
@@ -381,7 +384,15 @@ export type Database = {
           your_name?: string | null
           your_role?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cases_assigned_expert_id_fkey"
+            columns: ["assigned_expert_id"]
+            isOneToOne: false
+            referencedRelation: "experts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cases_private_keys: {
         Row: {
@@ -452,6 +463,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      experts: {
+        Row: {
+          active: boolean
+          bio: string | null
+          city: string | null
+          created_at: string
+          email: string | null
+          full_name: string
+          hourly_rate: number | null
+          id: string
+          niche_area: string
+          phone: string | null
+          rating: number | null
+          specialization: string
+          title: string | null
+          updated_at: string
+          years_experience: number | null
+        }
+        Insert: {
+          active?: boolean
+          bio?: string | null
+          city?: string | null
+          created_at?: string
+          email?: string | null
+          full_name: string
+          hourly_rate?: number | null
+          id?: string
+          niche_area: string
+          phone?: string | null
+          rating?: number | null
+          specialization: string
+          title?: string | null
+          updated_at?: string
+          years_experience?: number | null
+        }
+        Update: {
+          active?: boolean
+          bio?: string | null
+          city?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          hourly_rate?: number | null
+          id?: string
+          niche_area?: string
+          phone?: string | null
+          rating?: number | null
+          specialization?: string
+          title?: string | null
+          updated_at?: string
+          years_experience?: number | null
+        }
+        Relationships: []
       }
       mediator_availability: {
         Row: {
