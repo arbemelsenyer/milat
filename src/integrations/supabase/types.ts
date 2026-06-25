@@ -238,6 +238,57 @@ export type Database = {
           },
         ]
       }
+      case_expert_assignments: {
+        Row: {
+          approvals: Json
+          assigned_by: string
+          case_id: string
+          created_at: string
+          expert_id: string
+          id: string
+          note: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approvals?: Json
+          assigned_by: string
+          case_id: string
+          created_at?: string
+          expert_id: string
+          id?: string
+          note?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approvals?: Json
+          assigned_by?: string
+          case_id?: string
+          created_at?: string
+          expert_id?: string
+          id?: string
+          note?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_expert_assignments_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_expert_assignments_expert_id_fkey"
+            columns: ["expert_id"]
+            isOneToOne: false
+            referencedRelation: "experts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_parties: {
         Row: {
           address: string | null
