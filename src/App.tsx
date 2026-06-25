@@ -22,6 +22,8 @@ import MediationEngine from "./pages/MediationEngine";
 import CaseDetail from "./pages/CaseDetail";
 import CaseRoom from "./pages/CaseRoom";
 import MediatorDetail from "./pages/MediatorDetail";
+import NotificationSettings from "./pages/NotificationSettings";
+import PrivacyTests from "./pages/PrivacyTests";
 
 
 const queryClient = new QueryClient();
