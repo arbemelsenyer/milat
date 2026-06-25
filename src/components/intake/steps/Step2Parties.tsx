@@ -101,6 +101,60 @@ export function Step2Parties({ data, onChange }: Step2Props) {
         </FormField>
       </div>
 
+      {/* Additional parties (dynamic, unlimited) */}
+      {additional.map((p, i) => (
+        <div key={i} className="space-y-4 relative border border-border rounded-lg p-4">
+          <button
+            type="button"
+            onClick={() => removeParty(i)}
+            aria-label={`Taraf ${i + 3} sil`}
+            className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          <h3 className="text-lg font-medium text-foreground border-b border-border pb-2">
+            Taraf {i + 3}
+          </h3>
+          <FormField label={t('step2.otherName')} required>
+            <Input
+              value={p.name}
+              onChange={(e) => updateAdditional(i, { name: e.target.value })}
+              placeholder={t('step2.otherNamePlaceholder')}
+            />
+          </FormField>
+          <FormField label={t('step2.otherPartyIs')}>
+            <div className="grid grid-cols-2 gap-3">
+              <SelectableCard
+                selected={p.role === 'individual'}
+                onClick={() => updateAdditional(i, { role: 'individual' })}
+                title={t('step2.individual')}
+                icon={<User className="w-4 h-4" />}
+              />
+              <SelectableCard
+                selected={p.role === 'business'}
+                onClick={() => updateAdditional(i, { role: 'business' })}
+                title={t('step2.business')}
+                icon={<Building2 className="w-4 h-4" />}
+              />
+            </div>
+          </FormField>
+        </div>
+      ))}
+
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">{2 + additional.length} taraf</p>
+        <Button
+          type="button"
+          onClick={addParty}
+          size="sm"
+          className="bg-green-600 hover:bg-green-700 text-white gap-1"
+        >
+          <Plus className="w-4 h-4" /> Taraf Ekle
+        </Button>
+      </div>
+
+
+
       {/* Relationship */}
       <FormField
         label={t('step2.relationship')}
