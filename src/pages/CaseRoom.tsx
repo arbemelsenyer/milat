@@ -444,3 +444,212 @@ function AnalysisView({ analysis }: { analysis: any }) {
     </div>
   );
 }
+
+// =================== Stage 6: EXPERTS ===================
+function ExpertsTab({ caseId, niche }: { caseId: string; niche: string }) {
+  const [assigned, setAssigned] = useState<any[]>([]);
+  const load = async () => {
+    const { data } = await supabase
+      .from("case_assignments")
+      .select("*, experts(*)")
+      .eq("case_id", caseId);
+    setAssigned((data ?? []) as any[]);
+  };
+  useEffect(() => { load(); }, [caseId]);
+
+  const assign = async (expert: any) => {
+    const { error } = await supabase.from("case_assignments").insert({
+      case_id: caseId, expert_id: expert.id, status: "pending",
+    } as any);
+    if (error) { toast({ title: "Hata", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Bilirkişi atandı", description: expert.full_name });
+    load();
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5">
+        <h3 className="font-semibold mb-3">Atanan Bilirkişiler</h3>
+        {assigned.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Henüz bilirkişi atanmadı.</p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {assigned.map((a) => (
+              <li key={a.id} className="flex items-center justify-between border-b pb-2 last:border-0">
+                <span>{a.experts?.full_name} — {a.experts?.specialization}</span>
+                <Badge variant="outline">{a.status}</Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      <ExpertSelector niche={niche} onSelect={assign} />
+    </div>
+  );
+}
+
+// =================== Stage 7: NEGOTIATION ROUNDS ===================
+function RoundsTab({ caseId, parties }: { caseId: string; parties: any[] }) {
+  const { user } = useAuth();
+  const [rounds, setRounds] = useState<any[]>([]);
+  const [proposal, setProposal] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    const { data } = await supabase
+      .from("negotiation_rounds")
+      .select("*")
+      .eq("case_id", caseId)
+      .order("round_no", { ascending: true });
+    setRounds((data ?? []) as any[]);
+  };
+  useEffect(() => { load(); }, [caseId]);
+
+  const newRound = async () => {
+    if (!proposal.trim()) return;
+    setBusy(true);
+    const nextNo = (rounds[rounds.length - 1]?.round_no ?? 0) + 1;
+    const { error } = await supabase.from("negotiation_rounds").insert({
+      case_id: caseId, round_no: nextNo, status: "open",
+      proposal: { text: proposal, by: user?.id },
+    } as any);
+    setBusy(false);
+    if (error) { toast({ title: "Hata", description: error.message, variant: "destructive" }); return; }
+    setProposal("");
+    toast({ title: `Tur ${nextNo} açıldı` });
+    load();
+  };
+
+  const setStatus = async (id: string, status: string) => {
+    await supabase.from("negotiation_rounds").update({ status }).eq("id", id);
+    load();
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5 space-y-3">
+        <h3 className="font-semibold">Yeni Müzakere Turu</h3>
+        <Textarea value={proposal} onChange={(e) => setProposal(e.target.value)} placeholder="Tur teklifi / gündem..." />
+        <Button onClick={newRound} disabled={busy || !proposal.trim()}>
+          {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Repeat className="h-4 w-4 mr-1" />}
+          Tur Aç
+        </Button>
+      </Card>
+      <div className="space-y-2">
+        {rounds.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Henüz tur yok.</p>
+        ) : rounds.map((r) => (
+          <Card key={r.id} className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-medium">Tur {r.round_no}</div>
+              <Badge variant={r.status === "agreed" ? "default" : r.status === "failed" ? "destructive" : "outline"}>
+                {r.status}
+              </Badge>
+            </div>
+            <p className="text-sm whitespace-pre-wrap">{r.proposal?.text}</p>
+            {r.status === "open" && (
+              <div className="flex gap-2 mt-3">
+                <Button size="sm" variant="outline" onClick={() => setStatus(r.id, "agreed")}>
+                  <Check className="h-3 w-3 mr-1" /> Anlaşıldı
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setStatus(r.id, "failed")}>
+                  <X className="h-3 w-3 mr-1" /> Anlaşılamadı
+                </Button>
+              </div>
+            )}
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// =================== Stage 8: AGREEMENT & OFFICIAL DOCS ===================
+function AgreementTab({ caseRow, parties, onChanged }: { caseRow: any; parties: any[]; onChanged: () => void }) {
+  const [agreementText, setAgreementText] = useState("");
+  const [feeAmount, setFeeAmount] = useState<string>("");
+  const [meetingDate, setMeetingDate] = useState("");
+  const [meetingLocation, setMeetingLocation] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const finalize = async (status: "agreement" | "no_agreement") => {
+    setSaving(true);
+    const { error } = await supabase.from("cases").update({
+      status, current_phase: 8,
+    } as any).eq("id", caseRow.id);
+    if (!error && status === "agreement" && agreementText.trim()) {
+      await supabase.from("agreement_documents").insert({
+        case_id: caseRow.id,
+        doc_type: "agreement",
+        metadata: { text: agreementText, fee: feeAmount, meeting_date: meetingDate, meeting_location: meetingLocation },
+        file_path: "",
+      } as any);
+    }
+    setSaving(false);
+    if (error) { toast({ title: "Hata", description: error.message, variant: "destructive" }); return; }
+    toast({ title: status === "agreement" ? "Anlaşma kaydedildi" : "Dava sonlandırıldı" });
+    onChanged();
+  };
+
+  const docData = {
+    basvuruNo: caseRow.application_no ?? undefined,
+    uyapNo: caseRow.uyap_no ?? undefined,
+    basvuruTarihi: new Date().toLocaleDateString("tr-TR"),
+    dosyaTuru: caseRow.dispute_type ?? undefined,
+    niche: caseRow.dispute_type ?? undefined,
+    title: caseRow.title ?? undefined,
+    description: caseRow.issue_description ?? undefined,
+    parties: parties.map((p) => ({
+      role: p.party_role,
+      full_name: p.party_type === "individual" ? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() : p.company_name,
+      organization: p.company_name ?? undefined,
+      tc_kimlik: p.tc_kimlik ?? undefined,
+      vergi_no: p.tax_number ?? undefined,
+      address: p.address ?? undefined,
+      phone: p.phone ?? p.gsm ?? undefined,
+      email: p.email ?? undefined,
+    })),
+    meeting_date: meetingDate,
+    meeting_location: meetingLocation,
+    agreement_text: agreementText,
+    fee_amount: feeAmount ? Number(feeAmount) : undefined,
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5 space-y-3">
+        <h3 className="font-semibold flex items-center gap-2">
+          <FileSignature className="h-4 w-4" /> Anlaşma Metni
+        </h3>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div>
+            <Label>Toplantı Tarihi</Label>
+            <Input type="date" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)} />
+          </div>
+          <div>
+            <Label>Toplantı Yeri</Label>
+            <Input value={meetingLocation} onChange={(e) => setMeetingLocation(e.target.value)} />
+          </div>
+          <div>
+            <Label>Arabuluculuk Ücreti (₺)</Label>
+            <Input type="number" value={feeAmount} onChange={(e) => setFeeAmount(e.target.value)} />
+          </div>
+        </div>
+        <div>
+          <Label>Anlaşma Metni</Label>
+          <Textarea rows={6} value={agreementText} onChange={(e) => setAgreementText(e.target.value)} placeholder="Tarafların üzerinde mutabık kaldıkları metin..." />
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={() => finalize("agreement")} disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
+            Anlaşma ile Sonlandır
+          </Button>
+          <Button variant="outline" onClick={() => finalize("no_agreement")} disabled={saving}>
+            <X className="h-4 w-4 mr-1" /> Anlaşmama ile Sonlandır
+          </Button>
+        </div>
+      </Card>
+      <OfficialDocsPanel data={docData} />
+    </div>
+  );
+}
