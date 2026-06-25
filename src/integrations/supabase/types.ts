@@ -194,10 +194,12 @@ export type Database = {
           contact_info: string | null
           created_at: string
           email: string | null
+          first_name: string | null
           full_name: string | null
           gsm: string | null
           id: string
           is_individual: boolean
+          last_name: string | null
           organization: string | null
           party_type: string
           phone: string | null
@@ -217,10 +219,12 @@ export type Database = {
           contact_info?: string | null
           created_at?: string
           email?: string | null
+          first_name?: string | null
           full_name?: string | null
           gsm?: string | null
           id?: string
           is_individual?: boolean
+          last_name?: string | null
           organization?: string | null
           party_type?: string
           phone?: string | null
@@ -240,10 +244,12 @@ export type Database = {
           contact_info?: string | null
           created_at?: string
           email?: string | null
+          first_name?: string | null
           full_name?: string | null
           gsm?: string | null
           id?: string
           is_individual?: boolean
+          last_name?: string | null
           organization?: string | null
           party_type?: string
           phone?: string | null
