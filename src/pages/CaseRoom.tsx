@@ -327,7 +327,7 @@ export default function CaseRoom() {
         </TabsContent>
 
         <TabsContent value="experts">
-          <ExpertsTab caseId={caseId!} niche={caseRow?.dispute_type ?? ""} />
+          <ExpertsTab caseId={caseId!} niche={caseRow?.dispute_type ?? ""} parties={parties} />
         </TabsContent>
 
         <TabsContent value="rounds">
