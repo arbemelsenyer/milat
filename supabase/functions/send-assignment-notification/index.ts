@@ -95,12 +95,12 @@ serve(async (req) => {
       await sendEmail({
         from: "MediPact AI <onboarding@resend.dev>",
         to: [ownerProfile.email],
-        subject: isEn ? "Mediator Assigned to Your Case" : "Davanıza Arabulucu Atandı",
+        subject: isEn ? "Mediator Assigned to Your Case" : "Başvurunuza Arabulucu Atandı",
         html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;">
           <h2>${isEn ? "Mediator Assigned" : "Arabulucu Atandı"}</h2>
           <p>${isEn ? "Dear" : "Sayın"} ${ownerName},</p>
-          <p>${isEn ? `<strong>${mediatorName}</strong> has been assigned to your case "<em>${caseTitle}</em>".` : `<strong>${mediatorName}</strong> "<em>${caseTitle}</em>" davanıza arabulucu olarak atandı.`}</p>
-          <p>${isEn ? "They will review your case and contact you." : "Davanızı inceleyecek ve sizinle iletişime geçecek."}</p>
+          <p>${isEn ? `<strong>${mediatorName}</strong> has been assigned to your case "<em>${caseTitle}</em>".` : `<strong>${mediatorName}</strong> "<em>${caseTitle}</em>" başvurunuza arabulucu olarak atandı.`}</p>
+          <p>${isEn ? "They will review your case and contact you." : "Başvurunuzı inceleyecek ve sizinle iletişime geçecek."}</p>
           <p>MediPact AI</p></div>`,
       });
     }
@@ -110,11 +110,11 @@ serve(async (req) => {
       await sendEmail({
         from: "MediPact AI <onboarding@resend.dev>",
         to: [mediatorProfile.email],
-        subject: isEn ? "New Case Assignment" : "Yeni Dava Ataması",
+        subject: isEn ? "New Case Assignment" : "Yeni Başvuru Ataması",
         html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;">
-          <h2>${isEn ? "New Case Assigned" : "Yeni Dava Atandı"}</h2>
+          <h2>${isEn ? "New Case Assigned" : "Yeni Başvuru Atandı"}</h2>
           <p>${isEn ? "Dear" : "Sayın"} ${mediatorName},</p>
-          <p>${isEn ? `You've been assigned to case "<em>${caseTitle}</em>".` : `"<em>${caseTitle}</em>" davası size atandı.`}</p>
+          <p>${isEn ? `You've been assigned to case "<em>${caseTitle}</em>".` : `"<em>${caseTitle}</em>" başvurusu size atandı.`}</p>
           <p>${isEn ? "Please log in to review and schedule a session." : "Lütfen giriş yaparak inceleyin ve oturum planlayın."}</p>
           <p>MediPact AI</p></div>`,
       });
@@ -124,15 +124,15 @@ serve(async (req) => {
     await supabase.rpc("create_notification", {
       p_user_id: caseData.user_id,
       p_title: isEn ? "Mediator Assigned" : "Arabulucu Atandı",
-      p_message: isEn ? `${mediatorName} assigned to your case.` : `${mediatorName} davanıza atandı.`,
+      p_message: isEn ? `${mediatorName} assigned to your case.` : `${mediatorName} başvurunuza atandı.`,
       p_type: "mediator_assigned",
       p_link: "/dashboard",
     });
 
     await supabase.rpc("create_notification", {
       p_user_id: mediatorId,
-      p_title: isEn ? "New Case" : "Yeni Dava",
-      p_message: isEn ? `You've been assigned to "${caseTitle}".` : `"${caseTitle}" davası size atandı.`,
+      p_title: isEn ? "New Case" : "Yeni Başvuru",
+      p_message: isEn ? `You've been assigned to "${caseTitle}".` : `"${caseTitle}" başvurusu size atandı.`,
       p_type: "mediator_assigned",
       p_link: "/mediator",
     });

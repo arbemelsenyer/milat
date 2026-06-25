@@ -203,7 +203,7 @@ serve(async (req) => {
             
             ${caseInfo ? `
             <div class="section">
-              <p><strong>${isEnglish ? "Case:" : "Dava:"}</strong> ${caseInfo.your_name || ""} ${caseInfo.other_party_name ? `vs ${caseInfo.other_party_name}` : ""}</p>
+              <p><strong>${isEnglish ? "Case:" : "Başvuru:"}</strong> ${caseInfo.your_name || ""} ${caseInfo.other_party_name ? `vs ${caseInfo.other_party_name}` : ""}</p>
               <p><strong>${isEnglish ? "Type:" : "Tür:"}</strong> ${caseInfo.dispute_type || (isEnglish ? "General" : "Genel")}</p>
             </div>
             ` : ""}

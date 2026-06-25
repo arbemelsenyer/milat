@@ -161,7 +161,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <Helmet>
         <title>Panelim | MediPact AI</title>
-        <meta name="description" content="Davalarınızı, seanslarınızı ve bildirimlerinizi tek bir panelden yönetin." />
+        <meta name="description" content="Başvurularınızı, seanslarınızı ve bildirimlerinizi tek bir panelden yönetin." />
         <link rel="canonical" href="/dashboard" />
         <meta name="robots" content="noindex" />
       </Helmet>
@@ -176,7 +176,7 @@ export default function Dashboard() {
                 {language === "tr" ? "Hoş geldiniz" : "Welcome"}
               </p>
               <h1 className="text-3xl md:text-4xl font-display font-bold mt-1">
-                {language === "tr" ? "Davalarım" : "My Cases"}
+                {language === "tr" ? "Başvurularım" : "My Cases"}
               </h1>
               <p className="text-primary-foreground/80 mt-2 max-w-xl text-sm">
                 {language === "tr"
@@ -196,7 +196,7 @@ export default function Dashboard() {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatCard
-            label={language === "tr" ? "Toplam Dava" : "Total Cases"}
+            label={language === "tr" ? "Toplam Başvuru" : "Total Cases"}
             value={stats.total}
             icon={Briefcase}
             accent="primary"

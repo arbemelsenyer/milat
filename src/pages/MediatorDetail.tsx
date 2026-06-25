@@ -78,7 +78,7 @@ export default function MediatorDetail() {
       return;
     }
     if (!caseId) {
-      toast.error("Önce bir dava seçin");
+      toast.error("Önce bir başvuru seçin");
       return;
     }
     setSubmitting(true);
@@ -201,7 +201,7 @@ export default function MediatorDetail() {
               <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-primary">{mediator.total_cases ?? 0}</div>
-                  <div className="text-xs text-muted-foreground">Toplam Dava</div>
+                  <div className="text-xs text-muted-foreground">Toplam Başvuru</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-primary">
@@ -254,7 +254,7 @@ export default function MediatorDetail() {
               </p>
             ) : (
               <div className="mb-4">
-                <label className="text-xs font-medium text-muted-foreground">Dava</label>
+                <label className="text-xs font-medium text-muted-foreground">Başvuru</label>
                 <select
                   value={caseId}
                   onChange={(e) => setCaseId(e.target.value)}

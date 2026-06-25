@@ -81,9 +81,9 @@ export default function SummaryPage() {
     : {
         loading: 'Yükleniyor...',
         intakeComplete: 'Başvuru Tamamlandı',
-        intakeCompleteDesc: 'Davanız tarafsız olarak yapılandırıldı. Aşağıdaki özeti inceleyin.',
+        intakeCompleteDesc: 'Başvurunuz tarafsız olarak yapılandırıldı. Aşağıdaki özeti inceleyin.',
         caseId: 'Dosya No',
-        neutralSummary: 'Tarafsız Dava Özeti',
+        neutralSummary: 'Tarafsız Uyuşmazlık Özeti',
         disputeType: 'Uyuşmazlık Türü',
         partiesInvolved: 'Taraflar',
         initiatingParty: 'Başvuran Taraf',

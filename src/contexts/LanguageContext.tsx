@@ -121,7 +121,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Step 5: Documents
     'step5.title': 'Destekleyici belgeler var mı?',
-    'step5.description': 'İsteğe bağlı: Davanızı desteklemek için ilgili belgeleri ekleyin',
+    'step5.description': 'İsteğe bağlı: Başvurunuzı desteklemek için ilgili belgeleri ekleyin',
     'step5.privacyNote': 'Gizlilik Notu:',
     'step5.privacyNoteText': 'Buraya yüklenen belgeler yalnızca arabuluculuk hazırlığı içindir ve gizli tutulur. Oturumunuzdan sonra saklanmayacaktır.',
     'step5.uploadClick': 'Belge yüklemek için tıklayın',

@@ -169,7 +169,7 @@ serve(async (req) => {
             ` : ""}
             
             <div class="section">
-              <div class="section-title">${isEnglish ? "Case Summary" : "Dava Özeti"}</div>
+              <div class="section-title">${isEnglish ? "Case Summary" : "Uyuşmazlık Özeti"}</div>
               <div class="info-box">
                 <p><strong>${isEnglish ? "Dispute Type" : "Uyuşmazlık Türü"}:</strong> ${caseSummary.disputeType}</p>
                 <p><strong>${isEnglish ? "Initiating Party" : "Başvuran Taraf"}:</strong> ${caseSummary.parties.initiator}</p>
@@ -197,7 +197,7 @@ serve(async (req) => {
           <h1 style="color: #4F46E5;">${isEnglish ? "Thank You!" : "Teşekkürler!"}</h1>
           <p>${isEnglish 
             ? "We have received your mediation session request. Our team will review your case and contact you within 24-48 hours to schedule your session."
-            : "Arabuluculuk oturumu talebinizi aldık. Ekibimiz davanızı inceleyecek ve oturumunuzu planlamak için 24-48 saat içinde sizinle iletişime geçecektir."
+            : "Arabuluculuk oturumu talebinizi aldık. Ekibimiz başvurunuzı inceleyecek ve oturumunuzu planlamak için 24-48 saat içinde sizinle iletişime geçecektir."
           }</p>
           <p>${isEnglish 
             ? "If you have any urgent questions, please don't hesitate to reach out."

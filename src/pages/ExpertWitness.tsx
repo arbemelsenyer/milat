@@ -83,7 +83,7 @@ export default function ExpertWitness() {
         <h1 className="text-2xl font-semibold mb-2">{t('Bilirkişi Raporu Analizi', 'Expert Witness Analysis')}</h1>
         <p className="text-muted-foreground text-sm mb-6">{t('PDF raporu yükleyin, AI analiz etsin.', 'Upload PDF report for AI analysis.')}</p>
         <div className="mb-4">
-          <label className="text-sm font-medium block mb-1">{t('Dava ID (isteğe bağlı)', 'Case ID (optional)')}</label>
+          <label className="text-sm font-medium block mb-1">{t('Başvuru ID (isteğe bağlı)', 'Case ID (optional)')}</label>
           <input value={caseId} onChange={e => setCaseId(e.target.value)} className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background" />
         </div>
         <div className="border-2 border-dashed border-border rounded-xl p-8 text-center mb-4 cursor-pointer" onClick={() => document.getElementById('pdf-input')?.click()}>

@@ -183,7 +183,7 @@ export default function MediatorDashboard() {
   const ctx = useMemo(() => {
     if (!current) return "";
     return [
-      `Dava ID: ${current.id}`,
+      `Başvuru ID: ${current.id}`,
       `Başlık: ${current.title ?? ""}`,
       `Niş: ${current.category ?? current.dispute_type ?? ""}`,
       `Durum: ${current.status}`,
@@ -212,7 +212,7 @@ export default function MediatorDashboard() {
           </h1>
           <p className="text-primary-foreground/80 mt-1 text-sm">
             {language === "tr"
-              ? "Aktif davalarınız, AI önerileri ve seans notları."
+              ? "Aktif başvurularınız, AI önerileri ve seans notları."
               : "Your active cases, AI suggestions, and session notes."}
           </p>
         </div>
@@ -229,13 +229,13 @@ export default function MediatorDashboard() {
           {/* Case list */}
           <aside className="lg:col-span-3 space-y-2">
             <h2 className="text-sm font-display font-semibold uppercase tracking-wide text-muted-foreground px-1">
-              {language === "tr" ? "Aktif Davalar" : "Active Cases"}
+              {language === "tr" ? "Aktif Başvurular" : "Active Cases"}
             </h2>
             {loading ? (
               <Loader2 className="w-5 h-5 animate-spin text-primary mx-auto mt-4" />
             ) : cases.length === 0 ? (
               <p className="text-sm text-muted-foreground p-3">
-                {language === "tr" ? "Atanmış dava yok." : "No assigned cases."}
+                {language === "tr" ? "Atanmış başvuru yok." : "No assigned cases."}
               </p>
             ) : (
               cases.map((c) => (
@@ -248,7 +248,7 @@ export default function MediatorDashboard() {
                       : "bg-card border-border hover:border-primary/40"
                   }`}
                 >
-                  <p className="text-sm font-semibold truncate">{c.title || c.dispute_type || "Dava"}</p>
+                  <p className="text-sm font-semibold truncate">{c.title || c.dispute_type || "Başvuru"}</p>
                   <p className={`text-xs mt-0.5 truncate ${selectedId === c.id ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
                     {c.your_name} ↔ {c.other_party_name}
                   </p>
@@ -267,7 +267,7 @@ export default function MediatorDashboard() {
           <section className="lg:col-span-9">
             {!current ? (
               <Card className="h-[480px] flex items-center justify-center text-muted-foreground">
-                {language === "tr" ? "Bir dava seçin." : "Select a case."}
+                {language === "tr" ? "Bir başvuru seçin." : "Select a case."}
               </Card>
             ) : (
               <div className="grid lg:grid-cols-3 gap-4">
@@ -277,7 +277,7 @@ export default function MediatorDashboard() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <CardTitle className="text-lg truncate">
-                            {current.title || current.dispute_type || "Dava"}
+                            {current.title || current.dispute_type || "Başvuru"}
                           </CardTitle>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {format(new Date(current.created_at), "PPP", { locale })}
@@ -471,7 +471,7 @@ export default function MediatorDashboard() {
                     niche={current.category ?? current.dispute_type ?? undefined}
                     starter={
                       language === "tr"
-                        ? "Bu davaya bakıyorum. İlgili Yargıtay kararları, müzakere stratejisi veya tarafların gerçek ihtiyaçları hakkında size yardımcı olabilirim."
+                        ? "Bu başvuruya bakıyorum. İlgili Yargıtay kararları, müzakere stratejisi veya tarafların gerçek ihtiyaçları hakkında size yardımcı olabilirim."
                         : "I'm looking at this case. Ask me about precedents, negotiation strategy, or party interests."
                     }
                   />

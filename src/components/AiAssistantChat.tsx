@@ -31,7 +31,7 @@ export function AiAssistantChat({ caseContext, niche, placeholder, starter }: Ai
             role: "assistant",
             content:
               language === "tr"
-                ? "Merhaba, ben MediPact AI. Bu davaya özel Yargıtay kararları, müzakere stratejisi veya tarafların pozisyonları hakkında sorularınızı sorabilirsiniz."
+                ? "Merhaba, ben MediPact AI. Bu başvuruya özel Yargıtay kararları, müzakere stratejisi veya tarafların pozisyonları hakkında sorularınızı sorabilirsiniz."
                 : "Hi, I'm MediPact AI. Ask me about Turkish Court of Cassation precedents, negotiation strategy, or party positions for this case.",
           },
         ],
@@ -111,7 +111,7 @@ export function AiAssistantChat({ caseContext, niche, placeholder, starter }: Ai
         <Textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={placeholder || (language === "tr" ? "Bu davayla ilgili soru sorun..." : "Ask about this case...")}
+          placeholder={placeholder || (language === "tr" ? "Bu başvuruyla ilgili soru sorun..." : "Ask about this case...")}
           rows={2}
           className="resize-none text-sm"
           onKeyDown={(e) => {

@@ -177,7 +177,7 @@ export default function MediationEngine() {
         }
       }
 
-      toast({ title: "Dava oluşturuldu", description: `Başvuru no: ${application_no}` });
+      toast({ title: "Başvuru oluşturuldu", description: `Başvuru no: ${application_no}` });
       setShowForm(false);
       setTitle(""); setUyapNo("");
       setParties([emptyParty("A"), emptyParty("B")]);
@@ -206,7 +206,7 @@ export default function MediationEngine() {
       <main className="container mx-auto px-4 py-8 max-w-6xl">
         <header className="flex items-start justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-primary">Arabuluculuk Dava Yönetimi</h1>
+            <h1 className="text-3xl font-bold text-primary">Arabuluculuk Başvuru Yönetimi</h1>
             <p className="text-muted-foreground mt-1 flex items-center gap-2">
               <ShieldCheck className="h-4 w-4" />
               İki taraflı gizli analiz sistemi
@@ -214,17 +214,17 @@ export default function MediationEngine() {
           </div>
           {canCreate && (
             <Button onClick={() => setShowForm((s) => !s)}>
-              <Plus className="h-4 w-4 mr-1" /> Yeni Dava
+              <Plus className="h-4 w-4 mr-1" /> Yeni Başvuru
             </Button>
           )}
         </header>
 
         {showForm && canCreate && (
           <Card className="p-6 mb-6 space-y-5">
-            <h2 className="text-xl font-semibold">Yeni Dava (UYAP Formatı)</h2>
+            <h2 className="text-xl font-semibold">Yeni Başvuru (UYAP Formatı)</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label>Dava Başlığı</Label>
+                <Label>Başvuru Başlığı</Label>
                 <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="(opsiyonel)" />
               </div>
               <div>
@@ -305,7 +305,7 @@ export default function MediationEngine() {
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => setShowForm(false)}>İptal</Button>
               <Button onClick={createCase} disabled={creating}>
-                {creating ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Oluşturuluyor</> : "Dava Aç ve Davet Gönder"}
+                {creating ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Oluşturuluyor</> : "Yeni Başvuru Oluştur ve Davet Gönder"}
               </Button>
             </div>
           </Card>
@@ -313,12 +313,12 @@ export default function MediationEngine() {
 
         <Card className="p-6">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <FolderOpen className="h-5 w-5" /> Davalarım
+            <FolderOpen className="h-5 w-5" /> Başvurularım
           </h2>
           {loading ? (
             <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>
           ) : cases.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">Henüz dava yok.</p>
+            <p className="text-muted-foreground text-center py-8">Henüz başvuru yok.</p>
           ) : (
             <div className="space-y-2">
               {cases.map((c) => (

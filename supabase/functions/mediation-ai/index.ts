@@ -173,7 +173,7 @@ serve(async (req) => {
           },
           {
             role: "user",
-            content: `Belge türü: ${titles[docType] ?? docType}\n\nDava bağlamı:\n${ctx}\n\nLütfen 6325 sayılı kanunun ilgili maddelerine atıfla, taraflar — uyuşmazlık konusu — anlaşma maddeleri — imza bölümleri içeren tam belgeyi üret.`,
+            content: `Belge türü: ${titles[docType] ?? docType}\n\nUyuşmazlık bağlamı:\n${ctx}\n\nLütfen 6325 sayılı kanunun ilgili maddelerine atıfla, taraflar — uyuşmazlık konusu — anlaşma maddeleri — imza bölümleri içeren tam belgeyi üret.`,
           },
         ],
         true,
@@ -251,8 +251,8 @@ serve(async (req) => {
         .slice(0, 18000);
       const result = await jsonAi(
         PRO,
-        "Sen Türk hukukunda emsal karar analisti bir arabulucusun. Mevcut dava ile geçmiş anonim davaları karşılaştırırsın.",
-        `Niş: ${niche}\nMevcut dava:\n${current}\n\nGeçmiş emsal davalar:\n${past || "(havuz boş)"}\n\nÇıktı: { "similarCases": [{"summary": string, "similarityScore": number, "keyDifferences": string[], "outcomePattern": string}], "overallTrend": string, "recommendation": string } Türkçe, en fazla 4 emsal.`,
+        "Sen Türk hukukunda emsal karar analisti bir arabulucusun. Mevcut uyuşmazlık ile geçmiş anonim uyuşmazlıkları karşılaştırırsın.",
+        `Niş: ${niche}\nMevcut uyuşmazlık:\n${current}\n\nGeçmiş emsal uyuşmazlıklar:\n${past || "(havuz boş)"}\n\nÇıktı: { "similarCases": [{"summary": string, "similarityScore": number, "keyDifferences": string[], "outcomePattern": string}], "overallTrend": string, "recommendation": string } Türkçe, en fazla 4 emsal.`,
       );
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -270,8 +270,8 @@ serve(async (req) => {
       }));
       const system = `Sen MediPact AI'sın — Türk hukukunda uzman, tarafsız bir arabuluculuk asistanısın. Yargıtay kararlarına atıfta bulunur, 6325 sayılı Arabuluculuk Kanunu çerçevesinde öneriler verirsin. Hukuki tavsiye yerine STRATEJİ önerirsin. Türkçe, net, maddeler halinde yanıt ver.
 
-Dava Niş: ${niche || "belirtilmemiş"}
-Dava Bağlamı:
+Uyuşmazlık Niş: ${niche || "belirtilmemiş"}
+Uyuşmazlık Bağlamı:
 ${ctx || "(bağlam yok)"}
 `;
       const r = await callAi(PRO, [
