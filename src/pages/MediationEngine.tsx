@@ -121,7 +121,8 @@ export default function MediationEngine() {
   // Build mask terms from form data
   const maskTerms = () => {
     const terms: { value: string; fieldType: string }[] = [];
-    for (const [p, role] of [[partyA, "name"], [partyB, "counterparty_name"]] as const) {
+    parties.forEach((p, idx) => {
+      const role = idx === 0 ? "name" : "counterparty_name";
       if (p.partyType === "individual") {
         if (p.firstName) terms.push({ value: p.firstName, fieldType: role });
         if (p.lastName) terms.push({ value: p.lastName, fieldType: role });
@@ -131,7 +132,7 @@ export default function MediationEngine() {
         if (p.authorizedPerson) terms.push({ value: p.authorizedPerson, fieldType: "authorized" });
       }
       if (p.address) terms.push({ value: p.address, fieldType: "address" });
-    }
+    });
     return terms;
   };
 
@@ -144,8 +145,7 @@ export default function MediationEngine() {
     setCreating(true);
     try {
       const { masked } = maskText(dispute, maskTerms());
-      const partyAName = partyA.partyType === "individual" ? `${partyA.firstName} ${partyA.lastName}`.trim() : partyA.companyName;
-      const partyBName = partyB.partyType === "individual" ? `${partyB.firstName} ${partyB.lastName}`.trim() : partyB.companyName;
+      const names = parties.map((p, i) => partyDisplayName(p, i));
 
       const { data: c, error } = await supabase
         .from("cases")
@@ -154,8 +154,8 @@ export default function MediationEngine() {
           dispute_type: niche,
           desired_outcome: "Anlaşma",
           issue_description: masked.slice(0, 5000),
-          your_name: partyAName || "Başvuran",
-          other_party_name: partyBName || "Karşı Taraf",
+          your_name: names[0] || "Başvuran",
+          other_party_name: names.slice(1).join(", ") || "Karşı Taraf",
           status: "draft",
           title: `${basvuruNo} • ${dosyaTuru} • ${niche}`,
           category: dosyaTuru,
@@ -168,10 +168,11 @@ export default function MediationEngine() {
       setCaseId(newId);
 
       // Persist parties
-      await supabase.from("case_parties").insert([
-        partyToRow(newId, "applicant", partyA, partyAName || "Başvuran"),
-        partyToRow(newId, "counterparty", partyB, partyBName || "Karşı Taraf"),
-      ] as any);
+      await supabase.from("case_parties").insert(
+        parties.map((p, i) =>
+          partyToRow(newId, i === 0 ? "applicant" : i === 1 ? "counterparty" : `party_${i + 1}`, p, names[i]),
+        ) as any,
+      );
 
       // Persist anonymized dispute text into vector pool (without embedding for now)
       await supabase.from("cases_vector_pool").insert({
@@ -180,6 +181,7 @@ export default function MediationEngine() {
         niche_area: niche,
       } as any);
 
+      setApprovals(new Array(parties.length).fill(false));
       toast({ title: "Başvuru oluşturuldu", description: "Arabulucu seçimine geçebilirsiniz." });
       setStep(1);
     } catch (e: any) {
