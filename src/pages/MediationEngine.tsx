@@ -329,11 +329,32 @@ export default function MediationEngine() {
               </div>
             </Card>
             <div className="grid md:grid-cols-2 gap-5">
-              <PartyForm title="Başvuran" value={partyA} onChange={setPartyA} />
-              <PartyForm title="Karşı Taraf" value={partyB} onChange={setPartyB} />
+              {parties.map((p, i) => (
+                <PartyForm
+                  key={i}
+                  title={partyLabel(i)}
+                  value={p}
+                  onChange={(np) => updateParty(i, np)}
+                  onRemove={parties.length > MIN_PARTIES ? () => removeParty(i) : undefined}
+                />
+              ))}
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {parties.length}/{MAX_PARTIES} taraf • en az {MIN_PARTIES}, en fazla {MAX_PARTIES}.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addParty}
+                disabled={parties.length >= MAX_PARTIES}
+              >
+                + Taraf Ekle
+              </Button>
             </div>
             <Card className="p-5 space-y-3">
-              <Label>Uyuşmazlık Açıklaması</Label>
+              <Label>Uyuşmazlık Konusu / Açıklaması</Label>
               <Textarea
                 rows={6}
                 placeholder="Olayı kendi sözlerinizle tarafsız bir dille anlatın..."
@@ -350,23 +371,131 @@ export default function MediationEngine() {
           </div>
         )}
 
-        {/* STEP 2: Mediator selection */}
+        {/* STEP 2: Mediator selection with mutual approval */}
         {step === 1 && (
           <div className="space-y-4">
-            <MediatorMarketplace
-              niche={niche}
-              onSelect={async (m) => {
-                if (!caseId) return;
-                await supabase.from("mediator_requests").insert({
-                  case_id: caseId,
-                  mediator_id: m.id,
-                  user_id: user!.id,
-                  status: "pending",
-                } as any).select();
-                toast({ title: "Randevu talebi gönderildi", description: m.full_name });
-                setStep(2);
-              }}
-            />
+            {!proposedMediator ? (
+              <MediatorMarketplace
+                niche={niche}
+                onSelect={(m) => {
+                  setProposedMediator({
+                    id: m.id,
+                    full_name: m.full_name,
+                    hourly_rate: m.hourly_rate,
+                    specializations: m.specializations,
+                  });
+                  setApprovals(new Array(parties.length).fill(false));
+                  toast({
+                    title: "Arabulucu önerildi",
+                    description: `${m.full_name} • tüm tarafların onayı gerekiyor.`,
+                  });
+                }}
+              />
+            ) : (
+              <Card className="p-5 space-y-4 border-primary/40 bg-primary/[0.03]">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div>
+                    <h3 className="font-semibold text-lg">Önerilen Arabulucu</h3>
+                    <p className="text-2xl font-bold mt-1">{proposedMediator.full_name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {proposedMediator.specializations.slice(0, 3).join(" • ")}
+                    </p>
+                    <p className="text-sm mt-1">
+                      Ücret: {Number(proposedMediator.hourly_rate).toLocaleString("tr-TR")} ₺/saat
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setProposedMediator(null);
+                      setApprovals([]);
+                    }}
+                  >
+                    Değiştir
+                  </Button>
+                </div>
+                <div className="border-t pt-4 space-y-3">
+                  <p className="text-sm font-medium">
+                    Onay durumu — tüm taraflar onaylayınca arabulucu atanır:
+                  </p>
+                  {parties.map((p, i) => (
+                    <label
+                      key={i}
+                      className="flex items-center gap-3 p-3 rounded-md border bg-background cursor-pointer hover:bg-muted/40"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={approvals[i] ?? false}
+                        onChange={(e) =>
+                          setApprovals((prev) => {
+                            const next = [...prev];
+                            while (next.length < parties.length) next.push(false);
+                            next[i] = e.target.checked;
+                            return next;
+                          })
+                        }
+                        className="h-4 w-4"
+                      />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">{partyDisplayName(p, i)}</div>
+                        <div className="text-xs text-muted-foreground">{partyLabel(i)}</div>
+                      </div>
+                      <span
+                        className={`text-xs px-2 py-1 rounded ${
+                          approvals[i] ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {approvals[i] ? "Onayladı" : "Beklemede"}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    disabled={
+                      confirmingMediator ||
+                      approvals.length !== parties.length ||
+                      !approvals.every(Boolean)
+                    }
+                    onClick={async () => {
+                      if (!caseId || !proposedMediator) return;
+                      setConfirmingMediator(true);
+                      try {
+                        await supabase.from("mediator_requests").insert({
+                          case_id: caseId,
+                          mediator_id: proposedMediator.id,
+                          user_id: user!.id,
+                          status: "approved",
+                          notes: `Tüm taraflar (${parties.length}) onayladı.`,
+                        } as any);
+                        await supabase
+                          .from("cases")
+                          .update({
+                            assigned_mediator_id: proposedMediator.id,
+                            status: "assigned",
+                          } as any)
+                          .eq("id", caseId);
+                        toast({
+                          title: "Arabulucu atandı",
+                          description: proposedMediator.full_name,
+                        });
+                        setStep(2);
+                      } catch (e: any) {
+                        toast({ title: "Hata", description: e.message, variant: "destructive" });
+                      } finally {
+                        setConfirmingMediator(false);
+                      }
+                    }}
+                  >
+                    {confirmingMediator ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : null}
+                    Arabulucuyu Onayla ve Ata
+                  </Button>
+                </div>
+              </Card>
+            )}
           </div>
         )}
 
