@@ -1,3 +1,33 @@
+export type IntakePartyRole = 'individual' | 'business' | '';
+
+export interface IntakePartyDetails {
+  name: string;
+  role: IntakePartyRole;
+  firstName: string;
+  lastName: string;
+  companyTitle: string;
+  taxOffice: string;
+  taxNumber: string;
+  address: string;
+  contactInfo: string;
+  phone: string;
+  email: string;
+}
+
+export const emptyIntakePartyDetails = (): IntakePartyDetails => ({
+  name: '',
+  role: '',
+  firstName: '',
+  lastName: '',
+  companyTitle: '',
+  taxOffice: '',
+  taxNumber: '',
+  address: '',
+  contactInfo: '',
+  phone: '',
+  email: '',
+});
+
 export interface IntakeFormData {
   // Step 1: Dispute Type
   disputeType: 'commercial' | 'ip' | 'healthcare' | 'other' | '';
@@ -5,10 +35,28 @@ export interface IntakeFormData {
 
   // Step 2: Parties
   yourName: string;
-  yourRole: 'individual' | 'business' | '';
+  yourRole: IntakePartyRole;
+  yourFirstName: string;
+  yourLastName: string;
+  yourCompanyTitle: string;
+  yourTaxOffice: string;
+  yourTaxNumber: string;
+  yourAddress: string;
+  yourContactInfo: string;
+  yourPhone: string;
+  yourEmail: string;
   otherPartyName: string;
-  otherPartyRole: 'individual' | 'business' | '';
-  additionalParties: { name: string; role: 'individual' | 'business' | '' }[];
+  otherPartyRole: IntakePartyRole;
+  otherPartyFirstName: string;
+  otherPartyLastName: string;
+  otherPartyCompanyTitle: string;
+  otherPartyTaxOffice: string;
+  otherPartyTaxNumber: string;
+  otherPartyAddress: string;
+  otherPartyContactInfo: string;
+  otherPartyPhone: string;
+  otherPartyEmail: string;
+  additionalParties: IntakePartyDetails[];
   relationship: string;
 
 
@@ -62,8 +110,26 @@ export const initialFormData: IntakeFormData = {
   disputeTypeOther: '',
   yourName: '',
   yourRole: '',
+  yourFirstName: '',
+  yourLastName: '',
+  yourCompanyTitle: '',
+  yourTaxOffice: '',
+  yourTaxNumber: '',
+  yourAddress: '',
+  yourContactInfo: '',
+  yourPhone: '',
+  yourEmail: '',
   otherPartyName: '',
   otherPartyRole: '',
+  otherPartyFirstName: '',
+  otherPartyLastName: '',
+  otherPartyCompanyTitle: '',
+  otherPartyTaxOffice: '',
+  otherPartyTaxNumber: '',
+  otherPartyAddress: '',
+  otherPartyContactInfo: '',
+  otherPartyPhone: '',
+  otherPartyEmail: '',
   additionalParties: [],
   relationship: '',
 
