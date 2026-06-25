@@ -450,45 +450,153 @@ function AnalysisView({ analysis }: { analysis: any }) {
   );
 }
 
-// =================== Stage 6: EXPERTS ===================
-function ExpertsTab({ caseId, niche }: { caseId: string; niche: string }) {
+// =================== Stage 6: EXPERTS (with party approval) ===================
+function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string; parties: any[] }) {
+  const { user } = useAuth();
   const [assigned, setAssigned] = useState<any[]>([]);
+
   const load = async () => {
     const { data } = await supabase
-      .from("case_assignments")
+      .from("case_expert_assignments")
       .select("*, experts(*)")
-      .eq("case_id", caseId);
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: false });
     setAssigned((data ?? []) as any[]);
   };
   useEffect(() => { load(); }, [caseId]);
 
   const assign = async (expert: any) => {
-    const { error } = await supabase.from("case_assignments").insert({
+    if (!user) return;
+    const { error } = await supabase.from("case_expert_assignments").insert({
       case_id: caseId, expert_id: expert.id, status: "pending",
+      assigned_by: user.id, approvals: {},
     } as any);
     if (error) { toast({ title: "Hata", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "Bilirkişi atandı", description: expert.full_name });
+    toast({ title: "Bilirkişi önerildi", description: `${expert.full_name} - taraf onayları bekleniyor` });
+    load();
+  };
+
+  const remove = async (id: string) => {
+    await supabase.from("case_expert_assignments").delete().eq("id", id);
     load();
   };
 
   return (
     <div className="space-y-4">
       <Card className="p-5">
-        <h3 className="font-semibold mb-3">Atanan Bilirkişiler</h3>
+        <h3 className="font-semibold mb-3">Önerilen / Atanan Bilirkişiler</h3>
         {assigned.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Henüz bilirkişi atanmadı.</p>
+          <p className="text-sm text-muted-foreground">Henüz bilirkişi önerilmedi.</p>
         ) : (
-          <ul className="space-y-2 text-sm">
-            {assigned.map((a) => (
-              <li key={a.id} className="flex items-center justify-between border-b pb-2 last:border-0">
-                <span>{a.experts?.full_name} — {a.experts?.specialization}</span>
-                <Badge variant="outline">{a.status}</Badge>
-              </li>
-            ))}
+          <ul className="space-y-3 text-sm">
+            {assigned.map((a) => {
+              const approvals = (a.approvals ?? {}) as Record<string, "approved" | "rejected">;
+              const approvedCount = parties.filter((p) => approvals[p.id] === "approved").length;
+              const rejected = parties.some((p) => approvals[p.id] === "rejected");
+              return (
+                <li key={a.id} className="border rounded p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{a.experts?.full_name}</div>
+                      <div className="text-xs text-muted-foreground">{a.experts?.specialization}</div>
+                    </div>
+                    <Badge variant={a.status === "approved" ? "default" : a.status === "rejected" ? "destructive" : "outline"}>
+                      {a.status}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {parties.map((p) => {
+                      const st = approvals[p.id];
+                      return (
+                        <Badge key={p.id} variant={st === "approved" ? "default" : st === "rejected" ? "destructive" : "outline"} className="text-xs">
+                          Taraf {p.party_role}: {st ?? "bekliyor"}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {rejected ? "Bir taraf reddetti." : `${approvedCount}/${parties.length} taraf onayladı.`}
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => remove(a.id)}>Kaldır</Button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </Card>
       <ExpertSelector niche={niche} onSelect={assign} />
+    </div>
+  );
+}
+
+// =================== Party-side expert approval ===================
+function PartyExpertApproval({ caseId, partyId }: { caseId: string; partyId: string }) {
+  const [assigned, setAssigned] = useState<any[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = async () => {
+    const { data } = await supabase
+      .from("case_expert_assignments")
+      .select("*, experts(*)")
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: false });
+    setAssigned((data ?? []) as any[]);
+  };
+  useEffect(() => { load(); }, [caseId]);
+
+  const decide = async (row: any, decision: "approved" | "rejected") => {
+    setBusy(row.id);
+    const approvals = { ...(row.approvals ?? {}), [partyId]: decision };
+    let nextStatus = row.status;
+    // recalculate based on all current parties (best-effort)
+    const { data: pps } = await supabase.from("case_parties").select("id").eq("case_id", caseId);
+    const partyIds = (pps ?? []).map((p: any) => p.id);
+    const anyRejected = partyIds.some((id: string) => approvals[id] === "rejected");
+    const allApproved = partyIds.length > 0 && partyIds.every((id: string) => approvals[id] === "approved");
+    if (anyRejected) nextStatus = "rejected";
+    else if (allApproved) nextStatus = "approved";
+    else nextStatus = "pending";
+
+    const { error } = await supabase.from("case_expert_assignments")
+      .update({ approvals, status: nextStatus } as any).eq("id", row.id);
+    setBusy(null);
+    if (error) { toast({ title: "Hata", description: error.message, variant: "destructive" }); return; }
+    toast({ title: decision === "approved" ? "Onaylandı" : "Reddedildi" });
+    load();
+  };
+
+  if (assigned.length === 0) {
+    return <Card className="p-5 text-sm text-muted-foreground">Arabulucu henüz bilirkişi önermedi.</Card>;
+  }
+  return (
+    <div className="space-y-3">
+      {assigned.map((a) => {
+        const my = (a.approvals ?? {})[partyId];
+        return (
+          <Card key={a.id} className="p-5 space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-semibold">{a.experts?.full_name}</div>
+                <div className="text-xs text-muted-foreground">{a.experts?.specialization} · {a.experts?.years_experience} yıl</div>
+              </div>
+              <Badge variant={a.status === "approved" ? "default" : a.status === "rejected" ? "destructive" : "outline"}>
+                {a.status}
+              </Badge>
+            </div>
+            {a.experts?.bio && <p className="text-sm text-muted-foreground">{a.experts.bio}</p>}
+            <div className="flex gap-2">
+              <Button size="sm" disabled={busy === a.id || my === "approved"} onClick={() => decide(a, "approved")}>
+                <Check className="h-3 w-3 mr-1" />
+                {my === "approved" ? "Onayladınız" : "Onayla"}
+              </Button>
+              <Button size="sm" variant="outline" disabled={busy === a.id || my === "rejected"} onClick={() => decide(a, "rejected")}>
+                <X className="h-3 w-3 mr-1" />
+                {my === "rejected" ? "Reddettiniz" : "Reddet"}
+              </Button>
+            </div>
+          </Card>
+        );
+      })}
     </div>
   );
 }
