@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { X } from "lucide-react";
 
 export type Party = {
   partyType: "individual" | "corporate";
@@ -41,44 +42,44 @@ export const emptyParty = (): Party => ({
 });
 
 interface Props {
-  title: string;
+  index: number;
   value: Party;
   onChange: (p: Party) => void;
   onRemove?: () => void;
 }
 
-export function PartyForm({ title, value, onChange, onRemove }: Props) {
+export function PartyForm({ index, value, onChange, onRemove }: Props) {
   const set = <K extends keyof Party>(k: K, v: Party[K]) => onChange({ ...value, [k]: v });
   const isInd = value.partyType === "individual";
 
   return (
-    <Card className="p-5 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h3 className="text-lg font-semibold">{title}</h3>
-        <div className="flex items-center gap-3">
-          <RadioGroup
-            className="flex gap-4"
-            value={value.partyType}
-            onValueChange={(v) => set("partyType", v as Party["partyType"])}
+    <Card className="p-5 space-y-4 relative">
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="text-lg font-semibold">Taraf {index + 1}</h3>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`Taraf ${index + 1} sil`}
+            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
           >
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <RadioGroupItem value="individual" /> Bireysel
-            </label>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <RadioGroupItem value="corporate" /> Kurumsal
-            </label>
-          </RadioGroup>
-          {onRemove && (
-            <button
-              type="button"
-              onClick={onRemove}
-              className="text-xs text-destructive hover:underline"
-            >
-              Kaldır
-            </button>
-          )}
-        </div>
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
+
+      <RadioGroup
+        className="flex gap-4"
+        value={value.partyType}
+        onValueChange={(v) => set("partyType", v as Party["partyType"])}
+      >
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <RadioGroupItem value="individual" /> Bireysel
+        </label>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <RadioGroupItem value="corporate" /> Kurumsal
+        </label>
+      </RadioGroup>
 
       {isInd ? (
         <div className="grid sm:grid-cols-2 gap-3">
@@ -86,23 +87,23 @@ export function PartyForm({ title, value, onChange, onRemove }: Props) {
           <Field label="Soyad" value={value.lastName} onChange={(v) => set("lastName", v)} />
           <Field label="TC Kimlik No" value={value.tcKimlik} onChange={(v) => set("tcKimlik", v)} />
           <Field label="Doğum Tarihi" type="date" value={value.birthDate} onChange={(v) => set("birthDate", v)} />
+          <Field label="Adres" value={value.address} onChange={(v) => set("address", v)} className="sm:col-span-2" />
+          <Field label="GSM" value={value.gsm} onChange={(v) => set("gsm", v)} />
+          <Field label="Telefon" value={value.phone} onChange={(v) => set("phone", v)} />
+          <Field label="E-posta" type="email" value={value.email} onChange={(v) => set("email", v)} className="sm:col-span-2" />
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Kurum Adı" value={value.companyName} onChange={(v) => set("companyName", v)} />
+          <Field label="Kurum Adı" value={value.companyName} onChange={(v) => set("companyName", v)} className="sm:col-span-2" />
           <Field label="Vergi Dairesi" value={value.taxOffice} onChange={(v) => set("taxOffice", v)} />
           <Field label="Vergi No" value={value.taxNumber} onChange={(v) => set("taxNumber", v)} />
           <Field label="Ticaret Sicil No" value={value.tradeRegistryNo} onChange={(v) => set("tradeRegistryNo", v)} />
-          <Field label="Yetkili Kişi Adı Soyadı" value={value.authorizedPerson} onChange={(v) => set("authorizedPerson", v)} className="sm:col-span-2" />
+          <Field label="Yetkili Kişi" value={value.authorizedPerson} onChange={(v) => set("authorizedPerson", v)} />
+          <Field label="Adres" value={value.address} onChange={(v) => set("address", v)} className="sm:col-span-2" />
+          <Field label="Telefon" value={value.phone} onChange={(v) => set("phone", v)} />
+          <Field label="E-posta" type="email" value={value.email} onChange={(v) => set("email", v)} />
         </div>
       )}
-
-      <div className="grid sm:grid-cols-2 gap-3 pt-2 border-t">
-        <Field label="Adres" value={value.address} onChange={(v) => set("address", v)} className="sm:col-span-2" />
-        {isInd && <Field label="GSM (Cep Telefonu)" value={value.gsm} onChange={(v) => set("gsm", v)} />}
-        <Field label="Telefon" value={value.phone} onChange={(v) => set("phone", v)} />
-        <Field label="E-posta" type="email" value={value.email} onChange={(v) => set("email", v)} className={isInd ? "" : "sm:col-span-2"} />
-      </div>
     </Card>
   );
 }
