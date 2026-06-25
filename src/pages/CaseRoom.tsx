@@ -453,11 +453,91 @@ function AnalysisView({ analysis }: { analysis: any }) {
   );
 }
 
+// =================== Expert Audit Log helpers + view ===================
+async function logExpertAction(args: {
+  caseId: string;
+  assignmentId?: string | null;
+  expertId?: string | null;
+  actorId: string;
+  actorRole: string;
+  action: string;
+  details?: Record<string, any>;
+}) {
+  await supabase.from("expert_assignment_logs").insert({
+    case_id: args.caseId,
+    assignment_id: args.assignmentId ?? null,
+    expert_id: args.expertId ?? null,
+    actor_id: args.actorId,
+    actor_role: args.actorRole,
+    action: args.action,
+    details: args.details ?? {},
+  } as any);
+}
+
+function ExpertAuditLog({ caseId, refreshKey }: { caseId: string; refreshKey: number }) {
+  const [logs, setLogs] = useState<any[]>([]);
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("expert_assignment_logs")
+        .select("*, experts:expert_id(full_name), profiles:actor_id(full_name, email)")
+        .eq("case_id", caseId)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      setLogs((data ?? []) as any[]);
+    })();
+  }, [caseId, refreshKey]);
+
+  const label = (a: string) =>
+    ({
+      proposed: "Önerdi",
+      approved: "Onayladı",
+      rejected: "Reddetti",
+      removed: "Kaldırdı",
+      status_changed: "Durum güncellendi",
+    }[a] ?? a);
+
+  if (logs.length === 0) return null;
+  return (
+    <Card className="p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <History className="h-4 w-4 text-primary" />
+        <h4 className="font-semibold text-sm">Bilirkişi İşlem Günlüğü</h4>
+      </div>
+      <ul className="space-y-2 text-sm">
+        {logs.map((l) => (
+          <li key={l.id} className="flex items-start justify-between gap-3 border-b last:border-0 pb-2">
+            <div>
+              <div>
+                <span className="font-medium">
+                  {l.profiles?.full_name || l.profiles?.email || "Kullanıcı"}
+                </span>{" "}
+                <span className="text-muted-foreground">({l.actor_role})</span>{" "}
+                — {label(l.action)}
+                {l.experts?.full_name && (
+                  <span className="text-muted-foreground"> · {l.experts.full_name}</span>
+                )}
+              </div>
+              {l.details?.note && (
+                <div className="text-xs text-muted-foreground mt-1">{l.details.note}</div>
+              )}
+            </div>
+            <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+              {new Date(l.created_at).toLocaleString("tr-TR")}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 // =================== Stage 6: EXPERTS (with party approval) ===================
 function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string; parties: any[] }) {
   const { user } = useAuth();
   const [assigned, setAssigned] = useState<any[]>([]);
   const [showSelector, setShowSelector] = useState(true);
+  const [logKey, setLogKey] = useState(0);
 
   const load = async () => {
     const { data } = await supabase
@@ -487,22 +567,35 @@ function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string;
 
   const assign = async (expert: any) => {
     if (!user) return;
-    const { error } = await supabase.from("case_expert_assignments").insert({
+    const { data: inserted, error } = await supabase.from("case_expert_assignments").insert({
       case_id: caseId, expert_id: expert.id, status: "pending",
       assigned_by: user.id, approvals: {},
-    } as any);
+    } as any).select().maybeSingle();
     if (error) { toast({ title: "Hata", description: error.message, variant: "destructive" }); return; }
+    await logExpertAction({
+      caseId, assignmentId: inserted?.id, expertId: expert.id,
+      actorId: user.id, actorRole: "mediator", action: "proposed",
+      details: { note: `${expert.full_name} önerildi` },
+    });
     await notifyParties(
       "Yeni Bilirkişi Önerisi",
       `Arabulucu ${expert.full_name} adlı bilirkişiyi önerdi. Onayınız bekleniyor.`
     );
     toast({ title: "Bilirkişi önerildi", description: `${expert.full_name} — taraflara bildirim gönderildi` });
     setShowSelector(false);
+    setLogKey((k) => k + 1);
     load();
   };
 
-  const remove = async (id: string) => {
-    await supabase.from("case_expert_assignments").delete().eq("id", id);
+  const remove = async (row: any) => {
+    if (!user) return;
+    await supabase.from("case_expert_assignments").delete().eq("id", row.id);
+    await logExpertAction({
+      caseId, assignmentId: row.id, expertId: row.expert_id,
+      actorId: user.id, actorRole: "mediator", action: "removed",
+      details: { note: `${row.experts?.full_name ?? "bilirkişi"} kaldırıldı` },
+    });
+    setLogKey((k) => k + 1);
     load();
   };
 
@@ -545,7 +638,7 @@ function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string;
                   <div className="text-xs text-muted-foreground">
                     {rejected ? "Bir taraf reddetti — yeni bilirkişi önerebilirsiniz." : `${approvedCount}/${parties.length} taraf onayladı.`}
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => remove(a.id)}>Kaldır</Button>
+                  <Button size="sm" variant="ghost" onClick={() => remove(a)}>Kaldır</Button>
                 </li>
               );
             })}
@@ -558,6 +651,7 @@ function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string;
         )}
       </Card>
       {showSelector && <ExpertSelector niche={niche} onSelect={assign} />}
+      <ExpertAuditLog caseId={caseId} refreshKey={logKey} />
     </div>
   );
 }
