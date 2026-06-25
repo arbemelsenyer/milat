@@ -61,6 +61,47 @@ export type Database = {
           },
         ]
       }
+      agreement_documents: {
+        Row: {
+          case_id: string
+          created_at: string
+          doc_type: string
+          file_path: string | null
+          id: string
+          metadata: Json
+          signed_by: string[]
+          updated_at: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          doc_type: string
+          file_path?: string | null
+          id?: string
+          metadata?: Json
+          signed_by?: string[]
+          updated_at?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          doc_type?: string
+          file_path?: string | null
+          id?: string
+          metadata?: Json
+          signed_by?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agreement_documents_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_assignments: {
         Row: {
           assigned_at: string
@@ -103,9 +144,11 @@ export type Database = {
           created_at: string
           detected_need: string | null
           id: string
+          party_id: string | null
           question_order: number
           question_text: string
           updated_at: string
+          user_id: string | null
           win_win_scenario: string | null
         }
         Insert: {
@@ -114,9 +157,11 @@ export type Database = {
           created_at?: string
           detected_need?: string | null
           id?: string
+          party_id?: string | null
           question_order?: number
           question_text: string
           updated_at?: string
+          user_id?: string | null
           win_win_scenario?: string | null
         }
         Update: {
@@ -125,9 +170,11 @@ export type Database = {
           created_at?: string
           detected_need?: string | null
           id?: string
+          party_id?: string | null
           question_order?: number
           question_text?: string
           updated_at?: string
+          user_id?: string | null
           win_win_scenario?: string | null
         }
         Relationships: [
@@ -136,6 +183,13 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_discovery_questions_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
             referencedColumns: ["id"]
           },
         ]
@@ -198,9 +252,12 @@ export type Database = {
           full_name: string | null
           gsm: string | null
           id: string
+          invite_status: string
+          invite_token: string | null
           is_individual: boolean
           last_name: string | null
           organization: string | null
+          party_role: string | null
           party_type: string
           phone: string | null
           role: string
@@ -223,9 +280,12 @@ export type Database = {
           full_name?: string | null
           gsm?: string | null
           id?: string
+          invite_status?: string
+          invite_token?: string | null
           is_individual?: boolean
           last_name?: string | null
           organization?: string | null
+          party_role?: string | null
           party_type?: string
           phone?: string | null
           role: string
@@ -248,9 +308,12 @@ export type Database = {
           full_name?: string | null
           gsm?: string | null
           id?: string
+          invite_status?: string
+          invite_token?: string | null
           is_individual?: boolean
           last_name?: string | null
           organization?: string | null
+          party_role?: string | null
           party_type?: string
           phone?: string | null
           role?: string
@@ -275,8 +338,10 @@ export type Database = {
           case_id: string
           created_at: string
           id: string
+          meeting_type: string
           notes: string | null
           participants: Json
+          prep_notes_generated: boolean
           scheduled_at: string | null
           session_type: string
           status: string
@@ -287,8 +352,10 @@ export type Database = {
           case_id: string
           created_at?: string
           id?: string
+          meeting_type?: string
           notes?: string | null
           participants?: Json
+          prep_notes_generated?: boolean
           scheduled_at?: string | null
           session_type: string
           status?: string
@@ -299,8 +366,10 @@ export type Database = {
           case_id?: string
           created_at?: string
           id?: string
+          meeting_type?: string
           notes?: string | null
           participants?: Json
+          prep_notes_generated?: boolean
           scheduled_at?: string | null
           session_type?: string
           status?: string
@@ -321,12 +390,15 @@ export type Database = {
         Row: {
           additional_notes: string | null
           ai_summary: Json | null
+          application_no: string | null
           assigned_expert_id: string | null
           assigned_mediator_id: string | null
           attempted_resolution: string | null
           category: string | null
           created_at: string
+          current_phase: number
           desired_outcome: string | null
+          dispute_subtype: string | null
           dispute_type: string | null
           dispute_type_other: string | null
           id: string
@@ -336,23 +408,28 @@ export type Database = {
           other_party_role: string | null
           priorities: string[] | null
           relationship: string | null
+          round_number: number
           status: string
           timeline: string | null
           title: string | null
           updated_at: string
           user_id: string
+          uyap_no: string | null
           your_name: string | null
           your_role: string | null
         }
         Insert: {
           additional_notes?: string | null
           ai_summary?: Json | null
+          application_no?: string | null
           assigned_expert_id?: string | null
           assigned_mediator_id?: string | null
           attempted_resolution?: string | null
           category?: string | null
           created_at?: string
+          current_phase?: number
           desired_outcome?: string | null
+          dispute_subtype?: string | null
           dispute_type?: string | null
           dispute_type_other?: string | null
           id?: string
@@ -362,23 +439,28 @@ export type Database = {
           other_party_role?: string | null
           priorities?: string[] | null
           relationship?: string | null
+          round_number?: number
           status?: string
           timeline?: string | null
           title?: string | null
           updated_at?: string
           user_id?: string
+          uyap_no?: string | null
           your_name?: string | null
           your_role?: string | null
         }
         Update: {
           additional_notes?: string | null
           ai_summary?: Json | null
+          application_no?: string | null
           assigned_expert_id?: string | null
           assigned_mediator_id?: string | null
           attempted_resolution?: string | null
           category?: string | null
           created_at?: string
+          current_phase?: number
           desired_outcome?: string | null
+          dispute_subtype?: string | null
           dispute_type?: string | null
           dispute_type_other?: string | null
           id?: string
@@ -388,11 +470,13 @@ export type Database = {
           other_party_role?: string | null
           priorities?: string[] | null
           relationship?: string | null
+          round_number?: number
           status?: string
           timeline?: string | null
           title?: string | null
           updated_at?: string
           user_id?: string
+          uyap_no?: string | null
           your_name?: string | null
           your_role?: string | null
         }
@@ -469,6 +553,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "cases_vector_pool_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      common_ground_reports: {
+        Row: {
+          case_id: string
+          created_at: string
+          id: string
+          report: Json
+          round_number: number
+          strategy: Json
+          updated_at: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          id?: string
+          report?: Json
+          round_number?: number
+          strategy?: Json
+          updated_at?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          id?: string
+          report?: Json
+          round_number?: number
+          strategy?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "common_ground_reports_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
@@ -747,6 +869,50 @@ export type Database = {
           },
         ]
       }
+      negotiation_rounds: {
+        Row: {
+          accepted_by: string[]
+          case_id: string
+          created_at: string
+          id: string
+          proposal: Json
+          rejected_by: string[]
+          round_no: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_by?: string[]
+          case_id: string
+          created_at?: string
+          id?: string
+          proposal?: Json
+          rejected_by?: string[]
+          round_no: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_by?: string[]
+          case_id?: string
+          created_at?: string
+          id?: string
+          proposal?: Json
+          rejected_by?: string[]
+          round_no?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "negotiation_rounds_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           case_id: string | null
@@ -787,6 +953,60 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      party_analyses: {
+        Row: {
+          analysis: Json
+          case_id: string
+          created_at: string
+          discovery_questions: Json
+          id: string
+          party_id: string
+          prep_notes: Json
+          round_number: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          analysis?: Json
+          case_id: string
+          created_at?: string
+          discovery_questions?: Json
+          id?: string
+          party_id: string
+          prep_notes?: Json
+          round_number?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          analysis?: Json
+          case_id?: string
+          created_at?: string
+          discovery_questions?: Json
+          id?: string
+          party_id?: string
+          prep_notes?: Json
+          round_number?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "party_analyses_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_analyses_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
             referencedColumns: ["id"]
           },
         ]
@@ -1030,11 +1250,20 @@ export type Database = {
         }
         Returns: string
       }
+      generate_application_no: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_case_mediator: {
+        Args: { _case_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_case_party: {
+        Args: { _case_id: string; _user_id: string }
         Returns: boolean
       }
       match_cases: {

@@ -2,781 +2,346 @@ import { useEffect, useState } from "react";
 import { AppNavbar } from "@/components/AppNavbar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { StepTimeline } from "@/components/mediation/StepTimeline";
-import { PartyForm, emptyParty, type Party } from "@/components/mediation/PartyForm";
-import { MediatorMarketplace } from "@/components/mediation/MediatorMarketplace";
-import { DocumentUploader } from "@/components/mediation/DocumentUploader";
-import { ConflictCards, type ConflictCard } from "@/components/mediation/ConflictCards";
-import { DiscoveryInterview } from "@/components/mediation/DiscoveryInterview";
-import { SessionScheduler } from "@/components/mediation/SessionScheduler";
-import { AgreementStreaming } from "@/components/mediation/AgreementStreaming";
-import { ExpertSelector, type Expert } from "@/components/mediation/ExpertSelector";
-import { OfficialDocsPanel } from "@/components/mediation/OfficialDocsPanel";
-import { maskText } from "@/lib/masking";
-import { Loader2, ShieldCheck, Scale, TrendingUp, Plus } from "lucide-react";
+import { Plus, Loader2, FolderOpen, ShieldCheck } from "lucide-react";
 
-const NICHES = [
-  "İşçi-İşveren",
-  "Ticari",
-  "Tüketici",
-  "Sağlık Hukuku",
-  "Sigorta",
-  "İnşaat",
-  "Fikri Sınai Mülkiyet",
+const DISPUTE_TYPES = [
+  "İşçi-İşveren", "Ticari", "Tüketici", "Sağlık Hukuku",
+  "Sigorta", "İnşaat", "Fikri Sınai Mülkiyet",
 ];
 
-const DOSYA_TURLERI = [
-  "Dava Şartı Arabuluculuk",
-  "İhtiyari Arabuluculuk",
-];
-
-function partyLabel(i: number) {
-  return `Taraf ${i + 1}`;
+interface PartyDraft {
+  party_type: "individual" | "corporate";
+  party_role: string;
+  // individual
+  first_name?: string;
+  last_name?: string;
+  tc_kimlik?: string;
+  birth_date?: string;
+  address?: string;
+  gsm?: string;
+  phone?: string;
+  email?: string;
+  // corporate
+  company_name?: string;
+  tax_office?: string;
+  tax_number?: string;
+  trade_registry_no?: string;
+  authorized_person?: string;
 }
 
-function partyDisplayName(p: Party, i: number) {
-  if (p.partyType === "individual") return `${p.firstName} ${p.lastName}`.trim() || partyLabel(i);
-  return p.companyName || partyLabel(i);
+function emptyParty(role: string): PartyDraft {
+  return { party_type: "individual", party_role: role, email: "" };
 }
 
-function generateBasvuruNo() {
-  const year = new Date().getFullYear();
-  const rand = Math.floor(1000 + Math.random() * 9000);
-  return `${year}/${rand}`;
+function nextRoleLetter(i: number) {
+  return String.fromCharCode("A".charCodeAt(0) + i);
 }
 
-const STEPS = [
-  { key: "intake", label: "Başvuru" },
-  { key: "mediator", label: "Arabulucu Seçimi" },
-  { key: "documents", label: "Belge Analizi" },
-  { key: "expert", label: "Bilirkişi" },
-  { key: "discovery", label: "İhtiyaç Tespiti" },
-  { key: "sessions", label: "Görüşme Planlaması" },
-  { key: "negotiation", label: "Müzakere" },
-  { key: "closure", label: "Anlaşma & Belgeler" },
-];
-
-async function callMediationAi(action: string, payload: Record<string, unknown>) {
-  const { data, error } = await supabase.functions.invoke("mediation-ai", {
-    body: { action, ...payload },
-  });
-  if (error) throw error;
-  return data;
+interface CaseRow {
+  id: string;
+  title: string | null;
+  application_no: string | null;
+  uyap_no: string | null;
+  dispute_type: string | null;
+  dispute_subtype: string | null;
+  status: string | null;
+  current_phase: number | null;
+  created_at: string;
 }
 
 export default function MediationEngine() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading, isMediator, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const [step, setStep] = useState(0);
-
-  // Step 1
-  const [niche, setNiche] = useState(NICHES[0]);
-  const [basvuruNo] = useState(generateBasvuruNo());
-  const [uyapNo, setUyapNo] = useState("");
-  const [dosyaTuru, setDosyaTuru] = useState(DOSYA_TURLERI[0]);
-  const basvuruTarihi = new Date().toLocaleDateString("tr-TR");
-  const [parties, setParties] = useState<Party[]>([emptyParty()]);
-  const updateParty = (i: number, p: Party) =>
-    setParties((prev) => prev.map((x, idx) => (idx === i ? p : x)));
-  const addParty = () => setParties((prev) => [...prev, emptyParty()]);
-  const removeParty = (i: number) =>
-    setParties((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));
-  const [dispute, setDispute] = useState("");
-  const [caseId, setCaseId] = useState<string | null>(null);
+  const [cases, setCases] = useState<CaseRow[]>([]);
+  const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [showForm, setShowForm] = useState(false);
 
-  // Step 2 — mediator selection & mutual approval
-  const [proposedMediator, setProposedMediator] = useState<{ id: string; full_name: string; hourly_rate: number; specializations: string[] } | null>(null);
-  const [approvals, setApprovals] = useState<boolean[]>([]);
-  const [confirmingMediator, setConfirmingMediator] = useState(false);
-
-  // Step 3 — Documents
-  const [docText, setDocText] = useState("");
-  const [conflicts, setConflicts] = useState<ConflictCard[]>([]);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [precedent, setPrecedent] = useState<any | null>(null);
-  const [comparingPrecedent, setComparingPrecedent] = useState(false);
-
-  // Step 4 — Expert
-  const [selectedExpert, setSelectedExpert] = useState<Expert | null>(null);
-  const [assigningExpert, setAssigningExpert] = useState(false);
-
-  // Step 5 — Discovery
-  const [questions, setQuestions] = useState<string[]>([]);
-  const [needs, setNeeds] = useState<{ needs: string[]; winWinScenarios: string[] } | null>(null);
-  const [askingQs, setAskingQs] = useState(false);
-
-  // Step 7 — Negotiation
-  const [transcript, setTranscript] = useState("");
-  const [suggestion, setSuggestion] = useState<{ suggestions: string[]; commonGround: string; frictionPoints: string[] } | null>(null);
-  const [suggesting, setSuggesting] = useState(false);
+  // New case form
+  const [title, setTitle] = useState("");
+  const [uyapNo, setUyapNo] = useState("");
+  const [disputeType, setDisputeType] = useState(DISPUTE_TYPES[0]);
+  const [parties, setParties] = useState<PartyDraft[]>([emptyParty("A"), emptyParty("B")]);
 
   useEffect(() => {
-    if (!authLoading && !user) navigate("/auth");
-  }, [authLoading, user, navigate]);
+    if (!isLoading && !user) navigate("/auth");
+  }, [isLoading, user, navigate]);
 
-  // Build mask terms from form data
-  const maskTerms = () => {
-    const terms: { value: string; fieldType: string }[] = [];
-    parties.forEach((p, idx) => {
-      const role = idx === 0 ? "name" : "counterparty_name";
-      if (p.partyType === "individual") {
-        if (p.firstName) terms.push({ value: p.firstName, fieldType: role });
-        if (p.lastName) terms.push({ value: p.lastName, fieldType: role });
-        if (p.firstName && p.lastName) terms.push({ value: `${p.firstName} ${p.lastName}`, fieldType: role });
-      } else {
-        if (p.companyName) terms.push({ value: p.companyName, fieldType: "company" });
-        if (p.authorizedPerson) terms.push({ value: p.authorizedPerson, fieldType: "authorized" });
-      }
-      if (p.address) terms.push({ value: p.address, fieldType: "address" });
-    });
-    return terms;
-  };
+  useEffect(() => {
+    if (user) loadCases();
+  }, [user]);
 
-  const handleCreateCase = async () => {
+  async function loadCases() {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("cases")
+      .select("id, title, application_no, uyap_no, dispute_type, dispute_subtype, status, current_phase, created_at")
+      .order("created_at", { ascending: false });
+    if (error) {
+      toast({ title: "Yükleme hatası", description: error.message, variant: "destructive" });
+    } else {
+      setCases((data ?? []) as CaseRow[]);
+    }
+    setLoading(false);
+  }
+
+  function addParty() {
+    setParties((ps) => [...ps, emptyParty(nextRoleLetter(ps.length))]);
+  }
+  function removeParty(i: number) {
+    setParties((ps) => ps.filter((_, idx) => idx !== i));
+  }
+  function updateParty(i: number, patch: Partial<PartyDraft>) {
+    setParties((ps) => ps.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
+  }
+
+  async function createCase() {
     if (!user) return;
-    if (!dispute.trim()) {
-      toast({ title: "Uyuşmazlık açıklaması gerekli", variant: "destructive" });
+    if (parties.length < 2) {
+      toast({ title: "En az 2 taraf gerekli", variant: "destructive" });
       return;
+    }
+    for (const p of parties) {
+      if (!p.email) {
+        toast({ title: "Her tarafın e-postası zorunlu", variant: "destructive" });
+        return;
+      }
     }
     setCreating(true);
     try {
-      const { masked } = maskText(dispute, maskTerms());
-      const names = parties.map((p, i) => partyDisplayName(p, i));
+      // application_no via DB function
+      const { data: appNoData } = await supabase.rpc("generate_application_no" as any);
+      const application_no = (appNoData as string) ?? `2026/${Math.floor(1000 + Math.random() * 9000)}`;
 
-      const { data: c, error } = await supabase
-        .from("cases")
-        .insert({
-          user_id: user.id,
-          dispute_type: niche,
-          desired_outcome: "Anlaşma",
-          issue_description: masked.slice(0, 5000),
-          your_name: names[0] || "Başvuran",
-          other_party_name: names.slice(1).join(", ") || "Karşı Taraf",
-          status: "draft",
-          title: `${basvuruNo} • ${dosyaTuru} • ${niche}`,
-          category: dosyaTuru,
-          additional_notes: uyapNo ? `UYAP No: ${uyapNo}` : null,
-        } as any)
-        .select()
-        .single();
-      if (error) throw error;
-      const newId = (c as any).id as string;
-      setCaseId(newId);
+      const { data: caseRow, error: caseErr } = await supabase.from("cases").insert({
+        user_id: user.id,
+        assigned_mediator_id: user.id,
+        title: title || `${disputeType} - ${application_no}`,
+        dispute_type: disputeType,
+        application_no,
+        uyap_no: uyapNo || null,
+        status: "active",
+        current_phase: 1,
+        round_number: 1,
+      } as any).select().single();
+      if (caseErr) throw caseErr;
 
-      // Persist parties
-      await supabase.from("case_parties").insert(
-        parties.map((p, i) =>
-          partyToRow(newId, i === 0 ? "applicant" : i === 1 ? "counterparty" : `party_${i + 1}`, p, names[i]),
-        ) as any,
-      );
+      // Insert parties
+      const partyRows = parties.map((p) => ({
+        case_id: caseRow.id,
+        user_id: null,
+        party_type: p.party_type,
+        is_individual: p.party_type === "individual",
+        party_role: p.party_role,
+        invite_token: crypto.randomUUID(),
+        invite_status: "pending",
+        first_name: p.first_name ?? null,
+        last_name: p.last_name ?? null,
+        full_name: p.party_type === "individual"
+          ? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim()
+          : p.company_name ?? "",
+        tc_kimlik: p.tc_kimlik ?? null,
+        birth_date: p.birth_date || null,
+        address: p.address ?? null,
+        gsm: p.gsm ?? null,
+        phone: p.phone ?? null,
+        email: p.email ?? null,
+        company_name: p.company_name ?? null,
+        tax_office: p.tax_office ?? null,
+        tax_number: p.tax_number ?? null,
+        trade_registry_no: p.trade_registry_no ?? null,
+        authorized_person: p.authorized_person ?? null,
+        role: p.party_role,
+      }));
+      const { data: insertedParties, error: pErr } = await supabase
+        .from("case_parties").insert(partyRows as any).select();
+      if (pErr) throw pErr;
 
-      // Persist anonymized dispute text into vector pool (without embedding for now)
-      await supabase.from("cases_vector_pool").insert({
-        case_id: newId,
-        anonymized_text: masked,
-        niche_area: niche,
-      } as any);
+      // Send invites
+      for (const ip of insertedParties ?? []) {
+        try {
+          await supabase.functions.invoke("send-party-invite", {
+            body: { party_id: (ip as any).id, app_url: window.location.origin },
+          });
+        } catch (e) {
+          console.error("invite send failed", e);
+        }
+      }
 
-      setApprovals(new Array(parties.length).fill(false));
-      toast({ title: "Başvuru oluşturuldu", description: "Arabulucu seçimine geçebilirsiniz." });
-      setStep(1);
+      toast({ title: "Dava oluşturuldu", description: `Başvuru no: ${application_no}` });
+      setShowForm(false);
+      setTitle(""); setUyapNo("");
+      setParties([emptyParty("A"), emptyParty("B")]);
+      await loadCases();
+      navigate(`/case-room/${caseRow.id}`);
     } catch (e: any) {
-      toast({ title: "Hata", description: e.message ?? String(e), variant: "destructive" });
+      toast({ title: "Oluşturma hatası", description: e.message, variant: "destructive" });
     } finally {
       setCreating(false);
     }
-  };
+  }
 
-  const handleDocText = async (text: string, fileName: string) => {
-    if (!caseId) return;
-    const { masked } = maskText(text, maskTerms());
-    setDocText((prev) => prev + "\n\n" + masked);
-    // store record
-    await supabase.from("case_documents").insert({
-      case_id: caseId,
-      file_name: fileName,
-      file_path: `inline/${fileName}`,
-      mime_type: "text/plain",
-      uploaded_by: user!.id,
-    } as any);
-  };
-
-  const analyzeDocs = async () => {
-    if (!docText.trim()) {
-      toast({ title: "Önce bir doküman yükleyin", variant: "destructive" });
-      return;
-    }
-    setAnalyzing(true);
-    try {
-      const r = await callMediationAi("analyze_document", { text: docText, niche });
-      setConflicts((r?.cards as ConflictCard[]) ?? []);
-      // Trigger discovery questions in parallel
-      setAskingQs(true);
-      const q = await callMediationAi("discovery_questions", {
-        niche,
-        summary: maskText(dispute, maskTerms()).masked + "\n\n" + docText.slice(0, 6000),
-      });
-      setQuestions((q?.questions as string[]) ?? []);
-    } catch (e: any) {
-      toast({ title: "Analiz hatası", description: e.message, variant: "destructive" });
-    } finally {
-      setAnalyzing(false);
-      setAskingQs(false);
-    }
-  };
-
-  const comparePrecedents = async () => {
-    setComparingPrecedent(true);
-    try {
-      const r = await callMediationAi("precedent_compare", {
-        niche,
-        text: maskText(dispute, maskTerms()).masked + "\n\n" + docText.slice(0, 6000),
-      });
-      setPrecedent(r);
-    } catch (e: any) {
-      toast({ title: "Emsal karşılaştırma hatası", description: e.message, variant: "destructive" });
-    } finally {
-      setComparingPrecedent(false);
-    }
-  };
-
-  const assignExpert = async () => {
-    if (!caseId || !selectedExpert) return;
-    setAssigningExpert(true);
-    try {
-      await supabase
-        .from("cases")
-        .update({ assigned_expert_id: selectedExpert.id } as any)
-        .eq("id", caseId);
-      toast({
-        title: "Bilirkişi atandı",
-        description: `${selectedExpert.full_name} • ${selectedExpert.specialization}`,
-      });
-      setStep(4);
-    } catch (e: any) {
-      toast({ title: "Hata", description: e.message, variant: "destructive" });
-    } finally {
-      setAssigningExpert(false);
-    }
-  };
-
-  const finishDiscovery = async (qa: { question: string; answer: string }[]) => {
-    if (!caseId) return;
-    await supabase.from("case_discovery_questions").insert(
-      qa.map((x, i) => ({
-        case_id: caseId,
-        question_text: x.question,
-        answer_text: x.answer,
-        question_order: i,
-      })) as any,
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin" />
+      </div>
     );
-    try {
-      const r = await callMediationAi("needs_extract", {
-        qa: qa.map((x) => `S: ${x.question}\nC: ${x.answer}`).join("\n\n"),
-      });
-      setNeeds(r);
-    } catch (e: any) {
-      toast({ title: "İhtiyaç çıkarma hatası", description: e.message, variant: "destructive" });
-    }
-    setStep(5);
-  };
+  }
 
-  const requestSuggestion = async () => {
-    if (!transcript.trim()) return;
-    setSuggesting(true);
-    try {
-      const r = await callMediationAi("negotiation_suggest", {
-        transcript: maskText(transcript, maskTerms()).masked,
-      });
-      setSuggestion(r);
-    } catch (e: any) {
-      toast({ title: "Hata", description: e.message, variant: "destructive" });
-    } finally {
-      setSuggesting(false);
-    }
-  };
-
-  if (authLoading) return <div className="p-8 text-muted-foreground">Yükleniyor...</div>;
+  const canCreate = isMediator || isAdmin;
 
   return (
     <div className="min-h-screen bg-background">
       <AppNavbar />
-      <main className="container max-w-6xl py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">MediPact AI — Akıllı Arabuluculuk Motoru</h1>
-          <p className="text-muted-foreground mt-1 flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-primary" /> Tüm kişisel veriler AI'ya gitmeden önce yerel olarak maskelenir.
-          </p>
-        </div>
+      <main className="container mx-auto px-4 py-8 max-w-6xl">
+        <header className="flex items-start justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-primary">Arabuluculuk Dava Yönetimi</h1>
+            <p className="text-muted-foreground mt-1 flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              İki taraflı gizli analiz sistemi
+            </p>
+          </div>
+          {canCreate && (
+            <Button onClick={() => setShowForm((s) => !s)}>
+              <Plus className="h-4 w-4 mr-1" /> Yeni Dava
+            </Button>
+          )}
+        </header>
 
-        <StepTimeline steps={STEPS} current={step} onJump={(i) => setStep(i)} />
-
-        {/* STEP 1: Intake */}
-        {step === 0 && (
-          <div className="space-y-5">
-            <Card className="p-5 space-y-4 border-primary/30 bg-primary/[0.03]">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-primary">Arabuluculuk Başvuru Formu (UYAP)</h3>
-                <span className="text-xs text-muted-foreground">6325 sayılı Kanun</span>
-              </div>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Başvuru Numarası</Label>
-                  <div className="h-10 px-3 flex items-center rounded-md border bg-muted/40 text-sm font-mono">{basvuruNo}</div>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">UYAP No</Label>
-                  <input
-                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                    placeholder="opsiyonel"
-                    value={uyapNo}
-                    onChange={(e) => setUyapNo(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Başvuru Tarihi</Label>
-                  <div className="h-10 px-3 flex items-center rounded-md border bg-muted/40 text-sm">{basvuruTarihi}</div>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Dosya Türü</Label>
-                  <select
-                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                    value={dosyaTuru}
-                    onChange={(e) => setDosyaTuru(e.target.value)}
-                  >
-                    {DOSYA_TURLERI.map((d) => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
+        {showForm && canCreate && (
+          <Card className="p-6 mb-6 space-y-5">
+            <h2 className="text-xl font-semibold">Yeni Dava (UYAP Formatı)</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Dava Başlığı</Label>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="(opsiyonel)" />
               </div>
               <div>
-                <Label>Uyuşmazlık Alanı</Label>
-                <select
-                  className="h-10 w-full rounded-md border bg-background px-3 text-sm mt-1"
-                  value={niche}
-                  onChange={(e) => setNiche(e.target.value)}
-                >
-                  {NICHES.map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
+                <Label>UYAP Numarası</Label>
+                <Input value={uyapNo} onChange={(e) => setUyapNo(e.target.value)} placeholder="UYAP no" />
               </div>
-            </Card>
-            <div className="grid md:grid-cols-2 gap-5">
-              {parties.map((p, i) => (
-                <PartyForm
-                  key={i}
-                  index={i}
-                  value={p}
-                  onChange={(np) => updateParty(i, np)}
-                  onRemove={parties.length > 1 ? () => removeParty(i) : undefined}
-                />
-              ))}
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">{parties.length} taraf</p>
-              <Button
-                type="button"
-                onClick={addParty}
-                className="bg-green-600 hover:bg-green-700 text-white gap-1"
-                size="sm"
-              >
-                <Plus className="h-4 w-4" /> Taraf Ekle
-              </Button>
-            </div>
-            <Card className="p-5 space-y-3">
-              <Label>Uyuşmazlık Konusu / Açıklaması</Label>
-              <Textarea
-                rows={6}
-                placeholder="Olayı kendi sözlerinizle tarafsız bir dille anlatın..."
-                value={dispute}
-                onChange={(e) => setDispute(e.target.value)}
-              />
-            </Card>
-            <div className="flex justify-end">
-              <Button onClick={handleCreateCase} disabled={creating}>
-                {creating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                Başvuruyu Oluştur ve Devam Et
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 2: Mediator selection with mutual approval */}
-        {step === 1 && (
-          <div className="space-y-4">
-            {!proposedMediator ? (
-              <MediatorMarketplace
-                niche={niche}
-                onSelect={(m) => {
-                  setProposedMediator({
-                    id: m.id,
-                    full_name: m.full_name,
-                    hourly_rate: m.hourly_rate,
-                    specializations: m.specializations,
-                  });
-                  setApprovals(new Array(parties.length).fill(false));
-                  toast({
-                    title: "Arabulucu önerildi",
-                    description: `${m.full_name} • tüm tarafların onayı gerekiyor.`,
-                  });
-                }}
-              />
-            ) : (
-              <Card className="p-5 space-y-4 border-primary/40 bg-primary/[0.03]">
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                  <div>
-                    <h3 className="font-semibold text-lg">Önerilen Arabulucu</h3>
-                    <p className="text-2xl font-bold mt-1">{proposedMediator.full_name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {proposedMediator.specializations.slice(0, 3).join(" • ")}
-                    </p>
-                    <p className="text-sm mt-1">
-                      Ücret: {Number(proposedMediator.hourly_rate).toLocaleString("tr-TR")} ₺/saat
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setProposedMediator(null);
-                      setApprovals([]);
-                    }}
-                  >
-                    Değiştir
-                  </Button>
-                </div>
-                <div className="border-t pt-4 space-y-3">
-                  <p className="text-sm font-medium">
-                    Onay durumu — tüm taraflar onaylayınca arabulucu atanır:
-                  </p>
-                  {parties.map((p, i) => (
-                    <label
-                      key={i}
-                      className="flex items-center gap-3 p-3 rounded-md border bg-background cursor-pointer hover:bg-muted/40"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={approvals[i] ?? false}
-                        onChange={(e) =>
-                          setApprovals((prev) => {
-                            const next = [...prev];
-                            while (next.length < parties.length) next.push(false);
-                            next[i] = e.target.checked;
-                            return next;
-                          })
-                        }
-                        className="h-4 w-4"
-                      />
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">{partyDisplayName(p, i)}</div>
-                        <div className="text-xs text-muted-foreground">{partyLabel(i)}</div>
-                      </div>
-                      <span
-                        className={`text-xs px-2 py-1 rounded ${
-                          approvals[i] ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {approvals[i] ? "Onayladı" : "Beklemede"}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                <div className="flex justify-end">
-                  <Button
-                    disabled={
-                      confirmingMediator ||
-                      approvals.length !== parties.length ||
-                      !approvals.every(Boolean)
-                    }
-                    onClick={async () => {
-                      if (!caseId || !proposedMediator) return;
-                      setConfirmingMediator(true);
-                      try {
-                        await supabase.from("mediator_requests").insert({
-                          case_id: caseId,
-                          mediator_id: proposedMediator.id,
-                          user_id: user!.id,
-                          status: "approved",
-                          notes: `Tüm taraflar (${parties.length}) onayladı.`,
-                        } as any);
-                        await supabase
-                          .from("cases")
-                          .update({
-                            assigned_mediator_id: proposedMediator.id,
-                            status: "assigned",
-                          } as any)
-                          .eq("id", caseId);
-                        toast({
-                          title: "Arabulucu atandı",
-                          description: proposedMediator.full_name,
-                        });
-                        setStep(2);
-                      } catch (e: any) {
-                        toast({ title: "Hata", description: e.message, variant: "destructive" });
-                      } finally {
-                        setConfirmingMediator(false);
-                      }
-                    }}
-                  >
-                    {confirmingMediator ? (
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    ) : null}
-                    Arabulucuyu Onayla ve Ata
-                  </Button>
-                </div>
-              </Card>
-            )}
-          </div>
-        )}
-
-        {/* STEP 3: Document analysis + vector pool precedent comparison */}
-        {step === 2 && (
-          <div className="space-y-4">
-            <DocumentUploader onTextExtracted={handleDocText} />
-            <div className="flex justify-end gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                onClick={comparePrecedents}
-                disabled={comparingPrecedent}
-              >
-                {comparingPrecedent ? (
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                ) : (
-                  <TrendingUp className="h-4 w-4 mr-1" />
-                )}
-                Emsal Karşılaştır
-              </Button>
-              <Button onClick={analyzeDocs} disabled={analyzing}>
-                {analyzing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                Çelişki Analizi Yap
-              </Button>
-            </div>
-            <ConflictCards cards={conflicts} />
-            {precedent && (
-              <Card className="p-5 space-y-3 border-primary/30 bg-primary/[0.03]">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <Scale className="h-4 w-4 text-primary" /> Vektör Havuzu — Emsal Analizi
-                </h3>
-                <p className="text-sm text-muted-foreground">{precedent.overallTrend}</p>
-                <div className="space-y-2">
-                  {(precedent.similarCases ?? []).map((sc: any, i: number) => (
-                    <div key={i} className="rounded-md border bg-background p-3 text-sm">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <div className="font-medium">Emsal {i + 1}</div>
-                        <span className="text-xs text-muted-foreground">
-                          Benzerlik: %{Math.round((sc.similarityScore ?? 0) * 100)}
-                        </span>
-                      </div>
-                      <p className="text-muted-foreground">{sc.summary}</p>
-                      {sc.outcomePattern && (
-                        <p className="text-xs mt-1"><b>Sonuç deseni:</b> {sc.outcomePattern}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {precedent.recommendation && (
-                  <p className="text-sm border-l-2 border-primary/40 pl-3 italic">
-                    {precedent.recommendation}
-                  </p>
-                )}
-              </Card>
-            )}
-            {conflicts.length > 0 && (
-              <div className="flex justify-end">
-                <Button variant="secondary" onClick={() => setStep(3)}>Bilirkişi Atamasına Geç</Button>
+              <div>
+                <Label>Uyuşmazlık Türü</Label>
+                <Select value={disputeType} onValueChange={setDisputeType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DISPUTE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
-          </div>
-        )}
-
-        {/* STEP 4: Expert (Bilirkişi) assignment */}
-        {step === 3 && (
-          <div className="space-y-4">
-            <ExpertSelector
-              niche={niche}
-              selectedId={selectedExpert?.id}
-              onSelect={setSelectedExpert}
-            />
-            <div className="flex items-center justify-between">
-              <Button variant="ghost" onClick={() => setStep(4)}>
-                Bilirkişi olmadan devam et
-              </Button>
-              <Button
-                onClick={assignExpert}
-                disabled={!selectedExpert || assigningExpert}
-              >
-                {assigningExpert ? (
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                ) : null}
-                Bilirkişiyi Ata ve Devam Et
-              </Button>
+              <div>
+                <Label>Başvuru No</Label>
+                <Input value="Otomatik (2026/xxxx)" disabled />
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* STEP 5: Discovery interview */}
-        {step === 4 && (
-          <div className="space-y-4">
-            {askingQs && !questions.length ? (
-              <p className="text-muted-foreground flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" /> Sorular hazırlanıyor...
-              </p>
-            ) : questions.length === 0 ? (
-              <Card className="p-5 space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Henüz soru üretilmedi. "Belge Analizi Yap" çalıştırılırsa otomatik üretilir.
-                </p>
-                <Button variant="outline" onClick={() => setStep(5)}>Atla — Görüşme Planına Geç</Button>
-              </Card>
-            ) : (
-              <DiscoveryInterview questions={questions} onComplete={finishDiscovery} />
-            )}
-          </div>
-        )}
-
-        {/* STEP 6: Sessions with AI suggestion */}
-        {step === 5 && (
-          <div className="space-y-4">
-            {needs && (
-              <Card className="p-5 space-y-3">
-                <h3 className="font-semibold">Tespit Edilen İhtiyaçlar & Kazan-Kazan Senaryoları</h3>
-                <div className="grid sm:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <div className="font-medium mb-1">İhtiyaçlar</div>
-                    <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
-                      {needs.needs?.map((n, i) => <li key={i}>{n}</li>)}
-                    </ul>
-                  </div>
-                  <div>
-                    <div className="font-medium mb-1">Kazan-Kazan Senaryoları</div>
-                    <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
-                      {needs.winWinScenarios?.map((n, i) => <li key={i}>{n}</li>)}
-                    </ul>
-                  </div>
-                </div>
-              </Card>
-            )}
-            {caseId && (
-              <SessionScheduler
-                caseId={caseId}
-                niche={niche}
-                context={
-                  maskText(dispute, maskTerms()).masked +
-                  (needs ? "\n\nİhtiyaçlar: " + (needs.needs ?? []).join("; ") : "")
-                }
-              />
-            )}
-            <div className="flex justify-end">
-              <Button onClick={() => setStep(6)}>Müzakereye Geç</Button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 7: Negotiation */}
-        {step === 6 && (
-          <div className="space-y-4">
-            <Card className="p-5 space-y-3">
-              <Label>Müzakere Kaydı</Label>
-              <Textarea rows={8} value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="Görüşme notlarını veya transkripti girin..." />
-              <div className="flex justify-end">
-                <Button onClick={requestSuggestion} disabled={suggesting}>
-                  {suggesting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                  AI Önerisi Al
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Taraflar ({parties.length})</h3>
+                <Button variant="outline" size="sm" onClick={addParty}>
+                  <Plus className="h-4 w-4 mr-1" /> Taraf Ekle
                 </Button>
               </div>
-            </Card>
-            {suggestion && (
-              <Card className="p-5 space-y-3">
-                <h3 className="font-semibold">AI Önerileri</h3>
-                <div className="text-sm space-y-2">
-                  <div><b>Ortak Zemin:</b> {suggestion.commonGround}</div>
-                  <div>
-                    <b>Sürtüşme Noktaları:</b>
-                    <ul className="list-disc pl-5 text-muted-foreground">
-                      {suggestion.frictionPoints?.map((f, i) => <li key={i}>{f}</li>)}
-                    </ul>
+              {parties.map((p, i) => (
+                <Card key={i} className="p-4 space-y-3 bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium">Taraf {p.party_role}</div>
+                    {parties.length > 2 && (
+                      <Button variant="ghost" size="sm" onClick={() => removeParty(i)}>Sil</Button>
+                    )}
                   </div>
-                  <div>
-                    <b>Öneriler:</b>
-                    <ul className="list-disc pl-5 text-muted-foreground">
-                      {suggestion.suggestions?.map((f, i) => <li key={i}>{f}</li>)}
-                    </ul>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <Label>Tür</Label>
+                      <Select value={p.party_type} onValueChange={(v: any) => updateParty(i, { party_type: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="individual">Bireysel</SelectItem>
+                          <SelectItem value="corporate">Kurumsal</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>E-posta (davet için)</Label>
+                      <Input type="email" value={p.email ?? ""} onChange={(e) => updateParty(i, { email: e.target.value })} />
+                    </div>
+                    {p.party_type === "individual" ? (
+                      <>
+                        <div><Label>Ad</Label><Input value={p.first_name ?? ""} onChange={(e) => updateParty(i, { first_name: e.target.value })} /></div>
+                        <div><Label>Soyad</Label><Input value={p.last_name ?? ""} onChange={(e) => updateParty(i, { last_name: e.target.value })} /></div>
+                        <div><Label>TC Kimlik No</Label><Input value={p.tc_kimlik ?? ""} onChange={(e) => updateParty(i, { tc_kimlik: e.target.value })} /></div>
+                        <div><Label>Doğum Tarihi</Label><Input type="date" value={p.birth_date ?? ""} onChange={(e) => updateParty(i, { birth_date: e.target.value })} /></div>
+                        <div><Label>GSM</Label><Input value={p.gsm ?? ""} onChange={(e) => updateParty(i, { gsm: e.target.value })} /></div>
+                        <div><Label>Telefon</Label><Input value={p.phone ?? ""} onChange={(e) => updateParty(i, { phone: e.target.value })} /></div>
+                        <div className="md:col-span-2"><Label>Adres</Label><Input value={p.address ?? ""} onChange={(e) => updateParty(i, { address: e.target.value })} /></div>
+                      </>
+                    ) : (
+                      <>
+                        <div><Label>Kurum Adı</Label><Input value={p.company_name ?? ""} onChange={(e) => updateParty(i, { company_name: e.target.value })} /></div>
+                        <div><Label>Yetkili Kişi</Label><Input value={p.authorized_person ?? ""} onChange={(e) => updateParty(i, { authorized_person: e.target.value })} /></div>
+                        <div><Label>Vergi Dairesi</Label><Input value={p.tax_office ?? ""} onChange={(e) => updateParty(i, { tax_office: e.target.value })} /></div>
+                        <div><Label>Vergi No</Label><Input value={p.tax_number ?? ""} onChange={(e) => updateParty(i, { tax_number: e.target.value })} /></div>
+                        <div><Label>Ticaret Sicil No</Label><Input value={p.trade_registry_no ?? ""} onChange={(e) => updateParty(i, { trade_registry_no: e.target.value })} /></div>
+                        <div><Label>Telefon</Label><Input value={p.phone ?? ""} onChange={(e) => updateParty(i, { phone: e.target.value })} /></div>
+                        <div className="md:col-span-2"><Label>Adres</Label><Input value={p.address ?? ""} onChange={(e) => updateParty(i, { address: e.target.value })} /></div>
+                      </>
+                    )}
                   </div>
-                </div>
-              </Card>
-            )}
-            <div className="flex justify-end">
-              <Button onClick={() => setStep(7)}>Kapanışa Geç</Button>
+                </Card>
+              ))}
             </div>
-          </div>
+
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={() => setShowForm(false)}>İptal</Button>
+              <Button onClick={createCase} disabled={creating}>
+                {creating ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Oluşturuluyor</> : "Dava Aç ve Davet Gönder"}
+              </Button>
+            </div>
+          </Card>
         )}
 
-        {/* STEP 8: Closure — agreement streaming + official PDF templates */}
-        {step === 7 && (
-          <div className="space-y-4">
-            <AgreementStreaming
-              context={[
-                `Niş: ${niche}`,
-                `Uyuşmazlık: ${maskText(dispute, maskTerms()).masked}`,
-                needs ? `İhtiyaçlar: ${needs.needs?.join("; ")}` : "",
-                needs ? `Senaryolar: ${needs.winWinScenarios?.join("; ")}` : "",
-                suggestion ? `Ortak zemin: ${suggestion.commonGround}` : "",
-              ].filter(Boolean).join("\n")}
-            />
-            <OfficialDocsPanel
-              data={{
-                basvuruNo,
-                uyapNo,
-                basvuruTarihi,
-                dosyaTuru,
-                niche,
-                title: `${basvuruNo} • ${dosyaTuru} • ${niche}`,
-                description: dispute,
-                parties: parties.map((p, i) => ({
-                  role: i === 0 ? "Başvuran" : i === 1 ? "Karşı Taraf" : `Taraf ${i + 1}`,
-                  full_name: partyDisplayName(p, i),
-                  organization: p.partyType === "corporate" ? p.companyName : undefined,
-                  tc_kimlik: p.tcKimlik,
-                  vergi_no: p.taxNumber,
-                  address: p.address,
-                  phone: p.phone,
-                  email: p.email,
-                })),
-                mediator: proposedMediator
-                  ? { full_name: proposedMediator.full_name }
-                  : undefined,
-              }}
-            />
-          </div>
-        )}
+        <Card className="p-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <FolderOpen className="h-5 w-5" /> Davalarım
+          </h2>
+          {loading ? (
+            <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>
+          ) : cases.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">Henüz dava yok.</p>
+          ) : (
+            <div className="space-y-2">
+              {cases.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => navigate(`/case-room/${c.id}`)}
+                  className="w-full text-left p-4 rounded-lg border hover:bg-accent/10 transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{c.title}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {c.application_no ?? "—"} · {c.dispute_type ?? ""} · Aşama {c.current_phase ?? 1}/8
+                      </div>
+                    </div>
+                    <div className="text-xs px-2 py-1 rounded bg-primary/10 text-primary">{c.status ?? "active"}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </Card>
       </main>
     </div>
   );
-}
-
-function partyToRow(case_id: string, role: string, p: Party, displayName: string) {
-  return {
-    case_id,
-    role,
-    party_type: p.partyType,
-    is_individual: p.partyType === "individual",
-    full_name: displayName,
-    tc_kimlik: p.tcKimlik || null,
-    birth_date: p.birthDate || null,
-    address: p.address || null,
-    phone: p.phone || null,
-    email: p.email || null,
-    company_name: p.companyName || null,
-    tax_office: p.taxOffice || null,
-    tax_number: p.taxNumber || null,
-    trade_registry_no: p.tradeRegistryNo || null,
-    authorized_person: p.authorizedPerson || null,
-    gsm: p.gsm || null,
-    organization: p.partyType === "corporate" ? p.companyName : null,
-  };
 }

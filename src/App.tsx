@@ -20,6 +20,7 @@ import AgreementGenerator from "./pages/AgreementGenerator";
 import LegalReasoningEngine from "./pages/LegalReasoningEngine";
 import MediationEngine from "./pages/MediationEngine";
 import CaseDetail from "./pages/CaseDetail";
+import CaseRoom from "./pages/CaseRoom";
 import MediatorDetail from "./pages/MediatorDetail";
 
 
@@ -48,6 +49,7 @@ const App = () => (
 <Route path="/legal-reasoning" element={<LegalReasoningEngine />} />
 <Route path="/mediation-engine" element={<MediationEngine />} />
 <Route path="/case/:id" element={<CaseDetail />} />
+<Route path="/case-room/:id" element={<CaseRoom />} />
 <Route path="/mediator/:id" element={<MediatorDetail />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

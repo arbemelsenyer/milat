@@ -1,89 +1,108 @@
+# MediPact AI Sistem 1 — Arabulucu Odaklı İki Taraflı Gizli Analiz
 
-# MediPact AI — Akıllı Arabuluculuk & Doküman Analiz Sistemi
+Mevcut `MediationEngine.tsx` baştan yeniden yapılandırılır. Her taraf yalnız kendi analizini görür; arabulucu her iki analizi + AI ortak zemin raporunu görür; taraflar birbirinin verisine erişemez (Supabase RLS).
 
-Bu çok geniş kapsamlı bir özellik. Onayınızdan sonra fazları sırayla uygulayacağım. Aşağıda mimari ve adımlar var; hepsini tek seferde inşa etmek tek bir tur içinde mümkün değil — onay sonrası fazları birbiri ardına teslim edeceğim.
+## Mimari Özet
 
-## Kapsam Özeti
+```text
+Arabulucu (mediator)        Taraf A (user_id=A)        Taraf B (user_id=B)
+     │                            │                          │
+     ├─ Dava açar                 ├─ Davet e-postası →       ├─ Davet e-postası →
+     ├─ Tarafları ekler           │  giriş + kendi paneli    │  giriş + kendi paneli
+     ├─ Tüm belgeleri görür       ├─ Sadece kendi belgesi    ├─ Sadece kendi belgesi
+     ├─ Her iki gizli analizi     ├─ Sadece kendi analizi    ├─ Sadece kendi analizi
+     ├─ AI Ortak Zemin Raporu     │  (RLS bloklu)            │  (RLS bloklu)
+     └─ Strateji önerisi (yalnız ona)
+```
 
-7 aşamalı timeline (Başvuru → Arabulucu Seçimi → Belge Analizi → İhtiyaç Tespiti → Planlama → Müzakere → Kapanış) ile MediationEngine sayfası, çift katmanlı maskeleme, çift AI doğrulama pipeline, doküman çelişki analizi, arabulucu marketplace ve resmi belge üretimi.
+## Veritabanı Değişiklikleri (migration)
 
-## Faz 1 — Veritabanı Şeması (migration)
+Yeni / değiştirilen tablolar — hepsinde RLS + GRANT:
 
-Yeni tablolar (RLS + GRANT + updated_at trigger dahil):
-- `cases_private_keys` — gerçek değer ⇄ maske eşlemesi (pgcrypto ile şifreli)
-- `cases_vector_pool` — anonimleştirilmiş metin + niche_area + embedding (pgvector)
-- `pending_pool` — dış kaynak ham içerik + doğrulama durumu
-- `case_discovery_questions` — dinamik mülakat Q/A
-- `case_sessions` — ön / ana / özel görüşme planlaması
-- `mediators` — arabulucu profili (spesializasyon, oran, müsaitlik)
-- `case_parties` — bireysel/kurumsal taraf bilgileri (mevcut tabloya yeni alanlar ekle: party_type, is_individual, tc_kimlik, birth_date, company_name, tax_office, tax_number, trade_registry_no, authorized_person)
+- `cases`: kolonlar eklenir → `uyap_no`, `application_no` (otomatik `2026/xxxx`), `dispute_subtype`, `current_phase` (1–8), `round_number`.
+- `case_parties`: `user_id` (davet kabul edilince doldurulur), `invite_token`, `invite_status` (`pending|accepted`), `party_role` (`A|B|C...`). RLS: taraf yalnızca `user_id = auth.uid()` olan satırı görür; arabulucu (cases.assigned_mediator_id) tümünü görür.
+- `party_analyses` (YENİ): `case_id`, `party_id`, `user_id`, `analysis_jsonb` (güçlü/zayıf/risk/fırsat/emsal), `discovery_questions jsonb`, `prep_notes jsonb`. RLS: yalnız `user_id = auth.uid()` veya arabulucu.
+- `common_ground_reports` (YENİ): `case_id`, `report_jsonb`, `strategy_jsonb`, `round_number`. RLS: yalnız arabulucu.
+- `case_documents`: zaten var; RLS sertleştirilir → taraf sadece kendi yüklediğini, arabulucu tümünü görür.
+- `case_discovery_questions`: party-scoped RLS.
+- `case_sessions` (mevcut): `meeting_type` (`pre|main|caucus`), `participants[]`, `video_url`, `prep_notes_generated` bool.
+- `agreement_documents` (YENİ): üretilen 5 resmi belge PDF metadata + storage path.
+- `negotiation_rounds` (YENİ): `case_id`, `round_no`, `status`, `accepted_by[]`, `rejected_by[]`.
 
-`case_documents` zaten var — gerekirse `analysis_result jsonb` alanı eklenecek.
+Yardımcı fonksiyonlar:
+- `is_case_mediator(case_id, user_id)` SECURITY DEFINER.
+- `is_case_party(case_id, user_id)` SECURITY DEFINER.
+- Tüm RLS politikaları bu iki helper üzerinden yazılır (recursion'dan kaçınmak için).
 
-`pgvector` ve `pgcrypto` extension'ları aktif edilecek.
+## Edge Functions
 
-RLS: tarafgör-yalnızca-kendi-davası, mediator atanmışsa erişim, admin tam erişim. `cases_private_keys` yalnızca `service_role` ve dava sahibi.
+- `party-confidential-analysis` (YENİ): Tek tarafın belgeleri + cevapları → Gemini ile gizli analiz. `party_analyses` tablosuna yazar. JWT doğrulaması; sadece o tarafın user_id'siyle çağrılabilir.
+- `common-ground-report` (YENİ): Arabulucu çağırır; iki tarafın analizini birleştirip ortak zemin + strateji üretir. `common_ground_reports`'a yazar.
+- `mediator-strategy-suggestion` (YENİ): "AI Önerisi Al" butonu — o ana kadarki tüm veri ile yeni öneri.
+- `generate-prep-notes` (YENİ): Toplantı öncesi her tarafa ayrı hazırlık notu (party-scoped).
+- `generate-agreement-documents` (YENİ): Anlaşma → 5 Adalet Bakanlığı formatında PDF (mevcut `pdfTemplates.ts` şablonlarını kullanır).
+- `send-party-invite` (YENİ): Resend ile davet e-postası + invite_token.
+- Mevcut `legal-reasoning-gemini` ve `mediation-ai` korunur ama yeni akışa adapte edilir.
 
-## Faz 2 — Maskeleme Motoru
+> Not: `VITE_GEMINI_API_KEY` istemcide ifşa olur. Güvenlik için tüm AI çağrıları edge function arkasında `GEMINI_API_KEY` (zaten secret) ile yapılır. Kullanıcı isteğindeki `VITE_GEMINI_API_KEY` ifadesini bu şekilde uyguluyoruz; aksi halde KVKK ve sızıntı riski oluşur.
 
-`src/lib/masking.ts`:
-- Regex tabanlı PII tespiti: TC (11 hane Luhn), IBAN, telefon (TR formatı), e-posta, vergi no (10 hane), tarih
-- NER lite: form alanlarından gelen tam adlar/şirket adları için sözlük tabanlı maskeleme
-- `maskText(text, caseId)` → `{ masked, mappings[] }`; `unmaskText(masked, caseId)` ters eşleme
-- Eşlemeler edge function ile `cases_private_keys`'e şifreli yazılır (pgcrypto `pgp_sym_encrypt`, anahtar = LOVABLE secret)
+## Frontend Yapısı
 
-Kural: AI Gateway'e yapılan TÜM çağrılar maskelenmiş metin gönderir; yanıt unmask edilir (ya da kullanıcıya maskeli kalır — UI'da toggle).
+`src/pages/MediationEngine.tsx` — role-aware ana sayfa. `useAuth` + dava rolüne göre üç görünüm:
 
-## Faz 3 — Edge Functions
+```text
+MediationEngine
+├── MediatorView/
+│   ├── PhaseStepper (1-8)
+│   ├── CaseHeader (UYAP no, başvuru no, tarih)
+│   ├── PartiesManager (dinamik ekle/davet)
+│   ├── DocumentsAllPanel (tüm belgeler)
+│   ├── DualAnalysisPanel (A | B yan yana)
+│   ├── CommonGroundPanel (AI rapor + "AI Önerisi Al")
+│   ├── SessionsPanel (ön/ana/özel görüşme)
+│   ├── ExpertPanel
+│   ├── RoundsPanel
+│   └── AgreementPanel (5 belge üretimi)
+├── PartyView/
+│   ├── MyDocumentsUpload
+│   ├── MyMissingDocsList (AI)
+│   ├── MyConfidentialAnalysis
+│   ├── MyDiscoveryQuestions (5 soru)
+│   ├── MyMeetings + PrepNotes
+│   └── MyProposals (kabul/red)
+└── InviteAcceptPage (token ile)
+```
 
-| Fonksiyon | Görev |
-|---|---|
-| `mask-and-store` | Metin/doküman maskele, private_keys ve vector_pool'a yaz |
-| `analyze-document` | Yüklenen PDF/Word'ü parse et, Turbo Law tarzı çelişki kartları üret (Gemini Pro), paralel olarak `discovery-questions` tetikler |
-| `discovery-questions` | Niş alana + dokümana göre 4-5 derin soru üret |
-| `legal-research` | Listelenen 20+ resmi kaynaktan Firecrawl ile arama, en ilgili 3-5 karar tam metni → `pending_pool` |
-| `validate-pool` | A: Gemini Flash format/ilgi triage → B: Gemini Pro derin doğrulama → approved JSON; reddedilen silinir |
-| `negotiation-suggest` | Müzakere aşamasında gerçek zamanlı AI önerisi |
-| `generate-agreement` | 6325 sayılı kanun formatında 4 belge tipi streaming |
+Yeni bileşenler `src/components/mediation/` altına: `PartiesManager.tsx`, `DualAnalysisPanel.tsx`, `CommonGroundPanel.tsx`, `ConfidentialAnalysisCard.tsx`, `DiscoveryQuestionsForm.tsx`, `MeetingPrepNotes.tsx`, `AgreementDocsPanel.tsx`, `PhaseStepper.tsx`.
 
-Tüm çağrılar Lovable AI Gateway (`google/gemini-3-flash-preview` triage, `google/gemini-2.5-pro` derin analiz). Kullanıcının istediği `VITE_GEMINI_API_KEY` yerine **Lovable AI Gateway** kullanılacak (ücretsiz kota dahili, secret tarafında zaten var). Bunu mesajda not edeceğim.
+## Tema
 
-Firecrawl bağlantısı **gerekli** — connector flow ile bağlatılacak.
+`src/index.css` semantic tokens güncellenir: primary `#2D3580` (lacivert), accent `#C4A882` (bej). Mevcut bileşenler bu tokenları zaten kullanıyor.
 
-## Faz 4 — Frontend Sayfaları & Bileşenler
+## Güvenlik
 
-Yeni dosyalar:
-- `src/pages/MediationEngine.tsx` — 7 aşamalı timeline orkestratörü
-- `src/components/mediation/StepTimeline.tsx`
-- `src/components/mediation/PartyForm.tsx` — bireysel/kurumsal toggle, tüm alanlar + Zod
-- `src/components/mediation/MediatorMarketplace.tsx` — Hiwell tarzı kart grid + filtre + detay sheet + randevu
-- `src/components/mediation/DocumentUploader.tsx` — drag/drop, PDF/Word
-- `src/components/mediation/ConflictCards.tsx` — çelişki/risk kartları
-- `src/components/mediation/DiscoveryInterview.tsx` — şık mülakat simülasyonu
-- `src/components/mediation/SessionScheduler.tsx` — 3 seans tipi
-- `src/components/mediation/NegotiationRoom.tsx` — AI önerili müzakere
-- `src/components/mediation/AgreementGenerator.tsx` — streaming belge üretimi (zaten ayrı sayfa var, modüle dönüştür)
+- Tüm yeni tablolarda RLS + GRANT (authenticated/service_role).
+- Taraf-A asla Taraf-B'nin satırını okuyamaz (politika: `user_id = auth.uid()`).
+- Arabulucu erişimi `is_case_mediator()` helper'ı ile.
+- AI çağrıları edge function arkasında — `GEMINI_API_KEY` istemciye sızmaz.
+- KVKK onayı `/auth` Sign Up'ta zaten zorunlu (mevcut).
 
-App.tsx'e `/mediation-engine` route eklenir.
+## Uygulama Sırası
 
-## Faz 5 — Arabulucu Marketplace
+1. **Migration** — yeni tablolar, kolonlar, helper fonksiyonlar, RLS politikaları, GRANT'ler.
+2. **Edge Functions** — 6 yeni fonksiyon + `config.toml` güncelleme.
+3. **Theme** — `index.css` lacivert/bej tokenları.
+4. **MediationEngine yeniden yazımı** — role-aware ana sayfa.
+5. **Bileşenler** — `src/components/mediation/` altında 8 yeni bileşen.
+6. **Invite akışı** — `/invite/:token` rotası + `App.tsx` güncellenir.
+7. **Smoke test** — playwright ile arabulucu/taraf akışı doğrulanır.
 
-Tohum verisi (5-8 örnek arabulucu) `mediators` tablosuna eklenir. Filtre: uzmanlık, dil (TR/EN/AR), ücret aralığı, müsaitlik. Detay sayfası mevcut `MediatorAvailabilityCalendar` bileşenini yeniden kullanır.
+## Korunanlar
 
-## Faz 6 — Belge Üretimi
+- `AppNavbar`, mevcut Supabase entegrasyonu, auth akışı, `pdfTemplates.ts`, dil sistemi, mevcut `experts` tablosu/akışı.
 
-`generate-agreement` 6325 sayılı kanunun 18. madde formatına göre 4 şablon (Tutanak / Anlaşma / Mutabakat / Uzlaşma). Streaming görüntüleme + PDF export (mevcut `pdf-export.ts` kullanılır).
+## Açık Sorular
 
-## Onayınız Gereken Noktalar
-
-1. **AI sağlayıcı**: `VITE_GEMINI_API_KEY` yerine Lovable AI Gateway (sunucu tarafı `LOVABLE_API_KEY`, frontend'e sızmaz, ücretsiz kota dahil). Onaylar mısınız?
-2. **Firecrawl**: 20+ resmi sitenin agentik taraması için Firecrawl connector bağlantısı gerek. Onayınız varsa connector flow başlatırım.
-3. **Teslimat**: Bu faz listesi sırayla uygulanacak (her faz ayrı turla). Faz 1 (DB migration) ile başlamamı onaylıyor musunuz?
-
-## Teknik Notlar
-
-- pgvector boyutu: `gemini-embedding-001` → 3072
-- Tüm AI çağrıları edge function arkasında, JWT doğrulama in-code
-- Tüm maskeleme istemci tarafında ön-tarama + sunucuda kesin tarama (defense in depth)
-- i18n: tüm yeni stringler mevcut `useLanguage` hook + TR/EN sözlüğü
-- Tasarım: mevcut `#1D9E75` accent, Outfit/Source Sans 3, AppNavbar
+1. **Davet e-postası**: Yeni taraf hesap oluşturmamışsa davet linki `/auth?invite=<token>` üzerinden kayıt → otomatik `case_parties.user_id` bağlama akışı doğru mu?
+2. **VITE_GEMINI_API_KEY**: Güvenlik için tüm AI çağrılarını edge function arkasında tutuyorum (istemciye Gemini anahtarı koymuyorum). Onaylıyor musunuz?
+3. **Kapsam büyüklüğü**: Bu plan 1 turda iskeleti kurar (migration + edge functions + ana bileşenler). Ortak zemin AI prompt'ları, bilirkişi entegrasyonu detayı ve dijital imza için 2. tur gerekebilir — onay verir misiniz yoksa hepsi tek seferde mi?

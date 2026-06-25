@@ -77,8 +77,29 @@ export default function AuthPage() {
   });
 
   useEffect(() => {
-    if (user) navigate('/dashboard');
-  }, [user, navigate]);
+    if (!user) return;
+    const params = new URLSearchParams(window.location.search);
+    const inviteToken = params.get('invite');
+    if (inviteToken) {
+      import('@/integrations/supabase/client').then(({ supabase }) => {
+        supabase.functions
+          .invoke('accept-party-invite', { body: { token: inviteToken } })
+          .then(({ data, error }) => {
+            if (error) {
+              toast({ variant: 'destructive', title: 'Davet kabul edilemedi', description: error.message });
+              navigate('/dashboard');
+            } else if ((data as any)?.case_id) {
+              navigate(`/case-room/${(data as any).case_id}`);
+            } else {
+              navigate('/dashboard');
+            }
+          });
+      });
+    } else {
+      navigate('/dashboard');
+    }
+  }, [user, navigate, toast]);
+
 
   const handleLogin = async (data: LoginFormData) => {
     setIsLoading(true);
