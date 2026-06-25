@@ -53,6 +53,8 @@ const App = () => (
 <Route path="/case/:id" element={<CaseDetail />} />
 <Route path="/case-room/:id" element={<CaseRoom />} />
 <Route path="/mediator/:id" element={<MediatorDetail />} />
+<Route path="/notification-settings" element={<NotificationSettings />} />
+<Route path="/privacy-tests" element={<PrivacyTests />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
