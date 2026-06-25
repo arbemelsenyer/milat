@@ -490,6 +490,10 @@ export default function CaseDetail() {
                   }}
                 />
               </TabsContent>
+
+              <TabsContent value="agents">
+                <AgentNegotiationPanel caseId={c.id} isMediator={user?.id === c.assigned_mediator_id} />
+              </TabsContent>
             </Tabs>
           </div>
 
