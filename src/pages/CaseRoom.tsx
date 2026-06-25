@@ -196,8 +196,13 @@ export default function CaseRoom() {
           <TabsTrigger value="parties"><Users className="h-4 w-4 mr-1" />Taraflar</TabsTrigger>
           <TabsTrigger value="documents"><FileText className="h-4 w-4 mr-1" />Belgeler</TabsTrigger>
           <TabsTrigger value="analyses"><Brain className="h-4 w-4 mr-1" />Gizli Analizler</TabsTrigger>
-          <TabsTrigger value="common"><Lightbulb className="h-4 w-4 mr-1" />Ortak Zemin (Gizli)</TabsTrigger>
+          <TabsTrigger value="common"><Lightbulb className="h-4 w-4 mr-1" />Ortak Zemin</TabsTrigger>
           <TabsTrigger value="discovery">İhtiyaç Tespiti</TabsTrigger>
+          <TabsTrigger value="sessions"><Calendar className="h-4 w-4 mr-1" />Toplantılar</TabsTrigger>
+          <TabsTrigger value="experts"><Award className="h-4 w-4 mr-1" />Bilirkişi</TabsTrigger>
+          <TabsTrigger value="rounds"><Repeat className="h-4 w-4 mr-1" />Müzakere Turları</TabsTrigger>
+          <TabsTrigger value="agreement"><FileSignature className="h-4 w-4 mr-1" />Anlaşma</TabsTrigger>
+        </TabsList>
         </TabsList>
 
         <TabsContent value="parties">
