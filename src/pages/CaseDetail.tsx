@@ -27,6 +27,7 @@ import { CaseTimeline, type TimelineEvent } from "@/components/CaseTimeline";
 import { AiAssistantChat } from "@/components/AiAssistantChat";
 import { CountdownBadge } from "@/components/CountdownBadge";
 import { OfficialDocuments } from "@/components/OfficialDocuments";
+import { AgentNegotiationPanel } from "@/components/mediation/AgentNegotiationPanel";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -488,6 +489,10 @@ export default function CaseDetail() {
                     })),
                   }}
                 />
+              </TabsContent>
+
+              <TabsContent value="agents">
+                <AgentNegotiationPanel caseId={c.id} isMediator={user?.id === c.assigned_mediator_id} />
               </TabsContent>
             </Tabs>
           </div>
