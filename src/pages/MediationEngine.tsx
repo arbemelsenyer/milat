@@ -102,17 +102,23 @@ export default function MediationEngine() {
   const [approvals, setApprovals] = useState<boolean[]>([]);
   const [confirmingMediator, setConfirmingMediator] = useState(false);
 
-  // Step 3
+  // Step 3 — Documents
   const [docText, setDocText] = useState("");
   const [conflicts, setConflicts] = useState<ConflictCard[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [precedent, setPrecedent] = useState<any | null>(null);
+  const [comparingPrecedent, setComparingPrecedent] = useState(false);
 
-  // Step 4
+  // Step 4 — Expert
+  const [selectedExpert, setSelectedExpert] = useState<Expert | null>(null);
+  const [assigningExpert, setAssigningExpert] = useState(false);
+
+  // Step 5 — Discovery
   const [questions, setQuestions] = useState<string[]>([]);
   const [needs, setNeeds] = useState<{ needs: string[]; winWinScenarios: string[] } | null>(null);
   const [askingQs, setAskingQs] = useState(false);
 
-  // Step 6
+  // Step 7 — Negotiation
   const [transcript, setTranscript] = useState("");
   const [suggestion, setSuggestion] = useState<{ suggestions: string[]; commonGround: string; frictionPoints: string[] } | null>(null);
   const [suggesting, setSuggesting] = useState(false);
