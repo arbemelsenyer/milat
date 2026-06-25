@@ -48,13 +48,26 @@ export function AppNavbar() {
           )}
 
           {isAdmin && (
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/admin">
-                <Shield className="w-4 h-4 mr-1" />
-                Admin
-              </Link>
-            </Button>
+            <>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/admin">
+                  <Shield className="w-4 h-4 mr-1" />
+                  Admin
+                </Link>
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/privacy-tests" title="Gizlilik Testleri">
+                  <ShieldCheck className="w-4 h-4" />
+                </Link>
+              </Button>
+            </>
           )}
+
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/notification-settings" title={language === 'tr' ? 'Bildirim Ayarları' : 'Notification Settings'}>
+              <Bell className="w-4 h-4" />
+            </Link>
+          </Button>
 
           <NotificationBell />
           <LanguageToggle />
