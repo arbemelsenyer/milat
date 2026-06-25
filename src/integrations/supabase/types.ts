@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_states: {
+        Row: {
+          agent_type: string
+          case_id: string
+          confidence_score: number | null
+          created_at: string
+          error_message: string | null
+          hallucination_risk: boolean
+          id: string
+          last_output: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          agent_type: string
+          case_id: string
+          confidence_score?: number | null
+          created_at?: string
+          error_message?: string | null
+          hallucination_risk?: boolean
+          id?: string
+          last_output?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          agent_type?: string
+          case_id?: string
+          confidence_score?: number | null
+          created_at?: string
+          error_message?: string | null
+          hallucination_risk?: boolean
+          id?: string
+          last_output?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_states_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_assignments: {
         Row: {
           assigned_at: string
