@@ -407,6 +407,10 @@ export default function CaseRoom() {
             )}
           </Card>
         </TabsContent>
+
+        <TabsContent value="experts">
+          <PartyExpertApproval caseId={caseId!} partyId={myParty!.id} />
+        </TabsContent>
       </Tabs>
     );
   }
