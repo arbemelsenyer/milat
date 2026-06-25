@@ -17,6 +17,7 @@ import {
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
 import { OfficialDocsPanel } from "@/components/mediation/OfficialDocsPanel";
+import { downloadOfficialPdf } from "@/lib/pdfTemplates";
 import { Input } from "@/components/ui/input";
 
 interface CaseRow {
