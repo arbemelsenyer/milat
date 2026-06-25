@@ -16,8 +16,10 @@ import { ConflictCards, type ConflictCard } from "@/components/mediation/Conflic
 import { DiscoveryInterview } from "@/components/mediation/DiscoveryInterview";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { AgreementStreaming } from "@/components/mediation/AgreementStreaming";
+import { ExpertSelector, type Expert } from "@/components/mediation/ExpertSelector";
+import { OfficialDocsPanel } from "@/components/mediation/OfficialDocsPanel";
 import { maskText } from "@/lib/masking";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Loader2, ShieldCheck, Scale, TrendingUp } from "lucide-react";
 
 const NICHES = [
   "İşçi-İşveren",
@@ -58,10 +60,11 @@ const STEPS = [
   { key: "intake", label: "Başvuru" },
   { key: "mediator", label: "Arabulucu Seçimi" },
   { key: "documents", label: "Belge Analizi" },
+  { key: "expert", label: "Bilirkişi" },
   { key: "discovery", label: "İhtiyaç Tespiti" },
   { key: "sessions", label: "Görüşme Planlaması" },
   { key: "negotiation", label: "Müzakere" },
-  { key: "closure", label: "Kapanış" },
+  { key: "closure", label: "Anlaşma & Belgeler" },
 ];
 
 async function callMediationAi(action: string, payload: Record<string, unknown>) {
