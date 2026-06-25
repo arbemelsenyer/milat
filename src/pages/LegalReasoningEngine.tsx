@@ -99,7 +99,11 @@ Taraflarin gercek ihtiyaclarini ortaya cikaracak 5 soru uret.`);
       const sp = JSON.parse(sorularText.replace(/```json|```/g,'').trim());
       setSorular((sp.sorular||[]).map((s:string,i:number)=>({id:i+1,soru:s,cevap:''})));
       setAsama('sorular');
-    } catch(e){console.error(e);}
+    } catch(e: any){
+      console.error(e);
+      toast({ title: 'Analiz hatası', description: e?.message || 'Bilinmeyen hata', variant: 'destructive' });
+      setAsama('maskeleme');
+    }
     setLoading(false);
   }
 
