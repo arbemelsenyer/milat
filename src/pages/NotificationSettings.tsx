@@ -63,7 +63,7 @@ export default function NotificationSettings() {
     })();
   }, [user]);
 
-  if (loading) return null;
+  if (isLoading) return null;
   if (!user) return <Navigate to="/auth" replace />;
 
   const save = async () => {
