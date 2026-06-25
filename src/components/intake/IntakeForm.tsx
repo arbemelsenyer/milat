@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { IntakeFormData, initialFormData } from '@/types/intake';
+import { IntakeFormData, IntakePartyDetails, initialFormData } from '@/types/intake';
 import { supabase } from '@/integrations/supabase/client';
 import { StepIndicator } from './StepIndicator';
 import {
@@ -151,7 +151,7 @@ export function IntakeForm() {
         }
         return true;
       case 1:
-        if (!formData.yourName.trim() || !formData.otherPartyName.trim()) {
+        if (!getIntakePartyDisplayName(getPrimaryParty(formData)).trim() || !getIntakePartyDisplayName(getRespondentParty(formData)).trim()) {
           toast({
             title: t('toast.provideNames'),
             description: t('toast.provideNamesDesc'),
@@ -222,7 +222,12 @@ export function IntakeForm() {
       
       if (user && caseId) {
         // Save case with submitted status, title and category
-        const title = `${formData.yourName} vs ${formData.otherPartyName}`;
+        const primaryParty = getPrimaryParty(formData);
+        const respondentParty = getRespondentParty(formData);
+        const allParties = [primaryParty, respondentParty, ...(formData.additionalParties ?? [])];
+        const primaryName = getIntakePartyDisplayName(primaryParty);
+        const respondentName = getIntakePartyDisplayName(respondentParty);
+        const title = `${primaryName} vs ${respondentName}`;
         const category = formData.disputeType || 'other';
         
         await supabase.from('cases').update({
@@ -235,21 +240,12 @@ export function IntakeForm() {
         // Also save form fields
         await saveCase(caseId, formData);
 
-        // Insert claimant party
-        await supabase.from('case_parties').insert({
-          case_id: caseId,
-          user_id: user.id,
-          role: 'claimant' as const,
-          full_name: formData.yourName,
-        });
-
-        // Insert respondent party
-        await supabase.from('case_parties').insert({
-          case_id: caseId,
-          role: 'respondent' as const,
-          full_name: formData.otherPartyName,
-          user_id: null,
-        });
+        await supabase.from('case_parties').delete().eq('case_id', caseId);
+        await supabase.from('case_parties').insert(
+          allParties.map((party, index) =>
+            intakePartyToRow(caseId, index === 0 ? user.id : null, index, party),
+          ) as any,
+        );
 
         // Create notification for creator
         await supabase.rpc('create_notification', {
@@ -275,8 +271,8 @@ export function IntakeForm() {
         intake: {
           disputeType: formData.disputeType as CaseFile['intake']['disputeType'],
           parties: {
-            selfName: formData.yourName,
-            otherName: formData.otherPartyName,
+            selfName: getIntakePartyDisplayName(getPrimaryParty(formData)),
+            otherName: getIntakePartyDisplayName(getRespondentParty(formData)),
             relationship: formData.relationship,
           },
           narrative: formData.issueDescription,
@@ -534,4 +530,69 @@ export function IntakeForm() {
       <IntakeChat />
     </div>
   );
+}
+
+function getPrimaryParty(formData: IntakeFormData): IntakePartyDetails {
+  return {
+    name: formData.yourName,
+    role: formData.yourRole,
+    firstName: formData.yourFirstName,
+    lastName: formData.yourLastName,
+    companyTitle: formData.yourCompanyTitle,
+    taxOffice: formData.yourTaxOffice,
+    taxNumber: formData.yourTaxNumber,
+    address: formData.yourAddress,
+    contactInfo: formData.yourContactInfo,
+    phone: formData.yourPhone,
+    email: formData.yourEmail,
+  };
+}
+
+function getRespondentParty(formData: IntakeFormData): IntakePartyDetails {
+  return {
+    name: formData.otherPartyName,
+    role: formData.otherPartyRole,
+    firstName: formData.otherPartyFirstName,
+    lastName: formData.otherPartyLastName,
+    companyTitle: formData.otherPartyCompanyTitle,
+    taxOffice: formData.otherPartyTaxOffice,
+    taxNumber: formData.otherPartyTaxNumber,
+    address: formData.otherPartyAddress,
+    contactInfo: formData.otherPartyContactInfo,
+    phone: formData.otherPartyPhone,
+    email: formData.otherPartyEmail,
+  };
+}
+
+function getIntakePartyDisplayName(party: IntakePartyDetails): string {
+  return (
+    party.name ||
+    [party.firstName, party.lastName].filter(Boolean).join(' ') ||
+    party.companyTitle ||
+    ''
+  ).trim();
+}
+
+function intakePartyToRow(caseId: string, userId: string | null, index: number, party: IntakePartyDetails) {
+  const isIndividual = party.role !== 'business';
+  const fullName = getIntakePartyDisplayName(party);
+
+  return {
+    case_id: caseId,
+    user_id: userId,
+    role: index === 0 ? 'claimant' : index === 1 ? 'respondent' : `party_${index + 1}`,
+    party_type: party.role === 'business' ? 'corporate' : 'individual',
+    is_individual: isIndividual,
+    full_name: fullName || null,
+    first_name: party.firstName || null,
+    last_name: party.lastName || null,
+    company_name: party.companyTitle || null,
+    organization: party.companyTitle || null,
+    tax_office: party.taxOffice || null,
+    tax_number: party.taxNumber || null,
+    address: party.address || null,
+    contact_info: party.contactInfo || null,
+    phone: party.phone || null,
+    email: party.email || null,
+  };
 }

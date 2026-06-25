@@ -191,12 +191,15 @@ export type Database = {
           birth_date: string | null
           case_id: string
           company_name: string | null
+          contact_info: string | null
           created_at: string
           email: string | null
+          first_name: string | null
           full_name: string | null
           gsm: string | null
           id: string
           is_individual: boolean
+          last_name: string | null
           organization: string | null
           party_type: string
           phone: string | null
@@ -213,12 +216,15 @@ export type Database = {
           birth_date?: string | null
           case_id: string
           company_name?: string | null
+          contact_info?: string | null
           created_at?: string
           email?: string | null
+          first_name?: string | null
           full_name?: string | null
           gsm?: string | null
           id?: string
           is_individual?: boolean
+          last_name?: string | null
           organization?: string | null
           party_type?: string
           phone?: string | null
@@ -235,12 +241,15 @@ export type Database = {
           birth_date?: string | null
           case_id?: string
           company_name?: string | null
+          contact_info?: string | null
           created_at?: string
           email?: string | null
+          first_name?: string | null
           full_name?: string | null
           gsm?: string | null
           id?: string
           is_individual?: boolean
+          last_name?: string | null
           organization?: string | null
           party_type?: string
           phone?: string | null

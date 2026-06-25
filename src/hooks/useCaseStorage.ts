@@ -33,9 +33,19 @@ export function useCaseStorage() {
   const formDataToCaseData = (formData: IntakeFormData): Partial<CaseData> => ({
     dispute_type: formData.disputeType || null,
     dispute_type_other: formData.disputeTypeOther || null,
-    your_name: formData.yourName || null,
+    your_name: getPartyDisplayName({
+      name: formData.yourName,
+      firstName: formData.yourFirstName,
+      lastName: formData.yourLastName,
+      companyTitle: formData.yourCompanyTitle,
+    }) || null,
     your_role: formData.yourRole || null,
-    other_party_name: formData.otherPartyName || null,
+    other_party_name: getPartyDisplayName({
+      name: formData.otherPartyName,
+      firstName: formData.otherPartyFirstName,
+      lastName: formData.otherPartyLastName,
+      companyTitle: formData.otherPartyCompanyTitle,
+    }) || null,
     other_party_role: formData.otherPartyRole || null,
     relationship: formData.relationship || null,
     issue_description: formData.issueDescription || null,
@@ -186,4 +196,13 @@ export function useCaseStorage() {
     saveSummary,
     submitMediatorRequest,
   };
+}
+
+function getPartyDisplayName(party: { name?: string; firstName?: string; lastName?: string; companyTitle?: string }) {
+  return (
+    party.name ||
+    [party.firstName, party.lastName].filter(Boolean).join(' ') ||
+    party.companyTitle ||
+    ''
+  ).trim();
 }

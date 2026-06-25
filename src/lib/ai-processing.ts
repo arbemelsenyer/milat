@@ -27,8 +27,8 @@ export function generateCaseSummary(data: IntakeFormData): CaseSummary {
     createdAt: new Date(),
     disputeType: disputeTypeLabels[data.disputeType] || 'Dispute',
     parties: {
-      initiator: data.yourName || 'Initiating Party',
-      respondent: data.otherPartyName || 'Other Party',
+      initiator: getPartyDisplayName(data.yourName, data.yourFirstName, data.yourLastName, data.yourCompanyTitle) || 'Initiating Party',
+      respondent: getPartyDisplayName(data.otherPartyName, data.otherPartyFirstName, data.otherPartyLastName, data.otherPartyCompanyTitle) || 'Other Party',
     },
     coreThemes,
     neutralSummary,
@@ -65,8 +65,8 @@ function extractThemes(description: string, outcome: string): string[] {
 }
 
 function generateNeutralSummary(data: IntakeFormData): string {
-  const initiator = data.yourName || 'The initiating party';
-  const respondent = data.otherPartyName || 'the other party';
+  const initiator = getPartyDisplayName(data.yourName, data.yourFirstName, data.yourLastName, data.yourCompanyTitle) || 'The initiating party';
+  const respondent = getPartyDisplayName(data.otherPartyName, data.otherPartyFirstName, data.otherPartyLastName, data.otherPartyCompanyTitle) || 'the other party';
   const relationship = data.relationship || 'a professional relationship';
 
   let summary = `${initiator} and ${respondent} share ${relationship}. `;
@@ -84,6 +84,10 @@ function generateNeutralSummary(data: IntakeFormData): string {
   summary += `Both parties appear interested in finding a constructive path forward.`;
 
   return summary;
+}
+
+function getPartyDisplayName(name?: string, firstName?: string, lastName?: string, companyTitle?: string) {
+  return (name || [firstName, lastName].filter(Boolean).join(' ') || companyTitle || '').trim();
 }
 
 function neutralizeLanguage(text: string): string {
