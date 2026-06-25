@@ -36,12 +36,7 @@ const DOSYA_TURLERI = [
   "İhtiyari Arabuluculuk",
 ];
 
-const MAX_PARTIES = 5;
-const MIN_PARTIES = 2;
-
 function partyLabel(i: number) {
-  if (i === 0) return "Başvuran";
-  if (i === 1) return "Karşı Taraf";
   return `Taraf ${i + 1}`;
 }
 
@@ -86,13 +81,12 @@ export default function MediationEngine() {
   const [uyapNo, setUyapNo] = useState("");
   const [dosyaTuru, setDosyaTuru] = useState(DOSYA_TURLERI[0]);
   const basvuruTarihi = new Date().toLocaleDateString("tr-TR");
-  const [parties, setParties] = useState<Party[]>([emptyParty(), emptyParty()]);
+  const [parties, setParties] = useState<Party[]>([emptyParty()]);
   const updateParty = (i: number, p: Party) =>
     setParties((prev) => prev.map((x, idx) => (idx === i ? p : x)));
-  const addParty = () =>
-    setParties((prev) => (prev.length < MAX_PARTIES ? [...prev, emptyParty()] : prev));
+  const addParty = () => setParties((prev) => [...prev, emptyParty()]);
   const removeParty = (i: number) =>
-    setParties((prev) => (prev.length > MIN_PARTIES ? prev.filter((_, idx) => idx !== i) : prev));
+    setParties((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));
   const [dispute, setDispute] = useState("");
   const [caseId, setCaseId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
