@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { NotificationBell } from '@/components/NotificationBell';
-import { MessageCircle, LogOut, Shield, LayoutDashboard } from 'lucide-react';
+import { MessageCircle, LogOut, Shield, LayoutDashboard, Bell, ShieldCheck } from 'lucide-react';
 
 export function AppNavbar() {
   const navigate = useNavigate();
