@@ -121,7 +121,11 @@ Cevaplar: ${cevaplar}
 
 Kapsamli cozum raporu uret.`);
       setRapor(JSON.parse(raporText.replace(/```json|```/g,'').trim()));
-    } catch(e){console.error(e);}
+    } catch(e: any){
+      console.error(e);
+      toast({ title: 'Rapor hatası', description: e?.message || 'Bilinmeyen hata', variant: 'destructive' });
+      setAsama('sorular');
+    }
     setLoading(false);
   }
 
