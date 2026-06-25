@@ -203,7 +203,6 @@ export default function CaseRoom() {
           <TabsTrigger value="rounds"><Repeat className="h-4 w-4 mr-1" />Müzakere Turları</TabsTrigger>
           <TabsTrigger value="agreement"><FileSignature className="h-4 w-4 mr-1" />Anlaşma</TabsTrigger>
         </TabsList>
-        </TabsList>
 
         <TabsContent value="parties">
           <Card className="p-5 space-y-3">
