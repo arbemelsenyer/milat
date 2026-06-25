@@ -23,16 +23,30 @@ const NICHES = [
   "İşçi-İşveren",
   "Ticari",
   "Tüketici",
-  "Sağlık Hukuku Uyuşmazlıkları",
-  "Sigorta Uyuşmazlıkları",
+  "Sağlık Hukuku",
+  "Sigorta",
   "İnşaat",
-  "Fikri ve Sınai Mülkiyet",
+  "Fikri Sınai Mülkiyet",
 ];
 
 const DOSYA_TURLERI = [
   "Dava Şartı Arabuluculuk",
   "İhtiyari Arabuluculuk",
 ];
+
+const MAX_PARTIES = 5;
+const MIN_PARTIES = 2;
+
+function partyLabel(i: number) {
+  if (i === 0) return "Başvuran";
+  if (i === 1) return "Karşı Taraf";
+  return `Taraf ${i + 1}`;
+}
+
+function partyDisplayName(p: Party, i: number) {
+  if (p.partyType === "individual") return `${p.firstName} ${p.lastName}`.trim() || partyLabel(i);
+  return p.companyName || partyLabel(i);
+}
 
 function generateBasvuruNo() {
   const year = new Date().getFullYear();
