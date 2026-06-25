@@ -18,6 +18,7 @@ export type Party = {
   authorizedPerson: string;
   // shared
   address: string;
+  gsm: string;
   phone: string;
   email: string;
 };
@@ -34,6 +35,7 @@ export const emptyParty = (): Party => ({
   tradeRegistryNo: "",
   authorizedPerson: "",
   address: "",
+  gsm: "",
   phone: "",
   email: "",
 });
