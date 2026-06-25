@@ -3,13 +3,15 @@ import { FormField } from '../FormField';
 import { SelectableCard } from '../SelectableCard';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { User, Building2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { User, Building2, Plus, X } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Step2Props {
   data: IntakeFormData;
   onChange: (updates: Partial<IntakeFormData>) => void;
 }
+
 
 export function Step2Parties({ data, onChange }: Step2Props) {
   const { t } = useLanguage();
