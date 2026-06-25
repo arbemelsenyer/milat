@@ -191,6 +191,7 @@ export type Database = {
           birth_date: string | null
           case_id: string
           company_name: string | null
+          contact_info: string | null
           created_at: string
           email: string | null
           full_name: string | null
@@ -213,6 +214,7 @@ export type Database = {
           birth_date?: string | null
           case_id: string
           company_name?: string | null
+          contact_info?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
@@ -235,6 +237,7 @@ export type Database = {
           birth_date?: string | null
           case_id?: string
           company_name?: string | null
+          contact_info?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
