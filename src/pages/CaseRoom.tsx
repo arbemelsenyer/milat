@@ -142,7 +142,7 @@ export default function CaseRoom() {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
   }
   if (!caseRow) {
-    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Dava bulunamadı.</div>;
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Başvuru bulunamadı.</div>;
   }
   if (!isMediator && !isParty) {
     return (
@@ -150,7 +150,7 @@ export default function CaseRoom() {
         <AppNavbar />
         <div className="container mx-auto py-12 text-center">
           <Lock className="h-12 w-12 mx-auto text-muted-foreground" />
-          <p className="mt-4 text-muted-foreground">Bu davaya erişim yetkiniz yok.</p>
+          <p className="mt-4 text-muted-foreground">Bu başvuruya erişim yetkiniz yok.</p>
         </div>
       </div>
     );
@@ -701,7 +701,7 @@ function AgreementTab({ caseRow, parties, onChanged }: { caseRow: any; parties: 
     }
     setSaving(false);
     if (error) { toast({ title: "Hata", description: error.message, variant: "destructive" }); return; }
-    toast({ title: status === "agreement" ? "Anlaşma kaydedildi" : "Dava sonlandırıldı" });
+    toast({ title: status === "agreement" ? "Anlaşma kaydedildi" : "Başvuru sonlandırıldı" });
     onChanged();
   };
 

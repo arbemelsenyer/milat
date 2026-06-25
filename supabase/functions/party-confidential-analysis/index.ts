@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
 
     const systemPrompt = `Sen bir Türk hukuk arabuluculuk uzmanı AI'sın. SADECE bu tarafın perspektifinden GİZLİ bir analiz hazırlıyorsun. Diğer taraf bunu ASLA göremeyecek. Çıktı JSON: {"strengths":[],"weaknesses":[],"risks":[],"opportunities":[],"precedents":[{"court":"","decision":"","relevance":""}],"discovery_questions":[{"id":1,"question":""}]} — tam 5 ihtiyaç tespiti sorusu üret.`;
 
-    const userPrompt = `DAVA TÜRÜ: ${caseRow?.dispute_type ?? ""} / ${caseRow?.dispute_subtype ?? ""}
+    const userPrompt = `UYUŞMAZLIK TÜRÜ: ${caseRow?.dispute_type ?? ""} / ${caseRow?.dispute_subtype ?? ""}
 TARAF: ${partyName} (rol: ${party.party_role ?? "?"})
 UYUŞMAZLIK ÖZETİ: ${caseRow?.issue_description ?? "(belirtilmemiş)"}
 YÜKLENEN BELGELER: ${(docs ?? []).map((d) => `- ${d.file_name}`).join("\n") || "(belge yok)"}

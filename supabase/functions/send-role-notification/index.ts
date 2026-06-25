@@ -184,11 +184,11 @@ serve(async (req) => {
                 <p>${role === "mediator" 
                   ? (isEnglish 
                       ? "As a Mediator, you can now view and manage assigned mediation cases, schedule sessions, and help parties resolve their disputes."
-                      : "Arabulucu olarak artık atanan davaları görüntüleyebilir, oturumlar planlayabilir ve tarafların uyuşmazlıklarını çözmelerine yardımcı olabilirsiniz.")
+                      : "Arabulucu olarak artık atanan başvuruları görüntüleyebilir, oturumlar planlayabilir ve tarafların uyuşmazlıklarını çözmelerine yardımcı olabilirsiniz.")
                   : role === "admin"
                     ? (isEnglish
                         ? "As an Admin, you have full access to manage users, assign mediators to cases, and oversee the platform."
-                        : "Yönetici olarak kullanıcıları yönetme, arabulucuları davalara atama ve platformu denetleme konularında tam erişiminiz var.")
+                        : "Yönetici olarak kullanıcıları yönetme, arabulucuları başvurulara atama ve platformu denetleme konularında tam erişiminiz var.")
                     : (isEnglish
                         ? "You can now access all standard user features."
                         : "Artık tüm standart kullanıcı özelliklerine erişebilirsiniz.")}</p>

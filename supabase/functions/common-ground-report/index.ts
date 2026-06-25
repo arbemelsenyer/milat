@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
 
     const systemPrompt = `Sen bir kıdemli arabulucu danışmansın. Birden fazla tarafın GİZLİ analizlerini okuyup ortak zemin raporu ve strateji üretiyorsun. Çıktın SADECE arabulucu görecek. JSON: {"common_interests":[],"high_potential_areas":[],"red_lines":[],"recommended_strategy":"","caucus_plan":[],"opening_offer":"","fallback_options":[]}`;
 
-    const userPrompt = `DAVA: ${caseRow.dispute_type} / ${caseRow.dispute_subtype}
+    const userPrompt = `BAŞVURU: ${caseRow.dispute_type} / ${caseRow.dispute_subtype}
 ÖZET: ${caseRow.issue_description}
 
 TARAF ANALİZLERİ:

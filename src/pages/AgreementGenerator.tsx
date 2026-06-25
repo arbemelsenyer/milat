@@ -135,7 +135,7 @@ export default function AgreementGenerator() {
             </div>
           )}
           <div>
-            <label className="text-sm font-medium block mb-1">{t('Dava ID (isteğe bağlı)', 'Case ID (optional)')}</label>
+            <label className="text-sm font-medium block mb-1">{t('Başvuru ID (isteğe bağlı)', 'Case ID (optional)')}</label>
             <input value={caseId} onChange={e => setCaseId(e.target.value)} className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background" />
           </div>
         </div>

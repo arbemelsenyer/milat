@@ -287,7 +287,7 @@ export default function AuthPage() {
                 <p className="mt-2 text-muted-foreground">
                   {activeTab === 'login'
                     ? language === 'tr'
-                      ? 'Davalarınıza ve panelinize erişmek için giriş yapın.'
+                      ? 'Başvurularınıza ve panelinize erişmek için giriş yapın.'
                       : 'Sign in to access your cases and dashboard.'
                     : language === 'tr'
                     ? 'Saniyeler içinde başlayın. Kredi kartı gerekmez.'

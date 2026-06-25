@@ -221,7 +221,7 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 mt-6">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">{language === 'tr' ? 'Toplam Dava' : 'Total Cases'}</CardTitle>
+              <CardTitle className="text-sm text-muted-foreground">{language === 'tr' ? 'Toplam Başvuru' : 'Total Cases'}</CardTitle>
             </CardHeader>
             <CardContent><div className="text-2xl font-bold">{cases.length}</div></CardContent>
           </Card>
@@ -243,7 +243,7 @@ export default function AdminDashboard() {
           <TabsList>
             <TabsTrigger value="cases" className="gap-2">
               <Calendar className="w-4 h-4" />
-              {language === 'tr' ? 'Davalar' : 'Cases'}
+              {language === 'tr' ? 'Başvurular' : 'Cases'}
             </TabsTrigger>
             <TabsTrigger value="users" className="gap-2">
               <UserCog className="w-4 h-4" />
@@ -255,7 +255,7 @@ export default function AdminDashboard() {
             {isLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
             ) : cases.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">{language === 'tr' ? 'Dava bulunamadı' : 'No cases found'}</p>
+              <p className="text-muted-foreground text-center py-8">{language === 'tr' ? 'Başvuru bulunamadı' : 'No cases found'}</p>
             ) : (
               cases.map(c => (
                 <Card key={c.id}>
@@ -300,7 +300,7 @@ export default function AdminDashboard() {
                           <DialogContent>
                             <DialogHeader>
                               <DialogTitle>{language === 'tr' ? 'Arabulucu Ata' : 'Assign Mediator'}</DialogTitle>
-                              <DialogDescription>{language === 'tr' ? 'Bu dava için bir arabulucu seçin' : 'Select a mediator for this case'}</DialogDescription>
+                              <DialogDescription>{language === 'tr' ? 'Bu başvuru için bir arabulucu seçin' : 'Select a mediator for this case'}</DialogDescription>
                             </DialogHeader>
                             <Select value={selectedMediatorId} onValueChange={setSelectedMediatorId}>
                               <SelectTrigger><SelectValue placeholder={language === 'tr' ? 'Arabulucu seçin' : 'Select mediator'} /></SelectTrigger>

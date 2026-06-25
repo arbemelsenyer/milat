@@ -191,7 +191,7 @@ export default function CaseDetail() {
   const caseContext = useMemo(() => {
     if (!c) return "";
     const lines = [
-      `Dava ID: ${c.id}`,
+      `Başvuru ID: ${c.id}`,
       `Başlık: ${c.title ?? ""}`,
       `Niş: ${c.category ?? c.dispute_type ?? ""}`,
       `Durum: ${c.status}`,
@@ -214,7 +214,7 @@ export default function CaseDetail() {
       <div className="min-h-screen bg-background">
         <AppNavbar />
         <div className="container max-w-3xl py-16 text-center">
-          <p className="text-muted-foreground">{language === "tr" ? "Dava bulunamadı." : "Case not found."}</p>
+          <p className="text-muted-foreground">{language === "tr" ? "Başvuru bulunamadı." : "Case not found."}</p>
           <Button variant="ghost" asChild className="mt-4">
             <Link to="/dashboard">
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -229,7 +229,7 @@ export default function CaseDetail() {
   return (
     <div className="min-h-screen bg-background">
       <Helmet>
-        <title>{c.title ?? "Dava"} | MediPact AI</title>
+        <title>{c.title ?? "Başvuru"} | MediPact AI</title>
         <meta name="robots" content="noindex" />
       </Helmet>
       <AppNavbar />
@@ -307,7 +307,7 @@ export default function CaseDetail() {
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-primary" />
-                      {language === "tr" ? "Dava Kronolojisi" : "Case Chronology"}
+                      {language === "tr" ? "Başvuru Kronolojisi" : "Case Chronology"}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -419,7 +419,7 @@ export default function CaseDetail() {
                   <CardHeader className="pb-3 border-b">
                     <CardTitle className="text-base flex items-center gap-2">
                       <MessageSquare className="w-4 h-4 text-primary" />
-                      {language === "tr" ? "Dava Mesajları" : "Case Messages"}
+                      {language === "tr" ? "Başvuru Mesajları" : "Case Messages"}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="flex-1 overflow-y-auto py-4 space-y-2.5">
@@ -505,7 +505,7 @@ export default function CaseDetail() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Scale className="w-4 h-4 text-primary" />
-                  {language === "tr" ? "Dava Özeti" : "Case Summary"}
+                  {language === "tr" ? "Uyuşmazlık Özeti" : "Case Summary"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground leading-relaxed">

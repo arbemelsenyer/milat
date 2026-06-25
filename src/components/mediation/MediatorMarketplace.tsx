@@ -103,7 +103,7 @@ export function MediatorMarketplace({ niche, onSelect }: Props) {
                   <div className="flex items-center gap-1 text-sm text-amber-600">
                     <Star className="h-3.5 w-3.5 fill-current" />
                     <span>{Number(m.rating).toFixed(1)}</span>
-                    <span className="text-muted-foreground">· {m.total_cases} dava</span>
+                    <span className="text-muted-foreground">· {m.total_cases} başvuru</span>
                   </div>
                 </div>
               </div>
