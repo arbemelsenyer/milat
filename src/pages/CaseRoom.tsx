@@ -324,6 +324,8 @@ export default function CaseRoom() {
             caseId={caseId!}
             niche={caseRow?.dispute_type ?? ""}
             context={caseRow?.issue_description ?? caseRow?.title ?? ""}
+            parties={parties}
+            mediatorId={caseRow?.assigned_mediator_id}
           />
         </TabsContent>
 
