@@ -761,6 +761,24 @@ function AgreementTab({ caseRow, parties, onChanged }: { caseRow: any; parties: 
             <X className="h-4 w-4 mr-1" /> Anlaşmama ile Sonlandır
           </Button>
         </div>
+        <div className="border-t pt-3">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              const ids: any[] = ["basvuru", "ilk-toplanti", "anlasma-tutanak", "anlasma-belgesi", "ucret-tarifesi"];
+              ids.forEach((id) => {
+                try { downloadOfficialPdf(id, docData); }
+                catch (e: any) { toast({ title: "Hata", description: e.message, variant: "destructive" }); }
+              });
+              toast({ title: "5 belgelik anlaşma paketi indirildi" });
+            }}
+          >
+            <FileSignature className="h-4 w-4 mr-1" /> 5 Belgelik Anlaşma Paketini İndir
+          </Button>
+          <p className="text-xs text-muted-foreground mt-1">
+            Başvuru · İlk Toplantı · Son Tutanak · Anlaşma Belgesi · Ücret Tarifesi
+          </p>
+        </div>
       </Card>
       <OfficialDocsPanel data={docData} />
     </div>
