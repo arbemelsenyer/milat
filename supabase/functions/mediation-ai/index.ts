@@ -221,6 +221,44 @@ serve(async (req) => {
       });
     }
 
+    if (action === "session_suggest") {
+      // Suggest agenda + next meeting time given case context and prior sessions
+      const niche = String(body.niche ?? "");
+      const ctx = serverMask(String(body.context ?? "")).slice(0, 12000);
+      const prior = String(body.priorSessions ?? "").slice(0, 4000);
+      const result = await jsonAi(
+        PRO,
+        "Sen kıdemli bir Türk arabulucusun. 6325 sayılı Kanun çerçevesinde toplantı planlaması yaparsın.",
+        `Niş: ${niche}\nBağlam:\n${ctx}\n\nÖnceki seanslar:\n${prior || "(yok)"}\n\nBir sonraki seans için öneri üret. Çıktı: { "sessionType": "preliminary"|"main"|"private", "suggestedDateOffsetDays": number, "durationMinutes": number, "agenda": string[], "preparationNotes": string[], "rationale": string } Türkçe.`,
+      );
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "precedent_compare") {
+      // Compare current case text against past anonymized cases in same niche.
+      const niche = String(body.niche ?? "");
+      const current = serverMask(String(body.text ?? "")).slice(0, 12000);
+      const { data: pool } = await supabase
+        .from("cases_vector_pool")
+        .select("anonymized_text, niche_area")
+        .eq("niche_area", niche)
+        .limit(20);
+      const past = (pool ?? [])
+        .map((p: any, i: number) => `--- Emsal ${i + 1} ---\n${String(p.anonymized_text ?? "").slice(0, 1500)}`)
+        .join("\n\n")
+        .slice(0, 18000);
+      const result = await jsonAi(
+        PRO,
+        "Sen Türk hukukunda emsal karar analisti bir arabulucusun. Mevcut dava ile geçmiş anonim davaları karşılaştırırsın.",
+        `Niş: ${niche}\nMevcut dava:\n${current}\n\nGeçmiş emsal davalar:\n${past || "(havuz boş)"}\n\nÇıktı: { "similarCases": [{"summary": string, "similarityScore": number, "keyDifferences": string[], "outcomePattern": string}], "overallTrend": string, "recommendation": string } Türkçe, en fazla 4 emsal.`,
+      );
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (action === "chat") {
       // body: { messages: [{role, content}], caseContext?: string, niche?: string }
       const niche = String(body.niche ?? "");
