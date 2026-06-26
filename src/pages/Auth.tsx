@@ -59,7 +59,7 @@ export default function AuthPage() {
   const [showSignupPwd, setShowSignupPwd] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, signIn, signUp } = useAuth();
+  const { user, isLoading: authLoading, isMediator, isAdmin, signIn, signUp } = useAuth();
   const { language } = useLanguage();
 
   const [kvkkRead, setKvkkRead] = useState(false);
@@ -77,9 +77,10 @@ export default function AuthPage() {
   });
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || authLoading) return;
     const params = new URLSearchParams(window.location.search);
     const inviteToken = params.get('invite');
+    const homePath = isMediator || isAdmin ? '/mediator' : '/dashboard';
     if (inviteToken) {
       import('@/integrations/supabase/client').then(({ supabase }) => {
         supabase.functions
@@ -87,18 +88,18 @@ export default function AuthPage() {
           .then(({ data, error }) => {
             if (error) {
               toast({ variant: 'destructive', title: 'Davet kabul edilemedi', description: error.message });
-              navigate('/dashboard');
+              navigate(homePath);
             } else if ((data as any)?.case_id) {
               navigate(`/case-room/${(data as any).case_id}`);
             } else {
-              navigate('/dashboard');
+              navigate(homePath);
             }
           });
       });
     } else {
-      navigate('/dashboard');
+      navigate(homePath);
     }
-  }, [user, navigate, toast]);
+  }, [user, authLoading, isMediator, isAdmin, navigate, toast]);
 
 
   const handleLogin = async (data: LoginFormData) => {
@@ -121,7 +122,6 @@ export default function AuthPage() {
         title: language === 'tr' ? 'Giriş başarılı' : 'Login successful',
         description: language === 'tr' ? 'Hoş geldiniz!' : 'Welcome back!',
       });
-      navigate('/dashboard');
     }
   };
 
@@ -150,7 +150,6 @@ export default function AuthPage() {
             ? 'Hesabınız oluşturuldu, giriş yapabilirsiniz.'
             : 'Your account has been created. You can now log in.',
       });
-      navigate('/dashboard');
     }
   };
 

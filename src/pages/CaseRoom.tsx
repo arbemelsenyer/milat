@@ -17,6 +17,7 @@ import {
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
 import { OfficialDocsPanel } from "@/components/mediation/OfficialDocsPanel";
+import { StepTimeline } from "@/components/mediation/StepTimeline";
 import { downloadOfficialPdf } from "@/lib/pdfTemplates";
 import { Input } from "@/components/ui/input";
 
@@ -40,6 +41,17 @@ interface DiscoveryQ {
   id: string; party_id: string | null; question_text: string; answer_text: string | null;
   question_order: number;
 }
+
+const PROCESS_STEPS = [
+  { key: "parties", label: "Taraflar" },
+  { key: "analysis", label: "Gizli Analiz" },
+  { key: "common", label: "Ortak Zemin" },
+  { key: "discovery", label: "İhtiyaç" },
+  { key: "sessions", label: "Toplantı" },
+  { key: "experts", label: "Bilirkişi" },
+  { key: "rounds", label: "Turlar" },
+  { key: "agreement", label: "Belgeler" },
+];
 
 export default function CaseRoom() {
   const { id: caseId } = useParams<{ id: string }>();
@@ -184,6 +196,15 @@ export default function CaseRoom() {
           </div>
         </Card>
 
+        <ProcessOverview
+          currentPhase={caseRow.current_phase ?? 1}
+          parties={parties}
+          analyses={analyses}
+          discovery={discovery}
+          docs={docs}
+          commonGround={commonGround}
+        />
+
         {isMediator ? <MediatorView /> : <PartyView />}
       </main>
     </div>
@@ -192,7 +213,7 @@ export default function CaseRoom() {
   // =================== MEDIATOR VIEW ===================
   function MediatorView() {
     return (
-      <Tabs defaultValue="parties">
+      <Tabs defaultValue="analyses">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="parties"><Users className="h-4 w-4 mr-1" />Taraflar</TabsTrigger>
           <TabsTrigger value="documents"><FileText className="h-4 w-4 mr-1" />Belgeler</TabsTrigger>
@@ -283,9 +304,7 @@ export default function CaseRoom() {
               </Button>
             </div>
             {commonGround ? (
-              <pre className="bg-muted/40 p-3 rounded text-xs whitespace-pre-wrap">
-                {JSON.stringify(commonGround.report, null, 2)}
-              </pre>
+              <CommonGroundView report={commonGround.report} />
             ) : (
               <p className="text-sm text-muted-foreground">Henüz rapor yok. İki taraf analizi sonrası üretebilirsiniz.</p>
             )}
@@ -347,7 +366,7 @@ export default function CaseRoom() {
   // =================== PARTY VIEW ===================
   function PartyView() {
     return (
-      <Tabs defaultValue="documents">
+      <Tabs defaultValue="analysis">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="documents"><Upload className="h-4 w-4 mr-1" />Belgelerim</TabsTrigger>
           <TabsTrigger value="analysis"><Brain className="h-4 w-4 mr-1" />Gizli Analizim</TabsTrigger>
@@ -417,6 +436,123 @@ export default function CaseRoom() {
       </Tabs>
     );
   }
+}
+
+function CommonGroundView({ report }: { report: any }) {
+  const sections: Array<[string, any]> = [
+    ["Ortak Menfaatler", report?.common_interests],
+    ["Yüksek Potansiyelli Alanlar", report?.high_potential_areas],
+    ["Kırmızı Çizgiler", report?.red_lines],
+    ["Alternatif Seçenekler", report?.fallback_options],
+  ];
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-4 border-primary/20 bg-primary/[0.04]">
+        <div className="text-xs font-medium text-muted-foreground mb-1">SÜREÇ YÖNETİMİ ÖNERİSİ</div>
+        <p className="text-sm leading-relaxed whitespace-pre-wrap">
+          {report?.recommended_strategy || report?.strategy || "Arabulucu süreç stratejisi henüz oluşmadı."}
+        </p>
+      </Card>
+
+      <div className="grid md:grid-cols-2 gap-3">
+        {sections.map(([title, value]) => (
+          <Card key={title} className="p-4">
+            <h4 className="font-semibold text-sm mb-2">{title}</h4>
+            {Array.isArray(value) && value.length > 0 ? (
+              <ul className="list-disc pl-5 text-sm space-y-1">
+                {value.map((item: any, index: number) => (
+                  <li key={index}>{typeof item === "string" ? item : JSON.stringify(item)}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">—</p>
+            )}
+          </Card>
+        ))}
+      </div>
+
+      {Array.isArray(report?.caucus_plan) && report.caucus_plan.length > 0 && (
+        <Card className="p-4">
+          <h4 className="font-semibold text-sm mb-2">Gizli Görüşme Planı</h4>
+          <ol className="list-decimal pl-5 text-sm space-y-1">
+            {report.caucus_plan.map((item: any, index: number) => (
+              <li key={index}>{typeof item === "string" ? item : JSON.stringify(item)}</li>
+            ))}
+          </ol>
+        </Card>
+      )}
+
+      {report?.opening_offer && (
+        <Card className="p-4">
+          <h4 className="font-semibold text-sm mb-2">Açılış Teklifi / İlk Hamle</h4>
+          <p className="text-sm whitespace-pre-wrap">{report.opening_offer}</p>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function ProcessOverview({
+  currentPhase,
+  parties,
+  analyses,
+  discovery,
+  docs,
+  commonGround,
+}: {
+  currentPhase: number;
+  parties: Party[];
+  analyses: PartyAnalysis[];
+  discovery: DiscoveryQ[];
+  docs: DocRow[];
+  commonGround: any | null;
+}) {
+  const current = Math.max(0, Math.min(PROCESS_STEPS.length - 1, currentPhase - 1));
+  const acceptedParties = parties.filter((p) => p.invite_status === "accepted").length;
+  const answeredQuestions = discovery.filter((q) => !!q.answer_text?.trim()).length;
+  const totalQuestions = discovery.length;
+
+  return (
+    <Card className="p-5 mb-5 space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Arabuluculuk Süreç Yönetimi</h2>
+          <p className="text-sm text-muted-foreground">
+            Gizli taraf analizleri, ortak zemin, ihtiyaç tespiti, toplantı, bilirkişi, müzakere ve belge üretimi tek akışta ilerler.
+          </p>
+        </div>
+        <Badge variant="secondary">Aşama {currentPhase}/8</Badge>
+      </div>
+
+      <StepTimeline steps={PROCESS_STEPS} current={current} />
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-md border p-3">
+          <div className="text-xs text-muted-foreground">Taraf Katılımı</div>
+          <div className="mt-1 text-xl font-semibold">{acceptedParties}/{parties.length}</div>
+        </div>
+        <div className="rounded-md border p-3">
+          <div className="text-xs text-muted-foreground">Gizli Analiz</div>
+          <div className="mt-1 text-xl font-semibold">{analyses.length}/{parties.length}</div>
+        </div>
+        <div className="rounded-md border p-3">
+          <div className="text-xs text-muted-foreground">Belge</div>
+          <div className="mt-1 text-xl font-semibold">{docs.length}</div>
+        </div>
+        <div className="rounded-md border p-3">
+          <div className="text-xs text-muted-foreground">İhtiyaç Cevabı</div>
+          <div className="mt-1 text-xl font-semibold">{answeredQuestions}/{totalQuestions || 0}</div>
+        </div>
+      </div>
+
+      {!commonGround && analyses.length >= 2 && (
+        <div className="rounded-md border border-primary/30 bg-primary/[0.04] p-3 text-sm">
+          İki tarafın gizli analizi hazır. Arabulucu “Ortak Zemin” sekmesinden süreç önerisini üretebilir.
+        </div>
+      )}
+    </Card>
+  );
 }
 
 function AnalysisView({ analysis }: { analysis: any }) {
