@@ -440,6 +440,68 @@ export default function CaseRoom() {
   }
 }
 
+function ProcessOverview({
+  currentPhase,
+  parties,
+  analyses,
+  discovery,
+  docs,
+  commonGround,
+}: {
+  currentPhase: number;
+  parties: Party[];
+  analyses: PartyAnalysis[];
+  discovery: DiscoveryQ[];
+  docs: DocRow[];
+  commonGround: any | null;
+}) {
+  const current = Math.max(0, Math.min(PROCESS_STEPS.length - 1, currentPhase - 1));
+  const acceptedParties = parties.filter((p) => p.invite_status === "accepted").length;
+  const answeredQuestions = discovery.filter((q) => !!q.answer_text?.trim()).length;
+  const totalQuestions = discovery.length;
+
+  return (
+    <Card className="p-5 mb-5 space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Arabuluculuk Süreç Yönetimi</h2>
+          <p className="text-sm text-muted-foreground">
+            Gizli taraf analizleri, ortak zemin, ihtiyaç tespiti, toplantı, bilirkişi, müzakere ve belge üretimi tek akışta ilerler.
+          </p>
+        </div>
+        <Badge variant="secondary">Aşama {currentPhase}/8</Badge>
+      </div>
+
+      <StepTimeline steps={PROCESS_STEPS} current={current} />
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-md border p-3">
+          <div className="text-xs text-muted-foreground">Taraf Katılımı</div>
+          <div className="mt-1 text-xl font-semibold">{acceptedParties}/{parties.length}</div>
+        </div>
+        <div className="rounded-md border p-3">
+          <div className="text-xs text-muted-foreground">Gizli Analiz</div>
+          <div className="mt-1 text-xl font-semibold">{analyses.length}/{parties.length}</div>
+        </div>
+        <div className="rounded-md border p-3">
+          <div className="text-xs text-muted-foreground">Belge</div>
+          <div className="mt-1 text-xl font-semibold">{docs.length}</div>
+        </div>
+        <div className="rounded-md border p-3">
+          <div className="text-xs text-muted-foreground">İhtiyaç Cevabı</div>
+          <div className="mt-1 text-xl font-semibold">{answeredQuestions}/{totalQuestions || 0}</div>
+        </div>
+      </div>
+
+      {!commonGround && analyses.length >= 2 && (
+        <div className="rounded-md border border-primary/30 bg-primary/[0.04] p-3 text-sm">
+          İki tarafın gizli analizi hazır. Arabulucu “Ortak Zemin” sekmesinden süreç önerisini üretebilir.
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function AnalysisView({ analysis }: { analysis: any }) {
   if (!analysis) return null;
   const sections: [string, any][] = [
