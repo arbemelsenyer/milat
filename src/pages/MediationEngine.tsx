@@ -352,7 +352,7 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }
     case 4: return <Phase4Analysis caseRow={caseRow} userId={userId} isMediator={isMediator} onDone={() => { bumpPhase(5); onAdvance(5); }} />;
     case 5: return <Phase5MediatorPanel caseRow={caseRow} isMediator={isMediator} onDone={() => { bumpPhase(6); onAdvance(6); }} />;
     case 6: return <SessionScheduler caseId={caseRow.id} />;
-    case 7: return <ExpertSelector caseId={caseRow.id} disputeType={caseRow.dispute_type || ""} />;
+    case 7: return <Phase7Expert caseRow={caseRow} />;
     case 8: return <Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(9); onAdvance(9); }} />;
     case 9: return <Phase9Closing caseRow={caseRow} />;
     default: return null;
