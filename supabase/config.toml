@@ -44,3 +44,6 @@ verify_jwt = true
 
 [functions.accept-party-invite]
 verify_jwt = true
+
+[functions.send-test-notification]
+verify_jwt = true
