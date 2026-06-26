@@ -38,14 +38,12 @@ export function AppNavbar() {
             </Link>
           </Button>
 
-          {isMediator && (
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/mediator">
-                <Shield className="w-4 h-4 mr-1" />
-                {language === 'tr' ? 'Süreç Yönetimi' : 'Process'}
-              </Link>
-            </Button>
-          )}
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/mediator">
+              <Shield className="w-4 h-4 mr-1" />
+              {language === 'tr' ? 'Süreç Yönetimi' : 'Process'}
+            </Link>
+          </Button>
 
           {isAdmin && (
             <>

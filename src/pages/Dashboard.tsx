@@ -185,9 +185,9 @@ export default function Dashboard() {
               </p>
             </div>
             <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
-              <Link to="/intake">
+              <Link to="/mediator">
                 <Plus className="w-4 h-4 mr-2" />
-                {language === "tr" ? "Yeni Başvuru" : "New Case"}
+                {language === "tr" ? "Yeni Başvuru (UYAP)" : "New Case (UYAP)"}
               </Link>
             </Button>
           </div>
@@ -267,7 +267,7 @@ export default function Dashboard() {
                 {language === "tr" ? "Henüz başvurunuz yok" : "No cases yet"}
               </h3>
               <Button asChild className="mt-4">
-                <Link to="/intake">
+                <Link to="/mediator">
                   <Plus className="w-4 h-4 mr-2" />
                   {language === "tr" ? "Başvuru Oluştur" : "Create Case"}
                 </Link>
