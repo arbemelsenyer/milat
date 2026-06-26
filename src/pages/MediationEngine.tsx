@@ -840,3 +840,27 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
     </Card>
   );
 }
+
+/* ===================== PHASE 7 - EXPERT ===================== */
+
+function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
+  const [selected, setSelected] = useState<string | null>(null);
+  return (
+    <Card className="p-6 space-y-4">
+      <h2 className="text-2xl font-bold text-primary">Aşama 7 — Bilirkişi (Opsiyonel)</h2>
+      <p className="text-sm text-muted-foreground">Uyuşmazlık türü: {caseRow.dispute_type}</p>
+      <ExpertSelector
+        niche={caseRow.dispute_type || ""}
+        selectedId={selected}
+        onSelect={async (e) => {
+          setSelected(e.id);
+          const { error } = await supabase.from("case_expert_assignments").insert({
+            case_id: caseRow.id, expert_id: e.id, status: "pending",
+          } as any);
+          if (error) toast({ title: "Atama hatası", description: trErr(error.message), variant: "destructive" });
+          else toast({ title: "Bilirkişi atandı (taraf onayı bekleniyor)" });
+        }}
+      />
+    </Card>
+  );
+}
