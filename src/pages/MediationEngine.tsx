@@ -796,7 +796,8 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
         : ["Anlaşamama Son Tutanağı"];
       for (const t of templates) {
         await supabase.from("agreement_documents").insert({
-          case_id: caseRow.id, doc_type: t, content: `${t}\n\nBaşvuru No: ${caseRow.application_no}\nTarih: ${new Date().toLocaleDateString("tr-TR")}\nKonu: ${caseRow.title}\nUyuşmazlık: ${caseRow.dispute_type}`,
+          case_id: caseRow.id, doc_type: t,
+          metadata: { content: `${t}\n\nBaşvuru No: ${caseRow.application_no}\nTarih: ${new Date().toLocaleDateString("tr-TR")}\nKonu: ${caseRow.title}\nUyuşmazlık: ${caseRow.dispute_type}` } as any,
         } as any);
       }
       await supabase.from("cases").update({ status: agreed ? "agreed" : "failed", current_phase: 9 } as any).eq("id", caseRow.id);
