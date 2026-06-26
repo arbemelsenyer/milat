@@ -810,7 +810,8 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
   }
 
   function download(d: any) {
-    const blob = new Blob([d.content || ""], { type: "text/plain;charset=utf-8" });
+    const text = d.metadata?.content || d.doc_type;
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `${d.doc_type}.txt`; a.click();
     URL.revokeObjectURL(url);
