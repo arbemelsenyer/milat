@@ -86,7 +86,7 @@ export default function AuthPage() {
     if (!user || authLoading) return;
     const params = new URLSearchParams(window.location.search);
     const inviteToken = params.get('invite');
-    const homePath = getSafeNextPath() ?? (isMediator || isAdmin ? '/mediator' : '/dashboard');
+    const homePath = getSafeNextPath() ?? '/legal-reasoning';
     if (inviteToken) {
       import('@/integrations/supabase/client').then(({ supabase }) => {
         supabase.functions
