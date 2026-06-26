@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Loader2, Bell, Mail } from "lucide-react";
+import { Loader2, Bell, Mail, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/components/ui/use-toast";
@@ -78,6 +78,31 @@ export default function NotificationSettings() {
 
   const toggle = (k: keyof Prefs) => setPrefs((p) => ({ ...p, [k]: !p[k] }));
 
+  const [testing, setTesting] = useState(false);
+  const sendTest = async (channels: { email?: boolean; inapp?: boolean }) => {
+    setTesting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-test-notification", {
+        body: { channels },
+      });
+      if (error) throw error;
+      const r = (data ?? {}) as { email?: { ok: boolean; error?: string }; inapp?: { ok: boolean; error?: string } };
+      const parts: string[] = [];
+      if (r.inapp) parts.push(`Uygulama içi: ${r.inapp.ok ? "✓" : "✗ " + (r.inapp.error ?? "")}`);
+      if (r.email) parts.push(`E-posta: ${r.email.ok ? "✓" : "✗ " + (r.email.error ?? "")}`);
+      const anyFail = (r.inapp && !r.inapp.ok) || (r.email && !r.email.ok);
+      toast({
+        title: anyFail ? "Deneme bildirimi (kısmi başarısız)" : "Deneme bildirimi gönderildi",
+        description: parts.join(" · "),
+        variant: anyFail ? "destructive" : "default",
+      });
+    } catch (e: any) {
+      toast({ title: "Deneme bildirimi başarısız", description: e.message, variant: "destructive" });
+    } finally {
+      setTesting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <AppNavbar />
@@ -106,11 +131,27 @@ export default function NotificationSettings() {
               ))}
             </div>
           )}
-          <Button onClick={save} disabled={busy || !loaded} className="mt-6">
-            {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Kaydet
-          </Button>
+          <div className="flex flex-wrap gap-2 mt-6">
+            <Button onClick={save} disabled={busy || !loaded}>
+              {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Kaydet
+            </Button>
+            <Button type="button" variant="outline" disabled={testing} onClick={() => sendTest({ email: true, inapp: true })}>
+              {testing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+              Deneme bildirimi gönder
+            </Button>
+            <Button type="button" variant="ghost" size="sm" disabled={testing} onClick={() => sendTest({ inapp: true, email: false })}>
+              <Bell className="h-4 w-4 mr-1" /> Sadece uygulama içi
+            </Button>
+            <Button type="button" variant="ghost" size="sm" disabled={testing} onClick={() => sendTest({ email: true, inapp: false })}>
+              <Mail className="h-4 w-4 mr-1" /> Sadece e-posta
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-3">
+            Deneme bildirimi seçili kanallara anlık tek bir test mesajı gönderir; tercihleri değiştirmez.
+          </p>
         </Card>
+
       </main>
     </div>
   );

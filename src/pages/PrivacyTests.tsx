@@ -1,49 +1,30 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { AppNavbar } from "@/components/AppNavbar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ShieldCheck, ShieldAlert, Play } from "lucide-react";
+import { Loader2, ShieldCheck, ShieldAlert, Play, FileDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-
-type Result = {
-  name: string;
-  description: string;
-  status: "pending" | "pass" | "fail";
-  detail?: string;
-};
-
-const TESTS: Array<Omit<Result, "status">> = [
-  {
-    name: "party_analyses gizliliği",
-    description: "Mevcut kullanıcı, kendisine ait olmayan party_analyses satırlarını okuyamaz.",
-  },
-  {
-    name: "case_discovery_questions gizliliği",
-    description: "Diğer tarafa ait keşif sorularına erişim engellenir.",
-  },
-  {
-    name: "common_ground_reports yalnızca arabulucu/yetkili",
-    description: "Karşı taraf, ortak zemin raporlarındaki gizli alanları göremez.",
-  },
-  {
-    name: "case_documents yalnızca yükleyen/yetkili",
-    description: "Karşı tarafa ait belge metaverisi başkası tarafından okunamaz.",
-  },
-  {
-    name: "cases_private_keys yalnızca sistem",
-    description: "Şifreleme anahtarlarına son kullanıcı erişimi tamamen reddedilir.",
-  },
-];
+import { LEAK_QUERIES, countLeaks } from "@/lib/privacyQueries";
+import {
+  generatePrivacyReportPdf,
+  loadLastRun,
+  saveLastRun,
+  type PrivacyResultRow,
+  type PrivacyRun,
+} from "@/lib/privacyReport";
 
 export default function PrivacyTests() {
   const { user, isLoading, isAdmin } = useAuth();
-  const [results, setResults] = useState<Result[]>(
-    TESTS.map((t) => ({ ...t, status: "pending" }))
-  );
+  const [results, setResults] = useState<PrivacyResultRow[]>([]);
   const [running, setRunning] = useState(false);
+  const [lastRun, setLastRun] = useState<PrivacyRun | null>(null);
+
+  useEffect(() => {
+    setLastRun(loadLastRun());
+  }, []);
 
   if (isLoading) return null;
   if (!user) return <Navigate to="/auth" replace />;
@@ -59,87 +40,49 @@ export default function PrivacyTests() {
 
   const run = async () => {
     setRunning(true);
-    const next: Result[] = [];
+    const next: PrivacyResultRow[] = [];
 
-    // 1) party_analyses — try to read rows owned by other users
-    {
+    for (const q of LEAK_QUERIES) {
       const { data, error } = await supabase
-        .from("party_analyses")
-        .select("id, user_id")
-        .neq("user_id", user.id)
+        .from(q.table as any)
+        .select(q.selectColumns)
+        .neq(q.ownerColumn, user.id)
         .limit(5);
-      const rows = data ?? [];
-      const leaked = rows.filter((r: any) => r.user_id && r.user_id !== user.id);
+      const leaks = countLeaks((data ?? []) as any[], q.ownerColumn, user.id);
       next.push({
-        ...TESTS[0],
-        status: leaked.length === 0 && !error ? "pass" : "fail",
+        name: q.name,
+        description: q.description,
+        status: leaks === 0 && !error ? "pass" : "fail",
         detail:
-          leaked.length === 0
-            ? `OK — başka kullanıcının verisine erişim yok (${rows.length} satır döndü, hepsi kendisine ait veya boş).`
-            : `SIZINTI: ${leaked.length} satır görüldü.`,
+          leaks === 0
+            ? `OK — sızıntı yok (${(data ?? []).length} satır döndü, hepsi yetkili).`
+            : `SIZINTI: ${leaks} yetkisiz satır görüldü.`,
       });
     }
 
-    // 2) case_discovery_questions
-    {
-      const { data } = await supabase
-        .from("case_discovery_questions")
-        .select("id, user_id")
-        .neq("user_id", user.id)
-        .limit(5);
-      const leaked = (data ?? []).filter((r: any) => r.user_id && r.user_id !== user.id);
-      next.push({
-        ...TESTS[1],
-        status: leaked.length === 0 ? "pass" : "fail",
-        detail:
-          leaked.length === 0
-            ? "OK — diğer kullanıcıların keşif sorularına erişim yok."
-            : `SIZINTI: ${leaked.length} satır.`,
-      });
-    }
-
-    // 3) common_ground_reports — readable for case mediators/admin only
+    // common_ground_reports — confirm no error / RLS active
     {
       const { data, error } = await supabase
         .from("common_ground_reports")
         .select("id, case_id")
         .limit(5);
-      // Just ensure errors-free and that response is constrained by RLS.
       next.push({
-        ...TESTS[2],
+        name: "common_ground_reports yalnızca arabulucu/yetkili",
+        description: "Karşı taraf, ortak zemin raporlarındaki gizli alanları göremez.",
         status: !error ? "pass" : "fail",
-        detail: error
-          ? error.message
-          : `RLS aktif — yalnızca ${data?.length ?? 0} yetkili satır döndü.`,
+        detail: error ? error.message : `RLS aktif — ${data?.length ?? 0} yetkili satır döndü.`,
       });
     }
 
-    // 4) case_documents — try arbitrary read
-    {
-      const { data } = await supabase
-        .from("case_documents")
-        .select("id, uploaded_by")
-        .neq("uploaded_by", user.id)
-        .limit(5);
-      const leaked = (data ?? []).filter((r: any) => r.uploaded_by && r.uploaded_by !== user.id);
-      next.push({
-        ...TESTS[3],
-        status: leaked.length === 0 ? "pass" : "fail",
-        detail:
-          leaked.length === 0
-            ? "OK — başka kullanıcıların belge metaverisi görünmüyor (case erişimi olmadığı sürece)."
-            : `SIZINTI: ${leaked.length} belge satırı.`,
-      });
-    }
-
-    // 5) cases_private_keys — must always be blocked for end users
+    // cases_private_keys — must be blocked
     {
       const { data, error } = await supabase
         .from("cases_private_keys")
         .select("id")
         .limit(1);
       next.push({
-        ...TESTS[4],
+        name: "cases_private_keys yalnızca sistem",
+        description: "Şifreleme anahtarlarına son kullanıcı erişimi tamamen reddedilir.",
         status: (data ?? []).length === 0 ? "pass" : "fail",
         detail:
           (data ?? []).length === 0
@@ -148,18 +91,31 @@ export default function PrivacyTests() {
       });
     }
 
+    const run: PrivacyRun = {
+      ranAt: new Date().toISOString(),
+      userEmail: user.email ?? null,
+      results: next,
+    };
+    saveLastRun(run);
+    setLastRun(run);
     setResults(next);
     setRunning(false);
   };
 
-  const passed = results.filter((r) => r.status === "pass").length;
-  const failed = results.filter((r) => r.status === "fail").length;
+  const downloadPdf = (run: PrivacyRun) => {
+    const doc = generatePrivacyReportPdf(run);
+    doc.save(`privacy-report-${new Date(run.ranAt).toISOString().slice(0, 10)}.pdf`);
+  };
+
+  const view = results.length > 0 ? results : lastRun?.results ?? [];
+  const passed = view.filter((r) => r.status === "pass").length;
+  const failed = view.filter((r) => r.status === "fail").length;
 
   return (
     <div className="min-h-screen bg-background">
       <AppNavbar />
       <main className="container max-w-4xl py-8 px-4">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
           <div>
             <h1 className="text-2xl font-display font-semibold">Gizlilik Test Paketi</h1>
             <p className="text-sm text-muted-foreground">
@@ -172,15 +128,36 @@ export default function PrivacyTests() {
           </Button>
         </div>
 
+        {lastRun && (
+          <Card className="p-4 mb-4 flex items-center justify-between gap-3 flex-wrap bg-muted/30">
+            <div className="text-sm">
+              <div className="font-medium">En son çalıştırma</div>
+              <div className="text-xs text-muted-foreground">
+                {new Date(lastRun.ranAt).toLocaleString("tr-TR")} ·{" "}
+                {lastRun.results.filter((r) => r.status === "pass").length} geçti,{" "}
+                {lastRun.results.filter((r) => r.status === "fail").length} başarısız
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => downloadPdf(lastRun)}>
+              <FileDown className="h-4 w-4 mr-1" /> Son raporu PDF indir
+            </Button>
+          </Card>
+        )}
+
         <div className="flex gap-3 mb-4">
           <Badge variant="default" className="gap-1"><ShieldCheck className="h-3 w-3" /> Geçti: {passed}</Badge>
           <Badge variant={failed > 0 ? "destructive" : "outline"} className="gap-1">
             <ShieldAlert className="h-3 w-3" /> Başarısız: {failed}
           </Badge>
+          {results.length > 0 && (
+            <Button size="sm" variant="ghost" onClick={() => downloadPdf({ ranAt: new Date().toISOString(), userEmail: user.email ?? null, results })}>
+              <FileDown className="h-4 w-4 mr-1" /> Bu çalıştırmayı indir
+            </Button>
+          )}
         </div>
 
         <div className="space-y-3">
-          {results.map((r, i) => (
+          {view.map((r, i) => (
             <Card key={i} className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -198,6 +175,11 @@ export default function PrivacyTests() {
               </div>
             </Card>
           ))}
+          {view.length === 0 && (
+            <Card className="p-6 text-sm text-muted-foreground">
+              Henüz test çalıştırılmadı. "Testleri Çalıştır" düğmesine basın.
+            </Card>
+          )}
         </div>
       </main>
     </div>

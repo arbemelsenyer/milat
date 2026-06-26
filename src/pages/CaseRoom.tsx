@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Loader2, ShieldCheck, Lock, Sparkles, Upload, FileText, Users, Brain, Lightbulb,
-  Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X, History,
+  Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X, History, Filter, FileDown,
 } from "lucide-react";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
@@ -476,6 +476,10 @@ async function logExpertAction(args: {
 
 function ExpertAuditLog({ caseId, refreshKey }: { caseId: string; refreshKey: number }) {
   const [logs, setLogs] = useState<any[]>([]);
+  const [actionFilter, setActionFilter] = useState<string>("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [personFilter, setPersonFilter] = useState<string>("all");
+
   useEffect(() => {
     (async () => {
       const { data } = await supabase
@@ -483,7 +487,7 @@ function ExpertAuditLog({ caseId, refreshKey }: { caseId: string; refreshKey: nu
         .select("*, experts:expert_id(full_name), profiles:actor_id(full_name, email)")
         .eq("case_id", caseId)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(200);
       setLogs((data ?? []) as any[]);
     })();
   }, [caseId, refreshKey]);
@@ -497,37 +501,125 @@ function ExpertAuditLog({ caseId, refreshKey }: { caseId: string; refreshKey: nu
       status_changed: "Durum güncellendi",
     }[a] ?? a);
 
+  const actions = Array.from(new Set(logs.map((l) => l.action))).sort();
+  const roles = Array.from(new Set(logs.map((l) => l.actor_role).filter(Boolean))).sort();
+  const persons = Array.from(
+    new Map(
+      logs.map((l) => [
+        l.actor_id,
+        l.profiles?.full_name || l.profiles?.email || l.actor_id?.slice(0, 8) || "—",
+      ])
+    ).entries()
+  );
+
+  const filtered = logs.filter((l) => {
+    if (actionFilter !== "all" && l.action !== actionFilter) return false;
+    if (roleFilter !== "all" && l.actor_role !== roleFilter) return false;
+    if (personFilter !== "all" && l.actor_id !== personFilter) return false;
+    return true;
+  });
+
+  const exportCsv = () => {
+    const header = ["created_at", "actor_role", "actor", "action", "expert", "note"];
+    const escape = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = filtered.map((l) => [
+      new Date(l.created_at).toISOString(),
+      l.actor_role ?? "",
+      l.profiles?.full_name || l.profiles?.email || l.actor_id || "",
+      l.action,
+      l.experts?.full_name ?? "",
+      l.details?.note ?? "",
+    ]);
+    const csv = [header, ...rows].map((r) => r.map(escape).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bilirkisi-gunlugu-${caseId.slice(0, 8)}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (logs.length === 0) return null;
   return (
     <Card className="p-5">
-      <div className="flex items-center gap-2 mb-3">
-        <History className="h-4 w-4 text-primary" />
-        <h4 className="font-semibold text-sm">Bilirkişi İşlem Günlüğü</h4>
+      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <History className="h-4 w-4 text-primary" />
+          <h4 className="font-semibold text-sm">Bilirkişi İşlem Günlüğü</h4>
+        </div>
+        <Button size="sm" variant="outline" onClick={exportCsv}>
+          <FileDown className="h-4 w-4 mr-1" /> CSV indir ({filtered.length})
+        </Button>
       </div>
-      <ul className="space-y-2 text-sm">
-        {logs.map((l) => (
-          <li key={l.id} className="flex items-start justify-between gap-3 border-b last:border-0 pb-2">
-            <div>
+
+      <div className="flex flex-wrap gap-2 mb-3 items-center">
+        <Filter className="h-3 w-3 text-muted-foreground" />
+        <select
+          className="h-8 rounded-md border bg-background px-2 text-xs"
+          value={actionFilter}
+          onChange={(e) => setActionFilter(e.target.value)}
+        >
+          <option value="all">Tüm türler</option>
+          {actions.map((a) => (
+            <option key={a} value={a}>{label(a)}</option>
+          ))}
+        </select>
+        <select
+          className="h-8 rounded-md border bg-background px-2 text-xs"
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+        >
+          <option value="all">Tüm roller</option>
+          {roles.map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+        <select
+          className="h-8 rounded-md border bg-background px-2 text-xs"
+          value={personFilter}
+          onChange={(e) => setPersonFilter(e.target.value)}
+        >
+          <option value="all">Tüm kişiler</option>
+          {persons.map(([id, name]) => (
+            <option key={id} value={id}>{name}</option>
+          ))}
+        </select>
+        {(actionFilter !== "all" || roleFilter !== "all" || personFilter !== "all") && (
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setActionFilter("all"); setRoleFilter("all"); setPersonFilter("all"); }}>
+            Filtreleri temizle
+          </Button>
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Filtreyle eşleşen kayıt yok.</p>
+      ) : (
+        <ul className="space-y-2 text-sm">
+          {filtered.map((l) => (
+            <li key={l.id} className="flex items-start justify-between gap-3 border-b last:border-0 pb-2">
               <div>
-                <span className="font-medium">
-                  {l.profiles?.full_name || l.profiles?.email || "Kullanıcı"}
-                </span>{" "}
-                <span className="text-muted-foreground">({l.actor_role})</span>{" "}
-                — {label(l.action)}
-                {l.experts?.full_name && (
-                  <span className="text-muted-foreground"> · {l.experts.full_name}</span>
+                <div>
+                  <span className="font-medium">
+                    {l.profiles?.full_name || l.profiles?.email || "Kullanıcı"}
+                  </span>{" "}
+                  <span className="text-muted-foreground">({l.actor_role})</span>{" "}
+                  — {label(l.action)}
+                  {l.experts?.full_name && (
+                    <span className="text-muted-foreground"> · {l.experts.full_name}</span>
+                  )}
+                </div>
+                {l.details?.note && (
+                  <div className="text-xs text-muted-foreground mt-1">{l.details.note}</div>
                 )}
               </div>
-              {l.details?.note && (
-                <div className="text-xs text-muted-foreground mt-1">{l.details.note}</div>
-              )}
-            </div>
-            <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-              {new Date(l.created_at).toLocaleString("tr-TR")}
-            </span>
-          </li>
-        ))}
-      </ul>
+              <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                {new Date(l.created_at).toLocaleString("tr-TR")}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }

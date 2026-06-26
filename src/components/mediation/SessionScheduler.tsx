@@ -462,8 +462,17 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
               ))}
             </ul>
             {alternatives.length > 0 && (
-              <div>
-                <div className="text-xs text-muted-foreground mt-2 mb-1">Önerilen alternatifler:</div>
+              <div className="space-y-2">
+                <div className="text-xs text-muted-foreground mt-2">
+                  Önerilen alternatifler — takvimde yeşil hücre boş, kırmızı dolu. Bir hücreye tıklayın, form otomatik güncellenir.
+                </div>
+                <AlternativesCalendar
+                  fromDate={date}
+                  alternatives={alternatives}
+                  hasConflict={(iso) => findConflictsFor(iso).length > 0}
+                  selectedIso={composedDateTime ? new Date(composedDateTime).toISOString() : null}
+                  onPick={applyAlternative}
+                />
                 <div className="flex flex-wrap gap-2">
                   {alternatives.map((iso) => (
                     <Button
@@ -520,6 +529,91 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
           })
         )}
       </div>
+    </div>
+  );
+}
+
+// Mini calendar grid showing the next 7 days × QUICK_HOURS slots.
+// Highlights conflicts (red), free alternatives (green), and the active selection.
+function AlternativesCalendar({
+  fromDate,
+  alternatives,
+  hasConflict,
+  selectedIso,
+  onPick,
+}: {
+  fromDate: string;
+  alternatives: string[];
+  hasConflict: (iso: string) => boolean;
+  selectedIso: string | null;
+  onPick: (iso: string) => void;
+}) {
+  const base = fromDate ? new Date(`${fromDate}T00:00:00`) : new Date();
+  const days: { ymd: string; label: string }[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(base);
+    d.setDate(base.getDate() + i);
+    const ymd = d.toISOString().slice(0, 10);
+    days.push({
+      ymd,
+      label: d.toLocaleDateString("tr-TR", { weekday: "short", day: "numeric", month: "short" }),
+    });
+  }
+  const altSet = new Set(alternatives.map((a) => new Date(a).toISOString()));
+  return (
+    <div className="overflow-x-auto rounded-md border bg-background">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b">
+            <th className="p-2 text-left text-muted-foreground font-normal">Saat</th>
+            {days.map((d) => (
+              <th key={d.ymd} className="p-2 text-left text-muted-foreground font-normal whitespace-nowrap">
+                {d.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {QUICK_HOURS.map((h) => (
+            <tr key={h} className="border-b last:border-0">
+              <td className="p-2 text-muted-foreground">{h}</td>
+              {days.map((d) => {
+                const local = `${d.ymd}T${h}`;
+                const iso = new Date(local).toISOString();
+                const conflict = hasConflict(local);
+                const isAlt = altSet.has(iso);
+                const isSel = selectedIso === iso;
+                const cls = isSel
+                  ? "bg-primary text-primary-foreground"
+                  : conflict
+                    ? "bg-destructive/20 text-destructive cursor-not-allowed"
+                    : isAlt
+                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/30"
+                      : "hover:bg-muted/50 text-muted-foreground";
+                return (
+                  <td key={d.ymd} className="p-1">
+                    <button
+                      type="button"
+                      disabled={conflict}
+                      onClick={() => !conflict && onPick(local)}
+                      className={`w-full rounded px-2 py-1 text-[11px] transition ${cls}`}
+                      title={
+                        conflict
+                          ? "Çakışma"
+                          : isAlt
+                            ? "Önerilen alternatif"
+                            : "Boş"
+                      }
+                    >
+                      {conflict ? "●" : isAlt ? "✓" : "·"}
+                    </button>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
