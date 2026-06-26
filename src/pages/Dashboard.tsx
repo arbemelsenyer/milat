@@ -185,7 +185,7 @@ export default function Dashboard() {
               </p>
             </div>
             <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
-              <Link to="/mediator">
+              <Link to="/mediator?new=1">
                 <Plus className="w-4 h-4 mr-2" />
                 {language === "tr" ? "Yeni Başvuru (UYAP)" : "New Case (UYAP)"}
               </Link>
