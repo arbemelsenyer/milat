@@ -32,6 +32,12 @@ import {
   EyeOff,
 } from 'lucide-react';
 
+function getSafeNextPath() {
+  const next = new URLSearchParams(window.location.search).get('next');
+  if (!next || !next.startsWith('/') || next.startsWith('//')) return null;
+  return next;
+}
+
 const loginSchema = z.object({
   email: z.string().email('Geçerli bir e-posta adresi girin'),
   password: z.string().min(6, 'Şifre en az 6 karakter olmalıdır'),
@@ -80,7 +86,7 @@ export default function AuthPage() {
     if (!user || authLoading) return;
     const params = new URLSearchParams(window.location.search);
     const inviteToken = params.get('invite');
-    const homePath = isMediator || isAdmin ? '/mediator' : '/dashboard';
+    const homePath = getSafeNextPath() ?? (isMediator || isAdmin ? '/mediator' : '/dashboard');
     if (inviteToken) {
       import('@/integrations/supabase/client').then(({ supabase }) => {
         supabase.functions

@@ -10,7 +10,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Plus, Loader2, FolderOpen, ShieldCheck } from "lucide-react";
 
 const DISPUTE_TYPES = [
@@ -61,6 +61,7 @@ interface CaseRow {
 export default function MediationEngine() {
   const { user, isLoading, isMediator, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [cases, setCases] = useState<CaseRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -73,8 +74,16 @@ export default function MediationEngine() {
   const [parties, setParties] = useState<PartyDraft[]>([emptyParty("A"), emptyParty("B")]);
 
   useEffect(() => {
-    if (!isLoading && !user) navigate("/auth");
-  }, [isLoading, user, navigate]);
+    if (!isLoading && !user) {
+      navigate(`/auth?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`);
+    }
+  }, [isLoading, user, navigate, location.pathname, location.search]);
+
+  useEffect(() => {
+    if (user && new URLSearchParams(location.search).get("new") === "1") {
+      setShowForm(true);
+    }
+  }, [user, location.search]);
 
   useEffect(() => {
     if (user) loadCases();
@@ -110,11 +119,13 @@ export default function MediationEngine() {
       toast({ title: "En az 2 taraf gerekli", variant: "destructive" });
       return;
     }
-    for (const p of parties) {
-      if (!p.email) {
-        toast({ title: "Her tarafın e-postası zorunlu", variant: "destructive" });
-        return;
-      }
+    const hasIncompleteParty = parties.some((p) => {
+      if (p.party_type === "corporate") return !(p.company_name || p.authorized_person || p.email);
+      return !([p.first_name, p.last_name].filter(Boolean).join(" ").trim() || p.email || p.phone || p.gsm);
+    });
+    if (hasIncompleteParty) {
+      toast({ title: "Taraf bilgileri eksik", description: "Her taraf için en az ad soyad/ünvan veya iletişim bilgisi girin.", variant: "destructive" });
+      return;
     }
     setCreating(true);
     try {
@@ -124,7 +135,7 @@ export default function MediationEngine() {
 
       const { data: caseRow, error: caseErr } = await supabase.from("cases").insert({
         user_id: user.id,
-        assigned_mediator_id: user.id,
+        assigned_mediator_id: isMediator || isAdmin ? user.id : null,
         title: title || `${disputeType} - ${application_no}`,
         dispute_type: disputeType,
         application_no,
@@ -136,9 +147,9 @@ export default function MediationEngine() {
       if (caseErr) throw caseErr;
 
       // Insert parties
-      const partyRows = parties.map((p) => ({
+      const partyRows = parties.map((p, index) => ({
         case_id: caseRow.id,
-        user_id: null,
+        user_id: !isMediator && !isAdmin && index === 0 ? user.id : null,
         party_type: p.party_type,
         is_individual: p.party_type === "individual",
         party_role: p.party_role,
@@ -168,6 +179,7 @@ export default function MediationEngine() {
 
       // Send invites
       for (const ip of insertedParties ?? []) {
+        if (!(ip as any).email) continue;
         try {
           await supabase.functions.invoke("send-party-invite", {
             body: { party_id: (ip as any).id, app_url: window.location.origin },
@@ -198,7 +210,7 @@ export default function MediationEngine() {
     );
   }
 
-  const canCreate = isMediator || isAdmin;
+  const canCreate = !!user;
 
   return (
     <div className="min-h-screen bg-background">
@@ -213,8 +225,8 @@ export default function MediationEngine() {
             </p>
           </div>
           {canCreate && (
-            <Button onClick={() => setShowForm((s) => !s)}>
-              <Plus className="h-4 w-4 mr-1" /> Yeni Başvuru
+              <Button onClick={() => setShowForm((s) => !s)}>
+               <Plus className="h-4 w-4 mr-1" /> Yeni Başvuru Oluştur
             </Button>
           )}
         </header>
@@ -305,7 +317,7 @@ export default function MediationEngine() {
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => setShowForm(false)}>İptal</Button>
               <Button onClick={createCase} disabled={creating}>
-                {creating ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Oluşturuluyor</> : "Yeni Başvuru Oluştur ve Davet Gönder"}
+                {creating ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Oluşturuluyor</> : "Yeni Başvuru Oluştur"}
               </Button>
             </div>
           </Card>
