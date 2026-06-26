@@ -25,6 +25,7 @@ interface CaseRow {
   id: string; title: string | null; application_no: string | null; uyap_no: string | null;
   dispute_type: string | null; dispute_subtype: string | null; current_phase: number | null;
   round_number: number | null; assigned_mediator_id: string | null; issue_description: string | null;
+  user_id: string;
 }
 interface Party {
   id: string; case_id: string; user_id: string | null; party_role: string | null;
@@ -67,6 +68,7 @@ export default function CaseRoom() {
   const [working, setWorking] = useState(false);
 
   const myParty = parties.find((p) => p.user_id === user?.id) ?? null;
+  const isOwner = !!(caseRow && user && caseRow.user_id === user.id);
   const isMediator = !!(caseRow && user && caseRow.assigned_mediator_id === user.id);
   const isParty = !!myParty;
 
@@ -156,7 +158,7 @@ export default function CaseRoom() {
   if (!caseRow) {
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Başvuru bulunamadı.</div>;
   }
-  if (!isMediator && !isParty) {
+  if (!isOwner && !isMediator && !isParty) {
     return (
       <div className="min-h-screen">
         <AppNavbar />
@@ -190,7 +192,7 @@ export default function CaseRoom() {
             <div className="flex gap-2">
               <Badge variant="outline" className="gap-1">
                 <ShieldCheck className="h-3 w-3" />
-                {isMediator ? "Arabulucu" : `Taraf ${myParty?.party_role ?? ""}`}
+                {isMediator ? "Arabulucu" : isParty ? `Taraf ${myParty?.party_role ?? ""}` : "Başvuru Sahibi"}
               </Badge>
             </div>
           </div>

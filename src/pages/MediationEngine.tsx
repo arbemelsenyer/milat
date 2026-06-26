@@ -74,8 +74,10 @@ export default function MediationEngine() {
   const [parties, setParties] = useState<PartyDraft[]>([emptyParty("A"), emptyParty("B")]);
 
   useEffect(() => {
-    if (!isLoading && !user) navigate("/auth");
-  }, [isLoading, user, navigate]);
+    if (!isLoading && !user) {
+      navigate(`/auth?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`);
+    }
+  }, [isLoading, user, navigate, location.pathname, location.search]);
 
   useEffect(() => {
     if (user && new URLSearchParams(location.search).get("new") === "1") {
