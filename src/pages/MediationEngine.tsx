@@ -555,32 +555,83 @@ function Phase3Documents({ caseRow, userId, onDone }: { caseRow: CaseRow; userId
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
+
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+    const ALLOWED_EXT = ["pdf", "doc", "docx"];
+    const ALLOWED_MIME = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+
+    for (const f of files) {
+      const ext = f.name.split(".").pop()?.toLowerCase() ?? "";
+      if (!ALLOWED_EXT.includes(ext) && !ALLOWED_MIME.includes(f.type)) {
+        toast({ title: "Geçersiz dosya türü", description: `"${f.name}" yalnızca PDF veya Word (.pdf, .doc, .docx) olabilir.`, variant: "destructive" });
+        e.target.value = "";
+        return;
+      }
+      if (f.size > MAX_SIZE) {
+        toast({ title: "Dosya çok büyük", description: `"${f.name}" 10MB sınırını aşıyor.`, variant: "destructive" });
+        e.target.value = "";
+        return;
+      }
+    }
+
     setBusy(true);
     try {
       for (const f of files) {
-        const path = `${caseRow.id}/${userId}/${Date.now()}-${f.name}`;
-        const { error: upErr } = await supabase.storage.from("case-documents").upload(path, f);
-        if (upErr) throw upErr;
+        // Storage RLS expects path: {user_id}/{case_id}/{file}
+        const safeName = f.name.replace(/[^\w.\-]+/g, "_");
+        const path = `${userId}/${caseRow.id}/${Date.now()}-${safeName}`;
+        const { error: upErr } = await supabase.storage.from("case-documents").upload(path, f, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: f.type || undefined,
+        });
+        if (upErr) {
+          const msg = /row-level security|not authorized|permission/i.test(upErr.message)
+            ? "Bu başvuruya belge yükleme yetkiniz yok."
+            : /exists|duplicate/i.test(upErr.message)
+            ? "Aynı isimde bir dosya zaten var, lütfen yeniden deneyin."
+            : `Depolama hatası: ${upErr.message}`;
+          throw new Error(msg);
+        }
         const { error: insErr } = await supabase.from("case_documents").insert({
-          case_id: caseRow.id, file_name: f.name, file_path: path, uploaded_by: userId, mime_type: f.type,
+          case_id: caseRow.id,
+          file_name: f.name,
+          file_path: path,
+          file_size: f.size,
+          mime_type: f.type,
+          uploaded_by: userId,
         } as any);
-        if (insErr) throw insErr;
+        if (insErr) {
+          // rollback storage object so we don't leave orphans
+          await supabase.storage.from("case-documents").remove([path]);
+          const msg = /row-level security|policy/i.test(insErr.message)
+            ? "Belge kaydı için yetkiniz yok. Lütfen başvuru sahibi veya taraf olarak giriş yapın."
+            : `Veritabanı hatası: ${insErr.message}`;
+          throw new Error(msg);
+        }
       }
-      toast({ title: "Belge(ler) yüklendi" });
+      toast({ title: "Belge yüklendi", description: files.length > 1 ? `${files.length} dosya başarıyla yüklendi.` : "Dosya başarıyla yüklendi." });
       load();
-    } catch (e: any) {
-      toast({ title: "Yükleme hatası", description: trErr(e.message), variant: "destructive" });
-    } finally { setBusy(false); e.target.value = ""; }
+    } catch (err: any) {
+      toast({ title: "Yükleme başarısız", description: err?.message ?? "Bilinmeyen bir hata oluştu.", variant: "destructive" });
+    } finally {
+      setBusy(false);
+      e.target.value = "";
+    }
   }
 
   return (
     <Card className="p-6 space-y-4">
       <h2 className="text-2xl font-bold text-primary">Aşama 3 — Belgeler</h2>
-      <p className="text-sm text-muted-foreground">Belgeleri sadece yükleyen taraf ve arabulucu görebilir.</p>
+      <p className="text-sm text-muted-foreground">PDF veya Word (max 10MB). Belgeleri sadece yükleyen taraf ve arabulucu görebilir.</p>
       <label className="flex flex-col items-center justify-center gap-2 cursor-pointer rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 py-10 hover:bg-primary/10">
         {busy ? <Loader2 className="h-8 w-8 animate-spin text-primary" /> : <Plus className="h-8 w-8 text-primary" />}
         <span className="font-medium">Belge Yükle</span>
-        <input type="file" multiple className="hidden" onChange={handleUpload} disabled={busy} />
+        <input type="file" multiple accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={handleUpload} disabled={busy} />
       </label>
       {docs.length > 0 && (
         <ul className="space-y-2">
