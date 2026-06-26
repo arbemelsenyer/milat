@@ -760,7 +760,7 @@ function Phase8Negotiation({ caseRow, userId, onDone }: { caseRow: CaseRow; user
               <b>Tur #{r.round_no}</b>
               <Badge>{r.status}</Badge>
             </div>
-            <p className="text-sm whitespace-pre-wrap">{r.proposal}</p>
+            <p className="text-sm whitespace-pre-wrap">{typeof r.proposal === "string" ? r.proposal : (r.proposal?.text ?? JSON.stringify(r.proposal))}</p>
             {r.status === "pending" && (
               <div className="flex gap-2">
                 <Button size="sm" variant="default" onClick={() => setStatus(r.id, "accepted")}>Kabul</Button>
