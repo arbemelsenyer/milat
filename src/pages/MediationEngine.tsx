@@ -846,6 +846,7 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
 /* ===================== PHASE 7 - EXPERT ===================== */
 
 function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
+  const { user } = useAuth();
   const [selected, setSelected] = useState<string | null>(null);
   return (
     <Card className="p-6 space-y-4">
@@ -855,9 +856,10 @@ function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
         niche={caseRow.dispute_type || ""}
         selectedId={selected}
         onSelect={async (e) => {
+          if (!user) return;
           setSelected(e.id);
           const { error } = await supabase.from("case_expert_assignments").insert({
-            case_id: caseRow.id, expert_id: e.id, status: "pending",
+            case_id: caseRow.id, expert_id: e.id, status: "pending", assigned_by: user.id,
           } as any);
           if (error) toast({ title: "Atama hatası", description: trErr(error.message), variant: "destructive" });
           else toast({ title: "Bilirkişi atandı (taraf onayı bekleniyor)" });
