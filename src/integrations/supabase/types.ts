@@ -441,6 +441,7 @@ export type Database = {
         Row: {
           additional_notes: string | null
           ai_summary: Json | null
+          application_date: string
           application_no: string | null
           assigned_expert_id: string | null
           assigned_mediator_id: string | null
@@ -472,6 +473,7 @@ export type Database = {
         Insert: {
           additional_notes?: string | null
           ai_summary?: Json | null
+          application_date?: string
           application_no?: string | null
           assigned_expert_id?: string | null
           assigned_mediator_id?: string | null
@@ -503,6 +505,7 @@ export type Database = {
         Update: {
           additional_notes?: string | null
           ai_summary?: Json | null
+          application_date?: string
           application_no?: string | null
           assigned_expert_id?: string | null
           assigned_mediator_id?: string | null

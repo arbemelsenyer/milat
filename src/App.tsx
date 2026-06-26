@@ -16,7 +16,7 @@ import NotFound from "./pages/NotFound";
 import ExpertWitness from "./pages/ExpertWitness";
 import LegalPrecedents from "./pages/LegalPrecedents";
 import AgreementGenerator from "./pages/AgreementGenerator";
-import LegalReasoningHub from "./pages/LegalReasoningHub";
+import MediationEngine from "./pages/MediationEngine";
 import CaseDetail from "./pages/CaseDetail";
 import CaseRoom from "./pages/CaseRoom";
 import MediatorDetail from "./pages/MediatorDetail";
@@ -56,7 +56,7 @@ const App = () => (
             <Route path="/expert-witness" element={<ExpertWitness />} />
             <Route path="/legal-precedents" element={<LegalPrecedents />} />
             <Route path="/agreement-generator" element={<AgreementGenerator />} />
-            <Route path="/legal-reasoning" element={<LegalReasoningHub />} />
+            <Route path="/legal-reasoning" element={<MediationEngine />} />
             <Route path="/mediation-engine" element={<RedirectToHub />} />
             <Route path="/case/:id" element={<CaseDetail />} />
             <Route path="/case-room/:id" element={<CaseRoom />} />
