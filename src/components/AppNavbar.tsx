@@ -21,7 +21,7 @@ export function AppNavbar() {
   return (
     <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-20">
       <div className="container max-w-6xl py-3 px-4 flex items-center justify-between">
-        <Link to="/dashboard" className="flex items-center gap-2">
+        <Link to={isMediator ? "/mediator" : "/dashboard"} className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <MessageCircle className="w-4 h-4 text-primary-foreground" />
           </div>
@@ -42,7 +42,7 @@ export function AppNavbar() {
             <Button variant="ghost" size="sm" asChild>
               <Link to="/mediator">
                 <Shield className="w-4 h-4 mr-1" />
-                {language === 'tr' ? 'Arabulucu' : 'Mediator'}
+                {language === 'tr' ? 'Süreç Yönetimi' : 'Process'}
               </Link>
             </Button>
           )}

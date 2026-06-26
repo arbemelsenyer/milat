@@ -39,22 +39,23 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/mediator" element={<MediatorDashboard />} />
+            <Route path="/mediator" element={<MediationEngine />} />
+            <Route path="/mediator-dashboard" element={<MediatorDashboard />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/intake" element={<IntakePage />} />
             <Route path="/summary" element={<SummaryPage />} />
-          <Route path="/expert-witness" element={<ExpertWitness />} />
-<Route path="/legal-precedents" element={<LegalPrecedents />} />
-<Route path="/agreement-generator" element={<AgreementGenerator />} />
-<Route path="/legal-reasoning" element={<LegalReasoningEngine />} />
-<Route path="/mediation-engine" element={<MediationEngine />} />
-<Route path="/case/:id" element={<CaseDetail />} />
-<Route path="/case-room/:id" element={<CaseRoom />} />
-<Route path="/mediator/:id" element={<MediatorDetail />} />
-<Route path="/notification-settings" element={<NotificationSettings />} />
-<Route path="/privacy-tests" element={<PrivacyTests />} />
+            <Route path="/expert-witness" element={<ExpertWitness />} />
+            <Route path="/legal-precedents" element={<LegalPrecedents />} />
+            <Route path="/agreement-generator" element={<AgreementGenerator />} />
+            <Route path="/legal-reasoning" element={<LegalReasoningEngine />} />
+            <Route path="/mediation-engine" element={<MediationEngine />} />
+            <Route path="/case/:id" element={<CaseDetail />} />
+            <Route path="/case-room/:id" element={<CaseRoom />} />
+            <Route path="/mediator/:id" element={<MediatorDetail />} />
+            <Route path="/notification-settings" element={<NotificationSettings />} />
+            <Route path="/privacy-tests" element={<PrivacyTests />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

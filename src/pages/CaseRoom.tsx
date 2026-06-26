@@ -17,6 +17,7 @@ import {
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
 import { OfficialDocsPanel } from "@/components/mediation/OfficialDocsPanel";
+import { StepTimeline } from "@/components/mediation/StepTimeline";
 import { downloadOfficialPdf } from "@/lib/pdfTemplates";
 import { Input } from "@/components/ui/input";
 
@@ -40,6 +41,17 @@ interface DiscoveryQ {
   id: string; party_id: string | null; question_text: string; answer_text: string | null;
   question_order: number;
 }
+
+const PROCESS_STEPS = [
+  { key: "parties", label: "Taraflar" },
+  { key: "analysis", label: "Gizli Analiz" },
+  { key: "common", label: "Ortak Zemin" },
+  { key: "discovery", label: "İhtiyaç" },
+  { key: "sessions", label: "Toplantı" },
+  { key: "experts", label: "Bilirkişi" },
+  { key: "rounds", label: "Turlar" },
+  { key: "agreement", label: "Belgeler" },
+];
 
 export default function CaseRoom() {
   const { id: caseId } = useParams<{ id: string }>();
@@ -184,6 +196,15 @@ export default function CaseRoom() {
           </div>
         </Card>
 
+        <ProcessOverview
+          currentPhase={caseRow.current_phase ?? 1}
+          parties={parties}
+          analyses={analyses}
+          discovery={discovery}
+          docs={docs}
+          commonGround={commonGround}
+        />
+
         {isMediator ? <MediatorView /> : <PartyView />}
       </main>
     </div>
@@ -192,7 +213,7 @@ export default function CaseRoom() {
   // =================== MEDIATOR VIEW ===================
   function MediatorView() {
     return (
-      <Tabs defaultValue="parties">
+      <Tabs defaultValue="analyses">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="parties"><Users className="h-4 w-4 mr-1" />Taraflar</TabsTrigger>
           <TabsTrigger value="documents"><FileText className="h-4 w-4 mr-1" />Belgeler</TabsTrigger>
@@ -347,7 +368,7 @@ export default function CaseRoom() {
   // =================== PARTY VIEW ===================
   function PartyView() {
     return (
-      <Tabs defaultValue="documents">
+      <Tabs defaultValue="analysis">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="documents"><Upload className="h-4 w-4 mr-1" />Belgelerim</TabsTrigger>
           <TabsTrigger value="analysis"><Brain className="h-4 w-4 mr-1" />Gizli Analizim</TabsTrigger>
