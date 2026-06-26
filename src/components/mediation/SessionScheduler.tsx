@@ -462,8 +462,17 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
               ))}
             </ul>
             {alternatives.length > 0 && (
-              <div>
-                <div className="text-xs text-muted-foreground mt-2 mb-1">Önerilen alternatifler:</div>
+              <div className="space-y-2">
+                <div className="text-xs text-muted-foreground mt-2">
+                  Önerilen alternatifler — takvimde yeşil hücre boş, kırmızı dolu. Bir hücreye tıklayın, form otomatik güncellenir.
+                </div>
+                <AlternativesCalendar
+                  fromDate={date}
+                  alternatives={alternatives}
+                  hasConflict={(iso) => findConflictsFor(iso).length > 0}
+                  selectedIso={composedDateTime ? new Date(composedDateTime).toISOString() : null}
+                  onPick={applyAlternative}
+                />
                 <div className="flex flex-wrap gap-2">
                   {alternatives.map((iso) => (
                     <Button
