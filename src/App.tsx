@@ -46,18 +46,18 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/mediator" element={<MediationEngine />} />
+            <Route path="/mediator" element={<RedirectToHub />} />
             <Route path="/mediator-dashboard" element={<MediatorDashboard />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/intake" element={<IntakePage />} />
+            <Route path="/intake" element={<RedirectToHub />} />
             <Route path="/summary" element={<SummaryPage />} />
             <Route path="/expert-witness" element={<ExpertWitness />} />
             <Route path="/legal-precedents" element={<LegalPrecedents />} />
             <Route path="/agreement-generator" element={<AgreementGenerator />} />
-            <Route path="/legal-reasoning" element={<LegalReasoningEngine />} />
-            <Route path="/mediation-engine" element={<MediationEngine />} />
+            <Route path="/legal-reasoning" element={<LegalReasoningHub />} />
+            <Route path="/mediation-engine" element={<RedirectToHub />} />
             <Route path="/case/:id" element={<CaseDetail />} />
             <Route path="/case-room/:id" element={<CaseRoom />} />
             <Route path="/mediator/:id" element={<MediatorDetail />} />

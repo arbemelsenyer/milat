@@ -267,7 +267,7 @@ export default function Dashboard() {
                 {language === "tr" ? "Henüz başvurunuz yok" : "No cases yet"}
               </h3>
               <Button asChild className="mt-4">
-                <Link to="/mediator">
+                <Link to="/legal-reasoning?new=1">
                   <Plus className="w-4 h-4 mr-2" />
                   {language === "tr" ? "Başvuru Oluştur" : "Create Case"}
                 </Link>
@@ -281,7 +281,7 @@ export default function Dashboard() {
               const StatusIcon = s.icon;
               const displayTitle = c.title || c.dispute_type || (language === "tr" ? "Başvuru" : "Case");
               const next = upcomingByCase.get(c.id);
-              const goTo = c.status === "draft" ? `/intake?resume=${c.id}` : `/case-room/${c.id}`;
+              const goTo = c.status === "draft" ? `/legal-reasoning?resume=${c.id}` : `/case-room/${c.id}`;
               return (
                 <Card key={c.id} className="group hover:border-primary/40 hover:shadow-elegant transition-all">
                   <CardHeader className="pb-2">
