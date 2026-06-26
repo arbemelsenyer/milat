@@ -16,7 +16,7 @@ import NotFound from "./pages/NotFound";
 import ExpertWitness from "./pages/ExpertWitness";
 import LegalPrecedents from "./pages/LegalPrecedents";
 import AgreementGenerator from "./pages/AgreementGenerator";
-import LegalReasoningHub from "./pages/LegalReasoningHub";
+import MediationEngine from "./pages/MediationEngine";
 import CaseDetail from "./pages/CaseDetail";
 import CaseRoom from "./pages/CaseRoom";
 import MediatorDetail from "./pages/MediatorDetail";
