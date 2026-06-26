@@ -304,9 +304,7 @@ export default function CaseRoom() {
               </Button>
             </div>
             {commonGround ? (
-              <pre className="bg-muted/40 p-3 rounded text-xs whitespace-pre-wrap">
-                {JSON.stringify(commonGround.report, null, 2)}
-              </pre>
+              <CommonGroundView report={commonGround.report} />
             ) : (
               <p className="text-sm text-muted-foreground">Henüz rapor yok. İki taraf analizi sonrası üretebilirsiniz.</p>
             )}
@@ -438,6 +436,61 @@ export default function CaseRoom() {
       </Tabs>
     );
   }
+}
+
+function CommonGroundView({ report }: { report: any }) {
+  const sections: Array<[string, any]> = [
+    ["Ortak Menfaatler", report?.common_interests],
+    ["Yüksek Potansiyelli Alanlar", report?.high_potential_areas],
+    ["Kırmızı Çizgiler", report?.red_lines],
+    ["Alternatif Seçenekler", report?.fallback_options],
+  ];
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-4 border-primary/20 bg-primary/[0.04]">
+        <div className="text-xs font-medium text-muted-foreground mb-1">SÜREÇ YÖNETİMİ ÖNERİSİ</div>
+        <p className="text-sm leading-relaxed whitespace-pre-wrap">
+          {report?.recommended_strategy || report?.strategy || "Arabulucu süreç stratejisi henüz oluşmadı."}
+        </p>
+      </Card>
+
+      <div className="grid md:grid-cols-2 gap-3">
+        {sections.map(([title, value]) => (
+          <Card key={title} className="p-4">
+            <h4 className="font-semibold text-sm mb-2">{title}</h4>
+            {Array.isArray(value) && value.length > 0 ? (
+              <ul className="list-disc pl-5 text-sm space-y-1">
+                {value.map((item: any, index: number) => (
+                  <li key={index}>{typeof item === "string" ? item : JSON.stringify(item)}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">—</p>
+            )}
+          </Card>
+        ))}
+      </div>
+
+      {Array.isArray(report?.caucus_plan) && report.caucus_plan.length > 0 && (
+        <Card className="p-4">
+          <h4 className="font-semibold text-sm mb-2">Gizli Görüşme Planı</h4>
+          <ol className="list-decimal pl-5 text-sm space-y-1">
+            {report.caucus_plan.map((item: any, index: number) => (
+              <li key={index}>{typeof item === "string" ? item : JSON.stringify(item)}</li>
+            ))}
+          </ol>
+        </Card>
+      )}
+
+      {report?.opening_offer && (
+        <Card className="p-4">
+          <h4 className="font-semibold text-sm mb-2">Açılış Teklifi / İlk Hamle</h4>
+          <p className="text-sm whitespace-pre-wrap">{report.opening_offer}</p>
+        </Card>
+      )}
+    </div>
+  );
 }
 
 function ProcessOverview({

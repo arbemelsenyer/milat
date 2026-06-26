@@ -73,7 +73,7 @@ export default function Landing() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
             <Button asChild size="lg" className="gap-2 text-base px-8">
-              <Link to="/intake">
+              <Link to="/mediation-engine">
                 {t('landing.startIntake')}
                 <ArrowRight className="w-4 h-4" />
               </Link>
@@ -163,7 +163,7 @@ export default function Landing() {
             {t('landing.readyDesc')}
           </p>
           <Button asChild size="lg" className="gap-2">
-            <Link to="/intake">
+            <Link to="/mediation-engine">
               {t('landing.beginIntake')}
               <ArrowRight className="w-4 h-4" />
             </Link>
