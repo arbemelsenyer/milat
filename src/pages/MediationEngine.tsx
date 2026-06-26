@@ -734,7 +734,7 @@ function Phase8Negotiation({ caseRow, userId, onDone }: { caseRow: CaseRow; user
   async function addRound() {
     const round_no = (rounds[rounds.length - 1]?.round_no ?? 0) + 1;
     const { error } = await supabase.from("negotiation_rounds").insert({
-      case_id: caseRow.id, round_no, proposal, status: "pending", created_by: userId,
+      case_id: caseRow.id, round_no, proposal: { text: proposal } as any, status: "pending",
     } as any);
     if (error) toast({ title: "Hata", description: trErr(error.message), variant: "destructive" });
     else { setProposal(""); load(); }
