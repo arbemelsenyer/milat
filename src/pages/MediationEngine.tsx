@@ -1031,7 +1031,8 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
     </Card>
   );
 }
-}
+
+
 
 /* ===================== PHASE 8 - NEGOTIATION ===================== */
 
