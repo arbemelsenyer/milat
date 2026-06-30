@@ -379,13 +379,16 @@ function Phase1Summary({ caseRow }: { caseRow: CaseRow }) {
     <Card className="p-6 space-y-3">
       <h2 className="text-2xl font-bold text-primary">Aşama 1 — Başvuru Özeti</h2>
       <div className="grid grid-cols-2 gap-4 text-sm">
-        <div><span className="text-muted-foreground">Başvuru No:</span> <b>{caseRow.application_no}</b></div>
-        <div><span className="text-muted-foreground">UYAP No:</span> {caseRow.uyap_no || "—"}</div>
+        <div><span className="text-muted-foreground">Sistem No:</span> <b className="font-mono">{caseRow.application_no}</b></div>
         <div><span className="text-muted-foreground">Başlık:</span> {caseRow.title}</div>
-        <div><span className="text-muted-foreground">Uyuşmazlık:</span> {caseRow.dispute_type}</div>
-        <div><span className="text-muted-foreground">Tarih:</span> {caseRow.application_date ? new Date(caseRow.application_date).toLocaleDateString("tr-TR") : "—"}</div>
+        <div><span className="text-muted-foreground">Uyuşmazlık Türü:</span> {caseRow.dispute_type || <span className="italic text-muted-foreground">AI tarafından Aşama 3'te tespit edilecek</span>}</div>
+        <div><span className="text-muted-foreground">Tarih:</span> {caseRow.application_date ? new Date(caseRow.application_date).toLocaleDateString("tr-TR") : new Date(caseRow.created_at).toLocaleDateString("tr-TR")}</div>
         <div><span className="text-muted-foreground">Durum:</span> {caseRow.status}</div>
+        <div><span className="text-muted-foreground">UYAP Kayıt No:</span> {caseRow.uyap_no || <span className="italic text-muted-foreground">Henüz kaydedilmedi</span>}</div>
       </div>
+      <p className="text-xs text-muted-foreground border-t pt-3">
+        UYAP Kayıt Numarası, başvuru resmi sisteme kaydedildiğinde Aşama 4 (Arabulucu Paneli) üzerinden eklenebilir.
+      </p>
     </Card>
   );
 }
