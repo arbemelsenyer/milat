@@ -128,7 +128,7 @@ async function embed(texts: string[]): Promise<number[][]> {
   throw lastError ?? new Error("Embedding isteği başarısız oldu");
 }
 
-async function processBook(admin: any, jobId: string, book: Book): Promise<{ chunks: number }> {
+async function processBook(admin: any, jobId: string, book: Book, existingChunks: number): Promise<{ chunks: number }> {
   console.log(`Processing book: ${book.title}`);
   await updateJob(admin, jobId, { current_book: `${book.title} — PDF indiriliyor` });
   const resp = await withTimeout("PDF indirme", PDF_DOWNLOAD_TIMEOUT_MS, () =>
@@ -164,7 +164,7 @@ async function processBook(admin: any, jobId: string, book: Book): Promise<{ chu
     const { error } = await admin.from("knowledge_base_chunks").insert(rows);
     if (error) throw new Error(error.message);
     total += rows.length;
-    await updateJob(admin, jobId, { total_chunks: total, current_book: `${book.title} — ${total}/${chunks.length} parça kaydedildi` });
+    await updateJob(admin, jobId, { total_chunks: existingChunks + total, current_book: `${book.title} — ${total}/${chunks.length} parça kaydedildi` });
   }
   console.log(`Completed book: ${book.title}, chunks=${total}`);
   return { chunks: total };
@@ -182,7 +182,7 @@ async function runJob(admin: any, jobId: string, books: Book[]) {
       status: "running",
     });
     try {
-      const { chunks } = await withTimeout(`Kitap işleme: ${book.title}`, BOOK_TIMEOUT_MS, () => processBook(admin, jobId, book));
+      const { chunks } = await withTimeout(`Kitap işleme: ${book.title}`, BOOK_TIMEOUT_MS, () => processBook(admin, jobId, book, totalChunks));
       totalChunks += chunks;
     } catch (e: any) {
       console.error(`Book failed: ${book.title}`, e.message);
