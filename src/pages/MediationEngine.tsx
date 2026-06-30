@@ -583,6 +583,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   const [docs, setDocs] = useState<any[]>([]);
   const [analyses, setAnalyses] = useState<any[]>([]);
   const [report, setReport] = useState<any>(null);
+  const [reportLoading, setReportLoading] = useState(true);
+  const [reportFetchError, setReportFetchError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [analysing, setAnalysing] = useState<string | null>(null);
@@ -591,18 +593,32 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   const [reportError, setReportError] = useState<string | null>(null);
   const [navigating, setNavigating] = useState(false);
 
+  const fetchReport = useCallback(async () => {
+    setReportLoading(true);
+    setReportFetchError(null);
+    const { data, error } = await supabase
+      .from("common_ground_reports")
+      .select("*")
+      .eq("case_id", caseRow.id)
+      .order("created_at", { ascending: false })
+      .maybeSingle();
+    if (error) setReportFetchError(error.message);
+    setReport(data ?? null);
+    setReportLoading(false);
+    return data ?? null;
+  }, [caseRow.id]);
+
   const loadAll = useCallback(async () => {
-    const [p, d, a, r] = await Promise.all([
+    const [p, d, a] = await Promise.all([
       supabase.from("case_parties").select("*").eq("case_id", caseRow.id).order("created_at"),
       supabase.from("case_documents").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }),
       supabase.from("party_analyses").select("*").eq("case_id", caseRow.id),
-      supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).maybeSingle(),
     ]);
     setParties(p.data ?? []);
     setDocs(d.data ?? []);
     setAnalyses(a.data ?? []);
-    setReport(r.data);
-  }, [caseRow.id]);
+    await fetchReport();
+  }, [caseRow.id, fetchReport]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
