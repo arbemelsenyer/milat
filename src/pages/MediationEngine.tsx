@@ -713,9 +713,13 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
       toast({ title: "Ortak zemin raporu hazır" });
       reload();
     } catch (e: any) {
-      const msg = e?.message || "Rapor üretilemedi.";
-      setReportError(msg);
-      toast({ title: "Rapor hatası", description: msg, variant: "destructive" });
+      console.error("[common-ground-report] error", e);
+      const raw = e?.message || "";
+      const friendly = /multiple .* rows|JSON object requested/i.test(raw)
+        ? "Sistem hatası oluştu, lütfen tekrar deneyin."
+        : raw || "Rapor üretilemedi. Lütfen tekrar deneyin.";
+      setReportError(friendly);
+      toast({ title: "Rapor hatası", description: friendly, variant: "destructive" });
     } finally { setReportBusy(false); }
   }
 
