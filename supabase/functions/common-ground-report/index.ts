@@ -87,7 +87,7 @@ ${(discAnswers ?? []).map((d) => `[Party ${d.party_id?.slice(0, 8)}] Q: ${d.ques
     try { parsed = JSON.parse(aiJson.choices[0].message.content); } catch { parsed = {}; }
 
     const { data: inserted } = await admin.from("common_ground_reports").insert({
-      case_id, report: parsed, strategy: { recommendation: parsed.recommended_strategy ?? "" },
+      case_id, report: parsed, strategy: parsed.mediator_strategy ?? {},
       round_number: caseRow.round_number ?? 1,
     }).select().single();
 
