@@ -184,43 +184,85 @@ async function processBook(admin: any, jobId: string, book: Book, existingChunks
   return { chunks: total };
 }
 
+const MAX_ATTEMPTS_PER_BOOK = 2;
+
 // Bir invocation = en fazla 1 kitap. İstemci, status running ve processed<total iken bizi yeniden çağırır.
 async function runOneBook(admin: any, jobId: string) {
   const { data: job, error } = await admin.from("knowledge_base_jobs").select("*").eq("id", jobId).maybeSingle();
   if (error || !job) throw new Error("İş bulunamadı");
   const processedUrls: string[] = Array.isArray(job.processed_urls) ? job.processed_urls : [];
   const books: Book[] = Array.isArray(job.book_queue) && job.book_queue.length > 0 ? job.book_queue : BOOKS;
+  const attemptCounts: Record<string, number> = (job.attempt_counts && typeof job.attempt_counts === "object") ? { ...job.attempt_counts } : {};
+  const errors: any[] = Array.isArray(job.errors) ? [...job.errors] : [];
+
   const next = books.find((b) => !processedUrls.includes(b.url));
   if (!next) {
     await updateJob(admin, jobId, {
-      status: (job.errors ?? []).length ? "completed_with_errors" : "completed",
+      status: errors.length ? "completed_with_errors" : "completed",
       current_book: null,
       finished_at: new Date().toISOString(),
     });
     return { done: true };
   }
 
-  await updateJob(admin, jobId, { status: "running", current_book: next.title });
-  const errors: any[] = Array.isArray(job.errors) ? [...job.errors] : [];
+  // Pre-increment attempt count BEFORE heavy work so CPU-time-exceeded kills don't loop forever.
+  const prevAttempts = Number(attemptCounts[next.url] ?? 0);
+  const newAttempts = prevAttempts + 1;
+  attemptCounts[next.url] = newAttempts;
+
+  if (newAttempts > MAX_ATTEMPTS_PER_BOOK) {
+    // Skip this book permanently — already crashed worker repeatedly.
+    errors.push({ book: next.title, url: next.url, error: `Kitap ${MAX_ATTEMPTS_PER_BOOK} denemede de işlenemedi (worker CPU/zaman limiti). Atlandı.` });
+    processedUrls.push(next.url);
+    await updateJob(admin, jobId, {
+      processed_books: processedUrls.length,
+      processed_urls: processedUrls,
+      attempt_counts: attemptCounts,
+      errors,
+      current_book: null,
+    });
+    if (processedUrls.length >= books.length) {
+      await updateJob(admin, jobId, {
+        status: errors.length ? "completed_with_errors" : "completed",
+        current_book: null,
+        finished_at: new Date().toISOString(),
+      });
+    }
+    return { done: processedUrls.length >= books.length, processed: processedUrls.length, total: books.length, skipped: next.title };
+  }
+
+  await updateJob(admin, jobId, {
+    status: "running",
+    current_book: `${next.title} (deneme ${newAttempts}/${MAX_ATTEMPTS_PER_BOOK})`,
+    attempt_counts: attemptCounts,
+  });
   let totalChunks: number = Number(job.total_chunks ?? 0);
+  let bookSucceeded = false;
   try {
     const { chunks } = await withTimeout(`Kitap işleme: ${next.title}`, BOOK_TIMEOUT_MS, () =>
       processBook(admin, jobId, next, totalChunks)
     );
     totalChunks += chunks;
+    bookSucceeded = true;
   } catch (e: any) {
     console.error(`[${jobId}] Book failed: ${next.title}`, e?.message);
-    errors.push({ book: next.title, url: next.url, error: e?.message ?? String(e) });
+    if (newAttempts >= MAX_ATTEMPTS_PER_BOOK) {
+      errors.push({ book: next.title, url: next.url, error: e?.message ?? String(e) });
+      bookSucceeded = true; // mark as processed (skip)
+    }
   }
-  processedUrls.push(next.url);
+
+  if (bookSucceeded) {
+    processedUrls.push(next.url);
+  }
   await updateJob(admin, jobId, {
     processed_books: processedUrls.length,
     processed_urls: processedUrls,
     total_chunks: totalChunks,
+    attempt_counts: attemptCounts,
     errors,
     current_book: null,
   });
-  // Eğer hepsi bittiyse kapat.
   if (processedUrls.length >= books.length) {
     await updateJob(admin, jobId, {
       status: errors.length ? "completed_with_errors" : "completed",
