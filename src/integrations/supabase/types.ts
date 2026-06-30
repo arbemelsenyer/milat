@@ -1501,6 +1501,22 @@ export type Database = {
         Args: { _case_id: string; _user_id: string }
         Returns: boolean
       }
+      list_experts_for_mediator: {
+        Args: { filter_niche?: string }
+        Returns: {
+          active: boolean
+          bio: string
+          city: string
+          full_name: string
+          hourly_rate: number
+          id: string
+          niche_area: string
+          rating: number
+          specialization: string
+          title: string
+          years_experience: number
+        }[]
+      }
       match_cases: {
         Args: {
           filter_niche_area: string
