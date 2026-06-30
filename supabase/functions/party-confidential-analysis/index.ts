@@ -185,3 +185,45 @@ Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinde
     });
   }
 });
+
+function mapDisputeToCategory(disputeType?: string | null, subtype?: string | null): string | null {
+  const t = `${disputeType ?? ""} ${subtype ?? ""}`.toLowerCase();
+  if (/iş|isci|işçi|işveren|isveren|kıdem|kidem/.test(t)) return "işçi_işveren";
+  if (/ticari|ticaret|şirket|sirket/.test(t)) return "ticari";
+  if (/tüketici|tuketici/.test(t)) return "tüketici";
+  if (/aile|boşan|bosan|nafaka|velayet/.test(t)) return "aile";
+  if (/sigorta/.test(t)) return "sigorta";
+  if (/sağlık|saglik|malpraktis/.test(t)) return "sağlık";
+  if (/inşaat|insaat|yapı|yapi/.test(t)) return "inşaat";
+  if (/fikri|marka|patent|telif/.test(t)) return "fikri_mülkiyet";
+  if (/enerji|maden/.test(t)) return "enerji_maden";
+  if (/banka|finans|kredi/.test(t)) return "bankacılık";
+  if (/spor/.test(t)) return "spor";
+  return null;
+}
+
+async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, category: string | null): Promise<string> {
+  try {
+    if (!query || query.trim().length < 10) return "";
+    const embRes = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "openai/text-embedding-3-small", input: query, dimensions: 768 }),
+    });
+    if (!embRes.ok) return "";
+    const embJson = await embRes.json();
+    const vec = embJson?.data?.[0]?.embedding;
+    if (!vec) return "";
+    const { data } = await admin.rpc("match_knowledge_base", {
+      query_embedding: vec, filter_category: category, match_count: 5, match_threshold: 0.65,
+    });
+    if (!data || data.length === 0) return "";
+    const parts = data.map((r: any) =>
+      `[Kaynak: ${r.source_title}]\n${r.chunk_text}`
+    ).join("\n\n");
+    return `\n═══ İLGİLİ KAYNAK BİLGİSİ (Adalet Bakanlığı Arabuluculuk Daire Başkanlığı resmi yayınlarından) ═══\n${parts}\n═══════════════════════════\n`;
+  } catch {
+    return "";
+  }
+}
+
