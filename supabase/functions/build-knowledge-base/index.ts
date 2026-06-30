@@ -85,7 +85,7 @@ async function updateJob(admin: any, jobId: string, patch: Record<string, unknow
   if (error) console.error("Job update failed", error.message);
 }
 
-function chunkText(text: string, target = 900, overlap = 90): string[] {
+function chunkText(text: string, target = 1800, overlap = 150): string[] {
   const clean = text.replace(/\s+/g, " ").trim();
   if (!clean) return [];
   const sentences = clean.split(/(?<=[.!?])\s+/);
@@ -101,8 +101,10 @@ function chunkText(text: string, target = 900, overlap = 90): string[] {
     }
   }
   if (cur.trim()) chunks.push(cur.trim());
-  return chunks.filter((c) => c.length > 100);
+  return chunks.filter((c) => c.length > 200);
 }
+
+const MAX_CHUNKS_PER_BOOK = 600;
 
 async function embed(texts: string[]): Promise<number[][]> {
   let lastError: Error | null = null;
