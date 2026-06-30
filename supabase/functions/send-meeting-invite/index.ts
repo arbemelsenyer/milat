@@ -162,6 +162,12 @@ serve(async (req) => {
     }
 
     const sentCount = results.filter((r) => r.ok).length;
+    if (sentCount > 0) {
+      await admin
+        .from("case_sessions")
+        .update({ invite_sent_at: new Date().toISOString() })
+        .eq("id", sessionId);
+    }
     return new Response(JSON.stringify({ success: true, sent: sentCount, total: results.length, results }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

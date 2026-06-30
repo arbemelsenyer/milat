@@ -1,0 +1,1 @@
+ALTER TABLE public.case_sessions ADD COLUMN IF NOT EXISTS invite_sent_at TIMESTAMPTZ;
