@@ -9,6 +9,13 @@ const corsHeaders = {
 };
 
 type Book = { title: string; url: string; category: string };
+type BuildRequest = { test?: boolean; limit?: number };
+
+const PDF_DOWNLOAD_TIMEOUT_MS = 45_000;
+const PDF_TEXT_TIMEOUT_MS = 90_000;
+const EMBEDDING_TIMEOUT_MS = 45_000;
+const BOOK_TIMEOUT_MS = 180_000;
+const MAX_EMBED_RETRIES = 3;
 
 const BOOKS: Book[] = [
   { category: "genel", title: "ADB Yayını 1", url: "https://adb.adalet.gov.tr/Resimler/SayfaDokuman/40320221402571.pdf" },
@@ -37,6 +44,41 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function jsonResponse(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function readBody(req: Request): Promise<BuildRequest> {
+  if (req.method !== "POST") return {};
+  const contentType = req.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) return {};
+  try {
+    return await req.json();
+  } catch {
+    return {};
+  }
+}
+
+async function withTimeout<T>(label: string, timeoutMs: number, task: () => Promise<T>): Promise<T> {
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`${label} zaman aşımına uğradı (${Math.round(timeoutMs / 1000)} sn)`)), timeoutMs);
+  });
+  return await Promise.race([task(), timeout]);
+}
+
+async function updateJob(admin: any, jobId: string, patch: Record<string, unknown>) {
+  const { error } = await admin.from("knowledge_base_jobs").update({
+    ...patch,
+    updated_at: new Date().toISOString(),
+  }).eq("id", jobId);
+  if (error) console.error("Job update failed", error.message);
+}
+
 function chunkText(text: string, target = 900, overlap = 90): string[] {
   const clean = text.replace(/\s+/g, " ").trim();
   if (!clean) return [];
@@ -58,36 +100,57 @@ function chunkText(text: string, target = 900, overlap = 90): string[] {
 }
 
 async function embed(texts: string[]): Promise<number[][]> {
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "openai/text-embedding-3-small",
-      input: texts,
-      dimensions: 768,
-    }),
-  });
-  if (!res.ok) throw new Error(`Embed failed ${res.status}: ${await res.text()}`);
-  const j = await res.json();
-  return j.data.map((d: any) => d.embedding);
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= MAX_EMBED_RETRIES; attempt += 1) {
+    try {
+      const res = await withTimeout(`Embedding isteği (${attempt}/${MAX_EMBED_RETRIES})`, EMBEDDING_TIMEOUT_MS, () =>
+        fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "openai/text-embedding-3-small",
+            input: texts,
+            dimensions: 768,
+          }),
+        })
+      );
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`Embedding hatası ${res.status}: ${body.slice(0, 300)}`);
+      }
+      const j = await res.json();
+      return j.data.map((d: any) => d.embedding);
+    } catch (e: any) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      if (attempt < MAX_EMBED_RETRIES) await delay(1_500 * attempt * attempt);
+    }
+  }
+  throw lastError ?? new Error("Embedding isteği başarısız oldu");
 }
 
-async function processBook(admin: any, book: Book): Promise<{ chunks: number }> {
-  const resp = await fetch(book.url, { headers: { "User-Agent": "Mozilla/5.0 MediPactBot" } });
+async function processBook(admin: any, jobId: string, book: Book): Promise<{ chunks: number }> {
+  console.log(`Processing book: ${book.title}`);
+  await updateJob(admin, jobId, { current_book: `${book.title} — PDF indiriliyor` });
+  const resp = await withTimeout("PDF indirme", PDF_DOWNLOAD_TIMEOUT_MS, () =>
+    fetch(book.url, { headers: { "User-Agent": "Mozilla/5.0 MediPactBot" } })
+  );
   if (!resp.ok) throw new Error(`PDF indirilemedi ${resp.status}`);
   const buf = new Uint8Array(await resp.arrayBuffer());
+  await updateJob(admin, jobId, { current_book: `${book.title} — metin çıkarılıyor` });
   const pdf = await getDocumentProxy(buf);
-  const { text } = await extractText(pdf, { mergePages: true });
+  const { text } = await withTimeout("PDF metin çıkarma", PDF_TEXT_TIMEOUT_MS, () => extractText(pdf, { mergePages: true }));
   const fullText = Array.isArray(text) ? text.join("\n") : text;
   const chunks = chunkText(fullText);
   if (!chunks.length) return { chunks: 0 };
 
   // Wipe existing chunks for this source so we get a clean re-run.
+  await updateJob(admin, jobId, { current_book: `${book.title} — eski parçalar temizleniyor` });
   await admin.from("knowledge_base_chunks").delete().eq("source_url", book.url);
 
   let total = 0;
   const BATCH = 32;
   for (let i = 0; i < chunks.length; i += BATCH) {
+    await updateJob(admin, jobId, { current_book: `${book.title} — embedding ${i + 1}-${Math.min(i + BATCH, chunks.length)}/${chunks.length}` });
     const slice = chunks.slice(i, i + BATCH);
     const vectors = await embed(slice);
     const rows = slice.map((c, j) => ({
@@ -101,83 +164,94 @@ async function processBook(admin: any, book: Book): Promise<{ chunks: number }> 
     const { error } = await admin.from("knowledge_base_chunks").insert(rows);
     if (error) throw new Error(error.message);
     total += rows.length;
+    await updateJob(admin, jobId, { total_chunks: total, current_book: `${book.title} — ${total}/${chunks.length} parça kaydedildi` });
   }
+  console.log(`Completed book: ${book.title}, chunks=${total}`);
   return { chunks: total };
 }
 
-async function runJob(admin: any, jobId: string) {
+async function runJob(admin: any, jobId: string, books: Book[]) {
   let processed = 0;
   let totalChunks = 0;
   const errors: any[] = [];
-  for (const book of BOOKS) {
-    await admin.from("knowledge_base_jobs").update({
+  for (const book of books) {
+    await updateJob(admin, jobId, {
       current_book: book.title,
       processed_books: processed,
       total_chunks: totalChunks,
       status: "running",
-    }).eq("id", jobId);
+    });
     try {
-      const { chunks } = await processBook(admin, book);
+      const { chunks } = await withTimeout(`Kitap işleme: ${book.title}`, BOOK_TIMEOUT_MS, () => processBook(admin, jobId, book));
       totalChunks += chunks;
     } catch (e: any) {
+      console.error(`Book failed: ${book.title}`, e.message);
       errors.push({ book: book.title, url: book.url, error: e.message });
     }
     processed += 1;
+    await updateJob(admin, jobId, {
+      processed_books: processed,
+      total_chunks: totalChunks,
+      errors,
+      current_book: processed < books.length ? books[processed].title : null,
+    });
   }
-  await admin.from("knowledge_base_jobs").update({
+  await updateJob(admin, jobId, {
     status: errors.length ? "completed_with_errors" : "completed",
     processed_books: processed,
     total_chunks: totalChunks,
     errors,
     current_book: null,
     finished_at: new Date().toISOString(),
-  }).eq("id", jobId);
+  });
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
+    const requestBody = await readBody(req);
+    const books = requestBody.test ? [BOOKS[1]] : BOOKS.slice(0, requestBody.limit && requestBody.limit > 0 ? Math.min(requestBody.limit, BOOKS.length) : BOOKS.length);
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
     const userClient = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } } });
     const { data: userData } = await userClient.auth.getUser();
     if (!userData?.user) {
-      return new Response(JSON.stringify({ error: "Invalid session" }), { status: 401, headers: corsHeaders });
+      return jsonResponse({ error: "Invalid session" }, 401);
     }
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: roleRow } = await admin.from("user_roles")
       .select("role").eq("user_id", userData.user.id).eq("role", "admin").maybeSingle();
     if (!roleRow) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
+      return jsonResponse({ error: "Forbidden" }, 403);
     }
 
     // Prevent concurrent jobs.
     const { data: running } = await admin.from("knowledge_base_jobs")
       .select("id").in("status", ["pending", "running"]).maybeSingle();
     if (running) {
-      return new Response(JSON.stringify({ error: "Zaten çalışan bir iş var", job_id: running.id }), {
-        status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Zaten çalışan bir iş var", job_id: running.id }, 409);
     }
 
     const { data: job, error: jobErr } = await admin.from("knowledge_base_jobs").insert({
-      status: "running", total_books: BOOKS.length, processed_books: 0, total_chunks: 0,
+      status: "running", total_books: books.length, processed_books: 0, total_chunks: 0,
+      current_book: books[0]?.title ?? null,
     }).select().single();
     if (jobErr) throw jobErr;
 
+    console.log(`Knowledge base job started: ${job.id}, books=${books.length}, test=${Boolean(requestBody.test)}`);
+
     // @ts-ignore EdgeRuntime is available in Supabase functions
-    EdgeRuntime.waitUntil(runJob(admin, job.id).catch(async (e) => {
-      await admin.from("knowledge_base_jobs").update({
+    EdgeRuntime.waitUntil(runJob(admin, job.id, books).catch(async (e) => {
+      console.error("Knowledge base job failed", e.message);
+      await updateJob(admin, job.id, {
         status: "failed", errors: [{ error: e.message }], finished_at: new Date().toISOString(),
-      }).eq("id", job.id);
+      });
     }));
 
-    return new Response(JSON.stringify({ job_id: job.id, total_books: BOOKS.length }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ job_id: job.id, total_books: books.length, test: Boolean(requestBody.test) });
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
+    return jsonResponse({ error: e.message }, 500);
   }
 });
