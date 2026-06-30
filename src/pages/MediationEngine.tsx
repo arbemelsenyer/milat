@@ -979,6 +979,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                           </ol>
                         </AnaSection>
                       )}
+                      <SourcesPanel sources={an.sources} />
                     </div>
                   )}
                 </div>
