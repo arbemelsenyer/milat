@@ -13,6 +13,7 @@ import { AppNavbar } from '@/components/AppNavbar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Search, UserCog, Calendar, UserPlus, Trash2 } from 'lucide-react';
+import { KnowledgeBaseAdmin } from '@/components/admin/KnowledgeBaseAdmin';
 
 interface CaseRow {
   id: string;
@@ -237,6 +238,10 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent><div className="text-2xl font-bold text-green-500">{mediators.length}</div></CardContent>
           </Card>
+        </div>
+
+        <div className="mb-8">
+          <KnowledgeBaseAdmin />
         </div>
 
         <Tabs defaultValue="cases" className="space-y-6">
