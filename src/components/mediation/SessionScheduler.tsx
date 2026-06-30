@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Calendar, Plus, Sparkles, Loader2, Users, Clock, Circle, Eye, Send, RefreshCw, CheckCircle2, XCircle, MailWarning } from "lucide-react";
+import { Calendar, Plus, Sparkles, Loader2, Users, Clock, Circle, Eye, Send, RefreshCw, CheckCircle2, XCircle, MailWarning, Ban } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 const TYPES = [
