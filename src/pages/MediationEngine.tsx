@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { AppNavbar } from "@/components/AppNavbar";
 import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -711,19 +712,30 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   const analysedCount = analyses.length;
   const canReport = analysedCount >= 2;
 
+  const progressPct = parties.length ? Math.round((analysedCount / parties.length) * 100) : 0;
+
   return (
     <div className="space-y-4">
-      <Card className="p-6 space-y-2">
-        <h2 className="text-2xl font-bold text-primary">Aşama 3 — Taraf Analizi</h2>
-        <p className="text-sm text-muted-foreground">
-          Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. En az 2 taraf analiz edildiğinde Ortak Zemin Raporu üretebilirsiniz.
-        </p>
-        <div className="flex gap-2 text-xs">
-          <Badge variant="secondary">Taraf: {parties.length}</Badge>
-          <Badge variant="secondary">Analiz: {analysedCount}</Badge>
-          {report && <Badge>Ortak Zemin Raporu ✓</Badge>}
+      <Card className="p-6 space-y-3">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-2xl font-bold text-primary">Aşama 3 — Taraf Analizi</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. En az 2 taraf analiz edildiğinde Ortak Zemin Raporu üretebilirsiniz.
+            </p>
+          </div>
+          <div className="text-right text-xs space-y-1 min-w-[180px]">
+            <div className="font-medium">Taraf Analizi: {analysedCount}/{parties.length} taraf analiz edildi</div>
+            <Progress value={progressPct} className="h-2" />
+            {report
+              ? <div className="text-emerald-600 font-semibold">✓ Ortak Zemin Raporu Hazır</div>
+              : canReport
+                ? <div className="text-muted-foreground">Ortak Zemin Raporu üretilebilir</div>
+                : <div className="text-muted-foreground">Rapor için en az 2 analiz gerekli</div>}
+          </div>
         </div>
       </Card>
+
 
       {parties.length === 0 && (
         <Card className="p-6"><p className="text-muted-foreground">Önce Aşama 2'de taraf ekleyin.</p></Card>
@@ -756,6 +768,15 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
 
               {open && (
                 <div className="border-t p-4 space-y-4">
+                  {/* Step indicator */}
+                  <div className="flex items-center gap-2 text-xs">
+                    <StepDot done={partyDocs.length > 0} label="1. Belge yüklendi" />
+                    <span className="text-muted-foreground">→</span>
+                    <StepDot done={!!a} active={analysing === p.id} label="2. AI analiz edildi" />
+                    <span className="text-muted-foreground">→</span>
+                    <StepDot done={!!report && !!a} label="3. Ortak zemine dahil" />
+                  </div>
+
                   {/* Party info */}
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     {p.tc_kimlik && <div><span className="text-muted-foreground">TC:</span> {p.tc_kimlik}</div>}
@@ -790,7 +811,14 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                         ))}
                       </ul>
                     )}
+                    {partyDocs.some((d) => !(d.mime_type ?? "").startsWith("text/") && !d.file_name?.toLowerCase().endsWith(".txt")) && (
+                      <p className="text-[11px] text-amber-600 mt-1 flex items-start gap-1">
+                        <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                        Uyarı: PDF/Word belgelerin içeriği tam okunamayabilir. Daha doğru analiz için kritik metinleri .txt olarak da yükleyebilirsiniz.
+                      </p>
+                    )}
                   </div>
+
 
                   {/* Analysis trigger */}
                   <div className="flex gap-2 flex-wrap">
@@ -901,6 +929,15 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
         )}
       </Card>
     </div>
+  );
+}
+
+function StepDot({ done, active, label }: { done: boolean; active?: boolean; label: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${done ? "bg-emerald-50 border-emerald-300 text-emerald-700" : active ? "bg-amber-50 border-amber-300 text-amber-700" : "bg-muted/40 border-border text-muted-foreground"}`}>
+      {done ? <CheckCircle2 className="h-3 w-3" /> : active ? <Loader2 className="h-3 w-3 animate-spin" /> : <Circle className="h-3 w-3" />}
+      {label}
+    </span>
   );
 }
 
