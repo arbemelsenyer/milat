@@ -601,6 +601,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
       .select("*")
       .eq("case_id", caseRow.id)
       .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
     if (error) setReportFetchError(error.message);
     setReport(data ?? null);
