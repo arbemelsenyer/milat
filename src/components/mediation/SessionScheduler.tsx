@@ -250,6 +250,26 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
         })
       )
     );
+
+    // Send actual email invites via edge function
+    let emailSummary = "";
+    if (inserted?.id) {
+      const { data: emailRes, error: emailErr } = await supabase.functions.invoke(
+        "send-meeting-invite",
+        { body: { sessionId: inserted.id } }
+      );
+      if (emailErr) {
+        emailSummary = " (email gönderilemedi)";
+        toast({
+          title: "Email uyarısı",
+          description: emailErr.message ?? "Davet emailleri gönderilemedi",
+          variant: "destructive",
+        });
+      } else {
+        emailSummary = ` · ${emailRes?.sent ?? 0} email gönderildi`;
+      }
+    }
+
     setDate("");
     setNotes("");
     toast({ title: "Seans planlandı", description: `${recipients.length} katılımcıya davet gönderildi` });
