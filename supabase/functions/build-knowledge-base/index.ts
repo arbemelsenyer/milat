@@ -159,7 +159,7 @@ async function embed(texts: string[]): Promise<number[][]> {
 
 // ============ Whole-book mode ============
 async function processBookWhole(admin: any, jobId: string, book: Book, existingChunks: number): Promise<{ chunks: number }> {
-  const { extractText } = await import("npm:unpdf@0.12.1");
+  // extractText/getDocumentProxy statik olarak import edildi.
   console.log(`[${jobId}] Processing book (whole): ${book.title}`);
   await updateJob(admin, jobId, { current_book: `${book.title} — PDF indiriliyor` });
   const resp = await withTimeout("PDF indirme", PDF_DOWNLOAD_TIMEOUT_MS, () =>
