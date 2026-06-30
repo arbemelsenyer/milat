@@ -363,13 +363,12 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }
   switch (phase) {
     case 1: return <Phase1Summary caseRow={caseRow} />;
     case 2: return <Phase2Parties caseRow={caseRow} isMediator={isMediator} userId={userId} onDone={() => { bumpPhase(3); onAdvance(3); }} />;
-    case 3: return <Phase3Documents caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(4); onAdvance(4); }} />;
-    case 4: return <Phase4Analysis caseRow={caseRow} userId={userId} isMediator={isMediator} onDone={() => { bumpPhase(5); onAdvance(5); }} />;
-    case 5: return <Phase5MediatorPanel caseRow={caseRow} isMediator={isMediator} onDone={() => { bumpPhase(6); onAdvance(6); }} />;
-    case 6: return <SessionScheduler caseId={caseRow.id} />;
-    case 7: return <Phase7Expert caseRow={caseRow} />;
-    case 8: return <Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(9); onAdvance(9); }} />;
-    case 9: return <Phase9Closing caseRow={caseRow} />;
+    case 3: return <Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} onAdvance={onAdvance} bumpPhase={bumpPhase} />;
+    case 4: return <Phase4Summary caseRow={caseRow} />;
+    case 5: return <SessionScheduler caseId={caseRow.id} />;
+    case 6: return <Phase7Expert caseRow={caseRow} />;
+    case 7: return <Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(8); onAdvance(8); }} />;
+    case 8: return <Phase9Closing caseRow={caseRow} />;
     default: return null;
   }
 }
