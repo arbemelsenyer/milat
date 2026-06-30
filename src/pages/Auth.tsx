@@ -409,6 +409,15 @@ export default function AuthPage() {
                           </FormItem>
                         )}
                       />
+                      <div className="flex justify-end -mt-2">
+                        <button
+                          type="button"
+                          onClick={() => setForgotOpen(true)}
+                          className="text-sm text-primary hover:underline"
+                        >
+                          {language === 'tr' ? 'Şifremi Unuttum' : 'Forgot password?'}
+                        </button>
+                      </div>
                       <Button
                         type="submit"
                         size="lg"
