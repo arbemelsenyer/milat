@@ -43,34 +43,76 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
-    // Verify caller is this party
+    // Authorization: caller must be the party themselves, the case owner, the assigned mediator, or an admin.
+    const { data: caseRow } = await admin.from("cases")
+      .select("id, user_id, assigned_mediator_id, dispute_type, dispute_subtype, issue_description, title")
+      .eq("id", case_id).maybeSingle();
+    if (!caseRow) {
+      return new Response(JSON.stringify({ error: "Case not found" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const { data: party } = await admin
-      .from("case_parties").select("id, user_id, case_id, party_role, party_type, first_name, last_name, company_name")
+      .from("case_parties").select("id, user_id, case_id, party_role, party_type, first_name, last_name, company_name, email, gsm, phone, address, authorized_person")
       .eq("id", party_id).eq("case_id", case_id).maybeSingle();
-    if (!party || party.user_id !== userId) {
+    if (!party) {
+      return new Response(JSON.stringify({ error: "Party not found" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: roleRow } = await admin.from("user_roles")
+      .select("role").eq("user_id", userId).in("role", ["admin", "mediator"]).maybeSingle();
+    const isPrivileged = !!roleRow || caseRow.user_id === userId || caseRow.assigned_mediator_id === userId;
+    if (!isPrivileged && party.user_id !== userId) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { data: caseRow } = await admin.from("cases")
-      .select("dispute_type, dispute_subtype, issue_description").eq("id", case_id).maybeSingle();
+    // Per-party documents (preferred). Fallback to uploads by the party's user when party_id wasn't set.
+    let docsQuery = admin.from("case_documents")
+      .select("file_name, file_path, mime_type, analysis_result, party_id, uploaded_by")
+      .eq("case_id", case_id);
+    const { data: allDocs } = await docsQuery;
+    const docs = (allDocs ?? []).filter((d: any) =>
+      d.party_id === party_id || (!d.party_id && party.user_id && d.uploaded_by === party.user_id)
+    );
 
-    const { data: docs } = await admin.from("case_documents")
-      .select("file_name, analysis_result").eq("case_id", case_id).eq("uploaded_by", userId);
+    // Try to read the document text from storage (best-effort) so the AI can analyse content.
+    let docExcerpts = "";
+    let docReadFailed = false;
+    for (const d of docs.slice(0, 5)) {
+      try {
+        const { data: blob, error: dlErr } = await admin.storage.from("case-documents").download(d.file_path);
+        if (dlErr || !blob) { docReadFailed = true; continue; }
+        if ((d.mime_type ?? "").startsWith("text/") || d.file_name.toLowerCase().endsWith(".txt")) {
+          const txt = await blob.text();
+          docExcerpts += `\n--- ${d.file_name} ---\n${txt.slice(0, 4000)}\n`;
+        } else {
+          // For PDF/Word we send only filenames; full extraction would need a parser.
+          docReadFailed = true;
+        }
+      } catch { docReadFailed = true; }
+    }
 
     const partyName = party.party_type === "individual"
       ? `${party.first_name ?? ""} ${party.last_name ?? ""}`.trim()
       : (party.company_name ?? "Taraf");
 
-    const systemPrompt = `Sen bir Türk hukuk arabuluculuk uzmanı AI'sın. SADECE bu tarafın perspektifinden GİZLİ bir analiz hazırlıyorsun. Diğer taraf bunu ASLA göremeyecek. Çıktı JSON: {"strengths":[],"weaknesses":[],"risks":[],"opportunities":[],"precedents":[{"court":"","decision":"","relevance":""}],"discovery_questions":[{"id":1,"question":""}]} — tam 5 ihtiyaç tespiti sorusu üret.`;
+    const systemPrompt = `Sen bir Türk hukuk arabuluculuk uzmanı AI'sın. Bu tarafın perspektifinden detaylı bir analiz hazırlıyorsun. 
+Otomatik olarak: (1) niş hukuki alanı tespit et, (2) ilgili mevzuat ve Yargıtay/BAM emsallerini tara, (3) tarafın pozisyon/ihtiyaç/BATNA analizini yap, (4) yüklenen belgelerden somut bulgular çıkar.
+Çıktı YALNIZCA JSON: {"dispute_area":"","legal_framework":{"statutes":[],"precedents":[{"court":"","decision":"","relevance":""}]},"document_findings":[],"party_position":{"strengths":[],"weaknesses":[],"interests":[],"batna":"","watna":""},"risks":[],"opportunities":[],"discovery_questions":[{"id":1,"question":""}]} — tam 5 ihtiyaç tespiti sorusu üret.`;
 
     const userPrompt = `UYUŞMAZLIK TÜRÜ: ${caseRow?.dispute_type ?? ""} / ${caseRow?.dispute_subtype ?? ""}
-TARAF: ${partyName} (rol: ${party.party_role ?? "?"})
+BAŞLIK: ${caseRow?.title ?? ""}
+TARAF: ${partyName} (rol: ${party.party_role ?? "?"}, tür: ${party.party_type ?? ""})
+İLETİŞİM: ${party.email ?? ""} ${party.gsm ?? ""}
 UYUŞMAZLIK ÖZETİ: ${caseRow?.issue_description ?? "(belirtilmemiş)"}
-YÜKLENEN BELGELER: ${(docs ?? []).map((d) => `- ${d.file_name}`).join("\n") || "(belge yok)"}
+YÜKLENEN BELGELER (${docs.length}): ${docs.map((d: any) => `- ${d.file_name}`).join("\n") || "(belge yok)"}
+${docExcerpts ? `\nBELGE İÇERİKLERİ (kısmi):\n${docExcerpts}` : ""}
+${docReadFailed ? "\nNOT: Bazı belgeler (PDF/Word) metin olarak okunamadı; yalnızca dosya adlarından çıkarım yapıldı." : ""}
 
-Bu tarafın perspektifinden gizli analiz üret. Yargıtay ve BAM emsallerinden somut karar referansları ver.`;
+Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinden somut karar referansları ver.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
