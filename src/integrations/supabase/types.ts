@@ -760,6 +760,78 @@ export type Database = {
         }
         Relationships: []
       }
+      knowledge_base_chunks: {
+        Row: {
+          category: string
+          chunk_index: number
+          chunk_text: string
+          created_at: string
+          embedding: string | null
+          id: string
+          source_title: string
+          source_url: string
+        }
+        Insert: {
+          category?: string
+          chunk_index?: number
+          chunk_text: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          source_title: string
+          source_url: string
+        }
+        Update: {
+          category?: string
+          chunk_index?: number
+          chunk_text?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          source_title?: string
+          source_url?: string
+        }
+        Relationships: []
+      }
+      knowledge_base_jobs: {
+        Row: {
+          current_book: string | null
+          errors: Json
+          finished_at: string | null
+          id: string
+          processed_books: number
+          started_at: string
+          status: string
+          total_books: number
+          total_chunks: number
+          updated_at: string
+        }
+        Insert: {
+          current_book?: string | null
+          errors?: Json
+          finished_at?: string | null
+          id?: string
+          processed_books?: number
+          started_at?: string
+          status?: string
+          total_books?: number
+          total_chunks?: number
+          updated_at?: string
+        }
+        Update: {
+          current_book?: string | null
+          errors?: Json
+          finished_at?: string | null
+          id?: string
+          processed_books?: number
+          started_at?: string
+          status?: string
+          total_books?: number
+          total_chunks?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       mediator_availability: {
         Row: {
           created_at: string
@@ -1441,6 +1513,21 @@ export type Database = {
           id: string
           niche_area: string
           similarity: number
+        }[]
+      }
+      match_knowledge_base: {
+        Args: {
+          filter_category?: string
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          category: string
+          chunk_text: string
+          similarity: number
+          source_title: string
+          source_url: string
         }[]
       }
     }
