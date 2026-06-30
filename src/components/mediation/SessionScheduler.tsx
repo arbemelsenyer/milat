@@ -272,7 +272,7 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
 
     setDate("");
     setNotes("");
-    toast({ title: "Seans planlandı", description: `${recipients.length} katılımcıya davet gönderildi` });
+    toast({ title: "Seans planlandı", description: `${recipients.length} katılımcıya in-app davet gönderildi${emailSummary}` });
     load();
   };
 
