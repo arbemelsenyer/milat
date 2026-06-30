@@ -1023,6 +1023,15 @@ function CommonGroundView({ data, strategy }: { data: any; strategy: any }) {
 /* ===================== PHASE 4 - MEDIATOR PANEL (READ-ONLY SUMMARY) ===================== */
 
 function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
+  const [uyap, setUyap] = useState(caseRow.uyap_no || "");
+  const [savingUyap, setSavingUyap] = useState(false);
+  async function saveUyap() {
+    setSavingUyap(true);
+    const { error } = await supabase.from("cases").update({ uyap_no: uyap.trim() || null } as any).eq("id", caseRow.id);
+    setSavingUyap(false);
+    if (error) toast({ title: "Kaydedilemedi", description: trErr(error.message), variant: "destructive" });
+    else toast({ title: "UYAP Kayıt No güncellendi" });
+  }
   const [report, setReport] = useState<any>(null);
   const [analyses, setAnalyses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
