@@ -98,6 +98,7 @@ export default function MediationEngine() {
   const [loading, setLoading] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [activeCase, setActiveCase] = useState<CaseRow | null>(null);
+  const [phase3Complete, setPhase3Complete] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -112,6 +113,18 @@ export default function MediationEngine() {
   useEffect(() => {
     if (caseId) loadCase(caseId); else setActiveCase(null);
   }, [caseId]);
+
+  const checkPhase3 = useCallback(async (id: string) => {
+    const [{ count: aCount }, { data: report }] = await Promise.all([
+      supabase.from("party_analyses").select("id", { count: "exact", head: true }).eq("case_id", id),
+      supabase.from("common_ground_reports").select("id").eq("case_id", id).maybeSingle(),
+    ]);
+    setPhase3Complete((aCount ?? 0) >= 2 && !!report);
+  }, []);
+
+  useEffect(() => {
+    if (caseId) checkPhase3(caseId);
+  }, [caseId, checkPhase3, phaseParam]);
 
   useEffect(() => {
     if (params.get("new") === "1") {
