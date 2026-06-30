@@ -46,6 +46,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/mediator" element={<RedirectToHub />} />
             <Route path="/mediator-dashboard" element={<MediatorDashboard />} />
