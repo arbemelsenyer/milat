@@ -13,6 +13,7 @@ import { AppNavbar } from '@/components/AppNavbar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Search, UserCog, Calendar, UserPlus, Trash2 } from 'lucide-react';
+import { KnowledgeBaseAdmin } from '@/components/admin/KnowledgeBaseAdmin';
 
 interface CaseRow {
   id: string;
