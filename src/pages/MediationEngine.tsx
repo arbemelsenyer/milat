@@ -1303,7 +1303,13 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
       </div>
       {report ? (
         <div>
-          <h3 className="font-semibold mb-2">Ortak Zemin Raporu</h3>
+          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+            <h3 className="font-semibold">Ortak Zemin Raporu</h3>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "print" })}>PDF</Button>
+              <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "html" })}>İndir</Button>
+            </div>
+          </div>
           <CommonGroundView data={report.report} strategy={report.strategy} />
         </div>
       ) : (
