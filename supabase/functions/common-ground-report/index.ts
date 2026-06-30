@@ -43,13 +43,28 @@ Deno.serve(async (req) => {
     const { data: discAnswers } = await admin.from("case_discovery_questions")
       .select("party_id, question_text, answer_text").eq("case_id", case_id);
 
-    const systemPrompt = `Sen bir kıdemli arabulucu danışmansın. Birden fazla tarafın GİZLİ analizlerini okuyup ortak zemin raporu ve strateji üretiyorsun. Çıktın SADECE arabulucu görecek. JSON: {"common_interests":[],"high_potential_areas":[],"red_lines":[],"recommended_strategy":"","caucus_plan":[],"opening_offer":"","fallback_options":[]}`;
+    const systemPrompt = `Sen kıdemli bir Türk arabuluculuk danışmanısın. Tarafların gizli analizlerini okuyup ortak zemin raporu ve arabulucu stratejisi üretiyorsun.
+Çıktı YALNIZCA JSON: {
+  "common_interests": [],
+  "zopa": {"description":"", "lower_bound":"", "upper_bound":""},
+  "scenarios": [
+    {"label":"A - Hızlı Çözüm","summary":"","tradeoffs":[]},
+    {"label":"B - Dengeli","summary":"","tradeoffs":[]},
+    {"label":"C - Yaratıcı","summary":"","tradeoffs":[]}
+  ],
+  "mediator_strategy": {
+    "opening_statement": "",
+    "critical_questions": [],
+    "deadlock_techniques": []
+  },
+  "red_lines": []
+}`;
 
-    const userPrompt = `BAŞVURU: ${caseRow.dispute_type} / ${caseRow.dispute_subtype}
-ÖZET: ${caseRow.issue_description}
+    const userPrompt = `BAŞVURU: ${caseRow.title ?? ""} — ${caseRow.dispute_type ?? ""} / ${caseRow.dispute_subtype ?? ""}
+ÖZET: ${caseRow.issue_description ?? ""}
 
 TARAF ANALİZLERİ:
-${(analyses ?? []).map((a: any) => `--- ${a.case_parties?.party_role ?? ""} ---\n${JSON.stringify(a.analysis, null, 2)}`).join("\n\n")}
+${(analyses ?? []).map((a: any) => `--- ${a.case_parties?.party_role ?? ""} (${a.case_parties?.first_name ?? a.case_parties?.company_name ?? ""}) ---\n${JSON.stringify(a.analysis, null, 2)}`).join("\n\n")}
 
 İHTİYAÇ TESPİTİ CEVAPLARI:
 ${(discAnswers ?? []).map((d) => `[Party ${d.party_id?.slice(0, 8)}] Q: ${d.question_text}\nA: ${d.answer_text ?? "(cevap yok)"}`).join("\n")}`;
