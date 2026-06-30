@@ -25,17 +25,25 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceKey);
 
     const { data: party } = await admin.from("case_parties")
-      .select("id, case_id, email, first_name, last_name, company_name, party_type, invite_token, cases:case_id(assigned_mediator_id, application_no)")
+      .select("id, case_id, email, first_name, last_name, company_name, party_type, cases:case_id(assigned_mediator_id, application_no)")
       .eq("id", party_id).maybeSingle();
     if (!party) return new Response(JSON.stringify({ error: "Party not found" }), { status: 404, headers: corsHeaders });
     if ((party as any).cases?.assigned_mediator_id !== u.user.id) {
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
     }
 
-    let token = party.invite_token;
+    // Issue / fetch invite token from private invites table (never exposed to case owner via RLS)
+    const { data: existingInvite } = await admin.from("case_party_invites")
+      .select("token").eq("case_party_id", party_id).maybeSingle();
+    let token = existingInvite?.token as string | undefined;
     if (!token) {
       token = crypto.randomUUID();
-      await admin.from("case_parties").update({ invite_token: token, invite_status: "pending" }).eq("id", party_id);
+      await admin.from("case_party_invites").insert({
+        case_party_id: party_id,
+        token,
+        invite_status: "pending",
+      });
+      await admin.from("case_parties").update({ invite_status: "pending" }).eq("id", party_id);
     }
 
     const name = party.party_type === "individual"
