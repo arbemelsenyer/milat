@@ -204,6 +204,7 @@ export type Database = {
           file_size: number | null
           id: string
           mime_type: string | null
+          party_id: string | null
           uploaded_by: string
         }
         Insert: {
@@ -215,6 +216,7 @@ export type Database = {
           file_size?: number | null
           id?: string
           mime_type?: string | null
+          party_id?: string | null
           uploaded_by: string
         }
         Update: {
@@ -226,6 +228,7 @@ export type Database = {
           file_size?: number | null
           id?: string
           mime_type?: string | null
+          party_id?: string | null
           uploaded_by?: string
         }
         Relationships: [
@@ -234,6 +237,13 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_documents_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
             referencedColumns: ["id"]
           },
         ]
