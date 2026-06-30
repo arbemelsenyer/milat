@@ -86,10 +86,13 @@ ${(discAnswers ?? []).map((d) => `[Party ${d.party_id?.slice(0, 8)}] Q: ${d.ques
     let parsed: any = {};
     try { parsed = JSON.parse(aiJson.choices[0].message.content); } catch { parsed = {}; }
 
-    const { data: inserted } = await admin.from("common_ground_reports").insert({
+    const { data: inserted, error: upErr } = await admin.from("common_ground_reports").upsert({
       case_id, report: parsed, strategy: parsed.mediator_strategy ?? {},
       round_number: caseRow.round_number ?? 1,
-    }).select().single();
+    }, { onConflict: "case_id,round_number" }).select().maybeSingle();
+    if (upErr) {
+      return new Response(JSON.stringify({ error: upErr.message }), { status: 500, headers: corsHeaders });
+    }
 
     return new Response(JSON.stringify({ report: inserted }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
