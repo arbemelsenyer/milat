@@ -673,6 +673,37 @@ export default function AuthPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {language === 'tr' ? 'Şifremi Unuttum' : 'Forgot Password'}
+            </DialogTitle>
+            <DialogDescription>
+              {language === 'tr'
+                ? 'E-posta adresinizi girin, size şifre sıfırlama linki gönderelim.'
+                : 'Enter your email and we will send you a reset link.'}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleForgotPassword} className="space-y-4">
+            <Input
+              type="email"
+              placeholder="ornek@email.com"
+              value={forgotEmail}
+              onChange={(e) => setForgotEmail(e.target.value)}
+              autoComplete="email"
+              required
+            />
+            <DialogFooter>
+              <Button type="submit" disabled={forgotLoading} className="w-full sm:w-auto">
+                {forgotLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {language === 'tr' ? 'Sıfırlama Linki Gönder' : 'Send Reset Link'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
