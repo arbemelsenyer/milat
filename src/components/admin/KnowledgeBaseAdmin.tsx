@@ -93,15 +93,22 @@ export function KnowledgeBaseAdmin() {
     return () => { cancelled = true; clearInterval(t); };
   }, []);
 
-  const start = async (mode: "all" | "test" = "all") => {
-    if (mode === "test") setTesting(true); else setStarting(true);
+  const [retrying, setRetrying] = useState(false);
+
+  const start = async (mode: "all" | "test" | "retry" = "all") => {
+    if (mode === "test") setTesting(true);
+    else if (mode === "retry") setRetrying(true);
+    else setStarting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("build-knowledge-base", {
-        body: mode === "test" ? { test: true } : {},
-      });
+      const body = mode === "test" ? { test: true } : mode === "retry" ? { retry_skipped: true } : {};
+      const { data, error } = await supabase.functions.invoke("build-knowledge-base", { body });
       if (error) throw error;
       toast({
-        title: mode === "test" ? "Tek PDF test başlatıldı" : "Bilgi tabanı güncelleme başlatıldı",
+        title: mode === "test"
+          ? "Tek PDF test başlatıldı"
+          : mode === "retry"
+            ? "Atlanan kitaplar yeniden işleniyor (sayfa bölümleri halinde)"
+            : "Bilgi tabanı güncelleme başlatıldı",
         description: `${data?.total_books ?? 0} kitap kuyruğa alındı.`,
       });
       await load();
@@ -109,6 +116,8 @@ export function KnowledgeBaseAdmin() {
       toast({ title: "Hata", description: e.message ?? "Başlatılamadı", variant: "destructive" });
     } finally {
       setStarting(false);
+      setTesting(false);
+      setRetrying(false);
     }
   };
 
@@ -130,11 +139,15 @@ export function KnowledgeBaseAdmin() {
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={() => start("all")} disabled={starting || testing || running} size="sm">
+          <Button onClick={() => start("all")} disabled={starting || testing || retrying || running} size="sm">
             {starting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
             Bilgi Tabanını Güncelle
           </Button>
-          <Button onClick={() => start("test")} disabled={starting || testing || running} size="sm" variant="outline">
+          <Button onClick={() => start("retry")} disabled={starting || testing || retrying || running} size="sm" variant="secondary">
+            {retrying ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+            Atlanan Kitapları Yeniden Dene (sayfa bölümleri)
+          </Button>
+          <Button onClick={() => start("test")} disabled={starting || testing || retrying || running} size="sm" variant="outline">
             {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
             Tek PDF ile Test Et
           </Button>

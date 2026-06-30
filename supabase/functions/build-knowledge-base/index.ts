@@ -1,6 +1,9 @@
 // Admin-only: ADB resmi arabuluculuk PDF'lerini chunk + embed + store eder.
-// Tek bir invocation = en fazla 1 kitap işler. Edge runtime CPU/wall limitlerine takılmamak için
-// istemci (KnowledgeBaseAdmin) işi yeniden çağırarak (resume) tüm kitapları sırayla bitirir.
+// İki mod:
+//   - whole_book: invocation = en fazla 1 kitap (küçük/orta PDF'ler için).
+//   - page_chunked: invocation = mevcut kitabın PAGE_BATCH_SIZE sayfası
+//     (büyük PDF'ler için; CPU/zaman limitine takılan kitaplar bu modla yeniden işlenir).
+// İstemci (KnowledgeBaseAdmin) job running iken bizi resume_job_id ile yeniden çağırır.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { extractText, getDocumentProxy } from "npm:unpdf@0.12.1";
 
@@ -10,13 +13,21 @@ const corsHeaders = {
 };
 
 type Book = { title: string; url: string; category: string };
-type BuildRequest = { test?: boolean; limit?: number; resume_job_id?: string; only_url?: string };
+type BuildRequest = {
+  test?: boolean;
+  limit?: number;
+  resume_job_id?: string;
+  only_url?: string;
+  retry_skipped?: boolean;
+};
 
 const PDF_DOWNLOAD_TIMEOUT_MS = 60_000;
-const PDF_TEXT_TIMEOUT_MS = 120_000;
+const PAGE_EXTRACT_TIMEOUT_MS = 90_000;
 const EMBEDDING_TIMEOUT_MS = 45_000;
 const BOOK_TIMEOUT_MS = 240_000;
+const PAGE_SLICE_TIMEOUT_MS = 150_000;
 const MAX_EMBED_RETRIES = 4;
+const PAGE_BATCH_SIZE = 50; // sayfa grubu (büyük PDF'ler için)
 
 const BOOKS: Book[] = [
   { category: "genel", title: "ADB Yayını 1", url: "https://adb.adalet.gov.tr/Resimler/SayfaDokuman/40320221402571.pdf" },
@@ -39,6 +50,17 @@ const BOOKS: Book[] = [
   { category: "spor", title: "Uzman Arabuluculuk - Spor", url: "https://adb.adalet.gov.tr/Resimler/SayfaDokuman/1832021210755Spor.pdf" },
   { category: "sigorta", title: "Uzman Arabuluculuk - Sigorta Hukuku", url: "https://adb.adalet.gov.tr/Resimler/SayfaDokuman/1792021150550Arabuluculuk_Sigorta_Hukuku_Dijital%20(1).pdf" },
 ];
+
+// Daha önce whole_book modunda CPU limitine takılan 7 kitap.
+const SKIPPED_TITLES = new Set<string>([
+  "Arabuluculukta Etkili Taraf Vekilliği",
+  "Aile Arabuluculuğu",
+  "Uzman Arabuluculuğa Giriş",
+  "Uzman Arabuluculuk - İş",
+  "Uzman Arabuluculuk - Banka ve Finans",
+  "Uzman Arabuluculuk - Fikri Mülkiyet",
+  "Uzman Arabuluculuk - Sigorta Hukuku",
+]);
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -135,8 +157,10 @@ async function embed(texts: string[]): Promise<number[][]> {
   throw lastError ?? new Error("Embedding isteği başarısız oldu");
 }
 
-async function processBook(admin: any, jobId: string, book: Book, existingChunks: number): Promise<{ chunks: number }> {
-  console.log(`[${jobId}] Processing book: ${book.title}`);
+// ============ Whole-book mode ============
+async function processBookWhole(admin: any, jobId: string, book: Book, existingChunks: number): Promise<{ chunks: number }> {
+  // extractText/getDocumentProxy statik olarak import edildi.
+  console.log(`[${jobId}] Processing book (whole): ${book.title}`);
   await updateJob(admin, jobId, { current_book: `${book.title} — PDF indiriliyor` });
   const resp = await withTimeout("PDF indirme", PDF_DOWNLOAD_TIMEOUT_MS, () =>
     fetch(book.url, { headers: { "User-Agent": "Mozilla/5.0 MediPactBot" } })
@@ -145,14 +169,13 @@ async function processBook(admin: any, jobId: string, book: Book, existingChunks
   const buf = new Uint8Array(await resp.arrayBuffer());
   await updateJob(admin, jobId, { current_book: `${book.title} — metin çıkarılıyor` });
   const pdf = await getDocumentProxy(buf);
-  const { text } = await withTimeout("PDF metin çıkarma", PDF_TEXT_TIMEOUT_MS, () => extractText(pdf, { mergePages: true }));
+  const { text } = await withTimeout("PDF metin çıkarma", PAGE_EXTRACT_TIMEOUT_MS, () => extractText(pdf, { mergePages: true }));
   const fullText = Array.isArray(text) ? text.join("\n") : text;
   const chunks = chunkText(fullText);
   if (!chunks.length) return { chunks: 0 };
   if (chunks.length > MAX_CHUNKS_PER_BOOK) {
     throw new Error(`Anormal parça sayısı (${chunks.length} > ${MAX_CHUNKS_PER_BOOK}). PDF içeriği bozuk veya yanlış indirilmiş olabilir.`);
   }
-
   await updateJob(admin, jobId, { current_book: `${book.title} — eski parçalar temizleniyor` });
   await admin.from("knowledge_base_chunks").delete().eq("source_url", book.url);
 
@@ -165,12 +188,8 @@ async function processBook(admin: any, jobId: string, book: Book, existingChunks
     const slice = chunks.slice(i, i + BATCH);
     const vectors = await embed(slice);
     const rows = slice.map((c, j) => ({
-      source_title: book.title,
-      source_url: book.url,
-      category: book.category,
-      chunk_text: c,
-      chunk_index: i + j,
-      embedding: vectors[j] as any,
+      source_title: book.title, source_url: book.url, category: book.category,
+      chunk_text: c, chunk_index: i + j, embedding: vectors[j] as any,
     }));
     const { error } = await admin.from("knowledge_base_chunks").insert(rows);
     if (error) throw new Error(error.message);
@@ -180,20 +199,88 @@ async function processBook(admin: any, jobId: string, book: Book, existingChunks
       current_book: `${book.title} — ${total}/${chunks.length} parça kaydedildi`,
     });
   }
-  console.log(`[${jobId}] Completed book: ${book.title}, chunks=${total}`);
+  console.log(`[${jobId}] Completed (whole): ${book.title}, chunks=${total}`);
   return { chunks: total };
 }
 
-const MAX_ATTEMPTS_PER_BOOK = 2;
+// ============ Page-chunked mode ============
+// Tek invocation = mevcut kitabın PAGE_BATCH_SIZE sayfası. İlerleme book_progress'a yazılır.
+async function processBookPageSlice(
+  admin: any,
+  jobId: string,
+  book: Book,
+  startPage: number,
+  bookProgress: Record<string, any>,
+  totalChunksSoFar: number,
+): Promise<{ pagesProcessed: number; totalPages: number; chunksAdded: number; bookDone: boolean }> {
+  console.log(`[${jobId}] Page-slice: ${book.title} from page ${startPage}`);
+  await updateJob(admin, jobId, { current_book: `${book.title} — sayfa ${startPage + 1}+ indiriliyor` });
+  const resp = await withTimeout("PDF indirme", PDF_DOWNLOAD_TIMEOUT_MS, () =>
+    fetch(book.url, { headers: { "User-Agent": "Mozilla/5.0 MediPactBot" } })
+  );
+  if (!resp.ok) throw new Error(`PDF indirilemedi ${resp.status}`);
+  const buf = new Uint8Array(await resp.arrayBuffer());
 
-// Bir invocation = en fazla 1 kitap. İstemci, status running ve processed<total iken bizi yeniden çağırır.
-async function runOneBook(admin: any, jobId: string) {
+  await updateJob(admin, jobId, { current_book: `${book.title} — sayfa açılıyor` });
+  const pdf: any = await getDocumentProxy(buf);
+  const totalPages: number = pdf.numPages;
+  const endPage = Math.min(startPage + PAGE_BATCH_SIZE, totalPages);
+
+  // İlk dilimde eski chunk'ları temizle.
+  if (startPage === 0) {
+    await admin.from("knowledge_base_chunks").delete().eq("source_url", book.url);
+  }
+
+  await updateJob(admin, jobId, { current_book: `${book.title} — metin çıkarılıyor (sayfa ${startPage + 1}-${endPage}/${totalPages})` });
+  const pageTexts: string[] = await withTimeout("Sayfa metin çıkarma", PAGE_EXTRACT_TIMEOUT_MS, async () => {
+    const out: string[] = [];
+    for (let p = startPage + 1; p <= endPage; p++) {
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+      out.push(tc.items.map((it: any) => ("str" in it ? it.str : "")).join(" "));
+    }
+    return out;
+  });
+
+  const sliceText = pageTexts.join("\n");
+  const chunks = chunkText(sliceText);
+  let chunkAdded = 0;
+  const baseIndex = Number(bookProgress[book.url]?.chunk_offset ?? 0);
+  if (chunks.length) {
+    const BATCH = 16;
+    for (let i = 0; i < chunks.length; i += BATCH) {
+      await updateJob(admin, jobId, {
+        current_book: `${book.title} — embedding sayfa ${startPage + 1}-${endPage}/${totalPages} (${i + 1}-${Math.min(i + BATCH, chunks.length)}/${chunks.length})`,
+      });
+      const slice = chunks.slice(i, i + BATCH);
+      const vectors = await embed(slice);
+      const rows = slice.map((c, j) => ({
+        source_title: book.title, source_url: book.url, category: book.category,
+        chunk_text: c, chunk_index: baseIndex + i + j, embedding: vectors[j] as any,
+      }));
+      const { error } = await admin.from("knowledge_base_chunks").insert(rows);
+      if (error) throw new Error(error.message);
+      chunkAdded += rows.length;
+      await updateJob(admin, jobId, { total_chunks: totalChunksSoFar + chunkAdded });
+    }
+  }
+
+  const bookDone = endPage >= totalPages;
+  return { pagesProcessed: endPage - startPage, totalPages, chunksAdded: chunkAdded, bookDone };
+}
+
+const MAX_ATTEMPTS_PER_BOOK = 2;
+const MAX_ATTEMPTS_PER_SLICE = 2;
+
+async function runOne(admin: any, jobId: string) {
   const { data: job, error } = await admin.from("knowledge_base_jobs").select("*").eq("id", jobId).maybeSingle();
   if (error || !job) throw new Error("İş bulunamadı");
   const processedUrls: string[] = Array.isArray(job.processed_urls) ? job.processed_urls : [];
   const books: Book[] = Array.isArray(job.book_queue) && job.book_queue.length > 0 ? job.book_queue : BOOKS;
   const attemptCounts: Record<string, number> = (job.attempt_counts && typeof job.attempt_counts === "object") ? { ...job.attempt_counts } : {};
   const errors: any[] = Array.isArray(job.errors) ? [...job.errors] : [];
+  const bookProgress: Record<string, any> = (job.book_progress && typeof job.book_progress === "object") ? { ...job.book_progress } : {};
+  const mode: string = job.mode ?? "whole_book";
 
   const next = books.find((b) => !processedUrls.includes(b.url));
   if (!next) {
@@ -205,27 +292,92 @@ async function runOneBook(admin: any, jobId: string) {
     return { done: true };
   }
 
-  // Pre-increment attempt count BEFORE heavy work so CPU-time-exceeded kills don't loop forever.
+  // ---------- page_chunked mode ----------
+  if (mode === "page_chunked") {
+    const progress = bookProgress[next.url] ?? { pages_done: 0, total_pages: 0, chunk_offset: 0, slice_attempts: 0 };
+    const sliceAttempts = Number(progress.slice_attempts ?? 0) + 1;
+    progress.slice_attempts = sliceAttempts;
+    bookProgress[next.url] = progress;
+
+    if (sliceAttempts > MAX_ATTEMPTS_PER_SLICE) {
+      // Bu sayfa dilimi 2 denemede de çöktü; kitabı atla.
+      errors.push({ book: next.title, url: next.url, error: `Sayfa ${progress.pages_done + 1}+ dilimi ${MAX_ATTEMPTS_PER_SLICE} denemede de işlenemedi.` });
+      processedUrls.push(next.url);
+      progress.slice_attempts = 0;
+      await updateJob(admin, jobId, {
+        processed_books: processedUrls.length, processed_urls: processedUrls,
+        attempt_counts: attemptCounts, errors, book_progress: bookProgress, current_book: null,
+      });
+      if (processedUrls.length >= books.length) {
+        await updateJob(admin, jobId, {
+          status: errors.length ? "completed_with_errors" : "completed",
+          current_book: null, finished_at: new Date().toISOString(),
+        });
+      }
+      return { done: processedUrls.length >= books.length, skipped: next.title };
+    }
+
+    await updateJob(admin, jobId, {
+      status: "running",
+      current_book: `${next.title} (sayfa ${progress.pages_done + 1}+, deneme ${sliceAttempts}/${MAX_ATTEMPTS_PER_SLICE})`,
+      book_progress: bookProgress,
+    });
+
+    let totalChunks: number = Number(job.total_chunks ?? 0);
+    try {
+      const { pagesProcessed, totalPages, chunksAdded, bookDone } = await withTimeout(
+        `Sayfa dilimi: ${next.title}`,
+        PAGE_SLICE_TIMEOUT_MS,
+        () => processBookPageSlice(admin, jobId, next, Number(progress.pages_done ?? 0), bookProgress, totalChunks),
+      );
+      progress.pages_done = Number(progress.pages_done ?? 0) + pagesProcessed;
+      progress.total_pages = totalPages;
+      progress.chunk_offset = Number(progress.chunk_offset ?? 0) + chunksAdded;
+      progress.slice_attempts = 0; // başarılı dilim → sıfırla
+      bookProgress[next.url] = progress;
+      totalChunks += chunksAdded;
+
+      if (bookDone) {
+        processedUrls.push(next.url);
+        console.log(`[${jobId}] Book done (chunked): ${next.title}, total chunks=${progress.chunk_offset}`);
+      }
+
+      await updateJob(admin, jobId, {
+        processed_books: processedUrls.length, processed_urls: processedUrls,
+        total_chunks: totalChunks, book_progress: bookProgress,
+        current_book: bookDone ? null : `${next.title} — ${progress.pages_done}/${totalPages} sayfa tamamlandı`,
+      });
+      if (processedUrls.length >= books.length) {
+        await updateJob(admin, jobId, {
+          status: errors.length ? "completed_with_errors" : "completed",
+          current_book: null, finished_at: new Date().toISOString(),
+        });
+      }
+      return { done: processedUrls.length >= books.length, book: next.title, pages_done: progress.pages_done, total_pages: totalPages };
+    } catch (e: any) {
+      console.error(`[${jobId}] Slice failed: ${next.title}`, e?.message);
+      // slice_attempts zaten artırıldı; bookProgress'i kalıcı kaydet, hatayı şimdi ekleme (yeniden denenecek).
+      await updateJob(admin, jobId, { book_progress: bookProgress, current_book: null });
+      return { done: false, error: e?.message ?? String(e), book: next.title };
+    }
+  }
+
+  // ---------- whole_book mode (mevcut davranış) ----------
   const prevAttempts = Number(attemptCounts[next.url] ?? 0);
   const newAttempts = prevAttempts + 1;
   attemptCounts[next.url] = newAttempts;
 
   if (newAttempts > MAX_ATTEMPTS_PER_BOOK) {
-    // Skip this book permanently — already crashed worker repeatedly.
     errors.push({ book: next.title, url: next.url, error: `Kitap ${MAX_ATTEMPTS_PER_BOOK} denemede de işlenemedi (worker CPU/zaman limiti). Atlandı.` });
     processedUrls.push(next.url);
     await updateJob(admin, jobId, {
-      processed_books: processedUrls.length,
-      processed_urls: processedUrls,
-      attempt_counts: attemptCounts,
-      errors,
-      current_book: null,
+      processed_books: processedUrls.length, processed_urls: processedUrls,
+      attempt_counts: attemptCounts, errors, current_book: null,
     });
     if (processedUrls.length >= books.length) {
       await updateJob(admin, jobId, {
         status: errors.length ? "completed_with_errors" : "completed",
-        current_book: null,
-        finished_at: new Date().toISOString(),
+        current_book: null, finished_at: new Date().toISOString(),
       });
     }
     return { done: processedUrls.length >= books.length, processed: processedUrls.length, total: books.length, skipped: next.title };
@@ -240,7 +392,7 @@ async function runOneBook(admin: any, jobId: string) {
   let bookSucceeded = false;
   try {
     const { chunks } = await withTimeout(`Kitap işleme: ${next.title}`, BOOK_TIMEOUT_MS, () =>
-      processBook(admin, jobId, next, totalChunks)
+      processBookWhole(admin, jobId, next, totalChunks),
     );
     totalChunks += chunks;
     bookSucceeded = true;
@@ -248,26 +400,19 @@ async function runOneBook(admin: any, jobId: string) {
     console.error(`[${jobId}] Book failed: ${next.title}`, e?.message);
     if (newAttempts >= MAX_ATTEMPTS_PER_BOOK) {
       errors.push({ book: next.title, url: next.url, error: e?.message ?? String(e) });
-      bookSucceeded = true; // mark as processed (skip)
+      bookSucceeded = true;
     }
   }
 
-  if (bookSucceeded) {
-    processedUrls.push(next.url);
-  }
+  if (bookSucceeded) processedUrls.push(next.url);
   await updateJob(admin, jobId, {
-    processed_books: processedUrls.length,
-    processed_urls: processedUrls,
-    total_chunks: totalChunks,
-    attempt_counts: attemptCounts,
-    errors,
-    current_book: null,
+    processed_books: processedUrls.length, processed_urls: processedUrls,
+    total_chunks: totalChunks, attempt_counts: attemptCounts, errors, current_book: null,
   });
   if (processedUrls.length >= books.length) {
     await updateJob(admin, jobId, {
       status: errors.length ? "completed_with_errors" : "completed",
-      current_book: null,
-      finished_at: new Date().toISOString(),
+      current_book: null, finished_at: new Date().toISOString(),
     });
   }
   return { done: processedUrls.length >= books.length, processed: processedUrls.length, total: books.length };
@@ -287,9 +432,8 @@ Deno.serve(async (req) => {
       .select("role").eq("user_id", userData.user.id).eq("role", "admin").maybeSingle();
     if (!roleRow) return jsonResponse({ error: "Forbidden" }, 403);
 
-    // Resume mode — bir sonraki kitabı işle.
     if (requestBody.resume_job_id) {
-      const result = await runOneBook(admin, requestBody.resume_job_id);
+      const result = await runOne(admin, requestBody.resume_job_id);
       return jsonResponse({ job_id: requestBody.resume_job_id, ...result });
     }
 
@@ -299,12 +443,16 @@ Deno.serve(async (req) => {
       .in("status", ["pending", "running"]);
 
     let books: Book[];
-    if (requestBody.only_url) {
+    let mode: "whole_book" | "page_chunked" = "whole_book";
+
+    if (requestBody.retry_skipped) {
+      books = BOOKS.filter((b) => SKIPPED_TITLES.has(b.title));
+      mode = "page_chunked";
+    } else if (requestBody.only_url) {
       const b = BOOKS.find((x) => x.url === requestBody.only_url);
       if (!b) return jsonResponse({ error: "URL bulunamadı" }, 400);
       books = [b];
     } else if (requestBody.test) {
-      // En küçük dosya beklentisiyle Aile Arabuluculuğu seçildi (orta boy, hızlı doğrulama).
       books = [BOOKS[5]];
     } else if (requestBody.limit && requestBody.limit > 0) {
       books = BOOKS.slice(0, Math.min(requestBody.limit, BOOKS.length));
@@ -320,13 +468,14 @@ Deno.serve(async (req) => {
       current_book: books[0]?.title ?? null,
       processed_urls: [],
       book_queue: books,
+      mode,
+      book_progress: {},
     }).select().single();
     if (jobErr) throw jobErr;
-    console.log(`[${job.id}] Knowledge base job created, books=${books.length}`);
+    console.log(`[${job.id}] Job created mode=${mode} books=${books.length}`);
 
-    // İlk kitabı bu invocation içinde işle, gerisini istemci resume ile sürdürür.
-    const result = await runOneBook(admin, job.id);
-    return jsonResponse({ job_id: job.id, total_books: books.length, ...result });
+    const result = await runOne(admin, job.id);
+    return jsonResponse({ job_id: job.id, total_books: books.length, mode, ...result });
   } catch (e: any) {
     console.error("build-knowledge-base error", e?.message);
     return jsonResponse({ error: e?.message ?? "İç hata" }, 500);
