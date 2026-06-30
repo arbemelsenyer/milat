@@ -795,11 +795,13 @@ export type Database = {
       }
       knowledge_base_jobs: {
         Row: {
+          book_queue: Json | null
           current_book: string | null
           errors: Json
           finished_at: string | null
           id: string
           processed_books: number
+          processed_urls: Json
           started_at: string
           status: string
           total_books: number
@@ -807,11 +809,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          book_queue?: Json | null
           current_book?: string | null
           errors?: Json
           finished_at?: string | null
           id?: string
           processed_books?: number
+          processed_urls?: Json
           started_at?: string
           status?: string
           total_books?: number
@@ -819,11 +823,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          book_queue?: Json | null
           current_book?: string | null
           errors?: Json
           finished_at?: string | null
           id?: string
           processed_books?: number
+          processed_urls?: Json
           started_at?: string
           status?: string
           total_books?: number

@@ -1,5 +1,6 @@
-// Admin-only: scrape ADB official mediation PDFs, chunk, embed, store.
-// Runs in background via EdgeRuntime.waitUntil and writes progress to knowledge_base_jobs.
+// Admin-only: ADB resmi arabuluculuk PDF'lerini chunk + embed + store eder.
+// Tek bir invocation = en fazla 1 kitap işler. Edge runtime CPU/wall limitlerine takılmamak için
+// istemci (KnowledgeBaseAdmin) işi yeniden çağırarak (resume) tüm kitapları sırayla bitirir.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { extractText, getDocumentProxy } from "npm:unpdf@0.12.1";
 
@@ -9,13 +10,13 @@ const corsHeaders = {
 };
 
 type Book = { title: string; url: string; category: string };
-type BuildRequest = { test?: boolean; limit?: number };
+type BuildRequest = { test?: boolean; limit?: number; resume_job_id?: string; only_url?: string };
 
-const PDF_DOWNLOAD_TIMEOUT_MS = 45_000;
-const PDF_TEXT_TIMEOUT_MS = 90_000;
+const PDF_DOWNLOAD_TIMEOUT_MS = 60_000;
+const PDF_TEXT_TIMEOUT_MS = 120_000;
 const EMBEDDING_TIMEOUT_MS = 45_000;
-const BOOK_TIMEOUT_MS = 180_000;
-const MAX_EMBED_RETRIES = 3;
+const BOOK_TIMEOUT_MS = 240_000;
+const MAX_EMBED_RETRIES = 4;
 
 const BOOKS: Book[] = [
   { category: "genel", title: "ADB Yayını 1", url: "https://adb.adalet.gov.tr/Resimler/SayfaDokuman/40320221402571.pdf" },
@@ -65,10 +66,15 @@ async function readBody(req: Request): Promise<BuildRequest> {
 }
 
 async function withTimeout<T>(label: string, timeoutMs: number, task: () => Promise<T>): Promise<T> {
+  let to: number | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error(`${label} zaman aşımına uğradı (${Math.round(timeoutMs / 1000)} sn)`)), timeoutMs);
+    to = setTimeout(() => reject(new Error(`${label} zaman aşımına uğradı (${Math.round(timeoutMs / 1000)} sn)`)), timeoutMs) as unknown as number;
   });
-  return await Promise.race([task(), timeout]);
+  try {
+    return await Promise.race([task(), timeout]);
+  } finally {
+    if (to !== undefined) clearTimeout(to);
+  }
 }
 
 async function updateJob(admin: any, jobId: string, patch: Record<string, unknown>) {
@@ -82,7 +88,6 @@ async function updateJob(admin: any, jobId: string, patch: Record<string, unknow
 function chunkText(text: string, target = 900, overlap = 90): string[] {
   const clean = text.replace(/\s+/g, " ").trim();
   if (!clean) return [];
-  // Split on sentence boundaries first.
   const sentences = clean.split(/(?<=[.!?])\s+/);
   const chunks: string[] = [];
   let cur = "";
@@ -107,13 +112,13 @@ async function embed(texts: string[]): Promise<number[][]> {
         fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
           method: "POST",
           headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "openai/text-embedding-3-small",
-            input: texts,
-            dimensions: 768,
-          }),
+          body: JSON.stringify({ model: "openai/text-embedding-3-small", input: texts, dimensions: 768 }),
         })
       );
+      if (res.status === 429 || res.status >= 500) {
+        const body = await res.text();
+        throw new Error(`Embedding geçici hatası ${res.status}: ${body.slice(0, 200)}`);
+      }
       if (!res.ok) {
         const body = await res.text();
         throw new Error(`Embedding hatası ${res.status}: ${body.slice(0, 300)}`);
@@ -129,7 +134,7 @@ async function embed(texts: string[]): Promise<number[][]> {
 }
 
 async function processBook(admin: any, jobId: string, book: Book, existingChunks: number): Promise<{ chunks: number }> {
-  console.log(`Processing book: ${book.title}`);
+  console.log(`[${jobId}] Processing book: ${book.title}`);
   await updateJob(admin, jobId, { current_book: `${book.title} — PDF indiriliyor` });
   const resp = await withTimeout("PDF indirme", PDF_DOWNLOAD_TIMEOUT_MS, () =>
     fetch(book.url, { headers: { "User-Agent": "Mozilla/5.0 MediPactBot" } })
@@ -143,14 +148,15 @@ async function processBook(admin: any, jobId: string, book: Book, existingChunks
   const chunks = chunkText(fullText);
   if (!chunks.length) return { chunks: 0 };
 
-  // Wipe existing chunks for this source so we get a clean re-run.
   await updateJob(admin, jobId, { current_book: `${book.title} — eski parçalar temizleniyor` });
   await admin.from("knowledge_base_chunks").delete().eq("source_url", book.url);
 
   let total = 0;
-  const BATCH = 32;
+  const BATCH = 16;
   for (let i = 0; i < chunks.length; i += BATCH) {
-    await updateJob(admin, jobId, { current_book: `${book.title} — embedding ${i + 1}-${Math.min(i + BATCH, chunks.length)}/${chunks.length}` });
+    await updateJob(admin, jobId, {
+      current_book: `${book.title} — embedding ${i + 1}-${Math.min(i + BATCH, chunks.length)}/${chunks.length}`,
+    });
     const slice = chunks.slice(i, i + BATCH);
     const vectors = await embed(slice);
     const rows = slice.map((c, j) => ({
@@ -164,94 +170,118 @@ async function processBook(admin: any, jobId: string, book: Book, existingChunks
     const { error } = await admin.from("knowledge_base_chunks").insert(rows);
     if (error) throw new Error(error.message);
     total += rows.length;
-    await updateJob(admin, jobId, { total_chunks: existingChunks + total, current_book: `${book.title} — ${total}/${chunks.length} parça kaydedildi` });
+    await updateJob(admin, jobId, {
+      total_chunks: existingChunks + total,
+      current_book: `${book.title} — ${total}/${chunks.length} parça kaydedildi`,
+    });
   }
-  console.log(`Completed book: ${book.title}, chunks=${total}`);
+  console.log(`[${jobId}] Completed book: ${book.title}, chunks=${total}`);
   return { chunks: total };
 }
 
-async function runJob(admin: any, jobId: string, books: Book[]) {
-  let processed = 0;
-  let totalChunks = 0;
-  const errors: any[] = [];
-  for (const book of books) {
+// Bir invocation = en fazla 1 kitap. İstemci, status running ve processed<total iken bizi yeniden çağırır.
+async function runOneBook(admin: any, jobId: string) {
+  const { data: job, error } = await admin.from("knowledge_base_jobs").select("*").eq("id", jobId).maybeSingle();
+  if (error || !job) throw new Error("İş bulunamadı");
+  const processedUrls: string[] = Array.isArray(job.processed_urls) ? job.processed_urls : [];
+  const books: Book[] = Array.isArray(job.book_queue) && job.book_queue.length > 0 ? job.book_queue : BOOKS;
+  const next = books.find((b) => !processedUrls.includes(b.url));
+  if (!next) {
     await updateJob(admin, jobId, {
-      current_book: book.title,
-      processed_books: processed,
-      total_chunks: totalChunks,
-      status: "running",
+      status: (job.errors ?? []).length ? "completed_with_errors" : "completed",
+      current_book: null,
+      finished_at: new Date().toISOString(),
     });
-    try {
-      const { chunks } = await withTimeout(`Kitap işleme: ${book.title}`, BOOK_TIMEOUT_MS, () => processBook(admin, jobId, book, totalChunks));
-      totalChunks += chunks;
-    } catch (e: any) {
-      console.error(`Book failed: ${book.title}`, e.message);
-      errors.push({ book: book.title, url: book.url, error: e.message });
-    }
-    processed += 1;
-    await updateJob(admin, jobId, {
-      processed_books: processed,
-      total_chunks: totalChunks,
-      errors,
-      current_book: processed < books.length ? books[processed].title : null,
-    });
+    return { done: true };
   }
+
+  await updateJob(admin, jobId, { status: "running", current_book: next.title });
+  const errors: any[] = Array.isArray(job.errors) ? [...job.errors] : [];
+  let totalChunks: number = Number(job.total_chunks ?? 0);
+  try {
+    const { chunks } = await withTimeout(`Kitap işleme: ${next.title}`, BOOK_TIMEOUT_MS, () =>
+      processBook(admin, jobId, next, totalChunks)
+    );
+    totalChunks += chunks;
+  } catch (e: any) {
+    console.error(`[${jobId}] Book failed: ${next.title}`, e?.message);
+    errors.push({ book: next.title, url: next.url, error: e?.message ?? String(e) });
+  }
+  processedUrls.push(next.url);
   await updateJob(admin, jobId, {
-    status: errors.length ? "completed_with_errors" : "completed",
-    processed_books: processed,
+    processed_books: processedUrls.length,
+    processed_urls: processedUrls,
     total_chunks: totalChunks,
     errors,
     current_book: null,
-    finished_at: new Date().toISOString(),
   });
+  // Eğer hepsi bittiyse kapat.
+  if (processedUrls.length >= books.length) {
+    await updateJob(admin, jobId, {
+      status: errors.length ? "completed_with_errors" : "completed",
+      current_book: null,
+      finished_at: new Date().toISOString(),
+    });
+  }
+  return { done: processedUrls.length >= books.length, processed: processedUrls.length, total: books.length };
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
     const requestBody = await readBody(req);
-    const books = requestBody.test ? [BOOKS[1]] : BOOKS.slice(0, requestBody.limit && requestBody.limit > 0 ? Math.min(requestBody.limit, BOOKS.length) : BOOKS.length);
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
+    if (!authHeader) return jsonResponse({ error: "Unauthorized" }, 401);
     const userClient = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } } });
     const { data: userData } = await userClient.auth.getUser();
-    if (!userData?.user) {
-      return jsonResponse({ error: "Invalid session" }, 401);
-    }
+    if (!userData?.user) return jsonResponse({ error: "Invalid session" }, 401);
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: roleRow } = await admin.from("user_roles")
       .select("role").eq("user_id", userData.user.id).eq("role", "admin").maybeSingle();
-    if (!roleRow) {
-      return jsonResponse({ error: "Forbidden" }, 403);
+    if (!roleRow) return jsonResponse({ error: "Forbidden" }, 403);
+
+    // Resume mode — bir sonraki kitabı işle.
+    if (requestBody.resume_job_id) {
+      const result = await runOneBook(admin, requestBody.resume_job_id);
+      return jsonResponse({ job_id: requestBody.resume_job_id, ...result });
     }
 
-    // Prevent concurrent jobs.
-    const { data: running } = await admin.from("knowledge_base_jobs")
-      .select("id").in("status", ["pending", "running"]).maybeSingle();
-    if (running) {
-      return jsonResponse({ error: "Zaten çalışan bir iş var", job_id: running.id }, 409);
+    // Yeni iş başlat. Diğer aktif işleri temizle.
+    await admin.from("knowledge_base_jobs")
+      .update({ status: "failed", finished_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .in("status", ["pending", "running"]);
+
+    let books: Book[];
+    if (requestBody.only_url) {
+      const b = BOOKS.find((x) => x.url === requestBody.only_url);
+      if (!b) return jsonResponse({ error: "URL bulunamadı" }, 400);
+      books = [b];
+    } else if (requestBody.test) {
+      // En küçük dosya beklentisiyle Aile Arabuluculuğu seçildi (orta boy, hızlı doğrulama).
+      books = [BOOKS[5]];
+    } else if (requestBody.limit && requestBody.limit > 0) {
+      books = BOOKS.slice(0, Math.min(requestBody.limit, BOOKS.length));
+    } else {
+      books = BOOKS;
     }
 
     const { data: job, error: jobErr } = await admin.from("knowledge_base_jobs").insert({
-      status: "running", total_books: books.length, processed_books: 0, total_chunks: 0,
+      status: "running",
+      total_books: books.length,
+      processed_books: 0,
+      total_chunks: 0,
       current_book: books[0]?.title ?? null,
+      processed_urls: [],
+      book_queue: books,
     }).select().single();
     if (jobErr) throw jobErr;
+    console.log(`[${job.id}] Knowledge base job created, books=${books.length}`);
 
-    console.log(`Knowledge base job started: ${job.id}, books=${books.length}, test=${Boolean(requestBody.test)}`);
-
-    // @ts-ignore EdgeRuntime is available in Supabase functions
-    EdgeRuntime.waitUntil(runJob(admin, job.id, books).catch(async (e) => {
-      console.error("Knowledge base job failed", e.message);
-      await updateJob(admin, job.id, {
-        status: "failed", errors: [{ error: e.message }], finished_at: new Date().toISOString(),
-      });
-    }));
-
-    return jsonResponse({ job_id: job.id, total_books: books.length, test: Boolean(requestBody.test) });
+    // İlk kitabı bu invocation içinde işle, gerisini istemci resume ile sürdürür.
+    const result = await runOneBook(admin, job.id);
+    return jsonResponse({ job_id: job.id, total_books: books.length, ...result });
   } catch (e: any) {
-    return jsonResponse({ error: e.message }, 500);
+    console.error("build-knowledge-base error", e?.message);
+    return jsonResponse({ error: e?.message ?? "İç hata" }, 500);
   }
 });
