@@ -99,8 +99,14 @@ Deno.serve(async (req) => {
       ? `${party.first_name ?? ""} ${party.last_name ?? ""}`.trim()
       : (party.company_name ?? "Taraf");
 
+    // RAG: pull relevant chunks from the Ministry of Justice mediation knowledge base.
+    const ragQuery = [caseRow?.title, caseRow?.dispute_type, caseRow?.dispute_subtype, caseRow?.issue_description]
+      .filter(Boolean).join(" — ");
+    const ragCategory = mapDisputeToCategory(caseRow?.dispute_type, caseRow?.dispute_subtype);
+    const ragBlock = await fetchKnowledgeBlock(admin, apiKey, ragQuery, ragCategory);
+
     const systemPrompt = `Sen bir Türk hukuk arabuluculuk uzmanı AI'sın. Bu tarafın perspektifinden detaylı bir analiz hazırlıyorsun. 
-Otomatik olarak: (1) niş hukuki alanı tespit et, (2) ilgili mevzuat ve Yargıtay/BAM emsallerini tara, (3) tarafın pozisyon/ihtiyaç/BATNA analizini yap, (4) yüklenen belgelerden somut bulgular çıkar.
+Otomatik olarak: (1) niş hukuki alanı tespit et, (2) ilgili mevzuat ve Yargıtay/BAM emsallerini tara, (3) tarafın pozisyon/ihtiyaç/BATNA analizini yap, (4) yüklenen belgelerden somut bulgular çıkar. Sana verilen "İLGİLİ KAYNAK BİLGİSİ" bloklarından yararlan, alakalıysa kaynak adını parantez içinde göster.
 Çıktı YALNIZCA JSON: {"dispute_area":"","legal_framework":{"statutes":[],"precedents":[{"court":"","decision":"","relevance":""}]},"document_findings":[],"party_position":{"strengths":[],"weaknesses":[],"interests":[],"batna":"","watna":""},"risks":[],"opportunities":[],"discovery_questions":[{"id":1,"question":""}]} — tam 5 ihtiyaç tespiti sorusu üret.`;
 
     const userPrompt = `UYUŞMAZLIK TÜRÜ: ${caseRow?.dispute_type ?? ""} / ${caseRow?.dispute_subtype ?? ""}
@@ -111,8 +117,9 @@ UYUŞMAZLIK ÖZETİ: ${caseRow?.issue_description ?? "(belirtilmemiş)"}
 YÜKLENEN BELGELER (${docs.length}): ${docs.map((d: any) => `- ${d.file_name}`).join("\n") || "(belge yok)"}
 ${docExcerpts ? `\nBELGE İÇERİKLERİ (kısmi):\n${docExcerpts}` : ""}
 ${docReadFailed ? "\nNOT: Bazı belgeler (PDF/Word) metin olarak okunamadı; yalnızca dosya adlarından çıkarım yapıldı." : ""}
+${ragBlock}
 
-Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinden somut karar referansları ver.`;
+Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinden somut karar referansları ver. Yukarıdaki resmi kaynaklardan yararlanarak analiz yap; alakalıysa kaynak göster.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
