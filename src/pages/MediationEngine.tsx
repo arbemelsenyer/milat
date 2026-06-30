@@ -1053,6 +1053,16 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
     <Card className="p-6 space-y-4">
       <h2 className="text-2xl font-bold text-primary">Aşama 4 — Arabulucu Paneli</h2>
       <p className="text-sm text-muted-foreground">Aşama 3'te üretilen analizlerin ve ortak zemin raporunun özet görünümü.</p>
+      <div className="border rounded-md p-3 bg-muted/30 space-y-2">
+        <Label className="text-sm">UYAP Kayıt No (varsa girin)</Label>
+        <div className="flex gap-2">
+          <Input value={uyap} onChange={(e) => setUyap(e.target.value)} placeholder="Örn. 2026/12345" className="font-mono" />
+          <Button onClick={saveUyap} disabled={savingUyap}>
+            {savingUyap ? <Loader2 className="h-4 w-4 animate-spin" /> : "Kaydet"}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Başvuru UYAP sistemine kaydedildiğinde devlet tarafından verilen resmi numarayı buraya girin. Boş bırakılırsa belgelerde "UYAP No: Henüz kaydedilmedi" görünür.</p>
+      </div>
       <div>
         <h3 className="font-semibold mb-2">Taraf Analizleri ({analyses.length})</h3>
         <div className="space-y-2">
