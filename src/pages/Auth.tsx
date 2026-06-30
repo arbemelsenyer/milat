@@ -75,36 +75,41 @@ export default function AuthPage() {
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const [forgotSent, setForgotSent] = useState(false);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotEmail || !/^\S+@\S+\.\S+$/.test(forgotEmail)) {
-      toast({
-        variant: 'destructive',
-        title: language === 'tr' ? 'Geçersiz e-posta' : 'Invalid email',
-      });
+    setForgotError(null);
+    const email = forgotEmail.trim();
+    if (!email) {
+      setForgotError(language === 'tr' ? 'E-posta adresi gereklidir.' : 'Email is required.');
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      setForgotError(language === 'tr' ? 'Geçerli bir e-posta adresi girin.' : 'Enter a valid email address.');
       return;
     }
     setForgotLoading(true);
     const { supabase } = await import('@/integrations/supabase/client');
-    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     setForgotLoading(false);
     if (error) {
-      toast({ variant: 'destructive', title: language === 'tr' ? 'Hata' : 'Error', description: error.message });
+      const msg = error.message.toLowerCase();
+      if (msg.includes('rate') || msg.includes('too many')) {
+        setForgotError(language === 'tr'
+          ? 'Çok fazla istek gönderdiniz. Lütfen birkaç dakika bekleyin.'
+          : 'Too many requests. Please wait a few minutes.');
+      } else {
+        setForgotError(language === 'tr' ? `Gönderilemedi: ${error.message}` : `Failed: ${error.message}`);
+      }
       return;
     }
-    toast({
-      title: language === 'tr' ? 'E-posta gönderildi' : 'Email sent',
-      description:
-        language === 'tr'
-          ? 'Şifre sıfırlama linki email\'inize gönderildi.'
-          : 'Password reset link sent to your email.',
-    });
-    setForgotOpen(false);
-    setForgotEmail('');
+    setForgotSent(true);
   };
+
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
