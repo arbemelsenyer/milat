@@ -426,7 +426,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         is_individual: isInd,
         party_role: draft.party_role,
         role: draft.party_role,
-        invite_token: crypto.randomUUID(),
+        // invite_token is issued server-side by send-party-invite (kept private from case owner)
         invite_status: "pending",
         first_name: draft.first_name ?? null,
         last_name: draft.last_name ?? null,
