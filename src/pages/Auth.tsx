@@ -72,6 +72,40 @@ export default function AuthPage() {
   const [kvkkConsent, setKvkkConsent] = useState(false);
   const [openModal, setOpenModal] = useState<null | 'aydinlatma' | 'imha' | 'acikRiza'>(null);
 
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail || !/^\S+@\S+\.\S+$/.test(forgotEmail)) {
+      toast({
+        variant: 'destructive',
+        title: language === 'tr' ? 'Geçersiz e-posta' : 'Invalid email',
+      });
+      return;
+    }
+    setForgotLoading(true);
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setForgotLoading(false);
+    if (error) {
+      toast({ variant: 'destructive', title: language === 'tr' ? 'Hata' : 'Error', description: error.message });
+      return;
+    }
+    toast({
+      title: language === 'tr' ? 'E-posta gönderildi' : 'Email sent',
+      description:
+        language === 'tr'
+          ? 'Şifre sıfırlama linki email\'inize gönderildi.'
+          : 'Password reset link sent to your email.',
+    });
+    setForgotOpen(false);
+    setForgotEmail('');
+  };
+
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
