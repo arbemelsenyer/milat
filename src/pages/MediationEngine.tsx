@@ -955,38 +955,20 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
         })}
       </div>
 
-      {/* Common ground report */}
-      <Card className="p-6 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Ortak Zemin Raporu & Çözüm Önerileri</h3>
-          <Button onClick={generateReport} disabled={!canReport || reportBusy} size="sm">
-            {reportBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
-            {report ? "Yeniden Üret" : "Rapor Üret"}
-          </Button>
-        </div>
-        {!canReport && <p className="text-xs text-muted-foreground">En az 2 taraf analiz edildikten sonra aktif olur.</p>}
-        {reportError && (
-          <div className="text-xs text-destructive flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3" /> {reportError}
-            <Button size="sm" variant="outline" className="ml-2" onClick={generateReport}><RefreshCw className="h-3 w-3 mr-1" />Tekrar Dene</Button>
+      {/* Next-step meeting CTA — shown only when report exists */}
+      {report && (
+        <Card className="p-6 space-y-2">
+          <p className="text-xs text-muted-foreground">Sonraki adım: Taraflarla görüşme planlayın</p>
+          <div className="flex gap-2 flex-wrap">
+            <Button onClick={() => chooseMeeting("ozel")} disabled={navigating} variant="outline">
+              <CalIcon className="h-4 w-4 mr-1" /> Özel Görüşme Planla
+            </Button>
+            <Button onClick={() => chooseMeeting("ortak")} disabled={navigating}>
+              <CalIcon className="h-4 w-4 mr-1" /> Ortak Görüşme Planla
+            </Button>
           </div>
-        )}
-        {report && <CommonGroundView data={report.report} strategy={report.strategy} />}
-
-        {report && (
-          <div className="pt-4 border-t space-y-2">
-            <p className="text-xs text-muted-foreground">Sonraki adım: Taraflarla görüşme planlayın</p>
-            <div className="flex gap-2 flex-wrap">
-              <Button onClick={() => chooseMeeting("ozel")} disabled={navigating} variant="outline">
-                <CalIcon className="h-4 w-4 mr-1" /> Özel Görüşme Planla
-              </Button>
-              <Button onClick={() => chooseMeeting("ortak")} disabled={navigating}>
-                <CalIcon className="h-4 w-4 mr-1" /> Ortak Görüşme Planla
-              </Button>
-            </div>
-          </div>
-        )}
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }
