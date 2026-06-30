@@ -145,6 +145,8 @@ Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinde
     const content = aiJson?.choices?.[0]?.message?.content ?? "{}";
     let parsed: any = {};
     try { parsed = JSON.parse(content); } catch { parsed = { raw: content }; }
+    // Attach the sources actually used by RAG so the UI can show transparency info.
+    parsed.sources = ragSources;
 
     // Upsert the party_analyses row (one per party per round)
     const { data: existing } = await admin.from("party_analyses")
@@ -176,7 +178,7 @@ Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinde
       }
     }
 
-    return new Response(JSON.stringify({ analysis: parsed }), {
+    return new Response(JSON.stringify({ analysis: parsed, sources: ragSources }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
