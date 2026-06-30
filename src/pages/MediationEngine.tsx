@@ -1078,7 +1078,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   useEffect(() => { (async () => {
     setLoading(true);
     const [r, a] = await Promise.all([
-      supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).maybeSingle(),
+      supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("party_analyses").select("party_id, analysis, case_parties:party_id(first_name, last_name, company_name, party_role)").eq("case_id", caseRow.id),
     ]);
     setReport(r.data);
