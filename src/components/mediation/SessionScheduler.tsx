@@ -209,14 +209,52 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
     return `Taraf ${p.party_role ?? "?"}`;
   };
 
+  // -------- Preview & send invites flow --------
+  type InvitePreview = {
+    party_id: string;
+    email: string;
+    displayName: string;
+    subject: string;
+    html: string;
+  };
+  type InviteResult = {
+    party_id: string;
+    email: string;
+    ok: boolean;
+    error?: string;
+    resend_id?: string;
+  };
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [activeSession, setActiveSession] = useState<any | null>(null);
+  const [previews, setPreviews] = useState<InvitePreview[]>([]);
+  const [activePreviewIdx, setActivePreviewIdx] = useState(0);
+  const [lastResults, setLastResults] = useState<InviteResult[]>([]);
+  const [alreadySent, setAlreadySent] = useState(false);
+  const [retryingParty, setRetryingParty] = useState<string | null>(null);
+
+  const loadPreview = async (sessionId: string, opts?: { partyIds?: string[] }) => {
+    setPreviewLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-meeting-invite", {
+        body: { sessionId, preview: true, partyIds: opts?.partyIds },
+      });
+      if (error) throw error;
+      setPreviews((data?.recipients ?? []) as InvitePreview[]);
+      setActivePreviewIdx(0);
+      setAlreadySent(!!data?.alreadySent);
+    } catch (e: any) {
+      toast({ title: "Önizleme alınamadı", description: e.message ?? "Bilinmeyen hata", variant: "destructive" });
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   const add = async () => {
     if (!composedDateTime) return;
     if (conflicts.length > 0) {
-      toast({
-        title: "Çakışma var",
-        description: "Önce çakışmayı çözün veya alternatif zaman seçin.",
-        variant: "destructive",
-      });
+      toast({ title: "Çakışma var", description: "Önce çakışmayı çözün veya alternatif zaman seçin.", variant: "destructive" });
       return;
     }
     const participants = parties
@@ -231,51 +269,89 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
       participants,
     } as any).select().maybeSingle();
     if (error) {
-      toast({ title: "Hata", description: error.message, variant: "destructive" });
+      toast({ title: "Toplantı kaydedilemedi", description: error.message, variant: "destructive" });
       return;
     }
-    const when = new Date(composedDateTime).toLocaleString("tr-TR");
-    const title = "Yeni Toplantı Daveti";
-    const msg = `${TYPES.find((t) => t.key === type)?.label ?? type} — ${when}`;
+    // in-app notifications
     const recipients = parties
       .filter((p) => selectedPartyIds.includes(p.id) && p.user_id)
       .map((p) => p.user_id as string);
+    const when = new Date(composedDateTime).toLocaleString("tr-TR");
+    const msg = `${TYPES.find((t) => t.key === type)?.label ?? type} — ${when}`;
     await Promise.all(
       recipients.map((uid) =>
         supabase.rpc("create_notification", {
-          p_user_id: uid,
-          p_title: title,
-          p_message: msg,
-          p_type: "info",
-          p_link: `/case-room/${caseId}`,
+          p_user_id: uid, p_title: "Yeni Toplantı Daveti", p_message: msg,
+          p_type: "info", p_link: `/case-room/${caseId}`,
         })
       )
     );
-
-    // Send actual email invites via edge function
-    let emailSummary = "";
-    if (inserted?.id) {
-      const { data: emailRes, error: emailErr } = await supabase.functions.invoke(
-        "send-meeting-invite",
-        { body: { sessionId: inserted.id } }
-      );
-      if (emailErr) {
-        emailSummary = " (email gönderilemedi)";
-        toast({
-          title: "Email uyarısı",
-          description: emailErr.message ?? "Davet emailleri gönderilemedi",
-          variant: "destructive",
-        });
-      } else {
-        emailSummary = ` · ${emailRes?.sent ?? 0} email gönderildi`;
-      }
-    }
-
+    setActiveSession(inserted);
+    setLastResults([]);
+    setAlreadySent(false);
+    setPreviewOpen(true);
+    if (inserted?.id) await loadPreview(inserted.id);
     setDate("");
     setNotes("");
-    toast({ title: "Seans planlandı", description: `${recipients.length} katılımcıya in-app davet gönderildi${emailSummary}` });
     load();
   };
+
+  const sendInvites = async (opts?: { force?: boolean; partyIds?: string[] }) => {
+    if (!activeSession?.id) return;
+    setSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-meeting-invite", {
+        body: { sessionId: activeSession.id, force: opts?.force, partyIds: opts?.partyIds },
+      });
+      if (error) {
+        const errMsg = error.message ?? "Davet e-postaları gönderilemedi";
+        toast({ title: "E-posta gönderim hatası", description: errMsg, variant: "destructive" });
+        return;
+      }
+      if (data?.alreadySent && !opts?.force) {
+        toast({
+          title: "Davetler zaten gönderilmiş",
+          description: "Tekrar göndermek için 'Tekrar Gönder (zorla)' butonunu kullanın.",
+        });
+        setAlreadySent(true);
+        return;
+      }
+      const results = (data?.results ?? []) as InviteResult[];
+      // merge with previous results when retrying a subset
+      setLastResults((prev) => {
+        if (!opts?.partyIds) return results;
+        const map = new Map(prev.map((r) => [r.party_id, r]));
+        results.forEach((r) => map.set(r.party_id, r));
+        return Array.from(map.values());
+      });
+      const sent = data?.sent ?? 0;
+      const failed = data?.failed ?? 0;
+      if (failed === 0) {
+        toast({ title: "Davetler gönderildi", description: `${sent} e-posta başarıyla iletildi.` });
+      } else {
+        toast({
+          title: `${sent} gönderildi, ${failed} başarısız`,
+          description: "Başarısız taraflar için 'Tekrar Dene' butonunu kullanabilirsiniz.",
+          variant: "destructive",
+        });
+      }
+    } catch (e: any) {
+      toast({ title: "Sistem hatası", description: e.message ?? "Bilinmeyen hata", variant: "destructive" });
+    } finally {
+      setSending(false);
+      setRetryingParty(null);
+    }
+  };
+
+  const openPreviewForExisting = async (s: any) => {
+    setActiveSession(s);
+    setLastResults([]);
+    setAlreadySent(!!s.invite_sent_at);
+    setPreviewOpen(true);
+    await loadPreview(s.id);
+  };
+
+
 
   const requestAiSuggestion = async () => {
     setSuggesting(true);
