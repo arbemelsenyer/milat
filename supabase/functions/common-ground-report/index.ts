@@ -92,6 +92,7 @@ Yukarıdaki resmi kaynaklardan yararlanarak ortak zemin raporu ve arabulucu stra
     const aiJson = await aiRes.json();
     let parsed: any = {};
     try { parsed = JSON.parse(aiJson.choices[0].message.content); } catch { parsed = {}; }
+    parsed.sources = ragSources;
 
     const { data: inserted, error: upErr } = await admin.from("common_ground_reports").upsert({
       case_id, report: parsed, strategy: parsed.mediator_strategy ?? {},
