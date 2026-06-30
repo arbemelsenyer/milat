@@ -23,6 +23,7 @@ import CaseRoom from "./pages/CaseRoom";
 import MediatorDetail from "./pages/MediatorDetail";
 import NotificationSettings from "./pages/NotificationSettings";
 import PrivacyTests from "./pages/PrivacyTests";
+import HealthCheck from "./pages/HealthCheck";
 
 // Legacy routes funnel into the unified /legal-reasoning hub
 function RedirectToHub({ tab }: { tab?: string }) {
