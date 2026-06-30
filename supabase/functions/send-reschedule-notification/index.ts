@@ -198,13 +198,13 @@ serve(async (req) => {
       }
     }
 
-    // Create in-app notification
-    await supabase.from("notifications").insert({
-      user_id: recipientUserId,
-      title: notifTitle,
-      message: notifMessage,
-      type: notifType,
-      link: isSubmitted ? "/mediator" : "/dashboard",
+    // Create in-app notification via SECURITY DEFINER RPC
+    await supabase.rpc("create_notification", {
+      p_user_id: recipientUserId,
+      p_title: notifTitle,
+      p_message: notifMessage,
+      p_type: notifType,
+      p_link: isSubmitted ? "/mediator" : "/dashboard",
     });
 
     return new Response(
