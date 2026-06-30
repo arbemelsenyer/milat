@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Calendar, Plus, Sparkles, Loader2, Users, Clock, Circle, Eye, Send, RefreshCw, CheckCircle2, XCircle, MailWarning } from "lucide-react";
+import { Calendar, Plus, Sparkles, Loader2, Users, Clock, Circle, Eye, Send, RefreshCw, CheckCircle2, XCircle, MailWarning, Ban } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 const TYPES = [
@@ -351,6 +351,46 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
     await loadPreview(s.id);
   };
 
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const cancelSession = async (s: any) => {
+    const reason = window.prompt(
+      `"${TYPES.find((t) => t.key === s.session_type)?.label ?? s.session_type}" toplantısını iptal etmek istediğinize emin misiniz?\n\nİptal gerekçesini yazın (taraflara e-posta ile bildirilecektir). Boş bırakabilirsiniz.`,
+      ""
+    );
+    if (reason === null) return; // user cancelled prompt
+    setCancellingId(s.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("cancel-meeting-invite", {
+        body: { sessionId: s.id, reason: reason || null },
+      });
+      if (error) {
+        toast({ title: "İptal başarısız", description: error.message ?? "Bilinmeyen hata", variant: "destructive" });
+        return;
+      }
+      const sent = data?.sent ?? 0;
+      const failed = data?.failed ?? 0;
+      const total = data?.total ?? 0;
+      if (total === 0) {
+        toast({ title: "Toplantı iptal edildi", description: "Daha önce davet gönderilmemişti, bildirim oluşturulmadı." });
+      } else if (failed === 0) {
+        toast({ title: "Toplantı iptal edildi", description: `${sent} tarafa iptal bildirimi gönderildi.` });
+      } else {
+        toast({
+          title: `İptal edildi (${sent}/${total} bildirildi)`,
+          description: `${failed} taraf için bildirim gönderilemedi.`,
+          variant: "destructive",
+        });
+      }
+      await load();
+    } catch (e: any) {
+      toast({ title: "Sistem hatası", description: e.message ?? "Bilinmeyen hata", variant: "destructive" });
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+
+
 
 
   const requestAiSuggestion = async () => {
@@ -627,9 +667,25 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <span className="text-xs text-muted-foreground">{s.status}</span>
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openPreviewForExisting(s)}>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openPreviewForExisting(s)} disabled={s.status === "cancelled"}>
                     <Send className="h-3 w-3 mr-1" /> Davet
                   </Button>
+                  {s.status !== "cancelled" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                      disabled={cancellingId === s.id}
+                      onClick={() => cancelSession(s)}
+                    >
+                      {cancellingId === s.id ? (
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      ) : (
+                        <Ban className="h-3 w-3 mr-1" />
+                      )}
+                      İptal Et
+                    </Button>
+                  )}
                 </div>
               </Card>
             );
