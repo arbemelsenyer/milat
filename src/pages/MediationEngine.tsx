@@ -118,7 +118,7 @@ export default function MediationEngine() {
   const checkPhase3 = useCallback(async (id: string) => {
     const [{ count: aCount }, { data: report }] = await Promise.all([
       supabase.from("party_analyses").select("id", { count: "exact", head: true }).eq("case_id", id),
-      supabase.from("common_ground_reports").select("id").eq("case_id", id).maybeSingle(),
+      supabase.from("common_ground_reports").select("id").eq("case_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
     setPhase3Complete((aCount ?? 0) >= 2 && !!report);
   }, []);
