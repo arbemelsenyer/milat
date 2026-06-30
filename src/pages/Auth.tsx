@@ -679,36 +679,64 @@ export default function AuthPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+      <Dialog
+        open={forgotOpen}
+        onOpenChange={(o) => {
+          setForgotOpen(o);
+          if (!o) {
+            setForgotEmail('');
+            setForgotError(null);
+            setForgotSent(false);
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
               {language === 'tr' ? 'Şifremi Unuttum' : 'Forgot Password'}
             </DialogTitle>
             <DialogDescription>
-              {language === 'tr'
+              {forgotSent
+                ? language === 'tr'
+                  ? 'Eğer bu e-posta sistemde kayıtlıysa, sıfırlama bağlantısı az önce gönderildi. Gelen kutunuzu (ve spam klasörünüzü) kontrol edin.'
+                  : 'If this email is registered, a reset link has just been sent. Check your inbox (and spam folder).'
+                : language === 'tr'
                 ? 'E-posta adresinizi girin, size şifre sıfırlama linki gönderelim.'
                 : 'Enter your email and we will send you a reset link.'}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleForgotPassword} className="space-y-4">
-            <Input
-              type="email"
-              placeholder="ornek@email.com"
-              value={forgotEmail}
-              onChange={(e) => setForgotEmail(e.target.value)}
-              autoComplete="email"
-              required
-            />
+
+          {forgotSent ? (
             <DialogFooter>
-              <Button type="submit" disabled={forgotLoading} className="w-full sm:w-auto">
-                {forgotLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {language === 'tr' ? 'Sıfırlama Linki Gönder' : 'Send Reset Link'}
+              <Button onClick={() => setForgotOpen(false)} className="w-full sm:w-auto">
+                {language === 'tr' ? 'Tamam' : 'OK'}
               </Button>
             </DialogFooter>
-          </form>
+          ) : (
+            <form onSubmit={handleForgotPassword} className="space-y-3">
+              <Input
+                type="email"
+                placeholder="ornek@email.com"
+                value={forgotEmail}
+                onChange={(e) => { setForgotEmail(e.target.value); if (forgotError) setForgotError(null); }}
+                autoComplete="email"
+                aria-invalid={!!forgotError}
+                required
+              />
+              {forgotError && (
+                <p className="text-sm text-destructive" role="alert">{forgotError}</p>
+              )}
+              <DialogFooter>
+                <Button type="submit" disabled={forgotLoading} className="w-full sm:w-auto">
+                  {forgotLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {language === 'tr' ? 'Sıfırlama Linki Gönder' : 'Send Reset Link'}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
