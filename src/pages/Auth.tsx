@@ -72,6 +72,40 @@ export default function AuthPage() {
   const [kvkkConsent, setKvkkConsent] = useState(false);
   const [openModal, setOpenModal] = useState<null | 'aydinlatma' | 'imha' | 'acikRiza'>(null);
 
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail || !/^\S+@\S+\.\S+$/.test(forgotEmail)) {
+      toast({
+        variant: 'destructive',
+        title: language === 'tr' ? 'Geçersiz e-posta' : 'Invalid email',
+      });
+      return;
+    }
+    setForgotLoading(true);
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setForgotLoading(false);
+    if (error) {
+      toast({ variant: 'destructive', title: language === 'tr' ? 'Hata' : 'Error', description: error.message });
+      return;
+    }
+    toast({
+      title: language === 'tr' ? 'E-posta gönderildi' : 'Email sent',
+      description:
+        language === 'tr'
+          ? 'Şifre sıfırlama linki email\'inize gönderildi.'
+          : 'Password reset link sent to your email.',
+    });
+    setForgotOpen(false);
+    setForgotEmail('');
+  };
+
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
@@ -375,6 +409,15 @@ export default function AuthPage() {
                           </FormItem>
                         )}
                       />
+                      <div className="flex justify-end -mt-2">
+                        <button
+                          type="button"
+                          onClick={() => setForgotOpen(true)}
+                          className="text-sm text-primary hover:underline"
+                        >
+                          {language === 'tr' ? 'Şifremi Unuttum' : 'Forgot password?'}
+                        </button>
+                      </div>
                       <Button
                         type="submit"
                         size="lg"
@@ -628,6 +671,37 @@ export default function AuthPage() {
           <DialogFooter>
             <Button onClick={() => setOpenModal(null)} className="w-full sm:w-auto">Anladım</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {language === 'tr' ? 'Şifremi Unuttum' : 'Forgot Password'}
+            </DialogTitle>
+            <DialogDescription>
+              {language === 'tr'
+                ? 'E-posta adresinizi girin, size şifre sıfırlama linki gönderelim.'
+                : 'Enter your email and we will send you a reset link.'}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleForgotPassword} className="space-y-4">
+            <Input
+              type="email"
+              placeholder="ornek@email.com"
+              value={forgotEmail}
+              onChange={(e) => setForgotEmail(e.target.value)}
+              autoComplete="email"
+              required
+            />
+            <DialogFooter>
+              <Button type="submit" disabled={forgotLoading} className="w-full sm:w-auto">
+                {forgotLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {language === 'tr' ? 'Sıfırlama Linki Gönder' : 'Send Reset Link'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

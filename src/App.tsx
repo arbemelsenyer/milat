@@ -7,6 +7,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import Landing from "./pages/Landing";
 import SummaryPage from "./pages/Summary";
 import AuthPage from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import MediatorDashboard from "./pages/MediatorDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -45,6 +46,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/mediator" element={<RedirectToHub />} />
             <Route path="/mediator-dashboard" element={<MediatorDashboard />} />
