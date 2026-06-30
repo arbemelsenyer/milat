@@ -240,6 +240,10 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
+        <div className="mb-8">
+          <KnowledgeBaseAdmin />
+        </div>
+
         <Tabs defaultValue="cases" className="space-y-6">
           <TabsList>
             <TabsTrigger value="cases" className="gap-2">
