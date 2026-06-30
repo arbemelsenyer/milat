@@ -591,6 +591,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   const [analysisError, setAnalysisError] = useState<{ partyId: string; msg: string } | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [reportStatus, setReportStatus] = useState<string | null>(null);
+  const [reportAttempt, setReportAttempt] = useState(0);
   const [navigating, setNavigating] = useState(false);
 
   const fetchReport = useCallback(async () => {
