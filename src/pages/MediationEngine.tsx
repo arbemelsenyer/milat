@@ -591,6 +591,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   const [analysisError, setAnalysisError] = useState<{ partyId: string; msg: string } | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [reportStatus, setReportStatus] = useState<string | null>(null);
+  const [reportAttempt, setReportAttempt] = useState(0);
   const [navigating, setNavigating] = useState(false);
 
   const fetchReport = useCallback(async () => {
@@ -701,26 +703,46 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   async function generateReport() {
     setReportBusy(true);
     setReportError(null);
-    try {
-      const { data, error } = await supabase.functions.invoke("common-ground-report", { body: { case_id: caseRow.id } });
-      if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
-      // Verify the record actually exists in DB before claiming success
-      const fresh = await fetchReport();
-      if (!fresh) {
-        throw new Error("Rapor kaydı oluşturulamadı. Lütfen tekrar deneyin.");
+    setReportAttempt(0);
+    const MAX_ATTEMPTS = 3;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      setReportAttempt(attempt);
+      setReportStatus(
+        attempt === 1
+          ? "Rapor hazırlanıyor…"
+          : `Yeniden deneniyor (${attempt}/${MAX_ATTEMPTS})…`,
+      );
+      try {
+        const { data, error } = await supabase.functions.invoke("common-ground-report", { body: { case_id: caseRow.id } });
+        if (error) throw error;
+        if ((data as any)?.error) throw new Error((data as any).error);
+        const fresh = await fetchReport();
+        if (!fresh) throw new Error("Rapor kaydı oluşturulamadı.");
+        toast({ title: "Ortak zemin raporu hazır" });
+        setReportStatus(null);
+        setReportBusy(false);
+        setReportAttempt(0);
+        reload();
+        return;
+      } catch (e: any) {
+        console.error(`[common-ground-report] attempt ${attempt} failed`, e);
+        const raw = e?.message || "";
+        const friendly = /multiple .* rows|JSON object requested/i.test(raw)
+          ? "Sistem hatası oluştu, lütfen tekrar deneyin."
+          : raw || "Rapor üretilemedi.";
+        if (attempt < MAX_ATTEMPTS) {
+          // Exponential backoff: 800ms, 1600ms
+          await new Promise((r) => setTimeout(r, 800 * attempt));
+          continue;
+        }
+        setReportError(friendly);
+        setReportStatus(null);
+        setReportBusy(false);
+        setReportAttempt(0);
+        toast({ title: "Rapor hatası", description: friendly, variant: "destructive" });
+        return;
       }
-      toast({ title: "Ortak zemin raporu hazır" });
-      reload();
-    } catch (e: any) {
-      console.error("[common-ground-report] error", e);
-      const raw = e?.message || "";
-      const friendly = /multiple .* rows|JSON object requested/i.test(raw)
-        ? "Sistem hatası oluştu, lütfen tekrar deneyin."
-        : raw || "Rapor üretilemedi. Lütfen tekrar deneyin.";
-      setReportError(friendly);
-      toast({ title: "Rapor hatası", description: friendly, variant: "destructive" });
-    } finally { setReportBusy(false); }
+    }
   }
 
   async function chooseMeeting(meetingType: "ozel" | "ortak") {
@@ -775,10 +797,16 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
               {reportLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
             </Button>
             <Button onClick={generateReport} disabled={!canReport || reportBusy} size="sm">
-              {reportBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Rapor hazırlanıyor…</> : <><Sparkles className="h-4 w-4 mr-1" /> {report ? "Yeniden Üret" : "Rapor Üret"}</>}
+              {reportBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {reportStatus ?? "Rapor hazırlanıyor…"}</> : <><Sparkles className="h-4 w-4 mr-1" /> {report ? "Yeniden Üret" : "Rapor Üret"}</>}
             </Button>
           </div>
         </div>
+        {reportBusy && reportAttempt > 1 && (
+          <div className="text-xs text-muted-foreground flex items-center gap-2">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Geçici bir hata oluştu, otomatik olarak tekrar deneniyor ({reportAttempt}/3)…
+          </div>
+        )}
         {reportFetchError && (
           <div className="text-xs text-destructive flex items-center gap-2">
             <AlertTriangle className="h-3 w-3" /> Rapor yüklenemedi: {reportFetchError}
