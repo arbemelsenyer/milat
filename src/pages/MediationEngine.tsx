@@ -792,10 +792,20 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
       <Card className="p-6 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h3 className="text-lg font-semibold">Ortak Zemin Raporu</h3>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button size="sm" variant="ghost" onClick={fetchReport} disabled={reportLoading} title="Raporu yeniden yükle">
               {reportLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
             </Button>
+            {report && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "print" })} title="PDF olarak yazdır">
+                  PDF
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "html" })} title="HTML olarak indir">
+                  İndir
+                </Button>
+              </>
+            )}
             <Button onClick={generateReport} disabled={!canReport || reportBusy} size="sm">
               {reportBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {reportStatus ?? "Rapor hazırlanıyor…"}</> : <><Sparkles className="h-4 w-4 mr-1" /> {report ? "Yeniden Üret" : "Rapor Üret"}</>}
             </Button>
