@@ -93,15 +93,22 @@ export function KnowledgeBaseAdmin() {
     return () => { cancelled = true; clearInterval(t); };
   }, []);
 
-  const start = async (mode: "all" | "test" = "all") => {
-    if (mode === "test") setTesting(true); else setStarting(true);
+  const [retrying, setRetrying] = useState(false);
+
+  const start = async (mode: "all" | "test" | "retry" = "all") => {
+    if (mode === "test") setTesting(true);
+    else if (mode === "retry") setRetrying(true);
+    else setStarting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("build-knowledge-base", {
-        body: mode === "test" ? { test: true } : {},
-      });
+      const body = mode === "test" ? { test: true } : mode === "retry" ? { retry_skipped: true } : {};
+      const { data, error } = await supabase.functions.invoke("build-knowledge-base", { body });
       if (error) throw error;
       toast({
-        title: mode === "test" ? "Tek PDF test başlatıldı" : "Bilgi tabanı güncelleme başlatıldı",
+        title: mode === "test"
+          ? "Tek PDF test başlatıldı"
+          : mode === "retry"
+            ? "Atlanan kitaplar yeniden işleniyor (sayfa bölümleri halinde)"
+            : "Bilgi tabanı güncelleme başlatıldı",
         description: `${data?.total_books ?? 0} kitap kuyruğa alındı.`,
       });
       await load();
@@ -109,6 +116,8 @@ export function KnowledgeBaseAdmin() {
       toast({ title: "Hata", description: e.message ?? "Başlatılamadı", variant: "destructive" });
     } finally {
       setStarting(false);
+      setTesting(false);
+      setRetrying(false);
     }
   };
 
