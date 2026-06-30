@@ -979,6 +979,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                           </ol>
                         </AnaSection>
                       )}
+                      <SourcesPanel sources={an.sources} />
                     </div>
                   )}
                 </div>
@@ -1087,7 +1088,43 @@ function CommonGroundView({ data, strategy }: { data: any; strategy: any }) {
           <ul className="list-disc pl-5 text-sm">{data.red_lines.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
         </AnaSection>
       )}
+      <SourcesPanel sources={data.sources} />
     </div>
+  );
+}
+
+function SourcesPanel({ sources }: { sources?: any[] }) {
+  if (!sources || sources.length === 0) return null;
+  return (
+    <AnaSection icon="📚" title={`Kullanılan Kaynaklar (${sources.length})`}>
+      <p className="text-[11px] text-muted-foreground mb-2">
+        Bu çıktı, Adalet Bakanlığı Arabuluculuk Daire Başkanlığı resmi yayınlarından alınan aşağıdaki bölümlerden yararlanılarak üretildi.
+      </p>
+      <ol className="space-y-2 text-sm list-decimal pl-5">
+        {sources.map((s: any, i: number) => (
+          <li key={i} className="border rounded p-2 bg-background">
+            <div className="flex items-start justify-between gap-2">
+              <div className="font-medium">
+                {s.url ? (
+                  <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    {s.title || "Kaynak"}
+                  </a>
+                ) : (s.title || "Kaynak")}
+                {s.category && <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">[{s.category}]</span>}
+              </div>
+              {typeof s.similarity === "number" && (
+                <span className="text-[10px] text-muted-foreground shrink-0">benzerlik %{Math.round(s.similarity * 100)}</span>
+              )}
+            </div>
+            {s.excerpt && (
+              <blockquote className="mt-1 text-xs text-muted-foreground italic border-l-2 pl-2">
+                "{s.excerpt}{s.excerpt.length >= 380 ? "…" : ""}"
+              </blockquote>
+            )}
+          </li>
+        ))}
+      </ol>
+    </AnaSection>
   );
 }
 

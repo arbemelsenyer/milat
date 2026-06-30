@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
     const ragQuery = [caseRow?.title, caseRow?.dispute_type, caseRow?.dispute_subtype, caseRow?.issue_description]
       .filter(Boolean).join(" — ");
     const ragCategory = mapDisputeToCategory(caseRow?.dispute_type, caseRow?.dispute_subtype);
-    const ragBlock = await fetchKnowledgeBlock(admin, apiKey, ragQuery, ragCategory);
+    const { block: ragBlock, sources: ragSources } = await fetchKnowledgeBlock(admin, apiKey, ragQuery, ragCategory);
 
     const systemPrompt = `Sen bir Türk hukuk arabuluculuk uzmanı AI'sın. Bu tarafın perspektifinden detaylı bir analiz hazırlıyorsun. 
 Otomatik olarak: (1) niş hukuki alanı tespit et, (2) ilgili mevzuat ve Yargıtay/BAM emsallerini tara, (3) tarafın pozisyon/ihtiyaç/BATNA analizini yap, (4) yüklenen belgelerden somut bulgular çıkar. Sana verilen "İLGİLİ KAYNAK BİLGİSİ" bloklarından yararlan, alakalıysa kaynak adını parantez içinde göster.
@@ -145,6 +145,8 @@ Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinde
     const content = aiJson?.choices?.[0]?.message?.content ?? "{}";
     let parsed: any = {};
     try { parsed = JSON.parse(content); } catch { parsed = { raw: content }; }
+    // Attach the sources actually used by RAG so the UI can show transparency info.
+    parsed.sources = ragSources;
 
     // Upsert the party_analyses row (one per party per round)
     const { data: existing } = await admin.from("party_analyses")
@@ -176,7 +178,7 @@ Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinde
       }
     }
 
-    return new Response(JSON.stringify({ analysis: parsed }), {
+    return new Response(JSON.stringify({ analysis: parsed, sources: ragSources }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
@@ -202,28 +204,36 @@ function mapDisputeToCategory(disputeType?: string | null, subtype?: string | nu
   return null;
 }
 
-async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, category: string | null): Promise<string> {
+async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, category: string | null): Promise<{ block: string; sources: any[] }> {
   try {
-    if (!query || query.trim().length < 10) return "";
+    if (!query || query.trim().length < 10) return { block: "", sources: [] };
     const embRes = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: "openai/text-embedding-3-small", input: query, dimensions: 768 }),
     });
-    if (!embRes.ok) return "";
+    if (!embRes.ok) return { block: "", sources: [] };
     const embJson = await embRes.json();
     const vec = embJson?.data?.[0]?.embedding;
-    if (!vec) return "";
+    if (!vec) return { block: "", sources: [] };
     const { data } = await admin.rpc("match_knowledge_base", {
       query_embedding: vec, filter_category: category, match_count: 5, match_threshold: 0.65,
     });
-    if (!data || data.length === 0) return "";
+    if (!data || data.length === 0) return { block: "", sources: [] };
+    const sources = data.map((r: any) => ({
+      title: r.source_title,
+      url: r.source_url,
+      category: r.category,
+      excerpt: String(r.chunk_text ?? "").slice(0, 400),
+      similarity: r.similarity,
+    }));
     const parts = data.map((r: any) =>
       `[Kaynak: ${r.source_title}]\n${r.chunk_text}`
     ).join("\n\n");
-    return `\n═══ İLGİLİ KAYNAK BİLGİSİ (Adalet Bakanlığı Arabuluculuk Daire Başkanlığı resmi yayınlarından) ═══\n${parts}\n═══════════════════════════\n`;
+    const block = `\n═══ İLGİLİ KAYNAK BİLGİSİ (Adalet Bakanlığı Arabuluculuk Daire Başkanlığı resmi yayınlarından) ═══\n${parts}\n═══════════════════════════\n`;
+    return { block, sources };
   } catch {
-    return "";
+    return { block: "", sources: [] };
   }
 }
 
