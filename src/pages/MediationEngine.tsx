@@ -255,10 +255,13 @@ export default function MediationEngine() {
               const done = p.id < completed;
               const active = p.id === phaseParam;
               const Icon = p.icon;
+              const locked = p.id >= 4 && !phase3Complete;
               return (
-                <button key={p.id} onClick={() => setPhase(p.id)}
+                <button key={p.id} onClick={() => { if (!locked) setPhase(p.id); else toast({ title: "Aşama kilitli", description: "Önce Aşama 3'te en az 2 tarafı analiz edip Ortak Zemin Raporu üretin." }); }}
                   className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition
-                    ${active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/40"}`}>
+                    ${active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/40"}
+                    ${locked ? "opacity-50 cursor-not-allowed" : ""}`}
+                  title={locked ? "Aşama 3 tamamlanmadı" : ""}>
                   {done ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Circle className="h-4 w-4 opacity-60" />}
                   <Icon className="h-4 w-4" />
                   <span className="flex-1 text-left">{p.id}. {p.label}</span>
@@ -272,7 +275,7 @@ export default function MediationEngine() {
           <PhaseRenderer
             phase={phaseParam}
             caseRow={activeCase}
-            reload={() => loadCase(activeCase.id)}
+            reload={() => { loadCase(activeCase.id); checkPhase3(activeCase.id); }}
             isMediator={isMediator || isAdmin}
             userId={user!.id}
             onAdvance={(next) => setPhase(next)}
