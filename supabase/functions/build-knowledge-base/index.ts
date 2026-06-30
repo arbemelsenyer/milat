@@ -149,6 +149,9 @@ async function processBook(admin: any, jobId: string, book: Book, existingChunks
   const fullText = Array.isArray(text) ? text.join("\n") : text;
   const chunks = chunkText(fullText);
   if (!chunks.length) return { chunks: 0 };
+  if (chunks.length > MAX_CHUNKS_PER_BOOK) {
+    throw new Error(`Anormal parça sayısı (${chunks.length} > ${MAX_CHUNKS_PER_BOOK}). PDF içeriği bozuk veya yanlış indirilmiş olabilir.`);
+  }
 
   await updateJob(admin, jobId, { current_book: `${book.title} — eski parçalar temizleniyor` });
   await admin.from("knowledge_base_chunks").delete().eq("source_url", book.url);
