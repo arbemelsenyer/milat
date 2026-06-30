@@ -800,6 +800,7 @@ export type Database = {
           finished_at: string | null
           id: string
           processed_books: number
+          processed_urls: Json
           started_at: string
           status: string
           total_books: number
@@ -812,6 +813,7 @@ export type Database = {
           finished_at?: string | null
           id?: string
           processed_books?: number
+          processed_urls?: Json
           started_at?: string
           status?: string
           total_books?: number
@@ -824,6 +826,7 @@ export type Database = {
           finished_at?: string | null
           id?: string
           processed_books?: number
+          processed_urls?: Json
           started_at?: string
           status?: string
           total_books?: number
