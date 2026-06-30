@@ -704,8 +704,12 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
       const { data, error } = await supabase.functions.invoke("common-ground-report", { body: { case_id: caseRow.id } });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
+      // Verify the record actually exists in DB before claiming success
+      const fresh = await fetchReport();
+      if (!fresh) {
+        throw new Error("Rapor kaydı oluşturulamadı. Lütfen tekrar deneyin.");
+      }
       toast({ title: "Ortak zemin raporu hazır" });
-      loadAll();
       reload();
     } catch (e: any) {
       const msg = e?.message || "Rapor üretilemedi.";
