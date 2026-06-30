@@ -118,7 +118,7 @@ export default function MediationEngine() {
   const checkPhase3 = useCallback(async (id: string) => {
     const [{ count: aCount }, { data: report }] = await Promise.all([
       supabase.from("party_analyses").select("id", { count: "exact", head: true }).eq("case_id", id),
-      supabase.from("common_ground_reports").select("id").eq("case_id", id).maybeSingle(),
+      supabase.from("common_ground_reports").select("id").eq("case_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
     setPhase3Complete((aCount ?? 0) >= 2 && !!report);
   }, []);
@@ -601,6 +601,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
       .select("*")
       .eq("case_id", caseRow.id)
       .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
     if (error) setReportFetchError(error.message);
     setReport(data ?? null);
@@ -712,9 +713,13 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
       toast({ title: "Ortak zemin raporu hazır" });
       reload();
     } catch (e: any) {
-      const msg = e?.message || "Rapor üretilemedi.";
-      setReportError(msg);
-      toast({ title: "Rapor hatası", description: msg, variant: "destructive" });
+      console.error("[common-ground-report] error", e);
+      const raw = e?.message || "";
+      const friendly = /multiple .* rows|JSON object requested/i.test(raw)
+        ? "Sistem hatası oluştu, lütfen tekrar deneyin."
+        : raw || "Rapor üretilemedi. Lütfen tekrar deneyin.";
+      setReportError(friendly);
+      toast({ title: "Rapor hatası", description: friendly, variant: "destructive" });
     } finally { setReportBusy(false); }
   }
 
@@ -1077,7 +1082,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   useEffect(() => { (async () => {
     setLoading(true);
     const [r, a] = await Promise.all([
-      supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).maybeSingle(),
+      supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("party_analyses").select("party_id, analysis, case_parties:party_id(first_name, last_name, company_name, party_role)").eq("case_id", caseRow.id),
     ]);
     setReport(r.data);
