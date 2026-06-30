@@ -25,11 +25,14 @@ Deno.serve(async (req) => {
     const { case_id } = await req.json();
     const admin = createClient(supabaseUrl, serviceKey);
 
-    // Only mediator may run this
+    // Only mediator/admin/case owner may run this
     const { data: caseRow } = await admin.from("cases")
-      .select("id, assigned_mediator_id, dispute_type, dispute_subtype, issue_description, round_number")
+      .select("id, user_id, assigned_mediator_id, dispute_type, dispute_subtype, issue_description, round_number, title")
       .eq("id", case_id).maybeSingle();
-    if (!caseRow || caseRow.assigned_mediator_id !== userData.user.id) {
+    const { data: roleRow } = await admin.from("user_roles")
+      .select("role").eq("user_id", userData.user.id).in("role", ["admin", "mediator"]).maybeSingle();
+    const allowed = caseRow && (caseRow.assigned_mediator_id === userData.user.id || caseRow.user_id === userData.user.id || !!roleRow);
+    if (!allowed) {
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
     }
 
