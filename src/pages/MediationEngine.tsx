@@ -811,7 +811,14 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                         ))}
                       </ul>
                     )}
+                    {partyDocs.some((d) => !(d.mime_type ?? "").startsWith("text/") && !d.file_name?.toLowerCase().endsWith(".txt")) && (
+                      <p className="text-[11px] text-amber-600 mt-1 flex items-start gap-1">
+                        <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                        Uyarı: PDF/Word belgelerin içeriği tam okunamayabilir. Daha doğru analiz için kritik metinleri .txt olarak da yükleyebilirsiniz.
+                      </p>
+                    )}
                   </div>
+
 
                   {/* Analysis trigger */}
                   <div className="flex gap-2 flex-wrap">
