@@ -792,10 +792,20 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
       <Card className="p-6 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h3 className="text-lg font-semibold">Ortak Zemin Raporu</h3>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button size="sm" variant="ghost" onClick={fetchReport} disabled={reportLoading} title="Raporu yeniden yükle">
               {reportLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
             </Button>
+            {report && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "print" })} title="PDF olarak yazdır">
+                  PDF
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "html" })} title="HTML olarak indir">
+                  İndir
+                </Button>
+              </>
+            )}
             <Button onClick={generateReport} disabled={!canReport || reportBusy} size="sm">
               {reportBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {reportStatus ?? "Rapor hazırlanıyor…"}</> : <><Sparkles className="h-4 w-4 mr-1" /> {report ? "Yeniden Üret" : "Rapor Üret"}</>}
             </Button>
@@ -1093,15 +1103,40 @@ function CommonGroundView({ data, strategy }: { data: any; strategy: any }) {
   );
 }
 
+const EXCERPT_MAX = 280;
+function cleanExcerpt(raw?: string): string {
+  if (!raw) return "";
+  const text = String(raw).replace(/\s+/g, " ").trim();
+  if (text.length <= EXCERPT_MAX) return text;
+  const slice = text.slice(0, EXCERPT_MAX);
+  // Prefer cutting at last sentence-ending punctuation, else last space.
+  const punct = Math.max(slice.lastIndexOf(". "), slice.lastIndexOf("! "), slice.lastIndexOf("? "));
+  let cut = punct > EXCERPT_MAX * 0.6 ? punct + 1 : slice.lastIndexOf(" ");
+  if (cut < EXCERPT_MAX * 0.5) cut = EXCERPT_MAX;
+  return slice.slice(0, cut).replace(/[\s,;:]+$/g, "") + "…";
+}
+
 function SourcesPanel({ sources }: { sources?: any[] }) {
-  if (!sources || sources.length === 0) return null;
+  const list = Array.isArray(sources) ? sources : [];
+  if (list.length === 0) {
+    return (
+      <AnaSection icon="📚" title="Kullanılan Kaynaklar">
+        <p className="text-xs text-muted-foreground italic">
+          Bu çıktı için resmi yayın bilgi tabanında yeterince benzer bir bölüm bulunamadı. Analiz, AI'ın genel arabuluculuk bilgisi ile üretildi. Daha fazla kaynak için Admin → "Bilgi Tabanını Güncelle" çalıştırılabilir.
+        </p>
+      </AnaSection>
+    );
+  }
   return (
-    <AnaSection icon="📚" title={`Kullanılan Kaynaklar (${sources.length})`}>
+    <AnaSection icon="📚" title={`Kullanılan Kaynaklar (${list.length})`}>
       <p className="text-[11px] text-muted-foreground mb-2">
         Bu çıktı, Adalet Bakanlığı Arabuluculuk Daire Başkanlığı resmi yayınlarından alınan aşağıdaki bölümlerden yararlanılarak üretildi.
+        {list.length < 5 && (
+          <> Bu konu için bilgi tabanında yalnızca <b>{list.length}</b> ilgili bölüm bulundu; en alakalıları gösteriliyor.</>
+        )}
       </p>
       <ol className="space-y-2 text-sm list-decimal pl-5">
-        {sources.map((s: any, i: number) => (
+        {list.map((s: any, i: number) => (
           <li key={i} className="border rounded p-2 bg-background">
             <div className="flex items-start justify-between gap-2">
               <div className="font-medium">
@@ -1118,7 +1153,7 @@ function SourcesPanel({ sources }: { sources?: any[] }) {
             </div>
             {s.excerpt && (
               <blockquote className="mt-1 text-xs text-muted-foreground italic border-l-2 pl-2">
-                "{s.excerpt}{s.excerpt.length >= 380 ? "…" : ""}"
+                "{cleanExcerpt(s.excerpt)}"
               </blockquote>
             )}
           </li>
@@ -1126,6 +1161,85 @@ function SourcesPanel({ sources }: { sources?: any[] }) {
       </ol>
     </AnaSection>
   );
+}
+
+function buildReportHtml(opts: { caseTitle?: string; caseId: string; report: any; strategy: any; sources: any[]; generatedAt: Date; }): string {
+  const { caseTitle, caseId, report, strategy, sources, generatedAt } = opts;
+  const r = report || {};
+  const s = strategy || r.mediator_strategy || {};
+  const esc = (v: any) => String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" } as any)[c]);
+  const list = (arr: any[]) => (arr && arr.length ? `<ul>${arr.map((x) => `<li>${esc(typeof x === "string" ? x : JSON.stringify(x))}</li>`).join("")}</ul>` : `<p class="muted">—</p>`);
+  const scenarios = (r.scenarios || []).map((sc: any) => `
+    <div class="card">
+      <h4>${esc(sc.label || "Senaryo")}</h4>
+      <p>${esc(sc.summary || "")}</p>
+      ${sc.tradeoffs?.length ? `<p class="muted"><b>Ödünler:</b></p>${list(sc.tradeoffs)}` : ""}
+    </div>`).join("");
+  const srcHtml = (sources && sources.length)
+    ? `<ol>${sources.map((x: any) => `
+        <li>
+          <b>${esc(x.title || "Kaynak")}</b>${x.category ? ` <span class="muted">[${esc(x.category)}]</span>` : ""}
+          ${typeof x.similarity === "number" ? ` <span class="muted">— benzerlik %${Math.round(x.similarity * 100)}</span>` : ""}
+          ${x.url ? `<br/><a href="${esc(x.url)}">${esc(x.url)}</a>` : ""}
+          ${x.excerpt ? `<blockquote>"${esc(cleanExcerpt(x.excerpt))}"</blockquote>` : ""}
+        </li>`).join("")}</ol>`
+    : `<p class="muted">İlgili resmi kaynak bulunamadı.</p>`;
+  return `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>Ortak Zemin Raporu — ${esc(caseTitle || caseId)}</title>
+<style>
+body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;max-width:820px;margin:24px auto;padding:0 24px;color:#1f2937;line-height:1.55}
+h1{color:#0f766e;border-bottom:2px solid #0f766e;padding-bottom:6px}
+h2{color:#0f766e;margin-top:28px;border-bottom:1px solid #e5e7eb;padding-bottom:4px}
+h4{margin:6px 0}
+.muted{color:#6b7280;font-size:13px}
+.card{border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin:8px 0;background:#f9fafb}
+blockquote{border-left:3px solid #14b8a6;margin:6px 0;padding:4px 10px;color:#374151;font-style:italic;background:#f0fdfa}
+ul,ol{padding-left:20px}
+.meta{color:#6b7280;font-size:12px;margin-bottom:18px}
+@media print{body{margin:0}}
+</style></head><body>
+<h1>Ortak Zemin Raporu</h1>
+<div class="meta"><b>Başvuru:</b> ${esc(caseTitle || "—")} &nbsp;•&nbsp; <b>ID:</b> ${esc(caseId)} &nbsp;•&nbsp; <b>Oluşturulma:</b> ${generatedAt.toLocaleString("tr-TR")}</div>
+
+<h2>Ortak Çıkarlar</h2>${list(r.common_interests || [])}
+
+<h2>ZOPA (Olası Anlaşma Aralığı)</h2>
+${r.zopa ? `<p>${esc(r.zopa.description || "")}</p><p class="muted">Alt sınır: ${esc(r.zopa.lower_bound || "—")} • Üst sınır: ${esc(r.zopa.upper_bound || "—")}</p>` : `<p class="muted">—</p>`}
+
+<h2>Çözüm Senaryoları</h2>${scenarios || `<p class="muted">—</p>`}
+
+<h2>Arabulucu Stratejisi</h2>
+${s.opening_statement ? `<p><b>Açılış:</b> ${esc(s.opening_statement)}</p>` : ""}
+${s.critical_questions?.length ? `<p><b>Kritik Sorular:</b></p>${list(s.critical_questions)}` : ""}
+${s.deadlock_techniques?.length ? `<p><b>Tıkanıklık Teknikleri:</b></p>${list(s.deadlock_techniques)}` : ""}
+
+<h2>Kırmızı Çizgiler</h2>${list(r.red_lines || [])}
+
+<h2>📚 Kullanılan Kaynaklar (${(sources || []).length})</h2>
+<p class="muted">Adalet Bakanlığı Arabuluculuk Daire Başkanlığı resmi yayınlarından.</p>
+${srcHtml}
+
+<div class="meta" style="margin-top:32px;text-align:center">MediPact AI tarafından oluşturuldu • ${generatedAt.toLocaleString("tr-TR")}</div>
+</body></html>`;
+}
+
+function downloadReport(opts: { caseTitle?: string; caseId: string; report: any; strategy: any; mode: "print" | "html" }) {
+  const sources = opts.report?.sources || [];
+  const html = buildReportHtml({ caseTitle: opts.caseTitle, caseId: opts.caseId, report: opts.report, strategy: opts.strategy, sources, generatedAt: new Date() });
+  if (opts.mode === "print") {
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.onload = () => w.print();
+  } else {
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ortak-zemin-raporu-${opts.caseId}.html`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 }
 
 /* ===================== PHASE 4 - MEDIATOR PANEL (READ-ONLY SUMMARY) ===================== */
@@ -1189,7 +1303,13 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
       </div>
       {report ? (
         <div>
-          <h3 className="font-semibold mb-2">Ortak Zemin Raporu</h3>
+          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+            <h3 className="font-semibold">Ortak Zemin Raporu</h3>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "print" })}>PDF</Button>
+              <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "html" })}>İndir</Button>
+            </div>
+          </div>
           <CommonGroundView data={report.report} strategy={report.strategy} />
         </div>
       ) : (
