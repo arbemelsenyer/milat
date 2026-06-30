@@ -712,19 +712,30 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   const analysedCount = analyses.length;
   const canReport = analysedCount >= 2;
 
+  const progressPct = parties.length ? Math.round((analysedCount / parties.length) * 100) : 0;
+
   return (
     <div className="space-y-4">
-      <Card className="p-6 space-y-2">
-        <h2 className="text-2xl font-bold text-primary">Aşama 3 — Taraf Analizi</h2>
-        <p className="text-sm text-muted-foreground">
-          Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. En az 2 taraf analiz edildiğinde Ortak Zemin Raporu üretebilirsiniz.
-        </p>
-        <div className="flex gap-2 text-xs">
-          <Badge variant="secondary">Taraf: {parties.length}</Badge>
-          <Badge variant="secondary">Analiz: {analysedCount}</Badge>
-          {report && <Badge>Ortak Zemin Raporu ✓</Badge>}
+      <Card className="p-6 space-y-3">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-2xl font-bold text-primary">Aşama 3 — Taraf Analizi</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. En az 2 taraf analiz edildiğinde Ortak Zemin Raporu üretebilirsiniz.
+            </p>
+          </div>
+          <div className="text-right text-xs space-y-1 min-w-[180px]">
+            <div className="font-medium">Taraf Analizi: {analysedCount}/{parties.length} taraf analiz edildi</div>
+            <Progress value={progressPct} className="h-2" />
+            {report
+              ? <div className="text-emerald-600 font-semibold">✓ Ortak Zemin Raporu Hazır</div>
+              : canReport
+                ? <div className="text-muted-foreground">Ortak Zemin Raporu üretilebilir</div>
+                : <div className="text-muted-foreground">Rapor için en az 2 analiz gerekli</div>}
+          </div>
         </div>
       </Card>
+
 
       {parties.length === 0 && (
         <Card className="p-6"><p className="text-muted-foreground">Önce Aşama 2'de taraf ekleyin.</p></Card>
