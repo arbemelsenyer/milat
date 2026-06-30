@@ -75,36 +75,41 @@ export default function AuthPage() {
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const [forgotSent, setForgotSent] = useState(false);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotEmail || !/^\S+@\S+\.\S+$/.test(forgotEmail)) {
-      toast({
-        variant: 'destructive',
-        title: language === 'tr' ? 'Geçersiz e-posta' : 'Invalid email',
-      });
+    setForgotError(null);
+    const email = forgotEmail.trim();
+    if (!email) {
+      setForgotError(language === 'tr' ? 'E-posta adresi gereklidir.' : 'Email is required.');
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      setForgotError(language === 'tr' ? 'Geçerli bir e-posta adresi girin.' : 'Enter a valid email address.');
       return;
     }
     setForgotLoading(true);
     const { supabase } = await import('@/integrations/supabase/client');
-    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     setForgotLoading(false);
     if (error) {
-      toast({ variant: 'destructive', title: language === 'tr' ? 'Hata' : 'Error', description: error.message });
+      const msg = error.message.toLowerCase();
+      if (msg.includes('rate') || msg.includes('too many')) {
+        setForgotError(language === 'tr'
+          ? 'Çok fazla istek gönderdiniz. Lütfen birkaç dakika bekleyin.'
+          : 'Too many requests. Please wait a few minutes.');
+      } else {
+        setForgotError(language === 'tr' ? `Gönderilemedi: ${error.message}` : `Failed: ${error.message}`);
+      }
       return;
     }
-    toast({
-      title: language === 'tr' ? 'E-posta gönderildi' : 'Email sent',
-      description:
-        language === 'tr'
-          ? 'Şifre sıfırlama linki email\'inize gönderildi.'
-          : 'Password reset link sent to your email.',
-    });
-    setForgotOpen(false);
-    setForgotEmail('');
+    setForgotSent(true);
   };
+
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -674,36 +679,64 @@ export default function AuthPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+      <Dialog
+        open={forgotOpen}
+        onOpenChange={(o) => {
+          setForgotOpen(o);
+          if (!o) {
+            setForgotEmail('');
+            setForgotError(null);
+            setForgotSent(false);
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
               {language === 'tr' ? 'Şifremi Unuttum' : 'Forgot Password'}
             </DialogTitle>
             <DialogDescription>
-              {language === 'tr'
+              {forgotSent
+                ? language === 'tr'
+                  ? 'Eğer bu e-posta sistemde kayıtlıysa, sıfırlama bağlantısı az önce gönderildi. Gelen kutunuzu (ve spam klasörünüzü) kontrol edin.'
+                  : 'If this email is registered, a reset link has just been sent. Check your inbox (and spam folder).'
+                : language === 'tr'
                 ? 'E-posta adresinizi girin, size şifre sıfırlama linki gönderelim.'
                 : 'Enter your email and we will send you a reset link.'}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleForgotPassword} className="space-y-4">
-            <Input
-              type="email"
-              placeholder="ornek@email.com"
-              value={forgotEmail}
-              onChange={(e) => setForgotEmail(e.target.value)}
-              autoComplete="email"
-              required
-            />
+
+          {forgotSent ? (
             <DialogFooter>
-              <Button type="submit" disabled={forgotLoading} className="w-full sm:w-auto">
-                {forgotLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {language === 'tr' ? 'Sıfırlama Linki Gönder' : 'Send Reset Link'}
+              <Button onClick={() => setForgotOpen(false)} className="w-full sm:w-auto">
+                {language === 'tr' ? 'Tamam' : 'OK'}
               </Button>
             </DialogFooter>
-          </form>
+          ) : (
+            <form onSubmit={handleForgotPassword} className="space-y-3">
+              <Input
+                type="email"
+                placeholder="ornek@email.com"
+                value={forgotEmail}
+                onChange={(e) => { setForgotEmail(e.target.value); if (forgotError) setForgotError(null); }}
+                autoComplete="email"
+                aria-invalid={!!forgotError}
+                required
+              />
+              {forgotError && (
+                <p className="text-sm text-destructive" role="alert">{forgotError}</p>
+              )}
+              <DialogFooter>
+                <Button type="submit" disabled={forgotLoading} className="w-full sm:w-auto">
+                  {forgotLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {language === 'tr' ? 'Sıfırlama Linki Gönder' : 'Send Reset Link'}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
