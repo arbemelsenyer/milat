@@ -293,28 +293,26 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
   onCancel: () => void; onCreated: (id: string) => void; userId: string; isMediator: boolean;
 }) {
   const [title, setTitle] = useState("");
-  const [uyapNo, setUyapNo] = useState("");
-  const [disputeType, setDisputeType] = useState(DISPUTE_TYPES[0]);
   const [busy, setBusy] = useState(false);
 
   async function create() {
     setBusy(true);
     try {
       const { data: appNoData } = await supabase.rpc("generate_application_no" as any);
-      const application_no = (appNoData as string) ?? `2026/${Math.floor(1000 + Math.random() * 9000)}`;
+      const application_no = (appNoData as string) ?? `MP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
       const { data: row, error } = await supabase.from("cases").insert({
         user_id: userId,
         assigned_mediator_id: isMediator ? userId : null,
-        title: title || `${disputeType} - ${application_no}`,
-        dispute_type: disputeType,
+        title: title || `Başvuru - ${application_no}`,
+        dispute_type: null,
         application_no,
-        uyap_no: uyapNo || null,
+        uyap_no: null,
         status: "active",
         current_phase: 2,
         round_number: 1,
       } as any).select().single();
       if (error) throw error;
-      toast({ title: "Başvuru oluşturuldu", description: `No: ${application_no}` });
+      toast({ title: "Başvuru oluşturuldu", description: `Sistem No: ${application_no}` });
       onCreated((row as any).id);
     } catch (e: any) {
       toast({ title: "Oluşturma hatası", description: trErr(e.message), variant: "destructive" });
@@ -324,15 +322,17 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
   return (
     <Card className="p-6 mb-6 space-y-4">
       <h2 className="text-xl font-semibold">Yeni Başvuru</h2>
+      <div className="text-xs text-muted-foreground bg-muted/50 border rounded p-3">
+        ℹ️ Uyuşmazlık türünü AI, taraf bilgileri ve açıklamanızı girdikten sonra (Aşama 3) otomatik tespit edecek.
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div><Label>Başvuru Başlığı</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
-        <div><Label>UYAP Numarası</Label><Input value={uyapNo} onChange={(e) => setUyapNo(e.target.value)} /></div>
+        <div className="md:col-span-2">
+          <Label>Başvuru Başlığı</Label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Örn. Kira sözleşmesinden doğan uyuşmazlık" />
+        </div>
         <div>
-          <Label>Uyuşmazlık Türü</Label>
-          <Select value={disputeType} onValueChange={setDisputeType}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{DISPUTE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-          </Select>
+          <Label>Sistem No</Label>
+          <Input value="Oluşturulduğunda atanır (MP-YYYY-XXXX)" disabled />
         </div>
         <div>
           <Label>Başvuru Tarihi</Label>
@@ -379,13 +379,16 @@ function Phase1Summary({ caseRow }: { caseRow: CaseRow }) {
     <Card className="p-6 space-y-3">
       <h2 className="text-2xl font-bold text-primary">Aşama 1 — Başvuru Özeti</h2>
       <div className="grid grid-cols-2 gap-4 text-sm">
-        <div><span className="text-muted-foreground">Başvuru No:</span> <b>{caseRow.application_no}</b></div>
-        <div><span className="text-muted-foreground">UYAP No:</span> {caseRow.uyap_no || "—"}</div>
+        <div><span className="text-muted-foreground">Sistem No:</span> <b className="font-mono">{caseRow.application_no}</b></div>
         <div><span className="text-muted-foreground">Başlık:</span> {caseRow.title}</div>
-        <div><span className="text-muted-foreground">Uyuşmazlık:</span> {caseRow.dispute_type}</div>
-        <div><span className="text-muted-foreground">Tarih:</span> {caseRow.application_date ? new Date(caseRow.application_date).toLocaleDateString("tr-TR") : "—"}</div>
+        <div><span className="text-muted-foreground">Uyuşmazlık Türü:</span> {caseRow.dispute_type || <span className="italic text-muted-foreground">AI tarafından Aşama 3'te tespit edilecek</span>}</div>
+        <div><span className="text-muted-foreground">Tarih:</span> {caseRow.application_date ? new Date(caseRow.application_date).toLocaleDateString("tr-TR") : new Date(caseRow.created_at).toLocaleDateString("tr-TR")}</div>
         <div><span className="text-muted-foreground">Durum:</span> {caseRow.status}</div>
+        <div><span className="text-muted-foreground">UYAP Kayıt No:</span> {caseRow.uyap_no || <span className="italic text-muted-foreground">Henüz kaydedilmedi</span>}</div>
       </div>
+      <p className="text-xs text-muted-foreground border-t pt-3">
+        UYAP Kayıt Numarası, başvuru resmi sisteme kaydedildiğinde Aşama 4 (Arabulucu Paneli) üzerinden eklenebilir.
+      </p>
     </Card>
   );
 }
@@ -1020,6 +1023,15 @@ function CommonGroundView({ data, strategy }: { data: any; strategy: any }) {
 /* ===================== PHASE 4 - MEDIATOR PANEL (READ-ONLY SUMMARY) ===================== */
 
 function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
+  const [uyap, setUyap] = useState(caseRow.uyap_no || "");
+  const [savingUyap, setSavingUyap] = useState(false);
+  async function saveUyap() {
+    setSavingUyap(true);
+    const { error } = await supabase.from("cases").update({ uyap_no: uyap.trim() || null } as any).eq("id", caseRow.id);
+    setSavingUyap(false);
+    if (error) toast({ title: "Kaydedilemedi", description: trErr(error.message), variant: "destructive" });
+    else toast({ title: "UYAP Kayıt No güncellendi" });
+  }
   const [report, setReport] = useState<any>(null);
   const [analyses, setAnalyses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1041,6 +1053,16 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
     <Card className="p-6 space-y-4">
       <h2 className="text-2xl font-bold text-primary">Aşama 4 — Arabulucu Paneli</h2>
       <p className="text-sm text-muted-foreground">Aşama 3'te üretilen analizlerin ve ortak zemin raporunun özet görünümü.</p>
+      <div className="border rounded-md p-3 bg-muted/30 space-y-2">
+        <Label className="text-sm">UYAP Kayıt No (varsa girin)</Label>
+        <div className="flex gap-2">
+          <Input value={uyap} onChange={(e) => setUyap(e.target.value)} placeholder="Örn. 2026/12345" className="font-mono" />
+          <Button onClick={saveUyap} disabled={savingUyap}>
+            {savingUyap ? <Loader2 className="h-4 w-4 animate-spin" /> : "Kaydet"}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Başvuru UYAP sistemine kaydedildiğinde devlet tarafından verilen resmi numarayı buraya girin. Boş bırakılırsa belgelerde "UYAP No: Henüz kaydedilmedi" görünür.</p>
+      </div>
       <div>
         <h3 className="font-semibold mb-2">Taraf Analizleri ({analyses.length})</h3>
         <div className="space-y-2">
@@ -1150,7 +1172,7 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
       for (const t of templates) {
         await supabase.from("agreement_documents").insert({
           case_id: caseRow.id, doc_type: t,
-          metadata: { content: `${t}\n\nBaşvuru No: ${caseRow.application_no}\nTarih: ${new Date().toLocaleDateString("tr-TR")}\nKonu: ${caseRow.title}\nUyuşmazlık: ${caseRow.dispute_type}` } as any,
+          metadata: { content: `${t}\n\nSistem No: ${caseRow.application_no}\nUYAP No: ${caseRow.uyap_no || "Henüz kaydedilmedi"}\nTarih: ${new Date().toLocaleDateString("tr-TR")}\nKonu: ${caseRow.title}\nUyuşmazlık: ${caseRow.dispute_type || "AI tarafından henüz tespit edilmedi"}` } as any,
         } as any);
       }
       await supabase.from("cases").update({ status: agreed ? "agreed" : "failed", current_phase: 9 } as any).eq("id", caseRow.id);
