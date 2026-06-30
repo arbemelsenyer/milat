@@ -52,6 +52,8 @@ export function KnowledgeBaseAdmin() {
   const { toast } = useToast();
   const [job, setJob] = useState<Job | null>(null);
   const [starting, setStarting] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const resumingRef = useState<{ current: string | null }>({ current: null })[0];
 
   const load = async () => {
     const { data } = await supabase
@@ -61,20 +63,47 @@ export function KnowledgeBaseAdmin() {
       .limit(1)
       .maybeSingle();
     if (data) setJob(data as any);
+    return data as Job | null;
   };
 
+  // Otomatik sürdürme: iş running ise her tick'te bir sonraki kitabı işlemek için fonksiyonu yeniden çağır.
   useEffect(() => {
-    load();
-    const t = setInterval(load, 4000);
-    return () => clearInterval(t);
+    let cancelled = false;
+    const tick = async () => {
+      const current = await load();
+      if (cancelled || !current) return;
+      const isActive = current.status === "running" || current.status === "pending";
+      if (!isActive) return;
+      if (resumingRef.current === current.id) return; // bu iş için zaten resume akıyor
+      if (current.processed_books >= current.total_books) return;
+      resumingRef.current = current.id;
+      try {
+        await supabase.functions.invoke("build-knowledge-base", {
+          body: { resume_job_id: current.id },
+        });
+      } catch (e) {
+        console.error("resume failed", e);
+      } finally {
+        resumingRef.current = null;
+        load();
+      }
+    };
+    tick();
+    const t = setInterval(tick, 5000);
+    return () => { cancelled = true; clearInterval(t); };
   }, []);
 
-  const start = async () => {
-    setStarting(true);
+  const start = async (mode: "all" | "test" = "all") => {
+    if (mode === "test") setTesting(true); else setStarting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("build-knowledge-base");
+      const { data, error } = await supabase.functions.invoke("build-knowledge-base", {
+        body: mode === "test" ? { test: true } : {},
+      });
       if (error) throw error;
-      toast({ title: "Bilgi tabanı güncelleme başlatıldı", description: `${data?.total_books ?? 19} kitap işlenecek.` });
+      toast({
+        title: mode === "test" ? "Tek PDF test başlatıldı" : "Bilgi tabanı güncelleme başlatıldı",
+        description: `${data?.total_books ?? 0} kitap kuyruğa alındı.`,
+      });
       await load();
     } catch (e: any) {
       toast({ title: "Hata", description: e.message ?? "Başlatılamadı", variant: "destructive" });
