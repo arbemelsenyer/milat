@@ -17,7 +17,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Plus, Loader2, FolderOpen, FileText, Users, Brain, ShieldCheck,
   Calendar as CalIcon, UserCheck, MessageSquare, FileCheck2, CheckCircle2, Circle,
-  Trash2, ArrowLeft, Download, Sparkles,
+  Trash2, ArrowLeft, Download, Sparkles, ChevronDown, ChevronUp, AlertTriangle, RefreshCw,
 } from "lucide-react";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
@@ -35,13 +35,12 @@ const DISPUTE_TYPES = [
 const PHASES = [
   { id: 1, label: "Başvuru", icon: FileText },
   { id: 2, label: "Taraflar", icon: Users },
-  { id: 3, label: "Belgeler", icon: FolderOpen },
-  { id: 4, label: "Gizli Analiz", icon: Brain },
-  { id: 5, label: "Arabulucu Paneli", icon: ShieldCheck },
-  { id: 6, label: "Toplantı", icon: CalIcon },
-  { id: 7, label: "Bilirkişi", icon: UserCheck, optional: true },
-  { id: 8, label: "Müzakere", icon: MessageSquare },
-  { id: 9, label: "Belgeler & Kapanış", icon: FileCheck2 },
+  { id: 3, label: "Taraf Analizi", icon: Brain },
+  { id: 4, label: "Arabulucu Paneli", icon: ShieldCheck },
+  { id: 5, label: "Toplantı", icon: CalIcon },
+  { id: 6, label: "Bilirkişi", icon: UserCheck, optional: true },
+  { id: 7, label: "Müzakere", icon: MessageSquare },
+  { id: 8, label: "Belgeler & Kapanış", icon: FileCheck2 },
 ] as const;
 
 type CaseRow = {
@@ -99,6 +98,7 @@ export default function MediationEngine() {
   const [loading, setLoading] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [activeCase, setActiveCase] = useState<CaseRow | null>(null);
+  const [phase3Complete, setPhase3Complete] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -113,6 +113,18 @@ export default function MediationEngine() {
   useEffect(() => {
     if (caseId) loadCase(caseId); else setActiveCase(null);
   }, [caseId]);
+
+  const checkPhase3 = useCallback(async (id: string) => {
+    const [{ count: aCount }, { data: report }] = await Promise.all([
+      supabase.from("party_analyses").select("id", { count: "exact", head: true }).eq("case_id", id),
+      supabase.from("common_ground_reports").select("id").eq("case_id", id).maybeSingle(),
+    ]);
+    setPhase3Complete((aCount ?? 0) >= 2 && !!report);
+  }, []);
+
+  useEffect(() => {
+    if (caseId) checkPhase3(caseId);
+  }, [caseId, checkPhase3, phaseParam]);
 
   useEffect(() => {
     if (params.get("new") === "1") {
@@ -243,10 +255,13 @@ export default function MediationEngine() {
               const done = p.id < completed;
               const active = p.id === phaseParam;
               const Icon = p.icon;
+              const locked = p.id >= 4 && !phase3Complete;
               return (
-                <button key={p.id} onClick={() => setPhase(p.id)}
+                <button key={p.id} onClick={() => { if (!locked) setPhase(p.id); else toast({ title: "Aşama kilitli", description: "Önce Aşama 3'te en az 2 tarafı analiz edip Ortak Zemin Raporu üretin." }); }}
                   className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition
-                    ${active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/40"}`}>
+                    ${active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/40"}
+                    ${locked ? "opacity-50 cursor-not-allowed" : ""}`}
+                  title={locked ? "Aşama 3 tamamlanmadı" : ""}>
                   {done ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Circle className="h-4 w-4 opacity-60" />}
                   <Icon className="h-4 w-4" />
                   <span className="flex-1 text-left">{p.id}. {p.label}</span>
@@ -260,7 +275,7 @@ export default function MediationEngine() {
           <PhaseRenderer
             phase={phaseParam}
             caseRow={activeCase}
-            reload={() => loadCase(activeCase.id)}
+            reload={() => { loadCase(activeCase.id); checkPhase3(activeCase.id); }}
             isMediator={isMediator || isAdmin}
             userId={user!.id}
             onAdvance={(next) => setPhase(next)}
@@ -348,13 +363,12 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }
   switch (phase) {
     case 1: return <Phase1Summary caseRow={caseRow} />;
     case 2: return <Phase2Parties caseRow={caseRow} isMediator={isMediator} userId={userId} onDone={() => { bumpPhase(3); onAdvance(3); }} />;
-    case 3: return <Phase3Documents caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(4); onAdvance(4); }} />;
-    case 4: return <Phase4Analysis caseRow={caseRow} userId={userId} isMediator={isMediator} onDone={() => { bumpPhase(5); onAdvance(5); }} />;
-    case 5: return <Phase5MediatorPanel caseRow={caseRow} isMediator={isMediator} onDone={() => { bumpPhase(6); onAdvance(6); }} />;
-    case 6: return <SessionScheduler caseId={caseRow.id} />;
-    case 7: return <Phase7Expert caseRow={caseRow} />;
-    case 8: return <Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(9); onAdvance(9); }} />;
-    case 9: return <Phase9Closing caseRow={caseRow} />;
+    case 3: return <Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} onAdvance={onAdvance} bumpPhase={bumpPhase} />;
+    case 4: return <Phase4Summary caseRow={caseRow} />;
+    case 5: return <SessionScheduler caseId={caseRow.id} />;
+    case 6: return <Phase7Expert caseRow={caseRow} />;
+    case 7: return <Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(8); onAdvance(8); }} />;
+    case 8: return <Phase9Closing caseRow={caseRow} />;
     default: return null;
   }
 }
@@ -539,235 +553,486 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
   );
 }
 
-/* ===================== PHASE 3 - DOCUMENTS ===================== */
+/* ===================== PHASE 3 - PARTY ANALYSIS (docs + analysis + common ground) ===================== */
 
-function Phase3Documents({ caseRow, userId, onDone }: { caseRow: CaseRow; userId: string; onDone: () => void }) {
+const MAX_SIZE = 10 * 1024 * 1024;
+const ALLOWED_EXT = ["pdf", "doc", "docx", "txt"];
+const ALLOWED_MIME = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+];
+
+function partyDisplay(p: any) {
+  return p.full_name || (p.party_type === "corporate" ? p.company_name : `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim()) || "(isimsiz)";
+}
+function roleLabel(r?: string) {
+  return r === "applicant" ? "Başvurucu" : r === "respondent" ? "Karşı Taraf" : "Üçüncü Taraf";
+}
+
+function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, bumpPhase }: {
+  caseRow: CaseRow; userId: string; isMediator: boolean; reload: () => void;
+  onAdvance: (n: number) => void; bumpPhase: (n: number) => Promise<void>;
+}) {
+  const [parties, setParties] = useState<any[]>([]);
   const [docs, setDocs] = useState<any[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [analyses, setAnalyses] = useState<any[]>([]);
+  const [report, setReport] = useState<any>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [analysing, setAnalysing] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<{ partyId: string; msg: string } | null>(null);
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [navigating, setNavigating] = useState(false);
 
-  const load = useCallback(async () => {
-    const { data } = await supabase.from("case_documents").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false });
-    setDocs(data ?? []);
+  const loadAll = useCallback(async () => {
+    const [p, d, a, r] = await Promise.all([
+      supabase.from("case_parties").select("*").eq("case_id", caseRow.id).order("created_at"),
+      supabase.from("case_documents").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }),
+      supabase.from("party_analyses").select("*").eq("case_id", caseRow.id),
+      supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).maybeSingle(),
+    ]);
+    setParties(p.data ?? []);
+    setDocs(d.data ?? []);
+    setAnalyses(a.data ?? []);
+    setReport(r.data);
   }, [caseRow.id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadAll(); }, [loadAll]);
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleUpload(partyId: string, e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
-
-    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
-    const ALLOWED_EXT = ["pdf", "doc", "docx"];
-    const ALLOWED_MIME = [
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ];
 
     for (const f of files) {
       const ext = f.name.split(".").pop()?.toLowerCase() ?? "";
       if (!ALLOWED_EXT.includes(ext) && !ALLOWED_MIME.includes(f.type)) {
-        toast({ title: "Geçersiz dosya türü", description: `"${f.name}" yalnızca PDF veya Word (.pdf, .doc, .docx) olabilir.`, variant: "destructive" });
-        e.target.value = "";
-        return;
+        toast({ title: "Geçersiz dosya türü", description: `"${f.name}" yalnızca PDF, Word veya metin dosyası olabilir.`, variant: "destructive" });
+        e.target.value = ""; return;
       }
       if (f.size > MAX_SIZE) {
         toast({ title: "Dosya çok büyük", description: `"${f.name}" 10MB sınırını aşıyor.`, variant: "destructive" });
-        e.target.value = "";
-        return;
+        e.target.value = ""; return;
       }
     }
 
-    setBusy(true);
+    setUploading(partyId);
     try {
       for (const f of files) {
-        // Storage RLS expects path: {user_id}/{case_id}/{file}
         const safeName = f.name.replace(/[^\w.\-]+/g, "_");
-        const path = `${userId}/${caseRow.id}/${Date.now()}-${safeName}`;
+        const path = `${userId}/${caseRow.id}/${partyId}-${Date.now()}-${safeName}`;
         const { error: upErr } = await supabase.storage.from("case-documents").upload(path, f, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: f.type || undefined,
+          cacheControl: "3600", upsert: false, contentType: f.type || undefined,
         });
         if (upErr) {
           const msg = /row-level security|not authorized|permission/i.test(upErr.message)
             ? "Bu başvuruya belge yükleme yetkiniz yok."
-            : /exists|duplicate/i.test(upErr.message)
-            ? "Aynı isimde bir dosya zaten var, lütfen yeniden deneyin."
             : `Depolama hatası: ${upErr.message}`;
           throw new Error(msg);
         }
         const { error: insErr } = await supabase.from("case_documents").insert({
-          case_id: caseRow.id,
-          file_name: f.name,
-          file_path: path,
-          file_size: f.size,
-          mime_type: f.type,
-          uploaded_by: userId,
+          case_id: caseRow.id, party_id: partyId,
+          file_name: f.name, file_path: path, file_size: f.size, mime_type: f.type, uploaded_by: userId,
         } as any);
         if (insErr) {
-          // rollback storage object so we don't leave orphans
           await supabase.storage.from("case-documents").remove([path]);
-          const msg = /row-level security|policy/i.test(insErr.message)
-            ? "Belge kaydı için yetkiniz yok. Lütfen başvuru sahibi veya taraf olarak giriş yapın."
-            : `Veritabanı hatası: ${insErr.message}`;
-          throw new Error(msg);
+          throw new Error(`Veritabanı hatası: ${insErr.message}`);
         }
       }
-      toast({ title: "Belge yüklendi", description: files.length > 1 ? `${files.length} dosya başarıyla yüklendi.` : "Dosya başarıyla yüklendi." });
-      load();
+      toast({ title: "Belge yüklendi" });
+      loadAll();
     } catch (err: any) {
-      toast({ title: "Yükleme başarısız", description: err?.message ?? "Bilinmeyen bir hata oluştu.", variant: "destructive" });
+      toast({ title: "Yükleme başarısız", description: err?.message ?? "Bilinmeyen hata", variant: "destructive" });
     } finally {
-      setBusy(false);
+      setUploading(null);
       e.target.value = "";
     }
   }
 
-  return (
-    <Card className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-primary">Aşama 3 — Belgeler</h2>
-      <p className="text-sm text-muted-foreground">PDF veya Word (max 10MB). Belgeleri sadece yükleyen taraf ve arabulucu görebilir.</p>
-      <label className="flex flex-col items-center justify-center gap-2 cursor-pointer rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 py-10 hover:bg-primary/10">
-        {busy ? <Loader2 className="h-8 w-8 animate-spin text-primary" /> : <Plus className="h-8 w-8 text-primary" />}
-        <span className="font-medium">Belge Yükle</span>
-        <input type="file" multiple accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={handleUpload} disabled={busy} />
-      </label>
-      {docs.length > 0 && (
-        <ul className="space-y-2">
-          {docs.map((d) => (
-            <li key={d.id} className="flex items-center gap-2 text-sm p-2 border rounded">
-              <FileText className="h-4 w-4 text-primary" />
-              <span className="flex-1">{d.file_name}</span>
-              <span className="text-xs text-muted-foreground">{new Date(d.created_at).toLocaleDateString("tr-TR")}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="flex justify-end">
-        <Button onClick={onDone}>Aşamayı Tamamla →</Button>
-      </div>
-    </Card>
-  );
-}
-
-/* ===================== PHASE 4 - CONFIDENTIAL ANALYSIS ===================== */
-
-function Phase4Analysis({ caseRow, userId, isMediator, onDone }: { caseRow: CaseRow; userId: string; isMediator: boolean; onDone: () => void }) {
-  const [parties, setParties] = useState<any[]>([]);
-  const [analyses, setAnalyses] = useState<any[]>([]);
-  const [busy, setBusy] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    const [p, a] = await Promise.all([
-      supabase.from("case_parties").select("*").eq("case_id", caseRow.id),
-      supabase.from("party_analyses").select("*").eq("case_id", caseRow.id),
-    ]);
-    setParties(p.data ?? []);
-    setAnalyses(a.data ?? []);
-  }, [caseRow.id]);
-
-  useEffect(() => { load(); }, [load]);
+  async function deleteDoc(d: any) {
+    await supabase.storage.from("case-documents").remove([d.file_path]);
+    await supabase.from("case_documents").delete().eq("id", d.id);
+    loadAll();
+  }
 
   async function runAnalysis(partyId: string) {
-    setBusy(partyId);
+    setAnalysing(partyId);
+    setAnalysisError(null);
     try {
-      const { error } = await supabase.functions.invoke("party-confidential-analysis", {
+      const { data, error } = await supabase.functions.invoke("party-confidential-analysis", {
         body: { case_id: caseRow.id, party_id: partyId },
       });
       if (error) throw error;
-      toast({ title: "Gizli analiz oluşturuldu" });
-      load();
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({ title: "Taraf analizi tamamlandı" });
+      loadAll();
     } catch (e: any) {
-      toast({ title: "Analiz hatası", description: trErr(e.message), variant: "destructive" });
-    } finally { setBusy(null); }
+      const msg = e?.message?.includes("Forbidden")
+        ? "Bu analiz için yetkiniz yok."
+        : e?.message || "AI servisine ulaşılamadı.";
+      setAnalysisError({ partyId, msg });
+      toast({ title: "Analiz hatası", description: msg, variant: "destructive" });
+    } finally { setAnalysing(null); }
   }
 
+  async function generateReport() {
+    setReportBusy(true);
+    setReportError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("common-ground-report", { body: { case_id: caseRow.id } });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({ title: "Ortak zemin raporu hazır" });
+      loadAll();
+      reload();
+    } catch (e: any) {
+      const msg = e?.message || "Rapor üretilemedi.";
+      setReportError(msg);
+      toast({ title: "Rapor hatası", description: msg, variant: "destructive" });
+    } finally { setReportBusy(false); }
+  }
+
+  async function chooseMeeting(meetingType: "ozel" | "ortak") {
+    setNavigating(true);
+    try {
+      // Pre-create a placeholder session with the chosen meeting_type (user can edit in Phase 5)
+      await supabase.from("case_sessions").insert({
+        case_id: caseRow.id, session_type: "joint", meeting_type: meetingType, status: "draft",
+      } as any).select().maybeSingle();
+      await bumpPhase(5);
+      onAdvance(5);
+    } catch (e: any) {
+      toast({ title: "Geçiş hatası", description: trErr(e.message), variant: "destructive" });
+    } finally { setNavigating(false); }
+  }
+
+  const analysedCount = analyses.length;
+  const canReport = analysedCount >= 2;
+
   return (
-    <Card className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-primary">Aşama 4 — Gizli Analiz</h2>
-      <p className="text-sm text-muted-foreground">Her tarafa özel analiz. Taraflar birbirinin analizini göremez.</p>
+    <div className="space-y-4">
+      <Card className="p-6 space-y-2">
+        <h2 className="text-2xl font-bold text-primary">Aşama 3 — Taraf Analizi</h2>
+        <p className="text-sm text-muted-foreground">
+          Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. En az 2 taraf analiz edildiğinde Ortak Zemin Raporu üretebilirsiniz.
+        </p>
+        <div className="flex gap-2 text-xs">
+          <Badge variant="secondary">Taraf: {parties.length}</Badge>
+          <Badge variant="secondary">Analiz: {analysedCount}</Badge>
+          {report && <Badge>Ortak Zemin Raporu ✓</Badge>}
+        </div>
+      </Card>
+
+      {parties.length === 0 && (
+        <Card className="p-6"><p className="text-muted-foreground">Önce Aşama 2'de taraf ekleyin.</p></Card>
+      )}
+
       <div className="space-y-3">
         {parties.map((p) => {
+          const partyDocs = docs.filter((d) => d.party_id === p.id);
           const a = analyses.find((x) => x.party_id === p.id);
-          const canSee = isMediator || p.user_id === userId;
+          const open = openId === p.id;
+          const an = a?.analysis ?? {};
           return (
-            <div key={p.id} className="p-4 border rounded space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="font-medium">{p.full_name}</div>
-                <div className="flex gap-2">
+            <Card key={p.id} className="overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setOpenId(open ? null : p.id)}
+                className="w-full flex items-center justify-between p-4 hover:bg-accent/30 transition"
+              >
+                <div className="text-left">
+                  <div className="font-semibold">{partyDisplay(p)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {roleLabel(p.party_role)} · {p.party_type === "corporate" ? "Kurumsal" : "Bireysel"} · {partyDocs.length} belge
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
                   {a && <Badge variant="secondary">Analiz hazır</Badge>}
-                  {isMediator && (
-                    <Button size="sm" onClick={() => runAnalysis(p.id)} disabled={busy === p.id}>
-                      {busy === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
-                      {a ? "Yeniden Üret" : "AI Analizi Üret"}
+                  {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </div>
+              </button>
+
+              {open && (
+                <div className="border-t p-4 space-y-4">
+                  {/* Party info */}
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {p.tc_kimlik && <div><span className="text-muted-foreground">TC:</span> {p.tc_kimlik}</div>}
+                    {p.tax_number && <div><span className="text-muted-foreground">Vergi No:</span> {p.tax_number}</div>}
+                    {p.email && <div><span className="text-muted-foreground">E-posta:</span> {p.email}</div>}
+                    {p.gsm && <div><span className="text-muted-foreground">GSM:</span> {p.gsm}</div>}
+                    {p.address && <div className="col-span-2"><span className="text-muted-foreground">Adres:</span> {p.address}</div>}
+                  </div>
+
+                  {/* Per-party docs */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-medium">Belgeler</div>
+                      <label className="text-xs cursor-pointer text-primary hover:underline flex items-center gap-1">
+                        {uploading === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                        Belge Yükle
+                        <input type="file" multiple className="hidden"
+                          accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                          onChange={(e) => handleUpload(p.id, e)} disabled={uploading === p.id} />
+                      </label>
+                    </div>
+                    {partyDocs.length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">Bu taraf için belge yok.</p>
+                    ) : (
+                      <ul className="space-y-1">
+                        {partyDocs.map((d) => (
+                          <li key={d.id} className="flex items-center gap-2 text-sm p-2 border rounded">
+                            <FileText className="h-4 w-4 text-primary" />
+                            <span className="flex-1 truncate">{d.file_name}</span>
+                            <Button variant="ghost" size="sm" onClick={() => deleteDoc(d)}><Trash2 className="h-3 w-3" /></Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* Analysis trigger */}
+                  <div className="flex gap-2 flex-wrap">
+                    <Button size="sm" onClick={() => runAnalysis(p.id)} disabled={analysing === p.id}>
+                      {analysing === p.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                      {a ? "Yeniden Analiz Et" : "Analiz Başlat"}
                     </Button>
+                    {analysisError?.partyId === p.id && (
+                      <Button size="sm" variant="outline" onClick={() => runAnalysis(p.id)}>
+                        <RefreshCw className="h-4 w-4 mr-1" /> Tekrar Dene
+                      </Button>
+                    )}
+                  </div>
+                  {analysisError?.partyId === p.id && (
+                    <div className="text-xs text-destructive flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" /> {analysisError.msg}
+                    </div>
+                  )}
+
+                  {/* Analysis result */}
+                  {a && (
+                    <div className="space-y-2">
+                      {an.dispute_area && (
+                        <AnaSection icon="🔍" title="Uyuşmazlık Türü">
+                          <p className="text-sm">{an.dispute_area}</p>
+                        </AnaSection>
+                      )}
+                      {an.legal_framework && (
+                        <AnaSection icon="⚖️" title="Hukuki Çerçeve">
+                          {an.legal_framework.statutes?.length > 0 && (
+                            <div className="text-sm">
+                              <div className="font-medium">Mevzuat:</div>
+                              <ul className="list-disc pl-5">{an.legal_framework.statutes.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+                            </div>
+                          )}
+                          {an.legal_framework.precedents?.length > 0 && (
+                            <div className="text-sm mt-2">
+                              <div className="font-medium">Emsal Kararlar:</div>
+                              <ul className="list-disc pl-5">
+                                {an.legal_framework.precedents.map((pr: any, i: number) => (
+                                  <li key={i}><b>{pr.court}:</b> {pr.decision} <span className="text-muted-foreground">— {pr.relevance}</span></li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </AnaSection>
+                      )}
+                      {an.document_findings?.length > 0 && (
+                        <AnaSection icon="📄" title="Belge Bulguları">
+                          <ul className="list-disc pl-5 text-sm">{an.document_findings.map((f: string, i: number) => <li key={i}>{f}</li>)}</ul>
+                        </AnaSection>
+                      )}
+                      {an.party_position && (
+                        <AnaSection icon="👤" title="Taraf Analizi">
+                          <PosBlock label="Güçlü Yanlar" items={an.party_position.strengths} />
+                          <PosBlock label="Zayıf Yanlar" items={an.party_position.weaknesses} />
+                          <PosBlock label="İhtiyaçlar" items={an.party_position.interests} />
+                          {an.party_position.batna && <div className="text-sm mt-1"><b>BATNA:</b> {an.party_position.batna}</div>}
+                          {an.party_position.watna && <div className="text-sm"><b>WATNA:</b> {an.party_position.watna}</div>}
+                        </AnaSection>
+                      )}
+                      {an.discovery_questions?.length > 0 && (
+                        <AnaSection icon="❓" title="İhtiyaç Soruları">
+                          <ol className="list-decimal pl-5 text-sm space-y-1">
+                            {an.discovery_questions.map((q: any, i: number) => <li key={i}>{q.question}</li>)}
+                          </ol>
+                        </AnaSection>
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
-              {a && canSee && (
-                <pre className="text-xs whitespace-pre-wrap bg-muted/40 p-3 rounded max-h-64 overflow-auto">
-                  {typeof a.analysis === "string" ? a.analysis : JSON.stringify(a.analysis, null, 2)}
-                </pre>
               )}
-              {a && !canSee && <p className="text-xs text-muted-foreground italic">Bu analiz gizlidir.</p>}
-            </div>
+            </Card>
           );
         })}
       </div>
-      {isMediator && analyses.length >= 2 && (
-        <div className="flex justify-end">
-          <Button onClick={onDone}>Aşamayı Tamamla →</Button>
+
+      {/* Common ground report */}
+      <Card className="p-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Ortak Zemin Raporu & Çözüm Önerileri</h3>
+          <Button onClick={generateReport} disabled={!canReport || reportBusy} size="sm">
+            {reportBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+            {report ? "Yeniden Üret" : "Rapor Üret"}
+          </Button>
         </div>
-      )}
-    </Card>
+        {!canReport && <p className="text-xs text-muted-foreground">En az 2 taraf analiz edildikten sonra aktif olur.</p>}
+        {reportError && (
+          <div className="text-xs text-destructive flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" /> {reportError}
+            <Button size="sm" variant="outline" className="ml-2" onClick={generateReport}><RefreshCw className="h-3 w-3 mr-1" />Tekrar Dene</Button>
+          </div>
+        )}
+        {report && <CommonGroundView data={report.report} strategy={report.strategy} />}
+
+        {report && (
+          <div className="pt-4 border-t space-y-2">
+            <p className="text-xs text-muted-foreground">Sonraki adım: Taraflarla görüşme planlayın</p>
+            <div className="flex gap-2 flex-wrap">
+              <Button onClick={() => chooseMeeting("ozel")} disabled={navigating} variant="outline">
+                <CalIcon className="h-4 w-4 mr-1" /> Özel Görüşme Planla
+              </Button>
+              <Button onClick={() => chooseMeeting("ortak")} disabled={navigating}>
+                <CalIcon className="h-4 w-4 mr-1" /> Ortak Görüşme Planla
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
   );
 }
 
-/* ===================== PHASE 5 - MEDIATOR PANEL ===================== */
+function AnaSection({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+  return (
+    <div className="border rounded-md p-3 bg-muted/30">
+      <div className="font-medium text-sm mb-1">{icon} {title}</div>
+      {children}
+    </div>
+  );
+}
+function PosBlock({ label, items }: { label: string; items?: string[] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="text-sm mt-1">
+      <span className="font-medium">{label}:</span>
+      <ul className="list-disc pl-5">{items.map((s, i) => <li key={i}>{s}</li>)}</ul>
+    </div>
+  );
+}
+function CommonGroundView({ data, strategy }: { data: any; strategy: any }) {
+  if (!data) return null;
+  return (
+    <div className="space-y-2">
+      {data.common_interests?.length > 0 && (
+        <AnaSection icon="🤝" title="Ortak Çıkarlar">
+          <ul className="list-disc pl-5 text-sm">{data.common_interests.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+        </AnaSection>
+      )}
+      {data.zopa && (
+        <AnaSection icon="📊" title="Uzlaşma Alanı (ZOPA)">
+          <p className="text-sm">{data.zopa.description}</p>
+          {(data.zopa.lower_bound || data.zopa.upper_bound) && (
+            <p className="text-xs text-muted-foreground mt-1">Alt: {data.zopa.lower_bound} — Üst: {data.zopa.upper_bound}</p>
+          )}
+        </AnaSection>
+      )}
+      {data.scenarios?.length > 0 && (
+        <AnaSection icon="📋" title="Çözüm Senaryoları">
+          <div className="space-y-2">
+            {data.scenarios.map((sc: any, i: number) => (
+              <div key={i} className="border rounded p-2 bg-background">
+                <div className="font-medium text-sm">{sc.label}</div>
+                <p className="text-sm">{sc.summary}</p>
+                {sc.tradeoffs?.length > 0 && (
+                  <ul className="list-disc pl-5 text-xs text-muted-foreground">{sc.tradeoffs.map((t: string, j: number) => <li key={j}>{t}</li>)}</ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </AnaSection>
+      )}
+      {(strategy || data.mediator_strategy) && (
+        <AnaSection icon="🎯" title="Arabulucu Stratejisi">
+          {(() => {
+            const s = strategy || data.mediator_strategy || {};
+            return (
+              <div className="text-sm space-y-1">
+                {s.opening_statement && <div><b>Açılış:</b> {s.opening_statement}</div>}
+                {s.critical_questions?.length > 0 && (
+                  <div><b>Kritik Sorular:</b><ul className="list-disc pl-5">{s.critical_questions.map((q: string, i: number) => <li key={i}>{q}</li>)}</ul></div>
+                )}
+                {s.deadlock_techniques?.length > 0 && (
+                  <div><b>Çıkmaz Teknikleri:</b><ul className="list-disc pl-5">{s.deadlock_techniques.map((q: string, i: number) => <li key={i}>{q}</li>)}</ul></div>
+                )}
+              </div>
+            );
+          })()}
+        </AnaSection>
+      )}
+      {data.red_lines?.length > 0 && (
+        <AnaSection icon="🚧" title="Kırmızı Çizgiler">
+          <ul className="list-disc pl-5 text-sm">{data.red_lines.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+        </AnaSection>
+      )}
+    </div>
+  );
+}
 
-function Phase5MediatorPanel({ caseRow, isMediator, onDone }: { caseRow: CaseRow; isMediator: boolean; onDone: () => void }) {
+/* ===================== PHASE 4 - MEDIATOR PANEL (READ-ONLY SUMMARY) ===================== */
+
+function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   const [report, setReport] = useState<any>(null);
-  const [busy, setBusy] = useState(false);
+  const [analyses, setAnalyses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => { (async () => {
-    const { data } = await supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).maybeSingle();
-    setReport(data);
+    setLoading(true);
+    const [r, a] = await Promise.all([
+      supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).maybeSingle(),
+      supabase.from("party_analyses").select("party_id, analysis, case_parties:party_id(first_name, last_name, company_name, party_role)").eq("case_id", caseRow.id),
+    ]);
+    setReport(r.data);
+    setAnalyses(a.data ?? []);
+    setLoading(false);
   })(); }, [caseRow.id]);
 
-  async function generate() {
-    setBusy(true);
-    try {
-      const { error } = await supabase.functions.invoke("common-ground-report", { body: { case_id: caseRow.id } });
-      if (error) throw error;
-      const { data } = await supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).maybeSingle();
-      setReport(data);
-      toast({ title: "Ortak zemin raporu hazır" });
-    } catch (e: any) {
-      toast({ title: "Hata", description: trErr(e.message), variant: "destructive" });
-    } finally { setBusy(false); }
-  }
-
-  if (!isMediator) return <Card className="p-6"><p className="text-muted-foreground">Sadece arabulucuya açık.</p></Card>;
+  if (loading) return <Card className="p-6"><Loader2 className="animate-spin" /></Card>;
 
   return (
     <Card className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-primary">Aşama 5 — Arabulucu Paneli</h2>
-      <Button onClick={generate} disabled={busy}>
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
-        AI Ortak Zemin Raporu Üret
-      </Button>
-      {report && (
-        <pre className="text-xs whitespace-pre-wrap bg-muted/40 p-3 rounded max-h-96 overflow-auto">
-          {typeof report.report === "string" ? report.report : JSON.stringify(report.report, null, 2)}
-        </pre>
-      )}
-      <div className="flex justify-end">
-        <Button onClick={onDone}>Toplantıya Geç →</Button>
+      <h2 className="text-2xl font-bold text-primary">Aşama 4 — Arabulucu Paneli</h2>
+      <p className="text-sm text-muted-foreground">Aşama 3'te üretilen analizlerin ve ortak zemin raporunun özet görünümü.</p>
+      <div>
+        <h3 className="font-semibold mb-2">Taraf Analizleri ({analyses.length})</h3>
+        <div className="space-y-2">
+          {analyses.map((a: any, i) => {
+            const cp = a.case_parties || {};
+            const name = cp.company_name || `${cp.first_name ?? ""} ${cp.last_name ?? ""}`.trim() || "Taraf";
+            return (
+              <div key={i} className="border rounded p-3 text-sm">
+                <div className="font-medium">{name} <span className="text-xs text-muted-foreground">({roleLabel(cp.party_role)})</span></div>
+                {a.analysis?.dispute_area && <div className="text-xs">📋 {a.analysis.dispute_area}</div>}
+                {a.analysis?.party_position?.batna && <div className="text-xs">BATNA: {a.analysis.party_position.batna}</div>}
+              </div>
+            );
+          })}
+        </div>
       </div>
+      {report ? (
+        <div>
+          <h3 className="font-semibold mb-2">Ortak Zemin Raporu</h3>
+          <CommonGroundView data={report.report} strategy={report.strategy} />
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground italic">Ortak zemin raporu henüz üretilmedi.</p>
+      )}
     </Card>
   );
 }
+
+
 
 /* ===================== PHASE 8 - NEGOTIATION ===================== */
 

@@ -25,11 +25,14 @@ Deno.serve(async (req) => {
     const { case_id } = await req.json();
     const admin = createClient(supabaseUrl, serviceKey);
 
-    // Only mediator may run this
+    // Only mediator/admin/case owner may run this
     const { data: caseRow } = await admin.from("cases")
-      .select("id, assigned_mediator_id, dispute_type, dispute_subtype, issue_description, round_number")
+      .select("id, user_id, assigned_mediator_id, dispute_type, dispute_subtype, issue_description, round_number, title")
       .eq("id", case_id).maybeSingle();
-    if (!caseRow || caseRow.assigned_mediator_id !== userData.user.id) {
+    const { data: roleRow } = await admin.from("user_roles")
+      .select("role").eq("user_id", userData.user.id).in("role", ["admin", "mediator"]).maybeSingle();
+    const allowed = caseRow && (caseRow.assigned_mediator_id === userData.user.id || caseRow.user_id === userData.user.id || !!roleRow);
+    if (!allowed) {
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
     }
 
@@ -40,13 +43,28 @@ Deno.serve(async (req) => {
     const { data: discAnswers } = await admin.from("case_discovery_questions")
       .select("party_id, question_text, answer_text").eq("case_id", case_id);
 
-    const systemPrompt = `Sen bir kıdemli arabulucu danışmansın. Birden fazla tarafın GİZLİ analizlerini okuyup ortak zemin raporu ve strateji üretiyorsun. Çıktın SADECE arabulucu görecek. JSON: {"common_interests":[],"high_potential_areas":[],"red_lines":[],"recommended_strategy":"","caucus_plan":[],"opening_offer":"","fallback_options":[]}`;
+    const systemPrompt = `Sen kıdemli bir Türk arabuluculuk danışmanısın. Tarafların gizli analizlerini okuyup ortak zemin raporu ve arabulucu stratejisi üretiyorsun.
+Çıktı YALNIZCA JSON: {
+  "common_interests": [],
+  "zopa": {"description":"", "lower_bound":"", "upper_bound":""},
+  "scenarios": [
+    {"label":"A - Hızlı Çözüm","summary":"","tradeoffs":[]},
+    {"label":"B - Dengeli","summary":"","tradeoffs":[]},
+    {"label":"C - Yaratıcı","summary":"","tradeoffs":[]}
+  ],
+  "mediator_strategy": {
+    "opening_statement": "",
+    "critical_questions": [],
+    "deadlock_techniques": []
+  },
+  "red_lines": []
+}`;
 
-    const userPrompt = `BAŞVURU: ${caseRow.dispute_type} / ${caseRow.dispute_subtype}
-ÖZET: ${caseRow.issue_description}
+    const userPrompt = `BAŞVURU: ${caseRow.title ?? ""} — ${caseRow.dispute_type ?? ""} / ${caseRow.dispute_subtype ?? ""}
+ÖZET: ${caseRow.issue_description ?? ""}
 
 TARAF ANALİZLERİ:
-${(analyses ?? []).map((a: any) => `--- ${a.case_parties?.party_role ?? ""} ---\n${JSON.stringify(a.analysis, null, 2)}`).join("\n\n")}
+${(analyses ?? []).map((a: any) => `--- ${a.case_parties?.party_role ?? ""} (${a.case_parties?.first_name ?? a.case_parties?.company_name ?? ""}) ---\n${JSON.stringify(a.analysis, null, 2)}`).join("\n\n")}
 
 İHTİYAÇ TESPİTİ CEVAPLARI:
 ${(discAnswers ?? []).map((d) => `[Party ${d.party_id?.slice(0, 8)}] Q: ${d.question_text}\nA: ${d.answer_text ?? "(cevap yok)"}`).join("\n")}`;
@@ -69,7 +87,7 @@ ${(discAnswers ?? []).map((d) => `[Party ${d.party_id?.slice(0, 8)}] Q: ${d.ques
     try { parsed = JSON.parse(aiJson.choices[0].message.content); } catch { parsed = {}; }
 
     const { data: inserted } = await admin.from("common_ground_reports").insert({
-      case_id, report: parsed, strategy: { recommendation: parsed.recommended_strategy ?? "" },
+      case_id, report: parsed, strategy: parsed.mediator_strategy ?? {},
       round_number: caseRow.round_number ?? 1,
     }).select().single();
 
