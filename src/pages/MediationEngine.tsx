@@ -932,6 +932,15 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   );
 }
 
+function StepDot({ done, active, label }: { done: boolean; active?: boolean; label: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${done ? "bg-emerald-50 border-emerald-300 text-emerald-700" : active ? "bg-amber-50 border-amber-300 text-amber-700" : "bg-muted/40 border-border text-muted-foreground"}`}>
+      {done ? <CheckCircle2 className="h-3 w-3" /> : active ? <Loader2 className="h-3 w-3 animate-spin" /> : <Circle className="h-3 w-3" />}
+      {label}
+    </span>
+  );
+}
+
 function AnaSection({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
   return (
     <div className="border rounded-md p-3 bg-muted/30">
