@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Calendar, Plus, Sparkles, Loader2, Users, Clock, Circle } from "lucide-react";
+import { Calendar, Plus, Sparkles, Loader2, Users, Clock, Circle, Eye, Send, RefreshCw, CheckCircle2, XCircle, MailWarning } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 const TYPES = [
@@ -208,14 +209,52 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
     return `Taraf ${p.party_role ?? "?"}`;
   };
 
+  // -------- Preview & send invites flow --------
+  type InvitePreview = {
+    party_id: string;
+    email: string;
+    displayName: string;
+    subject: string;
+    html: string;
+  };
+  type InviteResult = {
+    party_id: string;
+    email: string;
+    ok: boolean;
+    error?: string;
+    resend_id?: string;
+  };
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [activeSession, setActiveSession] = useState<any | null>(null);
+  const [previews, setPreviews] = useState<InvitePreview[]>([]);
+  const [activePreviewIdx, setActivePreviewIdx] = useState(0);
+  const [lastResults, setLastResults] = useState<InviteResult[]>([]);
+  const [alreadySent, setAlreadySent] = useState(false);
+  const [retryingParty, setRetryingParty] = useState<string | null>(null);
+
+  const loadPreview = async (sessionId: string, opts?: { partyIds?: string[] }) => {
+    setPreviewLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-meeting-invite", {
+        body: { sessionId, preview: true, partyIds: opts?.partyIds },
+      });
+      if (error) throw error;
+      setPreviews((data?.recipients ?? []) as InvitePreview[]);
+      setActivePreviewIdx(0);
+      setAlreadySent(!!data?.alreadySent);
+    } catch (e: any) {
+      toast({ title: "Önizleme alınamadı", description: e.message ?? "Bilinmeyen hata", variant: "destructive" });
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   const add = async () => {
     if (!composedDateTime) return;
     if (conflicts.length > 0) {
-      toast({
-        title: "Çakışma var",
-        description: "Önce çakışmayı çözün veya alternatif zaman seçin.",
-        variant: "destructive",
-      });
+      toast({ title: "Çakışma var", description: "Önce çakışmayı çözün veya alternatif zaman seçin.", variant: "destructive" });
       return;
     }
     const participants = parties
@@ -230,51 +269,89 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
       participants,
     } as any).select().maybeSingle();
     if (error) {
-      toast({ title: "Hata", description: error.message, variant: "destructive" });
+      toast({ title: "Toplantı kaydedilemedi", description: error.message, variant: "destructive" });
       return;
     }
-    const when = new Date(composedDateTime).toLocaleString("tr-TR");
-    const title = "Yeni Toplantı Daveti";
-    const msg = `${TYPES.find((t) => t.key === type)?.label ?? type} — ${when}`;
+    // in-app notifications
     const recipients = parties
       .filter((p) => selectedPartyIds.includes(p.id) && p.user_id)
       .map((p) => p.user_id as string);
+    const when = new Date(composedDateTime).toLocaleString("tr-TR");
+    const msg = `${TYPES.find((t) => t.key === type)?.label ?? type} — ${when}`;
     await Promise.all(
       recipients.map((uid) =>
         supabase.rpc("create_notification", {
-          p_user_id: uid,
-          p_title: title,
-          p_message: msg,
-          p_type: "info",
-          p_link: `/case-room/${caseId}`,
+          p_user_id: uid, p_title: "Yeni Toplantı Daveti", p_message: msg,
+          p_type: "info", p_link: `/case-room/${caseId}`,
         })
       )
     );
-
-    // Send actual email invites via edge function
-    let emailSummary = "";
-    if (inserted?.id) {
-      const { data: emailRes, error: emailErr } = await supabase.functions.invoke(
-        "send-meeting-invite",
-        { body: { sessionId: inserted.id } }
-      );
-      if (emailErr) {
-        emailSummary = " (email gönderilemedi)";
-        toast({
-          title: "Email uyarısı",
-          description: emailErr.message ?? "Davet emailleri gönderilemedi",
-          variant: "destructive",
-        });
-      } else {
-        emailSummary = ` · ${emailRes?.sent ?? 0} email gönderildi`;
-      }
-    }
-
+    setActiveSession(inserted);
+    setLastResults([]);
+    setAlreadySent(false);
+    setPreviewOpen(true);
+    if (inserted?.id) await loadPreview(inserted.id);
     setDate("");
     setNotes("");
-    toast({ title: "Seans planlandı", description: `${recipients.length} katılımcıya in-app davet gönderildi${emailSummary}` });
     load();
   };
+
+  const sendInvites = async (opts?: { force?: boolean; partyIds?: string[] }) => {
+    if (!activeSession?.id) return;
+    setSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-meeting-invite", {
+        body: { sessionId: activeSession.id, force: opts?.force, partyIds: opts?.partyIds },
+      });
+      if (error) {
+        const errMsg = error.message ?? "Davet e-postaları gönderilemedi";
+        toast({ title: "E-posta gönderim hatası", description: errMsg, variant: "destructive" });
+        return;
+      }
+      if (data?.alreadySent && !opts?.force) {
+        toast({
+          title: "Davetler zaten gönderilmiş",
+          description: "Tekrar göndermek için 'Tekrar Gönder (zorla)' butonunu kullanın.",
+        });
+        setAlreadySent(true);
+        return;
+      }
+      const results = (data?.results ?? []) as InviteResult[];
+      // merge with previous results when retrying a subset
+      setLastResults((prev) => {
+        if (!opts?.partyIds) return results;
+        const map = new Map(prev.map((r) => [r.party_id, r]));
+        results.forEach((r) => map.set(r.party_id, r));
+        return Array.from(map.values());
+      });
+      const sent = data?.sent ?? 0;
+      const failed = data?.failed ?? 0;
+      if (failed === 0) {
+        toast({ title: "Davetler gönderildi", description: `${sent} e-posta başarıyla iletildi.` });
+      } else {
+        toast({
+          title: `${sent} gönderildi, ${failed} başarısız`,
+          description: "Başarısız taraflar için 'Tekrar Dene' butonunu kullanabilirsiniz.",
+          variant: "destructive",
+        });
+      }
+    } catch (e: any) {
+      toast({ title: "Sistem hatası", description: e.message ?? "Bilinmeyen hata", variant: "destructive" });
+    } finally {
+      setSending(false);
+      setRetryingParty(null);
+    }
+  };
+
+  const openPreviewForExisting = async (s: any) => {
+    setActiveSession(s);
+    setLastResults([]);
+    setAlreadySent(!!s.invite_sent_at);
+    setPreviewOpen(true);
+    await loadPreview(s.id);
+  };
+
+
 
   const requestAiSuggestion = async () => {
     setSuggesting(true);
@@ -512,7 +589,7 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
         )}
 
         <Button onClick={add} disabled={!date || conflicts.length > 0} size="sm">
-          <Plus className="h-4 w-4 mr-1" /> Planla ve Davet Gönder
+          <Eye className="h-4 w-4 mr-1" /> Planla, Önizle ve Davet Gönder
         </Button>
       </Card>
 
@@ -541,17 +618,127 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
                       ))}
                     </div>
                   )}
+                  {s.invite_sent_at && (
+                    <Badge variant="secondary" className="text-[10px] mt-1 gap-1">
+                      <CheckCircle2 className="h-3 w-3" /> Davetler gönderildi: {new Date(s.invite_sent_at).toLocaleString("tr-TR")}
+                    </Badge>
+                  )}
                   {s.notes && <div className="text-xs mt-1 whitespace-pre-wrap">{s.notes}</div>}
                 </div>
-                <span className="text-xs text-muted-foreground">{s.status}</span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-xs text-muted-foreground">{s.status}</span>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openPreviewForExisting(s)}>
+                    <Send className="h-3 w-3 mr-1" /> Davet
+                  </Button>
+                </div>
               </Card>
             );
           })
         )}
       </div>
+
+      <Dialog open={previewOpen} onOpenChange={(o) => { setPreviewOpen(o); if (!o) { setPreviews([]); setLastResults([]); } }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Eye className="h-4 w-4" /> Davet Önizlemesi</DialogTitle>
+            <DialogDescription>
+              Aşağıdaki içerik her bir alıcıya ayrı ayrı gönderilecektir. Göndermeden önce kontrol edin.
+            </DialogDescription>
+          </DialogHeader>
+
+          {previewLoading ? (
+            <div className="py-12 flex items-center justify-center text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" /> Önizleme hazırlanıyor…
+            </div>
+          ) : previews.length === 0 ? (
+            <div className="py-8 text-sm text-muted-foreground flex items-center gap-2">
+              <MailWarning className="h-4 w-4" /> E-posta adresi olan taraf bulunamadı. Taraf bilgilerine e-posta ekleyin.
+            </div>
+          ) : (
+            <>
+              {alreadySent && (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+                  Bu toplantı için davetler daha önce gönderilmiş. Tekrar göndermek için aşağıdaki "Tekrar Gönder (zorla)" butonunu kullanın.
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label className="text-xs">Alıcılar ({previews.length})</Label>
+                <div className="flex flex-wrap gap-2">
+                  {previews.map((p, i) => {
+                    const r = lastResults.find((x) => x.party_id === p.party_id);
+                    const variant = r?.ok ? "default" : r ? "destructive" : i === activePreviewIdx ? "default" : "outline";
+                    return (
+                      <Button key={p.party_id} size="sm" variant={variant as any} className="h-7 text-xs gap-1"
+                        onClick={() => setActivePreviewIdx(i)}>
+                        {r?.ok && <CheckCircle2 className="h-3 w-3" />}
+                        {r && !r.ok && <XCircle className="h-3 w-3" />}
+                        {p.displayName} · {p.email}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {previews[activePreviewIdx] && (
+                <div className="space-y-2">
+                  <div className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">Konu:</span> {previews[activePreviewIdx].subject}
+                  </div>
+                  <iframe
+                    title="email-preview"
+                    srcDoc={previews[activePreviewIdx].html}
+                    className="w-full h-[400px] border rounded-md bg-white"
+                  />
+                </div>
+              )}
+
+              {lastResults.length > 0 && (
+                <div className="space-y-2 border rounded-md p-3">
+                  <div className="text-sm font-medium">Gönderim Sonuçları</div>
+                  {lastResults.map((r) => (
+                    <div key={r.party_id} className="flex items-center justify-between text-xs gap-2">
+                      <div className="flex items-center gap-2">
+                        {r.ok ? <CheckCircle2 className="h-3 w-3 text-emerald-600" /> : <XCircle className="h-3 w-3 text-destructive" />}
+                        <span>{r.email}</span>
+                        {!r.ok && <span className="text-destructive">— {r.error}</span>}
+                      </div>
+                      {!r.ok && (
+                        <Button size="sm" variant="outline" className="h-6 text-[11px]"
+                          disabled={sending || retryingParty === r.party_id}
+                          onClick={() => { setRetryingParty(r.party_id); sendInvites({ force: true, partyIds: [r.party_id] }); }}>
+                          {retryingParty === r.party_id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                          Tekrar Dene
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPreviewOpen(false)}>Kapat</Button>
+            {previews.length > 0 && (
+              alreadySent ? (
+                <Button onClick={() => sendInvites({ force: true })} disabled={sending} variant="destructive">
+                  {sending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
+                  Tekrar Gönder (zorla)
+                </Button>
+              ) : (
+                <Button onClick={() => sendInvites()} disabled={sending}>
+                  {sending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
+                  Davetleri Gönder
+                </Button>
+              )
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 // Mini calendar grid showing the next 7 days × QUICK_HOURS slots.
 // Highlights conflicts (red), free alternatives (green), and the active selection.

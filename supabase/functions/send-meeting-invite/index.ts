@@ -12,16 +12,67 @@ const TYPE_LABELS: Record<string, string> = {
   private: "Özel Görüşme",
 };
 
+function buildHtml(opts: {
+  displayName: string;
+  dateStr: string;
+  timeStr: string;
+  typeLabel: string;
+  notes?: string | null;
+}) {
+  const { displayName, dateStr, timeStr, typeLabel, notes } = opts;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body{font-family:Arial,sans-serif;line-height:1.6;color:#222;background:#f6f7f9;margin:0;padding:24px}
+    .container{max-width:600px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb}
+    .header{background:#2c7a7b;color:#fff;padding:24px;text-align:center}
+    .content{padding:24px}
+    .box{background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:16px;margin:16px 0;text-align:center}
+    .date{font-size:20px;font-weight:bold;color:#0f766e}
+    .time{font-size:16px;color:#0d9488;margin-top:4px}
+    .label{font-weight:bold;color:#374151}
+    .footer{padding:16px 24px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:13px;text-align:center}
+    pre{white-space:pre-wrap;font-family:inherit;background:#f9fafb;padding:12px;border-radius:6px;border:1px solid #e5e7eb}
+  </style></head><body>
+    <div class="container">
+      <div class="header"><h2 style="margin:0">Toplantı Daveti</h2><div style="opacity:.9;margin-top:4px">MediPact AI Arabuluculuk</div></div>
+      <div class="content">
+        <p>Sayın ${displayName},</p>
+        <p>Arabuluculuk sürecinizle ilgili aşağıdaki toplantıya davetlisiniz.</p>
+        <div class="box">
+          <div class="date">${dateStr}</div>
+          <div class="time">${timeStr}</div>
+        </div>
+        <p><span class="label">Toplantı Türü:</span> ${typeLabel}</p>
+        ${notes ? `<p><span class="label">Gündem / Notlar:</span></p><pre>${String(notes).replace(/</g, "&lt;")}</pre>` : ""}
+        <p>Lütfen belirtilen tarih ve saatte hazır bulununuz. Toplantıya bağlantı linki, başlamadan kısa süre önce paylaşılacaktır.</p>
+        <p>Sorularınız için arabulucunuzla iletişime geçebilirsiniz.</p>
+      </div>
+      <div class="footer">Saygılarımızla,<br><strong>MediPact AI Ekibi</strong></div>
+    </div>
+  </body></html>`;
+}
+
+function friendlyResendError(status: number, body: string): string {
+  if (status === 401 || status === 403) return "E-posta servisi yetki hatası. Lütfen sistem yöneticisi ile iletişime geçin.";
+  if (status === 422) return "Geçersiz e-posta adresi veya içerik. Lütfen alıcı bilgilerini kontrol edin.";
+  if (status === 429) return "E-posta gönderim limiti aşıldı. Birkaç dakika sonra tekrar deneyin.";
+  if (status >= 500) return "E-posta servisi geçici olarak ulaşılamıyor. Lütfen tekrar deneyin.";
+  return `E-posta gönderilemedi (kod ${status}). Ayrıntı: ${body.slice(0, 200)}`;
+}
+
 async function sendResend(opts: { from: string; to: string[]; subject: string; html: string }) {
   const key = Deno.env.get("RESEND_API_KEY");
-  if (!key) throw new Error("RESEND_API_KEY tanımlı değil");
+  if (!key) throw new Error("E-posta servisi yapılandırılmamış (RESEND_API_KEY eksik).");
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify(opts),
   });
-  if (!res.ok) throw new Error(`Resend hatası: ${res.status} - ${await res.text()}`);
-  return res.json();
+  const text = await res.text();
+  if (!res.ok) {
+    console.error("[send-meeting-invite] Resend hatası", { status: res.status, body: text });
+    throw new Error(friendlyResendError(res.status, text));
+  }
+  try { return JSON.parse(text); } catch { return {}; }
 }
 
 serve(async (req) => {
@@ -30,7 +81,7 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Yetkisiz" }), {
+      return new Response(JSON.stringify({ error: "Yetkisiz erişim. Lütfen tekrar giriş yapın." }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -42,14 +93,19 @@ serve(async (req) => {
     });
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) {
-      return new Response(JSON.stringify({ error: "Yetkisiz" }), {
+      return new Response(JSON.stringify({ error: "Oturum doğrulanamadı." }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { sessionId } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const sessionId: string | undefined = body.sessionId;
+    const force: boolean = body.force === true;
+    const preview: boolean = body.preview === true;
+    const partyIdsFilter: string[] | undefined = Array.isArray(body.partyIds) ? body.partyIds : undefined;
+
     if (!sessionId || typeof sessionId !== "string") {
-      return new Response(JSON.stringify({ error: "Geçersiz sessionId" }), {
+      return new Response(JSON.stringify({ error: "Geçersiz toplantı kimliği." }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -57,28 +113,27 @@ serve(async (req) => {
     const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const { data: session, error: sessErr } = await admin
-      .from("case_sessions")
-      .select("*")
-      .eq("id", sessionId)
-      .maybeSingle();
+      .from("case_sessions").select("*").eq("id", sessionId).maybeSingle();
     if (sessErr || !session) {
-      return new Response(JSON.stringify({ error: "Toplantı bulunamadı" }), {
+      return new Response(JSON.stringify({ error: "Toplantı bulunamadı." }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Authorization: user must be case owner, mediator or party
     const { data: canAccess } = await admin.rpc("can_access_case", {
       _case_id: session.case_id, _user_id: user.id,
     });
     if (!canAccess) {
-      return new Response(JSON.stringify({ error: "Bu toplantıya erişim yetkiniz yok" }), {
+      return new Response(JSON.stringify({ error: "Bu toplantıya erişim yetkiniz yok." }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const participants = (session.participants ?? []) as Array<{ party_id?: string; user_id?: string; role?: string }>;
-    const partyIds = participants.map((p) => p.party_id).filter(Boolean) as string[];
+    let partyIds = participants.map((p) => p.party_id).filter(Boolean) as string[];
+    if (partyIdsFilter && partyIdsFilter.length) {
+      partyIds = partyIds.filter((id) => partyIdsFilter.includes(id));
+    }
 
     const { data: parties } = await admin
       .from("case_parties")
@@ -86,12 +141,6 @@ serve(async (req) => {
       .in("id", partyIds.length ? partyIds : ["00000000-0000-0000-0000-000000000000"]);
 
     const recipients = (parties ?? []).filter((p: any) => p.email);
-    if (recipients.length === 0) {
-      return new Response(JSON.stringify({ error: "Email adresi olan taraf bulunamadı", sent: 0 }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const when = new Date(session.scheduled_at);
     const dateStr = when.toLocaleDateString("tr-TR", {
       weekday: "long", year: "numeric", month: "long", day: "numeric",
@@ -99,52 +148,69 @@ serve(async (req) => {
     const timeStr = when.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
     const typeLabel = TYPE_LABELS[session.session_type] ?? session.session_type;
 
-    const results: Array<{ email: string; ok: boolean; error?: string }> = [];
+    // Preview mode — return content & recipients without sending
+    if (preview) {
+      const previews = recipients.map((p: any) => {
+        const displayName = p.company_name || `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "Değerli Taraf";
+        return {
+          party_id: p.id,
+          email: p.email,
+          displayName,
+          subject: `Toplantı Daveti - ${typeLabel} - ${dateStr}`,
+          html: buildHtml({ displayName, dateStr, timeStr, typeLabel, notes: session.notes }),
+        };
+      });
+      return new Response(JSON.stringify({
+        preview: true,
+        meeting: { dateStr, timeStr, typeLabel, notes: session.notes },
+        recipients: previews,
+        alreadySent: !!session.invite_sent_at,
+        invite_sent_at: session.invite_sent_at,
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Double-send guard
+    if (session.invite_sent_at && !force && !partyIdsFilter) {
+      return new Response(JSON.stringify({
+        error: "Bu toplantı için davetler daha önce gönderilmiş. Yeniden göndermek için 'force=true' kullanın.",
+        alreadySent: true,
+        invite_sent_at: session.invite_sent_at,
+      }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (recipients.length === 0) {
+      return new Response(JSON.stringify({ error: "E-posta adresi olan taraf bulunamadı.", sent: 0, results: [] }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const results: Array<{ party_id: string; email: string; ok: boolean; error?: string; resend_id?: string }> = [];
 
     for (const p of recipients as any[]) {
-      const displayName =
-        p.company_name ||
-        `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() ||
-        "Değerli Taraf";
+      const displayName = p.company_name || `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "Değerli Taraf";
+      const html = buildHtml({ displayName, dateStr, timeStr, typeLabel, notes: session.notes });
 
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-        body{font-family:Arial,sans-serif;line-height:1.6;color:#222;background:#f6f7f9;margin:0;padding:24px}
-        .container{max-width:600px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb}
-        .header{background:#2c7a7b;color:#fff;padding:24px;text-align:center}
-        .content{padding:24px}
-        .box{background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:16px;margin:16px 0;text-align:center}
-        .date{font-size:20px;font-weight:bold;color:#0f766e}
-        .time{font-size:16px;color:#0d9488;margin-top:4px}
-        .label{font-weight:bold;color:#374151}
-        .footer{padding:16px 24px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:13px;text-align:center}
-        pre{white-space:pre-wrap;font-family:inherit;background:#f9fafb;padding:12px;border-radius:6px;border:1px solid #e5e7eb}
-      </style></head><body>
-        <div class="container">
-          <div class="header"><h2 style="margin:0">Toplantı Daveti</h2><div style="opacity:.9;margin-top:4px">MediPact AI Arabuluculuk</div></div>
-          <div class="content">
-            <p>Sayın ${displayName},</p>
-            <p>Arabuluculuk sürecinizle ilgili aşağıdaki toplantıya davetlisiniz.</p>
-            <div class="box">
-              <div class="date">${dateStr}</div>
-              <div class="time">${timeStr}</div>
-            </div>
-            <p><span class="label">Toplantı Türü:</span> ${typeLabel}</p>
-            ${session.notes ? `<p><span class="label">Gündem / Notlar:</span></p><pre>${String(session.notes).replace(/</g, "&lt;")}</pre>` : ""}
-            <p>Lütfen belirtilen tarih ve saatte hazır bulununuz. Toplantıya bağlantı linki, başlamadan kısa süre önce paylaşılacaktır.</p>
-            <p>Sorularınız için arabulucunuzla iletişime geçebilirsiniz.</p>
-          </div>
-          <div class="footer">Saygılarımızla,<br><strong>MediPact AI Ekibi</strong></div>
-        </div>
-      </body></html>`;
+      // pending log
+      const { data: pendingLog } = await admin.from("meeting_invite_logs").insert({
+        session_id: sessionId, case_id: session.case_id, party_id: p.id,
+        recipient_email: p.email, recipient_name: displayName, status: "pending",
+      }).select("id").maybeSingle();
 
       try {
-        await sendResend({
+        const resp = await sendResend({
           from: "MediPact AI <onboarding@resend.dev>",
           to: [p.email],
           subject: `Toplantı Daveti - ${typeLabel} - ${dateStr}`,
           html,
         });
-        results.push({ email: p.email, ok: true });
+        const resendId = (resp && (resp as any).id) || null;
+        results.push({ party_id: p.id, email: p.email, ok: true, resend_id: resendId });
+
+        await admin.from("meeting_invite_logs").insert({
+          session_id: sessionId, case_id: session.case_id, party_id: p.id,
+          recipient_email: p.email, recipient_name: displayName,
+          status: "sent", resend_message_id: resendId,
+        });
 
         if (p.user_id) {
           await admin.rpc("create_notification", {
@@ -156,24 +222,31 @@ serve(async (req) => {
           });
         }
       } catch (e: any) {
-        console.error("Email gönderim hatası:", p.email, e);
-        results.push({ email: p.email, ok: false, error: e.message });
+        const msg = e?.message ?? "Bilinmeyen hata";
+        console.error("[send-meeting-invite] Taraf gönderim hatası", { party_id: p.id, email: p.email, error: msg });
+        results.push({ party_id: p.id, email: p.email, ok: false, error: msg });
+        await admin.from("meeting_invite_logs").insert({
+          session_id: sessionId, case_id: session.case_id, party_id: p.id,
+          recipient_email: p.email, recipient_name: displayName,
+          status: "failed", error_message: msg,
+        });
       }
     }
 
     const sentCount = results.filter((r) => r.ok).length;
+    const failedCount = results.length - sentCount;
     if (sentCount > 0) {
-      await admin
-        .from("case_sessions")
+      await admin.from("case_sessions")
         .update({ invite_sent_at: new Date().toISOString() })
         .eq("id", sessionId);
     }
-    return new Response(JSON.stringify({ success: true, sent: sentCount, total: results.length, results }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({
+      success: true, sent: sentCount, failed: failedCount, total: results.length, results,
+    }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
-    console.error("send-meeting-invite hatası:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Bilinmeyen hata" }), {
+    console.error("[send-meeting-invite] Genel hata:", error);
+    const msg = error instanceof Error ? error.message : "Bilinmeyen sistem hatası";
+    return new Response(JSON.stringify({ error: msg }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
