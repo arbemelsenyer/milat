@@ -768,6 +768,15 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
 
               {open && (
                 <div className="border-t p-4 space-y-4">
+                  {/* Step indicator */}
+                  <div className="flex items-center gap-2 text-xs">
+                    <StepDot done={partyDocs.length > 0} label="1. Belge yüklendi" />
+                    <span className="text-muted-foreground">→</span>
+                    <StepDot done={!!a} active={analysing === p.id} label="2. AI analiz edildi" />
+                    <span className="text-muted-foreground">→</span>
+                    <StepDot done={!!report && !!a} label="3. Ortak zemine dahil" />
+                  </div>
+
                   {/* Party info */}
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     {p.tc_kimlik && <div><span className="text-muted-foreground">TC:</span> {p.tc_kimlik}</div>}
