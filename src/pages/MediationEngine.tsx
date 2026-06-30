@@ -17,7 +17,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Plus, Loader2, FolderOpen, FileText, Users, Brain, ShieldCheck,
   Calendar as CalIcon, UserCheck, MessageSquare, FileCheck2, CheckCircle2, Circle,
-  Trash2, ArrowLeft, Download, Sparkles,
+  Trash2, ArrowLeft, Download, Sparkles, ChevronDown, ChevronUp, AlertTriangle, RefreshCw,
 } from "lucide-react";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
@@ -35,13 +35,12 @@ const DISPUTE_TYPES = [
 const PHASES = [
   { id: 1, label: "Başvuru", icon: FileText },
   { id: 2, label: "Taraflar", icon: Users },
-  { id: 3, label: "Belgeler", icon: FolderOpen },
-  { id: 4, label: "Gizli Analiz", icon: Brain },
-  { id: 5, label: "Arabulucu Paneli", icon: ShieldCheck },
-  { id: 6, label: "Toplantı", icon: CalIcon },
-  { id: 7, label: "Bilirkişi", icon: UserCheck, optional: true },
-  { id: 8, label: "Müzakere", icon: MessageSquare },
-  { id: 9, label: "Belgeler & Kapanış", icon: FileCheck2 },
+  { id: 3, label: "Taraf Analizi", icon: Brain },
+  { id: 4, label: "Arabulucu Paneli", icon: ShieldCheck },
+  { id: 5, label: "Toplantı", icon: CalIcon },
+  { id: 6, label: "Bilirkişi", icon: UserCheck, optional: true },
+  { id: 7, label: "Müzakere", icon: MessageSquare },
+  { id: 8, label: "Belgeler & Kapanış", icon: FileCheck2 },
 ] as const;
 
 type CaseRow = {
