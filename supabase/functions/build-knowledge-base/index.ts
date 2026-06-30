@@ -5,7 +5,7 @@
 //     (büyük PDF'ler için; CPU/zaman limitine takılan kitaplar bu modla yeniden işlenir).
 // İstemci (KnowledgeBaseAdmin) job running iken bizi resume_job_id ile yeniden çağırır.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { getDocumentProxy } from "npm:unpdf@0.12.1";
+import { extractText, getDocumentProxy } from "npm:unpdf@0.12.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
