@@ -797,10 +797,16 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
               {reportLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
             </Button>
             <Button onClick={generateReport} disabled={!canReport || reportBusy} size="sm">
-              {reportBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Rapor hazırlanıyor…</> : <><Sparkles className="h-4 w-4 mr-1" /> {report ? "Yeniden Üret" : "Rapor Üret"}</>}
+              {reportBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {reportStatus ?? "Rapor hazırlanıyor…"}</> : <><Sparkles className="h-4 w-4 mr-1" /> {report ? "Yeniden Üret" : "Rapor Üret"}</>}
             </Button>
           </div>
         </div>
+        {reportBusy && reportAttempt > 1 && (
+          <div className="text-xs text-muted-foreground flex items-center gap-2">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Geçici bir hata oluştu, otomatik olarak tekrar deneniyor ({reportAttempt}/3)…
+          </div>
+        )}
         {reportFetchError && (
           <div className="text-xs text-destructive flex items-center gap-2">
             <AlertTriangle className="h-3 w-3" /> Rapor yüklenemedi: {reportFetchError}
