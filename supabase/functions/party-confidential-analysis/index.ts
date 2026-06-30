@@ -150,7 +150,7 @@ Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinde
       }).eq("id", existing.id);
     } else {
       await admin.from("party_analyses").insert({
-        case_id, party_id, user_id: userId,
+        case_id, party_id, user_id: party.user_id ?? userId,
         analysis: parsed,
         discovery_questions: parsed.discovery_questions ?? [],
       });
