@@ -667,9 +667,25 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <span className="text-xs text-muted-foreground">{s.status}</span>
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openPreviewForExisting(s)}>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openPreviewForExisting(s)} disabled={s.status === "cancelled"}>
                     <Send className="h-3 w-3 mr-1" /> Davet
                   </Button>
+                  {s.status !== "cancelled" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                      disabled={cancellingId === s.id}
+                      onClick={() => cancelSession(s)}
+                    >
+                      {cancellingId === s.id ? (
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      ) : (
+                        <Ban className="h-3 w-3 mr-1" />
+                      )}
+                      İptal Et
+                    </Button>
+                  )}
                 </div>
               </Card>
             );
