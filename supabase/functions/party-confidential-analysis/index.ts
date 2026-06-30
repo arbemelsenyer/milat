@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
     const ragQuery = [caseRow?.title, caseRow?.dispute_type, caseRow?.dispute_subtype, caseRow?.issue_description]
       .filter(Boolean).join(" — ");
     const ragCategory = mapDisputeToCategory(caseRow?.dispute_type, caseRow?.dispute_subtype);
-    const ragBlock = await fetchKnowledgeBlock(admin, apiKey, ragQuery, ragCategory);
+    const { block: ragBlock, sources: ragSources } = await fetchKnowledgeBlock(admin, apiKey, ragQuery, ragCategory);
 
     const systemPrompt = `Sen bir Türk hukuk arabuluculuk uzmanı AI'sın. Bu tarafın perspektifinden detaylı bir analiz hazırlıyorsun. 
 Otomatik olarak: (1) niş hukuki alanı tespit et, (2) ilgili mevzuat ve Yargıtay/BAM emsallerini tara, (3) tarafın pozisyon/ihtiyaç/BATNA analizini yap, (4) yüklenen belgelerden somut bulgular çıkar. Sana verilen "İLGİLİ KAYNAK BİLGİSİ" bloklarından yararlan, alakalıysa kaynak adını parantez içinde göster.
