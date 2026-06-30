@@ -60,6 +60,11 @@ Deno.serve(async (req) => {
   "red_lines": []
 }`;
 
+    const ragQuery = [caseRow.title, caseRow.dispute_type, caseRow.dispute_subtype, caseRow.issue_description]
+      .filter(Boolean).join(" — ");
+    const ragCategory = mapDisputeToCategory(caseRow.dispute_type, caseRow.dispute_subtype);
+    const ragBlock = await fetchKnowledgeBlock(admin, apiKey, ragQuery, ragCategory);
+
     const userPrompt = `BAŞVURU: ${caseRow.title ?? ""} — ${caseRow.dispute_type ?? ""} / ${caseRow.dispute_subtype ?? ""}
 ÖZET: ${caseRow.issue_description ?? ""}
 
@@ -67,7 +72,9 @@ TARAF ANALİZLERİ:
 ${(analyses ?? []).map((a: any) => `--- ${a.case_parties?.party_role ?? ""} (${a.case_parties?.first_name ?? a.case_parties?.company_name ?? ""}) ---\n${JSON.stringify(a.analysis, null, 2)}`).join("\n\n")}
 
 İHTİYAÇ TESPİTİ CEVAPLARI:
-${(discAnswers ?? []).map((d) => `[Party ${d.party_id?.slice(0, 8)}] Q: ${d.question_text}\nA: ${d.answer_text ?? "(cevap yok)"}`).join("\n")}`;
+${(discAnswers ?? []).map((d) => `[Party ${d.party_id?.slice(0, 8)}] Q: ${d.question_text}\nA: ${d.answer_text ?? "(cevap yok)"}`).join("\n")}
+${ragBlock}
+Yukarıdaki resmi kaynaklardan yararlanarak ortak zemin raporu ve arabulucu stratejisi üret; alakalıysa kaynak göster.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
