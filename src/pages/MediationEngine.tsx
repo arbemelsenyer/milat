@@ -750,14 +750,50 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
           <div className="text-right text-xs space-y-1 min-w-[180px]">
             <div className="font-medium">Taraf Analizi: {analysedCount}/{parties.length} taraf analiz edildi</div>
             <Progress value={progressPct} className="h-2" />
-            {report
-              ? <div className="text-emerald-600 font-semibold">✓ Ortak Zemin Raporu Hazır</div>
-              : canReport
-                ? <div className="text-muted-foreground">Ortak Zemin Raporu üretilebilir</div>
-                : <div className="text-muted-foreground">Rapor için en az 2 analiz gerekli</div>}
+            {reportLoading
+              ? <div className="text-muted-foreground flex items-center gap-1 justify-end"><Loader2 className="h-3 w-3 animate-spin" /> Rapor yükleniyor…</div>
+              : report
+                ? <div className="text-emerald-600 font-semibold">✓ Ortak Zemin Raporu Hazır</div>
+                : canReport
+                  ? <div className="text-muted-foreground">Ortak Zemin Raporu üretilebilir</div>
+                  : <div className="text-muted-foreground">Rapor için en az 2 analiz gerekli</div>}
           </div>
         </div>
       </Card>
+
+      {/* Persistent report panel — always visible right under progress */}
+      <Card className="p-6 space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h3 className="text-lg font-semibold">Ortak Zemin Raporu</h3>
+          <div className="flex gap-2">
+            <Button size="sm" variant="ghost" onClick={fetchReport} disabled={reportLoading} title="Raporu yeniden yükle">
+              {reportLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            </Button>
+            <Button onClick={generateReport} disabled={!canReport || reportBusy} size="sm">
+              {reportBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Rapor hazırlanıyor…</> : <><Sparkles className="h-4 w-4 mr-1" /> {report ? "Yeniden Üret" : "Rapor Üret"}</>}
+            </Button>
+          </div>
+        </div>
+        {reportFetchError && (
+          <div className="text-xs text-destructive flex items-center gap-2">
+            <AlertTriangle className="h-3 w-3" /> Rapor yüklenemedi: {reportFetchError}
+            <Button size="sm" variant="outline" onClick={fetchReport}><RefreshCw className="h-3 w-3 mr-1" />Tekrar Dene</Button>
+          </div>
+        )}
+        {reportError && (
+          <div className="text-xs text-destructive flex items-center gap-2">
+            <AlertTriangle className="h-3 w-3" /> {reportError}
+            <Button size="sm" variant="outline" onClick={generateReport}><RefreshCw className="h-3 w-3 mr-1" />Tekrar Dene</Button>
+          </div>
+        )}
+        {!reportLoading && !report && !reportError && (
+          <p className="text-sm text-muted-foreground italic">
+            {canReport ? "Henüz rapor üretilmedi. \"Rapor Üret\" butonuna basın." : "En az 2 taraf analiz edildikten sonra rapor üretilebilir."}
+          </p>
+        )}
+        {report && <CommonGroundView data={report.report} strategy={report.strategy} />}
+      </Card>
+
 
 
       {parties.length === 0 && (
