@@ -1067,6 +1067,56 @@ export type Database = {
         }
         Relationships: []
       }
+      meeting_invite_logs: {
+        Row: {
+          attempt: number
+          case_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          party_id: string | null
+          recipient_email: string
+          recipient_name: string | null
+          resend_message_id: string | null
+          session_id: string
+          status: string
+        }
+        Insert: {
+          attempt?: number
+          case_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          party_id?: string | null
+          recipient_email: string
+          recipient_name?: string | null
+          resend_message_id?: string | null
+          session_id: string
+          status: string
+        }
+        Update: {
+          attempt?: number
+          case_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          party_id?: string | null
+          recipient_email?: string
+          recipient_name?: string | null
+          resend_message_id?: string | null
+          session_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_invite_logs_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "case_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           case_id: string
