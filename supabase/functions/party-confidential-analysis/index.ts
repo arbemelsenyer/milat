@@ -163,7 +163,7 @@ Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinde
         .eq("question_order", q.id ?? 0).maybeSingle();
       if (!exists) {
         await admin.from("case_discovery_questions").insert({
-          case_id, party_id, user_id: userId,
+          case_id, party_id, user_id: party.user_id ?? userId,
           question_text: q.question, question_order: q.id ?? 0,
         });
       }
