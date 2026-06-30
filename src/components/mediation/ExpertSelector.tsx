@@ -32,9 +32,9 @@ export function ExpertSelector({ niche, selectedId, onSelect }: Props) {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      let q = supabase.from("experts").select("*").eq("active", true);
-      if (filterNiche) q = q.eq("niche_area", niche);
-      const { data } = await q.order("rating", { ascending: false });
+      const { data } = await supabase.rpc("list_experts_for_mediator", {
+        filter_niche: filterNiche ? niche : null,
+      });
       setExperts((data as Expert[]) ?? []);
       setLoading(false);
     })();
