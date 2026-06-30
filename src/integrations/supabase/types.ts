@@ -434,6 +434,7 @@ export type Database = {
           case_id: string
           created_at: string
           id: string
+          invite_sent_at: string | null
           meeting_type: string
           notes: string | null
           participants: Json
@@ -448,6 +449,7 @@ export type Database = {
           case_id: string
           created_at?: string
           id?: string
+          invite_sent_at?: string | null
           meeting_type?: string
           notes?: string | null
           participants?: Json
@@ -462,6 +464,7 @@ export type Database = {
           case_id?: string
           created_at?: string
           id?: string
+          invite_sent_at?: string | null
           meeting_type?: string
           notes?: string | null
           participants?: Json
