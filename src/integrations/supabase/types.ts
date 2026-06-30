@@ -795,6 +795,7 @@ export type Database = {
       }
       knowledge_base_jobs: {
         Row: {
+          book_queue: Json | null
           current_book: string | null
           errors: Json
           finished_at: string | null
@@ -808,6 +809,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          book_queue?: Json | null
           current_book?: string | null
           errors?: Json
           finished_at?: string | null
@@ -821,6 +823,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          book_queue?: Json | null
           current_book?: string | null
           errors?: Json
           finished_at?: string | null
