@@ -66,7 +66,18 @@ serve(async (req) => {
 
     const mediatorRequest = rescheduleData.mediator_requests;
     const isSubmitted = action === "submitted";
-    
+
+    // Authorization: submitter must be the case user; approver/rejecter must be the mediator
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: callerId, _role: "admin" });
+    const allowed = isAdmin === true
+      || (isSubmitted && callerId === mediatorRequest.user_id)
+      || (!isSubmitted && callerId === mediatorRequest.mediator_id);
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Determine recipient: submitted -> notify mediator; approved/rejected -> notify user
     const recipientUserId = isSubmitted ? mediatorRequest.mediator_id : mediatorRequest.user_id;
 
