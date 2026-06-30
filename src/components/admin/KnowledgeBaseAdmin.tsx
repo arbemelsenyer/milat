@@ -130,9 +130,13 @@ export function KnowledgeBaseAdmin() {
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={start} disabled={starting || running} size="sm">
+          <Button onClick={() => start("all")} disabled={starting || testing || running} size="sm">
             {starting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
             Bilgi Tabanını Güncelle
+          </Button>
+          <Button onClick={() => start("test")} disabled={starting || testing || running} size="sm" variant="outline">
+            {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+            Tek PDF ile Test Et
           </Button>
           {job && (
             <Badge className="gap-1" variant={job.status === "completed" ? "default" : job.status === "failed" ? "destructive" : "secondary"}>
