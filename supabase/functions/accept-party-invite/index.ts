@@ -24,12 +24,21 @@ Deno.serve(async (req) => {
     if (!token) return new Response(JSON.stringify({ error: "token required" }), { status: 400, headers: corsHeaders });
 
     const admin = createClient(supabaseUrl, serviceKey);
-    const { data: party } = await admin.from("case_parties").select("id, case_id, user_id").eq("invite_token", token).maybeSingle();
-    if (!party) return new Response(JSON.stringify({ error: "Invalid token" }), { status: 404, headers: corsHeaders });
+    const { data: invite } = await admin.from("case_party_invites")
+      .select("id, case_party_id, invite_status")
+      .eq("token", token).maybeSingle();
+    if (!invite) return new Response(JSON.stringify({ error: "Invalid token" }), { status: 404, headers: corsHeaders });
+
+    const { data: party } = await admin.from("case_parties")
+      .select("id, case_id, user_id").eq("id", invite.case_party_id).maybeSingle();
+    if (!party) return new Response(JSON.stringify({ error: "Party not found" }), { status: 404, headers: corsHeaders });
 
     await admin.from("case_parties").update({
       user_id: u.user.id, invite_status: "accepted",
     }).eq("id", party.id);
+    await admin.from("case_party_invites").update({
+      invite_status: "accepted", accepted_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }).eq("id", invite.id);
 
     return new Response(JSON.stringify({ case_id: party.case_id, party_id: party.id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

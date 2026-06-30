@@ -314,7 +314,6 @@ export type Database = {
           gsm: string | null
           id: string
           invite_status: string
-          invite_token: string | null
           is_individual: boolean
           last_name: string | null
           organization: string | null
@@ -342,7 +341,6 @@ export type Database = {
           gsm?: string | null
           id?: string
           invite_status?: string
-          invite_token?: string | null
           is_individual?: boolean
           last_name?: string | null
           organization?: string | null
@@ -370,7 +368,6 @@ export type Database = {
           gsm?: string | null
           id?: string
           invite_status?: string
-          invite_token?: string | null
           is_individual?: boolean
           last_name?: string | null
           organization?: string | null
@@ -390,6 +387,44 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_party_invites: {
+        Row: {
+          accepted_at: string | null
+          case_party_id: string
+          created_at: string
+          id: string
+          invite_status: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          case_party_id: string
+          created_at?: string
+          id?: string
+          invite_status?: string
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          case_party_id?: string
+          created_at?: string
+          id?: string
+          invite_status?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_party_invites_case_party_id_fkey"
+            columns: ["case_party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
             referencedColumns: ["id"]
           },
         ]
