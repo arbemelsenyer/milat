@@ -293,28 +293,26 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
   onCancel: () => void; onCreated: (id: string) => void; userId: string; isMediator: boolean;
 }) {
   const [title, setTitle] = useState("");
-  const [uyapNo, setUyapNo] = useState("");
-  const [disputeType, setDisputeType] = useState(DISPUTE_TYPES[0]);
   const [busy, setBusy] = useState(false);
 
   async function create() {
     setBusy(true);
     try {
       const { data: appNoData } = await supabase.rpc("generate_application_no" as any);
-      const application_no = (appNoData as string) ?? `2026/${Math.floor(1000 + Math.random() * 9000)}`;
+      const application_no = (appNoData as string) ?? `MP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
       const { data: row, error } = await supabase.from("cases").insert({
         user_id: userId,
         assigned_mediator_id: isMediator ? userId : null,
-        title: title || `${disputeType} - ${application_no}`,
-        dispute_type: disputeType,
+        title: title || `Başvuru - ${application_no}`,
+        dispute_type: null,
         application_no,
-        uyap_no: uyapNo || null,
+        uyap_no: null,
         status: "active",
         current_phase: 2,
         round_number: 1,
       } as any).select().single();
       if (error) throw error;
-      toast({ title: "Başvuru oluşturuldu", description: `No: ${application_no}` });
+      toast({ title: "Başvuru oluşturuldu", description: `Sistem No: ${application_no}` });
       onCreated((row as any).id);
     } catch (e: any) {
       toast({ title: "Oluşturma hatası", description: trErr(e.message), variant: "destructive" });
@@ -324,15 +322,17 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
   return (
     <Card className="p-6 mb-6 space-y-4">
       <h2 className="text-xl font-semibold">Yeni Başvuru</h2>
+      <div className="text-xs text-muted-foreground bg-muted/50 border rounded p-3">
+        ℹ️ Uyuşmazlık türünü AI, taraf bilgileri ve açıklamanızı girdikten sonra (Aşama 3) otomatik tespit edecek.
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div><Label>Başvuru Başlığı</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
-        <div><Label>UYAP Numarası</Label><Input value={uyapNo} onChange={(e) => setUyapNo(e.target.value)} /></div>
+        <div className="md:col-span-2">
+          <Label>Başvuru Başlığı</Label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Örn. Kira sözleşmesinden doğan uyuşmazlık" />
+        </div>
         <div>
-          <Label>Uyuşmazlık Türü</Label>
-          <Select value={disputeType} onValueChange={setDisputeType}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{DISPUTE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-          </Select>
+          <Label>Sistem No</Label>
+          <Input value="Oluşturulduğunda atanır (MP-YYYY-XXXX)" disabled />
         </div>
         <div>
           <Label>Başvuru Tarihi</Label>
