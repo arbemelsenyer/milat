@@ -70,10 +70,33 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    console.log("Starting session reminder check...");
-
+    // AuthZ: shared cron secret OR authenticated admin
+    const cronSecret = Deno.env.get("CRON_SECRET");
+    const provided = req.headers.get("x-cron-secret");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    let authorized = !!(cronSecret && provided && provided === cronSecret);
+    if (!authorized) {
+      const authHeader = req.headers.get("Authorization");
+      if (authHeader?.startsWith("Bearer ")) {
+        const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data: u } = await userClient.auth.getUser();
+        if (u?.user) {
+          const admin = createClient(supabaseUrl, supabaseServiceKey);
+          const { data: isAdmin } = await admin.rpc("has_role", { _user_id: u.user.id, _role: "admin" });
+          authorized = isAdmin === true;
+        }
+      }
+    }
+    if (!authorized) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log("Starting session reminder check...");
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Calculate the time window for 24-hour reminder

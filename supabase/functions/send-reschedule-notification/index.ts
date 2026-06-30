@@ -12,6 +12,26 @@ serve(async (req) => {
   }
 
   try {
+    // Require authenticated caller — prevents spoofed emails/notifications
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const callerId = userData.user.id;
+
     const { rescheduleRequestId, action, language = "tr" } = await req.json();
 
     if (!rescheduleRequestId || !action) {
@@ -21,8 +41,6 @@ serve(async (req) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Fetch reschedule request with related data
@@ -48,7 +66,18 @@ serve(async (req) => {
 
     const mediatorRequest = rescheduleData.mediator_requests;
     const isSubmitted = action === "submitted";
-    
+
+    // Authorization: submitter must be the case user; approver/rejecter must be the mediator
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: callerId, _role: "admin" });
+    const allowed = isAdmin === true
+      || (isSubmitted && callerId === mediatorRequest.user_id)
+      || (!isSubmitted && callerId === mediatorRequest.mediator_id);
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Determine recipient: submitted -> notify mediator; approved/rejected -> notify user
     const recipientUserId = isSubmitted ? mediatorRequest.mediator_id : mediatorRequest.user_id;
 
@@ -169,13 +198,13 @@ serve(async (req) => {
       }
     }
 
-    // Create in-app notification
-    await supabase.from("notifications").insert({
-      user_id: recipientUserId,
-      title: notifTitle,
-      message: notifMessage,
-      type: notifType,
-      link: isSubmitted ? "/mediator" : "/dashboard",
+    // Create in-app notification via SECURITY DEFINER RPC
+    await supabase.rpc("create_notification", {
+      p_user_id: recipientUserId,
+      p_title: notifTitle,
+      p_message: notifMessage,
+      p_type: notifType,
+      p_link: isSubmitted ? "/mediator" : "/dashboard",
     });
 
     return new Response(

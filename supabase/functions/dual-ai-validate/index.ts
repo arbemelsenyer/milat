@@ -38,6 +38,30 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    // AuthZ: shared cron secret OR an authenticated admin user
+    const cronSecret = Deno.env.get("CRON_SECRET");
+    const provided = req.headers.get("x-cron-secret");
+    let authorized = !!(cronSecret && provided && provided === cronSecret);
+    if (!authorized) {
+      const authHeader = req.headers.get("Authorization");
+      if (authHeader?.startsWith("Bearer ")) {
+        const sb = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data: u } = await sb.auth.getUser();
+        if (u?.user) {
+          const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+          const { data: isAdmin } = await admin.rpc("has_role", { _user_id: u.user.id, _role: "admin" });
+          authorized = isAdmin === true;
+        }
+      }
+    }
+    if (!authorized) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
 

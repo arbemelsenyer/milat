@@ -42,7 +42,19 @@ Deno.serve(async (req) => {
       ? `${party.first_name ?? ""} ${party.last_name ?? ""}`.trim() || "Sayın Taraf"
       : party.company_name || "Sayın Taraf";
 
-    const inviteUrl = `${app_url || ""}/auth?invite=${token}`;
+    // Validate app_url against allowed origins to prevent phishing via open redirect
+    const allowedOrigins = (Deno.env.get("APP_ALLOWED_ORIGINS") ??
+      "https://medipact-ai.lovable.app,https://id-preview--5ffedb1b-4087-4fe1-a1ef-873c9754f71d.lovable.app")
+      .split(",").map((s) => s.trim()).filter(Boolean);
+    let baseUrl = allowedOrigins[0];
+    if (app_url && typeof app_url === "string") {
+      try {
+        const u = new URL(app_url);
+        const origin = `${u.protocol}//${u.host}`;
+        if (allowedOrigins.includes(origin)) baseUrl = origin;
+      } catch { /* invalid URL -> fallback */ }
+    }
+    const inviteUrl = `${baseUrl}/auth?invite=${token}`;
     const applicationNo = (party as any).cases?.application_no ?? "";
 
     if (resendKey && party.email) {

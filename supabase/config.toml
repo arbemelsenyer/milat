@@ -22,7 +22,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-reschedule-notification]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-assignment-notification]
 verify_jwt = false
@@ -31,7 +31,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.legal-reasoning-gemini]
-verify_jwt = false
+verify_jwt = true
 
 [functions.party-confidential-analysis]
 verify_jwt = true
