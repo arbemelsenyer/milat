@@ -583,6 +583,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   const [docs, setDocs] = useState<any[]>([]);
   const [analyses, setAnalyses] = useState<any[]>([]);
   const [report, setReport] = useState<any>(null);
+  const [reportLoading, setReportLoading] = useState(true);
+  const [reportFetchError, setReportFetchError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [analysing, setAnalysing] = useState<string | null>(null);
@@ -591,18 +593,32 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   const [reportError, setReportError] = useState<string | null>(null);
   const [navigating, setNavigating] = useState(false);
 
+  const fetchReport = useCallback(async () => {
+    setReportLoading(true);
+    setReportFetchError(null);
+    const { data, error } = await supabase
+      .from("common_ground_reports")
+      .select("*")
+      .eq("case_id", caseRow.id)
+      .order("created_at", { ascending: false })
+      .maybeSingle();
+    if (error) setReportFetchError(error.message);
+    setReport(data ?? null);
+    setReportLoading(false);
+    return data ?? null;
+  }, [caseRow.id]);
+
   const loadAll = useCallback(async () => {
-    const [p, d, a, r] = await Promise.all([
+    const [p, d, a] = await Promise.all([
       supabase.from("case_parties").select("*").eq("case_id", caseRow.id).order("created_at"),
       supabase.from("case_documents").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }),
       supabase.from("party_analyses").select("*").eq("case_id", caseRow.id),
-      supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).maybeSingle(),
     ]);
     setParties(p.data ?? []);
     setDocs(d.data ?? []);
     setAnalyses(a.data ?? []);
-    setReport(r.data);
-  }, [caseRow.id]);
+    await fetchReport();
+  }, [caseRow.id, fetchReport]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
@@ -688,8 +704,12 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
       const { data, error } = await supabase.functions.invoke("common-ground-report", { body: { case_id: caseRow.id } });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
+      // Verify the record actually exists in DB before claiming success
+      const fresh = await fetchReport();
+      if (!fresh) {
+        throw new Error("Rapor kaydı oluşturulamadı. Lütfen tekrar deneyin.");
+      }
       toast({ title: "Ortak zemin raporu hazır" });
-      loadAll();
       reload();
     } catch (e: any) {
       const msg = e?.message || "Rapor üretilemedi.";
@@ -730,14 +750,50 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
           <div className="text-right text-xs space-y-1 min-w-[180px]">
             <div className="font-medium">Taraf Analizi: {analysedCount}/{parties.length} taraf analiz edildi</div>
             <Progress value={progressPct} className="h-2" />
-            {report
-              ? <div className="text-emerald-600 font-semibold">✓ Ortak Zemin Raporu Hazır</div>
-              : canReport
-                ? <div className="text-muted-foreground">Ortak Zemin Raporu üretilebilir</div>
-                : <div className="text-muted-foreground">Rapor için en az 2 analiz gerekli</div>}
+            {reportLoading
+              ? <div className="text-muted-foreground flex items-center gap-1 justify-end"><Loader2 className="h-3 w-3 animate-spin" /> Rapor yükleniyor…</div>
+              : report
+                ? <div className="text-emerald-600 font-semibold">✓ Ortak Zemin Raporu Hazır</div>
+                : canReport
+                  ? <div className="text-muted-foreground">Ortak Zemin Raporu üretilebilir</div>
+                  : <div className="text-muted-foreground">Rapor için en az 2 analiz gerekli</div>}
           </div>
         </div>
       </Card>
+
+      {/* Persistent report panel — always visible right under progress */}
+      <Card className="p-6 space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h3 className="text-lg font-semibold">Ortak Zemin Raporu</h3>
+          <div className="flex gap-2">
+            <Button size="sm" variant="ghost" onClick={fetchReport} disabled={reportLoading} title="Raporu yeniden yükle">
+              {reportLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            </Button>
+            <Button onClick={generateReport} disabled={!canReport || reportBusy} size="sm">
+              {reportBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Rapor hazırlanıyor…</> : <><Sparkles className="h-4 w-4 mr-1" /> {report ? "Yeniden Üret" : "Rapor Üret"}</>}
+            </Button>
+          </div>
+        </div>
+        {reportFetchError && (
+          <div className="text-xs text-destructive flex items-center gap-2">
+            <AlertTriangle className="h-3 w-3" /> Rapor yüklenemedi: {reportFetchError}
+            <Button size="sm" variant="outline" onClick={fetchReport}><RefreshCw className="h-3 w-3 mr-1" />Tekrar Dene</Button>
+          </div>
+        )}
+        {reportError && (
+          <div className="text-xs text-destructive flex items-center gap-2">
+            <AlertTriangle className="h-3 w-3" /> {reportError}
+            <Button size="sm" variant="outline" onClick={generateReport}><RefreshCw className="h-3 w-3 mr-1" />Tekrar Dene</Button>
+          </div>
+        )}
+        {!reportLoading && !report && !reportError && (
+          <p className="text-sm text-muted-foreground italic">
+            {canReport ? "Henüz rapor üretilmedi. \"Rapor Üret\" butonuna basın." : "En az 2 taraf analiz edildikten sonra rapor üretilebilir."}
+          </p>
+        )}
+        {report && <CommonGroundView data={report.report} strategy={report.strategy} />}
+      </Card>
+
 
 
       {parties.length === 0 && (
@@ -899,38 +955,20 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
         })}
       </div>
 
-      {/* Common ground report */}
-      <Card className="p-6 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Ortak Zemin Raporu & Çözüm Önerileri</h3>
-          <Button onClick={generateReport} disabled={!canReport || reportBusy} size="sm">
-            {reportBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
-            {report ? "Yeniden Üret" : "Rapor Üret"}
-          </Button>
-        </div>
-        {!canReport && <p className="text-xs text-muted-foreground">En az 2 taraf analiz edildikten sonra aktif olur.</p>}
-        {reportError && (
-          <div className="text-xs text-destructive flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3" /> {reportError}
-            <Button size="sm" variant="outline" className="ml-2" onClick={generateReport}><RefreshCw className="h-3 w-3 mr-1" />Tekrar Dene</Button>
+      {/* Next-step meeting CTA — shown only when report exists */}
+      {report && (
+        <Card className="p-6 space-y-2">
+          <p className="text-xs text-muted-foreground">Sonraki adım: Taraflarla görüşme planlayın</p>
+          <div className="flex gap-2 flex-wrap">
+            <Button onClick={() => chooseMeeting("ozel")} disabled={navigating} variant="outline">
+              <CalIcon className="h-4 w-4 mr-1" /> Özel Görüşme Planla
+            </Button>
+            <Button onClick={() => chooseMeeting("ortak")} disabled={navigating}>
+              <CalIcon className="h-4 w-4 mr-1" /> Ortak Görüşme Planla
+            </Button>
           </div>
-        )}
-        {report && <CommonGroundView data={report.report} strategy={report.strategy} />}
-
-        {report && (
-          <div className="pt-4 border-t space-y-2">
-            <p className="text-xs text-muted-foreground">Sonraki adım: Taraflarla görüşme planlayın</p>
-            <div className="flex gap-2 flex-wrap">
-              <Button onClick={() => chooseMeeting("ozel")} disabled={navigating} variant="outline">
-                <CalIcon className="h-4 w-4 mr-1" /> Özel Görüşme Planla
-              </Button>
-              <Button onClick={() => chooseMeeting("ortak")} disabled={navigating}>
-                <CalIcon className="h-4 w-4 mr-1" /> Ortak Görüşme Planla
-              </Button>
-            </div>
-          </div>
-        )}
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }
