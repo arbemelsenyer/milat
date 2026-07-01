@@ -89,6 +89,10 @@ type CaseRow = {
   deadline_conflict?: boolean | null;
   deadline_conflict_note?: string | null;
   deadline_detected_at?: string | null;
+  mediation_type?: "dava_sarti" | "ihtiyari" | null;
+  mahkeme_turu?: "tuketici" | "is" | "sulh" | "ticaret" | "yok" | null;
+  sure_hafta?: number | null;
+  uzatma_hafta?: number | null;
 };
 
 type PartyDraft = {
