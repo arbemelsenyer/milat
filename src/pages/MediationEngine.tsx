@@ -1003,6 +1003,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
         </div>
       </Card>
 
+      <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} />
+
       {/* Persistent report panel — always visible right under progress */}
       <Card className="p-6 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
