@@ -164,12 +164,14 @@ Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinde
       await admin.from("party_analyses").update({
         analysis: parsed,
         discovery_questions: parsed.discovery_questions ?? [],
+        risk_analizi: parsed.risk_analizi ?? null,
       }).eq("id", existing.id);
     } else {
       await admin.from("party_analyses").insert({
         case_id, party_id, user_id: party.user_id ?? userId,
         analysis: parsed,
         discovery_questions: parsed.discovery_questions ?? [],
+        risk_analizi: parsed.risk_analizi ?? null,
       });
     }
 
