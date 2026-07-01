@@ -29,22 +29,35 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function sanitizeUnicode(input: string): string {
+  if (!input) return "";
+  let s = input;
+  s = s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ");
+  s = s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, "");
+  s = s.replace(/(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "$1");
+  s = s.replace(/[\uFEFF\u200B\u200C\u200D]/g, "");
+  try {
+    s = new TextDecoder("utf-8", { fatal: false }).decode(new TextEncoder().encode(s));
+  } catch { /* yoksay */ }
+  return s;
+}
+
 function chunkText(text: string, target = 1800, overlap = 150): string[] {
-  const clean = text.replace(/\s+/g, " ").trim();
+  const clean = sanitizeUnicode(text).replace(/\s+/g, " ").trim();
   if (!clean) return [];
   const sentences = clean.split(/(?<=[.!?])\s+/);
   const chunks: string[] = [];
   let cur = "";
   for (const s of sentences) {
     if ((cur + " " + s).length > target && cur) {
-      chunks.push(cur.trim());
+      chunks.push(sanitizeUnicode(cur.trim()));
       const tail = cur.slice(Math.max(0, cur.length - overlap));
       cur = tail + " " + s;
     } else {
       cur = cur ? cur + " " + s : s;
     }
   }
-  if (cur.trim()) chunks.push(cur.trim());
+  if (cur.trim()) chunks.push(sanitizeUnicode(cur.trim()));
   return chunks.filter((c) => c.length > 200);
 }
 
@@ -162,7 +175,7 @@ Deno.serve(async (req) => {
           const slice = chunks.slice(i, i + BATCH);
           const vectors = await embed(slice);
           const rows = slice.map((c, j) => ({
-            source_title: f.name,
+            source_title: sanitizeUnicode(f.name),
             source_url: sourceUrl,
             category,
             chunk_text: c,

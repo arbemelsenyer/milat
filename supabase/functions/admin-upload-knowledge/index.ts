@@ -28,22 +28,42 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// Türkçe karakterleri koruyarak sadece geçersiz kontrol karakterlerini ve
+// bozuk surrogate çiftlerini temizler. Postgres text sütunları \u0000 kabul etmez;
+// lone surrogate'lar ise JSON.stringify sırasında geçersiz UTF-16 üretir.
+function sanitizeUnicode(input: string): string {
+  if (!input) return "";
+  let s = input;
+  // NUL ve C0 kontrol karakterleri (TAB, LF, CR hariç)
+  s = s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ");
+  // Lone (eşleşmemiş) surrogate'lar
+  s = s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, "");
+  s = s.replace(/(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "$1");
+  // Zero-width / BOM
+  s = s.replace(/[\uFEFF\u200B\u200C\u200D]/g, "");
+  // Encode/decode roundtrip: geçersiz UTF-8'i ayıklar, Türkçe karakterler korunur
+  try {
+    s = new TextDecoder("utf-8", { fatal: false }).decode(new TextEncoder().encode(s));
+  } catch { /* yoksay */ }
+  return s;
+}
+
 function chunkText(text: string, target = 1800, overlap = 150): string[] {
-  const clean = text.replace(/\s+/g, " ").trim();
+  const clean = sanitizeUnicode(text).replace(/\s+/g, " ").trim();
   if (!clean) return [];
   const sentences = clean.split(/(?<=[.!?])\s+/);
   const chunks: string[] = [];
   let cur = "";
   for (const s of sentences) {
     if ((cur + " " + s).length > target && cur) {
-      chunks.push(cur.trim());
+      chunks.push(sanitizeUnicode(cur.trim()));
       const tail = cur.slice(Math.max(0, cur.length - overlap));
       cur = tail + " " + s;
     } else {
       cur = cur ? cur + " " + s : s;
     }
   }
-  if (cur.trim()) chunks.push(cur.trim());
+  if (cur.trim()) chunks.push(sanitizeUnicode(cur.trim()));
   return chunks.filter((c) => c.length > 200);
 }
 
@@ -141,7 +161,7 @@ Deno.serve(async (req) => {
     }
 
     const chunks = chunkText(fullText);
-    if (!chunks.length) return json({ error: "Dosyadan yeterli metin çıkarılamadı" }, 400);
+    if (!chunks.length) return json({ error: "Bu dosya işlenemedi, lütfen başka bir dosya deneyin" }, 400);
     if (chunks.length > 800) return json({ error: `Anormal parça sayısı (${chunks.length}). Daha küçük bir dosya deneyin.` }, 400);
 
     // Remove any existing chunks with same source_url (idempotency for re-upload)
@@ -151,18 +171,26 @@ Deno.serve(async (req) => {
     const BATCH = 16;
     for (let i = 0; i < chunks.length; i += BATCH) {
       const slice = chunks.slice(i, i + BATCH);
-      const vectors = await embed(slice);
+      let vectors: number[][];
+      try {
+        vectors = await embed(slice);
+      } catch (e: any) {
+        return json({ error: `Bu dosya işlenemedi, lütfen başka bir dosya deneyin (${e?.message ?? "embedding hatası"})` }, 400);
+      }
       const rows = slice.map((c, j) => ({
-        source_title: title,
+        source_title: sanitizeUnicode(title),
         source_url: sourceUrl,
         category,
         chunk_text: c,
         chunk_index: i + j,
         embedding: vectors[j] as any,
-        metadata: { uploaded_by: userId, file_name: file.name, uploaded_at: new Date().toISOString() },
+        metadata: { uploaded_by: userId, file_name: sanitizeUnicode(file.name), uploaded_at: new Date().toISOString() },
       }));
       const { error } = await admin.from("knowledge_base_chunks").insert(rows);
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error("insert failed", error.message);
+        return json({ error: "Bu dosya işlenemedi, lütfen başka bir dosya deneyin" }, 400);
+      }
       total += rows.length;
     }
 
@@ -175,6 +203,6 @@ Deno.serve(async (req) => {
     });
   } catch (e: any) {
     console.error("admin-upload-knowledge error", e);
-    return json({ error: e.message ?? "Sunucu hatası" }, 500);
+    return json({ error: "Bu dosya işlenemedi, lütfen başka bir dosya deneyin" }, 500);
   }
 });
