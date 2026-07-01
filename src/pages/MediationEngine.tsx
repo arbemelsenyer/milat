@@ -461,7 +461,9 @@ function DisputeClassifierCard({
       setManual((data as any).kategori);
       toast({ title: "Tür tespiti tamamlandı", description: `${catLabel((data as any).kategori)} · %${(data as any).guven_skoru}` });
     } catch (e: any) {
-      setError(e?.message ?? "Sınıflandırılamadı.");
+      const raw = e?.message ?? "";
+      setError(trErr(raw) || "Uyuşmazlık türü tespit edilemedi. Lütfen tekrar deneyin.");
+      toast({ title: "Sınıflandırma başarısız", description: trErr(raw) || "Bağlantı veya AI servisi hatası.", variant: "destructive" });
     } finally { setBusy(false); }
   }, [caseRow.id]);
 
@@ -509,8 +511,14 @@ function DisputeClassifierCard({
       </div>
 
       {error && (
-        <div className="text-xs text-destructive flex items-center gap-1">
-          <AlertTriangle className="h-3 w-3" /> {error}
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-2">
+          <div className="text-xs text-destructive flex items-start gap-1">
+            <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => runClassify(text)} disabled={busy}>
+            {busy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Deneniyor…</> : <><RefreshCw className="h-4 w-4 mr-1" /> Tekrar Dene</>}
+          </Button>
         </div>
       )}
 
