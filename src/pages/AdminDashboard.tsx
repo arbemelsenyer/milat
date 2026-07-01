@@ -57,6 +57,10 @@ export default function AdminDashboard() {
   const [isAssigning, setIsAssigning] = useState(false);
   const [userSearch, setUserSearch] = useState('');
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
+
 
   useEffect(() => {
     if (!authLoading) {
