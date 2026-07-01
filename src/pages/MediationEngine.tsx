@@ -78,6 +78,17 @@ type CaseRow = {
   application_date: string | null;
   assigned_mediator_id: string | null;
   created_at: string;
+  is_mandatory?: boolean | null;
+  legal_duration_days?: number | null;
+  extension_days?: number | null;
+  legal_basis?: string | null;
+  deadline_total?: string | null;
+  deadline_extended?: string | null;
+  extension_used?: boolean | null;
+  deadline_sources?: string[] | null;
+  deadline_conflict?: boolean | null;
+  deadline_conflict_note?: string | null;
+  deadline_detected_at?: string | null;
 };
 
 type PartyDraft = {
