@@ -806,6 +806,26 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
 
   return (
     <div className="space-y-4">
+      {initialLoading ? (
+        <Card className="p-6 space-y-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Taraf verileri yükleniyor…
+          </div>
+          <div className="space-y-2">
+            <div className="h-4 bg-muted rounded animate-pulse w-1/3" />
+            <div className="h-16 bg-muted rounded animate-pulse" />
+            <div className="h-16 bg-muted rounded animate-pulse" />
+          </div>
+        </Card>
+      ) : loadError ? (
+        <Card className="p-6 space-y-3">
+          <div className="flex items-center gap-2 text-destructive font-semibold">
+            <AlertTriangle className="h-5 w-5" /> Veriler yüklenemedi
+          </div>
+          <p className="text-xs text-muted-foreground break-words">{loadError}</p>
+          <Button size="sm" onClick={loadAll}><RefreshCw className="h-4 w-4 mr-1" /> Yenile</Button>
+        </Card>
+      ) : (
       <Card className="p-6 space-y-3">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
