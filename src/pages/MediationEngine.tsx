@@ -845,7 +845,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                 ? <div className="text-emerald-600 font-semibold">✓ Ortak Zemin Raporu Hazır</div>
                 : canReport
                   ? <div className="text-muted-foreground">Ortak Zemin Raporu üretilebilir</div>
-                  : <div className="text-muted-foreground">Rapor için en az 2 analiz gerekli</div>}
+                  : <div className="text-muted-foreground">Rapor için en az 1 analiz gerekli</div>}
           </div>
         </div>
       </Card>
