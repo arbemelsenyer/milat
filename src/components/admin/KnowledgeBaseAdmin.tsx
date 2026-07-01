@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, BookOpen, CheckCircle2, Clock3, Loader2, RefreshCw, Trash2, Upload, XCircle } from "lucide-react";
+import { GoogleDriveImporter } from "./GoogleDriveImporter";
 
 interface Job {
   id: string;
