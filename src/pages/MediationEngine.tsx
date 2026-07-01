@@ -969,12 +969,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
             <div className="h-16 bg-muted rounded animate-pulse" />
             <div className="h-16 bg-muted rounded animate-pulse" />
           </div>
-      </Card>
+        </Card>
 
-      <DisputeClassifierCard
-        caseRow={caseRow}
-        initialText={caseRow.title ?? ""}
-      />
       ) : loadError ? (
         <Card className="p-6 space-y-3">
           <div className="flex items-center gap-2 text-destructive font-semibold">
