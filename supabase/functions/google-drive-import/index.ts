@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
           const slice = chunks.slice(i, i + BATCH);
           const vectors = await embed(slice);
           const rows = slice.map((c, j) => ({
-            source_title: f.name,
+            source_title: sanitizeUnicode(f.name),
             source_url: sourceUrl,
             category,
             chunk_text: c,
