@@ -122,6 +122,27 @@ export default function MediationEngine() {
   const [showNew, setShowNew] = useState(false);
   const [activeCase, setActiveCase] = useState<CaseRow | null>(null);
   const [phase3Complete, setPhase3Complete] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<CaseRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function deleteCase(c: CaseRow) {
+    setDeleting(true);
+    try {
+      const { error, count } = await supabase
+        .from("cases").delete({ count: "exact" }).eq("id", c.id);
+      if (error) throw error;
+      if (!count) throw new Error("Bu başvuruyu silme yetkiniz yok.");
+      toast({ title: "Başvuru silindi" });
+      setCases((prev) => prev.filter((x) => x.id !== c.id));
+      setDeleteTarget(null);
+    } catch (e: any) {
+      toast({
+        title: "Silme işlemi başarısız",
+        description: trErr(e?.message ?? ""),
+        variant: "destructive",
+      });
+    } finally { setDeleting(false); }
+  }
 
   useEffect(() => {
     if (!isLoading && !user) {
