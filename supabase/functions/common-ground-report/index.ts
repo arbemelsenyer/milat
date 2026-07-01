@@ -37,13 +37,14 @@ Deno.serve(async (req) => {
     }
 
     const { data: analyses } = await admin.from("party_analyses")
-      .select("party_id, analysis, discovery_questions, case_parties:party_id(party_role, first_name, last_name, company_name)")
+      .select("party_id, analysis, discovery_questions, risk_analizi, case_parties:party_id(party_role, first_name, last_name, company_name)")
       .eq("case_id", case_id);
 
     const { data: discAnswers } = await admin.from("case_discovery_questions")
       .select("party_id, question_text, answer_text").eq("case_id", case_id);
 
-    const systemPrompt = `Sen kıdemli bir Türk arabuluculuk danışmanısın. Tarafların gizli analizlerini okuyup ortak zemin raporu ve arabulucu stratejisi üretiyorsun.
+    const systemPrompt = `Sen kıdemli bir Türk arabuluculuk danışmanısın. Tarafların gizli analizlerini okuyup ortak zemin raporu, arabulucu stratejisi ve iki tarafın risk analizlerini karşılaştıran risk_ozeti üretiyorsun.
+KESİN KURAL: Sabit/uydurma % ASLA verme. Kaynak yoksa "Yeterli veri yok" yaz.
 Çıktı YALNIZCA JSON: {
   "common_interests": [],
   "zopa": {"description":"", "lower_bound":"", "upper_bound":""},
@@ -52,29 +53,37 @@ Deno.serve(async (req) => {
     {"label":"B - Dengeli","summary":"","tradeoffs":[]},
     {"label":"C - Yaratıcı","summary":"","tradeoffs":[]}
   ],
-  "mediator_strategy": {
-    "opening_statement": "",
-    "critical_questions": [],
-    "deadlock_techniques": []
-  },
-  "red_lines": []
+  "mediator_strategy": {"opening_statement":"","critical_questions":[],"deadlock_techniques":[]},
+  "red_lines": [],
+  "risk_ozeti": {
+    "genel_uzlasma_orani":"",
+    "genel_uzlasma_orani_kaynak":"",
+    "genel_risk_puani":"Düşük|Orta|Yüksek",
+    "taraf_karsilastirma":[{"taraf":"","risk_puani":"","guclu_yon":"","zayif_yon":""}],
+    "ortak_kritik_faktorler":[],
+    "ortak_uzlasma_engelleri":[],
+    "kaynak_listesi":[],
+    "arabulucu_onerisi":""
+  }
 }`;
 
     const ragQuery = [caseRow.title, caseRow.dispute_type, caseRow.dispute_subtype, caseRow.issue_description]
       .filter(Boolean).join(" — ");
     const ragCategory = mapDisputeToCategory(caseRow.dispute_type, caseRow.dispute_subtype);
-    const { block: ragBlock, sources: ragSources } = await fetchKnowledgeBlock(admin, apiKey, ragQuery, ragCategory);
+    const { block: ragBlock, sources: ragSources, embedding: queryEmb } = await fetchKnowledgeBlock(admin, apiKey, ragQuery, ragCategory);
+    const { block: similarBlock } = await fetchSimilarCases(admin, queryEmb, ragCategory);
 
     const userPrompt = `BAŞVURU: ${caseRow.title ?? ""} — ${caseRow.dispute_type ?? ""} / ${caseRow.dispute_subtype ?? ""}
 ÖZET: ${caseRow.issue_description ?? ""}
 
-TARAF ANALİZLERİ:
-${(analyses ?? []).map((a: any) => `--- ${a.case_parties?.party_role ?? ""} (${a.case_parties?.first_name ?? a.case_parties?.company_name ?? ""}) ---\n${JSON.stringify(a.analysis, null, 2)}`).join("\n\n")}
+TARAF ANALİZLERİ (risk_analizi dahil):
+${(analyses ?? []).map((a: any) => `--- ${a.case_parties?.party_role ?? ""} (${a.case_parties?.first_name ?? a.case_parties?.company_name ?? ""}) ---\nanalysis: ${JSON.stringify(a.analysis, null, 2)}\nrisk_analizi: ${JSON.stringify(a.risk_analizi ?? {}, null, 2)}`).join("\n\n")}
 
 İHTİYAÇ TESPİTİ CEVAPLARI:
 ${(discAnswers ?? []).map((d) => `[Party ${d.party_id?.slice(0, 8)}] Q: ${d.question_text}\nA: ${d.answer_text ?? "(cevap yok)"}`).join("\n")}
 ${ragBlock}
-Yukarıdaki resmi kaynaklardan yararlanarak ortak zemin raporu ve arabulucu stratejisi üret; alakalıysa kaynak göster.`;
+${similarBlock}
+Yukarıdaki resmi kaynaklardan ve benzer geçmiş davalardan yararlanarak ortak zemin raporu ve iki tarafı karşılaştıran risk_ozeti üret; uydurma % verme.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -96,11 +105,13 @@ Yukarıdaki resmi kaynaklardan yararlanarak ortak zemin raporu ve arabulucu stra
 
     const { data: inserted, error: upErr } = await admin.from("common_ground_reports").upsert({
       case_id, report: parsed, strategy: parsed.mediator_strategy ?? {},
+      risk_ozeti: parsed.risk_ozeti ?? null,
       round_number: caseRow.round_number ?? 1,
     }, { onConflict: "case_id,round_number" }).select().maybeSingle();
     if (upErr) {
       return new Response(JSON.stringify({ error: upErr.message }), { status: 500, headers: corsHeaders });
     }
+
 
     return new Response(JSON.stringify({ report: inserted }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
