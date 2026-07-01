@@ -1147,7 +1147,7 @@ function PosBlock({ label, items }: { label: string; items?: string[] }) {
     </div>
   );
 }
-function CommonGroundView({ data, strategy }: { data: any; strategy: any }) {
+function CommonGroundView({ data, strategy, parties, analyses, caseId }: { data: any; strategy: any; parties?: any[]; analyses?: any[]; caseId?: string }) {
   if (!data) return null;
   return (
     <div className="space-y-2">
@@ -1202,8 +1202,162 @@ function CommonGroundView({ data, strategy }: { data: any; strategy: any }) {
           <ul className="list-disc pl-5 text-sm">{data.red_lines.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
         </AnaSection>
       )}
+      <ComparativeRiskAnalysis parties={parties} analyses={analyses} reportData={data} caseId={caseId} />
       <RiskSummaryCard summary={data.risk_ozeti} sources={data.sources} />
       <SourcesPanel sources={data.sources} />
+    </div>
+  );
+}
+
+// ── Karşılaştırmalı Risk & Anlaşma Analizi ──
+// İki tarafın risk_analizi verisini yan yana gösterir, ortalama uzlaşma oranı,
+// ZOPA aralığı ve en güçlü senaryoyu hesaplar. Sonucu common_ground_reports.risk_ozeti
+// alanına (eksikse) kaydeder.
+function parsePercent(v: any): number | null {
+  if (v === null || v === undefined) return null;
+  const m = String(v).match(/(\d+(?:[.,]\d+)?)\s*%?/);
+  if (!m) return null;
+  const n = parseFloat(m[1].replace(",", "."));
+  return isNaN(n) ? null : n;
+}
+function partyDisplayName(cp: any, idx: number): string {
+  if (!cp) return `Taraf ${idx + 1}`;
+  return cp.company_name || `${cp.first_name ?? ""} ${cp.last_name ?? ""}`.trim() || `Taraf ${idx + 1}`;
+}
+function ComparativeRiskAnalysis({
+  parties, analyses, reportData, caseId,
+}: { parties?: any[]; analyses?: any[]; reportData: any; caseId?: string }) {
+  const rows = React.useMemo(() => {
+    const list = Array.isArray(analyses) ? analyses : [];
+    return list.map((a: any, i: number) => {
+      const cp = (parties ?? []).find((p) => p.id === a.party_id) || a.case_parties || null;
+      const r = a.risk_analizi || {};
+      return {
+        name: partyDisplayName(cp, i),
+        risk_puani: r.risk_puani,
+        uzlasma_orani: r.uzlasma_orani,
+        uzlasma_pct: parsePercent(r.uzlasma_orani),
+        mahkeme_riski: r.mahkeme_riski,
+        mahkeme_pct: parsePercent(r.mahkeme_riski),
+      };
+    });
+  }, [parties, analyses]);
+
+  const avgUzlasma = React.useMemo(() => {
+    const vals = rows.map((r) => r.uzlasma_pct).filter((v): v is number => v !== null);
+    if (!vals.length) return null;
+    return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+  }, [rows]);
+
+  const strongestScenario = React.useMemo(() => {
+    const scs = Array.isArray(reportData?.scenarios) ? reportData.scenarios : [];
+    return scs.find((s: any) => /dengeli/i.test(String(s?.label))) || scs[0] || null;
+  }, [reportData]);
+
+  const zopa = reportData?.zopa;
+
+  const persistedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (persistedRef.current) return;
+    if (!caseId) return;
+    if (reportData?.risk_ozeti && Object.keys(reportData.risk_ozeti).length > 0) return;
+    if (rows.length < 2) return;
+    persistedRef.current = true;
+    const summary = {
+      genel_uzlasma_orani: avgUzlasma !== null ? `% ${avgUzlasma} (taraf ortalaması)` : "Yeterli veri yok",
+      genel_uzlasma_orani_kaynak: "İki tarafın risk_analizi ortalaması",
+      genel_risk_puani: rows.find((r) => /yük/i.test(String(r.risk_puani)))?.risk_puani
+        || rows.find((r) => /orta/i.test(String(r.risk_puani)))?.risk_puani
+        || rows[0]?.risk_puani || "",
+      taraf_karsilastirma: rows.map((r) => ({
+        taraf: r.name, risk_puani: r.risk_puani || "",
+        guclu_yon: r.uzlasma_orani ? `Uzlaşma: ${r.uzlasma_orani}` : "",
+        zayif_yon: r.mahkeme_riski ? `Mahkeme riski: ${r.mahkeme_riski}` : "",
+      })),
+      ortak_kritik_faktorler: [],
+      ortak_uzlasma_engelleri: [],
+      kaynak_listesi: [],
+      arabulucu_onerisi: strongestScenario?.summary ? `Önerilen yön: ${strongestScenario.label} — ${strongestScenario.summary}` : "",
+    };
+    (async () => {
+      try {
+        const { data: existing } = await supabase
+          .from("common_ground_reports").select("id, report").eq("case_id", caseId)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (!existing) return;
+        const nextReport = { ...((existing as any).report ?? {}), risk_ozeti: summary };
+        await supabase.from("common_ground_reports")
+          .update({ risk_ozeti: summary as any, report: nextReport as any })
+          .eq("id", (existing as any).id);
+      } catch (e) { console.warn("[ComparativeRiskAnalysis] persist failed", e); }
+    })();
+  }, [caseId, avgUzlasma, rows, strongestScenario, reportData?.risk_ozeti]);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="border rounded-lg p-4 space-y-3 bg-primary/5 border-primary/30">
+      <div className="font-semibold text-sm">📊 Karşılaştırmalı Risk & Anlaşma Analizi</div>
+
+      <div className="grid sm:grid-cols-2 gap-2">
+        {rows.map((r, i) => (
+          <div key={i} className="border rounded p-3 bg-background text-sm space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-medium truncate">{r.name}</div>
+              {r.risk_puani && (
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${riskBadgeTone(r.risk_puani)}`}>{r.risk_puani}</span>
+              )}
+            </div>
+            <div className="text-xs"><span className="text-muted-foreground">Anlaşma oranı: </span><b>{r.uzlasma_orani || "Yeterli veri yok"}</b></div>
+            <div className="text-xs"><span className="text-muted-foreground">Mahkeme riski: </span><b>{r.mahkeme_riski || "Yeterli veri yok"}</b></div>
+            {r.uzlasma_pct !== null && (
+              <div className="h-1.5 rounded bg-muted overflow-hidden">
+                <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, Math.max(0, r.uzlasma_pct))}%` }} />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-2">
+        <div className="border rounded p-3 bg-background">
+          <div className="text-xs text-muted-foreground">Genel Uzlaşma Tahmini (ortalama)</div>
+          <div className="text-lg font-semibold">
+            {avgUzlasma !== null ? `% ${avgUzlasma}` : "Yeterli veri yok"}
+          </div>
+          {avgUzlasma !== null && (
+            <div className="h-2 rounded bg-muted overflow-hidden mt-1">
+              <div className="h-full bg-primary" style={{ width: `${Math.min(100, avgUzlasma)}%` }} />
+            </div>
+          )}
+          <div className="text-[11px] text-muted-foreground mt-1 italic">Tarafların risk_analizi verilerinden hesaplandı</div>
+        </div>
+
+        <div className="border rounded p-3 bg-background">
+          <div className="text-xs text-muted-foreground">Uzlaşma Alanı (ZOPA)</div>
+          {zopa && (zopa.lower_bound || zopa.upper_bound || zopa.description) ? (
+            <>
+              <div className="text-sm font-medium">
+                {zopa.lower_bound || "?"} <span className="text-muted-foreground">↔</span> {zopa.upper_bound || "?"}
+              </div>
+              <div className="relative h-2 rounded bg-muted overflow-hidden mt-1">
+                <div className="absolute inset-y-0 left-[15%] right-[15%] bg-primary/60 rounded" />
+              </div>
+              {zopa.description && <div className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{zopa.description}</div>}
+            </>
+          ) : (
+            <div className="text-sm italic text-muted-foreground">ZOPA bilgisi henüz yok</div>
+          )}
+        </div>
+      </div>
+
+      {strongestScenario && (
+        <div className="border rounded p-3 bg-background">
+          <div className="text-xs text-muted-foreground">Ortak Zemin Bazında Önerilen Senaryo</div>
+          <div className="text-sm font-medium">⭐ {strongestScenario.label}</div>
+          {strongestScenario.summary && <div className="text-xs mt-0.5">{strongestScenario.summary}</div>}
+        </div>
+      )}
     </div>
   );
 }
