@@ -57,3 +57,6 @@ verify_jwt = true
 [functions.cancel-meeting-invite]
 verify_jwt = true
 
+[functions.build-legal-knowledge]
+verify_jwt = true
+
