@@ -214,22 +214,22 @@ function mapDisputeToCategory(disputeType?: string | null, subtype?: string | nu
   return null;
 }
 
-async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, category: string | null): Promise<{ block: string; sources: any[] }> {
+async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, category: string | null): Promise<{ block: string; sources: any[]; embedding: number[] | null }> {
   try {
-    if (!query || query.trim().length < 10) return { block: "", sources: [] };
+    if (!query || query.trim().length < 10) return { block: "", sources: [], embedding: null };
     const embRes = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: "openai/text-embedding-3-small", input: query, dimensions: 768 }),
     });
-    if (!embRes.ok) return { block: "", sources: [] };
+    if (!embRes.ok) return { block: "", sources: [], embedding: null };
     const embJson = await embRes.json();
     const vec = embJson?.data?.[0]?.embedding;
-    if (!vec) return { block: "", sources: [] };
+    if (!vec) return { block: "", sources: [], embedding: null };
     const { data } = await admin.rpc("match_knowledge_base", {
       query_embedding: vec, filter_category: category, match_count: 5, match_threshold: 0.65,
     });
-    if (!data || data.length === 0) return { block: "", sources: [] };
+    if (!data || data.length === 0) return { block: "", sources: [], embedding: vec };
     const sources = data.map((r: any) => ({
       title: r.source_title,
       url: r.source_url,
@@ -241,9 +241,27 @@ async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, ca
       `[Kaynak: ${r.source_title}]\n${r.chunk_text}`
     ).join("\n\n");
     const block = `\n═══ İLGİLİ KAYNAK BİLGİSİ (Adalet Bakanlığı Arabuluculuk Daire Başkanlığı resmi yayınlarından) ═══\n${parts}\n═══════════════════════════\n`;
-    return { block, sources };
+    return { block, sources, embedding: vec };
   } catch {
-    return { block: "", sources: [] };
+    return { block: "", sources: [], embedding: null };
   }
 }
+
+async function fetchSimilarCases(admin: any, embedding: number[] | null, category: string | null): Promise<{ block: string; matches: any[] }> {
+  try {
+    if (!embedding || !category) return { block: "", matches: [] };
+    const { data } = await admin.rpc("match_cases", {
+      query_embedding: embedding, match_threshold: 0.7, match_count: 4, filter_niche_area: category,
+    });
+    if (!data || data.length === 0) return { block: "", matches: [] };
+    const parts = data.map((r: any, i: number) =>
+      `[Benzer Dava #${i + 1} — benzerlik ${(r.similarity * 100).toFixed(0)}%]\n${String(r.anonymized_text ?? "").slice(0, 800)}`
+    ).join("\n\n");
+    const block = `\n═══ BENZER GEÇMİŞ DAVALAR (anonimleştirilmiş) ═══\n${parts}\n═══════════════════════════\n`;
+    return { block, matches: data };
+  } catch {
+    return { block: "", matches: [] };
+  }
+}
+
 
