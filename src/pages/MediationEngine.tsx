@@ -987,7 +987,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                       {an.dispute_area && (
                         <AnaSection icon="🔍" title="Uyuşmazlık Türü">
 
-                          <p className="text-sm">{an.dispute_area}</p>
+                          <p className="text-sm">{safeText(an.dispute_area)}</p>
                         </AnaSection>
                       )}
                       {an.legal_framework && (
