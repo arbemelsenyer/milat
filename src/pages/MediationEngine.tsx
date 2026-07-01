@@ -461,7 +461,9 @@ function DisputeClassifierCard({
       setManual((data as any).kategori);
       toast({ title: "Tür tespiti tamamlandı", description: `${catLabel((data as any).kategori)} · %${(data as any).guven_skoru}` });
     } catch (e: any) {
-      setError(e?.message ?? "Sınıflandırılamadı.");
+      const raw = e?.message ?? "";
+      setError(trErr(raw) || "Uyuşmazlık türü tespit edilemedi. Lütfen tekrar deneyin.");
+      toast({ title: "Sınıflandırma başarısız", description: trErr(raw) || "Bağlantı veya AI servisi hatası.", variant: "destructive" });
     } finally { setBusy(false); }
   }, [caseRow.id]);
 
