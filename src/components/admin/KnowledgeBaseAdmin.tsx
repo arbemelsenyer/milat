@@ -173,6 +173,10 @@ export function KnowledgeBaseAdmin() {
             {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
             Tek PDF ile Test Et
           </Button>
+          <Button onClick={runLegalKnowledge} disabled={legalRunning} size="sm" variant="secondary">
+            {legalRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <BookOpen className="w-4 h-4 mr-2" />}
+            Mevzuat & Tarife Ekle
+          </Button>
           {job && (
             <Badge className="gap-1" variant={job.status === "completed" ? "default" : job.status === "failed" ? "destructive" : "secondary"}>
               {statusIcon(job.status)}
