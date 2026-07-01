@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
     }
 
     const chunks = chunkText(fullText);
-    if (!chunks.length) return json({ error: "Dosyadan yeterli metin çıkarılamadı" }, 400);
+    if (!chunks.length) return json({ error: "Bu dosya işlenemedi, lütfen başka bir dosya deneyin" }, 400);
     if (chunks.length > 800) return json({ error: `Anormal parça sayısı (${chunks.length}). Daha küçük bir dosya deneyin.` }, 400);
 
     // Remove any existing chunks with same source_url (idempotency for re-upload)
@@ -171,18 +171,26 @@ Deno.serve(async (req) => {
     const BATCH = 16;
     for (let i = 0; i < chunks.length; i += BATCH) {
       const slice = chunks.slice(i, i + BATCH);
-      const vectors = await embed(slice);
+      let vectors: number[][];
+      try {
+        vectors = await embed(slice);
+      } catch (e: any) {
+        return json({ error: `Bu dosya işlenemedi, lütfen başka bir dosya deneyin (${e?.message ?? "embedding hatası"})` }, 400);
+      }
       const rows = slice.map((c, j) => ({
-        source_title: title,
+        source_title: sanitizeUnicode(title),
         source_url: sourceUrl,
         category,
         chunk_text: c,
         chunk_index: i + j,
         embedding: vectors[j] as any,
-        metadata: { uploaded_by: userId, file_name: file.name, uploaded_at: new Date().toISOString() },
+        metadata: { uploaded_by: userId, file_name: sanitizeUnicode(file.name), uploaded_at: new Date().toISOString() },
       }));
       const { error } = await admin.from("knowledge_base_chunks").insert(rows);
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error("insert failed", error.message);
+        return json({ error: "Bu dosya işlenemedi, lütfen başka bir dosya deneyin" }, 400);
+      }
       total += rows.length;
     }
 
@@ -195,6 +203,6 @@ Deno.serve(async (req) => {
     });
   } catch (e: any) {
     console.error("admin-upload-knowledge error", e);
-    return json({ error: e.message ?? "Sunucu hatası" }, 500);
+    return json({ error: "Bu dosya işlenemedi, lütfen başka bir dosya deneyin" }, 500);
   }
 });
