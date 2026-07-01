@@ -374,6 +374,39 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="users" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  {language === 'tr' ? 'Kullanıcı Davet Et' : 'Invite User'}
+                </CardTitle>
+                <CardDescription>
+                  {language === 'tr'
+                    ? 'Sisteme yeni bir kullanıcı davet edin. Davet edilen kişiye e-posta ile şifre oluşturma linki gönderilir.'
+                    : 'Invite a new user. They will receive an email with a link to set their password.'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-[1fr,1fr,auto]">
+                <Input
+                  type="email"
+                  placeholder={language === 'tr' ? 'E-posta adresi' : 'Email address'}
+                  value={inviteEmail}
+                  onChange={e => setInviteEmail(e.target.value)}
+                  disabled={isInviting}
+                />
+                <Input
+                  placeholder={language === 'tr' ? 'Ad Soyad (opsiyonel)' : 'Full name (optional)'}
+                  value={inviteName}
+                  onChange={e => setInviteName(e.target.value)}
+                  disabled={isInviting}
+                />
+                <Button onClick={handleInviteUser} disabled={isInviting || !inviteEmail.trim()}>
+                  {isInviting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
+                  {language === 'tr' ? 'Davet Gönder' : 'Send Invite'}
+                </Button>
+              </CardContent>
+            </Card>
+
             <div className="relative">
               <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
               <Input
@@ -383,6 +416,7 @@ export default function AdminDashboard() {
                 onChange={e => setUserSearch(e.target.value)}
               />
             </div>
+
             {filteredUsers.map(u => (
               <Card key={u.user_id}>
                 <CardContent className="py-4 flex items-center justify-between">
