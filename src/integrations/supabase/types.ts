@@ -809,6 +809,7 @@ export type Database = {
           created_at: string
           embedding: string | null
           id: string
+          metadata: Json
           source_title: string
           source_url: string
         }
@@ -819,6 +820,7 @@ export type Database = {
           created_at?: string
           embedding?: string | null
           id?: string
+          metadata?: Json
           source_title: string
           source_url: string
         }
@@ -829,6 +831,7 @@ export type Database = {
           created_at?: string
           embedding?: string | null
           id?: string
+          metadata?: Json
           source_title?: string
           source_url?: string
         }
@@ -1650,6 +1653,7 @@ export type Database = {
         Returns: {
           category: string
           chunk_text: string
+          metadata: Json
           similarity: number
           source_title: string
           source_url: string
