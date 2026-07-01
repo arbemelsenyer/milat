@@ -1081,6 +1081,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
           </div>
         </Card>
       )}
+      </>
+      )}
     </div>
   );
 }
