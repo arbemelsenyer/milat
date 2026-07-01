@@ -66,3 +66,7 @@ verify_jwt = true
 [functions.admin-delete-knowledge]
 verify_jwt = true
 
+[functions.admin-invite-user]
+verify_jwt = true
+
+
