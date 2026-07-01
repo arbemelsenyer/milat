@@ -992,18 +992,18 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                       )}
                       {an.legal_framework && (
                         <AnaSection icon="⚖️" title="Hukuki Çerçeve">
-                          {an.legal_framework.statutes?.length > 0 && (
+                          {safeList(an.legal_framework.statutes).length > 0 && (
                             <div className="text-sm">
                               <div className="font-medium">Mevzuat:</div>
-                              <ul className="list-disc pl-5">{an.legal_framework.statutes.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+                              <ul className="list-disc pl-5">{safeList(an.legal_framework.statutes).map((s, i) => <li key={i}>{s}</li>)}</ul>
                             </div>
                           )}
-                          {an.legal_framework.precedents?.length > 0 && (
+                          {Array.isArray(an.legal_framework.precedents) && an.legal_framework.precedents.length > 0 && (
                             <div className="text-sm mt-2">
                               <div className="font-medium">Emsal Kararlar:</div>
                               <ul className="list-disc pl-5">
                                 {an.legal_framework.precedents.map((pr: any, i: number) => (
-                                  <li key={i}><b>{pr.court}:</b> {pr.decision} <span className="text-muted-foreground">— {pr.relevance}</span></li>
+                                  <li key={i}><b>{safeText(pr?.court)}:</b> {safeText(pr?.decision)} <span className="text-muted-foreground">— {safeText(pr?.relevance)}</span></li>
                                 ))}
                               </ul>
                             </div>
