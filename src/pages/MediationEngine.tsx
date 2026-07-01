@@ -528,7 +528,168 @@ function Phase1Summary({ caseRow }: { caseRow: CaseRow }) {
         </p>
       </Card>
       <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} autoRun />
+      <DeadlineCard caseRow={caseRow} />
     </div>
+  );
+}
+
+/* ============ DEADLINE / TAKVIM CARD ============ */
+
+function DeadlineCard({ caseRow }: { caseRow: CaseRow }) {
+  const [busy, setBusy] = useState(false);
+  const [extending, setExtending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [local, setLocal] = useState<Partial<CaseRow>>({
+    is_mandatory: caseRow.is_mandatory,
+    legal_duration_days: caseRow.legal_duration_days,
+    extension_days: caseRow.extension_days,
+    legal_basis: caseRow.legal_basis,
+    deadline_total: caseRow.deadline_total,
+    deadline_extended: caseRow.deadline_extended,
+    extension_used: caseRow.extension_used,
+    deadline_sources: caseRow.deadline_sources,
+    deadline_conflict: caseRow.deadline_conflict,
+    deadline_conflict_note: caseRow.deadline_conflict_note,
+    deadline_detected_at: caseRow.deadline_detected_at,
+  });
+
+  const detect = useCallback(async () => {
+    if (!caseRow.dispute_type) {
+      setError("Önce AI uyuşmazlık türünü tespit etmeli. Yukarıdaki karttan sınıflandırın.");
+      return;
+    }
+    setBusy(true); setError(null);
+    try {
+      const { data, error: fErr } = await supabase.functions.invoke("detect-legal-deadlines", {
+        body: { case_id: caseRow.id, dispute_type: caseRow.dispute_type, persist: true },
+      });
+      if (fErr) throw fErr;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      const r = data as any;
+      const start = new Date(caseRow.application_date ?? caseRow.created_at);
+      setLocal({
+        is_mandatory: r.dava_sarti_mi,
+        legal_duration_days: r.sure_gun,
+        extension_days: r.uzatma_gun,
+        legal_basis: r.ilgili_kanun,
+        deadline_total: r.sure_gun != null ? new Date(start.getTime() + r.sure_gun * 86400000).toISOString() : null,
+        deadline_extended: (r.sure_gun != null && r.uzatma_gun) ? new Date(start.getTime() + (r.sure_gun + r.uzatma_gun) * 86400000).toISOString() : null,
+        extension_used: false,
+        deadline_sources: r.kullanilan_kaynaklar,
+        deadline_conflict: r.celiski_var,
+        deadline_conflict_note: r.celiski_aciklamasi,
+        deadline_detected_at: new Date().toISOString(),
+      });
+      toast({ title: "Yasal süre tespit edildi", description: r.aciklama || catLabel(caseRow.dispute_type) });
+    } catch (e: any) {
+      setError(trErr(e?.message ?? "") || "Süre tespiti başarısız. Tekrar deneyin.");
+    } finally { setBusy(false); }
+  }, [caseRow.id, caseRow.dispute_type, caseRow.application_date, caseRow.created_at]);
+
+  // Auto-run once when dispute_type set and no detection yet
+  const detectedRef = useRef(false);
+  useEffect(() => {
+    if (detectedRef.current) return;
+    if (!caseRow.dispute_type) return;
+    if (local.deadline_detected_at) return;
+    detectedRef.current = true;
+    detect();
+  }, [caseRow.dispute_type, local.deadline_detected_at, detect]);
+
+  async function extendDeadline() {
+    if (!local.deadline_extended || local.extension_used) return;
+    setExtending(true);
+    try {
+      const { error } = await supabase.from("cases").update({
+        extension_used: true,
+      } as any).eq("id", caseRow.id);
+      if (error) throw error;
+      setLocal((s) => ({ ...s, extension_used: true }));
+      toast({ title: "Süre uzatıldı", description: `Yeni bitiş: ${new Date(local.deadline_extended).toLocaleDateString("tr-TR")}` });
+    } catch (e: any) {
+      toast({ title: "Uzatma başarısız", description: trErr(e?.message ?? ""), variant: "destructive" });
+    } finally { setExtending(false); }
+  }
+
+  const active = local.extension_used && local.deadline_extended ? local.deadline_extended : local.deadline_total;
+  const remainingDays = active ? Math.ceil((new Date(active).getTime() - Date.now()) / 86400000) : null;
+  const statusChip = (() => {
+    if (remainingDays == null) return null;
+    if (remainingDays < 0) return <Badge className="bg-neutral-800 text-white">⚫ Süre doldu</Badge>;
+    if (remainingDays < 3) return <Badge className="bg-red-600 text-white">🔴 {remainingDays} gün</Badge>;
+    if (remainingDays < 7) return <Badge className="bg-amber-500 text-white">🟡 {remainingDays} gün</Badge>;
+    return <Badge className="bg-emerald-600 text-white">🟢 {remainingDays} gün</Badge>;
+  })();
+  const startDate = new Date(caseRow.application_date ?? caseRow.created_at);
+  const noSources = local.deadline_detected_at && !local.legal_duration_days && !local.legal_basis;
+
+  return (
+    <Card className="p-6 space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <CalIcon className="h-4 w-4 text-primary" /> 📅 Takvim & Süreler
+        </h3>
+        <Button size="sm" variant="outline" onClick={detect} disabled={busy || !caseRow.dispute_type}>
+          {busy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Tespit ediliyor…</> : <><RefreshCw className="h-4 w-4 mr-1" /> {local.deadline_detected_at ? "Yeniden Tespit Et" : "Yasal Süreyi Tespit Et"}</>}
+        </Button>
+      </div>
+
+      {!caseRow.dispute_type && (
+        <p className="text-xs text-muted-foreground italic">Önce yukarıdaki karttan uyuşmazlık türünü tespit edin.</p>
+      )}
+
+      {error && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive flex items-start gap-1">
+          <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" /> {error}
+        </div>
+      )}
+
+      {local.deadline_detected_at && (
+        <div className="space-y-3">
+          {noSources || (local.deadline_sources && local.deadline_sources.length === 0) ? (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+              Bu uyuşmazlık için yasal süre bilgi tabanında bulunamadı. Lütfen ilgili mevzuatı manuel kontrol edin.
+            </div>
+          ) : null}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            <div><span className="text-muted-foreground">Dava Şartı:</span> <b>{local.is_mandatory === true ? "Evet" : local.is_mandatory === false ? "Hayır" : "Tespit Edilemedi"}</b></div>
+            <div><span className="text-muted-foreground">Yasal Dayanak:</span> {local.legal_basis || "—"}</div>
+            <div><span className="text-muted-foreground">📅 Başvuru Tarihi:</span> {startDate.toLocaleDateString("tr-TR")}</div>
+            <div><span className="text-muted-foreground">📅 Süre Bitişi:</span> {local.deadline_total ? new Date(local.deadline_total).toLocaleDateString("tr-TR") : "—"} {local.legal_duration_days ? <span className="text-xs text-muted-foreground">({local.legal_duration_days} gün)</span> : null}</div>
+            {local.deadline_extended && (
+              <div><span className="text-muted-foreground">📅 Uzatılmış Bitiş:</span> {new Date(local.deadline_extended).toLocaleDateString("tr-TR")} {local.extension_days ? <span className="text-xs text-muted-foreground">(+{local.extension_days} gün)</span> : null} {local.extension_used && <Badge variant="outline" className="ml-1 text-[10px]">Kullanıldı</Badge>}</div>
+            )}
+            <div><span className="text-muted-foreground">Kalan Süre:</span> {statusChip ?? "—"}</div>
+          </div>
+
+          {local.deadline_sources && local.deadline_sources.length > 0 && (
+            <div className="text-xs text-muted-foreground">
+              <span>Kullanılan Kaynaklar:</span> {local.deadline_sources.slice(0, 6).join(" · ")}
+            </div>
+          )}
+
+          {local.deadline_conflict && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 flex items-start gap-1">
+              <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+              <div>
+                <b>⚠️ Kaynaklarda farklı bilgi bulundu.</b> Lütfen manuel kontrol edin.
+                {local.deadline_conflict_note && <div className="mt-1 text-amber-800">{local.deadline_conflict_note}</div>}
+              </div>
+            </div>
+          )}
+
+          {local.extension_days && !local.extension_used && local.deadline_extended && (
+            <div>
+              <Button size="sm" onClick={extendDeadline} disabled={extending}>
+                {extending ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Uzatılıyor…</> : "Süre Uzat (+" + local.extension_days + " gün)"}
+              </Button>
+              <p className="text-[11px] text-muted-foreground mt-1">Bir kez kullanılabilir.</p>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 
