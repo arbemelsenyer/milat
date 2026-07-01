@@ -826,6 +826,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
           <Button size="sm" onClick={loadAll}><RefreshCw className="h-4 w-4 mr-1" /> Yenile</Button>
         </Card>
       ) : (
+      <>
       <Card className="p-6 space-y-3">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
