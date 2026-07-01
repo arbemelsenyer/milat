@@ -800,7 +800,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   }
 
   const analysedCount = analyses.length;
-  const canReport = analysedCount >= 2;
+  const canReport = analysedCount >= 1;
+  const partialReport = analysedCount >= 1 && analysedCount < parties.length;
 
   const progressPct = parties.length ? Math.round((analysedCount / parties.length) * 100) : 0;
 
