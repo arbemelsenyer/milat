@@ -668,6 +668,7 @@ export type Database = {
           created_at: string
           id: string
           report: Json
+          risk_ozeti: Json | null
           round_number: number
           strategy: Json
           updated_at: string
@@ -677,6 +678,7 @@ export type Database = {
           created_at?: string
           id?: string
           report?: Json
+          risk_ozeti?: Json | null
           round_number?: number
           strategy?: Json
           updated_at?: string
@@ -686,6 +688,7 @@ export type Database = {
           created_at?: string
           id?: string
           report?: Json
+          risk_ozeti?: Json | null
           round_number?: number
           strategy?: Json
           updated_at?: string
@@ -1300,6 +1303,7 @@ export type Database = {
           id: string
           party_id: string
           prep_notes: Json
+          risk_analizi: Json | null
           round_number: number
           updated_at: string
           user_id: string
@@ -1312,6 +1316,7 @@ export type Database = {
           id?: string
           party_id: string
           prep_notes?: Json
+          risk_analizi?: Json | null
           round_number?: number
           updated_at?: string
           user_id: string
@@ -1324,6 +1329,7 @@ export type Database = {
           id?: string
           party_id?: string
           prep_notes?: Json
+          risk_analizi?: Json | null
           round_number?: number
           updated_at?: string
           user_id?: string

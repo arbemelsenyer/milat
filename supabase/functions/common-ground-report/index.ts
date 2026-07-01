@@ -37,13 +37,14 @@ Deno.serve(async (req) => {
     }
 
     const { data: analyses } = await admin.from("party_analyses")
-      .select("party_id, analysis, discovery_questions, case_parties:party_id(party_role, first_name, last_name, company_name)")
+      .select("party_id, analysis, discovery_questions, risk_analizi, case_parties:party_id(party_role, first_name, last_name, company_name)")
       .eq("case_id", case_id);
 
     const { data: discAnswers } = await admin.from("case_discovery_questions")
       .select("party_id, question_text, answer_text").eq("case_id", case_id);
 
-    const systemPrompt = `Sen kıdemli bir Türk arabuluculuk danışmanısın. Tarafların gizli analizlerini okuyup ortak zemin raporu ve arabulucu stratejisi üretiyorsun.
+    const systemPrompt = `Sen kıdemli bir Türk arabuluculuk danışmanısın. Tarafların gizli analizlerini okuyup ortak zemin raporu, arabulucu stratejisi ve iki tarafın risk analizlerini karşılaştıran risk_ozeti üretiyorsun.
+KESİN KURAL: Sabit/uydurma % ASLA verme. Kaynak yoksa "Yeterli veri yok" yaz.
 Çıktı YALNIZCA JSON: {
   "common_interests": [],
   "zopa": {"description":"", "lower_bound":"", "upper_bound":""},
@@ -52,29 +53,37 @@ Deno.serve(async (req) => {
     {"label":"B - Dengeli","summary":"","tradeoffs":[]},
     {"label":"C - Yaratıcı","summary":"","tradeoffs":[]}
   ],
-  "mediator_strategy": {
-    "opening_statement": "",
-    "critical_questions": [],
-    "deadlock_techniques": []
-  },
-  "red_lines": []
+  "mediator_strategy": {"opening_statement":"","critical_questions":[],"deadlock_techniques":[]},
+  "red_lines": [],
+  "risk_ozeti": {
+    "genel_uzlasma_orani":"",
+    "genel_uzlasma_orani_kaynak":"",
+    "genel_risk_puani":"Düşük|Orta|Yüksek",
+    "taraf_karsilastirma":[{"taraf":"","risk_puani":"","guclu_yon":"","zayif_yon":""}],
+    "ortak_kritik_faktorler":[],
+    "ortak_uzlasma_engelleri":[],
+    "kaynak_listesi":[],
+    "arabulucu_onerisi":""
+  }
 }`;
 
     const ragQuery = [caseRow.title, caseRow.dispute_type, caseRow.dispute_subtype, caseRow.issue_description]
       .filter(Boolean).join(" — ");
     const ragCategory = mapDisputeToCategory(caseRow.dispute_type, caseRow.dispute_subtype);
-    const { block: ragBlock, sources: ragSources } = await fetchKnowledgeBlock(admin, apiKey, ragQuery, ragCategory);
+    const { block: ragBlock, sources: ragSources, embedding: queryEmb } = await fetchKnowledgeBlock(admin, apiKey, ragQuery, ragCategory);
+    const { block: similarBlock } = await fetchSimilarCases(admin, queryEmb, ragCategory);
 
     const userPrompt = `BAŞVURU: ${caseRow.title ?? ""} — ${caseRow.dispute_type ?? ""} / ${caseRow.dispute_subtype ?? ""}
 ÖZET: ${caseRow.issue_description ?? ""}
 
-TARAF ANALİZLERİ:
-${(analyses ?? []).map((a: any) => `--- ${a.case_parties?.party_role ?? ""} (${a.case_parties?.first_name ?? a.case_parties?.company_name ?? ""}) ---\n${JSON.stringify(a.analysis, null, 2)}`).join("\n\n")}
+TARAF ANALİZLERİ (risk_analizi dahil):
+${(analyses ?? []).map((a: any) => `--- ${a.case_parties?.party_role ?? ""} (${a.case_parties?.first_name ?? a.case_parties?.company_name ?? ""}) ---\nanalysis: ${JSON.stringify(a.analysis, null, 2)}\nrisk_analizi: ${JSON.stringify(a.risk_analizi ?? {}, null, 2)}`).join("\n\n")}
 
 İHTİYAÇ TESPİTİ CEVAPLARI:
 ${(discAnswers ?? []).map((d) => `[Party ${d.party_id?.slice(0, 8)}] Q: ${d.question_text}\nA: ${d.answer_text ?? "(cevap yok)"}`).join("\n")}
 ${ragBlock}
-Yukarıdaki resmi kaynaklardan yararlanarak ortak zemin raporu ve arabulucu stratejisi üret; alakalıysa kaynak göster.`;
+${similarBlock}
+Yukarıdaki resmi kaynaklardan ve benzer geçmiş davalardan yararlanarak ortak zemin raporu ve iki tarafı karşılaştıran risk_ozeti üret; uydurma % verme.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -96,11 +105,13 @@ Yukarıdaki resmi kaynaklardan yararlanarak ortak zemin raporu ve arabulucu stra
 
     const { data: inserted, error: upErr } = await admin.from("common_ground_reports").upsert({
       case_id, report: parsed, strategy: parsed.mediator_strategy ?? {},
+      risk_ozeti: parsed.risk_ozeti ?? null,
       round_number: caseRow.round_number ?? 1,
     }, { onConflict: "case_id,round_number" }).select().maybeSingle();
     if (upErr) {
       return new Response(JSON.stringify({ error: upErr.message }), { status: 500, headers: corsHeaders });
     }
+
 
     return new Response(JSON.stringify({ report: inserted }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -126,22 +137,22 @@ function mapDisputeToCategory(disputeType?: string | null, subtype?: string | nu
   return null;
 }
 
-async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, category: string | null): Promise<{ block: string; sources: any[] }> {
+async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, category: string | null): Promise<{ block: string; sources: any[]; embedding: number[] | null }> {
   try {
-    if (!query || query.trim().length < 10) return { block: "", sources: [] };
+    if (!query || query.trim().length < 10) return { block: "", sources: [], embedding: null };
     const embRes = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: "openai/text-embedding-3-small", input: query, dimensions: 768 }),
     });
-    if (!embRes.ok) return { block: "", sources: [] };
+    if (!embRes.ok) return { block: "", sources: [], embedding: null };
     const embJson = await embRes.json();
     const vec = embJson?.data?.[0]?.embedding;
-    if (!vec) return { block: "", sources: [] };
+    if (!vec) return { block: "", sources: [], embedding: null };
     const { data } = await admin.rpc("match_knowledge_base", {
       query_embedding: vec, filter_category: category, match_count: 5, match_threshold: 0.65,
     });
-    if (!data || data.length === 0) return { block: "", sources: [] };
+    if (!data || data.length === 0) return { block: "", sources: [], embedding: vec };
     const sources = data.map((r: any) => ({
       title: r.source_title,
       url: r.source_url,
@@ -153,9 +164,27 @@ async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, ca
       `[Kaynak: ${r.source_title}]\n${r.chunk_text}`
     ).join("\n\n");
     const block = `\n═══ İLGİLİ KAYNAK BİLGİSİ (Adalet Bakanlığı Arabuluculuk Daire Başkanlığı resmi yayınlarından) ═══\n${parts}\n═══════════════════════════\n`;
-    return { block, sources };
+    return { block, sources, embedding: vec };
   } catch {
-    return { block: "", sources: [] };
+    return { block: "", sources: [], embedding: null };
   }
 }
+
+async function fetchSimilarCases(admin: any, embedding: number[] | null, category: string | null): Promise<{ block: string; matches: any[] }> {
+  try {
+    if (!embedding || !category) return { block: "", matches: [] };
+    const { data } = await admin.rpc("match_cases", {
+      query_embedding: embedding, match_threshold: 0.7, match_count: 4, filter_niche_area: category,
+    });
+    if (!data || data.length === 0) return { block: "", matches: [] };
+    const parts = data.map((r: any, i: number) =>
+      `[Benzer Dava #${i + 1} — benzerlik ${(r.similarity * 100).toFixed(0)}%]\n${String(r.anonymized_text ?? "").slice(0, 800)}`
+    ).join("\n\n");
+    const block = `\n═══ BENZER GEÇMİŞ DAVALAR (anonimleştirilmiş) ═══\n${parts}\n═══════════════════════════\n`;
+    return { block, matches: data };
+  } catch {
+    return { block: "", matches: [] };
+  }
+}
+
 

@@ -943,8 +943,10 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                   {/* Analysis result */}
                   {a && (
                     <div className="space-y-2">
+                      <RiskAnalysisCard risk={an.risk_analizi ?? (a as any).risk_analizi} />
                       {an.dispute_area && (
                         <AnaSection icon="🔍" title="Uyuşmazlık Türü">
+
                           <p className="text-sm">{an.dispute_area}</p>
                         </AnaSection>
                       )}
@@ -1098,10 +1100,138 @@ function CommonGroundView({ data, strategy }: { data: any; strategy: any }) {
           <ul className="list-disc pl-5 text-sm">{data.red_lines.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
         </AnaSection>
       )}
+      <RiskSummaryCard summary={data.risk_ozeti} />
       <SourcesPanel sources={data.sources} />
     </div>
   );
 }
+
+function RiskAnalysisCard({ risk }: { risk?: any }) {
+  if (!risk || typeof risk !== "object") return null;
+  const level = String(risk.risk_puani ?? "").toLowerCase();
+  const tone =
+    level.includes("yük") ? "border-red-400/50 bg-red-50/60 dark:bg-red-950/20"
+    : level.includes("orta") ? "border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20"
+    : level.includes("düş") || level.includes("dus") ? "border-emerald-400/50 bg-emerald-50/60 dark:bg-emerald-950/20"
+    : "border-border bg-muted/30";
+  const badgeTone =
+    level.includes("yük") ? "bg-red-600 text-white"
+    : level.includes("orta") ? "bg-amber-500 text-white"
+    : level.includes("düş") || level.includes("dus") ? "bg-emerald-600 text-white"
+    : "bg-muted text-foreground";
+  return (
+    <div className={`border rounded-lg p-4 space-y-3 ${tone}`}>
+      <div className="flex items-center justify-between">
+        <div className="font-semibold text-sm">📊 Risk Analizi & Anlaşma Oranı</div>
+        {risk.risk_puani && (
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badgeTone}`}>{risk.risk_puani} Risk</span>
+        )}
+      </div>
+      <div className="grid sm:grid-cols-2 gap-2 text-sm">
+        <div>
+          <div className="text-xs text-muted-foreground">Anlaşma Oranı</div>
+          <div className="font-medium">{risk.uzlasma_orani || "Yeterli veri yok"}</div>
+          {risk.uzlasma_orani_kaynak && <div className="text-[11px] text-muted-foreground italic">Kaynak: {risk.uzlasma_orani_kaynak}</div>}
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground">Mahkeme Riski</div>
+          <div className="font-medium">{risk.mahkeme_riski || "Yeterli veri yok"}</div>
+          {risk.mahkeme_riski_kaynak && <div className="text-[11px] text-muted-foreground italic">Kaynak: {risk.mahkeme_riski_kaynak}</div>}
+        </div>
+        {risk.tahmini_sure_tasarrufu_ay && (
+          <div className="sm:col-span-2">
+            <div className="text-xs text-muted-foreground">Tahmini Süre Tasarrufu</div>
+            <div className="font-medium">{risk.tahmini_sure_tasarrufu_ay} {typeof risk.tahmini_sure_tasarrufu_ay === "number" || /^\d/.test(String(risk.tahmini_sure_tasarrufu_ay)) ? "ay" : ""}</div>
+          </div>
+        )}
+      </div>
+      {Array.isArray(risk.kritik_faktorler) && risk.kritik_faktorler.filter(Boolean).length > 0 && (
+        <div>
+          <div className="text-xs font-medium mb-1">Kritik Faktörler</div>
+          <ul className="list-disc pl-5 text-sm">{risk.kritik_faktorler.filter(Boolean).map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+        </div>
+      )}
+      {Array.isArray(risk.uzlasma_engelleri) && risk.uzlasma_engelleri.filter(Boolean).length > 0 && (
+        <div>
+          <div className="text-xs font-medium mb-1">Uzlaşma Engelleri</div>
+          <ul className="list-disc pl-5 text-sm">{risk.uzlasma_engelleri.filter(Boolean).map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+        </div>
+      )}
+      {Array.isArray(risk.kaynak_listesi) && risk.kaynak_listesi.filter(Boolean).length > 0 && (
+        <div className="text-xs">
+          <span className="font-medium">Kullanılan Kaynaklar: </span>
+          <span className="text-muted-foreground">{risk.kaynak_listesi.filter(Boolean).join(" · ")}</span>
+        </div>
+      )}
+      {risk.oneri && (
+        <div className="text-sm border-l-2 border-primary/40 pl-2 italic">{risk.oneri}</div>
+      )}
+    </div>
+  );
+}
+
+function RiskSummaryCard({ summary }: { summary?: any }) {
+  if (!summary || typeof summary !== "object") return null;
+  const level = String(summary.genel_risk_puani ?? "").toLowerCase();
+  const tone =
+    level.includes("yük") ? "border-red-400/50 bg-red-50/60 dark:bg-red-950/20"
+    : level.includes("orta") ? "border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20"
+    : level.includes("düş") || level.includes("dus") ? "border-emerald-400/50 bg-emerald-50/60 dark:bg-emerald-950/20"
+    : "border-border bg-muted/30";
+  const badgeTone =
+    level.includes("yük") ? "bg-red-600 text-white"
+    : level.includes("orta") ? "bg-amber-500 text-white"
+    : level.includes("düş") || level.includes("dus") ? "bg-emerald-600 text-white"
+    : "bg-muted text-foreground";
+  return (
+    <div className={`border rounded-lg p-4 space-y-3 ${tone}`}>
+      <div className="flex items-center justify-between">
+        <div className="font-semibold text-sm">📊 Karşılaştırmalı Risk Özeti</div>
+        {summary.genel_risk_puani && (
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badgeTone}`}>{summary.genel_risk_puani} Risk</span>
+        )}
+      </div>
+      <div className="text-sm">
+        <span className="text-xs text-muted-foreground">Genel Anlaşma Oranı: </span>
+        <span className="font-medium">{summary.genel_uzlasma_orani || "Yeterli veri yok"}</span>
+        {summary.genel_uzlasma_orani_kaynak && <span className="text-[11px] text-muted-foreground italic"> ({summary.genel_uzlasma_orani_kaynak})</span>}
+      </div>
+      {Array.isArray(summary.taraf_karsilastirma) && summary.taraf_karsilastirma.length > 0 && (
+        <div className="grid sm:grid-cols-2 gap-2">
+          {summary.taraf_karsilastirma.map((t: any, i: number) => (
+            <div key={i} className="border rounded p-2 bg-background text-sm">
+              <div className="font-medium">{t.taraf || `Taraf ${i + 1}`} <span className="text-xs text-muted-foreground">— {t.risk_puani}</span></div>
+              {t.guclu_yon && <div className="text-xs">✓ {t.guclu_yon}</div>}
+              {t.zayif_yon && <div className="text-xs">✗ {t.zayif_yon}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+      {Array.isArray(summary.ortak_kritik_faktorler) && summary.ortak_kritik_faktorler.filter(Boolean).length > 0 && (
+        <div>
+          <div className="text-xs font-medium mb-1">Ortak Kritik Faktörler</div>
+          <ul className="list-disc pl-5 text-sm">{summary.ortak_kritik_faktorler.filter(Boolean).map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+        </div>
+      )}
+      {Array.isArray(summary.ortak_uzlasma_engelleri) && summary.ortak_uzlasma_engelleri.filter(Boolean).length > 0 && (
+        <div>
+          <div className="text-xs font-medium mb-1">Ortak Uzlaşma Engelleri</div>
+          <ul className="list-disc pl-5 text-sm">{summary.ortak_uzlasma_engelleri.filter(Boolean).map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+        </div>
+      )}
+      {Array.isArray(summary.kaynak_listesi) && summary.kaynak_listesi.filter(Boolean).length > 0 && (
+        <div className="text-xs">
+          <span className="font-medium">Kullanılan Kaynaklar: </span>
+          <span className="text-muted-foreground">{summary.kaynak_listesi.filter(Boolean).join(" · ")}</span>
+        </div>
+      )}
+      {summary.arabulucu_onerisi && (
+        <div className="text-sm border-l-2 border-primary/40 pl-2 italic">{summary.arabulucu_onerisi}</div>
+      )}
+    </div>
+  );
+}
+
 
 const EXCERPT_MAX = 280;
 function cleanExcerpt(raw?: string): string {
