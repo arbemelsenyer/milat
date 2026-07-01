@@ -187,12 +187,8 @@ export default function MediatorDetail() {
                         <MapPin className="h-4 w-4" /> {mediator.city}
                       </span>
                     )}
-                    {mediator.hourly_rate != null && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" /> {mediator.hourly_rate} TL/saat
-                      </span>
-                    )}
                   </div>
+
                 </div>
               </div>
 
