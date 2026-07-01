@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { AppNavbar } from "@/components/AppNavbar";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
