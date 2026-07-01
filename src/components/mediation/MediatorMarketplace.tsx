@@ -64,7 +64,7 @@ export function MediatorMarketplace({ niche, onSelect }: Props) {
   return (
     <div className="space-y-4">
       <Card className="p-4">
-        <div className="grid sm:grid-cols-4 gap-3">
+        <div className="grid sm:grid-cols-3 gap-3">
           <Input placeholder="Ara: isim veya uzmanlık" value={search} onChange={(e) => setSearch(e.target.value)} />
           <select className="h-10 rounded-md border bg-background px-3 text-sm" value={lang} onChange={(e) => setLang(e.target.value)}>
             <option value="">Tüm Diller</option>
@@ -72,7 +72,6 @@ export function MediatorMarketplace({ niche, onSelect }: Props) {
             <option value="EN">İngilizce</option>
             <option value="AR">Arapça</option>
           </select>
-          <Input type="number" placeholder="Max ücret (₺)" value={maxRate} onChange={(e) => setMaxRate(e.target.value)} />
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={onlyAvail} onChange={(e) => setOnlyAvail(e.target.checked)} />
             Sadece müsait olanlar
