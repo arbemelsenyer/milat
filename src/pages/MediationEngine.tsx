@@ -107,7 +107,25 @@ function emptyParty(role: PartyDraft["party_role"] = "applicant"): PartyDraft {
 }
 
 function trErr(msg: string) {
-  return msg || "Bilinmeyen hata. Lütfen tekrar deneyin.";
+  const m = (msg || "").toLowerCase();
+  if (!msg) return "Bilinmeyen hata. Lütfen tekrar deneyin.";
+  if (
+    m.includes("row-level security") ||
+    m.includes("row level security") ||
+    m.includes(" rls") ||
+    m.includes("permission denied") ||
+    m.includes("not authorized") ||
+    m.includes("42501")
+  ) {
+    return "Bu işlem için yetkiniz yok. Sadece başvuru sahibi, atanmış arabulucu veya yönetici silebilir.";
+  }
+  if (m.includes("jwt") || m.includes("not authenticated") || m.includes("invalid token")) {
+    return "Oturumunuz sona ermiş olabilir. Lütfen tekrar giriş yapın.";
+  }
+  if (m.includes("failed to fetch") || m.includes("networkerror") || m.includes("network request")) {
+    return "Bağlantı hatası. İnternet bağlantınızı kontrol edip tekrar deneyin.";
+  }
+  return msg;
 }
 
 export default function MediationEngine() {
