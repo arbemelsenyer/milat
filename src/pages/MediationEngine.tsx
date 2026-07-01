@@ -1266,18 +1266,18 @@ function RiskAnalysisCard({
       <div className="grid sm:grid-cols-2 gap-2 text-sm">
         <div>
           <div className="text-xs text-muted-foreground">Anlaşma Oranı</div>
-          <div className="font-medium">{risk.uzlasma_orani || "Yeterli veri yok"}</div>
-          {risk.uzlasma_orani_kaynak && <div className="text-[11px] text-muted-foreground italic">Kaynak: {risk.uzlasma_orani_kaynak}</div>}
+          <div className="font-medium">{safeText(risk.uzlasma_orani) || "Yeterli veri yok"}</div>
+          {risk.uzlasma_orani_kaynak && <div className="text-[11px] text-muted-foreground italic">Kaynak: {safeText(risk.uzlasma_orani_kaynak)}</div>}
         </div>
         <div>
           <div className="text-xs text-muted-foreground">Mahkeme Riski</div>
-          <div className="font-medium">{risk.mahkeme_riski || "Yeterli veri yok"}</div>
-          {risk.mahkeme_riski_kaynak && <div className="text-[11px] text-muted-foreground italic">Kaynak: {risk.mahkeme_riski_kaynak}</div>}
+          <div className="font-medium">{safeText(risk.mahkeme_riski) || "Yeterli veri yok"}</div>
+          {risk.mahkeme_riski_kaynak && <div className="text-[11px] text-muted-foreground italic">Kaynak: {safeText(risk.mahkeme_riski_kaynak)}</div>}
         </div>
         {risk.tahmini_sure_tasarrufu_ay && (
           <div className="sm:col-span-2">
             <div className="text-xs text-muted-foreground">Tahmini Süre Tasarrufu</div>
-            <div className="font-medium">{risk.tahmini_sure_tasarrufu_ay} {typeof risk.tahmini_sure_tasarrufu_ay === "number" || /^\d/.test(String(risk.tahmini_sure_tasarrufu_ay)) ? "ay" : ""}</div>
+            <div className="font-medium">{safeText(risk.tahmini_sure_tasarrufu_ay)} {typeof risk.tahmini_sure_tasarrufu_ay === "number" || /^\d/.test(String(risk.tahmini_sure_tasarrufu_ay)) ? "ay" : ""}</div>
           </div>
         )}
       </div>
