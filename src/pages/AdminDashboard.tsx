@@ -12,8 +12,9 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { AppNavbar } from '@/components/AppNavbar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, UserCog, Calendar, UserPlus, Trash2 } from 'lucide-react';
+import { Loader2, Search, UserCog, Calendar, UserPlus, Trash2, Mail } from 'lucide-react';
 import { KnowledgeBaseAdmin } from '@/components/admin/KnowledgeBaseAdmin';
+
 
 interface CaseRow {
   id: string;
@@ -56,6 +57,10 @@ export default function AdminDashboard() {
   const [isAssigning, setIsAssigning] = useState(false);
   const [userSearch, setUserSearch] = useState('');
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
+
 
   useEffect(() => {
     if (!authLoading) {
@@ -189,6 +194,41 @@ export default function AdminDashboard() {
     fetchData();
     setIsUpdatingRole(false);
   };
+
+  const handleInviteUser = async () => {
+    const email = inviteEmail.trim();
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+      toast({
+        variant: 'destructive',
+        title: language === 'tr' ? 'Geçersiz e-posta' : 'Invalid email',
+        description: language === 'tr' ? 'Lütfen geçerli bir e-posta girin.' : 'Please enter a valid email.',
+      });
+      return;
+    }
+    setIsInviting(true);
+    const { data, error } = await supabase.functions.invoke('admin-invite-user', {
+      body: { email, fullName: inviteName.trim() || undefined },
+    });
+    setIsInviting(false);
+    if (error || (data as any)?.error) {
+      toast({
+        variant: 'destructive',
+        title: language === 'tr' ? 'Davet gönderilemedi' : 'Invite failed',
+        description: (data as any)?.error || error?.message || 'Unknown error',
+      });
+      return;
+    }
+    toast({
+      title: language === 'tr' ? 'Davet Gönderildi' : 'Invitation Sent',
+      description: language === 'tr'
+        ? `${email} adresine davet e-postası gönderildi.`
+        : `Invitation email sent to ${email}.`,
+    });
+    setInviteEmail('');
+    setInviteName('');
+    fetchAllUsers();
+  };
+
 
   const getMediatorName = (id: string | null) => {
     if (!id) return null;
@@ -334,6 +374,39 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="users" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  {language === 'tr' ? 'Kullanıcı Davet Et' : 'Invite User'}
+                </CardTitle>
+                <CardDescription>
+                  {language === 'tr'
+                    ? 'Sisteme yeni bir kullanıcı davet edin. Davet edilen kişiye e-posta ile şifre oluşturma linki gönderilir.'
+                    : 'Invite a new user. They will receive an email with a link to set their password.'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-[1fr,1fr,auto]">
+                <Input
+                  type="email"
+                  placeholder={language === 'tr' ? 'E-posta adresi' : 'Email address'}
+                  value={inviteEmail}
+                  onChange={e => setInviteEmail(e.target.value)}
+                  disabled={isInviting}
+                />
+                <Input
+                  placeholder={language === 'tr' ? 'Ad Soyad (opsiyonel)' : 'Full name (optional)'}
+                  value={inviteName}
+                  onChange={e => setInviteName(e.target.value)}
+                  disabled={isInviting}
+                />
+                <Button onClick={handleInviteUser} disabled={isInviting || !inviteEmail.trim()}>
+                  {isInviting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
+                  {language === 'tr' ? 'Davet Gönder' : 'Send Invite'}
+                </Button>
+              </CardContent>
+            </Card>
+
             <div className="relative">
               <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
               <Input
@@ -343,6 +416,7 @@ export default function AdminDashboard() {
                 onChange={e => setUserSearch(e.target.value)}
               />
             </div>
+
             {filteredUsers.map(u => (
               <Card key={u.user_id}>
                 <CardContent className="py-4 flex items-center justify-between">

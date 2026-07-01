@@ -318,319 +318,107 @@ export default function AuthPage() {
                 <span className="font-display font-semibold text-xl">MediPact AI</span>
               </div>
 
-              <div className="mb-8">
+              <div className="mb-6">
                 <h2 className="font-display text-3xl font-semibold tracking-tight">
-                  {activeTab === 'login'
-                    ? language === 'tr'
-                      ? 'Tekrar hoş geldiniz'
-                      : 'Welcome back'
-                    : language === 'tr'
-                    ? 'Hesap oluşturun'
-                    : 'Create your account'}
+                  {language === 'tr' ? 'Tekrar hoş geldiniz' : 'Welcome back'}
                 </h2>
                 <p className="mt-2 text-muted-foreground">
-                  {activeTab === 'login'
-                    ? language === 'tr'
-                      ? 'Başvurularınıza ve panelinize erişmek için giriş yapın.'
-                      : 'Sign in to access your cases and dashboard.'
-                    : language === 'tr'
-                    ? 'Saniyeler içinde başlayın. Kredi kartı gerekmez.'
-                    : 'Get started in seconds. No credit card required.'}
+                  {language === 'tr'
+                    ? 'Başvurularınıza ve panelinize erişmek için giriş yapın.'
+                    : 'Sign in to access your cases and dashboard.'}
                 </p>
               </div>
 
-              <Tabs
-                value={activeTab}
-                onValueChange={(v) => setActiveTab(v as 'login' | 'signup')}
-              >
-                <TabsList className="grid w-full grid-cols-2 mb-6 h-11 p-1 bg-muted/60">
-                  <TabsTrigger value="login" className="h-9">
-                    {language === 'tr' ? 'Giriş Yap' : 'Login'}
-                  </TabsTrigger>
-                  <TabsTrigger value="signup" className="h-9">
-                    {language === 'tr' ? 'Kayıt Ol' : 'Sign Up'}
-                  </TabsTrigger>
-                </TabsList>
+              <div className="mb-6 rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm leading-relaxed text-foreground/80">
+                {language === 'tr'
+                  ? 'MediPact AI şu an davet bazlı erişim sunmaktadır. Erişim için iletişime geçin.'
+                  : 'MediPact AI is currently invite-only. Please contact us to request access.'}
+              </div>
 
-                <TabsContent value="login" className="mt-0">
-                  <Form {...loginForm}>
-                    <form
-                      onSubmit={loginForm.handleSubmit(handleLogin)}
-                      className="space-y-5"
-                    >
-                      <FormField
-                        control={loginForm.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              {language === 'tr' ? 'E-posta' : 'Email'}
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                type="email"
-                                placeholder="ornek@email.com"
-                                autoComplete="email"
-                                className="h-11"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={loginForm.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              {language === 'tr' ? 'Şifre' : 'Password'}
-                            </FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Input
-                                  type={showLoginPwd ? 'text' : 'password'}
-                                  placeholder="••••••••"
-                                  autoComplete="current-password"
-                                  className="h-11 pr-10"
-                                  {...field}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowLoginPwd((v) => !v)}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                  aria-label="toggle password"
-                                >
-                                  {showLoginPwd ? (
-                                    <EyeOff className="w-4 h-4" />
-                                  ) : (
-                                    <Eye className="w-4 h-4" />
-                                  )}
-                                </button>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <div className="flex justify-end -mt-2">
-                        <button
-                          type="button"
-                          onClick={() => setForgotOpen(true)}
-                          className="text-sm text-primary hover:underline"
-                        >
-                          {language === 'tr' ? 'Şifremi Unuttum' : 'Forgot password?'}
-                        </button>
-                      </div>
-                      <Button
-                        type="submit"
-                        size="lg"
-                        className="w-full h-11 shadow-[var(--shadow-elegant)]"
-                        disabled={isLoading}
-                      >
-                        {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        {language === 'tr' ? 'Giriş Yap' : 'Sign In'}
-                      </Button>
-                    </form>
-                  </Form>
-                </TabsContent>
-
-                <TabsContent value="signup" className="mt-0">
-                  <Form {...signupForm}>
-                    <form
-                      onSubmit={signupForm.handleSubmit(handleSignup)}
-                      className="space-y-5"
-                    >
-                      <FormField
-                        control={signupForm.control}
-                        name="fullName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              {language === 'tr' ? 'Ad Soyad' : 'Full Name'}
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder={
-                                  language === 'tr' ? 'Adınız Soyadınız' : 'Your name'
-                                }
-                                autoComplete="name"
-                                className="h-11"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={signupForm.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              {language === 'tr' ? 'E-posta' : 'Email'}
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                type="email"
-                                placeholder="ornek@email.com"
-                                autoComplete="email"
-                                className="h-11"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={signupForm.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              {language === 'tr' ? 'Şifre' : 'Password'}
-                            </FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Input
-                                  type={showSignupPwd ? 'text' : 'password'}
-                                  placeholder="••••••••"
-                                  autoComplete="new-password"
-                                  className="h-11 pr-10"
-                                  {...field}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowSignupPwd((v) => !v)}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                  aria-label="toggle password"
-                                >
-                                  {showSignupPwd ? (
-                                    <EyeOff className="w-4 h-4" />
-                                  ) : (
-                                    <Eye className="w-4 h-4" />
-                                  )}
-                                </button>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={signupForm.control}
-                        name="confirmPassword"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              {language === 'tr' ? 'Şifre Tekrar' : 'Confirm Password'}
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                type="password"
-                                placeholder="••••••••"
-                                autoComplete="new-password"
-                                className="h-11"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {/* KVKK consent checkboxes */}
-                      <div className="space-y-2.5 rounded-lg border border-border/60 bg-muted/30 p-3">
-                        <label className="flex items-start gap-2.5 cursor-pointer text-left">
-                          <Checkbox
-                            checked={kvkkRead}
-                            onCheckedChange={(v) => setKvkkRead(v === true)}
-                            className="mt-0.5"
+              <Form {...loginForm}>
+                <form
+                  onSubmit={loginForm.handleSubmit(handleLogin)}
+                  className="space-y-5"
+                >
+                  <FormField
+                    control={loginForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{language === 'tr' ? 'E-posta' : 'Email'}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="email"
+                            placeholder="ornek@email.com"
+                            autoComplete="email"
+                            className="h-11"
+                            {...field}
                           />
-                          <span className="text-xs leading-relaxed text-muted-foreground">
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={loginForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{language === 'tr' ? 'Şifre' : 'Password'}</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              type={showLoginPwd ? 'text' : 'password'}
+                              placeholder="••••••••"
+                              autoComplete="current-password"
+                              className="h-11 pr-10"
+                              {...field}
+                            />
                             <button
                               type="button"
-                              onClick={(e) => { e.preventDefault(); setOpenModal('aydinlatma'); }}
-                              className="text-primary underline underline-offset-2 hover:opacity-80"
+                              onClick={() => setShowLoginPwd((v) => !v)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                              aria-label="toggle password"
                             >
-                              KVKK Aydınlatma Metni
+                              {showLoginPwd ? (
+                                <EyeOff className="w-4 h-4" />
+                              ) : (
+                                <Eye className="w-4 h-4" />
+                              )}
                             </button>
-                            {' ve '}
-                            <button
-                              type="button"
-                              onClick={(e) => { e.preventDefault(); setOpenModal('imha'); }}
-                              className="text-primary underline underline-offset-2 hover:opacity-80"
-                            >
-                              Veri Saklama ve İmha Politikası
-                            </button>
-                            'nı okudum, anladım.
-                          </span>
-                        </label>
-                        <label className="flex items-start gap-2.5 cursor-pointer text-left">
-                          <Checkbox
-                            checked={kvkkConsent}
-                            onCheckedChange={(v) => setKvkkConsent(v === true)}
-                            className="mt-0.5"
-                          />
-                          <span className="text-xs leading-relaxed text-muted-foreground">
-                            Arabuluculuk uyuşmazlık süreçlerindeki verilerimin yapay zeka tabanlı analiz edilmesi amacıyla işlenmesine{' '}
-                            <button
-                              type="button"
-                              onClick={(e) => { e.preventDefault(); setOpenModal('acikRiza'); }}
-                              className="text-primary underline underline-offset-2 hover:opacity-80"
-                            >
-                              Açık Rıza
-                            </button>
-                            {' '}veriyorum.
-                          </span>
-                        </label>
-                      </div>
-
-                      <Button
-                        type="submit"
-                        size="lg"
-                        className="w-full h-11 shadow-[var(--shadow-elegant)]"
-                        disabled={isLoading || !kvkkRead || !kvkkConsent}
-                      >
-                        {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        {language === 'tr' ? 'Hesap Oluştur' : 'Create Account'}
-                      </Button>
-                      <p className="text-xs text-muted-foreground text-center leading-relaxed">
-                        {language === 'tr'
-                          ? 'Kayıt olarak Kullanım Şartlarımızı ve Gizlilik Politikamızı kabul etmiş olursunuz.'
-                          : 'By signing up, you agree to our Terms of Service and Privacy Policy.'}
-                      </p>
-                    </form>
-                  </Form>
-                </TabsContent>
-              </Tabs>
-
-              <p className="mt-8 text-center text-sm text-muted-foreground">
-                {activeTab === 'login' ? (
-                  <>
-                    {language === 'tr' ? 'Hesabınız yok mu?' : "Don't have an account?"}{' '}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex justify-end -mt-2">
                     <button
-                      onClick={() => setActiveTab('signup')}
-                      className="font-medium text-primary hover:underline"
+                      type="button"
+                      onClick={() => setForgotOpen(true)}
+                      className="text-sm text-primary hover:underline"
                     >
-                      {language === 'tr' ? 'Kayıt olun' : 'Sign up'}
+                      {language === 'tr' ? 'Şifremi Unuttum' : 'Forgot password?'}
                     </button>
-                  </>
-                ) : (
-                  <>
-                    {language === 'tr' ? 'Zaten hesabınız var mı?' : 'Already have an account?'}{' '}
-                    <button
-                      onClick={() => setActiveTab('login')}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {language === 'tr' ? 'Giriş yapın' : 'Log in'}
-                    </button>
-                  </>
-                )}
+                  </div>
+                  <Button
+                    type="submit"
+                    size="lg"
+                    className="w-full h-11 shadow-[var(--shadow-elegant)]"
+                    disabled={isLoading}
+                  >
+                    {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    {language === 'tr' ? 'Giriş Yap' : 'Sign In'}
+                  </Button>
+                </form>
+              </Form>
+
+              <p className="mt-8 text-center text-xs text-muted-foreground">
+                {language === 'tr'
+                  ? 'Erişim sadece davet ile mümkündür. Davet için sistem yöneticinizle iletişime geçin.'
+                  : 'Access is invite-only. Please contact your administrator to request an invitation.'}
               </p>
+
             </div>
           </div>
         </main>
