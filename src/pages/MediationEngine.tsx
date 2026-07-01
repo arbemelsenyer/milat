@@ -612,6 +612,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   const [reportStatus, setReportStatus] = useState<string | null>(null);
   const [reportAttempt, setReportAttempt] = useState(0);
   const [navigating, setNavigating] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchReport = useCallback(async () => {
     setReportLoading(true);
@@ -638,13 +640,14 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   }, [caseRow.id]);
 
   const loadAll = useCallback(async () => {
+    setLoadError(null);
     try {
       const [p, d, a] = await Promise.all([
         supabase.from("case_parties").select("*").eq("case_id", caseRow.id).order("created_at"),
         supabase.from("case_documents").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }),
         supabase.from("party_analyses").select("*").eq("case_id", caseRow.id),
       ]);
-      if (p.error) console.error("[loadAll parties]", p.error);
+      if (p.error) { console.error("[loadAll parties]", p.error); throw p.error; }
       if (d.error) console.error("[loadAll docs]", d.error);
       if (a.error) console.error("[loadAll analyses]", a.error);
       setParties(Array.isArray(p.data) ? p.data : []);
@@ -652,7 +655,10 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
       setAnalyses(Array.isArray(a.data) ? a.data : []);
     } catch (e: any) {
       console.error("[loadAll] fatal", e);
+      setLoadError(e?.message ?? "Bilinmeyen hata");
       toast({ title: "Veriler yüklenemedi", description: e?.message ?? "Bilinmeyen hata", variant: "destructive" });
+    } finally {
+      setInitialLoading(false);
     }
     await fetchReport();
   }, [caseRow.id, fetchReport]);
@@ -800,6 +806,27 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
 
   return (
     <div className="space-y-4">
+      {initialLoading ? (
+        <Card className="p-6 space-y-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Taraf verileri yükleniyor…
+          </div>
+          <div className="space-y-2">
+            <div className="h-4 bg-muted rounded animate-pulse w-1/3" />
+            <div className="h-16 bg-muted rounded animate-pulse" />
+            <div className="h-16 bg-muted rounded animate-pulse" />
+          </div>
+        </Card>
+      ) : loadError ? (
+        <Card className="p-6 space-y-3">
+          <div className="flex items-center gap-2 text-destructive font-semibold">
+            <AlertTriangle className="h-5 w-5" /> Veriler yüklenemedi
+          </div>
+          <p className="text-xs text-muted-foreground break-words">{loadError}</p>
+          <Button size="sm" onClick={loadAll}><RefreshCw className="h-4 w-4 mr-1" /> Yenile</Button>
+        </Card>
+      ) : (
+      <>
       <Card className="p-6 space-y-3">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -874,7 +901,10 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
 
 
       {parties.length === 0 && (
-        <Card className="p-6"><p className="text-muted-foreground">Önce Aşama 2'de taraf ekleyin.</p></Card>
+        <Card className="p-6 space-y-2">
+          <div className="font-semibold">Taraflar bulunamadı</div>
+          <p className="text-sm text-muted-foreground">Bu başvuruya henüz taraf eklenmemiş. Aşama 2 — Taraf Bilgileri ekranından en az iki taraf ekleyin, ardından bu adımda belge yükleyip analiz başlatabilirsiniz.</p>
+        </Card>
       )}
 
       <div className="space-y-3">
@@ -974,6 +1004,19 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                     </div>
                   )}
 
+                  {!a && analysing !== p.id && !analysisError && (
+                    <div className="text-xs text-muted-foreground italic flex items-start gap-1 p-2 border border-dashed rounded">
+                      <Circle className="h-3 w-3 mt-0.5" />
+                      Analiz henüz yapılmadı. {partyDocs.length === 0 ? "Önce belge yükleyin, ardından" : ""} “Analiz Başlat” butonuna basın.
+                    </div>
+                  )}
+                  {analysing === p.id && (
+                    <div className="text-xs text-muted-foreground flex items-center gap-2 p-2 border rounded bg-muted/30">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Analiz yapılıyor, lütfen bekleyin…
+                    </div>
+                  )}
+
+
                   {/* Analysis result */}
                   {a && (
                     <div className="space-y-2">
@@ -1054,6 +1097,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
             </Button>
           </div>
         </Card>
+      )}
+      </>
       )}
     </div>
   );
