@@ -115,7 +115,7 @@ export function MediatorMarketplace({ niche, onSelect }: Props) {
                 <div className="flex items-center gap-1.5"><Globe className="h-3 w-3" /> {m.languages.join(", ")}</div>
               </div>
               <div className="flex items-center justify-between pt-2 border-t gap-2">
-                <span className="font-semibold">{Number(m.hourly_rate).toLocaleString("tr-TR")} ₺/saat</span>
+                <span className="text-xs text-muted-foreground">Ücret için iletişime geçin</span>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" asChild>
                     <a href={`/mediator/${m.id}`}>Profil</a>
