@@ -800,7 +800,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   }
 
   const analysedCount = analyses.length;
-  const canReport = analysedCount >= 2;
+  const canReport = analysedCount >= 1;
+  const partialReport = analysedCount >= 1 && analysedCount < parties.length;
 
   const progressPct = parties.length ? Math.round((analysedCount / parties.length) * 100) : 0;
 
@@ -832,7 +833,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
           <div>
             <h2 className="text-2xl font-bold text-primary">Aşama 3 — Taraf Analizi</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. En az 2 taraf analiz edildiğinde Ortak Zemin Raporu üretebilirsiniz.
+              Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. En az 1 taraf analiz edildiğinde Ortak Zemin Raporu üretebilirsiniz.
             </p>
           </div>
           <div className="text-right text-xs space-y-1 min-w-[180px]">
@@ -844,7 +845,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                 ? <div className="text-emerald-600 font-semibold">✓ Ortak Zemin Raporu Hazır</div>
                 : canReport
                   ? <div className="text-muted-foreground">Ortak Zemin Raporu üretilebilir</div>
-                  : <div className="text-muted-foreground">Rapor için en az 2 analiz gerekli</div>}
+                  : <div className="text-muted-foreground">Rapor için en az 1 analiz gerekli</div>}
           </div>
         </div>
       </Card>
@@ -892,8 +893,14 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
         )}
         {!reportLoading && !report && !reportError && (
           <p className="text-sm text-muted-foreground italic">
-            {canReport ? "Henüz rapor üretilmedi. \"Rapor Üret\" butonuna basın." : "En az 2 taraf analiz edildikten sonra rapor üretilebilir."}
+            {canReport ? "Henüz rapor üretilmedi. \"Rapor Üret\" butonuna basın." : "En az 1 taraf analiz edildikten sonra rapor üretilebilir."}
           </p>
+        )}
+        {partialReport && (
+          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 flex items-start gap-2">
+            <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+            <span>Henüz analiz edilmemiş taraf var, rapor eksik olabilir. Tam karşılaştırmalı rapor için tüm tarafları analiz edin.</span>
+          </div>
         )}
         {report && <CommonGroundView data={report.report} strategy={report.strategy} />}
       </Card>
