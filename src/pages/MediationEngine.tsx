@@ -1106,32 +1106,128 @@ function CommonGroundView({ data, strategy }: { data: any; strategy: any }) {
           <ul className="list-disc pl-5 text-sm">{data.red_lines.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
         </AnaSection>
       )}
-      <RiskSummaryCard summary={data.risk_ozeti} />
+      <RiskSummaryCard summary={data.risk_ozeti} sources={data.sources} />
       <SourcesPanel sources={data.sources} />
     </div>
   );
 }
 
-function RiskAnalysisCard({ risk }: { risk?: any }) {
+// ── Standardized risk-level tone helpers (used by every risk-badge/card) ──
+export function normalizeRiskLevel(raw?: string): "low" | "medium" | "high" | "unknown" {
+  const l = String(raw ?? "").toLowerCase();
+  if (l.includes("yük") || l.includes("high")) return "high";
+  if (l.includes("orta") || l.includes("medium") || l.includes("mid")) return "medium";
+  if (l.includes("düş") || l.includes("dus") || l.includes("low")) return "low";
+  return "unknown";
+}
+export function riskContainerTone(raw?: string): string {
+  switch (normalizeRiskLevel(raw)) {
+    case "high": return "border-red-400/50 bg-red-50/60 dark:bg-red-950/20";
+    case "medium": return "border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20";
+    case "low": return "border-emerald-400/50 bg-emerald-50/60 dark:bg-emerald-950/20";
+    default: return "border-border bg-muted/30";
+  }
+}
+export function riskBadgeTone(raw?: string): string {
+  switch (normalizeRiskLevel(raw)) {
+    case "high": return "bg-red-600 text-white";
+    case "medium": return "bg-amber-500 text-white";
+    case "low": return "bg-emerald-600 text-white";
+    default: return "bg-muted text-foreground";
+  }
+}
+
+// Match a knowledge-base source (with excerpt/url) to a name that came back inside kaynak_listesi.
+function matchSource(name: string, sources?: any[]): any | null {
+  if (!Array.isArray(sources) || !name) return null;
+  const norm = (s: string) => String(s ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  const target = norm(name);
+  return sources.find((s: any) => {
+    const t = norm(s?.title);
+    return t && (t === target || t.includes(target) || target.includes(t));
+  }) ?? null;
+}
+
+function SourceChip({ name, source }: { name: string; source: any | null }) {
+  const excerpt = source?.excerpt ? cleanExcerpt(source.excerpt) : "";
+  if (!source) {
+    return (
+      <span className="inline-block text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border">
+        {name}
+      </span>
+    );
+  }
+  return (
+    <HoverCard openDelay={80} closeDelay={100}>
+      <HoverCardTrigger asChild>
+        {source.url ? (
+          <a
+            href={source.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 hover:underline cursor-pointer"
+          >
+            {name}
+          </a>
+        ) : (
+          <span className="inline-block text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 cursor-help">
+            {name}
+          </span>
+        )}
+      </HoverCardTrigger>
+      <HoverCardContent className="w-80 text-xs space-y-1" side="top">
+        <div className="font-semibold">{source.title || name}</div>
+        {source.category && <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{source.category}</div>}
+        {excerpt && <blockquote className="italic border-l-2 pl-2 text-muted-foreground">"{excerpt}"</blockquote>}
+        {typeof source.similarity === "number" && (
+          <div className="text-[10px] text-muted-foreground">benzerlik %{Math.round(source.similarity * 100)}</div>
+        )}
+        {source.url && <div className="text-[10px] text-primary">Kaynağa git ↗</div>}
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
+// Guidance shown when a metric returns "Yeterli veri yok" so the mediator knows how to strengthen the analysis.
+const NEEDS_MORE_DATA = /yeterli\s*veri\s*yok|insufficient|bilinmiyor|—+|^\s*-\s*$/i;
+function isMissing(v: any): boolean {
+  if (v === null || v === undefined) return true;
+  const s = String(v).trim();
+  if (!s) return true;
+  return NEEDS_MORE_DATA.test(s);
+}
+function MissingDataHint({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-2 text-[11px] flex items-start gap-1 rounded border border-dashed border-amber-400/50 bg-amber-50/50 dark:bg-amber-950/10 p-2 text-amber-900 dark:text-amber-200">
+      <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+      <span>{children}</span>
+    </div>
+  );
+}
+
+function RiskAnalysisCard({
+  risk, sources, onRefresh, refreshing,
+}: { risk?: any; sources?: any[]; onRefresh?: () => void; refreshing?: boolean }) {
   if (!risk || typeof risk !== "object") return null;
-  const level = String(risk.risk_puani ?? "").toLowerCase();
-  const tone =
-    level.includes("yük") ? "border-red-400/50 bg-red-50/60 dark:bg-red-950/20"
-    : level.includes("orta") ? "border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20"
-    : level.includes("düş") || level.includes("dus") ? "border-emerald-400/50 bg-emerald-50/60 dark:bg-emerald-950/20"
-    : "border-border bg-muted/30";
-  const badgeTone =
-    level.includes("yük") ? "bg-red-600 text-white"
-    : level.includes("orta") ? "bg-amber-500 text-white"
-    : level.includes("düş") || level.includes("dus") ? "bg-emerald-600 text-white"
-    : "bg-muted text-foreground";
+  const tone = riskContainerTone(risk.risk_puani);
+  const badgeTone = riskBadgeTone(risk.risk_puani);
+  const missingAny =
+    isMissing(risk.uzlasma_orani) || isMissing(risk.mahkeme_riski) || isMissing(risk.tahmini_sure_tasarrufu_ay);
   return (
     <div className={`border rounded-lg p-4 space-y-3 ${tone}`}>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="font-semibold text-sm">📊 Risk Analizi & Anlaşma Oranı</div>
-        {risk.risk_puani && (
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badgeTone}`}>{risk.risk_puani} Risk</span>
-        )}
+        <div className="flex items-center gap-2">
+          {risk.risk_puani && (
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badgeTone}`}>{risk.risk_puani} Risk</span>
+          )}
+          {onRefresh && (
+            <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={onRefresh} disabled={refreshing}>
+              {refreshing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+              Risk Analizini Güncelle
+            </Button>
+          )}
+        </div>
       </div>
       <div className="grid sm:grid-cols-2 gap-2 text-sm">
         <div>
@@ -1151,6 +1247,15 @@ function RiskAnalysisCard({ risk }: { risk?: any }) {
           </div>
         )}
       </div>
+      {missingAny && (
+        <MissingDataHint>
+          <b>Bazı metrikler için yeterli veri bulunamadı.</b> Daha net bir risk analizi için taraf profilinde
+          <span className="mx-1 font-medium">talep tutarı, uyuşmazlık alt türü ve olayın kısa özetini</span>
+          netleştirin; ilgili sözleşme/fatura/yazışma belgelerini <b>.txt</b> veya metin katmanlı PDF olarak yükleyin ve
+          BATNA (dava yolu) ile menfaat/pozisyon ayrımını Aşama 2/3 formunda doldurun. Ardından
+          <b> "Risk Analizini Güncelle"</b> butonuyla yeniden hesaplatın.
+        </MissingDataHint>
+      )}
       {Array.isArray(risk.kritik_faktorler) && risk.kritik_faktorler.filter(Boolean).length > 0 && (
         <div>
           <div className="text-xs font-medium mb-1">Kritik Faktörler</div>
@@ -1165,8 +1270,12 @@ function RiskAnalysisCard({ risk }: { risk?: any }) {
       )}
       {Array.isArray(risk.kaynak_listesi) && risk.kaynak_listesi.filter(Boolean).length > 0 && (
         <div className="text-xs">
-          <span className="font-medium">Kullanılan Kaynaklar: </span>
-          <span className="text-muted-foreground">{risk.kaynak_listesi.filter(Boolean).join(" · ")}</span>
+          <div className="font-medium mb-1">Kullanılan Kaynaklar</div>
+          <div className="flex flex-wrap gap-1">
+            {risk.kaynak_listesi.filter(Boolean).map((name: string, i: number) => (
+              <SourceChip key={i} name={name} source={matchSource(name, sources)} />
+            ))}
+          </div>
         </div>
       )}
       {risk.oneri && (
@@ -1176,19 +1285,12 @@ function RiskAnalysisCard({ risk }: { risk?: any }) {
   );
 }
 
-function RiskSummaryCard({ summary }: { summary?: any }) {
+function RiskSummaryCard({ summary, sources }: { summary?: any; sources?: any[] }) {
   if (!summary || typeof summary !== "object") return null;
-  const level = String(summary.genel_risk_puani ?? "").toLowerCase();
-  const tone =
-    level.includes("yük") ? "border-red-400/50 bg-red-50/60 dark:bg-red-950/20"
-    : level.includes("orta") ? "border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20"
-    : level.includes("düş") || level.includes("dus") ? "border-emerald-400/50 bg-emerald-50/60 dark:bg-emerald-950/20"
-    : "border-border bg-muted/30";
-  const badgeTone =
-    level.includes("yük") ? "bg-red-600 text-white"
-    : level.includes("orta") ? "bg-amber-500 text-white"
-    : level.includes("düş") || level.includes("dus") ? "bg-emerald-600 text-white"
-    : "bg-muted text-foreground";
+  const tone = riskContainerTone(summary.genel_risk_puani);
+  const badgeTone = riskBadgeTone(summary.genel_risk_puani);
+  const missingHeadline =
+    isMissing(summary.genel_uzlasma_orani) && isMissing(summary.genel_risk_puani);
   return (
     <div className={`border rounded-lg p-4 space-y-3 ${tone}`}>
       <div className="flex items-center justify-between">
@@ -1202,11 +1304,23 @@ function RiskSummaryCard({ summary }: { summary?: any }) {
         <span className="font-medium">{summary.genel_uzlasma_orani || "Yeterli veri yok"}</span>
         {summary.genel_uzlasma_orani_kaynak && <span className="text-[11px] text-muted-foreground italic"> ({summary.genel_uzlasma_orani_kaynak})</span>}
       </div>
+      {missingHeadline && (
+        <MissingDataHint>
+          Karşılaştırmalı özet için tarafların risk analizinde eksik alanlar var. Her taraf kartında
+          <b> "Risk Analizini Güncelle"</b> butonuyla analizleri yenileyin; ardından bu raporu
+          <b> "Yeniden Üret"</b> ile tekrar hesaplatın.
+        </MissingDataHint>
+      )}
       {Array.isArray(summary.taraf_karsilastirma) && summary.taraf_karsilastirma.length > 0 && (
         <div className="grid sm:grid-cols-2 gap-2">
           {summary.taraf_karsilastirma.map((t: any, i: number) => (
             <div key={i} className="border rounded p-2 bg-background text-sm">
-              <div className="font-medium">{t.taraf || `Taraf ${i + 1}`} <span className="text-xs text-muted-foreground">— {t.risk_puani}</span></div>
+              <div className="font-medium flex items-center gap-2">
+                <span>{t.taraf || `Taraf ${i + 1}`}</span>
+                {t.risk_puani && (
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${riskBadgeTone(t.risk_puani)}`}>{t.risk_puani}</span>
+                )}
+              </div>
               {t.guclu_yon && <div className="text-xs">✓ {t.guclu_yon}</div>}
               {t.zayif_yon && <div className="text-xs">✗ {t.zayif_yon}</div>}
             </div>
@@ -1227,8 +1341,12 @@ function RiskSummaryCard({ summary }: { summary?: any }) {
       )}
       {Array.isArray(summary.kaynak_listesi) && summary.kaynak_listesi.filter(Boolean).length > 0 && (
         <div className="text-xs">
-          <span className="font-medium">Kullanılan Kaynaklar: </span>
-          <span className="text-muted-foreground">{summary.kaynak_listesi.filter(Boolean).join(" · ")}</span>
+          <div className="font-medium mb-1">Kullanılan Kaynaklar</div>
+          <div className="flex flex-wrap gap-1">
+            {summary.kaynak_listesi.filter(Boolean).map((name: string, i: number) => (
+              <SourceChip key={i} name={name} source={matchSource(name, sources)} />
+            ))}
+          </div>
         </div>
       )}
       {summary.arabulucu_onerisi && (
@@ -1237,6 +1355,7 @@ function RiskSummaryCard({ summary }: { summary?: any }) {
     </div>
   );
 }
+
 
 
 const EXCERPT_MAX = 280;
