@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, BookOpen, CheckCircle2, Clock3, Loader2, RefreshCw, XCircle } from "lucide-react";
+import { AlertTriangle, BookOpen, CheckCircle2, Clock3, Loader2, RefreshCw, Trash2, Upload, XCircle } from "lucide-react";
 
 interface Job {
   id: string;
@@ -148,6 +151,113 @@ export function KnowledgeBaseAdmin() {
   const staleMinutes = running ? minutesSince(job?.updated_at) : null;
   const isStale = staleMinutes !== null && staleMinutes >= 10;
 
+  // --- Manuel kaynak yükleme ---
+  const CATEGORIES = [
+    "kira", "gayrimenkul", "işçi_işveren", "ticari", "tüketici",
+    "sağlık", "fikri_mülkiyet", "inşaat", "sigorta", "bankacılık",
+    "aile", "spor", "enerji_maden", "mevzuat", "genel",
+  ];
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [uploadCategory, setUploadCategory] = useState<string>("genel");
+  const [uploadStage, setUploadStage] = useState<string>("");
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async () => {
+    if (!uploadFile) { toast({ title: "Dosya seçin", variant: "destructive" }); return; }
+    if (!uploadTitle.trim()) { toast({ title: "Kaynak adı zorunludur", variant: "destructive" }); return; }
+    if (uploadFile.size > 20 * 1024 * 1024) { toast({ title: "Dosya 20MB'ı aşamaz", variant: "destructive" }); return; }
+    const name = uploadFile.name.toLowerCase();
+    if (!(name.endsWith(".pdf") || name.endsWith(".docx") || name.endsWith(".txt"))) {
+      toast({ title: "Sadece PDF, DOCX veya TXT kabul edilir", variant: "destructive" }); return;
+    }
+    setUploading(true);
+    setUploadStage("Dosya yükleniyor ve metin çıkarılıyor...");
+    try {
+      const form = new FormData();
+      form.append("file", uploadFile);
+      form.append("title", uploadTitle.trim());
+      form.append("category", uploadCategory);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Oturum bulunamadı");
+      setUploadStage("Chunk oluşturuluyor ve embedding üretiliyor...");
+      const projectUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
+      const res = await fetch(`${projectUrl}/functions/v1/admin-upload-knowledge`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      setUploadStage(`Tamamlandı: ${data.chunks} chunk oluşturuldu ✅`);
+      toast({ title: "Kaynak eklendi", description: `${data.chunks} chunk oluşturuldu.` });
+      setUploadFile(null);
+      setUploadTitle("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      await loadSources();
+    } catch (e: any) {
+      setUploadStage("");
+      toast({ title: "Yükleme başarısız", description: e.message ?? "Bilinmeyen hata", variant: "destructive" });
+    } finally {
+      setUploading(false);
+      setTimeout(() => setUploadStage(""), 4000);
+    }
+  };
+
+  // --- Kaynak listesi ---
+  type SourceRow = { source_title: string; source_url: string | null; category: string; chunk_count: number; latest: string };
+  const [sources, setSources] = useState<SourceRow[]>([]);
+  const [sourcesLoading, setSourcesLoading] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const loadSources = async () => {
+    setSourcesLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("knowledge_base_chunks")
+        .select("source_title, source_url, category, created_at")
+        .order("created_at", { ascending: false })
+        .limit(5000);
+      if (error) throw error;
+      const map = new Map<string, SourceRow>();
+      for (const r of (data ?? []) as any[]) {
+        const key = r.source_url ?? r.source_title;
+        const existing = map.get(key);
+        if (existing) {
+          existing.chunk_count += 1;
+          if (r.created_at > existing.latest) existing.latest = r.created_at;
+        } else {
+          map.set(key, { source_title: r.source_title, source_url: r.source_url, category: r.category, chunk_count: 1, latest: r.created_at });
+        }
+      }
+      setSources(Array.from(map.values()).sort((a, b) => b.latest.localeCompare(a.latest)));
+    } catch (e: any) {
+      console.error(e);
+    } finally {
+      setSourcesLoading(false);
+    }
+  };
+
+  useEffect(() => { loadSources(); }, []);
+
+  const deleteSource = async (row: SourceRow) => {
+    if (!confirm(`"${row.source_title}" kaynağını ve ${row.chunk_count} chunk'ını silmek istediğinize emin misiniz?`)) return;
+    setDeleting(row.source_url ?? row.source_title);
+    try {
+      const body: any = row.source_url ? { source_url: row.source_url } : { source_title: row.source_title };
+      const { data, error } = await supabase.functions.invoke("admin-delete-knowledge", { body });
+      if (error) throw error;
+      toast({ title: "Kaynak silindi", description: `${data?.deleted ?? 0} chunk kaldırıldı.` });
+      await loadSources();
+    } catch (e: any) {
+      toast({ title: "Silme başarısız", description: e.message, variant: "destructive" });
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+
   return (
     <Card>
       <CardHeader>
@@ -256,6 +366,101 @@ export function KnowledgeBaseAdmin() {
             </ul>
           </div>
         )}
+
+        {/* Manuel Kaynak Yükleme */}
+        <div className="mt-4 space-y-3 rounded-md border bg-muted/20 p-4">
+          <div className="flex items-center gap-2 font-medium text-sm">
+            <Upload className="w-4 h-4" /> Manuel Kaynak Yükle
+          </div>
+          <p className="text-xs text-muted-foreground">
+            PDF, DOCX veya TXT (max 20MB). Dosya metni çıkarılıp chunk'lara bölünür, embedding üretilir ve bilgi tabanına eklenir.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="kb-title">Kaynak Adı *</Label>
+              <Input
+                id="kb-title"
+                placeholder="Örn: Kira Yargıtay Kararları 2024"
+                value={uploadTitle}
+                onChange={(e) => setUploadTitle(e.target.value)}
+                disabled={uploading}
+                maxLength={200}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="kb-cat">Kategori *</Label>
+              <Select value={uploadCategory} onValueChange={setUploadCategory} disabled={uploading}>
+                <SelectTrigger id="kb-cat"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="kb-file">Dosya *</Label>
+            <Input
+              id="kb-file"
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+              disabled={uploading}
+            />
+            {uploadFile && (
+              <p className="text-xs text-muted-foreground">{uploadFile.name} · {(uploadFile.size / 1024 / 1024).toFixed(2)} MB</p>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={handleUpload} disabled={uploading || !uploadFile || !uploadTitle.trim()} size="sm">
+              {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+              Yükle ve İşle
+            </Button>
+            {uploadStage && <span className="text-xs text-muted-foreground">{uploadStage}</span>}
+          </div>
+        </div>
+
+        {/* Yüklenmiş Kaynaklar Listesi */}
+        <div className="mt-4 space-y-2 rounded-md border p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">Yüklenmiş Kaynaklar ({sources.length})</div>
+            <Button size="sm" variant="ghost" onClick={loadSources} disabled={sourcesLoading}>
+              {sourcesLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            </Button>
+          </div>
+          {sourcesLoading && sources.length === 0 ? (
+            <div className="text-xs text-muted-foreground">Yükleniyor...</div>
+          ) : sources.length === 0 ? (
+            <div className="text-xs text-muted-foreground">Henüz kaynak yüklenmemiş.</div>
+          ) : (
+            <ul className="divide-y max-h-80 overflow-y-auto">
+              {sources.map((s) => {
+                const key = s.source_url ?? s.source_title;
+                return (
+                  <li key={key} className="flex items-start justify-between gap-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium text-sm">{s.source_title}</div>
+                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-0.5">
+                        <Badge variant="outline" className="text-[10px]">{s.category}</Badge>
+                        <span>{s.chunk_count} chunk</span>
+                        <span>· {formatDate(s.latest)}</span>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => deleteSource(s)}
+                      disabled={deleting === key}
+                      className="text-destructive hover:text-destructive shrink-0"
+                    >
+                      {deleting === key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
