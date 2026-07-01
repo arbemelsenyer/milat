@@ -943,7 +943,13 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                   {/* Analysis result */}
                   {a && (
                     <div className="space-y-2">
-                      <RiskAnalysisCard risk={an.risk_analizi ?? (a as any).risk_analizi} />
+                      <RiskAnalysisCard
+                        risk={an.risk_analizi ?? (a as any).risk_analizi}
+                        sources={an.sources}
+                        onRefresh={() => runAnalysis(p.id)}
+                        refreshing={analysing === p.id}
+                      />
+
                       {an.dispute_area && (
                         <AnaSection icon="🔍" title="Uyuşmazlık Türü">
 
