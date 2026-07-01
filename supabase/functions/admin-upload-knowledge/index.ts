@@ -28,22 +28,42 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// Türkçe karakterleri koruyarak sadece geçersiz kontrol karakterlerini ve
+// bozuk surrogate çiftlerini temizler. Postgres text sütunları \u0000 kabul etmez;
+// lone surrogate'lar ise JSON.stringify sırasında geçersiz UTF-16 üretir.
+function sanitizeUnicode(input: string): string {
+  if (!input) return "";
+  let s = input;
+  // NUL ve C0 kontrol karakterleri (TAB, LF, CR hariç)
+  s = s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ");
+  // Lone (eşleşmemiş) surrogate'lar
+  s = s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, "");
+  s = s.replace(/(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "$1");
+  // Zero-width / BOM
+  s = s.replace(/[\uFEFF\u200B\u200C\u200D]/g, "");
+  // Encode/decode roundtrip: geçersiz UTF-8'i ayıklar, Türkçe karakterler korunur
+  try {
+    s = new TextDecoder("utf-8", { fatal: false }).decode(new TextEncoder().encode(s));
+  } catch { /* yoksay */ }
+  return s;
+}
+
 function chunkText(text: string, target = 1800, overlap = 150): string[] {
-  const clean = text.replace(/\s+/g, " ").trim();
+  const clean = sanitizeUnicode(text).replace(/\s+/g, " ").trim();
   if (!clean) return [];
   const sentences = clean.split(/(?<=[.!?])\s+/);
   const chunks: string[] = [];
   let cur = "";
   for (const s of sentences) {
     if ((cur + " " + s).length > target && cur) {
-      chunks.push(cur.trim());
+      chunks.push(sanitizeUnicode(cur.trim()));
       const tail = cur.slice(Math.max(0, cur.length - overlap));
       cur = tail + " " + s;
     } else {
       cur = cur ? cur + " " + s : s;
     }
   }
-  if (cur.trim()) chunks.push(cur.trim());
+  if (cur.trim()) chunks.push(sanitizeUnicode(cur.trim()));
   return chunks.filter((c) => c.length > 200);
 }
 
