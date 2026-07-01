@@ -314,7 +314,6 @@ export type Database = {
           gsm: string | null
           id: string
           invite_status: string
-          invite_token: string | null
           is_individual: boolean
           last_name: string | null
           organization: string | null
@@ -342,7 +341,6 @@ export type Database = {
           gsm?: string | null
           id?: string
           invite_status?: string
-          invite_token?: string | null
           is_individual?: boolean
           last_name?: string | null
           organization?: string | null
@@ -370,7 +368,6 @@ export type Database = {
           gsm?: string | null
           id?: string
           invite_status?: string
-          invite_token?: string | null
           is_individual?: boolean
           last_name?: string | null
           organization?: string | null
