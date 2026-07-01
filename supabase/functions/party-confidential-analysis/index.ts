@@ -103,11 +103,19 @@ Deno.serve(async (req) => {
     const ragQuery = [caseRow?.title, caseRow?.dispute_type, caseRow?.dispute_subtype, caseRow?.issue_description]
       .filter(Boolean).join(" — ");
     const ragCategory = mapDisputeToCategory(caseRow?.dispute_type, caseRow?.dispute_subtype);
-    const { block: ragBlock, sources: ragSources } = await fetchKnowledgeBlock(admin, apiKey, ragQuery, ragCategory);
+    const { block: ragBlock, sources: ragSources, embedding: queryEmb } = await fetchKnowledgeBlock(admin, apiKey, ragQuery, ragCategory);
+    const { block: similarBlock, matches: similarMatches } = await fetchSimilarCases(admin, queryEmb, ragCategory);
 
-    const systemPrompt = `Sen bir Türk hukuk arabuluculuk uzmanı AI'sın. Bu tarafın perspektifinden detaylı bir analiz hazırlıyorsun. 
-Otomatik olarak: (1) niş hukuki alanı tespit et, (2) ilgili mevzuat ve Yargıtay/BAM emsallerini tara, (3) tarafın pozisyon/ihtiyaç/BATNA analizini yap, (4) yüklenen belgelerden somut bulgular çıkar. Sana verilen "İLGİLİ KAYNAK BİLGİSİ" bloklarından yararlan, alakalıysa kaynak adını parantez içinde göster.
-Çıktı YALNIZCA JSON: {"dispute_area":"","legal_framework":{"statutes":[],"precedents":[{"court":"","decision":"","relevance":""}]},"document_findings":[],"party_position":{"strengths":[],"weaknesses":[],"interests":[],"batna":"","watna":""},"risks":[],"opportunities":[],"discovery_questions":[{"id":1,"question":""}]} — tam 5 ihtiyaç tespiti sorusu üret.`;
+    const systemPrompt = `Sen bir Türk hukuk arabuluculuk uzmanı AI'sın. Bu tarafın perspektifinden detaylı bir analiz hazırlıyorsun.
+Otomatik olarak: (1) niş hukuki alanı tespit et, (2) ilgili mevzuat ve Yargıtay/BAM emsallerini tara, (3) tarafın pozisyon/ihtiyaç/BATNA analizini yap, (4) yüklenen belgelerden somut bulgular çıkar. Sana verilen "İLGİLİ KAYNAK BİLGİSİ" ve "BENZER GEÇMİŞ DAVALAR" bloklarından yararlan, alakalıysa kaynak adını parantez içinde göster.
+
+SON ADIM — RİSK ANALİZİ & ANLAŞMA ORANI:
+A) "İLGİLİ KAYNAK BİLGİSİ" bloklarını tara: bu alanda uzlaşma istatistiği/Yargıtay eğilimi/uzlaşma engeli var mı?
+B) "BENZER GEÇMİŞ DAVALAR" bloklarına bak: benzer davalar nasıl sonuçlanmış?
+C) Bu iki kaynaktan + tarafın mevcut durumundan (BATNA, belge güç durumu, ZOPA, ihtiyaç/pozisyon uyumu) risk_analizi üret.
+KESİN KURAL: Sabit/uydurma % ASLA verme. Kaynak yoksa "Yeterli veri yok" yaz. Verdiğin her % için kaynağını belirt.
+
+Çıktı YALNIZCA JSON: {"dispute_area":"","legal_framework":{"statutes":[],"precedents":[{"court":"","decision":"","relevance":""}]},"document_findings":[],"party_position":{"strengths":[],"weaknesses":[],"interests":[],"batna":"","watna":""},"risks":[],"opportunities":[],"discovery_questions":[{"id":1,"question":""}],"risk_analizi":{"uzlasma_orani":"","uzlasma_orani_kaynak":"","risk_puani":"Düşük|Orta|Yüksek","mahkeme_riski":"","mahkeme_riski_kaynak":"","tahmini_sure_tasarrufu_ay":"","kritik_faktorler":["","",""],"uzlasma_engelleri":["",""],"kaynak_listesi":[],"oneri":""}} — tam 5 ihtiyaç tespiti sorusu üret.`;
 
     const userPrompt = `UYUŞMAZLIK TÜRÜ: ${caseRow?.dispute_type ?? ""} / ${caseRow?.dispute_subtype ?? ""}
 BAŞLIK: ${caseRow?.title ?? ""}
