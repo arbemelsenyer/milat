@@ -394,19 +394,171 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }
 
 function Phase1Summary({ caseRow }: { caseRow: CaseRow }) {
   return (
+    <div className="space-y-4">
+      <Card className="p-6 space-y-3">
+        <h2 className="text-2xl font-bold text-primary">Aşama 1 — Başvuru Özeti</h2>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div><span className="text-muted-foreground">Sistem No:</span> <b className="font-mono">{caseRow.application_no}</b></div>
+          <div><span className="text-muted-foreground">Başlık:</span> {caseRow.title}</div>
+          <div><span className="text-muted-foreground">Uyuşmazlık Türü:</span> {caseRow.dispute_type || <span className="italic text-muted-foreground">Aşağıdaki karttan otomatik tespit edilebilir</span>}</div>
+          <div><span className="text-muted-foreground">Tarih:</span> {caseRow.application_date ? new Date(caseRow.application_date).toLocaleDateString("tr-TR") : new Date(caseRow.created_at).toLocaleDateString("tr-TR")}</div>
+          <div><span className="text-muted-foreground">Durum:</span> {caseRow.status}</div>
+          <div><span className="text-muted-foreground">UYAP Kayıt No:</span> {caseRow.uyap_no || <span className="italic text-muted-foreground">Henüz kaydedilmedi</span>}</div>
+        </div>
+        <p className="text-xs text-muted-foreground border-t pt-3">
+          UYAP Kayıt Numarası, başvuru resmi sisteme kaydedildiğinde Aşama 4 (Arabulucu Paneli) üzerinden eklenebilir.
+        </p>
+      </Card>
+      <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} autoRun />
+    </div>
+  );
+}
+
+/* ============ DISPUTE CLASSIFIER (AI tür tespiti) ============ */
+
+const DISPUTE_CATEGORIES: { value: string; label: string }[] = [
+  { value: "işçi_işveren", label: "İşçi–İşveren" },
+  { value: "ticari", label: "Ticari" },
+  { value: "tüketici", label: "Tüketici" },
+  { value: "sağlık", label: "Sağlık" },
+  { value: "fikri_mülkiyet", label: "Fikri Mülkiyet" },
+  { value: "inşaat", label: "İnşaat" },
+  { value: "sigorta", label: "Sigorta" },
+  { value: "bankacılık", label: "Bankacılık" },
+  { value: "aile", label: "Aile" },
+  { value: "spor", label: "Spor" },
+  { value: "enerji_maden", label: "Enerji & Maden" },
+  { value: "kira", label: "Kira" },
+  { value: "gayrimenkul", label: "Gayrimenkul" },
+  { value: "genel", label: "Genel" },
+];
+function catLabel(v?: string | null) {
+  return DISPUTE_CATEGORIES.find((c) => c.value === v)?.label ?? v ?? "—";
+}
+
+function DisputeClassifierCard({
+  caseRow, initialText, autoRun = false,
+}: { caseRow: CaseRow; initialText: string; autoRun?: boolean }) {
+  const [text, setText] = useState(initialText || caseRow.title || "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ kategori: string; guven_skoru: number; gerekce: string; ilgili_kanun: string[] } | null>(null);
+  const [manual, setManual] = useState<string>(caseRow.dispute_type ?? "");
+  const [savingManual, setSavingManual] = useState(false);
+  const ranRef = useRef(false);
+
+  const runClassify = useCallback(async (input: string) => {
+    const q = (input ?? "").trim();
+    if (q.length < 5) { setError("Sınıflandırma için en az 5 karakter gerekli."); return; }
+    setBusy(true); setError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("classify-dispute", {
+        body: { case_id: caseRow.id, text: q, persist: true },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setResult(data as any);
+      setManual((data as any).kategori);
+      toast({ title: "Tür tespiti tamamlandı", description: `${catLabel((data as any).kategori)} · %${(data as any).guven_skoru}` });
+    } catch (e: any) {
+      setError(e?.message ?? "Sınıflandırılamadı.");
+    } finally { setBusy(false); }
+  }, [caseRow.id]);
+
+  useEffect(() => {
+    if (!autoRun || ranRef.current) return;
+    if (caseRow.dispute_type) return; // already classified
+    if ((initialText ?? "").trim().length < 10) return;
+    ranRef.current = true;
+    runClassify(initialText);
+  }, [autoRun, caseRow.dispute_type, initialText, runClassify]);
+
+  async function saveManual(value: string) {
+    setSavingManual(true);
+    try {
+      const { error } = await supabase.from("cases").update({ dispute_type: value } as any).eq("id", caseRow.id);
+      if (error) throw error;
+      setManual(value);
+      toast({ title: "Alan güncellendi", description: catLabel(value) });
+    } catch (e: any) {
+      toast({ title: "Güncellenemedi", description: trErr(e?.message ?? ""), variant: "destructive" });
+    } finally { setSavingManual(false); }
+  }
+
+  const lowConfidence = result && result.guven_skoru < 60;
+  const currentCat = manual || caseRow.dispute_type || result?.kategori || "";
+
+  return (
     <Card className="p-6 space-y-3">
-      <h2 className="text-2xl font-bold text-primary">Aşama 1 — Başvuru Özeti</h2>
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        <div><span className="text-muted-foreground">Sistem No:</span> <b className="font-mono">{caseRow.application_no}</b></div>
-        <div><span className="text-muted-foreground">Başlık:</span> {caseRow.title}</div>
-        <div><span className="text-muted-foreground">Uyuşmazlık Türü:</span> {caseRow.dispute_type || <span className="italic text-muted-foreground">AI tarafından Aşama 3'te tespit edilecek</span>}</div>
-        <div><span className="text-muted-foreground">Tarih:</span> {caseRow.application_date ? new Date(caseRow.application_date).toLocaleDateString("tr-TR") : new Date(caseRow.created_at).toLocaleDateString("tr-TR")}</div>
-        <div><span className="text-muted-foreground">Durum:</span> {caseRow.status}</div>
-        <div><span className="text-muted-foreground">UYAP Kayıt No:</span> {caseRow.uyap_no || <span className="italic text-muted-foreground">Henüz kaydedilmedi</span>}</div>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" /> AI Uyuşmazlık Türü Tespiti
+        </h3>
+        <Button size="sm" onClick={() => runClassify(text)} disabled={busy}>
+          {busy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Analiz…</> : <><RefreshCw className="h-4 w-4 mr-1" /> {result ? "Yeniden Sınıflandır" : "Sınıflandır"}</>}
+        </Button>
       </div>
-      <p className="text-xs text-muted-foreground border-t pt-3">
-        UYAP Kayıt Numarası, başvuru resmi sisteme kaydedildiğinde Aşama 4 (Arabulucu Paneli) üzerinden eklenebilir.
-      </p>
+      <div>
+        <Label className="text-xs">Uyuşmazlık metni (başlık + kısa açıklama)</Label>
+        <Textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={3}
+          placeholder="Örn: Kiracı 4 aydır kira ödemiyor, tahliye ve birikmiş kira talep ediliyor."
+        />
+      </div>
+
+      {error && (
+        <div className="text-xs text-destructive flex items-center gap-1">
+          <AlertTriangle className="h-3 w-3" /> {error}
+        </div>
+      )}
+
+      {(result || caseRow.dispute_type) && (
+        <div className="border rounded-md p-3 space-y-2 bg-muted/30">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="text-sm">
+              <div>📋 <b>Tespit Edilen Alan:</b> {catLabel(currentCat)}</div>
+              {result && (
+                <>
+                  <div className="text-xs text-muted-foreground">Güven: %{result.guven_skoru}</div>
+                  {result.gerekce && <div className="text-xs mt-1"><span className="text-muted-foreground">Gerekçe:</span> {result.gerekce}</div>}
+                  {result.ilgili_kanun?.length > 0 && (
+                    <div className="text-xs mt-1">
+                      <span className="text-muted-foreground">Dayanak:</span> {result.ilgili_kanun.join(", ")}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="min-w-[200px]">
+              <Label className="text-[11px] text-muted-foreground">Değiştir</Label>
+              <Select value={manual || undefined} onValueChange={saveManual} disabled={savingManual}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Manuel seç…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DISPUTE_CATEGORIES.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {lowConfidence && (
+            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 flex items-start gap-1">
+              <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+              AI bu konuyu %{result!.guven_skoru} güvenle sınıflandırdı. Lütfen doğru alanı manuel seçin.
+            </div>
+          )}
+        </div>
+      )}
+
+      {!result && !caseRow.dispute_type && !busy && (
+        <p className="text-xs text-muted-foreground italic">
+          Metni yazıp "Sınıflandır" butonuna basın; AI, Türk hukuku ve bilgi tabanı kaynaklarına göre alanı tespit edecek.
+        </p>
+      )}
     </Card>
   );
 }
