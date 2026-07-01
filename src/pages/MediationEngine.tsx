@@ -24,6 +24,22 @@ import {
 } from "lucide-react";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
+import { Phase3ErrorBoundary } from "@/components/mediation/Phase3ErrorBoundary";
+
+// Safely coerce any AI-returned value into a renderable string. Prevents
+// "Objects are not valid as a React child" crashes when the model returns an
+// object/array where we expected a scalar.
+function safeText(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  try { return JSON.stringify(v); } catch { return String(v); }
+}
+// Coerce arrays of strings — items may occasionally be objects.
+function safeList(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.map(safeText).filter((s) => s.trim().length > 0);
+}
 
 const DISPUTE_TYPES = [
   "İşçi-İşveren",
