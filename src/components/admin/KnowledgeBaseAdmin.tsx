@@ -93,6 +93,28 @@ export function KnowledgeBaseAdmin() {
     return () => { cancelled = true; clearInterval(t); };
   }, []);
 
+  const [legalRunning, setLegalRunning] = useState(false);
+  const [legalResult, setLegalResult] = useState<any>(null);
+
+  const runLegalKnowledge = async () => {
+    setLegalRunning(true);
+    setLegalResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("build-legal-knowledge", { body: {} });
+      if (error) throw error;
+      setLegalResult(data);
+      const ok = (data?.results ?? []).filter((r: any) => r.ok).length;
+      toast({
+        title: "Mevzuat & tarife eklendi",
+        description: `${ok}/${data?.total_sources ?? 0} kaynak · ${data?.total_chunks ?? 0} chunk · 2026 tarifesinden ${data?.tarife_kalem_sayisi ?? 0} kalem çıkarıldı.`,
+      });
+    } catch (e: any) {
+      toast({ title: "Hata", description: e.message ?? "İşlem başarısız", variant: "destructive" });
+    } finally {
+      setLegalRunning(false);
+    }
+  };
+
   const [retrying, setRetrying] = useState(false);
 
   const start = async (mode: "all" | "test" | "retry" = "all") => {
