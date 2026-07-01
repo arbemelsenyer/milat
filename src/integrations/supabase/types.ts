@@ -497,12 +497,24 @@ export type Database = {
           category: string | null
           created_at: string
           current_phase: number
+          deadline_conflict: boolean | null
+          deadline_conflict_note: string | null
+          deadline_detected_at: string | null
+          deadline_extended: string | null
+          deadline_sources: Json | null
+          deadline_total: string | null
+          deadline_warning_sent: boolean
           desired_outcome: string | null
           dispute_subtype: string | null
           dispute_type: string | null
           dispute_type_other: string | null
+          extension_days: number | null
+          extension_used: boolean
           id: string
+          is_mandatory: boolean | null
           issue_description: string | null
+          legal_basis: string | null
+          legal_duration_days: number | null
           open_to_compromise: boolean | null
           other_party_name: string | null
           other_party_role: string | null
@@ -529,12 +541,24 @@ export type Database = {
           category?: string | null
           created_at?: string
           current_phase?: number
+          deadline_conflict?: boolean | null
+          deadline_conflict_note?: string | null
+          deadline_detected_at?: string | null
+          deadline_extended?: string | null
+          deadline_sources?: Json | null
+          deadline_total?: string | null
+          deadline_warning_sent?: boolean
           desired_outcome?: string | null
           dispute_subtype?: string | null
           dispute_type?: string | null
           dispute_type_other?: string | null
+          extension_days?: number | null
+          extension_used?: boolean
           id?: string
+          is_mandatory?: boolean | null
           issue_description?: string | null
+          legal_basis?: string | null
+          legal_duration_days?: number | null
           open_to_compromise?: boolean | null
           other_party_name?: string | null
           other_party_role?: string | null
@@ -561,12 +585,24 @@ export type Database = {
           category?: string | null
           created_at?: string
           current_phase?: number
+          deadline_conflict?: boolean | null
+          deadline_conflict_note?: string | null
+          deadline_detected_at?: string | null
+          deadline_extended?: string | null
+          deadline_sources?: Json | null
+          deadline_total?: string | null
+          deadline_warning_sent?: boolean
           desired_outcome?: string | null
           dispute_subtype?: string | null
           dispute_type?: string | null
           dispute_type_other?: string | null
+          extension_days?: number | null
+          extension_used?: boolean
           id?: string
+          is_mandatory?: boolean | null
           issue_description?: string | null
+          legal_basis?: string | null
+          legal_duration_days?: number | null
           open_to_compromise?: boolean | null
           other_party_name?: string | null
           other_party_role?: string | null
