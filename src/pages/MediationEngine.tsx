@@ -382,7 +382,7 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }
   switch (phase) {
     case 1: return <Phase1Summary caseRow={caseRow} />;
     case 2: return <Phase2Parties caseRow={caseRow} isMediator={isMediator} userId={userId} onDone={() => { bumpPhase(3); onAdvance(3); }} />;
-    case 3: return <Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} onAdvance={onAdvance} bumpPhase={bumpPhase} />;
+    case 3: return <Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} onAdvance={onAdvance} bumpPhase={bumpPhase} /></Phase3ErrorBoundary>;
     case 4: return <Phase4Summary caseRow={caseRow} />;
     case 5: return <SessionScheduler caseId={caseRow.id} />;
     case 6: return <Phase7Expert caseRow={caseRow} />;
