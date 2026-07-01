@@ -14,7 +14,6 @@ type Mediator = {
   total_cases: number;
   success_rate: number;
   avg_resolution_days: number;
-  hourly_rate: number;
   languages: string[];
   bio: string | null;
   rating: number;
@@ -32,7 +31,6 @@ export function MediatorMarketplace({ niche, onSelect }: Props) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [lang, setLang] = useState<string>("");
-  const [maxRate, setMaxRate] = useState<string>("");
   const [onlyAvail, setOnlyAvail] = useState(true);
 
   useEffect(() => {
@@ -40,18 +38,18 @@ export function MediatorMarketplace({ niche, onSelect }: Props) {
       setLoading(true);
       const { data, error } = await supabase
         .from("mediators")
-        .select("*")
+        .select("id, full_name, photo_url, specializations, total_cases, success_rate, avg_resolution_days, languages, bio, rating, is_available, city")
         .order("rating", { ascending: false });
       if (!error && data) setMediators(data as Mediator[]);
       setLoading(false);
     })();
   }, []);
 
+
   const filtered = useMemo(() => {
     return mediators.filter((m) => {
       if (onlyAvail && !m.is_available) return false;
       if (lang && !m.languages.includes(lang)) return false;
-      if (maxRate && m.hourly_rate > Number(maxRate)) return false;
       if (niche && m.specializations.length && !m.specializations.some((s) => s.toLowerCase().includes(niche.toLowerCase()))) {
         // soft filter — keep if niche unknown
       }
@@ -61,12 +59,12 @@ export function MediatorMarketplace({ niche, onSelect }: Props) {
       }
       return true;
     });
-  }, [mediators, search, lang, maxRate, onlyAvail, niche]);
+  }, [mediators, search, lang, onlyAvail, niche]);
 
   return (
     <div className="space-y-4">
       <Card className="p-4">
-        <div className="grid sm:grid-cols-4 gap-3">
+        <div className="grid sm:grid-cols-3 gap-3">
           <Input placeholder="Ara: isim veya uzmanlık" value={search} onChange={(e) => setSearch(e.target.value)} />
           <select className="h-10 rounded-md border bg-background px-3 text-sm" value={lang} onChange={(e) => setLang(e.target.value)}>
             <option value="">Tüm Diller</option>
@@ -74,7 +72,6 @@ export function MediatorMarketplace({ niche, onSelect }: Props) {
             <option value="EN">İngilizce</option>
             <option value="AR">Arapça</option>
           </select>
-          <Input type="number" placeholder="Max ücret (₺)" value={maxRate} onChange={(e) => setMaxRate(e.target.value)} />
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={onlyAvail} onChange={(e) => setOnlyAvail(e.target.checked)} />
             Sadece müsait olanlar
@@ -118,7 +115,7 @@ export function MediatorMarketplace({ niche, onSelect }: Props) {
                 <div className="flex items-center gap-1.5"><Globe className="h-3 w-3" /> {m.languages.join(", ")}</div>
               </div>
               <div className="flex items-center justify-between pt-2 border-t gap-2">
-                <span className="font-semibold">{Number(m.hourly_rate).toLocaleString("tr-TR")} ₺/saat</span>
+                <span className="text-xs text-muted-foreground">Ücret için iletişime geçin</span>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" asChild>
                     <a href={`/mediator/${m.id}`}>Profil</a>

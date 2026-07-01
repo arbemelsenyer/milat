@@ -46,7 +46,7 @@ export default function MediatorDetail() {
   useEffect(() => {
     if (!id) return;
     (async () => {
-      const { data: m } = await supabase.from("mediators").select("*").eq("id", id).maybeSingle();
+      const { data: m } = await supabase.from("mediators").select("id, user_id, full_name, photo_url, specializations, total_cases, success_rate, avg_resolution_days, languages, bio, rating, city, is_available").eq("id", id).maybeSingle();
       setMediator(m as Mediator | null);
 
       const { data: av } = await supabase
@@ -187,12 +187,8 @@ export default function MediatorDetail() {
                         <MapPin className="h-4 w-4" /> {mediator.city}
                       </span>
                     )}
-                    {mediator.hourly_rate != null && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" /> {mediator.hourly_rate} TL/saat
-                      </span>
-                    )}
                   </div>
+
                 </div>
               </div>
 
