@@ -241,7 +241,23 @@ export function KnowledgeBaseAdmin() {
             )}
           </div>
         )}
+        {legalResult && (
+          <div className="space-y-2 rounded-md border bg-muted/30 p-3 text-sm">
+            <div className="font-medium">Mevzuat & Tarife sonucu</div>
+            <div className="text-xs text-muted-foreground">
+              {legalResult.total_chunks} chunk · 2026 tarifesinden {legalResult.tarife_kalem_sayisi ?? 0} kalem parse edildi.
+            </div>
+            <ul className="space-y-1 text-xs">
+              {(legalResult.results ?? []).map((r: any, i: number) => (
+                <li key={i} className={r.ok ? "text-foreground" : "text-destructive"}>
+                  {r.ok ? "✓" : "✗"} {r.title} {r.ok ? `— ${r.chunks} chunk${r.kalemler != null ? `, ${r.kalemler} kalem` : ""}` : `— ${r.error}`}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
+
