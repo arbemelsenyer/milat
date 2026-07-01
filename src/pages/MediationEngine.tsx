@@ -640,13 +640,14 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   }, [caseRow.id]);
 
   const loadAll = useCallback(async () => {
+    setLoadError(null);
     try {
       const [p, d, a] = await Promise.all([
         supabase.from("case_parties").select("*").eq("case_id", caseRow.id).order("created_at"),
         supabase.from("case_documents").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }),
         supabase.from("party_analyses").select("*").eq("case_id", caseRow.id),
       ]);
-      if (p.error) console.error("[loadAll parties]", p.error);
+      if (p.error) { console.error("[loadAll parties]", p.error); throw p.error; }
       if (d.error) console.error("[loadAll docs]", d.error);
       if (a.error) console.error("[loadAll analyses]", a.error);
       setParties(Array.isArray(p.data) ? p.data : []);
@@ -654,7 +655,10 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
       setAnalyses(Array.isArray(a.data) ? a.data : []);
     } catch (e: any) {
       console.error("[loadAll] fatal", e);
+      setLoadError(e?.message ?? "Bilinmeyen hata");
       toast({ title: "Veriler yüklenemedi", description: e?.message ?? "Bilinmeyen hata", variant: "destructive" });
+    } finally {
+      setInitialLoading(false);
     }
     await fetchReport();
   }, [caseRow.id, fetchReport]);
