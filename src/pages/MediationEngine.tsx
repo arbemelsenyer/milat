@@ -252,9 +252,10 @@ export default function MediationEngine() {
             ) : (
               <div className="space-y-2">
                 {cases.map((c) => (
-                  <button key={c.id} onClick={() => openCase(c.id, c.current_phase || 1)}
-                    className="w-full text-left p-4 rounded-lg border hover:bg-accent/10 transition">
-                    <div className="flex items-center justify-between">
+                  <div key={c.id}
+                    className="w-full p-4 rounded-lg border hover:bg-accent/10 transition flex items-center justify-between gap-2">
+                    <button onClick={() => openCase(c.id, c.current_phase || 1)}
+                      className="flex-1 text-left flex items-center justify-between gap-2">
                       <div>
                         <div className="font-medium">{c.title || "(başlıksız)"}</div>
                         <div className="text-sm text-muted-foreground">
@@ -262,8 +263,16 @@ export default function MediationEngine() {
                         </div>
                       </div>
                       <Badge variant="secondary">{c.status ?? "active"}</Badge>
-                    </div>
-                  </button>
+                    </button>
+                    <Button
+                      variant="ghost" size="icon"
+                      aria-label="Başvuruyu sil"
+                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 ))}
               </div>
             )}
