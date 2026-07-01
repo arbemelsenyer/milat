@@ -1290,30 +1290,30 @@ function RiskAnalysisCard({
           <b> "Risk Analizini Güncelle"</b> butonuyla yeniden hesaplatın.
         </MissingDataHint>
       )}
-      {Array.isArray(risk.kritik_faktorler) && risk.kritik_faktorler.filter(Boolean).length > 0 && (
+      {safeList(risk.kritik_faktorler).length > 0 && (
         <div>
           <div className="text-xs font-medium mb-1">Kritik Faktörler</div>
-          <ul className="list-disc pl-5 text-sm">{risk.kritik_faktorler.filter(Boolean).map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+          <ul className="list-disc pl-5 text-sm">{safeList(risk.kritik_faktorler).map((s, i) => <li key={i}>{s}</li>)}</ul>
         </div>
       )}
-      {Array.isArray(risk.uzlasma_engelleri) && risk.uzlasma_engelleri.filter(Boolean).length > 0 && (
+      {safeList(risk.uzlasma_engelleri).length > 0 && (
         <div>
           <div className="text-xs font-medium mb-1">Uzlaşma Engelleri</div>
-          <ul className="list-disc pl-5 text-sm">{risk.uzlasma_engelleri.filter(Boolean).map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+          <ul className="list-disc pl-5 text-sm">{safeList(risk.uzlasma_engelleri).map((s, i) => <li key={i}>{s}</li>)}</ul>
         </div>
       )}
-      {Array.isArray(risk.kaynak_listesi) && risk.kaynak_listesi.filter(Boolean).length > 0 && (
+      {safeList(risk.kaynak_listesi).length > 0 && (
         <div className="text-xs">
           <div className="font-medium mb-1">Kullanılan Kaynaklar</div>
           <div className="flex flex-wrap gap-1">
-            {risk.kaynak_listesi.filter(Boolean).map((name: string, i: number) => (
+            {safeList(risk.kaynak_listesi).map((name, i) => (
               <SourceChip key={i} name={name} source={matchSource(name, sources)} />
             ))}
           </div>
         </div>
       )}
       {risk.oneri && (
-        <div className="text-sm border-l-2 border-primary/40 pl-2 italic">{risk.oneri}</div>
+        <div className="text-sm border-l-2 border-primary/40 pl-2 italic">{safeText(risk.oneri)}</div>
       )}
     </div>
   );
