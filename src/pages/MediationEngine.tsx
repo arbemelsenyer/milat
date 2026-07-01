@@ -1004,6 +1004,19 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                     </div>
                   )}
 
+                  {!a && analysing !== p.id && !analysisError && (
+                    <div className="text-xs text-muted-foreground italic flex items-start gap-1 p-2 border border-dashed rounded">
+                      <Circle className="h-3 w-3 mt-0.5" />
+                      Analiz henüz yapılmadı. {partyDocs.length === 0 ? "Önce belge yükleyin, ardından" : ""} “Analiz Başlat” butonuna basın.
+                    </div>
+                  )}
+                  {analysing === p.id && (
+                    <div className="text-xs text-muted-foreground flex items-center gap-2 p-2 border rounded bg-muted/30">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Analiz yapılıyor, lütfen bekleyin…
+                    </div>
+                  )}
+
+
                   {/* Analysis result */}
                   {a && (
                     <div className="space-y-2">
