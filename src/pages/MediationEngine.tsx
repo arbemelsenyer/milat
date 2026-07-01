@@ -107,7 +107,25 @@ function emptyParty(role: PartyDraft["party_role"] = "applicant"): PartyDraft {
 }
 
 function trErr(msg: string) {
-  return msg || "Bilinmeyen hata. Lütfen tekrar deneyin.";
+  const m = (msg || "").toLowerCase();
+  if (!msg) return "Bilinmeyen hata. Lütfen tekrar deneyin.";
+  if (
+    m.includes("row-level security") ||
+    m.includes("row level security") ||
+    m.includes(" rls") ||
+    m.includes("permission denied") ||
+    m.includes("not authorized") ||
+    m.includes("42501")
+  ) {
+    return "Bu işlem için yetkiniz yok. Sadece başvuru sahibi, atanmış arabulucu veya yönetici silebilir.";
+  }
+  if (m.includes("jwt") || m.includes("not authenticated") || m.includes("invalid token")) {
+    return "Oturumunuz sona ermiş olabilir. Lütfen tekrar giriş yapın.";
+  }
+  if (m.includes("failed to fetch") || m.includes("networkerror") || m.includes("network request")) {
+    return "Bağlantı hatası. İnternet bağlantınızı kontrol edip tekrar deneyin.";
+  }
+  return msg;
 }
 
 export default function MediationEngine() {
@@ -131,8 +149,36 @@ export default function MediationEngine() {
       const { error, count } = await supabase
         .from("cases").delete({ count: "exact" }).eq("id", c.id);
       if (error) throw error;
-      if (!count) throw new Error("Bu başvuruyu silme yetkiniz yok.");
-      toast({ title: "Başvuru silindi" });
+      if (!count) {
+        throw new Error(
+          "Silme işlemi başarısız. Bu başvuruyu silme yetkiniz yok veya başvuru zaten silinmiş olabilir."
+        );
+      }
+
+      // Cascade doğrulaması: bağlı kayıtların gerçekten silindiğini kontrol et
+      const childTables = [
+        "case_parties", "case_documents", "party_analyses",
+        "common_ground_reports", "case_sessions", "negotiation_rounds",
+      ] as const;
+      const checks = await Promise.all(
+        childTables.map((t) =>
+          supabase.from(t as any).select("id", { count: "exact", head: true }).eq("case_id", c.id)
+        )
+      );
+      const remaining = checks
+        .map((r, i) => ({ table: childTables[i], n: r.count ?? 0 }))
+        .filter((x) => x.n > 0);
+      if (remaining.length > 0) {
+        console.warn("Cascade delete incomplete:", remaining);
+        toast({
+          title: "Silme kısmen tamamlandı",
+          description: `Bazı bağlı kayıtlar kaldı: ${remaining.map((x) => x.table).join(", ")}. Yönetici ile iletişime geçin.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Başvuru silindi", description: "Başvuru ve tüm bağlı kayıtlar başarıyla silindi." });
+      }
+
       setCases((prev) => prev.filter((x) => x.id !== c.id));
       setDeleteTarget(null);
     } catch (e: any) {
@@ -267,10 +313,13 @@ export default function MediationEngine() {
                     <Button
                       variant="ghost" size="icon"
                       aria-label="Başvuruyu sil"
+                      disabled={deleting}
                       onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-50"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      {deleting && deleteTarget?.id === c.id
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <Trash2 className="h-4 w-4" />}
                     </Button>
                   </div>
                 ))}
