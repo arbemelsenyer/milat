@@ -616,28 +616,44 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   const fetchReport = useCallback(async () => {
     setReportLoading(true);
     setReportFetchError(null);
-    const { data, error } = await supabase
-      .from("common_ground_reports")
-      .select("*")
-      .eq("case_id", caseRow.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error) setReportFetchError(error.message);
-    setReport(data ?? null);
-    setReportLoading(false);
-    return data ?? null;
+    try {
+      const { data, error } = await supabase
+        .from("common_ground_reports")
+        .select("*")
+        .eq("case_id", caseRow.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      setReport(data ?? null);
+      setReportLoading(false);
+      return data ?? null;
+    } catch (e: any) {
+      console.error("[fetchReport] failed", e);
+      setReportFetchError(e?.message ?? "Rapor yüklenemedi.");
+      setReport(null);
+      setReportLoading(false);
+      return null;
+    }
   }, [caseRow.id]);
 
   const loadAll = useCallback(async () => {
-    const [p, d, a] = await Promise.all([
-      supabase.from("case_parties").select("*").eq("case_id", caseRow.id).order("created_at"),
-      supabase.from("case_documents").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }),
-      supabase.from("party_analyses").select("*").eq("case_id", caseRow.id),
-    ]);
-    setParties(p.data ?? []);
-    setDocs(d.data ?? []);
-    setAnalyses(a.data ?? []);
+    try {
+      const [p, d, a] = await Promise.all([
+        supabase.from("case_parties").select("*").eq("case_id", caseRow.id).order("created_at"),
+        supabase.from("case_documents").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }),
+        supabase.from("party_analyses").select("*").eq("case_id", caseRow.id),
+      ]);
+      if (p.error) console.error("[loadAll parties]", p.error);
+      if (d.error) console.error("[loadAll docs]", d.error);
+      if (a.error) console.error("[loadAll analyses]", a.error);
+      setParties(Array.isArray(p.data) ? p.data : []);
+      setDocs(Array.isArray(d.data) ? d.data : []);
+      setAnalyses(Array.isArray(a.data) ? a.data : []);
+    } catch (e: any) {
+      console.error("[loadAll] fatal", e);
+      toast({ title: "Veriler yüklenemedi", description: e?.message ?? "Bilinmeyen hata", variant: "destructive" });
+    }
     await fetchReport();
   }, [caseRow.id, fetchReport]);
 
