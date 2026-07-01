@@ -833,7 +833,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
           <div>
             <h2 className="text-2xl font-bold text-primary">Aşama 3 — Taraf Analizi</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. En az 2 taraf analiz edildiğinde Ortak Zemin Raporu üretebilirsiniz.
+              Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. En az 1 taraf analiz edildiğinde Ortak Zemin Raporu üretebilirsiniz.
             </p>
           </div>
           <div className="text-right text-xs space-y-1 min-w-[180px]">
