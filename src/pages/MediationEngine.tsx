@@ -24,6 +24,22 @@ import {
 } from "lucide-react";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
+import { Phase3ErrorBoundary } from "@/components/mediation/Phase3ErrorBoundary";
+
+// Safely coerce any AI-returned value into a renderable string. Prevents
+// "Objects are not valid as a React child" crashes when the model returns an
+// object/array where we expected a scalar.
+function safeText(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  try { return JSON.stringify(v); } catch { return String(v); }
+}
+// Coerce arrays of strings — items may occasionally be objects.
+function safeList(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.map(safeText).filter((s) => s.trim().length > 0);
+}
 
 const DISPUTE_TYPES = [
   "İşçi-İşveren",
@@ -366,7 +382,7 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }
   switch (phase) {
     case 1: return <Phase1Summary caseRow={caseRow} />;
     case 2: return <Phase2Parties caseRow={caseRow} isMediator={isMediator} userId={userId} onDone={() => { bumpPhase(3); onAdvance(3); }} />;
-    case 3: return <Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} onAdvance={onAdvance} bumpPhase={bumpPhase} />;
+    case 3: return <Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} onAdvance={onAdvance} bumpPhase={bumpPhase} /></Phase3ErrorBoundary>;
     case 4: return <Phase4Summary caseRow={caseRow} />;
     case 5: return <SessionScheduler caseId={caseRow.id} />;
     case 6: return <Phase7Expert caseRow={caseRow} />;
@@ -600,28 +616,44 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   const fetchReport = useCallback(async () => {
     setReportLoading(true);
     setReportFetchError(null);
-    const { data, error } = await supabase
-      .from("common_ground_reports")
-      .select("*")
-      .eq("case_id", caseRow.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error) setReportFetchError(error.message);
-    setReport(data ?? null);
-    setReportLoading(false);
-    return data ?? null;
+    try {
+      const { data, error } = await supabase
+        .from("common_ground_reports")
+        .select("*")
+        .eq("case_id", caseRow.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      setReport(data ?? null);
+      setReportLoading(false);
+      return data ?? null;
+    } catch (e: any) {
+      console.error("[fetchReport] failed", e);
+      setReportFetchError(e?.message ?? "Rapor yüklenemedi.");
+      setReport(null);
+      setReportLoading(false);
+      return null;
+    }
   }, [caseRow.id]);
 
   const loadAll = useCallback(async () => {
-    const [p, d, a] = await Promise.all([
-      supabase.from("case_parties").select("*").eq("case_id", caseRow.id).order("created_at"),
-      supabase.from("case_documents").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }),
-      supabase.from("party_analyses").select("*").eq("case_id", caseRow.id),
-    ]);
-    setParties(p.data ?? []);
-    setDocs(d.data ?? []);
-    setAnalyses(a.data ?? []);
+    try {
+      const [p, d, a] = await Promise.all([
+        supabase.from("case_parties").select("*").eq("case_id", caseRow.id).order("created_at"),
+        supabase.from("case_documents").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }),
+        supabase.from("party_analyses").select("*").eq("case_id", caseRow.id),
+      ]);
+      if (p.error) console.error("[loadAll parties]", p.error);
+      if (d.error) console.error("[loadAll docs]", d.error);
+      if (a.error) console.error("[loadAll analyses]", a.error);
+      setParties(Array.isArray(p.data) ? p.data : []);
+      setDocs(Array.isArray(d.data) ? d.data : []);
+      setAnalyses(Array.isArray(a.data) ? a.data : []);
+    } catch (e: any) {
+      console.error("[loadAll] fatal", e);
+      toast({ title: "Veriler yüklenemedi", description: e?.message ?? "Bilinmeyen hata", variant: "destructive" });
+    }
     await fetchReport();
   }, [caseRow.id, fetchReport]);
 
@@ -955,47 +987,47 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                       {an.dispute_area && (
                         <AnaSection icon="🔍" title="Uyuşmazlık Türü">
 
-                          <p className="text-sm">{an.dispute_area}</p>
+                          <p className="text-sm">{safeText(an.dispute_area)}</p>
                         </AnaSection>
                       )}
                       {an.legal_framework && (
                         <AnaSection icon="⚖️" title="Hukuki Çerçeve">
-                          {an.legal_framework.statutes?.length > 0 && (
+                          {safeList(an.legal_framework.statutes).length > 0 && (
                             <div className="text-sm">
                               <div className="font-medium">Mevzuat:</div>
-                              <ul className="list-disc pl-5">{an.legal_framework.statutes.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+                              <ul className="list-disc pl-5">{safeList(an.legal_framework.statutes).map((s, i) => <li key={i}>{s}</li>)}</ul>
                             </div>
                           )}
-                          {an.legal_framework.precedents?.length > 0 && (
+                          {Array.isArray(an.legal_framework.precedents) && an.legal_framework.precedents.length > 0 && (
                             <div className="text-sm mt-2">
                               <div className="font-medium">Emsal Kararlar:</div>
                               <ul className="list-disc pl-5">
                                 {an.legal_framework.precedents.map((pr: any, i: number) => (
-                                  <li key={i}><b>{pr.court}:</b> {pr.decision} <span className="text-muted-foreground">— {pr.relevance}</span></li>
+                                  <li key={i}><b>{safeText(pr?.court)}:</b> {safeText(pr?.decision)} <span className="text-muted-foreground">— {safeText(pr?.relevance)}</span></li>
                                 ))}
                               </ul>
                             </div>
                           )}
                         </AnaSection>
                       )}
-                      {an.document_findings?.length > 0 && (
+                      {safeList(an.document_findings).length > 0 && (
                         <AnaSection icon="📄" title="Belge Bulguları">
-                          <ul className="list-disc pl-5 text-sm">{an.document_findings.map((f: string, i: number) => <li key={i}>{f}</li>)}</ul>
+                          <ul className="list-disc pl-5 text-sm">{safeList(an.document_findings).map((f, i) => <li key={i}>{f}</li>)}</ul>
                         </AnaSection>
                       )}
                       {an.party_position && (
                         <AnaSection icon="👤" title="Taraf Analizi">
-                          <PosBlock label="Güçlü Yanlar" items={an.party_position.strengths} />
-                          <PosBlock label="Zayıf Yanlar" items={an.party_position.weaknesses} />
-                          <PosBlock label="İhtiyaçlar" items={an.party_position.interests} />
-                          {an.party_position.batna && <div className="text-sm mt-1"><b>BATNA:</b> {an.party_position.batna}</div>}
-                          {an.party_position.watna && <div className="text-sm"><b>WATNA:</b> {an.party_position.watna}</div>}
+                          <PosBlock label="Güçlü Yanlar" items={safeList(an.party_position.strengths)} />
+                          <PosBlock label="Zayıf Yanlar" items={safeList(an.party_position.weaknesses)} />
+                          <PosBlock label="İhtiyaçlar" items={safeList(an.party_position.interests)} />
+                          {an.party_position.batna && <div className="text-sm mt-1"><b>BATNA:</b> {safeText(an.party_position.batna)}</div>}
+                          {an.party_position.watna && <div className="text-sm"><b>WATNA:</b> {safeText(an.party_position.watna)}</div>}
                         </AnaSection>
                       )}
-                      {an.discovery_questions?.length > 0 && (
+                      {Array.isArray(an.discovery_questions) && an.discovery_questions.length > 0 && (
                         <AnaSection icon="❓" title="İhtiyaç Soruları">
                           <ol className="list-decimal pl-5 text-sm space-y-1">
-                            {an.discovery_questions.map((q: any, i: number) => <li key={i}>{q.question}</li>)}
+                            {an.discovery_questions.map((q: any, i: number) => <li key={i}>{safeText(q?.question ?? q)}</li>)}
                           </ol>
                         </AnaSection>
                       )}
@@ -1234,18 +1266,18 @@ function RiskAnalysisCard({
       <div className="grid sm:grid-cols-2 gap-2 text-sm">
         <div>
           <div className="text-xs text-muted-foreground">Anlaşma Oranı</div>
-          <div className="font-medium">{risk.uzlasma_orani || "Yeterli veri yok"}</div>
-          {risk.uzlasma_orani_kaynak && <div className="text-[11px] text-muted-foreground italic">Kaynak: {risk.uzlasma_orani_kaynak}</div>}
+          <div className="font-medium">{safeText(risk.uzlasma_orani) || "Yeterli veri yok"}</div>
+          {risk.uzlasma_orani_kaynak && <div className="text-[11px] text-muted-foreground italic">Kaynak: {safeText(risk.uzlasma_orani_kaynak)}</div>}
         </div>
         <div>
           <div className="text-xs text-muted-foreground">Mahkeme Riski</div>
-          <div className="font-medium">{risk.mahkeme_riski || "Yeterli veri yok"}</div>
-          {risk.mahkeme_riski_kaynak && <div className="text-[11px] text-muted-foreground italic">Kaynak: {risk.mahkeme_riski_kaynak}</div>}
+          <div className="font-medium">{safeText(risk.mahkeme_riski) || "Yeterli veri yok"}</div>
+          {risk.mahkeme_riski_kaynak && <div className="text-[11px] text-muted-foreground italic">Kaynak: {safeText(risk.mahkeme_riski_kaynak)}</div>}
         </div>
         {risk.tahmini_sure_tasarrufu_ay && (
           <div className="sm:col-span-2">
             <div className="text-xs text-muted-foreground">Tahmini Süre Tasarrufu</div>
-            <div className="font-medium">{risk.tahmini_sure_tasarrufu_ay} {typeof risk.tahmini_sure_tasarrufu_ay === "number" || /^\d/.test(String(risk.tahmini_sure_tasarrufu_ay)) ? "ay" : ""}</div>
+            <div className="font-medium">{safeText(risk.tahmini_sure_tasarrufu_ay)} {typeof risk.tahmini_sure_tasarrufu_ay === "number" || /^\d/.test(String(risk.tahmini_sure_tasarrufu_ay)) ? "ay" : ""}</div>
           </div>
         )}
       </div>
@@ -1258,30 +1290,30 @@ function RiskAnalysisCard({
           <b> "Risk Analizini Güncelle"</b> butonuyla yeniden hesaplatın.
         </MissingDataHint>
       )}
-      {Array.isArray(risk.kritik_faktorler) && risk.kritik_faktorler.filter(Boolean).length > 0 && (
+      {safeList(risk.kritik_faktorler).length > 0 && (
         <div>
           <div className="text-xs font-medium mb-1">Kritik Faktörler</div>
-          <ul className="list-disc pl-5 text-sm">{risk.kritik_faktorler.filter(Boolean).map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+          <ul className="list-disc pl-5 text-sm">{safeList(risk.kritik_faktorler).map((s, i) => <li key={i}>{s}</li>)}</ul>
         </div>
       )}
-      {Array.isArray(risk.uzlasma_engelleri) && risk.uzlasma_engelleri.filter(Boolean).length > 0 && (
+      {safeList(risk.uzlasma_engelleri).length > 0 && (
         <div>
           <div className="text-xs font-medium mb-1">Uzlaşma Engelleri</div>
-          <ul className="list-disc pl-5 text-sm">{risk.uzlasma_engelleri.filter(Boolean).map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+          <ul className="list-disc pl-5 text-sm">{safeList(risk.uzlasma_engelleri).map((s, i) => <li key={i}>{s}</li>)}</ul>
         </div>
       )}
-      {Array.isArray(risk.kaynak_listesi) && risk.kaynak_listesi.filter(Boolean).length > 0 && (
+      {safeList(risk.kaynak_listesi).length > 0 && (
         <div className="text-xs">
           <div className="font-medium mb-1">Kullanılan Kaynaklar</div>
           <div className="flex flex-wrap gap-1">
-            {risk.kaynak_listesi.filter(Boolean).map((name: string, i: number) => (
+            {safeList(risk.kaynak_listesi).map((name, i) => (
               <SourceChip key={i} name={name} source={matchSource(name, sources)} />
             ))}
           </div>
         </div>
       )}
       {risk.oneri && (
-        <div className="text-sm border-l-2 border-primary/40 pl-2 italic">{risk.oneri}</div>
+        <div className="text-sm border-l-2 border-primary/40 pl-2 italic">{safeText(risk.oneri)}</div>
       )}
     </div>
   );
