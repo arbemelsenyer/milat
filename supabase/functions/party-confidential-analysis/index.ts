@@ -126,8 +126,8 @@ YÜKLENEN BELGELER (${docs.length}): ${docs.map((d: any) => `- ${d.file_name}`).
 ${docExcerpts ? `\nBELGE İÇERİKLERİ (kısmi):\n${docExcerpts}` : ""}
 ${docReadFailed ? "\nNOT: Bazı belgeler (PDF/Word) metin olarak okunamadı; yalnızca dosya adlarından çıkarım yapıldı." : ""}
 ${ragBlock}
-
-Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinden somut karar referansları ver. Yukarıdaki resmi kaynaklardan yararlanarak analiz yap; alakalıysa kaynak göster.`;
+${similarBlock}
+Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinden somut karar referansları ver. Yukarıdaki resmi kaynaklardan ve benzer geçmiş davalardan yararlanarak risk_analizi üret; sabit/uydurma yüzde verme.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
