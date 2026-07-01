@@ -366,6 +366,101 @@ export function KnowledgeBaseAdmin() {
             </ul>
           </div>
         )}
+
+        {/* Manuel Kaynak Yükleme */}
+        <div className="mt-4 space-y-3 rounded-md border bg-muted/20 p-4">
+          <div className="flex items-center gap-2 font-medium text-sm">
+            <Upload className="w-4 h-4" /> Manuel Kaynak Yükle
+          </div>
+          <p className="text-xs text-muted-foreground">
+            PDF, DOCX veya TXT (max 20MB). Dosya metni çıkarılıp chunk'lara bölünür, embedding üretilir ve bilgi tabanına eklenir.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="kb-title">Kaynak Adı *</Label>
+              <Input
+                id="kb-title"
+                placeholder="Örn: Kira Yargıtay Kararları 2024"
+                value={uploadTitle}
+                onChange={(e) => setUploadTitle(e.target.value)}
+                disabled={uploading}
+                maxLength={200}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="kb-cat">Kategori *</Label>
+              <Select value={uploadCategory} onValueChange={setUploadCategory} disabled={uploading}>
+                <SelectTrigger id="kb-cat"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="kb-file">Dosya *</Label>
+            <Input
+              id="kb-file"
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+              disabled={uploading}
+            />
+            {uploadFile && (
+              <p className="text-xs text-muted-foreground">{uploadFile.name} · {(uploadFile.size / 1024 / 1024).toFixed(2)} MB</p>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={handleUpload} disabled={uploading || !uploadFile || !uploadTitle.trim()} size="sm">
+              {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+              Yükle ve İşle
+            </Button>
+            {uploadStage && <span className="text-xs text-muted-foreground">{uploadStage}</span>}
+          </div>
+        </div>
+
+        {/* Yüklenmiş Kaynaklar Listesi */}
+        <div className="mt-4 space-y-2 rounded-md border p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">Yüklenmiş Kaynaklar ({sources.length})</div>
+            <Button size="sm" variant="ghost" onClick={loadSources} disabled={sourcesLoading}>
+              {sourcesLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            </Button>
+          </div>
+          {sourcesLoading && sources.length === 0 ? (
+            <div className="text-xs text-muted-foreground">Yükleniyor...</div>
+          ) : sources.length === 0 ? (
+            <div className="text-xs text-muted-foreground">Henüz kaynak yüklenmemiş.</div>
+          ) : (
+            <ul className="divide-y max-h-80 overflow-y-auto">
+              {sources.map((s) => {
+                const key = s.source_url ?? s.source_title;
+                return (
+                  <li key={key} className="flex items-start justify-between gap-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium text-sm">{s.source_title}</div>
+                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-0.5">
+                        <Badge variant="outline" className="text-[10px]">{s.category}</Badge>
+                        <span>{s.chunk_count} chunk</span>
+                        <span>· {formatDate(s.latest)}</span>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => deleteSource(s)}
+                      disabled={deleting === key}
+                      className="text-destructive hover:text-destructive shrink-0"
+                    >
+                      {deleting === key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
