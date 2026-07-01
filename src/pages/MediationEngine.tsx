@@ -910,7 +910,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                 <span>Henüz analiz edilmemiş taraf var, rapor eksik olabilir. Tam karşılaştırmalı rapor için tüm tarafları analiz edip "Yeniden Üret" butonuna basın.</span>
               </div>
             )}
-            <CommonGroundView data={report.report} strategy={report.strategy} />
+            <CommonGroundView data={report.report} strategy={report.strategy} parties={parties} analyses={analyses} caseId={caseRow.id} />
           </>
         )}
       </Card>
