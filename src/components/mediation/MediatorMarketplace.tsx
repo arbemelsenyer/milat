@@ -50,7 +50,6 @@ export function MediatorMarketplace({ niche, onSelect }: Props) {
     return mediators.filter((m) => {
       if (onlyAvail && !m.is_available) return false;
       if (lang && !m.languages.includes(lang)) return false;
-      if (maxRate && m.hourly_rate > Number(maxRate)) return false;
       if (niche && m.specializations.length && !m.specializations.some((s) => s.toLowerCase().includes(niche.toLowerCase()))) {
         // soft filter — keep if niche unknown
       }
@@ -60,7 +59,7 @@ export function MediatorMarketplace({ niche, onSelect }: Props) {
       }
       return true;
     });
-  }, [mediators, search, lang, maxRate, onlyAvail, niche]);
+  }, [mediators, search, lang, onlyAvail, niche]);
 
   return (
     <div className="space-y-4">
