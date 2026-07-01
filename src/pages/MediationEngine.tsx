@@ -1010,24 +1010,24 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                           )}
                         </AnaSection>
                       )}
-                      {an.document_findings?.length > 0 && (
+                      {safeList(an.document_findings).length > 0 && (
                         <AnaSection icon="📄" title="Belge Bulguları">
-                          <ul className="list-disc pl-5 text-sm">{an.document_findings.map((f: string, i: number) => <li key={i}>{f}</li>)}</ul>
+                          <ul className="list-disc pl-5 text-sm">{safeList(an.document_findings).map((f, i) => <li key={i}>{f}</li>)}</ul>
                         </AnaSection>
                       )}
                       {an.party_position && (
                         <AnaSection icon="👤" title="Taraf Analizi">
-                          <PosBlock label="Güçlü Yanlar" items={an.party_position.strengths} />
-                          <PosBlock label="Zayıf Yanlar" items={an.party_position.weaknesses} />
-                          <PosBlock label="İhtiyaçlar" items={an.party_position.interests} />
-                          {an.party_position.batna && <div className="text-sm mt-1"><b>BATNA:</b> {an.party_position.batna}</div>}
-                          {an.party_position.watna && <div className="text-sm"><b>WATNA:</b> {an.party_position.watna}</div>}
+                          <PosBlock label="Güçlü Yanlar" items={safeList(an.party_position.strengths)} />
+                          <PosBlock label="Zayıf Yanlar" items={safeList(an.party_position.weaknesses)} />
+                          <PosBlock label="İhtiyaçlar" items={safeList(an.party_position.interests)} />
+                          {an.party_position.batna && <div className="text-sm mt-1"><b>BATNA:</b> {safeText(an.party_position.batna)}</div>}
+                          {an.party_position.watna && <div className="text-sm"><b>WATNA:</b> {safeText(an.party_position.watna)}</div>}
                         </AnaSection>
                       )}
-                      {an.discovery_questions?.length > 0 && (
+                      {Array.isArray(an.discovery_questions) && an.discovery_questions.length > 0 && (
                         <AnaSection icon="❓" title="İhtiyaç Soruları">
                           <ol className="list-decimal pl-5 text-sm space-y-1">
-                            {an.discovery_questions.map((q: any, i: number) => <li key={i}>{q.question}</li>)}
+                            {an.discovery_questions.map((q: any, i: number) => <li key={i}>{safeText(q?.question ?? q)}</li>)}
                           </ol>
                         </AnaSection>
                       )}
