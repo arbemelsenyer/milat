@@ -149,8 +149,36 @@ export default function MediationEngine() {
       const { error, count } = await supabase
         .from("cases").delete({ count: "exact" }).eq("id", c.id);
       if (error) throw error;
-      if (!count) throw new Error("Bu başvuruyu silme yetkiniz yok.");
-      toast({ title: "Başvuru silindi" });
+      if (!count) {
+        throw new Error(
+          "Silme işlemi başarısız. Bu başvuruyu silme yetkiniz yok veya başvuru zaten silinmiş olabilir."
+        );
+      }
+
+      // Cascade doğrulaması: bağlı kayıtların gerçekten silindiğini kontrol et
+      const childTables = [
+        "case_parties", "case_documents", "party_analyses",
+        "common_ground_reports", "case_sessions", "negotiation_rounds",
+      ] as const;
+      const checks = await Promise.all(
+        childTables.map((t) =>
+          supabase.from(t as any).select("id", { count: "exact", head: true }).eq("case_id", c.id)
+        )
+      );
+      const remaining = checks
+        .map((r, i) => ({ table: childTables[i], n: r.count ?? 0 }))
+        .filter((x) => x.n > 0);
+      if (remaining.length > 0) {
+        console.warn("Cascade delete incomplete:", remaining);
+        toast({
+          title: "Silme kısmen tamamlandı",
+          description: `Bazı bağlı kayıtlar kaldı: ${remaining.map((x) => x.table).join(", ")}. Yönetici ile iletişime geçin.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Başvuru silindi", description: "Başvuru ve tüm bağlı kayıtlar başarıyla silindi." });
+      }
+
       setCases((prev) => prev.filter((x) => x.id !== c.id));
       setDeleteTarget(null);
     } catch (e: any) {
