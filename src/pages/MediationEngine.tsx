@@ -9,6 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -118,6 +122,27 @@ export default function MediationEngine() {
   const [showNew, setShowNew] = useState(false);
   const [activeCase, setActiveCase] = useState<CaseRow | null>(null);
   const [phase3Complete, setPhase3Complete] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<CaseRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function deleteCase(c: CaseRow) {
+    setDeleting(true);
+    try {
+      const { error, count } = await supabase
+        .from("cases").delete({ count: "exact" }).eq("id", c.id);
+      if (error) throw error;
+      if (!count) throw new Error("Bu başvuruyu silme yetkiniz yok.");
+      toast({ title: "Başvuru silindi" });
+      setCases((prev) => prev.filter((x) => x.id !== c.id));
+      setDeleteTarget(null);
+    } catch (e: any) {
+      toast({
+        title: "Silme işlemi başarısız",
+        description: trErr(e?.message ?? ""),
+        variant: "destructive",
+      });
+    } finally { setDeleting(false); }
+  }
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -227,9 +252,10 @@ export default function MediationEngine() {
             ) : (
               <div className="space-y-2">
                 {cases.map((c) => (
-                  <button key={c.id} onClick={() => openCase(c.id, c.current_phase || 1)}
-                    className="w-full text-left p-4 rounded-lg border hover:bg-accent/10 transition">
-                    <div className="flex items-center justify-between">
+                  <div key={c.id}
+                    className="w-full p-4 rounded-lg border hover:bg-accent/10 transition flex items-center justify-between gap-2">
+                    <button onClick={() => openCase(c.id, c.current_phase || 1)}
+                      className="flex-1 text-left flex items-center justify-between gap-2">
                       <div>
                         <div className="font-medium">{c.title || "(başlıksız)"}</div>
                         <div className="text-sm text-muted-foreground">
@@ -237,12 +263,44 @@ export default function MediationEngine() {
                         </div>
                       </div>
                       <Badge variant="secondary">{c.status ?? "active"}</Badge>
-                    </div>
-                  </button>
+                    </button>
+                    <Button
+                      variant="ghost" size="icon"
+                      aria-label="Başvuruyu sil"
+                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 ))}
               </div>
             )}
           </Card>
+
+          <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Bu başvuruyu silmek istediğinizden emin misiniz?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Başvuruya ait tüm taraflar, belgeler ve analizler de silinecektir. Bu işlem geri alınamaz.
+                  {deleteTarget?.application_no && (
+                    <span className="block mt-2 font-medium">{deleteTarget.application_no} — {deleteTarget.title}</span>
+                  )}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleting}>İptal</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={deleting}
+                  onClick={(e) => { e.preventDefault(); if (deleteTarget) deleteCase(deleteTarget); }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {deleting ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Siliniyor…</> : "Evet, Sil"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </main>
       </div>
     );

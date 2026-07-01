@@ -1,0 +1,2 @@
+CREATE POLICY "Mediators can delete assigned cases" ON public.cases FOR DELETE USING (assigned_mediator_id = auth.uid());
+CREATE POLICY "Admins can delete all cases" ON public.cases FOR DELETE USING (public.has_role(auth.uid(), 'admin'::app_role));
