@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, BookOpen, CheckCircle2, Clock3, Loader2, RefreshCw, XCircle } from "lucide-react";
+import { AlertTriangle, BookOpen, CheckCircle2, Clock3, Loader2, RefreshCw, Trash2, Upload, XCircle } from "lucide-react";
 
 interface Job {
   id: string;
