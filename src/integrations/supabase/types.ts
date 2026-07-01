@@ -515,6 +515,8 @@ export type Database = {
           issue_description: string | null
           legal_basis: string | null
           legal_duration_days: number | null
+          mahkeme_turu: string | null
+          mediation_type: string | null
           open_to_compromise: boolean | null
           other_party_name: string | null
           other_party_role: string | null
@@ -522,11 +524,13 @@ export type Database = {
           relationship: string | null
           round_number: number
           status: string
+          sure_hafta: number | null
           timeline: string | null
           title: string | null
           updated_at: string
           user_id: string
           uyap_no: string | null
+          uzatma_hafta: number | null
           your_name: string | null
           your_role: string | null
         }
@@ -559,6 +563,8 @@ export type Database = {
           issue_description?: string | null
           legal_basis?: string | null
           legal_duration_days?: number | null
+          mahkeme_turu?: string | null
+          mediation_type?: string | null
           open_to_compromise?: boolean | null
           other_party_name?: string | null
           other_party_role?: string | null
@@ -566,11 +572,13 @@ export type Database = {
           relationship?: string | null
           round_number?: number
           status?: string
+          sure_hafta?: number | null
           timeline?: string | null
           title?: string | null
           updated_at?: string
           user_id?: string
           uyap_no?: string | null
+          uzatma_hafta?: number | null
           your_name?: string | null
           your_role?: string | null
         }
@@ -603,6 +611,8 @@ export type Database = {
           issue_description?: string | null
           legal_basis?: string | null
           legal_duration_days?: number | null
+          mahkeme_turu?: string | null
+          mediation_type?: string | null
           open_to_compromise?: boolean | null
           other_party_name?: string | null
           other_party_role?: string | null
@@ -610,11 +620,13 @@ export type Database = {
           relationship?: string | null
           round_number?: number
           status?: string
+          sure_hafta?: number | null
           timeline?: string | null
           title?: string | null
           updated_at?: string
           user_id?: string
           uyap_no?: string | null
+          uzatma_hafta?: number | null
           your_name?: string | null
           your_role?: string | null
         }

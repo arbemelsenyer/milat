@@ -1,10 +1,19 @@
-// Detects legal mediation deadlines for a case using RAG over knowledge_base_chunks.
-// Calls Gemini with retrieved chunks; refuses to fabricate durations.
+// Detects legal mediation deadlines by classifying the court type (tuketici/is/sulh/ticaret/yok)
+// using RAG over knowledge_base_chunks + strict rule set. AI does not invent numbers — mapping
+// hafta/uzatma is derived from the classified court type.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const COURT_RULES: Record<string, { sure_hafta: number | null; uzatma_hafta: number | null; dayanak: string; label: string }> = {
+  tuketici: { sure_hafta: 3, uzatma_hafta: 1, dayanak: "TKHK 73/A", label: "Tüketici Mahkemesi" },
+  is:       { sure_hafta: 3, uzatma_hafta: 1, dayanak: "7036 sayılı İş Mahkemeleri Kanunu md. 3", label: "İş Mahkemesi" },
+  sulh:     { sure_hafta: 3, uzatma_hafta: 1, dayanak: "HUAK 18/B (7445 sayılı Kanun)", label: "Sulh Hukuk Mahkemesi" },
+  ticaret:  { sure_hafta: 6, uzatma_hafta: 2, dayanak: "TTK 5/A", label: "Ticaret Mahkemesi" },
+  yok:      { sure_hafta: null, uzatma_hafta: null, dayanak: "-", label: "Dava şartı kapsamı dışı" },
 };
 
 Deno.serve(async (req) => {
@@ -32,7 +41,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { case_id, dispute_type, persist } = await req.json();
+    const { case_id, dispute_type, dispute_text, persist } = await req.json();
     if (!case_id || !dispute_type) {
       return new Response(JSON.stringify({ error: "case_id ve dispute_type gerekli" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -49,8 +58,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 1) Retrieve knowledge base chunks
-    const query = `arabuluculuk süresi hafta gün dava şartı ${dispute_type}`;
+    // Retrieve RAG context
+    const query = `arabuluculuk mahkeme türü tüketici iş sulh ticaret dava şartı ${dispute_type} ${dispute_text ?? ""}`.slice(0, 500);
     let chunks: any[] = [];
     const embRes = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
       method: "POST",
@@ -62,44 +71,65 @@ Deno.serve(async (req) => {
       const vec = embJson?.data?.[0]?.embedding;
       if (vec) {
         const { data } = await admin.rpc("match_knowledge_base", {
-          query_embedding: vec, filter_category: null, match_count: 10, match_threshold: 0.5,
+          query_embedding: vec, filter_category: null, match_count: 8, match_threshold: 0.4,
         });
         chunks = Array.isArray(data) ? data : [];
       }
     }
-
     const ragBlock = chunks.length
       ? chunks.map((r: any, i: number) =>
-          `[${i + 1}] (${r.category ?? "genel"} · ${r.source_title})\n${String(r.chunk_text ?? "").slice(0, 700)}`
+          `[${i + 1}] (${r.category ?? "genel"} · ${r.source_title})\n${String(r.chunk_text ?? "").slice(0, 600)}`
         ).join("\n\n")
       : "(bilgi tabanında ilgili kaynak bulunamadı)";
 
-    const systemPrompt = `Sen bir Türk arabuluculuk hukuku uzmanısın. Sana verilen KAYNAK METİNLERİNE göre soruları cevapla.
-KURAL: Sadece verilen metinlere dayan. Metinde açıkça yazmıyorsa "bulunamadı" de, UYDURMA YAPMA.
-Emin olmadığın hiçbir sayıyı, kanun maddesini veya bilgiyi verme.`;
+    const systemPrompt = `Sen Türk arabuluculuk hukukunda uzman bir sınıflandırıcısın. Uyuşmazlığı SADECE aşağıdaki 5 kategoriden birine ata. UYDURMA YAPMA.
 
-    const userPrompt = `Uyuşmazlık türü: ${dispute_type}
+KARAR KURALLARI:
+A) tuketici (Tüketici Mahkemesi — 3+1 hafta, TKHK 73/A):
+   - Bireysel hasta vs özel doktor/hastane
+   - Bireysel kredi kartı, tüketici kredisi, mortgage
+   - Bireysel kasko, konut, sağlık sigortası
+   - Ayıplı mal/hizmet, e-ticaret, abonelik
+   - Tüketici sıfatıyla yapılan işlemler
 
-KAYNAK METİNLER:
+B) is (İş Mahkemesi — 3+1 hafta, 7036 sayılı Kanun):
+   - Kıdem/ihbar tazminatı, fazla mesai
+   - İşe iade, mobbing, iş kazası
+
+C) sulh (Sulh Hukuk — 3+1 hafta, HUAK 18/B - 7445 s.K.):
+   - Kira ilişkisinden doğan uyuşmazlıklar (ilamsız icra tahliyesi hariç)
+   - Ortaklığın giderilmesi (izale-i şüyuu)
+   - Kat Mülkiyeti Kanunu uyuşmazlıkları
+   - Komşu hakkı
+
+D) ticaret (Ticaret Mahkemesi — 6+2 hafta, TTK 5/A):
+   - Ticari kredi, leasing, faktoring, kurumsal banka
+   - Ticari sigorta, rücu, kurumsal poliçe
+   - İnşaat/yüklenici sözleşmeleri
+   - FSMH para/tazminat talebi
+   - Spor, enerji, maden sözleşmeleri
+   - Ortaklık, bayilik, franchise
+   - Hasta vs sigorta şirketi (malpraktis sigortası)
+
+E) yok (Dava şartı kapsamı DIŞINDA):
+   - Kamu hastanesi/idare aleyhine malpraktis
+   - FSMH hükümsüzlük/iptal/tecavüzün durdurulması (parasal talep yoksa)
+   - İdari yargı kapsamındaki uyuşmazlıklar
+
+ÖNEMLİ: Hem tüketici hem ticari unsur varsa → TÜKETİCİ önceliklidir.
+Emin değilsen mahkeme_turu=null döndür ve kaynak_bulunamadi=true de.`;
+
+    const userPrompt = `Uyuşmazlık türü etiketi: ${dispute_type}
+Uyuşmazlık açıklaması: ${(dispute_text ?? "").slice(0, 800) || "(yok)"}
+
+KAYNAK METİNLER (bilgi tabanı):
 ${ragBlock}
 
-Sorular:
-1. Bu uyuşmazlık türü dava şartı arabuluculuk mu, ihtiyari mi? Hangi kanunun hangi maddesi düzenliyor?
-2. Dava şartıysa: yasal süre kaç hafta/gün? Uzatma hakkı var mı, kaç hafta/gün? Hangi maddeye göre?
-3. İhtiyariyse: kanunda üst sınır var mı?
-4. Birden fazla kaynakta farklı bilgi varsa çelişkiyi belirt.
-
-YALNIZCA aşağıdaki JSON şemasında yanıt ver (başka metin yok):
+YALNIZCA aşağıdaki JSON şemasında yanıt ver:
 {
-  "dava_sarti_mi": true | false | null,
-  "ilgili_kanun": "kanun adı md. XX" veya "bulunamadı",
-  "sure_gun": sayı veya null,
-  "uzatma_gun": sayı veya null,
-  "aciklama": "1-2 cümle Türkçe açıklama",
-  "celiski_var": true | false,
-  "celiski_aciklamasi": "varsa açıkla, yoksa boş",
-  "kaynak_bulunamadi": true | false,
-  "kullanilan_kaynaklar": ["kaynak başlığı 1", "kaynak başlığı 2"]
+  "mahkeme_turu": "tuketici" | "is" | "sulh" | "ticaret" | "yok" | null,
+  "aciklama": "1-2 cümle Türkçe gerekçe",
+  "kaynak_bulunamadi": true | false
 }`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -125,24 +155,26 @@ YALNIZCA aşağıdaki JSON şemasında yanıt ver (başka metin yok):
     let parsed: any = {};
     try { parsed = JSON.parse(content); } catch { parsed = {}; }
 
-    const sure = parsed?.sure_gun == null ? null : Math.max(0, Math.min(365, Number(parsed.sure_gun) || 0));
-    const uzatma = parsed?.uzatma_gun == null ? null : Math.max(0, Math.min(365, Number(parsed.uzatma_gun) || 0));
+    const rawKind = String(parsed?.mahkeme_turu ?? "").toLowerCase();
+    const mahkeme_turu = ["tuketici", "is", "sulh", "ticaret", "yok"].includes(rawKind) ? rawKind : null;
+    const rule = mahkeme_turu ? COURT_RULES[mahkeme_turu] : null;
+    const kaynak_bulunamadi = !!parsed?.kaynak_bulunamadi || !mahkeme_turu || chunks.length === 0;
+
     const result = {
-      dava_sarti_mi: typeof parsed?.dava_sarti_mi === "boolean" ? parsed.dava_sarti_mi : null,
-      ilgili_kanun: String(parsed?.ilgili_kanun ?? "bulunamadı").slice(0, 300),
-      sure_gun: sure,
-      uzatma_gun: uzatma,
+      mahkeme_turu,
+      sure_hafta: rule?.sure_hafta ?? null,
+      uzatma_hafta: rule?.uzatma_hafta ?? null,
+      toplam_max_hafta: rule && rule.sure_hafta != null ? (rule.sure_hafta + (rule.uzatma_hafta ?? 0)) : null,
+      dayanak: rule?.dayanak ?? "bulunamadı",
+      mahkeme_label: rule?.label ?? "Tespit Edilemedi",
       aciklama: String(parsed?.aciklama ?? "").slice(0, 500),
-      celiski_var: !!parsed?.celiski_var,
-      celiski_aciklamasi: String(parsed?.celiski_aciklamasi ?? "").slice(0, 500),
-      kaynak_bulunamadi: !!parsed?.kaynak_bulunamadi || chunks.length === 0,
-      kullanilan_kaynaklar: Array.isArray(parsed?.kullanilan_kaynaklar)
-        ? parsed.kullanilan_kaynaklar.map((x: any) => String(x)).slice(0, 15)
-        : chunks.map((c) => c.source_title).slice(0, 15),
+      kaynak_bulunamadi,
+      kullanilan_kaynaklar: chunks.map((c) => c.source_title).slice(0, 12),
+      // legacy compatibility
+      dava_sarti_mi: mahkeme_turu ? mahkeme_turu !== "yok" : null,
     };
 
     if (persist) {
-      // Fetch application_date to compute deadline
       const { data: caseRow } = await admin
         .from("cases")
         .select("application_date, created_at")
@@ -150,23 +182,27 @@ YALNIZCA aşağıdaki JSON şemasında yanıt ver (başka metin yok):
         .maybeSingle();
       const startIso = caseRow?.application_date ?? caseRow?.created_at ?? new Date().toISOString();
       const start = new Date(startIso);
-      const deadline_total = sure != null
-        ? new Date(start.getTime() + sure * 86400000).toISOString()
-        : null;
-      const deadline_extended = (sure != null && uzatma != null && uzatma > 0)
-        ? new Date(start.getTime() + (sure + uzatma) * 86400000).toISOString()
-        : null;
+      const sure_gun = result.sure_hafta != null ? result.sure_hafta * 7 : null;
+      const uzatma_gun = result.uzatma_hafta != null ? result.uzatma_hafta * 7 : null;
+      const deadline_total = sure_gun != null
+        ? new Date(start.getTime() + sure_gun * 86400000).toISOString() : null;
+      const deadline_extended = (sure_gun != null && uzatma_gun && uzatma_gun > 0)
+        ? new Date(start.getTime() + (sure_gun + uzatma_gun) * 86400000).toISOString() : null;
 
       await admin.from("cases").update({
+        mediation_type: "dava_sarti",
+        mahkeme_turu: result.mahkeme_turu,
+        sure_hafta: result.sure_hafta,
+        uzatma_hafta: result.uzatma_hafta,
         is_mandatory: result.dava_sarti_mi,
-        legal_duration_days: sure,
-        extension_days: uzatma,
-        legal_basis: result.ilgili_kanun,
+        legal_duration_days: sure_gun,
+        extension_days: uzatma_gun,
+        legal_basis: result.dayanak,
         deadline_total,
         deadline_extended,
         deadline_sources: result.kullanilan_kaynaklar,
-        deadline_conflict: result.celiski_var,
-        deadline_conflict_note: result.celiski_aciklamasi,
+        deadline_conflict: false,
+        deadline_conflict_note: null,
         deadline_detected_at: new Date().toISOString(),
       } as any).eq("id", case_id);
     }
