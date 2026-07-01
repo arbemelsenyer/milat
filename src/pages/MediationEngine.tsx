@@ -896,13 +896,23 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
             {canReport ? "Henüz rapor üretilmedi. \"Rapor Üret\" butonuna basın." : "En az 1 taraf analiz edildikten sonra rapor üretilebilir."}
           </p>
         )}
-        {partialReport && (
+        {partialReport && !report && (
           <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 flex items-start gap-2">
             <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
-            <span>Henüz analiz edilmemiş taraf var, rapor eksik olabilir. Tam karşılaştırmalı rapor için tüm tarafları analiz edin.</span>
+            <span>Şu an {analysedCount}/{parties.length} taraf analiz edilmiş. Rapor üretebilirsiniz ancak eksik taraflar için içerik sınırlı olacaktır.</span>
           </div>
         )}
-        {report && <CommonGroundView data={report.report} strategy={report.strategy} />}
+        {report && (
+          <>
+            {partialReport && (
+              <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 flex items-start gap-2">
+                <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                <span>Henüz analiz edilmemiş taraf var, rapor eksik olabilir. Tam karşılaştırmalı rapor için tüm tarafları analiz edip "Yeniden Üret" butonuna basın.</span>
+              </div>
+            )}
+            <CommonGroundView data={report.report} strategy={report.strategy} />
+          </>
+        )}
       </Card>
 
 
