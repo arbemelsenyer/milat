@@ -1295,9 +1295,23 @@ function ComparativeRiskAnalysis({
 
   if (rows.length === 0) return null;
 
+  const anyRiskData = rows.some((r) => r.risk_puani || r.uzlasma_orani || r.mahkeme_riski);
+  if (!anyRiskData) {
+    return (
+      <div className="border rounded-lg p-4 bg-amber-50 border-amber-200 text-xs text-amber-800 flex items-start gap-2">
+        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+        <div>
+          <div className="font-semibold mb-0.5">Karşılaştırmalı risk verisi bulunamadı</div>
+          Taraf analizlerinde henüz <code className="font-mono">risk_analizi</code> alanı yok. Aşama 3'te "Risk Analizini Güncelle" butonu ile her taraf için risk analizini yeniden üretin.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="border rounded-lg p-4 space-y-3 bg-primary/5 border-primary/30">
       <div className="font-semibold text-sm">📊 Karşılaştırmalı Risk & Anlaşma Analizi</div>
+
 
       <div className="grid sm:grid-cols-2 gap-2">
         {rows.map((r, i) => (
