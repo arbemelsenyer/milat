@@ -1815,7 +1815,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
               <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "html" })}>İndir</Button>
             </div>
           </div>
-          <CommonGroundView data={report.report} strategy={report.strategy} />
+          <CommonGroundView data={report.report} strategy={report.strategy} parties={analyses.map((a: any) => ({ id: a.party_id, ...(a.case_parties || {}) }))} analyses={analyses} caseId={caseRow.id} />
         </div>
       ) : (
         <p className="text-sm text-muted-foreground italic">Ortak zemin raporu henüz üretilmedi.</p>
