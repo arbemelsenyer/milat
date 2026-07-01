@@ -93,6 +93,28 @@ export function KnowledgeBaseAdmin() {
     return () => { cancelled = true; clearInterval(t); };
   }, []);
 
+  const [legalRunning, setLegalRunning] = useState(false);
+  const [legalResult, setLegalResult] = useState<any>(null);
+
+  const runLegalKnowledge = async () => {
+    setLegalRunning(true);
+    setLegalResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("build-legal-knowledge", { body: {} });
+      if (error) throw error;
+      setLegalResult(data);
+      const ok = (data?.results ?? []).filter((r: any) => r.ok).length;
+      toast({
+        title: "Mevzuat & tarife eklendi",
+        description: `${ok}/${data?.total_sources ?? 0} kaynak · ${data?.total_chunks ?? 0} chunk · 2026 tarifesinden ${data?.tarife_kalem_sayisi ?? 0} kalem çıkarıldı.`,
+      });
+    } catch (e: any) {
+      toast({ title: "Hata", description: e.message ?? "İşlem başarısız", variant: "destructive" });
+    } finally {
+      setLegalRunning(false);
+    }
+  };
+
   const [retrying, setRetrying] = useState(false);
 
   const start = async (mode: "all" | "test" | "retry" = "all") => {
@@ -150,6 +172,10 @@ export function KnowledgeBaseAdmin() {
           <Button onClick={() => start("test")} disabled={starting || testing || retrying || running} size="sm" variant="outline">
             {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
             Tek PDF ile Test Et
+          </Button>
+          <Button onClick={runLegalKnowledge} disabled={legalRunning} size="sm" variant="secondary">
+            {legalRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <BookOpen className="w-4 h-4 mr-2" />}
+            Mevzuat & Tarife Ekle
           </Button>
           {job && (
             <Badge className="gap-1" variant={job.status === "completed" ? "default" : job.status === "failed" ? "destructive" : "secondary"}>
@@ -215,7 +241,23 @@ export function KnowledgeBaseAdmin() {
             )}
           </div>
         )}
+        {legalResult && (
+          <div className="space-y-2 rounded-md border bg-muted/30 p-3 text-sm">
+            <div className="font-medium">Mevzuat & Tarife sonucu</div>
+            <div className="text-xs text-muted-foreground">
+              {legalResult.total_chunks} chunk · 2026 tarifesinden {legalResult.tarife_kalem_sayisi ?? 0} kalem parse edildi.
+            </div>
+            <ul className="space-y-1 text-xs">
+              {(legalResult.results ?? []).map((r: any, i: number) => (
+                <li key={i} className={r.ok ? "text-foreground" : "text-destructive"}>
+                  {r.ok ? "✓" : "✗"} {r.title} {r.ok ? `— ${r.chunks} chunk${r.kalemler != null ? `, ${r.kalemler} kalem` : ""}` : `— ${r.error}`}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
+
