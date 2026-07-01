@@ -313,10 +313,13 @@ export default function MediationEngine() {
                     <Button
                       variant="ghost" size="icon"
                       aria-label="Başvuruyu sil"
+                      disabled={deleting}
                       onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-50"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      {deleting && deleteTarget?.id === c.id
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <Trash2 className="h-4 w-4" />}
                     </Button>
                   </div>
                 ))}
