@@ -195,6 +195,41 @@ export default function AdminDashboard() {
     setIsUpdatingRole(false);
   };
 
+  const handleInviteUser = async () => {
+    const email = inviteEmail.trim();
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+      toast({
+        variant: 'destructive',
+        title: language === 'tr' ? 'Geçersiz e-posta' : 'Invalid email',
+        description: language === 'tr' ? 'Lütfen geçerli bir e-posta girin.' : 'Please enter a valid email.',
+      });
+      return;
+    }
+    setIsInviting(true);
+    const { data, error } = await supabase.functions.invoke('admin-invite-user', {
+      body: { email, fullName: inviteName.trim() || undefined },
+    });
+    setIsInviting(false);
+    if (error || (data as any)?.error) {
+      toast({
+        variant: 'destructive',
+        title: language === 'tr' ? 'Davet gönderilemedi' : 'Invite failed',
+        description: (data as any)?.error || error?.message || 'Unknown error',
+      });
+      return;
+    }
+    toast({
+      title: language === 'tr' ? 'Davet Gönderildi' : 'Invitation Sent',
+      description: language === 'tr'
+        ? `${email} adresine davet e-postası gönderildi.`
+        : `Invitation email sent to ${email}.`,
+    });
+    setInviteEmail('');
+    setInviteName('');
+    fetchAllUsers();
+  };
+
+
   const getMediatorName = (id: string | null) => {
     if (!id) return null;
     const m = mediators.find(m => m.user_id === id);
