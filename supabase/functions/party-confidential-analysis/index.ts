@@ -199,7 +199,12 @@ Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinde
 });
 
 function mapDisputeToCategory(disputeType?: string | null, subtype?: string | null): string | null {
+  const CATS = ["işçi_işveren","ticari","tüketici","sağlık","fikri_mülkiyet","inşaat","sigorta","bankacılık","aile","spor","enerji_maden","kira","gayrimenkul","genel"];
+  const raw = (disputeType ?? "").trim().toLowerCase();
+  if (CATS.includes(raw)) return raw === "genel" ? null : raw;
   const t = `${disputeType ?? ""} ${subtype ?? ""}`.toLowerCase();
+  if (/kira/.test(t)) return "kira";
+  if (/gayrimenkul|tapu|emlak/.test(t)) return "gayrimenkul";
   if (/iş|isci|işçi|işveren|isveren|kıdem|kidem/.test(t)) return "işçi_işveren";
   if (/ticari|ticaret|şirket|sirket/.test(t)) return "ticari";
   if (/tüketici|tuketici/.test(t)) return "tüketici";
