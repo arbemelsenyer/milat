@@ -151,6 +151,113 @@ export function KnowledgeBaseAdmin() {
   const staleMinutes = running ? minutesSince(job?.updated_at) : null;
   const isStale = staleMinutes !== null && staleMinutes >= 10;
 
+  // --- Manuel kaynak yükleme ---
+  const CATEGORIES = [
+    "kira", "gayrimenkul", "işçi_işveren", "ticari", "tüketici",
+    "sağlık", "fikri_mülkiyet", "inşaat", "sigorta", "bankacılık",
+    "aile", "spor", "enerji_maden", "mevzuat", "genel",
+  ];
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [uploadCategory, setUploadCategory] = useState<string>("genel");
+  const [uploadStage, setUploadStage] = useState<string>("");
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async () => {
+    if (!uploadFile) { toast({ title: "Dosya seçin", variant: "destructive" }); return; }
+    if (!uploadTitle.trim()) { toast({ title: "Kaynak adı zorunludur", variant: "destructive" }); return; }
+    if (uploadFile.size > 20 * 1024 * 1024) { toast({ title: "Dosya 20MB'ı aşamaz", variant: "destructive" }); return; }
+    const name = uploadFile.name.toLowerCase();
+    if (!(name.endsWith(".pdf") || name.endsWith(".docx") || name.endsWith(".txt"))) {
+      toast({ title: "Sadece PDF, DOCX veya TXT kabul edilir", variant: "destructive" }); return;
+    }
+    setUploading(true);
+    setUploadStage("Dosya yükleniyor ve metin çıkarılıyor...");
+    try {
+      const form = new FormData();
+      form.append("file", uploadFile);
+      form.append("title", uploadTitle.trim());
+      form.append("category", uploadCategory);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Oturum bulunamadı");
+      setUploadStage("Chunk oluşturuluyor ve embedding üretiliyor...");
+      const projectUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
+      const res = await fetch(`${projectUrl}/functions/v1/admin-upload-knowledge`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      setUploadStage(`Tamamlandı: ${data.chunks} chunk oluşturuldu ✅`);
+      toast({ title: "Kaynak eklendi", description: `${data.chunks} chunk oluşturuldu.` });
+      setUploadFile(null);
+      setUploadTitle("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      await loadSources();
+    } catch (e: any) {
+      setUploadStage("");
+      toast({ title: "Yükleme başarısız", description: e.message ?? "Bilinmeyen hata", variant: "destructive" });
+    } finally {
+      setUploading(false);
+      setTimeout(() => setUploadStage(""), 4000);
+    }
+  };
+
+  // --- Kaynak listesi ---
+  type SourceRow = { source_title: string; source_url: string | null; category: string; chunk_count: number; latest: string };
+  const [sources, setSources] = useState<SourceRow[]>([]);
+  const [sourcesLoading, setSourcesLoading] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const loadSources = async () => {
+    setSourcesLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("knowledge_base_chunks")
+        .select("source_title, source_url, category, created_at")
+        .order("created_at", { ascending: false })
+        .limit(5000);
+      if (error) throw error;
+      const map = new Map<string, SourceRow>();
+      for (const r of (data ?? []) as any[]) {
+        const key = r.source_url ?? r.source_title;
+        const existing = map.get(key);
+        if (existing) {
+          existing.chunk_count += 1;
+          if (r.created_at > existing.latest) existing.latest = r.created_at;
+        } else {
+          map.set(key, { source_title: r.source_title, source_url: r.source_url, category: r.category, chunk_count: 1, latest: r.created_at });
+        }
+      }
+      setSources(Array.from(map.values()).sort((a, b) => b.latest.localeCompare(a.latest)));
+    } catch (e: any) {
+      console.error(e);
+    } finally {
+      setSourcesLoading(false);
+    }
+  };
+
+  useEffect(() => { loadSources(); }, []);
+
+  const deleteSource = async (row: SourceRow) => {
+    if (!confirm(`"${row.source_title}" kaynağını ve ${row.chunk_count} chunk'ını silmek istediğinize emin misiniz?`)) return;
+    setDeleting(row.source_url ?? row.source_title);
+    try {
+      const body: any = row.source_url ? { source_url: row.source_url } : { source_title: row.source_title };
+      const { data, error } = await supabase.functions.invoke("admin-delete-knowledge", { body });
+      if (error) throw error;
+      toast({ title: "Kaynak silindi", description: `${data?.deleted ?? 0} chunk kaldırıldı.` });
+      await loadSources();
+    } catch (e: any) {
+      toast({ title: "Silme başarısız", description: e.message, variant: "destructive" });
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+
   return (
     <Card>
       <CardHeader>
