@@ -14,7 +14,6 @@ type Mediator = {
   total_cases: number;
   success_rate: number;
   avg_resolution_days: number;
-  hourly_rate: number;
   languages: string[];
   bio: string | null;
   rating: number;
@@ -32,7 +31,6 @@ export function MediatorMarketplace({ niche, onSelect }: Props) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [lang, setLang] = useState<string>("");
-  const [maxRate, setMaxRate] = useState<string>("");
   const [onlyAvail, setOnlyAvail] = useState(true);
 
   useEffect(() => {
@@ -40,12 +38,13 @@ export function MediatorMarketplace({ niche, onSelect }: Props) {
       setLoading(true);
       const { data, error } = await supabase
         .from("mediators")
-        .select("*")
+        .select("id, full_name, photo_url, specializations, total_cases, success_rate, avg_resolution_days, languages, bio, rating, is_available, city")
         .order("rating", { ascending: false });
       if (!error && data) setMediators(data as Mediator[]);
       setLoading(false);
     })();
   }, []);
+
 
   const filtered = useMemo(() => {
     return mediators.filter((m) => {
