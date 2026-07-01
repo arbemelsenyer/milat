@@ -901,7 +901,10 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
 
 
       {parties.length === 0 && (
-        <Card className="p-6"><p className="text-muted-foreground">Önce Aşama 2'de taraf ekleyin.</p></Card>
+        <Card className="p-6 space-y-2">
+          <div className="font-semibold">Taraflar bulunamadı</div>
+          <p className="text-sm text-muted-foreground">Bu başvuruya henüz taraf eklenmemiş. Aşama 2 — Taraf Bilgileri ekranından en az iki taraf ekleyin, ardından bu adımda belge yükleyip analiz başlatabilirsiniz.</p>
+        </Card>
       )}
 
       <div className="space-y-3">
