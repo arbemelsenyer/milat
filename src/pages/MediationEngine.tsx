@@ -1295,9 +1295,23 @@ function ComparativeRiskAnalysis({
 
   if (rows.length === 0) return null;
 
+  const anyRiskData = rows.some((r) => r.risk_puani || r.uzlasma_orani || r.mahkeme_riski);
+  if (!anyRiskData) {
+    return (
+      <div className="border rounded-lg p-4 bg-amber-50 border-amber-200 text-xs text-amber-800 flex items-start gap-2">
+        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+        <div>
+          <div className="font-semibold mb-0.5">Karşılaştırmalı risk verisi bulunamadı</div>
+          Taraf analizlerinde henüz <code className="font-mono">risk_analizi</code> alanı yok. Aşama 3'te "Risk Analizini Güncelle" butonu ile her taraf için risk analizini yeniden üretin.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="border rounded-lg p-4 space-y-3 bg-primary/5 border-primary/30">
       <div className="font-semibold text-sm">📊 Karşılaştırmalı Risk & Anlaşma Analizi</div>
+
 
       <div className="grid sm:grid-cols-2 gap-2">
         {rows.map((r, i) => (
@@ -1762,19 +1776,46 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   const [report, setReport] = useState<any>(null);
   const [analyses, setAnalyses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
 
-  useEffect(() => { (async () => {
+  const load = useCallback(async () => {
     setLoading(true);
-    const [r, a] = await Promise.all([
-      supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-      supabase.from("party_analyses").select("party_id, analysis, risk_analizi, case_parties:party_id(first_name, last_name, company_name, party_role)").eq("case_id", caseRow.id),
-    ]);
-    setReport(r.data);
-    setAnalyses(a.data ?? []);
-    setLoading(false);
-  })(); }, [caseRow.id]);
+    setLoadErr(null);
+    try {
+      const [r, a] = await Promise.all([
+        supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("party_analyses").select("party_id, analysis, risk_analizi, case_parties:party_id(first_name, last_name, company_name, party_role)").eq("case_id", caseRow.id),
+      ]);
+      if (r.error) throw r.error;
+      if (a.error) throw a.error;
+      setReport(r.data);
+      setAnalyses(Array.isArray(a.data) ? a.data : []);
+    } catch (e: any) {
+      console.error("[Phase4Summary] load failed", e);
+      setLoadErr(e?.message ?? "Bilinmeyen hata");
+      setReport(null);
+      setAnalyses([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [caseRow.id]);
+  useEffect(() => { load(); }, [load]);
 
-  if (loading) return <Card className="p-6"><Loader2 className="animate-spin" /></Card>;
+  if (loading) return (
+    <Card className="p-6 flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" /> Risk verileri ve taraf analizleri yükleniyor…
+    </Card>
+  );
+
+  if (loadErr) return (
+    <Card className="p-6 space-y-3">
+      <div className="flex items-center gap-2 text-destructive font-semibold text-sm">
+        <AlertTriangle className="h-4 w-4" /> Risk & analiz verileri yüklenemedi
+      </div>
+      <p className="text-xs text-muted-foreground break-words">{trErr(loadErr)}</p>
+      <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-3 w-3 mr-1" /> Tekrar Dene</Button>
+    </Card>
+  );
 
   return (
     <Card className="p-6 space-y-4">
