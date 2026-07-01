@@ -1762,19 +1762,46 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   const [report, setReport] = useState<any>(null);
   const [analyses, setAnalyses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
 
-  useEffect(() => { (async () => {
+  const load = useCallback(async () => {
     setLoading(true);
-    const [r, a] = await Promise.all([
-      supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-      supabase.from("party_analyses").select("party_id, analysis, risk_analizi, case_parties:party_id(first_name, last_name, company_name, party_role)").eq("case_id", caseRow.id),
-    ]);
-    setReport(r.data);
-    setAnalyses(a.data ?? []);
-    setLoading(false);
-  })(); }, [caseRow.id]);
+    setLoadErr(null);
+    try {
+      const [r, a] = await Promise.all([
+        supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("party_analyses").select("party_id, analysis, risk_analizi, case_parties:party_id(first_name, last_name, company_name, party_role)").eq("case_id", caseRow.id),
+      ]);
+      if (r.error) throw r.error;
+      if (a.error) throw a.error;
+      setReport(r.data);
+      setAnalyses(Array.isArray(a.data) ? a.data : []);
+    } catch (e: any) {
+      console.error("[Phase4Summary] load failed", e);
+      setLoadErr(e?.message ?? "Bilinmeyen hata");
+      setReport(null);
+      setAnalyses([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [caseRow.id]);
+  useEffect(() => { load(); }, [load]);
 
-  if (loading) return <Card className="p-6"><Loader2 className="animate-spin" /></Card>;
+  if (loading) return (
+    <Card className="p-6 flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" /> Risk verileri ve taraf analizleri yükleniyor…
+    </Card>
+  );
+
+  if (loadErr) return (
+    <Card className="p-6 space-y-3">
+      <div className="flex items-center gap-2 text-destructive font-semibold text-sm">
+        <AlertTriangle className="h-4 w-4" /> Risk & analiz verileri yüklenemedi
+      </div>
+      <p className="text-xs text-muted-foreground break-words">{trErr(loadErr)}</p>
+      <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-3 w-3 mr-1" /> Tekrar Dene</Button>
+    </Card>
+  );
 
   return (
     <Card className="p-6 space-y-4">
