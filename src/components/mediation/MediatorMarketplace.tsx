@@ -37,10 +37,10 @@ export function MediatorMarketplace({ niche, onSelect }: Props) {
     (async () => {
       setLoading(true);
       const { data, error } = await supabase
-        .from("mediators")
+        .from("mediators_public" as any)
         .select("id, full_name, photo_url, specializations, total_cases, success_rate, avg_resolution_days, languages, bio, rating, is_available, city")
         .order("rating", { ascending: false });
-      if (!error && data) setMediators(data as Mediator[]);
+      if (!error && data) setMediators(data as unknown as Mediator[]);
       setLoading(false);
     })();
   }, []);

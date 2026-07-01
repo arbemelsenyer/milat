@@ -1623,7 +1623,60 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      mediators_public: {
+        Row: {
+          avg_resolution_days: number | null
+          bio: string | null
+          city: string | null
+          created_at: string | null
+          full_name: string | null
+          id: string | null
+          is_available: boolean | null
+          languages: string[] | null
+          photo_url: string | null
+          rating: number | null
+          specializations: string[] | null
+          success_rate: number | null
+          total_cases: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          avg_resolution_days?: number | null
+          bio?: string | null
+          city?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_available?: boolean | null
+          languages?: string[] | null
+          photo_url?: string | null
+          rating?: number | null
+          specializations?: string[] | null
+          success_rate?: number | null
+          total_cases?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          avg_resolution_days?: number | null
+          bio?: string | null
+          city?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_available?: boolean | null
+          languages?: string[] | null
+          photo_url?: string | null
+          rating?: number | null
+          specializations?: string[] | null
+          success_rate?: number | null
+          total_cases?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       can_access_case: {
