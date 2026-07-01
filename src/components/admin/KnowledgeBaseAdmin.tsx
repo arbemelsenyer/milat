@@ -420,6 +420,11 @@ export function KnowledgeBaseAdmin() {
             {uploadStage && <span className="text-xs text-muted-foreground">{uploadStage}</span>}
           </div>
         </div>
+        {/* Google Drive'dan İçe Aktar */}
+        <div className="mt-4">
+          <GoogleDriveImporter />
+        </div>
+
 
         {/* Yüklenmiş Kaynaklar Listesi */}
         <div className="mt-4 space-y-2 rounded-md border p-4">
