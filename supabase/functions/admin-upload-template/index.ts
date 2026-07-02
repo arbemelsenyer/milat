@@ -1,4 +1,5 @@
-// Admin-only: upload a single .docx/.pdf/.txt file → upsert into document_templates.
+// Admin-only: upload .docx/.pdf/.txt template file(s).
+// Auto-detects template_type from the file's text content unless one is explicitly provided.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { extractText, getDocumentProxy } from "npm:unpdf@0.12.1";
 import mammoth from "npm:mammoth@1.8.0";
@@ -14,18 +15,6 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const MAX_BYTES = 20 * 1024 * 1024;
-
-const KNOWN_TEMPLATE_TYPES = new Set([
-  "dava_sarti_anlasma",
-  "dava_sarti_anlasamamama",
-  "dava_sarti_ilk_oturum",
-  "ihtiyari_anlasma",
-  "ihtiyari_anlasamamama",
-  "ihtiyari_davet",
-  "isci_isveren_davet",
-  "ticari_davet",
-  "tuketici_davet",
-]);
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -48,6 +37,45 @@ async function extractFromFile(bytes: Uint8Array, fileName: string, mime: string
   throw new Error("Desteklenmeyen dosya formatı. PDF, DOCX veya TXT yükleyin.");
 }
 
+// Otomatik şablon türü tespiti — dosya metnindeki başlık/anahtar kelimelere bakar.
+function detectTemplateType(text: string): { type: string; auto: boolean } {
+  const t = (text || "").toUpperCase();
+  const has = (kw: string) => t.includes(kw.toUpperCase());
+
+  if (has("ANLAŞMA BELGESİ") || has("ANLAŞMA SON TUTANA")) {
+    if (has("İŞÇİ")) return { type: "isci_isveren_anlasma", auto: true };
+    if (has("TİCARİ")) return { type: "ticari_anlasma", auto: true };
+    if (has("TÜKETİCİ")) return { type: "tuketici_anlasma", auto: true };
+    if (has("KİRA")) return { type: "kira_anlasma", auto: true };
+    if (has("ORTAKLIK")) return { type: "ortaklik_anlasma", auto: true };
+    if (has("İHTİYARİ")) return { type: "ihtiyari_anlasma", auto: true };
+  }
+  if (has("ANLAŞAMAMA")) {
+    if (has("İŞÇİ")) return { type: "isci_isveren_anlasamamama", auto: true };
+    if (has("TİCARİ")) return { type: "ticari_anlasamamama", auto: true };
+    if (has("KİRA")) return { type: "kira_anlasamamama", auto: true };
+    if (has("ORTAKLIK")) return { type: "ortaklik_anlasamamama", auto: true };
+    if (has("İHTİYARİ")) return { type: "ihtiyari_anlasamamama", auto: true };
+  }
+  if (has("İLK OTURUM") || has("İLK TOPLANTI")) {
+    if (has("İŞÇİ")) return { type: "isci_isveren_ilk_oturum", auto: true };
+    if (has("TİCARİ")) return { type: "ticari_ilk_oturum", auto: true };
+  }
+  if (has("DAVET MEKTUBU")) {
+    if (has("İŞÇİ")) return { type: "isci_isveren_davet", auto: true };
+    if (has("TİCARİ")) return { type: "ticari_davet", auto: true };
+    if (has("TÜKETİCİ")) return { type: "tuketici_davet", auto: true };
+    if (has("İHTİYARİ")) return { type: "ihtiyari_davet", auto: true };
+  }
+  if (has("ÜCRET SÖZLEŞMESİ")) {
+    if (has("İŞÇİ")) return { type: "isci_isveren_ucret", auto: true };
+    if (has("TİCARİ")) return { type: "ticari_ucret", auto: true };
+  }
+  if (has("BİLGİLENDİRME TUTANAĞI")) return { type: "bilgilendirme_tutanagi", auto: true };
+
+  return { type: "diger", auto: false };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -66,11 +94,10 @@ Deno.serve(async (req) => {
 
     const form = await req.formData();
     const file = form.get("file");
-    const templateType = String(form.get("template_type") ?? "").trim();
+    // Manuel override: kullanıcı sarı uyarıdan sonra tür seçtiyse.
+    const overrideType = String(form.get("template_type") ?? "").trim();
 
     if (!(file instanceof File)) return json({ error: "Dosya bulunamadı" }, 400);
-    if (!templateType) return json({ error: "Şablon türü zorunludur" }, 400);
-    if (!KNOWN_TEMPLATE_TYPES.has(templateType)) return json({ error: `Bilinmeyen şablon türü: ${templateType}` }, 400);
     if (file.size > MAX_BYTES) return json({ error: "Dosya 20MB'ı aşamaz" }, 400);
 
     const name = file.name.toLowerCase();
@@ -87,17 +114,32 @@ Deno.serve(async (req) => {
     }
     if (!text.trim()) return json({ error: "Dosyadan metin çıkarılamadı" }, 400);
 
+    let templateType = overrideType;
+    let autoDetected = false;
+    if (!templateType) {
+      const det = detectTemplateType(text);
+      templateType = det.type;
+      autoDetected = det.auto;
+    }
+
     const { error: upErr } = await admin.from("document_templates").upsert({
       template_type: templateType,
       template_content: text,
       source_url: `admin-upload://${file.name}`,
-      is_active: true,
+      is_active: templateType !== "diger",
       uploaded_at: new Date().toISOString(),
     }, { onConflict: "template_type" });
 
     if (upErr) return json({ error: upErr.message }, 500);
 
-    return json({ ok: true, template_type: templateType, chars: text.length, filename: file.name });
+    return json({
+      ok: true,
+      template_type: templateType,
+      auto_detected: autoDetected,
+      needs_manual: templateType === "diger",
+      chars: text.length,
+      filename: file.name,
+    });
   } catch (e: any) {
     console.error("admin-upload-template error", e);
     return json({ error: e?.message ?? "Sunucu hatası" }, 500);
