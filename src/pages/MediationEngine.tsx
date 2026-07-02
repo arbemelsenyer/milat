@@ -1022,12 +1022,27 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
 
   useEffect(() => { load(); }, [load]);
 
+  function validateParty(p: any, isInd: boolean): string | null {
+    if (isInd) {
+      if (!p.first_name?.trim()) return "Ad zorunludur.";
+      if (!p.last_name?.trim()) return "Soyad zorunludur.";
+      if (p.tc_kimlik && !/^\d{11}$/.test(String(p.tc_kimlik).trim())) return "TC Kimlik No 11 haneli rakam olmalıdır.";
+    } else {
+      if (!p.company_name?.trim()) return "Kurum adı zorunludur.";
+    }
+    const phoneRe = /^[+\d\s().-]{7,20}$/;
+    if (p.gsm && !phoneRe.test(String(p.gsm).trim())) return "GSM numarası geçerli değil.";
+    if (p.phone && !phoneRe.test(String(p.phone).trim())) return "Telefon numarası geçerli değil.";
+    if (p.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(p.email).trim())) return "E-posta adresi geçerli değil.";
+    return null;
+  }
+
   async function save() {
     if (!draft) return;
     if (!draft.kvkk_ok) { toast({ title: "KVKK onayı gerekli", variant: "destructive" }); return; }
     const isInd = draft.party_type === "individual";
-    if (isInd && !(draft.first_name && draft.last_name)) { toast({ title: "Ad ve soyad zorunlu", variant: "destructive" }); return; }
-    if (!isInd && !draft.company_name) { toast({ title: "Kurum adı zorunlu", variant: "destructive" }); return; }
+    const vErr = validateParty(draft, isInd);
+    if (vErr) { toast({ title: "Doğrulama hatası", description: vErr, variant: "destructive" }); return; }
     setBusy(true);
     try {
       const full_name = isInd ? `${draft.first_name} ${draft.last_name}`.trim() : draft.company_name!;
@@ -1044,7 +1059,6 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         last_name: draft.last_name ?? null,
         full_name,
         tc_kimlik: draft.tc_kimlik ?? null,
-        birth_date: draft.birth_date || null,
         address: draft.address ?? null,
         gsm: draft.gsm ?? null,
         phone: draft.phone ?? null,
