@@ -158,21 +158,28 @@ export function KnowledgeBaseAdmin() {
     "sağlık", "fikri_mülkiyet", "inşaat", "sigorta", "bankacılık",
     "aile", "spor", "enerji_maden", "mevzuat", "genel",
   ];
+  // Auto-detect kapsamındaki bilinen şablon türleri (manuel override için).
   const TEMPLATE_TYPES = [
+    "isci_isveren_anlasma", "ticari_anlasma", "tuketici_anlasma", "kira_anlasma", "ortaklik_anlasma", "ihtiyari_anlasma",
+    "isci_isveren_anlasamamama", "ticari_anlasamamama", "kira_anlasamamama", "ortaklik_anlasamamama", "ihtiyari_anlasamamama",
+    "isci_isveren_ilk_oturum", "ticari_ilk_oturum",
+    "isci_isveren_davet", "ticari_davet", "tuketici_davet", "ihtiyari_davet",
+    "isci_isveren_ucret", "ticari_ucret",
+    "bilgilendirme_tutanagi",
     "dava_sarti_anlasma", "dava_sarti_anlasamamama", "dava_sarti_ilk_oturum",
-    "ihtiyari_anlasma", "ihtiyari_anlasamamama", "ihtiyari_davet",
-    "isci_isveren_davet", "ticari_davet", "tuketici_davet",
   ];
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadCategory, setUploadCategory] = useState<string>("genel");
   const [uploadMode, setUploadMode] = useState<"knowledge" | "template">("knowledge");
-  const [uploadTemplateType, setUploadTemplateType] = useState<string>("dava_sarti_anlasma");
   const [uploadStage, setUploadStage] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
-  const [uploadResults, setUploadResults] = useState<Array<{ name: string; ok: boolean; error?: string; chunks?: number }>>([]);
+  type UploadResult = { name: string; ok: boolean; error?: string; chunks?: number; template_type?: string; auto_detected?: boolean; needs_manual?: boolean };
+  const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
+  const [manualOverride, setManualOverride] = useState<Record<string, string>>({});
+  const [reassigning, setReassigning] = useState<string | null>(null);
 
   const handleUpload = async () => {
     if (!uploadFiles.length) { toast({ title: "Dosya seçin", variant: "destructive" }); return; }
