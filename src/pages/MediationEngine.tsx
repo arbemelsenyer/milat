@@ -1197,7 +1197,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
                 <div><Label>Ad *</Label><Input value={draft.first_name ?? ""} onChange={(e) => setDraft({ ...draft, first_name: e.target.value })} /></div>
                 <div><Label>Soyad *</Label><Input value={draft.last_name ?? ""} onChange={(e) => setDraft({ ...draft, last_name: e.target.value })} /></div>
                 <div><Label>TC Kimlik No</Label><Input value={draft.tc_kimlik ?? ""} onChange={(e) => setDraft({ ...draft, tc_kimlik: e.target.value })} /></div>
-                <div><Label>Doğum Tarihi</Label><Input type="date" value={draft.birth_date ?? ""} onChange={(e) => setDraft({ ...draft, birth_date: e.target.value })} /></div>
+                
                 <div><Label>GSM</Label><Input value={draft.gsm ?? ""} onChange={(e) => setDraft({ ...draft, gsm: e.target.value })} /></div>
                 <div><Label>Telefon</Label><Input value={draft.phone ?? ""} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} /></div>
               </>
