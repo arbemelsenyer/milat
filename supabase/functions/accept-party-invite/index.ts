@@ -28,10 +28,17 @@ Deno.serve(async (req) => {
       .select("id, case_party_id, invite_status")
       .eq("token", token).maybeSingle();
     if (!invite) return new Response(JSON.stringify({ error: "Invalid token" }), { status: 404, headers: corsHeaders });
+    if (invite.invite_status !== "pending") {
+      return new Response(JSON.stringify({ error: "Invite already used or expired" }), { status: 409, headers: corsHeaders });
+    }
 
     const { data: party } = await admin.from("case_parties")
       .select("id, case_id, user_id").eq("id", invite.case_party_id).maybeSingle();
     if (!party) return new Response(JSON.stringify({ error: "Party not found" }), { status: 404, headers: corsHeaders });
+    if (party.user_id) {
+      return new Response(JSON.stringify({ error: "Party slot already claimed" }), { status: 409, headers: corsHeaders });
+    }
+
 
     await admin.from("case_parties").update({
       user_id: u.user.id, invite_status: "accepted",
