@@ -322,12 +322,19 @@ export function GoogleDriveImporter() {
             <Button size="sm" variant="outline" onClick={disconnect} className="ml-auto">Bağlantıyı Kes</Button>
           </div>
 
-          <Input
-            placeholder="Ada göre filtrele…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="h-8 text-sm"
-          />
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Ada göre filtrele…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="h-8 text-sm flex-1"
+            />
+            <Button size="sm" variant="outline" onClick={selectAllInFolder} disabled={loadingFiles || filtered.length === 0}>
+              {filtered.filter((f) => f.mimeType !== "application/vnd.google-apps.folder").every((f) => !!selected[f.id]) && filtered.some((f) => f.mimeType !== "application/vnd.google-apps.folder")
+                ? "Tümünü Kaldır"
+                : "Tümünü Seç"}
+            </Button>
+          </div>
 
           <div className="max-h-72 overflow-y-auto rounded border bg-background">
             {loadingFiles ? (
@@ -364,16 +371,38 @@ export function GoogleDriveImporter() {
             )}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
-              <Label htmlFor="gd-cat">Kategori *</Label>
-              <Select value={category} onValueChange={setCategory} disabled={importing}>
-                <SelectTrigger id="gd-cat"><SelectValue /></SelectTrigger>
+              <Label>Kategori *</Label>
+              <Select value={mode} onValueChange={(v) => setMode(v as any)} disabled={importing}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  <SelectItem value="knowledge">Bilgi Tabanı</SelectItem>
+                  <SelectItem value="template">Şablon Olarak</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {mode === "knowledge" ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="gd-cat">Bilgi Tabanı Kategorisi *</Label>
+                <Select value={category} onValueChange={setCategory} disabled={importing}>
+                  <SelectTrigger id="gd-cat"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label>Şablon Türü *</Label>
+                <Select value={templateType} onValueChange={setTemplateType} disabled={importing}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TEMPLATE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex items-end">
               <div className="text-xs text-muted-foreground">
                 Seçili dosya: <b>{selectableCount}</b>
@@ -381,23 +410,34 @@ export function GoogleDriveImporter() {
             </div>
           </div>
 
+          {importing && importProgress.total > 0 && (
+            <div className="space-y-1">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div className="h-full bg-primary transition-all" style={{ width: `${Math.round((importProgress.done / importProgress.total) * 100)}%` }} />
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {importProgress.done}/{importProgress.total} dosya işlendi
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-3">
             <Button onClick={runImport} disabled={importing || selectableCount === 0} size="sm">
               {importing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CloudDownload className="w-4 h-4 mr-2" />}
-              İçe Aktar ve İşle
+              {selectableCount > 1 ? `${selectableCount} Dosyayı İçe Aktar` : "İçe Aktar ve İşle"}
             </Button>
             {stage && <span className="text-xs text-muted-foreground">{stage}</span>}
           </div>
 
           {results && results.length > 0 && (
-            <div className="rounded border bg-background p-3 space-y-1">
-              <div className="text-xs font-medium">Sonuçlar</div>
+            <div className="rounded border bg-background p-3 space-y-1 max-h-56 overflow-y-auto">
+              <div className="text-xs font-medium">Sonuçlar ({results.filter((r) => r.ok).length}/{results.length})</div>
               <ul className="text-xs space-y-1">
                 {results.map((r) => (
                   <li key={r.id} className="flex items-center justify-between gap-2">
                     <span className="truncate">{r.name}</span>
                     {r.ok
-                      ? <span className="text-emerald-700">✓ {r.chunks} chunk</span>
+                      ? <span className="text-emerald-700">✓ {r.chunks ? `${r.chunks} chunk` : "şablon"}</span>
                       : <span className="text-destructive">✗ {r.error}</span>}
                   </li>
                 ))}
