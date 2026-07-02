@@ -144,13 +144,27 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const accessToken: string = String(body.accessToken ?? "").trim();
+    const mode: string = String(body.mode ?? "knowledge").trim(); // "knowledge" | "template"
     const category: string = String(body.category ?? "").trim();
+    const templateType: string = String(body.template_type ?? "").trim();
     const files: Array<{ id: string; name: string; mimeType: string }> = Array.isArray(body.files) ? body.files : [];
 
     if (!accessToken) return json({ error: "Google erişim jetonu eksik" }, 400);
-    if (!ALLOWED_CATEGORIES.has(category)) return json({ error: "Geçersiz kategori" }, 400);
     if (!files.length) return json({ error: "En az bir dosya seçin" }, 400);
-    if (files.length > 25) return json({ error: "En fazla 25 dosya seçilebilir" }, 400);
+    if (files.length > 50) return json({ error: "En fazla 50 dosya seçilebilir" }, 400);
+
+    const KNOWN_TEMPLATE_TYPES = new Set([
+      "dava_sarti_anlasma","dava_sarti_anlasamamama","dava_sarti_ilk_oturum",
+      "ihtiyari_anlasma","ihtiyari_anlasamamama","ihtiyari_davet",
+      "isci_isveren_davet","ticari_davet","tuketici_davet",
+    ]);
+
+    if (mode === "template") {
+      if (!KNOWN_TEMPLATE_TYPES.has(templateType)) return json({ error: `Bilinmeyen şablon türü: ${templateType}` }, 400);
+      if (files.length > 1) return json({ error: "Şablon modunda tek dosya seçin (her şablon tek dosyadan oluşur)." }, 400);
+    } else {
+      if (!ALLOWED_CATEGORIES.has(category)) return json({ error: "Geçersiz kategori" }, 400);
+    }
 
     const results: any[] = [];
     let grandTotalChunks = 0;
@@ -161,6 +175,21 @@ Deno.serve(async (req) => {
         const { bytes, effectiveMime, effectiveName } = await downloadFromDrive(f.id, f.mimeType, accessToken);
         const displayName = f.name + effectiveName;
         const fullText = await extractFromBytes(bytes, displayName, effectiveMime);
+
+        if (mode === "template") {
+          if (!fullText.trim()) throw new Error("Dosyadan metin çıkarılamadı");
+          const { error: upErr } = await admin.from("document_templates").upsert({
+            template_type: templateType,
+            template_content: fullText,
+            source_url: `gdrive://${f.id}`,
+            is_active: true,
+            uploaded_at: new Date().toISOString(),
+          }, { onConflict: "template_type" });
+          if (upErr) throw new Error(upErr.message);
+          results.push({ id: f.id, name: f.name, ok: true, chunks: 0, template_type: templateType, chars: fullText.length });
+          continue;
+        }
+
         const chunks = chunkText(fullText);
         if (!chunks.length) throw new Error("Yeterli metin çıkarılamadı");
         if (chunks.length > 800) throw new Error(`Anormal parça sayısı (${chunks.length})`);
@@ -204,6 +233,7 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
+      mode,
       processed: results.filter((r) => r.ok).length,
       failed: results.filter((r) => !r.ok).length,
       chunks: grandTotalChunks,

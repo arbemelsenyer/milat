@@ -14,6 +14,12 @@ const CATEGORIES = [
   "aile", "spor", "enerji_maden", "mevzuat", "genel",
 ];
 
+const TEMPLATE_TYPES = [
+  "dava_sarti_anlasma", "dava_sarti_anlasamamama", "dava_sarti_ilk_oturum",
+  "ihtiyari_anlasma", "ihtiyari_anlasamamama", "ihtiyari_davet",
+  "isci_isveren_davet", "ticari_davet", "tuketici_davet",
+];
+
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 const ROOT = { id: "root", name: "Drive'ım" };
 
@@ -63,6 +69,8 @@ export function GoogleDriveImporter() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [category, setCategory] = useState("genel");
+  const [mode, setMode] = useState<"knowledge" | "template">("knowledge");
+  const [templateType, setTemplateType] = useState<string>("dava_sarti_anlasma");
 
   const [stack, setStack] = useState<Array<{ id: string; name: string }>>([ROOT]);
   const [files, setFiles] = useState<DriveFile[]>([]);
@@ -70,6 +78,7 @@ export function GoogleDriveImporter() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Record<string, DriveFile>>({});
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [stage, setStage] = useState("");
   const [results, setResults] = useState<any[] | null>(null);
   const tokenClientRef = useRef<any>(null);
@@ -190,6 +199,20 @@ export function GoogleDriveImporter() {
 
   const selectableCount = Object.values(selected).filter((s) => s.mimeType !== "application/vnd.google-apps.folder").length;
 
+  const selectAllInFolder = () => {
+    const eligible = filtered.filter((f) => f.mimeType !== "application/vnd.google-apps.folder");
+    const allSelected = eligible.every((f) => !!selected[f.id]);
+    setSelected((prev) => {
+      const cp = { ...prev };
+      if (allSelected) {
+        for (const f of eligible) delete cp[f.id];
+      } else {
+        for (const f of eligible) cp[f.id] = f;
+      }
+      return cp;
+    });
+  };
+
   const runImport = async () => {
     if (!accessToken) return;
     const picked = Object.values(selected).filter((s) => s.mimeType !== "application/vnd.google-apps.folder");
@@ -197,25 +220,46 @@ export function GoogleDriveImporter() {
       toast({ title: "Dosya seçin", description: "En az bir belge seçmelisiniz.", variant: "destructive" });
       return;
     }
+    if (mode === "template" && picked.length > 1) {
+      toast({ title: "Şablon modunda tek dosya seçin", description: "Her şablon türü tek dosyadan oluşur.", variant: "destructive" });
+      return;
+    }
     setImporting(true);
     setResults(null);
-    setStage("Google Drive'dan indiriliyor...");
+    setImportProgress({ done: 0, total: picked.length });
+    setStage(`0/${picked.length} dosya işlendi — Google Drive'dan indiriliyor…`);
     try {
-      setStage("Metin çıkarılıyor, chunk'lara bölünüyor ve embedding üretiliyor...");
-      const { data, error } = await supabase.functions.invoke("google-drive-import", {
-        body: {
-          accessToken,
-          category,
-          files: picked.map((p) => ({ id: p.id, name: p.name, mimeType: p.mimeType })),
-        },
-      });
-      if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
-      setResults((data as any)?.results ?? []);
-      setStage("");
+      // Process in chunks so progress updates and we don't hit function time limits with big batches.
+      const CHUNK = mode === "template" ? 1 : 5;
+      const allResults: any[] = [];
+      let done = 0;
+      for (let i = 0; i < picked.length; i += CHUNK) {
+        const slice = picked.slice(i, i + CHUNK);
+        setStage(`${done}/${picked.length} dosya işlendi — sıradaki ${slice.length} dosya işleniyor…`);
+        const { data, error } = await supabase.functions.invoke("google-drive-import", {
+          body: {
+            accessToken,
+            mode,
+            category,
+            template_type: templateType,
+            files: slice.map((p) => ({ id: p.id, name: p.name, mimeType: p.mimeType })),
+          },
+        });
+        if (error) throw error;
+        if ((data as any)?.error) throw new Error((data as any).error);
+        const partial = (data as any)?.results ?? [];
+        allResults.push(...partial);
+        done += slice.length;
+        setImportProgress({ done, total: picked.length });
+        setResults([...allResults]);
+      }
+      const ok = allResults.filter((r) => r.ok).length;
+      const fail = allResults.length - ok;
+      setStage(`Tamamlandı: ${picked.length} dosyadan ${ok}'i başarılı${fail ? `, ${fail} hata` : ""} ✅`);
       toast({
-        title: "İçe aktarma tamamlandı",
-        description: `${(data as any)?.processed ?? 0} dosya · ${(data as any)?.chunks ?? 0} chunk kaydedildi.`,
+        title: fail === 0 ? "İçe aktarma tamamlandı" : `${ok}/${picked.length} başarılı`,
+        description: fail > 0 ? `${fail} dosyada hata oluştu.` : undefined,
+        variant: fail > 0 ? "destructive" : "default",
       });
       setSelected({});
     } catch (e: any) {
@@ -278,12 +322,19 @@ export function GoogleDriveImporter() {
             <Button size="sm" variant="outline" onClick={disconnect} className="ml-auto">Bağlantıyı Kes</Button>
           </div>
 
-          <Input
-            placeholder="Ada göre filtrele…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="h-8 text-sm"
-          />
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Ada göre filtrele…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="h-8 text-sm flex-1"
+            />
+            <Button size="sm" variant="outline" onClick={selectAllInFolder} disabled={loadingFiles || filtered.length === 0}>
+              {filtered.filter((f) => f.mimeType !== "application/vnd.google-apps.folder").every((f) => !!selected[f.id]) && filtered.some((f) => f.mimeType !== "application/vnd.google-apps.folder")
+                ? "Tümünü Kaldır"
+                : "Tümünü Seç"}
+            </Button>
+          </div>
 
           <div className="max-h-72 overflow-y-auto rounded border bg-background">
             {loadingFiles ? (
@@ -320,16 +371,38 @@ export function GoogleDriveImporter() {
             )}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
-              <Label htmlFor="gd-cat">Kategori *</Label>
-              <Select value={category} onValueChange={setCategory} disabled={importing}>
-                <SelectTrigger id="gd-cat"><SelectValue /></SelectTrigger>
+              <Label>Kategori *</Label>
+              <Select value={mode} onValueChange={(v) => setMode(v as any)} disabled={importing}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  <SelectItem value="knowledge">Bilgi Tabanı</SelectItem>
+                  <SelectItem value="template">Şablon Olarak</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {mode === "knowledge" ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="gd-cat">Bilgi Tabanı Kategorisi *</Label>
+                <Select value={category} onValueChange={setCategory} disabled={importing}>
+                  <SelectTrigger id="gd-cat"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label>Şablon Türü *</Label>
+                <Select value={templateType} onValueChange={setTemplateType} disabled={importing}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TEMPLATE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex items-end">
               <div className="text-xs text-muted-foreground">
                 Seçili dosya: <b>{selectableCount}</b>
@@ -337,23 +410,34 @@ export function GoogleDriveImporter() {
             </div>
           </div>
 
+          {importing && importProgress.total > 0 && (
+            <div className="space-y-1">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div className="h-full bg-primary transition-all" style={{ width: `${Math.round((importProgress.done / importProgress.total) * 100)}%` }} />
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {importProgress.done}/{importProgress.total} dosya işlendi
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-3">
             <Button onClick={runImport} disabled={importing || selectableCount === 0} size="sm">
               {importing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CloudDownload className="w-4 h-4 mr-2" />}
-              İçe Aktar ve İşle
+              {selectableCount > 1 ? `${selectableCount} Dosyayı İçe Aktar` : "İçe Aktar ve İşle"}
             </Button>
             {stage && <span className="text-xs text-muted-foreground">{stage}</span>}
           </div>
 
           {results && results.length > 0 && (
-            <div className="rounded border bg-background p-3 space-y-1">
-              <div className="text-xs font-medium">Sonuçlar</div>
+            <div className="rounded border bg-background p-3 space-y-1 max-h-56 overflow-y-auto">
+              <div className="text-xs font-medium">Sonuçlar ({results.filter((r) => r.ok).length}/{results.length})</div>
               <ul className="text-xs space-y-1">
                 {results.map((r) => (
                   <li key={r.id} className="flex items-center justify-between gap-2">
                     <span className="truncate">{r.name}</span>
                     {r.ok
-                      ? <span className="text-emerald-700">✓ {r.chunks} chunk</span>
+                      ? <span className="text-emerald-700">✓ {r.chunks ? `${r.chunks} chunk` : "şablon"}</span>
                       : <span className="text-destructive">✗ {r.error}</span>}
                   </li>
                 ))}
