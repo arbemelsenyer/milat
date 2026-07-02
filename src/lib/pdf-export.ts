@@ -298,17 +298,19 @@ export function generatePdfHtml(summary: CaseSummary, options: ExportOptions): s
 export function exportToPdf(summary: CaseSummary, language: 'tr' | 'en' = 'tr'): void {
   const html = generatePdfHtml(summary, { language });
   
-  // Create a new window for printing
-  const printWindow = window.open('', '_blank');
+  // Use a Blob URL instead of document.write() to avoid live-DOM script execution.
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const printWindow = window.open(url, '_blank');
   if (printWindow) {
-    printWindow.document.write(html);
-    printWindow.document.close();
-    
-    // Wait for content to load before printing
     printWindow.onload = () => {
       printWindow.print();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     };
+  } else {
+    URL.revokeObjectURL(url);
   }
+
 }
 
 export function downloadAsHtml(summary: CaseSummary, language: 'tr' | 'en' = 'tr'): void {
