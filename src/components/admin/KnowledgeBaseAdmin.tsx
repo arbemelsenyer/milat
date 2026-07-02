@@ -544,15 +544,51 @@ export function KnowledgeBaseAdmin() {
           </div>
 
           {uploadResults.length > 0 && (
-            <div className="rounded border bg-background p-3 space-y-1 max-h-48 overflow-y-auto">
+            <div className="rounded border bg-background p-3 space-y-2 max-h-96 overflow-y-auto">
               <div className="text-xs font-medium">Sonuçlar ({uploadResults.filter((r) => r.ok).length}/{uploadResults.length})</div>
-              <ul className="text-xs space-y-1">
+              <ul className="text-xs space-y-2">
                 {uploadResults.map((r, i) => (
-                  <li key={i} className="flex items-center justify-between gap-2">
-                    <span className="truncate">{r.name}</span>
-                    {r.ok
-                      ? <span className="text-emerald-700">✓ {r.chunks != null ? `${r.chunks} chunk` : "OK"}</span>
-                      : <span className="text-destructive">✗ {r.error}</span>}
+                  <li key={i} className="space-y-1 border-b last:border-b-0 pb-2 last:pb-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-medium">{r.name}</span>
+                      {!r.ok && <span className="text-destructive shrink-0">✗ {r.error}</span>}
+                      {r.ok && r.template_type && !r.needs_manual && (
+                        <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white shrink-0">
+                          ✓ {r.template_type}{r.auto_detected ? " · otomatik" : ""}
+                        </Badge>
+                      )}
+                      {r.ok && !r.template_type && (
+                        <span className="text-emerald-700 shrink-0">✓ {r.chunks != null ? `${r.chunks} chunk` : "OK"}</span>
+                      )}
+                    </div>
+                    {r.ok && r.needs_manual && (
+                      <div className="rounded-md border border-yellow-400 bg-yellow-50 p-2 space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-yellow-800">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          <span className="font-medium">Tür tespit edilemedi, lütfen manuel seçin</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={manualOverride[r.name] ?? ""}
+                            onValueChange={(v) => setManualOverride((prev) => ({ ...prev, [r.name]: v }))}
+                            disabled={reassigning === r.name}
+                          >
+                            <SelectTrigger className="h-8"><SelectValue placeholder="Tür seçin..." /></SelectTrigger>
+                            <SelectContent>
+                              {TEMPLATE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={!manualOverride[r.name] || reassigning === r.name}
+                            onClick={() => reassignTemplate(r.name)}
+                          >
+                            {reassigning === r.name ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Uygula"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
