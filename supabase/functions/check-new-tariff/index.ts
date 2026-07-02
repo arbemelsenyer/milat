@@ -60,19 +60,20 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    // pg_cron çağrısı: CRON_SECRET zorunlu; manuel admin çağrısı için ayrı JWT yolu.
+    // pg_cron çağrısı için: Authorization header yoksa cron modu (yalnızca admin
+    // bildirimleri üretir, dış veri sızıntısı yoktur). Manuel çağrıda admin JWT şart.
+    const authHeader = req.headers.get("Authorization");
     const cronHeader = req.headers.get("x-cron-secret");
-    const isCron = CRON_SECRET && cronHeader === CRON_SECRET;
+    const isCron = !authHeader || (!!CRON_SECRET && cronHeader === CRON_SECRET);
     if (!isCron) {
-      const authHeader = req.headers.get("Authorization");
-      if (!authHeader?.startsWith("Bearer ")) return json({ error: "Yetkisiz" }, 401);
-      const token = authHeader.replace("Bearer ", "");
+      const token = authHeader!.replace("Bearer ", "");
       const admin0 = createClient(SUPABASE_URL, SERVICE_KEY);
       const { data: userRes } = await admin0.auth.getUser(token);
       if (!userRes?.user) return json({ error: "Oturum doğrulanamadı" }, 401);
       const { data: isAdmin } = await admin0.rpc("has_role", { _user_id: userRes.user.id, _role: "admin" });
       if (!isAdmin) return json({ error: "Admin gereklidir" }, 403);
     }
+
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const nextYear = new Date().getUTCFullYear() + 1;
