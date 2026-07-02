@@ -50,6 +50,11 @@ Deno.serve(async (req) => {
       invite_status: "accepted", accepted_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }).eq("id", invite.id);
 
+    const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || null;
+    await admin.from("party_invite_logs").insert({
+      case_id: party.case_id, party_id: party.id, event_type: "accepted", ip_address: ip,
+    });
+
     return new Response(JSON.stringify({ case_id: party.case_id, party_id: party.id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
