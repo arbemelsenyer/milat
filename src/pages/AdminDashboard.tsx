@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Search, UserCog, Calendar, UserPlus, Trash2, Mail, ShieldAlert } from 'lucide-react';
 import { KnowledgeBaseAdmin } from '@/components/admin/KnowledgeBaseAdmin';
 import { TariffAdmin } from '@/components/admin/TariffAdmin';
+import { TemplateAdmin } from '@/components/admin/TemplateAdmin';
 
 
 interface CaseRow {
@@ -302,6 +303,10 @@ export default function AdminDashboard() {
 
         <div className="mb-8">
           <TariffAdmin />
+        </div>
+
+        <div className="mb-8">
+          <TemplateAdmin />
         </div>
 
         <Tabs defaultValue="cases" className="space-y-6">
