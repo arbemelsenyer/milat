@@ -911,6 +911,39 @@ export type Database = {
         }
         Relationships: []
       }
+      fee_tariffs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          effective_date: string
+          id: string
+          is_active: boolean
+          tariff_data: Json
+          updated_at: string
+          yil: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          effective_date: string
+          id?: string
+          is_active?: boolean
+          tariff_data: Json
+          updated_at?: string
+          yil: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          effective_date?: string
+          id?: string
+          is_active?: boolean
+          tariff_data?: Json
+          updated_at?: string
+          yil?: number
+        }
+        Relationships: []
+      }
       knowledge_base_chunks: {
         Row: {
           category: string
@@ -1871,6 +1904,7 @@ export type Database = {
           source_url: string
         }[]
       }
+      notify_admins_new_tariff: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "user" | "mediator" | "admin"
