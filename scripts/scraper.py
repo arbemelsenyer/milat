@@ -153,6 +153,170 @@ def standart_web_isle(kaynak):
         print(f"Hata ({kaynak['alan']}): {e}")
     return yeni, atlandi
 
+
+# ============================================================
+# YENİ: Resmi Gazete & TBMM mevzuat takibi
+# Bu iki fonksiyon cases_vector_pool yerine pending_pool tablosuna yazar.
+# Admin panelinden onaylanan kayıtlar knowledge_base_chunks'a taşınır.
+# ============================================================
+
+MEVZUAT_ANAHTAR = ["arabuluculuk", "arabulucu", "arabuluculuğa", "arabuluculuğun"]
+
+def _pending_zaten_var_mi(url):
+    """pending_pool'da aynı source_url ile kayıt var mı?"""
+    if not url:
+        return False
+    try:
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/pending_pool?source_url=eq.{requests.utils.quote(url, safe='')}&select=id&limit=1",
+            headers=headers_sb, timeout=10,
+        )
+        if r.status_code == 200:
+            return len(r.json()) > 0
+    except Exception:
+        pass
+    # knowledge_base_chunks'da da onaylanmış olabilir
+    try:
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/knowledge_base_chunks?source_url=eq.{requests.utils.quote(url, safe='')}&select=id&limit=1",
+            headers=headers_sb, timeout=10,
+        )
+        if r.status_code == 200 and len(r.json()) > 0:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _pending_ekle(title, url, raw_content, metadata=None):
+    """pending_pool'a yeni bir mevzuat kaydı ekle."""
+    if not raw_content or len(raw_content) < 200:
+        return False
+    if _pending_zaten_var_mi(url):
+        return False
+    body = {
+        "source_url": url,
+        "raw_content": raw_content[:200000],
+        "niche_area": "mevzuat",
+        "status": "pending",
+        "metadata": {
+            "source_title": (title or "")[:300],
+            "provider": (metadata or {}).get("provider", "unknown"),
+            **(metadata or {}),
+        },
+    }
+    try:
+        r = requests.post(
+            f"{SUPABASE_URL}/rest/v1/pending_pool",
+            headers={**headers_sb, "Prefer": "return=minimal"},
+            json=body, timeout=15,
+        )
+        return r.status_code in (200, 201, 204)
+    except Exception as e:
+        print(f"pending_pool insert hata: {e}")
+        return False
+
+
+def _metin_alakali(metin):
+    if not metin:
+        return False
+    low = metin.lower()
+    return any(k in low for k in MEVZUAT_ANAHTAR)
+
+
+def scrape_resmi_gazete():
+    """
+    Resmi Gazete son 30 günlük arşivini tarar, 'arabuluculuk' geçen
+    tebliğ/yönetmelik/kanunları pending_pool'a ekler.
+    """
+    import datetime as _dt
+    yeni = 0
+    today = _dt.date.today()
+    for offset in range(0, 30):
+        gun = today - _dt.timedelta(days=offset)
+        # Resmi Gazete günlük fihrist URL kalıbı
+        url = f"https://www.resmigazete.gov.tr/{gun.year:04d}/{gun.month:02d}/{gun.year:04d}{gun.month:02d}{gun.day:02d}.htm"
+        try:
+            res = requests.get(url, timeout=20, headers={'User-Agent': 'Mozilla/5.0'})
+            if res.status_code != 200:
+                continue
+            soup = BeautifulSoup(res.text, 'html.parser')
+            # Fihristte 'arabuluculuk' geçen linkleri bul
+            for a in soup.find_all('a', href=True):
+                text = a.get_text(" ", strip=True)
+                if not _metin_alakali(text):
+                    continue
+                link = a['href']
+                if link.startswith("/"):
+                    link = "https://www.resmigazete.gov.tr" + link
+                elif not link.startswith("http"):
+                    link = f"https://www.resmigazete.gov.tr/{gun.year:04d}/{gun.month:02d}/" + link
+                if _pending_zaten_var_mi(link):
+                    continue
+                try:
+                    detay = requests.get(link, timeout=20, headers={'User-Agent': 'Mozilla/5.0'})
+                    d_soup = BeautifulSoup(detay.text, 'html.parser')
+                    for el in d_soup(["script", "style", "nav", "footer", "header"]):
+                        el.decompose()
+                    ham = d_soup.get_text("\n", strip=True)
+                    if not _metin_alakali(ham) or len(ham) < 300:
+                        continue
+                    if _pending_ekle(text, link, ham, {"provider": "resmi_gazete", "yayin_tarihi": gun.isoformat()}):
+                        yeni += 1
+                        print(f"[Resmi Gazete] +1: {text[:80]}")
+                except Exception as e:
+                    print(f"[Resmi Gazete] detay hata: {e}")
+        except Exception as e:
+            print(f"[Resmi Gazete] gün hata {gun}: {e}")
+    return yeni
+
+
+def scrape_tbmm():
+    """
+    TBMM sitesinde 'arabuluculuk' araması yaparak kanun tekliflerini
+    ve kabul edilen kanunları pending_pool'a ekler.
+    """
+    yeni = 0
+    search_urls = [
+        "https://www.tbmm.gov.tr/develop/owa/kanun_teklifi_sd.sorgu_yonlendirme?kelime=arabuluculuk",
+        "https://www.tbmm.gov.tr/develop/owa/kanunlar_sd.sorgu_yonlendirme?kelime=arabuluculuk",
+        "https://www.google.com/search?q=site:tbmm.gov.tr+arabuluculuk",
+    ]
+    for surl in search_urls:
+        try:
+            res = requests.get(surl, timeout=25, headers={'User-Agent': 'Mozilla/5.0'})
+            if res.status_code != 200:
+                continue
+            soup = BeautifulSoup(res.text, 'html.parser')
+            for a in soup.find_all('a', href=True):
+                text = a.get_text(" ", strip=True)
+                href = a['href']
+                if "tbmm.gov.tr" not in href and not href.startswith("/"):
+                    continue
+                if not (_metin_alakali(text) or _metin_alakali(href)):
+                    continue
+                link = href if href.startswith("http") else "https://www.tbmm.gov.tr" + href
+                if _pending_zaten_var_mi(link):
+                    continue
+                try:
+                    detay = requests.get(link, timeout=20, headers={'User-Agent': 'Mozilla/5.0'})
+                    d_soup = BeautifulSoup(detay.text, 'html.parser')
+                    for el in d_soup(["script", "style", "nav", "footer", "header"]):
+                        el.decompose()
+                    ham = d_soup.get_text("\n", strip=True)
+                    if not _metin_alakali(ham) or len(ham) < 300:
+                        continue
+                    if _pending_ekle(text or "TBMM Kanun/Teklif", link, ham, {"provider": "tbmm"}):
+                        yeni += 1
+                        print(f"[TBMM] +1: {(text or link)[:80]}")
+                except Exception as e:
+                    print(f"[TBMM] detay hata: {e}")
+        except Exception as e:
+            print(f"[TBMM] arama hata: {e}")
+    return yeni
+
+
+
 kaynaklar = [
     {'url': 'https://karararama.yargitay.gov.tr', 'alan': 'yargitay'},
     {'url': 'https://emsal.yargitay.gov.tr', 'alan': 'yargitay_emsal'},
@@ -192,3 +356,16 @@ if __name__ == "__main__":
             else:
                 yeni, atlandi = standart_web_isle(kaynak)
             print(f"{kaynak['alan']}: {yeni} yeni veri, {atlandi} atlandı")
+
+        # --- Mevzuat Takibi (Resmi Gazete + TBMM → pending_pool) ---
+        try:
+            rg = scrape_resmi_gazete()
+            print(f"resmi_gazete_mevzuat: {rg} yeni bekleyen kayıt")
+        except Exception as e:
+            print(f"resmi_gazete_mevzuat hata: {e}")
+        try:
+            tb = scrape_tbmm()
+            print(f"tbmm_mevzuat: {tb} yeni bekleyen kayıt")
+        except Exception as e:
+            print(f"tbmm_mevzuat hata: {e}")
+
