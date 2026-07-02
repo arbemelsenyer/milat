@@ -158,21 +158,28 @@ export function KnowledgeBaseAdmin() {
     "sağlık", "fikri_mülkiyet", "inşaat", "sigorta", "bankacılık",
     "aile", "spor", "enerji_maden", "mevzuat", "genel",
   ];
+  // Auto-detect kapsamındaki bilinen şablon türleri (manuel override için).
   const TEMPLATE_TYPES = [
+    "isci_isveren_anlasma", "ticari_anlasma", "tuketici_anlasma", "kira_anlasma", "ortaklik_anlasma", "ihtiyari_anlasma",
+    "isci_isveren_anlasamamama", "ticari_anlasamamama", "kira_anlasamamama", "ortaklik_anlasamamama", "ihtiyari_anlasamamama",
+    "isci_isveren_ilk_oturum", "ticari_ilk_oturum",
+    "isci_isveren_davet", "ticari_davet", "tuketici_davet", "ihtiyari_davet",
+    "isci_isveren_ucret", "ticari_ucret",
+    "bilgilendirme_tutanagi",
     "dava_sarti_anlasma", "dava_sarti_anlasamamama", "dava_sarti_ilk_oturum",
-    "ihtiyari_anlasma", "ihtiyari_anlasamamama", "ihtiyari_davet",
-    "isci_isveren_davet", "ticari_davet", "tuketici_davet",
   ];
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadCategory, setUploadCategory] = useState<string>("genel");
   const [uploadMode, setUploadMode] = useState<"knowledge" | "template">("knowledge");
-  const [uploadTemplateType, setUploadTemplateType] = useState<string>("dava_sarti_anlasma");
   const [uploadStage, setUploadStage] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
-  const [uploadResults, setUploadResults] = useState<Array<{ name: string; ok: boolean; error?: string; chunks?: number }>>([]);
+  type UploadResult = { name: string; ok: boolean; error?: string; chunks?: number; template_type?: string; auto_detected?: boolean; needs_manual?: boolean };
+  const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
+  const [manualOverride, setManualOverride] = useState<Record<string, string>>({});
+  const [reassigning, setReassigning] = useState<string | null>(null);
 
   const handleUpload = async () => {
     if (!uploadFiles.length) { toast({ title: "Dosya seçin", variant: "destructive" }); return; }
@@ -186,26 +193,27 @@ export function KnowledgeBaseAdmin() {
         toast({ title: `${f.name}: sadece PDF, DOCX veya TXT kabul edilir`, variant: "destructive" }); return;
       }
     }
-    if (uploadMode === "template" && uploadFiles.length > 1) {
-      toast({ title: "Şablon modunda tek dosya seçin", description: "Her şablon türü tek dosyadan oluşur; ayrı ayrı yükleyin.", variant: "destructive" });
-      return;
-    }
     setUploading(true);
     setUploadResults([]);
+    setManualOverride({});
     setUploadProgress({ done: 0, total: uploadFiles.length });
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { toast({ title: "Oturum bulunamadı", variant: "destructive" }); setUploading(false); return; }
     const projectUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
-    const results: Array<{ name: string; ok: boolean; error?: string; chunks?: number }> = [];
+    const results: UploadResult[] = [];
     for (let i = 0; i < uploadFiles.length; i++) {
       const file = uploadFiles[i];
-      setUploadStage(`${i + 1}/${uploadFiles.length} dosya işleniyor: ${file.name}`);
+      setUploadStage(
+        uploadMode === "template"
+          ? `${i + 1}/${uploadFiles.length} — Tür otomatik tespit ediliyor: ${file.name}`
+          : `${i + 1}/${uploadFiles.length} dosya işleniyor: ${file.name}`
+      );
       try {
         const form = new FormData();
         form.append("file", file);
         let endpoint = "";
         if (uploadMode === "template") {
-          form.append("template_type", uploadTemplateType);
+          // template_type göndermiyoruz — sunucu otomatik tespit edecek.
           endpoint = "admin-upload-template";
         } else {
           const title = (uploadFiles.length === 1 && uploadTitle.trim()) ? uploadTitle.trim() : file.name.replace(/\.[^.]+$/, "");
@@ -220,7 +228,12 @@ export function KnowledgeBaseAdmin() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
-        results.push({ name: file.name, ok: true, chunks: data.chunks });
+        results.push({
+          name: file.name, ok: true, chunks: data.chunks,
+          template_type: data.template_type,
+          auto_detected: data.auto_detected,
+          needs_manual: data.needs_manual,
+        });
       } catch (e: any) {
         results.push({ name: file.name, ok: false, error: e?.message ?? "Bilinmeyen hata" });
       }
@@ -229,7 +242,10 @@ export function KnowledgeBaseAdmin() {
     }
     const ok = results.filter((r) => r.ok).length;
     const fail = results.length - ok;
-    setUploadStage(`Tamamlandı: ${uploadFiles.length} dosyadan ${ok}'i başarılı${fail ? `, ${fail} hata` : ""} ✅`);
+    const undetected = results.filter((r) => r.ok && r.needs_manual).length;
+    setUploadStage(
+      `Tamamlandı: ${uploadFiles.length} dosyadan ${ok}'i başarılı${fail ? `, ${fail} hata` : ""}${undetected ? `, ${undetected} tür tespit edilemedi` : ""} ✅`
+    );
     toast({
       title: fail === 0 ? "Yükleme tamamlandı" : `${ok}/${uploadFiles.length} başarılı`,
       description: fail > 0 ? `${fail} dosyada hata oluştu — detaylar aşağıda.` : undefined,
@@ -240,7 +256,40 @@ export function KnowledgeBaseAdmin() {
     if (fileInputRef.current) fileInputRef.current.value = "";
     setUploading(false);
     await loadSources();
-    setTimeout(() => setUploadStage(""), 6000);
+    setTimeout(() => setUploadStage(""), 8000);
+  };
+
+  // Manuel tür seçildikten sonra "diger" olarak kaydedilen şablonu doğru türe taşı.
+  const reassignTemplate = async (fileName: string) => {
+    const newType = manualOverride[fileName];
+    if (!newType) return;
+    setReassigning(fileName);
+    try {
+      // "diger" satırını yeni türle güncelle (upsert conflict = template_type).
+      // Basitlik için: mevcut "diger" içeriğini oku, yeni tür ile upsert et, sonra "diger"'i sil.
+      const { data: row, error: readErr } = await supabase
+        .from("document_templates")
+        .select("template_content, source_url")
+        .eq("template_type", "diger")
+        .maybeSingle();
+      if (readErr) throw readErr;
+      if (!row) throw new Error("'diger' kaydı bulunamadı — yeniden yükleyin.");
+      const { error: upErr } = await supabase.from("document_templates").upsert({
+        template_type: newType,
+        template_content: row.template_content,
+        source_url: row.source_url,
+        is_active: true,
+        uploaded_at: new Date().toISOString(),
+      }, { onConflict: "template_type" });
+      if (upErr) throw upErr;
+      await supabase.from("document_templates").delete().eq("template_type", "diger");
+      toast({ title: "Tür güncellendi", description: `${fileName} → ${newType}` });
+      setUploadResults((prev) => prev.map((r) => r.name === fileName ? { ...r, template_type: newType, needs_manual: false, auto_detected: false } : r));
+    } catch (e: any) {
+      toast({ title: "Güncelleme başarısız", description: e.message, variant: "destructive" });
+    } finally {
+      setReassigning(null);
+    }
   };
 
   // --- Kaynak listesi ---
@@ -437,14 +486,11 @@ export function KnowledgeBaseAdmin() {
                 </Select>
               </div>
             ) : (
-              <div className="space-y-1.5">
-                <Label>Şablon Türü *</Label>
-                <Select value={uploadTemplateType} onValueChange={setUploadTemplateType} disabled={uploading}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {TEMPLATE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Şablon Türü</Label>
+                <div className="rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground">
+                  Tür: <span className="italic">otomatik tespit ediliyor (dosya içeriğinden)</span>
+                </div>
               </div>
             )}
             {uploadMode === "knowledge" && uploadFiles.length === 1 && (
@@ -468,7 +514,7 @@ export function KnowledgeBaseAdmin() {
               id="kb-file"
               ref={fileInputRef}
               type="file"
-              multiple={uploadMode === "knowledge"}
+              multiple
               accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
               onChange={(e) => setUploadFiles(Array.from(e.target.files ?? []))}
               disabled={uploading}
@@ -498,15 +544,51 @@ export function KnowledgeBaseAdmin() {
           </div>
 
           {uploadResults.length > 0 && (
-            <div className="rounded border bg-background p-3 space-y-1 max-h-48 overflow-y-auto">
+            <div className="rounded border bg-background p-3 space-y-2 max-h-96 overflow-y-auto">
               <div className="text-xs font-medium">Sonuçlar ({uploadResults.filter((r) => r.ok).length}/{uploadResults.length})</div>
-              <ul className="text-xs space-y-1">
+              <ul className="text-xs space-y-2">
                 {uploadResults.map((r, i) => (
-                  <li key={i} className="flex items-center justify-between gap-2">
-                    <span className="truncate">{r.name}</span>
-                    {r.ok
-                      ? <span className="text-emerald-700">✓ {r.chunks != null ? `${r.chunks} chunk` : "OK"}</span>
-                      : <span className="text-destructive">✗ {r.error}</span>}
+                  <li key={i} className="space-y-1 border-b last:border-b-0 pb-2 last:pb-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-medium">{r.name}</span>
+                      {!r.ok && <span className="text-destructive shrink-0">✗ {r.error}</span>}
+                      {r.ok && r.template_type && !r.needs_manual && (
+                        <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white shrink-0">
+                          ✓ {r.template_type}{r.auto_detected ? " · otomatik" : ""}
+                        </Badge>
+                      )}
+                      {r.ok && !r.template_type && (
+                        <span className="text-emerald-700 shrink-0">✓ {r.chunks != null ? `${r.chunks} chunk` : "OK"}</span>
+                      )}
+                    </div>
+                    {r.ok && r.needs_manual && (
+                      <div className="rounded-md border border-yellow-400 bg-yellow-50 p-2 space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-yellow-800">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          <span className="font-medium">Tür tespit edilemedi, lütfen manuel seçin</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={manualOverride[r.name] ?? ""}
+                            onValueChange={(v) => setManualOverride((prev) => ({ ...prev, [r.name]: v }))}
+                            disabled={reassigning === r.name}
+                          >
+                            <SelectTrigger className="h-8"><SelectValue placeholder="Tür seçin..." /></SelectTrigger>
+                            <SelectContent>
+                              {TEMPLATE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={!manualOverride[r.name] || reassigning === r.name}
+                            onClick={() => reassignTemplate(r.name)}
+                          >
+                            {reassigning === r.name ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Uygula"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
