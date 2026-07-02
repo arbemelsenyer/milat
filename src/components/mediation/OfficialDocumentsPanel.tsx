@@ -105,9 +105,9 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
         doc = r;
       }
       const opts = { templateType: doc.template_type, applicationNo: caseRow.application_no, filledText: doc.filled_text, udfXml: doc.udf_xml };
-      if (fmt === "pdf") downloadOfficialPdf(opts);
+      if (fmt === "pdf") await downloadOfficialPdf(opts);
       else if (fmt === "docx") await downloadOfficialDocx(opts);
-      else downloadOfficialUdf(opts);
+      else await downloadOfficialUdf(opts);
     } finally {
       setGenerating(null);
     }
