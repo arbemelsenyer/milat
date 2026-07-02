@@ -1219,7 +1219,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
             <span>KVKK kapsamında kişisel verilerin işlenmesini onaylıyorum.</span>
           </label>
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setDraft(null)}>İptal</Button>
+            <Button variant="ghost" onClick={() => setDraft(null)} disabled={busy}>İptal</Button>
             <Button onClick={save} disabled={busy}>{busy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Kaydediliyor…</> : "Tarafı Kaydet"}</Button>
           </div>
         </Card>
