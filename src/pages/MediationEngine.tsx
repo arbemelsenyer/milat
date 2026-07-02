@@ -1090,8 +1090,8 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
   async function saveEdit() {
     if (!editing) return;
     const isInd = editing.party_type === "individual";
-    if (isInd && !(editing.first_name && editing.last_name)) { toast({ title: "Ad ve soyad zorunlu", variant: "destructive" }); return; }
-    if (!isInd && !editing.company_name) { toast({ title: "Kurum adı zorunlu", variant: "destructive" }); return; }
+    const vErr = validateParty(editing, isInd);
+    if (vErr) { toast({ title: "Doğrulama hatası", description: vErr, variant: "destructive" }); return; }
     setSavingEdit(true);
     try {
       const full_name = isInd
@@ -1102,7 +1102,6 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         last_name: editing.last_name ?? null,
         full_name,
         tc_kimlik: editing.tc_kimlik ?? null,
-        birth_date: editing.birth_date || null,
         address: editing.address ?? null,
         gsm: editing.gsm ?? null,
         phone: editing.phone ?? null,
