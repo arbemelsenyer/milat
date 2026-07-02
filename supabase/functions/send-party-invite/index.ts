@@ -32,19 +32,27 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
     }
 
-    // Issue / fetch invite token from private invites table (never exposed to case owner via RLS)
+    // Always mint a fresh token; only its SHA-256 hash is persisted so the
+    // plaintext value never leaves this response.
+    const token = crypto.randomUUID();
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+    const tokenHash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+
     const { data: existingInvite } = await admin.from("case_party_invites")
-      .select("token").eq("case_party_id", party_id).maybeSingle();
-    let token = existingInvite?.token as string | undefined;
-    if (!token) {
-      token = crypto.randomUUID();
-      await admin.from("case_party_invites").insert({
-        case_party_id: party_id,
-        token,
-        invite_status: "pending",
-      });
-      await admin.from("case_parties").update({ invite_status: "pending" }).eq("id", party_id);
+      .select("id, invite_status").eq("case_party_id", party_id).maybeSingle();
+    if (existingInvite && existingInvite.invite_status === "accepted") {
+      return new Response(JSON.stringify({ error: "Invite already accepted" }), { status: 409, headers: corsHeaders });
     }
+    if (existingInvite) {
+      await admin.from("case_party_invites").update({
+        token_hash: tokenHash, invite_status: "pending", updated_at: new Date().toISOString(),
+      }).eq("id", existingInvite.id);
+    } else {
+      await admin.from("case_party_invites").insert({
+        case_party_id: party_id, token_hash: tokenHash, invite_status: "pending",
+      });
+    }
+    await admin.from("case_parties").update({ invite_status: "pending" }).eq("id", party_id);
 
     const name = party.party_type === "individual"
       ? `${party.first_name ?? ""} ${party.last_name ?? ""}`.trim() || "Sayın Taraf"

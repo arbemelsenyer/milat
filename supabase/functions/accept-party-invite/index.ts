@@ -24,9 +24,12 @@ Deno.serve(async (req) => {
     if (!token) return new Response(JSON.stringify({ error: "token required" }), { status: 400, headers: corsHeaders });
 
     const admin = createClient(supabaseUrl, serviceKey);
+    const enc = new TextEncoder().encode(String(token));
+    const digest = await crypto.subtle.digest("SHA-256", enc);
+    const tokenHash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
     const { data: invite } = await admin.from("case_party_invites")
       .select("id, case_party_id, invite_status")
-      .eq("token", token).maybeSingle();
+      .eq("token_hash", tokenHash).maybeSingle();
     if (!invite) return new Response(JSON.stringify({ error: "Invalid token" }), { status: 404, headers: corsHeaders });
     if (invite.invite_status !== "pending") {
       return new Response(JSON.stringify({ error: "Invite already used or expired" }), { status: 409, headers: corsHeaders });
