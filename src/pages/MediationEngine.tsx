@@ -2705,20 +2705,38 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
 
   async function calculateFee() {
     setFeeError(null); setFeeResult(null); setExistingFeeId(null);
-    const dv = Number(disputeValue.replace(/[^\d.,-]/g, "").replace(",", "."));
+    const dv = Number(disputeValue.replace(/[^\d.,-]/g, "").replace(",", ".")) || 0;
     const sc = Math.max(1, Number(sessionCount) || 1);
-    if (!Number.isFinite(dv) || dv < 0) {
-      toast({ title: "Geçersiz uyuşmazlık değeri", variant: "destructive" });
+    const hps = Math.max(1, Number(hoursPerSession) || 1);
+    if (!isSeri && feeType === "anlasma" && (!dv || dv <= 0)) {
+      toast({ title: "Uyuşmazlık değeri gerekli", variant: "destructive" });
       return;
     }
     setFeeBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("calculate-mediation-fee", {
-        body: { dispute_value: dv, session_count: sc, fee_type: feeType, dispute_type: caseRow.dispute_type || "" },
+        body: {
+          dispute_value: dv,
+          session_count: sc,
+          hours_per_session: hps,
+          fee_type: feeType,
+          dispute_type: isSeri ? seriTur : (caseRow.dispute_type || ""),
+          arabulucu_sayisi: arabulucuSayisi,
+          party_count: partyCount,
+          is_seri: isSeri,
+          seri_dosya_sayisi: isSeri ? Math.max(1, Number(seriDosyaSayisi) || 0) : 0,
+        },
       });
-      if (error) throw error;
-      if ((data as any)?.error === "insufficient_data") {
-        setFeeError((data as any).message || "Yeterli veri yok. Uydurma hesaplama yapılmadı.");
+      if (error) {
+        let msg = error.message || "Sunucu hatası";
+        try {
+          const ctx = (error as any).context;
+          if (ctx?.body) {
+            const b = typeof ctx.body === "string" ? JSON.parse(ctx.body) : ctx.body;
+            if (b?.message) msg = b.message;
+          }
+        } catch {}
+        setFeeError(msg);
         return;
       }
       if ((data as any)?.error) {
@@ -2727,16 +2745,15 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
       }
       const r = data as any;
       setFeeResult(r);
-      // Persist to case_fees
       const { data: inserted, error: insErr } = await supabase.from("case_fees" as any).insert({
         case_id: caseRow.id,
         fee_type: feeType,
         dispute_value: dv,
         session_count: sc,
-        calculated_fee: r.toplam_ucret,
+        calculated_fee: r.brut_ucret ?? r.toplam_ucret,
         vat_amount: r.kdv,
-        total_fee: r.genel_toplam,
-        tarife_yili: 2026,
+        total_fee: r.net_tahsilat ?? r.genel_toplam,
+        tarife_yili: r.tarife_yili ?? 2026,
         tarife_maddesi: r.tarife_maddesi,
         ai_breakdown: r,
       } as any).select("id").maybeSingle();
@@ -2754,7 +2771,6 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
     if (!feeResult) return;
     setInvoiceBusy(true);
     try {
-      // Gather parties + mediator profile
       const [{ data: parties }, { data: profile }] = await Promise.all([
         supabase.from("case_parties").select("first_name, last_name, company_name, party_type").eq("case_id", caseRow.id),
         caseRow.assigned_mediator_id
@@ -2762,9 +2778,7 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
           : Promise.resolve({ data: null } as any),
       ]);
       const partyList = (parties ?? []).map((p: any) => ({
-        name: p.party_type === "corporate"
-          ? (p.company_name || "-")
-          : `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "-",
+        name: p.party_type === "corporate" ? (p.company_name || "-") : `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "-",
         role: p.party_type === "corporate" ? "Kurumsal" : "Bireysel",
       }));
 
@@ -2778,12 +2792,16 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
         feeType,
         disputeValue: Number(disputeValue.replace(/[^\d.,-]/g, "").replace(",", ".")) || 0,
         sessionCount: Math.max(1, Number(sessionCount) || 1),
-        bazUcret: feeResult.baz_ucret,
-        ekOturumUcreti: feeResult.ek_oturum_ucreti,
-        toplamUcret: feeResult.toplam_ucret,
+        brutUcret: feeResult.brut_ucret,
         kdv: feeResult.kdv,
-        genelToplam: feeResult.genel_toplam,
+        gvStopaj: feeResult.gv_stopaj,
+        netUcret: feeResult.net_ucret,
+        kdvTevkifati: feeResult.kdv_tevkifati,
+        tahsilEdilenKdv: feeResult.tahsil_edilen_kdv,
+        netTahsilat: feeResult.net_tahsilat,
+        tarifeYili: feeResult.tarife_yili,
         tarifeMaddesi: feeResult.tarife_maddesi,
+        dilimBreakdown: feeResult.breakdown,
         createdAt: new Date(),
       });
 
@@ -2797,6 +2815,10 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
       setInvoiceBusy(false);
     }
   }
+
+  const PartyBtn = ({ v, label }: { v: 2 | 3 | 6 | 11; label: string }) => (
+    <Button type="button" size="sm" variant={partyCount === v ? "default" : "outline"} onClick={() => setPartyCount(v)}>{label}</Button>
+  );
 
   return (
     <Card className="p-6 space-y-6">
@@ -2821,37 +2843,13 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
         </ul>
       )}
 
-      {/* ============== ÜCRET HESAPLAMA ============== */}
       <div className="border-t pt-6 space-y-4">
-        <h3 className="text-xl font-semibold flex items-center gap-2">
-          <span>💰</span> Ücret Hesaplama
-        </h3>
-        <p className="text-sm text-muted-foreground">
-          2026 Arabuluculuk Asgari Ücret Tarifesine göre AI destekli hesaplama.
-        </p>
+        <h3 className="text-xl font-semibold flex items-center gap-2"><span>💰</span> Ücret Hesaplama</h3>
+        <p className="text-sm text-muted-foreground">Aktif AAÜT tarifesine göre deterministik hesaplama.</p>
 
         <div className="grid gap-3 md:grid-cols-3">
           <div className="space-y-1">
-            <Label>Uyuşmazlık Değeri (TL)</Label>
-            <Input
-              type="text" inputMode="decimal"
-              placeholder="Örn. 100000"
-              value={disputeValue}
-              onChange={(e) => setDisputeValue(e.target.value)}
-              disabled={feeBusy}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Oturum Sayısı</Label>
-            <Input
-              type="number" min={1} step={1}
-              value={sessionCount}
-              onChange={(e) => setSessionCount(e.target.value)}
-              disabled={feeBusy}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Sonuç</Label>
+            <Label>Sonuç Türü</Label>
             <Select value={feeType} onValueChange={(v) => setFeeType(v as any)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -2861,29 +2859,87 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1">
+            <Label>Arabulucu Sayısı</Label>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant={arabulucuSayisi === 1 ? "default" : "outline"} onClick={() => setArabulucuSayisi(1)}>1 Arabulucu</Button>
+              <Button type="button" size="sm" variant={arabulucuSayisi === 2 ? "default" : "outline"} onClick={() => setArabulucuSayisi(2)}>Birden Fazla</Button>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label>Taraf Sayısı</Label>
+            <div className="flex gap-2 flex-wrap">
+              <PartyBtn v={2} label="2" /><PartyBtn v={3} label="3–5" /><PartyBtn v={6} label="6–10" /><PartyBtn v={11} label="11+" />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="space-y-1">
+            <Label>Uyuşmazlık Değeri (TL)</Label>
+            <Input type="text" inputMode="decimal" placeholder="Anlaşma için gerekli"
+              value={disputeValue} onChange={(e) => setDisputeValue(e.target.value)} disabled={feeBusy || isSeri} />
+          </div>
+          <div className="space-y-1">
+            <Label>Oturum Sayısı</Label>
+            <Input type="number" min={1} step={1} value={sessionCount}
+              onChange={(e) => setSessionCount(e.target.value)} disabled={feeBusy} />
+          </div>
+          <div className="space-y-1">
+            <Label>Oturum Başına Saat</Label>
+            <Input type="number" min={1} step={1} value={hoursPerSession}
+              onChange={(e) => setHoursPerSession(e.target.value)} disabled={feeBusy} />
+          </div>
+        </div>
+
+        <div className="border rounded p-3 bg-muted/20 space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={isSeri} onChange={(e) => setIsSeri(e.target.checked)} />
+            <span className="font-medium text-sm">Seri Uyuşmazlık</span>
+          </label>
+          <p className="text-xs text-muted-foreground">Aynı taraflardan biri ortak olmalı ve aynı ay içinde en az 10 başvuru gereklidir.</p>
+          {isSeri && (
+            <div className="grid gap-3 md:grid-cols-2 pt-2">
+              <div className="space-y-1">
+                <Label>Dosya Sayısı</Label>
+                <Input type="number" min={10} step={1} value={seriDosyaSayisi} onChange={(e) => setSeriDosyaSayisi(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Tür</Label>
+                <Select value={seriTur} onValueChange={(v) => setSeriTur(v as any)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ticari">Ticari</SelectItem>
+                    <SelectItem value="diger">Diğer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2">
-          <Button onClick={calculateFee} disabled={feeBusy || !disputeValue}>
-            {feeBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-            Ücret Hesapla
+          <Button onClick={calculateFee} disabled={feeBusy}>
+            {feeBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}Ücret Hesapla
           </Button>
-          <Button
-            variant="outline"
-            onClick={createInvoice}
-            disabled={!feeResult || invoiceBusy}
-          >
+          <Button variant="outline" onClick={createInvoice} disabled={!feeResult || invoiceBusy}>
             {invoiceBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FileText className="h-4 w-4 mr-1" />}
             Fatura Oluştur
           </Button>
         </div>
 
         {feeError && (
-          <div className="p-3 rounded border border-amber-300 bg-amber-50 text-amber-900 text-sm flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-            <div>
-              <div className="font-medium">Hesaplama yapılamadı</div>
-              <div>{feeError}</div>
+          <div className="p-3 rounded border border-amber-300 bg-amber-50 text-amber-900 text-sm flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <div>
+                <div className="font-medium">Hesaplama yapılamadı</div>
+                <div>{feeError}</div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setFeeError(null)}>Geri Dön</Button>
+              <Button size="sm" onClick={calculateFee}>Tekrar Dene</Button>
             </div>
           </div>
         )}
@@ -2892,36 +2948,30 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
           <div className="rounded border overflow-hidden">
             <table className="w-full text-sm">
               <tbody>
-                <tr className="border-b">
-                  <td className="px-3 py-2 text-muted-foreground">Baz Ücret</td>
-                  <td className="px-3 py-2 text-right font-medium">{fmtTL(feeResult.baz_ucret)}</td>
-                </tr>
-                <tr className="border-b">
-                  <td className="px-3 py-2 text-muted-foreground">Ek Oturum Ücreti</td>
-                  <td className="px-3 py-2 text-right font-medium">{fmtTL(feeResult.ek_oturum_ucreti)}</td>
-                </tr>
-                <tr className="border-b bg-muted/30">
-                  <td className="px-3 py-2">Ara Toplam</td>
-                  <td className="px-3 py-2 text-right font-semibold">{fmtTL(feeResult.toplam_ucret)}</td>
-                </tr>
-                <tr className="border-b">
-                  <td className="px-3 py-2 text-muted-foreground">KDV (%20)</td>
-                  <td className="px-3 py-2 text-right">{fmtTL(feeResult.kdv)}</td>
-                </tr>
-                <tr className="bg-primary text-primary-foreground">
-                  <td className="px-3 py-3 font-bold">GENEL TOPLAM</td>
-                  <td className="px-3 py-3 text-right font-bold">{fmtTL(feeResult.genel_toplam)}</td>
-                </tr>
+                <tr className="border-b"><td className="px-3 py-2 text-muted-foreground">Brüt Ücret</td><td className="px-3 py-2 text-right font-medium">{fmtTL(feeResult.brut_ucret)}</td></tr>
+                <tr className="border-b"><td className="px-3 py-2 text-muted-foreground">KDV (%20)</td><td className="px-3 py-2 text-right">{fmtTL(feeResult.kdv)}</td></tr>
+                <tr className="border-b"><td className="px-3 py-2 text-muted-foreground">GV Stopaj (%20)</td><td className="px-3 py-2 text-right">-{fmtTL(feeResult.gv_stopaj)}</td></tr>
+                <tr className="border-b bg-muted/30"><td className="px-3 py-2 font-semibold">Net Ücret</td><td className="px-3 py-2 text-right font-semibold">{fmtTL(feeResult.net_ucret)}</td></tr>
+                <tr className="border-b"><td className="px-3 py-2 text-muted-foreground">KDV Tevkifatı</td><td className="px-3 py-2 text-right">{fmtTL(feeResult.kdv_tevkifati)}</td></tr>
+                <tr className="border-b"><td className="px-3 py-2 text-muted-foreground">Tahsil Edilen KDV</td><td className="px-3 py-2 text-right">{fmtTL(feeResult.tahsil_edilen_kdv)}</td></tr>
+                <tr className="bg-primary text-primary-foreground"><td className="px-3 py-3 font-bold">NET TAHSİLAT</td><td className="px-3 py-3 text-right font-bold">{fmtTL(feeResult.net_tahsilat)}</td></tr>
               </tbody>
             </table>
-            {feeResult.tarife_maddesi && (
-              <div className="p-3 text-xs text-muted-foreground border-t bg-muted/20">
-                <span className="font-medium">Tarife Dayanağı: </span>{feeResult.tarife_maddesi}
-              </div>
-            )}
-            {feeResult.aciklama && (
-              <div className="px-3 pb-3 text-xs text-muted-foreground">{feeResult.aciklama}</div>
-            )}
+            <div className="p-3 text-xs text-muted-foreground border-t bg-muted/20 space-y-1">
+              <div><span className="font-medium">Tarife: </span>{feeResult.tarife_yili} Yılı Arabuluculuk Asgari Ücret Tarifesi</div>
+              {feeResult.tarife_maddesi && <div><span className="font-medium">Tarife Maddesi: </span>{feeResult.tarife_maddesi}</div>}
+              {feeResult.aciklama && <div>{feeResult.aciklama}</div>}
+              {feeResult.breakdown && feeResult.breakdown.length > 0 && (
+                <div className="pt-2">
+                  <div className="font-medium mb-1">Dilim Dökümü:</div>
+                  <ul className="space-y-0.5">
+                    {feeResult.breakdown.map((b, i) => (
+                      <li key={i}>• {b.dilim} — {b.oran} → {fmtTL(b.tutar)}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
