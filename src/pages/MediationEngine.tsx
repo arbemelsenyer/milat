@@ -17,6 +17,9 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,7 +27,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Plus, Loader2, FolderOpen, FileText, Users, Brain, ShieldCheck,
   Calendar as CalIcon, UserCheck, MessageSquare, FileCheck2, CheckCircle2, Circle,
-  Trash2, ArrowLeft, Download, Sparkles, ChevronDown, ChevronUp, AlertTriangle, RefreshCw,
+  Trash2, ArrowLeft, Download, Sparkles, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Pencil,
 } from "lucide-react";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
@@ -1005,6 +1008,8 @@ function DisputeClassifierCard({
 function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseRow; isMediator: boolean; userId: string; onDone: () => void }) {
   const [parties, setParties] = useState<any[]>([]);
   const [draft, setDraft] = useState<PartyDraft | null>(null);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -1068,7 +1073,46 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
     else load();
   }
 
+  async function saveEdit() {
+    if (!editing) return;
+    const isInd = editing.party_type === "individual";
+    if (isInd && !(editing.first_name && editing.last_name)) { toast({ title: "Ad ve soyad zorunlu", variant: "destructive" }); return; }
+    if (!isInd && !editing.company_name) { toast({ title: "Kurum adı zorunlu", variant: "destructive" }); return; }
+    setSavingEdit(true);
+    try {
+      const full_name = isInd
+        ? `${editing.first_name ?? ""} ${editing.last_name ?? ""}`.trim()
+        : (editing.company_name ?? "");
+      const patch: any = {
+        first_name: editing.first_name ?? null,
+        last_name: editing.last_name ?? null,
+        full_name,
+        tc_kimlik: editing.tc_kimlik ?? null,
+        birth_date: editing.birth_date || null,
+        address: editing.address ?? null,
+        gsm: editing.gsm ?? null,
+        phone: editing.phone ?? null,
+        email: editing.email ?? null,
+        company_name: editing.company_name ?? null,
+        tax_office: editing.tax_office ?? null,
+        tax_number: editing.tax_number ?? null,
+        trade_registry_no: editing.trade_registry_no ?? null,
+        authorized_person: editing.authorized_person ?? null,
+      };
+      const { error } = await supabase.from("case_parties").update(patch).eq("id", editing.id);
+      if (error) throw error;
+      toast({ title: "Taraf bilgileri güncellendi" });
+      setEditing(null);
+      load();
+    } catch (e: any) {
+      toast({ title: "Güncelleme başarısız", description: trErr(e.message), variant: "destructive" });
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   return (
+
     <div className="space-y-4">
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
@@ -1091,7 +1135,14 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
                     {" · "}{p.email || "e-posta yok"}
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => remove(p.id)}><Trash2 className="h-4 w-4" /></Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => setEditing({ ...p })} title="Düzenle">
+                    <Pencil className="h-4 w-4 mr-1" /> Düzenle
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => remove(p.id)} title="Sil">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -1160,9 +1211,49 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
           </div>
         </Card>
       )}
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && !savingEdit && setEditing(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Taraf Bilgilerini Düzenle</DialogTitle>
+          </DialogHeader>
+          {editing && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {editing.party_type === "individual" ? (
+                <>
+                  <div><Label>Ad *</Label><Input value={editing.first_name ?? ""} onChange={(e) => setEditing({ ...editing, first_name: e.target.value })} /></div>
+                  <div><Label>Soyad *</Label><Input value={editing.last_name ?? ""} onChange={(e) => setEditing({ ...editing, last_name: e.target.value })} /></div>
+                  <div><Label>TC Kimlik No</Label><Input value={editing.tc_kimlik ?? ""} onChange={(e) => setEditing({ ...editing, tc_kimlik: e.target.value })} /></div>
+                  <div><Label>Doğum Tarihi</Label><Input type="date" value={editing.birth_date ?? ""} onChange={(e) => setEditing({ ...editing, birth_date: e.target.value })} /></div>
+                  <div><Label>GSM</Label><Input value={editing.gsm ?? ""} onChange={(e) => setEditing({ ...editing, gsm: e.target.value })} /></div>
+                  <div><Label>Telefon</Label><Input value={editing.phone ?? ""} onChange={(e) => setEditing({ ...editing, phone: e.target.value })} /></div>
+                </>
+              ) : (
+                <>
+                  <div><Label>Kurum Adı *</Label><Input value={editing.company_name ?? ""} onChange={(e) => setEditing({ ...editing, company_name: e.target.value })} /></div>
+                  <div><Label>Yetkili Kişi</Label><Input value={editing.authorized_person ?? ""} onChange={(e) => setEditing({ ...editing, authorized_person: e.target.value })} /></div>
+                  <div><Label>Vergi Dairesi</Label><Input value={editing.tax_office ?? ""} onChange={(e) => setEditing({ ...editing, tax_office: e.target.value })} /></div>
+                  <div><Label>Vergi No</Label><Input value={editing.tax_number ?? ""} onChange={(e) => setEditing({ ...editing, tax_number: e.target.value })} /></div>
+                  <div><Label>Ticaret Sicil No</Label><Input value={editing.trade_registry_no ?? ""} onChange={(e) => setEditing({ ...editing, trade_registry_no: e.target.value })} /></div>
+                  <div><Label>Telefon</Label><Input value={editing.phone ?? ""} onChange={(e) => setEditing({ ...editing, phone: e.target.value })} /></div>
+                </>
+              )}
+              <div className="md:col-span-2"><Label>Adres</Label><Input value={editing.address ?? ""} onChange={(e) => setEditing({ ...editing, address: e.target.value })} /></div>
+              <div className="md:col-span-2"><Label>E-posta</Label><Input type="email" value={editing.email ?? ""} onChange={(e) => setEditing({ ...editing, email: e.target.value })} /></div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditing(null)} disabled={savingEdit}>İptal</Button>
+            <Button onClick={saveEdit} disabled={savingEdit}>
+              {savingEdit ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Kaydediliyor…</> : "Kaydet"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 /* ===================== PHASE 3 - PARTY ANALYSIS (docs + analysis + common ground) ===================== */
 
