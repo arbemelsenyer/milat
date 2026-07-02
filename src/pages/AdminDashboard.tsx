@@ -60,6 +60,8 @@ export default function AdminDashboard() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [isInviting, setIsInviting] = useState(false);
+  const [inviteLogs, setInviteLogs] = useState<Array<{ id: string; case_id: string; party_id: string; event_type: string; ip_address: string | null; created_at: string }>>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
 
 
   useEffect(() => {
