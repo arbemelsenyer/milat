@@ -16,6 +16,7 @@ import { Loader2, Search, UserCog, Calendar, UserPlus, Trash2, Mail, ShieldAlert
 import { KnowledgeBaseAdmin } from '@/components/admin/KnowledgeBaseAdmin';
 import { TariffAdmin } from '@/components/admin/TariffAdmin';
 import { TemplateAdmin } from '@/components/admin/TemplateAdmin';
+import { MevzuatAdmin } from '@/components/admin/MevzuatAdmin';
 
 
 interface CaseRow {
