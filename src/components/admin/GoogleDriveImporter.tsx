@@ -14,6 +14,12 @@ const CATEGORIES = [
   "aile", "spor", "enerji_maden", "mevzuat", "genel",
 ];
 
+const TEMPLATE_TYPES = [
+  "dava_sarti_anlasma", "dava_sarti_anlasamamama", "dava_sarti_ilk_oturum",
+  "ihtiyari_anlasma", "ihtiyari_anlasamamama", "ihtiyari_davet",
+  "isci_isveren_davet", "ticari_davet", "tuketici_davet",
+];
+
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 const ROOT = { id: "root", name: "Drive'ım" };
 
