@@ -305,6 +305,10 @@ export default function AdminDashboard() {
           <TariffAdmin />
         </div>
 
+        <div className="mb-8">
+          <TemplateAdmin />
+        </div>
+
         <Tabs defaultValue="cases" className="space-y-6">
           <TabsList>
             <TabsTrigger value="cases" className="gap-2">
