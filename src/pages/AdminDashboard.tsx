@@ -309,6 +309,10 @@ export default function AdminDashboard() {
               <UserCog className="w-4 h-4" />
               {language === 'tr' ? 'Kullanıcılar' : 'Users'}
             </TabsTrigger>
+            <TabsTrigger value="invite-logs" className="gap-2">
+              <ShieldAlert className="w-4 h-4" />
+              {language === 'tr' ? 'Davet Logları' : 'Invite Logs'}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="cases" className="space-y-4">
