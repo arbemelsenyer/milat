@@ -300,6 +300,10 @@ export default function AdminDashboard() {
           <KnowledgeBaseAdmin />
         </div>
 
+        <div className="mb-8">
+          <TariffAdmin />
+        </div>
+
         <Tabs defaultValue="cases" className="space-y-6">
           <TabsList>
             <TabsTrigger value="cases" className="gap-2">
