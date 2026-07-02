@@ -550,6 +550,8 @@ export type Database = {
       cases: {
         Row: {
           additional_notes: string | null
+          agreement_amount: number | null
+          agreement_terms: string | null
           ai_summary: Json | null
           application_date: string
           application_no: string | null
@@ -582,6 +584,7 @@ export type Database = {
           open_to_compromise: boolean | null
           other_party_name: string | null
           other_party_role: string | null
+          outcome: string | null
           priorities: string[] | null
           relationship: string | null
           round_number: number
@@ -598,6 +601,8 @@ export type Database = {
         }
         Insert: {
           additional_notes?: string | null
+          agreement_amount?: number | null
+          agreement_terms?: string | null
           ai_summary?: Json | null
           application_date?: string
           application_no?: string | null
@@ -630,6 +635,7 @@ export type Database = {
           open_to_compromise?: boolean | null
           other_party_name?: string | null
           other_party_role?: string | null
+          outcome?: string | null
           priorities?: string[] | null
           relationship?: string | null
           round_number?: number
@@ -646,6 +652,8 @@ export type Database = {
         }
         Update: {
           additional_notes?: string | null
+          agreement_amount?: number | null
+          agreement_terms?: string | null
           ai_summary?: Json | null
           application_date?: string
           application_no?: string | null
@@ -678,6 +686,7 @@ export type Database = {
           open_to_compromise?: boolean | null
           other_party_name?: string | null
           other_party_role?: string | null
+          outcome?: string | null
           priorities?: string[] | null
           relationship?: string | null
           round_number?: number
@@ -812,6 +821,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      document_templates: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          source_url: string | null
+          template_content: string | null
+          template_type: string
+          updated_at: string
+          uploaded_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          source_url?: string | null
+          template_content?: string | null
+          template_type: string
+          updated_at?: string
+          uploaded_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          source_url?: string | null
+          template_content?: string | null
+          template_type?: string
+          updated_at?: string
+          uploaded_at?: string
+        }
+        Relationships: []
       }
       expert_assignment_logs: {
         Row: {
