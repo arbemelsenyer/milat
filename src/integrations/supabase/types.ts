@@ -1225,6 +1225,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "meeting_invite_logs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "meeting_invite_logs_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
