@@ -4,6 +4,18 @@ interface ExportOptions {
   language: 'tr' | 'en';
 }
 
+// HTML-escape untrusted values before interpolation to prevent stored XSS
+// in the print popup (same-origin window).
+function esc(v: unknown): string {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+
 export function generatePdfHtml(summary: CaseSummary, options: ExportOptions): string {
   const { language } = options;
   const isEnglish = language === 'en';
