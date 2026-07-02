@@ -405,57 +405,113 @@ export function KnowledgeBaseAdmin() {
           </div>
         )}
 
-        {/* Manuel Kaynak Yükleme */}
+        {/* Manuel Kaynak Yükleme — toplu (multi-file) */}
         <div className="mt-4 space-y-3 rounded-md border bg-muted/20 p-4">
           <div className="flex items-center gap-2 font-medium text-sm">
-            <Upload className="w-4 h-4" /> Manuel Kaynak Yükle
+            <Upload className="w-4 h-4" /> Manuel Kaynak Yükle (Toplu)
           </div>
           <p className="text-xs text-muted-foreground">
-            PDF, DOCX veya TXT (max 20MB). Dosya metni çıkarılıp chunk'lara bölünür, embedding üretilir ve bilgi tabanına eklenir.
+            Birden fazla PDF/DOCX/TXT dosyası (her biri max 20MB). Sırayla işlenir; bir dosya hata verirse diğerlerine devam edilir.
           </p>
-          <div className="grid gap-3 sm:grid-cols-2">
+
+          {/* Mode selector */}
+          <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
-              <Label htmlFor="kb-title">Kaynak Adı *</Label>
-              <Input
-                id="kb-title"
-                placeholder="Örn: Kira Yargıtay Kararları 2024"
-                value={uploadTitle}
-                onChange={(e) => setUploadTitle(e.target.value)}
-                disabled={uploading}
-                maxLength={200}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="kb-cat">Kategori *</Label>
-              <Select value={uploadCategory} onValueChange={setUploadCategory} disabled={uploading}>
-                <SelectTrigger id="kb-cat"><SelectValue /></SelectTrigger>
+              <Label>Kategori *</Label>
+              <Select value={uploadMode} onValueChange={(v) => setUploadMode(v as any)} disabled={uploading}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  <SelectItem value="knowledge">Bilgi Tabanı</SelectItem>
+                  <SelectItem value="template">Şablon Olarak</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {uploadMode === "knowledge" ? (
+              <div className="space-y-1.5">
+                <Label>Bilgi Tabanı Kategorisi *</Label>
+                <Select value={uploadCategory} onValueChange={setUploadCategory} disabled={uploading}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label>Şablon Türü *</Label>
+                <Select value={uploadTemplateType} onValueChange={setUploadTemplateType} disabled={uploading}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TEMPLATE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {uploadMode === "knowledge" && uploadFiles.length === 1 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="kb-title">Kaynak Adı (tek dosya)</Label>
+                <Input
+                  id="kb-title"
+                  placeholder="(boş bırakılırsa dosya adı)"
+                  value={uploadTitle}
+                  onChange={(e) => setUploadTitle(e.target.value)}
+                  disabled={uploading}
+                  maxLength={200}
+                />
+              </div>
+            )}
           </div>
+
           <div className="space-y-1.5">
-            <Label htmlFor="kb-file">Dosya *</Label>
+            <Label htmlFor="kb-file">Dosya(lar) *</Label>
             <Input
               id="kb-file"
               ref={fileInputRef}
               type="file"
+              multiple={uploadMode === "knowledge"}
               accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-              onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => setUploadFiles(Array.from(e.target.files ?? []))}
               disabled={uploading}
             />
-            {uploadFile && (
-              <p className="text-xs text-muted-foreground">{uploadFile.name} · {(uploadFile.size / 1024 / 1024).toFixed(2)} MB</p>
+            {uploadFiles.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {uploadFiles.length} dosya seçildi · toplam {(uploadFiles.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(2)} MB
+              </p>
             )}
           </div>
+
+          {uploading && uploadProgress.total > 0 && (
+            <div className="space-y-1">
+              <Progress value={Math.round((uploadProgress.done / uploadProgress.total) * 100)} />
+              <div className="text-xs text-muted-foreground">
+                {uploadProgress.done}/{uploadProgress.total} dosya işlendi
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-3">
-            <Button onClick={handleUpload} disabled={uploading || !uploadFile || !uploadTitle.trim()} size="sm">
+            <Button onClick={handleUpload} disabled={uploading || uploadFiles.length === 0} size="sm">
               {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-              Yükle ve İşle
+              {uploadFiles.length > 1 ? `${uploadFiles.length} Dosyayı Yükle` : "Yükle ve İşle"}
             </Button>
             {uploadStage && <span className="text-xs text-muted-foreground">{uploadStage}</span>}
           </div>
+
+          {uploadResults.length > 0 && (
+            <div className="rounded border bg-background p-3 space-y-1 max-h-48 overflow-y-auto">
+              <div className="text-xs font-medium">Sonuçlar ({uploadResults.filter((r) => r.ok).length}/{uploadResults.length})</div>
+              <ul className="text-xs space-y-1">
+                {uploadResults.map((r, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2">
+                    <span className="truncate">{r.name}</span>
+                    {r.ok
+                      ? <span className="text-emerald-700">✓ {r.chunks != null ? `${r.chunks} chunk` : "OK"}</span>
+                      : <span className="text-destructive">✗ {r.error}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
         {/* Google Drive'dan İçe Aktar */}
         <div className="mt-4">
