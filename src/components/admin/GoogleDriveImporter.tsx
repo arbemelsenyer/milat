@@ -199,6 +199,20 @@ export function GoogleDriveImporter() {
 
   const selectableCount = Object.values(selected).filter((s) => s.mimeType !== "application/vnd.google-apps.folder").length;
 
+  const selectAllInFolder = () => {
+    const eligible = filtered.filter((f) => f.mimeType !== "application/vnd.google-apps.folder");
+    const allSelected = eligible.every((f) => !!selected[f.id]);
+    setSelected((prev) => {
+      const cp = { ...prev };
+      if (allSelected) {
+        for (const f of eligible) delete cp[f.id];
+      } else {
+        for (const f of eligible) cp[f.id] = f;
+      }
+      return cp;
+    });
+  };
+
   const runImport = async () => {
     if (!accessToken) return;
     const picked = Object.values(selected).filter((s) => s.mimeType !== "application/vnd.google-apps.folder");
@@ -206,25 +220,46 @@ export function GoogleDriveImporter() {
       toast({ title: "Dosya seçin", description: "En az bir belge seçmelisiniz.", variant: "destructive" });
       return;
     }
+    if (mode === "template" && picked.length > 1) {
+      toast({ title: "Şablon modunda tek dosya seçin", description: "Her şablon türü tek dosyadan oluşur.", variant: "destructive" });
+      return;
+    }
     setImporting(true);
     setResults(null);
-    setStage("Google Drive'dan indiriliyor...");
+    setImportProgress({ done: 0, total: picked.length });
+    setStage(`0/${picked.length} dosya işlendi — Google Drive'dan indiriliyor…`);
     try {
-      setStage("Metin çıkarılıyor, chunk'lara bölünüyor ve embedding üretiliyor...");
-      const { data, error } = await supabase.functions.invoke("google-drive-import", {
-        body: {
-          accessToken,
-          category,
-          files: picked.map((p) => ({ id: p.id, name: p.name, mimeType: p.mimeType })),
-        },
-      });
-      if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
-      setResults((data as any)?.results ?? []);
-      setStage("");
+      // Process in chunks so progress updates and we don't hit function time limits with big batches.
+      const CHUNK = mode === "template" ? 1 : 5;
+      const allResults: any[] = [];
+      let done = 0;
+      for (let i = 0; i < picked.length; i += CHUNK) {
+        const slice = picked.slice(i, i + CHUNK);
+        setStage(`${done}/${picked.length} dosya işlendi — sıradaki ${slice.length} dosya işleniyor…`);
+        const { data, error } = await supabase.functions.invoke("google-drive-import", {
+          body: {
+            accessToken,
+            mode,
+            category,
+            template_type: templateType,
+            files: slice.map((p) => ({ id: p.id, name: p.name, mimeType: p.mimeType })),
+          },
+        });
+        if (error) throw error;
+        if ((data as any)?.error) throw new Error((data as any).error);
+        const partial = (data as any)?.results ?? [];
+        allResults.push(...partial);
+        done += slice.length;
+        setImportProgress({ done, total: picked.length });
+        setResults([...allResults]);
+      }
+      const ok = allResults.filter((r) => r.ok).length;
+      const fail = allResults.length - ok;
+      setStage(`Tamamlandı: ${picked.length} dosyadan ${ok}'i başarılı${fail ? `, ${fail} hata` : ""} ✅`);
       toast({
-        title: "İçe aktarma tamamlandı",
-        description: `${(data as any)?.processed ?? 0} dosya · ${(data as any)?.chunks ?? 0} chunk kaydedildi.`,
+        title: fail === 0 ? "İçe aktarma tamamlandı" : `${ok}/${picked.length} başarılı`,
+        description: fail > 0 ? `${fail} dosyada hata oluştu.` : undefined,
+        variant: fail > 0 ? "destructive" : "default",
       });
       setSelected({});
     } catch (e: any) {
