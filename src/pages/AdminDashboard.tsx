@@ -75,8 +75,21 @@ export default function AdminDashboard() {
     if (user && isAdmin) {
       fetchData();
       fetchAllUsers();
+      fetchInviteLogs();
     }
   }, [user, isAdmin]);
+
+  const fetchInviteLogs = async () => {
+    setLogsLoading(true);
+    const { data } = await supabase
+      .from('party_invite_logs' as any)
+      .select('id, case_id, party_id, event_type, ip_address, created_at')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    setInviteLogs((data as any) || []);
+    setLogsLoading(false);
+  };
+
 
   const fetchData = async () => {
     setIsLoading(true);
