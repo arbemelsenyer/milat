@@ -356,3 +356,16 @@ if __name__ == "__main__":
             else:
                 yeni, atlandi = standart_web_isle(kaynak)
             print(f"{kaynak['alan']}: {yeni} yeni veri, {atlandi} atlandı")
+
+        # --- Mevzuat Takibi (Resmi Gazete + TBMM → pending_pool) ---
+        try:
+            rg = scrape_resmi_gazete()
+            print(f"resmi_gazete_mevzuat: {rg} yeni bekleyen kayıt")
+        except Exception as e:
+            print(f"resmi_gazete_mevzuat hata: {e}")
+        try:
+            tb = scrape_tbmm()
+            print(f"tbmm_mevzuat: {tb} yeni bekleyen kayıt")
+        except Exception as e:
+            print(f"tbmm_mevzuat hata: {e}")
+
