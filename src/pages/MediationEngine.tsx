@@ -1022,12 +1022,27 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
 
   useEffect(() => { load(); }, [load]);
 
+  function validateParty(p: any, isInd: boolean): string | null {
+    if (isInd) {
+      if (!p.first_name?.trim()) return "Ad zorunludur.";
+      if (!p.last_name?.trim()) return "Soyad zorunludur.";
+      if (p.tc_kimlik && !/^\d{11}$/.test(String(p.tc_kimlik).trim())) return "TC Kimlik No 11 haneli rakam olmalıdır.";
+    } else {
+      if (!p.company_name?.trim()) return "Kurum adı zorunludur.";
+    }
+    const phoneRe = /^[+\d\s().-]{7,20}$/;
+    if (p.gsm && !phoneRe.test(String(p.gsm).trim())) return "GSM numarası geçerli değil.";
+    if (p.phone && !phoneRe.test(String(p.phone).trim())) return "Telefon numarası geçerli değil.";
+    if (p.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(p.email).trim())) return "E-posta adresi geçerli değil.";
+    return null;
+  }
+
   async function save() {
     if (!draft) return;
     if (!draft.kvkk_ok) { toast({ title: "KVKK onayı gerekli", variant: "destructive" }); return; }
     const isInd = draft.party_type === "individual";
-    if (isInd && !(draft.first_name && draft.last_name)) { toast({ title: "Ad ve soyad zorunlu", variant: "destructive" }); return; }
-    if (!isInd && !draft.company_name) { toast({ title: "Kurum adı zorunlu", variant: "destructive" }); return; }
+    const vErr = validateParty(draft, isInd);
+    if (vErr) { toast({ title: "Doğrulama hatası", description: vErr, variant: "destructive" }); return; }
     setBusy(true);
     try {
       const full_name = isInd ? `${draft.first_name} ${draft.last_name}`.trim() : draft.company_name!;
@@ -1044,7 +1059,6 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         last_name: draft.last_name ?? null,
         full_name,
         tc_kimlik: draft.tc_kimlik ?? null,
-        birth_date: draft.birth_date || null,
         address: draft.address ?? null,
         gsm: draft.gsm ?? null,
         phone: draft.phone ?? null,
@@ -1076,8 +1090,8 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
   async function saveEdit() {
     if (!editing) return;
     const isInd = editing.party_type === "individual";
-    if (isInd && !(editing.first_name && editing.last_name)) { toast({ title: "Ad ve soyad zorunlu", variant: "destructive" }); return; }
-    if (!isInd && !editing.company_name) { toast({ title: "Kurum adı zorunlu", variant: "destructive" }); return; }
+    const vErr = validateParty(editing, isInd);
+    if (vErr) { toast({ title: "Doğrulama hatası", description: vErr, variant: "destructive" }); return; }
     setSavingEdit(true);
     try {
       const full_name = isInd
@@ -1088,7 +1102,6 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         last_name: editing.last_name ?? null,
         full_name,
         tc_kimlik: editing.tc_kimlik ?? null,
-        birth_date: editing.birth_date || null,
         address: editing.address ?? null,
         gsm: editing.gsm ?? null,
         phone: editing.phone ?? null,
@@ -1184,7 +1197,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
                 <div><Label>Ad *</Label><Input value={draft.first_name ?? ""} onChange={(e) => setDraft({ ...draft, first_name: e.target.value })} /></div>
                 <div><Label>Soyad *</Label><Input value={draft.last_name ?? ""} onChange={(e) => setDraft({ ...draft, last_name: e.target.value })} /></div>
                 <div><Label>TC Kimlik No</Label><Input value={draft.tc_kimlik ?? ""} onChange={(e) => setDraft({ ...draft, tc_kimlik: e.target.value })} /></div>
-                <div><Label>Doğum Tarihi</Label><Input type="date" value={draft.birth_date ?? ""} onChange={(e) => setDraft({ ...draft, birth_date: e.target.value })} /></div>
+                
                 <div><Label>GSM</Label><Input value={draft.gsm ?? ""} onChange={(e) => setDraft({ ...draft, gsm: e.target.value })} /></div>
                 <div><Label>Telefon</Label><Input value={draft.phone ?? ""} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} /></div>
               </>
@@ -1206,8 +1219,8 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
             <span>KVKK kapsamında kişisel verilerin işlenmesini onaylıyorum.</span>
           </label>
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setDraft(null)}>İptal</Button>
-            <Button onClick={save} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Tarafı Kaydet"}</Button>
+            <Button variant="ghost" onClick={() => setDraft(null)} disabled={busy}>İptal</Button>
+            <Button onClick={save} disabled={busy}>{busy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Kaydediliyor…</> : "Tarafı Kaydet"}</Button>
           </div>
         </Card>
       )}
@@ -1224,7 +1237,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
                   <div><Label>Ad *</Label><Input value={editing.first_name ?? ""} onChange={(e) => setEditing({ ...editing, first_name: e.target.value })} /></div>
                   <div><Label>Soyad *</Label><Input value={editing.last_name ?? ""} onChange={(e) => setEditing({ ...editing, last_name: e.target.value })} /></div>
                   <div><Label>TC Kimlik No</Label><Input value={editing.tc_kimlik ?? ""} onChange={(e) => setEditing({ ...editing, tc_kimlik: e.target.value })} /></div>
-                  <div><Label>Doğum Tarihi</Label><Input type="date" value={editing.birth_date ?? ""} onChange={(e) => setEditing({ ...editing, birth_date: e.target.value })} /></div>
+                  
                   <div><Label>GSM</Label><Input value={editing.gsm ?? ""} onChange={(e) => setEditing({ ...editing, gsm: e.target.value })} /></div>
                   <div><Label>Telefon</Label><Input value={editing.phone ?? ""} onChange={(e) => setEditing({ ...editing, phone: e.target.value })} /></div>
                 </>
