@@ -398,7 +398,7 @@ export type Database = {
           created_at: string
           id: string
           invite_status: string
-          token: string
+          token_hash: string
           updated_at: string
         }
         Insert: {
@@ -407,7 +407,7 @@ export type Database = {
           created_at?: string
           id?: string
           invite_status?: string
-          token: string
+          token_hash: string
           updated_at?: string
         }
         Update: {
@@ -416,7 +416,7 @@ export type Database = {
           created_at?: string
           id?: string
           invite_status?: string
-          token?: string
+          token_hash?: string
           updated_at?: string
         }
         Relationships: [
