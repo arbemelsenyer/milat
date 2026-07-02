@@ -152,58 +152,95 @@ export function KnowledgeBaseAdmin() {
   const staleMinutes = running ? minutesSince(job?.updated_at) : null;
   const isStale = staleMinutes !== null && staleMinutes >= 10;
 
-  // --- Manuel kaynak yükleme ---
+  // --- Manuel kaynak yükleme (multi-file + KB/Template mode) ---
   const CATEGORIES = [
     "kira", "gayrimenkul", "işçi_işveren", "ticari", "tüketici",
     "sağlık", "fikri_mülkiyet", "inşaat", "sigorta", "bankacılık",
     "aile", "spor", "enerji_maden", "mevzuat", "genel",
   ];
+  const TEMPLATE_TYPES = [
+    "dava_sarti_anlasma", "dava_sarti_anlasamamama", "dava_sarti_ilk_oturum",
+    "ihtiyari_anlasma", "ihtiyari_anlasamamama", "ihtiyari_davet",
+    "isci_isveren_davet", "ticari_davet", "tuketici_davet",
+  ];
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadCategory, setUploadCategory] = useState<string>("genel");
+  const [uploadMode, setUploadMode] = useState<"knowledge" | "template">("knowledge");
+  const [uploadTemplateType, setUploadTemplateType] = useState<string>("dava_sarti_anlasma");
   const [uploadStage, setUploadStage] = useState<string>("");
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
+  const [uploadResults, setUploadResults] = useState<Array<{ name: string; ok: boolean; error?: string; chunks?: number }>>([]);
 
   const handleUpload = async () => {
-    if (!uploadFile) { toast({ title: "Dosya seçin", variant: "destructive" }); return; }
-    if (!uploadTitle.trim()) { toast({ title: "Kaynak adı zorunludur", variant: "destructive" }); return; }
-    if (uploadFile.size > 20 * 1024 * 1024) { toast({ title: "Dosya 20MB'ı aşamaz", variant: "destructive" }); return; }
-    const name = uploadFile.name.toLowerCase();
-    if (!(name.endsWith(".pdf") || name.endsWith(".docx") || name.endsWith(".txt"))) {
-      toast({ title: "Sadece PDF, DOCX veya TXT kabul edilir", variant: "destructive" }); return;
+    if (!uploadFiles.length) { toast({ title: "Dosya seçin", variant: "destructive" }); return; }
+    if (uploadMode === "knowledge" && !uploadTitle.trim() && uploadFiles.length === 1) {
+      toast({ title: "Kaynak adı zorunludur", variant: "destructive" }); return;
+    }
+    for (const f of uploadFiles) {
+      if (f.size > 20 * 1024 * 1024) { toast({ title: `${f.name} 20MB'ı aşıyor`, variant: "destructive" }); return; }
+      const nm = f.name.toLowerCase();
+      if (!(nm.endsWith(".pdf") || nm.endsWith(".docx") || nm.endsWith(".txt"))) {
+        toast({ title: `${f.name}: sadece PDF, DOCX veya TXT kabul edilir`, variant: "destructive" }); return;
+      }
+    }
+    if (uploadMode === "template" && uploadFiles.length > 1) {
+      toast({ title: "Şablon modunda tek dosya seçin", description: "Her şablon türü tek dosyadan oluşur; ayrı ayrı yükleyin.", variant: "destructive" });
+      return;
     }
     setUploading(true);
-    setUploadStage("Dosya yükleniyor ve metin çıkarılıyor...");
-    try {
-      const form = new FormData();
-      form.append("file", uploadFile);
-      form.append("title", uploadTitle.trim());
-      form.append("category", uploadCategory);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Oturum bulunamadı");
-      setUploadStage("Chunk oluşturuluyor ve embedding üretiliyor...");
-      const projectUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
-      const res = await fetch(`${projectUrl}/functions/v1/admin-upload-knowledge`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${session.access_token}` },
-        body: form,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
-      setUploadStage(`Tamamlandı: ${data.chunks} chunk oluşturuldu ✅`);
-      toast({ title: "Kaynak eklendi", description: `${data.chunks} chunk oluşturuldu.` });
-      setUploadFile(null);
-      setUploadTitle("");
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      await loadSources();
-    } catch (e: any) {
-      setUploadStage("");
-      toast({ title: "Yükleme başarısız", description: e.message ?? "Bilinmeyen hata", variant: "destructive" });
-    } finally {
-      setUploading(false);
-      setTimeout(() => setUploadStage(""), 4000);
+    setUploadResults([]);
+    setUploadProgress({ done: 0, total: uploadFiles.length });
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { toast({ title: "Oturum bulunamadı", variant: "destructive" }); setUploading(false); return; }
+    const projectUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
+    const results: Array<{ name: string; ok: boolean; error?: string; chunks?: number }> = [];
+    for (let i = 0; i < uploadFiles.length; i++) {
+      const file = uploadFiles[i];
+      setUploadStage(`${i + 1}/${uploadFiles.length} dosya işleniyor: ${file.name}`);
+      try {
+        const form = new FormData();
+        form.append("file", file);
+        let endpoint = "";
+        if (uploadMode === "template") {
+          form.append("template_type", uploadTemplateType);
+          endpoint = "admin-upload-template";
+        } else {
+          const title = (uploadFiles.length === 1 && uploadTitle.trim()) ? uploadTitle.trim() : file.name.replace(/\.[^.]+$/, "");
+          form.append("title", title);
+          form.append("category", uploadCategory);
+          endpoint = "admin-upload-knowledge";
+        }
+        const res = await fetch(`${projectUrl}/functions/v1/${endpoint}`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          body: form,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+        results.push({ name: file.name, ok: true, chunks: data.chunks });
+      } catch (e: any) {
+        results.push({ name: file.name, ok: false, error: e?.message ?? "Bilinmeyen hata" });
+      }
+      setUploadProgress({ done: i + 1, total: uploadFiles.length });
+      setUploadResults([...results]);
     }
+    const ok = results.filter((r) => r.ok).length;
+    const fail = results.length - ok;
+    setUploadStage(`Tamamlandı: ${uploadFiles.length} dosyadan ${ok}'i başarılı${fail ? `, ${fail} hata` : ""} ✅`);
+    toast({
+      title: fail === 0 ? "Yükleme tamamlandı" : `${ok}/${uploadFiles.length} başarılı`,
+      description: fail > 0 ? `${fail} dosyada hata oluştu — detaylar aşağıda.` : undefined,
+      variant: fail > 0 ? "destructive" : "default",
+    });
+    setUploadFiles([]);
+    setUploadTitle("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setUploading(false);
+    await loadSources();
+    setTimeout(() => setUploadStage(""), 6000);
   };
 
   // --- Kaynak listesi ---
