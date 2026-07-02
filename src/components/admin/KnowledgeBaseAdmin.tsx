@@ -193,26 +193,27 @@ export function KnowledgeBaseAdmin() {
         toast({ title: `${f.name}: sadece PDF, DOCX veya TXT kabul edilir`, variant: "destructive" }); return;
       }
     }
-    if (uploadMode === "template" && uploadFiles.length > 1) {
-      toast({ title: "Şablon modunda tek dosya seçin", description: "Her şablon türü tek dosyadan oluşur; ayrı ayrı yükleyin.", variant: "destructive" });
-      return;
-    }
     setUploading(true);
     setUploadResults([]);
+    setManualOverride({});
     setUploadProgress({ done: 0, total: uploadFiles.length });
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { toast({ title: "Oturum bulunamadı", variant: "destructive" }); setUploading(false); return; }
     const projectUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
-    const results: Array<{ name: string; ok: boolean; error?: string; chunks?: number }> = [];
+    const results: UploadResult[] = [];
     for (let i = 0; i < uploadFiles.length; i++) {
       const file = uploadFiles[i];
-      setUploadStage(`${i + 1}/${uploadFiles.length} dosya işleniyor: ${file.name}`);
+      setUploadStage(
+        uploadMode === "template"
+          ? `${i + 1}/${uploadFiles.length} — Tür otomatik tespit ediliyor: ${file.name}`
+          : `${i + 1}/${uploadFiles.length} dosya işleniyor: ${file.name}`
+      );
       try {
         const form = new FormData();
         form.append("file", file);
         let endpoint = "";
         if (uploadMode === "template") {
-          form.append("template_type", uploadTemplateType);
+          // template_type göndermiyoruz — sunucu otomatik tespit edecek.
           endpoint = "admin-upload-template";
         } else {
           const title = (uploadFiles.length === 1 && uploadTitle.trim()) ? uploadTitle.trim() : file.name.replace(/\.[^.]+$/, "");
@@ -227,7 +228,12 @@ export function KnowledgeBaseAdmin() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
-        results.push({ name: file.name, ok: true, chunks: data.chunks });
+        results.push({
+          name: file.name, ok: true, chunks: data.chunks,
+          template_type: data.template_type,
+          auto_detected: data.auto_detected,
+          needs_manual: data.needs_manual,
+        });
       } catch (e: any) {
         results.push({ name: file.name, ok: false, error: e?.message ?? "Bilinmeyen hata" });
       }
@@ -236,7 +242,10 @@ export function KnowledgeBaseAdmin() {
     }
     const ok = results.filter((r) => r.ok).length;
     const fail = results.length - ok;
-    setUploadStage(`Tamamlandı: ${uploadFiles.length} dosyadan ${ok}'i başarılı${fail ? `, ${fail} hata` : ""} ✅`);
+    const undetected = results.filter((r) => r.ok && r.needs_manual).length;
+    setUploadStage(
+      `Tamamlandı: ${uploadFiles.length} dosyadan ${ok}'i başarılı${fail ? `, ${fail} hata` : ""}${undetected ? `, ${undetected} tür tespit edilemedi` : ""} ✅`
+    );
     toast({
       title: fail === 0 ? "Yükleme tamamlandı" : `${ok}/${uploadFiles.length} başarılı`,
       description: fail > 0 ? `${fail} dosyada hata oluştu — detaylar aşağıda.` : undefined,
@@ -247,7 +256,40 @@ export function KnowledgeBaseAdmin() {
     if (fileInputRef.current) fileInputRef.current.value = "";
     setUploading(false);
     await loadSources();
-    setTimeout(() => setUploadStage(""), 6000);
+    setTimeout(() => setUploadStage(""), 8000);
+  };
+
+  // Manuel tür seçildikten sonra "diger" olarak kaydedilen şablonu doğru türe taşı.
+  const reassignTemplate = async (fileName: string) => {
+    const newType = manualOverride[fileName];
+    if (!newType) return;
+    setReassigning(fileName);
+    try {
+      // "diger" satırını yeni türle güncelle (upsert conflict = template_type).
+      // Basitlik için: mevcut "diger" içeriğini oku, yeni tür ile upsert et, sonra "diger"'i sil.
+      const { data: row, error: readErr } = await supabase
+        .from("document_templates")
+        .select("template_content, source_url")
+        .eq("template_type", "diger")
+        .maybeSingle();
+      if (readErr) throw readErr;
+      if (!row) throw new Error("'diger' kaydı bulunamadı — yeniden yükleyin.");
+      const { error: upErr } = await supabase.from("document_templates").upsert({
+        template_type: newType,
+        template_content: row.template_content,
+        source_url: row.source_url,
+        is_active: true,
+        uploaded_at: new Date().toISOString(),
+      }, { onConflict: "template_type" });
+      if (upErr) throw upErr;
+      await supabase.from("document_templates").delete().eq("template_type", "diger");
+      toast({ title: "Tür güncellendi", description: `${fileName} → ${newType}` });
+      setUploadResults((prev) => prev.map((r) => r.name === fileName ? { ...r, template_type: newType, needs_manual: false, auto_detected: false } : r));
+    } catch (e: any) {
+      toast({ title: "Güncelleme başarısız", description: e.message, variant: "destructive" });
+    } finally {
+      setReassigning(null);
+    }
   };
 
   // --- Kaynak listesi ---
