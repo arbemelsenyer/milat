@@ -1005,6 +1005,8 @@ function DisputeClassifierCard({
 function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseRow; isMediator: boolean; userId: string; onDone: () => void }) {
   const [parties, setParties] = useState<any[]>([]);
   const [draft, setDraft] = useState<PartyDraft | null>(null);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
 
