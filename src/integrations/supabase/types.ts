@@ -1402,6 +1402,48 @@ export type Database = {
           },
         ]
       }
+      party_invite_logs: {
+        Row: {
+          case_id: string
+          created_at: string
+          event_type: string
+          id: string
+          ip_address: string | null
+          party_id: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          ip_address?: string | null
+          party_id: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          party_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "party_invite_logs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_invite_logs_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_pool: {
         Row: {
           approved: boolean | null
