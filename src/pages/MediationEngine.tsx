@@ -2823,25 +2823,31 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
   return (
     <Card className="p-6 space-y-6">
       <h2 className="text-2xl font-bold text-primary">Aşama 9 — Belgeler & Kapanış</h2>
-      <div className="flex gap-2">
-        <Button onClick={() => generateDocs(true)} disabled={busy}>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4 mr-1" />}
-          Anlaşma Belgelerini Üret
-        </Button>
-        <Button variant="outline" onClick={() => generateDocs(false)} disabled={busy}>
-          Anlaşamama Tutanağı Üret
-        </Button>
-      </div>
-      {docs.length > 0 && (
-        <ul className="space-y-2">
-          {docs.map((d) => (
-            <li key={d.id} className="flex items-center justify-between p-3 border rounded">
-              <span className="font-medium">{d.doc_type}</span>
-              <Button size="sm" variant="ghost" onClick={() => download(d)}><Download className="h-4 w-4 mr-1" /> İndir</Button>
-            </li>
-          ))}
-        </ul>
-      )}
+
+      <OfficialDocumentsPanel caseRow={caseRow} />
+
+      <details className="text-xs text-muted-foreground border rounded p-3">
+        <summary className="cursor-pointer font-medium">Basit metin belgeler (eski)</summary>
+        <div className="mt-2 flex gap-2">
+          <Button size="sm" onClick={() => generateDocs(true)} disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4 mr-1" />}
+            Anlaşma
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => generateDocs(false)} disabled={busy}>
+            Anlaşamama
+          </Button>
+        </div>
+        {docs.length > 0 && (
+          <ul className="space-y-1 mt-2">
+            {docs.map((d) => (
+              <li key={d.id} className="flex items-center justify-between p-2 border rounded">
+                <span>{d.doc_type}</span>
+                <Button size="sm" variant="ghost" onClick={() => download(d)}><Download className="h-3 w-3 mr-1" /> İndir</Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </details>
 
       <div className="border-t pt-6 space-y-4">
         <h3 className="text-xl font-semibold flex items-center gap-2"><span>💰</span> Ücret Hesaplama</h3>
