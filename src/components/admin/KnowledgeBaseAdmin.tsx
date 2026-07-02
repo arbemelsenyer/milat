@@ -486,14 +486,11 @@ export function KnowledgeBaseAdmin() {
                 </Select>
               </div>
             ) : (
-              <div className="space-y-1.5">
-                <Label>Şablon Türü *</Label>
-                <Select value={uploadTemplateType} onValueChange={setUploadTemplateType} disabled={uploading}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {TEMPLATE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Şablon Türü</Label>
+                <div className="rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground">
+                  Tür: <span className="italic">otomatik tespit ediliyor (dosya içeriğinden)</span>
+                </div>
               </div>
             )}
             {uploadMode === "knowledge" && uploadFiles.length === 1 && (
