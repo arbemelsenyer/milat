@@ -12,11 +12,14 @@ Deno.serve(async (req) => {
 
   const cronSecret = Deno.env.get("CRON_SECRET");
   const provided = req.headers.get("x-cron-secret") ?? new URL(req.url).searchParams.get("secret");
-  if (cronSecret && provided !== cronSecret) {
+  // Default-deny: require CRON_SECRET to be configured AND to match.
+  const authorized = !!(cronSecret && provided && provided === cronSecret);
+  if (!authorized) {
     return new Response(JSON.stringify({ error: "Forbidden" }), {
       status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
