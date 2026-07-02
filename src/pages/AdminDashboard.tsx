@@ -12,7 +12,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { AppNavbar } from '@/components/AppNavbar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, UserCog, Calendar, UserPlus, Trash2, Mail } from 'lucide-react';
+import { Loader2, Search, UserCog, Calendar, UserPlus, Trash2, Mail, ShieldAlert } from 'lucide-react';
 import { KnowledgeBaseAdmin } from '@/components/admin/KnowledgeBaseAdmin';
 
 
