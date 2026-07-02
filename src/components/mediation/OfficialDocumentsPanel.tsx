@@ -128,7 +128,15 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
         }
         const base = `${doc.template_type}_${caseRow.application_no || "belge"}`;
         zip.file(`${base}.txt`, doc.filled_text);
-        zip.file(`${base}.udf`, doc.udf_xml);
+        // Wrap UDF as a ZIP-in-ZIP so UYAP editor recognizes the .udf entry.
+        const inner = new JSZip();
+        inner.file("content.xml", doc.udf_xml);
+        inner.file(
+          "properties.xml",
+          `<?xml version="1.0" encoding="UTF-8"?>\n<properties><format>UDF</format><version>1.7</version></properties>`
+        );
+        const udfBlob = await inner.generateAsync({ type: "uint8array" });
+        zip.file(`${base}.udf`, udfBlob);
       }
       const blob = await zip.generateAsync({ type: "blob" });
       saveAs(blob, `resmi_belgeler_${caseRow.application_no || caseRow.id.slice(0, 8)}.zip`);
