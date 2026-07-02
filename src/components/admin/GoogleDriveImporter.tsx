@@ -69,6 +69,8 @@ export function GoogleDriveImporter() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [category, setCategory] = useState("genel");
+  const [mode, setMode] = useState<"knowledge" | "template">("knowledge");
+  const [templateType, setTemplateType] = useState<string>("dava_sarti_anlasma");
 
   const [stack, setStack] = useState<Array<{ id: string; name: string }>>([ROOT]);
   const [files, setFiles] = useState<DriveFile[]>([]);
@@ -76,6 +78,7 @@ export function GoogleDriveImporter() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Record<string, DriveFile>>({});
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [stage, setStage] = useState("");
   const [results, setResults] = useState<any[] | null>(null);
   const tokenClientRef = useRef<any>(null);
