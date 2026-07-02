@@ -2645,12 +2645,23 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
   // Fee calculation state
   const [disputeValue, setDisputeValue] = useState<string>("");
   const [sessionCount, setSessionCount] = useState<string>("1");
+  const [hoursPerSession, setHoursPerSession] = useState<string>("2");
   const [feeType, setFeeType] = useState<"anlasma" | "anlasamama" | "ihtiyari">("anlasma");
+  const [arabulucuSayisi, setArabulucuSayisi] = useState<1 | 2>(1);
+  const [partyCount, setPartyCount] = useState<2 | 3 | 6 | 11>(2);
+  const [isSeri, setIsSeri] = useState(false);
+  const [seriDosyaSayisi, setSeriDosyaSayisi] = useState<string>("10");
+  const [seriTur, setSeriTur] = useState<"ticari" | "diger">("diger");
   const [feeBusy, setFeeBusy] = useState(false);
   const [feeError, setFeeError] = useState<string | null>(null);
   const [feeResult, setFeeResult] = useState<null | {
+    brut_ucret: number; kdv: number; gv_stopaj: number;
+    net_ucret: number; kdv_tevkifati: number; tahsil_edilen_kdv: number; net_tahsilat: number;
+    genel_toplam: number; tarife_yili: number; tarife_maddesi: string; aciklama: string;
+    breakdown?: Array<{ dilim: string; oran: string; tutar: number }>;
+    hesaplama_turu?: string;
+    // legacy fields still populated by edge fn for db persistence
     baz_ucret: number; ek_oturum_ucreti: number; toplam_ucret: number;
-    kdv: number; genel_toplam: number; tarife_maddesi: string; aciklama: string;
   }>(null);
   const [existingFeeId, setExistingFeeId] = useState<string | null>(null);
   const [invoiceBusy, setInvoiceBusy] = useState(false);
