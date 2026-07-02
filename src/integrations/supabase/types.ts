@@ -299,6 +299,68 @@ export type Database = {
           },
         ]
       }
+      case_fees: {
+        Row: {
+          ai_breakdown: Json | null
+          calculated_fee: number
+          case_id: string
+          created_at: string
+          dispute_value: number
+          fee_type: string
+          id: string
+          invoice_generated: boolean
+          notes: string | null
+          session_count: number
+          tarife_maddesi: string | null
+          tarife_yili: number
+          total_fee: number
+          updated_at: string
+          vat_amount: number
+        }
+        Insert: {
+          ai_breakdown?: Json | null
+          calculated_fee?: number
+          case_id: string
+          created_at?: string
+          dispute_value?: number
+          fee_type: string
+          id?: string
+          invoice_generated?: boolean
+          notes?: string | null
+          session_count?: number
+          tarife_maddesi?: string | null
+          tarife_yili?: number
+          total_fee?: number
+          updated_at?: string
+          vat_amount?: number
+        }
+        Update: {
+          ai_breakdown?: Json | null
+          calculated_fee?: number
+          case_id?: string
+          created_at?: string
+          dispute_value?: number
+          fee_type?: string
+          id?: string
+          invoice_generated?: boolean
+          notes?: string | null
+          session_count?: number
+          tarife_maddesi?: string | null
+          tarife_yili?: number
+          total_fee?: number
+          updated_at?: string
+          vat_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_fees_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_parties: {
         Row: {
           address: string | null
