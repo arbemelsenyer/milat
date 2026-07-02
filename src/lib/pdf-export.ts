@@ -4,6 +4,18 @@ interface ExportOptions {
   language: 'tr' | 'en';
 }
 
+// HTML-escape untrusted values before interpolation to prevent stored XSS
+// in the print popup (same-origin window).
+function esc(v: unknown): string {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+
 export function generatePdfHtml(summary: CaseSummary, options: ExportOptions): string {
   const { language } = options;
   const isEnglish = language === 'en';
@@ -196,60 +208,60 @@ export function generatePdfHtml(summary: CaseSummary, options: ExportOptions): s
 </head>
 <body>
   <div class="header">
-    <h1>${labels.title}</h1>
+    <h1>${esc(labels.title)}</h1>
     <div class="meta-info">
-      <span><strong>${labels.caseId}:</strong> ${summary.id}</span>
-      <span><strong>${labels.createdAt}:</strong> ${formatDate(summary.createdAt)}</span>
+      <span><strong>${esc(labels.caseId)}:</strong> ${esc(summary.id)}</span>
+      <span><strong>${esc(labels.createdAt)}:</strong> ${esc(formatDate(summary.createdAt))}</span>
     </div>
   </div>
 
   <div class="section">
-    <div class="section-title">${labels.disputeType}</div>
+    <div class="section-title">${esc(labels.disputeType)}</div>
     <div class="section-content">
-      <strong>${summary.disputeType}</strong>
+      <strong>${esc(summary.disputeType)}</strong>
     </div>
   </div>
 
   <div class="section">
-    <div class="section-title">${labels.parties}</div>
+    <div class="section-title">${esc(labels.parties)}</div>
     <div class="section-content">
       <div class="parties-grid">
         <div class="party-box">
-          <div class="party-label">${labels.initiator}</div>
-          <div class="party-name">${summary.parties.initiator}</div>
+          <div class="party-label">${esc(labels.initiator)}</div>
+          <div class="party-name">${esc(summary.parties.initiator)}</div>
         </div>
         <div class="party-box">
-          <div class="party-label">${labels.respondent}</div>
-          <div class="party-name">${summary.parties.respondent}</div>
+          <div class="party-label">${esc(labels.respondent)}</div>
+          <div class="party-name">${esc(summary.parties.respondent)}</div>
         </div>
       </div>
     </div>
   </div>
 
   <div class="section">
-    <div class="section-title">${labels.coreThemes}</div>
+    <div class="section-title">${esc(labels.coreThemes)}</div>
     <div class="section-content">
       <div class="themes-list">
-        ${summary.coreThemes.map((theme) => `<span class="theme-tag">${theme}</span>`).join('')}
+        ${summary.coreThemes.map((theme) => `<span class="theme-tag">${esc(theme)}</span>`).join('')}
       </div>
     </div>
   </div>
 
   <div class="section">
-    <div class="section-title">${labels.neutralSummary}</div>
+    <div class="section-title">${esc(labels.neutralSummary)}</div>
     <div class="section-content">
-      <p>${summary.neutralSummary}</p>
+      <p>${esc(summary.neutralSummary)}</p>
     </div>
   </div>
 
   <div class="section">
-    <div class="section-title">${labels.keyIssues}</div>
+    <div class="section-title">${esc(labels.keyIssues)}</div>
     <div class="section-content">
       <ul class="issues-list">
         ${summary.keyIssues.map((issue, index) => `
           <li>
             <span class="issue-number">${index + 1}</span>
-            <span>${issue}</span>
+            <span>${esc(issue)}</span>
           </li>
         `).join('')}
       </ul>
@@ -257,13 +269,13 @@ export function generatePdfHtml(summary: CaseSummary, options: ExportOptions): s
   </div>
 
   <div class="section">
-    <div class="section-title">${labels.pathways}</div>
+    <div class="section-title">${esc(labels.pathways)}</div>
     <div class="section-content">
       <ul class="pathways-list">
         ${summary.potentialPathways.map((pathway) => `
           <li>
             <span class="pathway-arrow">→</span>
-            <span>${pathway}</span>
+            <span>${esc(pathway)}</span>
           </li>
         `).join('')}
       </ul>
@@ -271,8 +283,9 @@ export function generatePdfHtml(summary: CaseSummary, options: ExportOptions): s
   </div>
 
   <div class="disclaimer">
-    <strong>⚠️</strong> ${labels.disclaimer}
+    <strong>⚠️</strong> ${esc(labels.disclaimer)}
   </div>
+
 
   <div class="footer">
     ${labels.generatedBy} • ${formatDate(new Date())}
@@ -285,17 +298,19 @@ export function generatePdfHtml(summary: CaseSummary, options: ExportOptions): s
 export function exportToPdf(summary: CaseSummary, language: 'tr' | 'en' = 'tr'): void {
   const html = generatePdfHtml(summary, { language });
   
-  // Create a new window for printing
-  const printWindow = window.open('', '_blank');
+  // Use a Blob URL instead of document.write() to avoid live-DOM script execution.
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const printWindow = window.open(url, '_blank');
   if (printWindow) {
-    printWindow.document.write(html);
-    printWindow.document.close();
-    
-    // Wait for content to load before printing
     printWindow.onload = () => {
       printWindow.print();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     };
+  } else {
+    URL.revokeObjectURL(url);
   }
+
 }
 
 export function downloadAsHtml(summary: CaseSummary, language: 'tr' | 'en' = 'tr'): void {
