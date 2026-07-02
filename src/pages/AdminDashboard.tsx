@@ -310,6 +310,12 @@ export default function AdminDashboard() {
           <TemplateAdmin />
         </div>
 
+        <div className="mb-8">
+          <MevzuatAdmin />
+        </div>
+
+
+
         <Tabs defaultValue="cases" className="space-y-6">
           <TabsList>
             <TabsTrigger value="cases" className="gap-2">
