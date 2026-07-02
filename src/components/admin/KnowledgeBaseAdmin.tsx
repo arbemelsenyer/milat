@@ -514,7 +514,7 @@ export function KnowledgeBaseAdmin() {
               id="kb-file"
               ref={fileInputRef}
               type="file"
-              multiple={uploadMode === "knowledge"}
+              multiple
               accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
               onChange={(e) => setUploadFiles(Array.from(e.target.files ?? []))}
               disabled={uploading}
