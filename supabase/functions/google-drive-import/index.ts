@@ -175,6 +175,21 @@ Deno.serve(async (req) => {
         const { bytes, effectiveMime, effectiveName } = await downloadFromDrive(f.id, f.mimeType, accessToken);
         const displayName = f.name + effectiveName;
         const fullText = await extractFromBytes(bytes, displayName, effectiveMime);
+
+        if (mode === "template") {
+          if (!fullText.trim()) throw new Error("Dosyadan metin çıkarılamadı");
+          const { error: upErr } = await admin.from("document_templates").upsert({
+            template_type: templateType,
+            template_content: fullText,
+            source_url: `gdrive://${f.id}`,
+            is_active: true,
+            uploaded_at: new Date().toISOString(),
+          }, { onConflict: "template_type" });
+          if (upErr) throw new Error(upErr.message);
+          results.push({ id: f.id, name: f.name, ok: true, chunks: 0, template_type: templateType, chars: fullText.length });
+          continue;
+        }
+
         const chunks = chunkText(fullText);
         if (!chunks.length) throw new Error("Yeterli metin çıkarılamadı");
         if (chunks.length > 800) throw new Error(`Anormal parça sayısı (${chunks.length})`);
@@ -218,6 +233,7 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
+      mode,
       processed: results.filter((r) => r.ok).length,
       failed: results.filter((r) => !r.ok).length,
       chunks: grandTotalChunks,
