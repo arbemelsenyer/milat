@@ -1132,7 +1132,14 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
                     {" · "}{p.email || "e-posta yok"}
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => remove(p.id)}><Trash2 className="h-4 w-4" /></Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => setEditing({ ...p })} title="Düzenle">
+                    <Pencil className="h-4 w-4 mr-1" /> Düzenle
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => remove(p.id)} title="Sil">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
