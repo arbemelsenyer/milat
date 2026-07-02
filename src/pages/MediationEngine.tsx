@@ -30,6 +30,7 @@ import {
   Trash2, ArrowLeft, Download, Sparkles, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Pencil,
 } from "lucide-react";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
+import { OfficialDocumentsPanel } from "@/components/mediation/OfficialDocumentsPanel";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
 import { Phase3ErrorBoundary } from "@/components/mediation/Phase3ErrorBoundary";
 
