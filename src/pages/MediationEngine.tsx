@@ -2642,6 +2642,19 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
   const [docs, setDocs] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
 
+  // Fee calculation state
+  const [disputeValue, setDisputeValue] = useState<string>("");
+  const [sessionCount, setSessionCount] = useState<string>("1");
+  const [feeType, setFeeType] = useState<"anlasma" | "anlasamama" | "ihtiyari">("anlasma");
+  const [feeBusy, setFeeBusy] = useState(false);
+  const [feeError, setFeeError] = useState<string | null>(null);
+  const [feeResult, setFeeResult] = useState<null | {
+    baz_ucret: number; ek_oturum_ucreti: number; toplam_ucret: number;
+    kdv: number; genel_toplam: number; tarife_maddesi: string; aciklama: string;
+  }>(null);
+  const [existingFeeId, setExistingFeeId] = useState<string | null>(null);
+  const [invoiceBusy, setInvoiceBusy] = useState(false);
+
   useEffect(() => { (async () => {
     const { data } = await supabase.from("agreement_documents").select("*").eq("case_id", caseRow.id);
     setDocs(data ?? []);
@@ -2676,8 +2689,106 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
     URL.revokeObjectURL(url);
   }
 
+  const fmtTL = (n: number) =>
+    new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(n);
+
+  async function calculateFee() {
+    setFeeError(null); setFeeResult(null); setExistingFeeId(null);
+    const dv = Number(disputeValue.replace(/[^\d.,-]/g, "").replace(",", "."));
+    const sc = Math.max(1, Number(sessionCount) || 1);
+    if (!Number.isFinite(dv) || dv < 0) {
+      toast({ title: "Geçersiz uyuşmazlık değeri", variant: "destructive" });
+      return;
+    }
+    setFeeBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("calculate-mediation-fee", {
+        body: { dispute_value: dv, session_count: sc, fee_type: feeType, dispute_type: caseRow.dispute_type || "" },
+      });
+      if (error) throw error;
+      if ((data as any)?.error === "insufficient_data") {
+        setFeeError((data as any).message || "Yeterli veri yok. Uydurma hesaplama yapılmadı.");
+        return;
+      }
+      if ((data as any)?.error) {
+        setFeeError((data as any).message || (data as any).error);
+        return;
+      }
+      const r = data as any;
+      setFeeResult(r);
+      // Persist to case_fees
+      const { data: inserted, error: insErr } = await supabase.from("case_fees" as any).insert({
+        case_id: caseRow.id,
+        fee_type: feeType,
+        dispute_value: dv,
+        session_count: sc,
+        calculated_fee: r.toplam_ucret,
+        vat_amount: r.kdv,
+        total_fee: r.genel_toplam,
+        tarife_yili: 2026,
+        tarife_maddesi: r.tarife_maddesi,
+        ai_breakdown: r,
+      } as any).select("id").maybeSingle();
+      if (insErr) throw insErr;
+      setExistingFeeId((inserted as any)?.id ?? null);
+      toast({ title: "Ücret hesaplandı" });
+    } catch (e: any) {
+      setFeeError(trErr(e.message || "Hesaplama başarısız"));
+    } finally {
+      setFeeBusy(false);
+    }
+  }
+
+  async function createInvoice() {
+    if (!feeResult) return;
+    setInvoiceBusy(true);
+    try {
+      // Gather parties + mediator profile
+      const [{ data: parties }, { data: profile }] = await Promise.all([
+        supabase.from("case_parties").select("first_name, last_name, company_name, party_type").eq("case_id", caseRow.id),
+        caseRow.assigned_mediator_id
+          ? supabase.from("profiles").select("full_name").eq("user_id", caseRow.assigned_mediator_id).maybeSingle()
+          : Promise.resolve({ data: null } as any),
+      ]);
+      const partyList = (parties ?? []).map((p: any) => ({
+        name: p.party_type === "corporate"
+          ? (p.company_name || "-")
+          : `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "-",
+        role: p.party_type === "corporate" ? "Kurumsal" : "Bireysel",
+      }));
+
+      const { downloadInvoicePdf } = await import("@/lib/invoice-pdf");
+      downloadInvoicePdf({
+        applicationNo: caseRow.application_no || "",
+        disputeSubject: caseRow.title || caseRow.dispute_type || "-",
+        mediatorName: (profile as any)?.full_name || "-",
+        mediatorRegistryNo: null,
+        parties: partyList,
+        feeType,
+        disputeValue: Number(disputeValue.replace(/[^\d.,-]/g, "").replace(",", ".")) || 0,
+        sessionCount: Math.max(1, Number(sessionCount) || 1),
+        bazUcret: feeResult.baz_ucret,
+        ekOturumUcreti: feeResult.ek_oturum_ucreti,
+        toplamUcret: feeResult.toplam_ucret,
+        kdv: feeResult.kdv,
+        genelToplam: feeResult.genel_toplam,
+        tarifeMaddesi: feeResult.tarife_maddesi,
+        createdAt: new Date(),
+      });
+
+      if (existingFeeId) {
+        await supabase.from("case_fees" as any).update({ invoice_generated: true } as any).eq("id", existingFeeId);
+      }
+      toast({ title: "Fatura indirildi" });
+    } catch (e: any) {
+      toast({ title: "Fatura oluşturulamadı", description: trErr(e.message), variant: "destructive" });
+    } finally {
+      setInvoiceBusy(false);
+    }
+  }
+
   return (
-    <Card className="p-6 space-y-4">
+    <Card className="p-6 space-y-6">
       <h2 className="text-2xl font-bold text-primary">Aşama 9 — Belgeler & Kapanış</h2>
       <div className="flex gap-2">
         <Button onClick={() => generateDocs(true)} disabled={busy}>
@@ -2698,9 +2809,115 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
           ))}
         </ul>
       )}
+
+      {/* ============== ÜCRET HESAPLAMA ============== */}
+      <div className="border-t pt-6 space-y-4">
+        <h3 className="text-xl font-semibold flex items-center gap-2">
+          <span>💰</span> Ücret Hesaplama
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          2026 Arabuluculuk Asgari Ücret Tarifesine göre AI destekli hesaplama.
+        </p>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="space-y-1">
+            <Label>Uyuşmazlık Değeri (TL)</Label>
+            <Input
+              type="text" inputMode="decimal"
+              placeholder="Örn. 100000"
+              value={disputeValue}
+              onChange={(e) => setDisputeValue(e.target.value)}
+              disabled={feeBusy}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Oturum Sayısı</Label>
+            <Input
+              type="number" min={1} step={1}
+              value={sessionCount}
+              onChange={(e) => setSessionCount(e.target.value)}
+              disabled={feeBusy}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Sonuç</Label>
+            <Select value={feeType} onValueChange={(v) => setFeeType(v as any)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="anlasma">Anlaşma</SelectItem>
+                <SelectItem value="anlasamama">Anlaşamama</SelectItem>
+                <SelectItem value="ihtiyari">İhtiyari</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <Button onClick={calculateFee} disabled={feeBusy || !disputeValue}>
+            {feeBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+            Ücret Hesapla
+          </Button>
+          <Button
+            variant="outline"
+            onClick={createInvoice}
+            disabled={!feeResult || invoiceBusy}
+          >
+            {invoiceBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FileText className="h-4 w-4 mr-1" />}
+            Fatura Oluştur
+          </Button>
+        </div>
+
+        {feeError && (
+          <div className="p-3 rounded border border-amber-300 bg-amber-50 text-amber-900 text-sm flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div>
+              <div className="font-medium">Hesaplama yapılamadı</div>
+              <div>{feeError}</div>
+            </div>
+          </div>
+        )}
+
+        {feeResult && (
+          <div className="rounded border overflow-hidden">
+            <table className="w-full text-sm">
+              <tbody>
+                <tr className="border-b">
+                  <td className="px-3 py-2 text-muted-foreground">Baz Ücret</td>
+                  <td className="px-3 py-2 text-right font-medium">{fmtTL(feeResult.baz_ucret)}</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="px-3 py-2 text-muted-foreground">Ek Oturum Ücreti</td>
+                  <td className="px-3 py-2 text-right font-medium">{fmtTL(feeResult.ek_oturum_ucreti)}</td>
+                </tr>
+                <tr className="border-b bg-muted/30">
+                  <td className="px-3 py-2">Ara Toplam</td>
+                  <td className="px-3 py-2 text-right font-semibold">{fmtTL(feeResult.toplam_ucret)}</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="px-3 py-2 text-muted-foreground">KDV (%20)</td>
+                  <td className="px-3 py-2 text-right">{fmtTL(feeResult.kdv)}</td>
+                </tr>
+                <tr className="bg-primary text-primary-foreground">
+                  <td className="px-3 py-3 font-bold">GENEL TOPLAM</td>
+                  <td className="px-3 py-3 text-right font-bold">{fmtTL(feeResult.genel_toplam)}</td>
+                </tr>
+              </tbody>
+            </table>
+            {feeResult.tarife_maddesi && (
+              <div className="p-3 text-xs text-muted-foreground border-t bg-muted/20">
+                <span className="font-medium">Tarife Dayanağı: </span>{feeResult.tarife_maddesi}
+              </div>
+            )}
+            {feeResult.aciklama && (
+              <div className="px-3 pb-3 text-xs text-muted-foreground">{feeResult.aciklama}</div>
+            )}
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
+
 
 /* ===================== PHASE 7 - EXPERT ===================== */
 
