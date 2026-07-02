@@ -801,7 +801,13 @@ function DeadlineCard({ caseRow }: { caseRow: CaseRow }) {
               <div><span className="text-muted-foreground">📅 Başvuru:</span> {startDate.toLocaleDateString("tr-TR")}</div>
               <div><span className="text-muted-foreground">📅 Süre Sonu:</span> {local.deadline_total ? new Date(local.deadline_total).toLocaleDateString("tr-TR") : "—"}</div>
               {local.deadline_extended && (
-                <div><span className="text-muted-foreground">📅 Uzatılmış Son:</span> {new Date(local.deadline_extended).toLocaleDateString("tr-TR")} {local.extension_used && <Badge variant="outline" className="ml-1 text-[10px]">Kullanıldı</Badge>}</div>
+                <div className={local.extension_used ? "md:col-span-2 rounded-md bg-green-50 border border-green-200 p-2" : ""}>
+                  <span className="text-muted-foreground">📅 Uzatılmış Son:</span>{" "}
+                  <b className={local.extension_used ? "text-green-700" : ""}>{new Date(local.deadline_extended).toLocaleDateString("tr-TR")}</b>
+                  {local.extension_used && (
+                    <Badge className="ml-2 bg-green-600 text-white hover:bg-green-700 text-[10px]">Uzatma hakkı kullanıldı</Badge>
+                  )}
+                </div>
               )}
               <div><span className="text-muted-foreground">Kalan Süre:</span> {chip ?? "—"}</div>
             </div>
@@ -839,6 +845,14 @@ function DeadlineCard({ caseRow }: { caseRow: CaseRow }) {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+          )}
+
+          {local.extension_used && (
+            <div className="text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1">
+                <CheckCircle2 className="h-3 w-3 text-green-600" /> Süre uzatma hakkı kullanıldı.
+              </span>
+            </div>
           )}
         </div>
       )}
