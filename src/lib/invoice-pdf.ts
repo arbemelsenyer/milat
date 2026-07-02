@@ -9,25 +9,30 @@ export interface InvoiceData {
   feeType: "anlasma" | "anlasamama" | "ihtiyari";
   disputeValue: number;
   sessionCount: number;
-  bazUcret: number;
-  ekOturumUcreti: number;
-  toplamUcret: number;
+  // NEW breakdown fields
+  brutUcret: number;
   kdv: number;
-  genelToplam: number;
+  gvStopaj: number;
+  netUcret: number;
+  kdvTevkifati: number;
+  tahsilEdilenKdv: number;
+  netTahsilat: number;
+  tarifeYili: number;
   tarifeMaddesi: string;
+  dilimBreakdown?: Array<{ dilim: string; oran: string; tutar: number }>;
   createdAt?: Date;
 }
 
-const NAVY: [number, number, number] = [45, 53, 128];   // #2D3580
-const BEIGE: [number, number, number] = [196, 168, 130]; // #C4A882
+const NAVY: [number, number, number] = [45, 53, 128];
+const BEIGE: [number, number, number] = [196, 168, 130];
 
 const fmtTL = (n: number) =>
   new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(n);
 
 const feeTypeLabel: Record<InvoiceData["feeType"], string> = {
-  anlasma: "Anlaşma",
-  anlasamama: "Anlaşamama",
-  ihtiyari: "İhtiyari Arabuluculuk",
+  anlasma: "Anlasma",
+  anlasamama: "Anlasamama",
+  ihtiyari: "Ihtiyari Arabuluculuk",
 };
 
 export function generateInvoicePdf(data: InvoiceData): jsPDF {
@@ -36,7 +41,6 @@ export function generateInvoicePdf(data: InvoiceData): jsPDF {
   const margin = 40;
   let y = 0;
 
-  // Header band
   doc.setFillColor(...NAVY);
   doc.rect(0, 0, pageWidth, 90, "F");
   doc.setTextColor(255, 255, 255);
@@ -54,92 +58,80 @@ export function generateInvoicePdf(data: InvoiceData): jsPDF {
   y = 120;
   doc.setTextColor(30, 30, 30);
 
-  // Mediator block
-  drawSectionTitle(doc, "Arabulucu Bilgileri", margin, y);
-  y += 18;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  drawSectionTitle(doc, "Arabulucu Bilgileri", margin, y); y += 18;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
   doc.text(`Ad Soyad: ${data.mediatorName || "-"}`, margin, y); y += 14;
   doc.text(`Sicil No: ${data.mediatorRegistryNo || "-"}`, margin, y); y += 22;
 
-  // Parties block
-  drawSectionTitle(doc, "Taraflar", margin, y);
-  y += 18;
-  if (data.parties.length === 0) {
-    doc.text("-", margin, y); y += 14;
-  } else {
-    data.parties.forEach((p) => {
-      const line = p.role ? `${p.name} (${p.role})` : p.name;
-      doc.text(`• ${line}`, margin, y);
-      y += 14;
-    });
-  }
+  drawSectionTitle(doc, "Taraflar", margin, y); y += 18;
+  if (data.parties.length === 0) { doc.text("-", margin, y); y += 14; }
+  else data.parties.forEach((p) => { doc.text(`• ${p.role ? `${p.name} (${p.role})` : p.name}`, margin, y); y += 14; });
   y += 8;
 
-  // Dispute
-  drawSectionTitle(doc, "Uyusmazlik", margin, y);
-  y += 18;
+  drawSectionTitle(doc, "Uyusmazlik", margin, y); y += 18;
   doc.text(`Konu: ${data.disputeSubject || "-"}`, margin, y); y += 14;
   doc.text(`Sonuc Turu: ${feeTypeLabel[data.feeType]}`, margin, y); y += 14;
   doc.text(`Uyusmazlik Degeri: ${fmtTL(data.disputeValue)}`, margin, y); y += 14;
   doc.text(`Oturum Sayisi: ${data.sessionCount}`, margin, y); y += 20;
 
-  // Fee table
-  drawSectionTitle(doc, "Ucret Detaylari", margin, y);
-  y += 14;
+  drawSectionTitle(doc, "Ucret Dokumu", margin, y); y += 14;
   const colLabelX = margin;
   const colValueX = pageWidth - margin;
   const rowH = 22;
 
-  const rows: Array<[string, string]> = [
-    ["Baz Ucret", fmtTL(data.bazUcret)],
-    ["Ek Oturum Ucreti", fmtTL(data.ekOturumUcreti)],
-    ["Ara Toplam", fmtTL(data.toplamUcret)],
+  const rows: Array<[string, string, boolean?]> = [
+    ["Brut Ucret", fmtTL(data.brutUcret)],
     ["KDV (%20)", fmtTL(data.kdv)],
+    ["GV Stopaj (%20)", `-${fmtTL(data.gvStopaj)}`],
+    ["Net Ucret", fmtTL(data.netUcret), true],
+    ["KDV Tevkifati", fmtTL(data.kdvTevkifati)],
+    ["Tahsil Edilen KDV", fmtTL(data.tahsilEdilenKdv)],
   ];
 
   doc.setDrawColor(...BEIGE);
   doc.setLineWidth(0.5);
-  rows.forEach(([label, value], idx) => {
-    if (idx % 2 === 0) {
-      doc.setFillColor(248, 244, 236);
-      doc.rect(margin, y, pageWidth - 2 * margin, rowH, "F");
-    }
-    doc.setFont("helvetica", "normal");
+  rows.forEach(([label, value, bold], idx) => {
+    if (idx % 2 === 0) { doc.setFillColor(248, 244, 236); doc.rect(margin, y, pageWidth - 2 * margin, rowH, "F"); }
+    doc.setFont("helvetica", bold ? "bold" : "normal");
     doc.text(label, colLabelX + 6, y + 15);
     doc.text(value, colValueX - 6, y + 15, { align: "right" });
     y += rowH;
   });
 
-  // Total row
   doc.setFillColor(...NAVY);
   doc.rect(margin, y, pageWidth - 2 * margin, rowH + 4, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text("GENEL TOPLAM", colLabelX + 6, y + 17);
-  doc.text(fmtTL(data.genelToplam), colValueX - 6, y + 17, { align: "right" });
+  doc.text("NET TAHSILAT", colLabelX + 6, y + 17);
+  doc.text(fmtTL(data.netTahsilat), colValueX - 6, y + 17, { align: "right" });
   y += rowH + 18;
   doc.setTextColor(30, 30, 30);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
 
-  // Tarife basis
-  if (data.tarifeMaddesi) {
-    const lines = doc.splitTextToSize(`Tarife Dayanagi: ${data.tarifeMaddesi}`, pageWidth - 2 * margin);
-    doc.text(lines, margin, y);
-    y += lines.length * 12 + 10;
+  // Dilim breakdown
+  if (data.dilimBreakdown && data.dilimBreakdown.length > 0) {
+    drawSectionTitle(doc, "Dilim Dokumu", margin, y); y += 16;
+    doc.setFontSize(9);
+    data.dilimBreakdown.forEach((b) => {
+      const line = `• ${b.dilim} — ${b.oran} → ${fmtTL(b.tutar)}`;
+      const wrapped = doc.splitTextToSize(line, pageWidth - 2 * margin);
+      doc.text(wrapped, margin, y);
+      y += wrapped.length * 12;
+    });
+    y += 8; doc.setFontSize(10);
   }
 
-  // Footer note
-  doc.setTextColor(90, 90, 90);
-  doc.setFontSize(9);
-  const footNote = "2026 Yili Arabuluculuk Asgari Ucret Tarifesine gore hesaplanmistir.";
-  doc.text(footNote, margin, y); y += 40;
+  if (data.tarifeMaddesi) {
+    const lines = doc.splitTextToSize(`Tarife Dayanagi: ${data.tarifeMaddesi}`, pageWidth - 2 * margin);
+    doc.text(lines, margin, y); y += lines.length * 12 + 6;
+  }
 
-  // Signature line
-  doc.setDrawColor(...NAVY);
-  doc.setLineWidth(0.8);
+  doc.setTextColor(90, 90, 90); doc.setFontSize(9);
+  doc.text(`${data.tarifeYili} Yili Arabuluculuk Asgari Ucret Tarifesine gore hesaplanmistir.`, margin, y);
+  y += 30;
+
+  doc.setDrawColor(...NAVY); doc.setLineWidth(0.8);
   doc.line(pageWidth - margin - 180, y, pageWidth - margin, y);
   doc.setTextColor(30, 30, 30);
   doc.text("Arabulucu Imza", pageWidth - margin - 90, y + 14, { align: "center" });
@@ -159,6 +151,5 @@ function drawSectionTitle(doc: jsPDF, title: string, x: number, y: number) {
 
 export function downloadInvoicePdf(data: InvoiceData) {
   const doc = generateInvoicePdf(data);
-  const filename = `arabuluculuk-fatura-${data.applicationNo || Date.now()}.pdf`;
-  doc.save(filename);
+  doc.save(`arabuluculuk-fatura-${data.applicationNo || Date.now()}.pdf`);
 }
