@@ -1070,7 +1070,46 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
     else load();
   }
 
+  async function saveEdit() {
+    if (!editing) return;
+    const isInd = editing.party_type === "individual";
+    if (isInd && !(editing.first_name && editing.last_name)) { toast({ title: "Ad ve soyad zorunlu", variant: "destructive" }); return; }
+    if (!isInd && !editing.company_name) { toast({ title: "Kurum adı zorunlu", variant: "destructive" }); return; }
+    setSavingEdit(true);
+    try {
+      const full_name = isInd
+        ? `${editing.first_name ?? ""} ${editing.last_name ?? ""}`.trim()
+        : (editing.company_name ?? "");
+      const patch: any = {
+        first_name: editing.first_name ?? null,
+        last_name: editing.last_name ?? null,
+        full_name,
+        tc_kimlik: editing.tc_kimlik ?? null,
+        birth_date: editing.birth_date || null,
+        address: editing.address ?? null,
+        gsm: editing.gsm ?? null,
+        phone: editing.phone ?? null,
+        email: editing.email ?? null,
+        company_name: editing.company_name ?? null,
+        tax_office: editing.tax_office ?? null,
+        tax_number: editing.tax_number ?? null,
+        trade_registry_no: editing.trade_registry_no ?? null,
+        authorized_person: editing.authorized_person ?? null,
+      };
+      const { error } = await supabase.from("case_parties").update(patch).eq("id", editing.id);
+      if (error) throw error;
+      toast({ title: "Taraf bilgileri güncellendi" });
+      setEditing(null);
+      load();
+    } catch (e: any) {
+      toast({ title: "Güncelleme başarısız", description: trErr(e.message), variant: "destructive" });
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   return (
+
     <div className="space-y-4">
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
