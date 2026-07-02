@@ -26,11 +26,11 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const cronSecret = Deno.env.get("CRON_SECRET");
+  const seedToken = Deno.env.get("TEMPLATE_SEED_TOKEN");
 
-  // Auth: either admin JWT OR X-Cron-Secret header
-  const cronHeader = req.headers.get("x-cron-secret");
-  const isCronAuthed = cronSecret && cronHeader && cronHeader === cronSecret;
+  // Auth: admin JWT OR X-Seed-Token header (one-time bootstrap)
+  const seedHeader = req.headers.get("x-seed-token");
+  const isCronAuthed = seedToken && seedHeader && seedHeader === seedToken;
 
   if (!isCronAuthed) {
     const authHeader = req.headers.get("Authorization");
