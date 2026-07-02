@@ -12,7 +12,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { AppNavbar } from '@/components/AppNavbar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, UserCog, Calendar, UserPlus, Trash2, Mail } from 'lucide-react';
+import { Loader2, Search, UserCog, Calendar, UserPlus, Trash2, Mail, ShieldAlert } from 'lucide-react';
 import { KnowledgeBaseAdmin } from '@/components/admin/KnowledgeBaseAdmin';
 
 
@@ -60,6 +60,8 @@ export default function AdminDashboard() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [isInviting, setIsInviting] = useState(false);
+  const [inviteLogs, setInviteLogs] = useState<Array<{ id: string; case_id: string; party_id: string; event_type: string; ip_address: string | null; created_at: string }>>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
 
 
   useEffect(() => {
@@ -73,8 +75,21 @@ export default function AdminDashboard() {
     if (user && isAdmin) {
       fetchData();
       fetchAllUsers();
+      fetchInviteLogs();
     }
   }, [user, isAdmin]);
+
+  const fetchInviteLogs = async () => {
+    setLogsLoading(true);
+    const { data } = await supabase
+      .from('party_invite_logs' as any)
+      .select('id, case_id, party_id, event_type, ip_address, created_at')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    setInviteLogs((data as any) || []);
+    setLogsLoading(false);
+  };
+
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -294,6 +309,10 @@ export default function AdminDashboard() {
               <UserCog className="w-4 h-4" />
               {language === 'tr' ? 'Kullanıcılar' : 'Users'}
             </TabsTrigger>
+            <TabsTrigger value="invite-logs" className="gap-2">
+              <ShieldAlert className="w-4 h-4" />
+              {language === 'tr' ? 'Davet Logları' : 'Invite Logs'}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="cases" className="space-y-4">
@@ -451,6 +470,64 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             ))}
+          </TabsContent>
+
+          <TabsContent value="invite-logs" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">
+                    {language === 'tr' ? 'Taraf Davet Logları' : 'Party Invite Logs'}
+                  </CardTitle>
+                  <CardDescription>
+                    {language === 'tr'
+                      ? 'Kabul edilen ve iptal edilen davet olayları. Ham token asla saklanmaz.'
+                      : 'Accepted and revoked invite events. Raw tokens are never stored.'}
+                  </CardDescription>
+                </div>
+                <Button size="sm" variant="outline" onClick={fetchInviteLogs} disabled={logsLoading}>
+                  {logsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (language === 'tr' ? 'Yenile' : 'Refresh')}
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {logsLoading ? (
+                  <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+                ) : inviteLogs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    {language === 'tr' ? 'Henüz kayıt yok.' : 'No log entries yet.'}
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="text-left text-muted-foreground border-b">
+                        <tr>
+                          <th className="py-2 pr-4">{language === 'tr' ? 'Tarih' : 'Date'}</th>
+                          <th className="py-2 pr-4">{language === 'tr' ? 'Olay' : 'Event'}</th>
+                          <th className="py-2 pr-4">Case ID</th>
+                          <th className="py-2 pr-4">Party ID</th>
+                          <th className="py-2 pr-4">IP</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {inviteLogs.map(l => (
+                          <tr key={l.id} className="border-b last:border-0">
+                            <td className="py-2 pr-4 whitespace-nowrap">{new Date(l.created_at).toLocaleString()}</td>
+                            <td className="py-2 pr-4">
+                              <Badge variant={l.event_type === 'accepted' ? 'default' : 'destructive'}>
+                                {l.event_type}
+                              </Badge>
+                            </td>
+                            <td className="py-2 pr-4 font-mono text-xs">{l.case_id.slice(0, 8)}…</td>
+                            <td className="py-2 pr-4 font-mono text-xs">{l.party_id.slice(0, 8)}…</td>
+                            <td className="py-2 pr-4 font-mono text-xs">{l.ip_address || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

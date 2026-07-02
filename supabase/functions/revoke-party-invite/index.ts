@@ -1,4 +1,4 @@
-// Bind logged-in user to a case_party via invite token
+// Revoke a party invite: invalidates the token hash and logs the event
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
@@ -20,42 +20,37 @@ Deno.serve(async (req) => {
     const { data: u } = await userClient.auth.getUser();
     if (!u?.user) return new Response(JSON.stringify({ error: "Invalid session" }), { status: 401, headers: corsHeaders });
 
-    const { token } = await req.json();
-    if (!token) return new Response(JSON.stringify({ error: "token required" }), { status: 400, headers: corsHeaders });
+    const { party_id } = await req.json();
+    if (!party_id) return new Response(JSON.stringify({ error: "party_id required" }), { status: 400, headers: corsHeaders });
 
     const admin = createClient(supabaseUrl, serviceKey);
-    const enc = new TextEncoder().encode(String(token));
-    const digest = await crypto.subtle.digest("SHA-256", enc);
-    const tokenHash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
-    const { data: invite } = await admin.from("case_party_invites")
-      .select("id, case_party_id, invite_status")
-      .eq("token_hash", tokenHash).maybeSingle();
-    if (!invite) return new Response(JSON.stringify({ error: "Invalid token" }), { status: 404, headers: corsHeaders });
-    if (invite.invite_status !== "pending") {
-      return new Response(JSON.stringify({ error: "Invite already used or expired" }), { status: 409, headers: corsHeaders });
-    }
-
     const { data: party } = await admin.from("case_parties")
-      .select("id, case_id, user_id").eq("id", invite.case_party_id).maybeSingle();
+      .select("id, case_id, cases:case_id(assigned_mediator_id)").eq("id", party_id).maybeSingle();
     if (!party) return new Response(JSON.stringify({ error: "Party not found" }), { status: 404, headers: corsHeaders });
-    if (party.user_id) {
-      return new Response(JSON.stringify({ error: "Party slot already claimed" }), { status: 409, headers: corsHeaders });
+
+    const { data: isAdminRow } = await admin.from("user_roles")
+      .select("role").eq("user_id", u.user.id).eq("role", "admin").maybeSingle();
+    const isMediator = (party as any).cases?.assigned_mediator_id === u.user.id;
+    if (!isAdminRow && !isMediator) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
     }
 
+    // Invalidate the invite (rotate hash to random so any prior token is dead)
+    const rand = crypto.randomUUID() + ":revoked:" + Date.now();
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rand));
+    const tokenHash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 
-    await admin.from("case_parties").update({
-      user_id: u.user.id, invite_status: "accepted",
-    }).eq("id", party.id);
     await admin.from("case_party_invites").update({
-      invite_status: "accepted", accepted_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-    }).eq("id", invite.id);
+      invite_status: "revoked", token_hash: tokenHash, updated_at: new Date().toISOString(),
+    }).eq("case_party_id", party_id);
+    await admin.from("case_parties").update({ invite_status: "revoked" }).eq("id", party_id);
 
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || null;
     await admin.from("party_invite_logs").insert({
-      case_id: party.case_id, party_id: party.id, event_type: "accepted", ip_address: ip,
+      case_id: party.case_id, party_id: party.id, event_type: "revoked", ip_address: ip,
     });
 
-    return new Response(JSON.stringify({ case_id: party.case_id, party_id: party.id }), {
+    return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
