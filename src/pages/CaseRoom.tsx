@@ -356,7 +356,7 @@ export default function CaseRoom() {
         </TabsContent>
 
         <TabsContent value="rounds">
-          <RoundsTab caseId={caseId!} parties={parties} />
+          <MeetingNotesPanel caseId={caseId!} caseSummary={caseRow?.title ?? ""} />
         </TabsContent>
 
         <TabsContent value="agreement">
