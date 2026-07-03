@@ -301,7 +301,7 @@ export default function Dashboard() {
                         <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip content={<PieCustomTooltip />} />
                     <Legend verticalAlign="bottom" />
                   </PieChart>
                 </ResponsiveContainer>
