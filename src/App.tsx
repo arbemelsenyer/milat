@@ -24,6 +24,12 @@ import MediatorDetail from "./pages/MediatorDetail";
 import NotificationSettings from "./pages/NotificationSettings";
 import PrivacyTests from "./pages/PrivacyTests";
 import HealthCheck from "./pages/HealthCheck";
+import Cases from "./pages/Cases";
+import Archive from "./pages/Archive";
+import CalendarPage from "./pages/CalendarPage";
+import CaseRedirect from "./pages/CaseRedirect";
+import AppLayout from "./components/AppLayout";
+import { HelmetProvider } from "react-helmet-async";
 
 // Legacy routes funnel into the unified /legal-reasoning hub
 function RedirectToHub({ tab }: { tab?: string }) {
@@ -44,32 +50,43 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <HelmetProvider>
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/dashboard" element={<Dashboard />} />
+
+            {/* App shell with left sidebar */}
+            <Route element={<AppLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/cases" element={<Cases />} />
+              <Route path="/cases/:id" element={<CaseRedirect />} />
+              <Route path="/archive" element={<Archive />} />
+              <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/legal-reasoning" element={<MediationEngine />} />
+              <Route path="/case-room/:id" element={<CaseRoom />} />
+              <Route path="/case/:id" element={<CaseDetail />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/summary" element={<SummaryPage />} />
+              <Route path="/expert-witness" element={<ExpertWitness />} />
+              <Route path="/legal-precedents" element={<LegalPrecedents />} />
+              <Route path="/agreement-generator" element={<AgreementGenerator />} />
+              <Route path="/mediator-dashboard" element={<MediatorDashboard />} />
+              <Route path="/mediator/:id" element={<MediatorDetail />} />
+              <Route path="/notification-settings" element={<NotificationSettings />} />
+              <Route path="/privacy-tests" element={<PrivacyTests />} />
+              <Route path="/health-check" element={<HealthCheck />} />
+            </Route>
+
             <Route path="/mediator" element={<RedirectToHub />} />
-            <Route path="/mediator-dashboard" element={<MediatorDashboard />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/profile" element={<Profile />} />
             <Route path="/intake" element={<RedirectToHub />} />
-            <Route path="/summary" element={<SummaryPage />} />
-            <Route path="/expert-witness" element={<ExpertWitness />} />
-            <Route path="/legal-precedents" element={<LegalPrecedents />} />
-            <Route path="/agreement-generator" element={<AgreementGenerator />} />
-            <Route path="/legal-reasoning" element={<MediationEngine />} />
             <Route path="/mediation-engine" element={<RedirectToHub />} />
-            <Route path="/case/:id" element={<CaseDetail />} />
-            <Route path="/case-room/:id" element={<CaseRoom />} />
-            <Route path="/mediator/:id" element={<MediatorDetail />} />
-            <Route path="/notification-settings" element={<NotificationSettings />} />
-            <Route path="/privacy-tests" element={<PrivacyTests />} />
-            <Route path="/health-check" element={<HealthCheck />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </HelmetProvider>
         </BrowserRouter>
       </TooltipProvider>
     </LanguageProvider>
