@@ -271,7 +271,7 @@ export default function Dashboard() {
                       ))}
                     </Pie>
                     <Tooltip />
-                    <Legend verticalAlign=""bottom"} />
+                    <Legend verticalAlign="bottom" />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
