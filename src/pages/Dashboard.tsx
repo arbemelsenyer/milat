@@ -154,6 +154,19 @@ export default function Dashboard() {
     return map;
   }, [sessions]);
 
+  const PIE_COLORS = ["#2D3580", "#4A5299", "#6772AD", "#8498C2", "#A1BDD6", "#BEE2EA"];
+
+  const disputeTypeData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    cases.forEach((c) => {
+      const key = c.dispute_type || (language === "tr" ? "Belirtilmemiş" : "Unspecified");
+      counts[key] = (counts[key] ?? 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [cases, language]);
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
