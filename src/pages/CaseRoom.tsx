@@ -12,8 +12,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Loader2, ShieldCheck, Lock, Sparkles, Upload, FileText, Users, Brain, Lightbulb,
-  Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X, History, Filter, FileDown,
+  Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X, History, Filter, FileDown, MessageSquare,
 } from "lucide-react";
+import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
 import { OfficialDocsPanel } from "@/components/mediation/OfficialDocsPanel";
