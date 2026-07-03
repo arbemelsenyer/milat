@@ -68,15 +68,19 @@ interface SessionLite {
   status: string;
 }
 
-function PieCustomTooltip({ active, payload }: TooltipProps<number, string>) {
+function PieCustomTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number }>;
+}) {
   if (active && payload && payload.length) {
     const p = payload[0];
     return (
       <div className="bg-card border border-border rounded-lg shadow-elegant px-3 py-2 text-sm">
         <p className="font-semibold text-foreground">{p.name}</p>
-        <p className="text-muted-foreground">
-          {p.value} {p.value === 1 ? "vaka" : "vaka"}
-        </p>
+        <p className="text-muted-foreground">{p.value} vaka</p>
       </div>
     );
   }
