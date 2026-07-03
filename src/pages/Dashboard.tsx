@@ -243,6 +243,42 @@ export default function Dashboard() {
           />
         </div>
 
+        {/* Dispute Type PieChart */}
+        {disputeTypeData.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">
+                {language === "tr" ? "Uyuşmazlık Türleri Dağılımı" : "Dispute Type Distribution"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={disputeTypeData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={90}
+                      innerRadius={45}
+                      dataKey="value"
+                      nameKey="name"
+                      stroke="none"
+                      label
+                    >
+                      {disputeTypeData.map((_, index) => (
+                        <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend verticalAlign=""bottom"} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Notifications */}
         {unreadCount > 0 && (
           <div className="mb-6 space-y-2">
