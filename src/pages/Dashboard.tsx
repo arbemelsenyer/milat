@@ -68,6 +68,25 @@ interface SessionLite {
   status: string;
 }
 
+function PieCustomTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number }>;
+}) {
+  if (active && payload && payload.length) {
+    const p = payload[0];
+    return (
+      <div className="bg-card border border-border rounded-lg shadow-elegant px-3 py-2 text-sm">
+        <p className="font-semibold text-foreground">{p.name}</p>
+        <p className="text-muted-foreground">{p.value} vaka</p>
+      </div>
+    );
+  }
+  return null;
+}
+
 const statusConfig: Record<string, { label: { tr: string; en: string }; icon: typeof Clock; variant: "default" | "secondary" | "outline" | "destructive" }> = {
   draft: { label: { tr: "Taslak", en: "Draft" }, icon: FileText, variant: "secondary" },
   submitted: { label: { tr: "Gönderildi", en: "Submitted" }, icon: Clock, variant: "default" },
@@ -282,7 +301,7 @@ export default function Dashboard() {
                         <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip content={<PieCustomTooltip />} />
                     <Legend verticalAlign="bottom" />
                   </PieChart>
                 </ResponsiveContainer>
