@@ -33,6 +33,7 @@ import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { OfficialDocumentsPanel } from "@/components/mediation/OfficialDocumentsPanel";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
 import { Phase3ErrorBoundary } from "@/components/mediation/Phase3ErrorBoundary";
+import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 
 // Safely coerce any AI-returned value into a renderable string. Prevents
 // "Objects are not valid as a React child" crashes when the model returns an
