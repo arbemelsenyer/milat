@@ -24,6 +24,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  TooltipProps,
 } from "recharts";
 
 import { Button } from "@/components/ui/button";
