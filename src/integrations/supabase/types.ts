@@ -361,6 +361,44 @@ export type Database = {
           },
         ]
       }
+      case_notes: {
+        Row: {
+          case_id: string
+          content: string
+          created_at: string
+          created_by: string
+          id: string
+          phase: number
+          updated_at: string
+        }
+        Insert: {
+          case_id: string
+          content: string
+          created_at?: string
+          created_by: string
+          id?: string
+          phase: number
+          updated_at?: string
+        }
+        Update: {
+          case_id?: string
+          content?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          phase?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_notes_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_parties: {
         Row: {
           address: string | null
