@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Item {
-  kind: "session" | "deadline";
+  kind: "session" | "deadline_total";
   date: string;
   case_id: string;
   label: string;
@@ -38,7 +38,7 @@ export default function CalendarPage() {
     (async () => {
       const [{ data: sessions }, { data: cases }] = await Promise.all([
         supabase.from("case_sessions").select("id,case_id,scheduled_at,status").order("scheduled_at", { ascending: true }),
-        supabase.from("cases").select("id,application_no,title,deadline").not("deadline", "is", null),
+        supabase.from("cases").select("id,application_no,title,deadline_total").not("deadline_total", "is", null),
       ]);
       const caseMap = new Map((cases ?? []).map((c: any) => [c.id, c]));
       const list: Item[] = [];
@@ -54,10 +54,10 @@ export default function CalendarPage() {
         });
       });
       (cases ?? []).forEach((c: any) => {
-        if (!c.deadline) return;
+        if (!c.deadline_total) return;
         list.push({
-          kind: "deadline",
-          date: c.deadline,
+          kind: "deadline_total",
+          date: c.deadline_total,
           case_id: c.id,
           label: `Yasal süre — ${c.title ?? c.application_no ?? "Başvuru"}`,
           application_no: c.application_no,

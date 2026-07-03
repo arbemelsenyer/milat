@@ -21,7 +21,7 @@ interface CaseRow {
   your_name: string | null;
   other_party_name: string | null;
   outcome: string | null;
-  deadline: string | null;
+  deadline_total: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -60,7 +60,7 @@ export default function Cases() {
     (async () => {
       const { data } = await supabase
         .from("cases")
-        .select("id,status,title,application_no,dispute_type,your_name,other_party_name,outcome,deadline,created_at,updated_at")
+        .select("id,status,title,application_no,dispute_type,your_name,other_party_name,outcome,deadline_total,created_at,updated_at")
         .order("updated_at", { ascending: false });
       setCases((data as CaseRow[]) ?? []);
       setLoading(false);
@@ -119,7 +119,7 @@ export default function Cases() {
           <div className="grid gap-3">
             {filtered.map((c) => {
               const phase = statusPhase(c.status);
-              const days = c.deadline ? differenceInDays(new Date(c.deadline), new Date()) : null;
+              const days = c.deadline_total ? differenceInDays(new Date(c.deadline_total), new Date()) : null;
               return (
                 <Card
                   key={c.id}
@@ -141,13 +141,13 @@ export default function Cases() {
                       </p>
                     </div>
                     <div className="flex flex-col items-start md:items-end gap-1">
-                      {c.deadline && (
+                      {c.deadline_total && (
                         <Badge className={deadlineColor(days)}>
                           {days === null ? "—" : days < 0 ? `${Math.abs(days)}g geçti` : `${days}g kaldı`}
                         </Badge>
                       )}
                       <span className="text-xs text-muted-foreground">
-                        {c.deadline ? `Süre: ${format(new Date(c.deadline), "d MMM", { locale: tr })}` : "Süre belirsiz"}
+                        {c.deadline_total ? `Süre: ${format(new Date(c.deadline_total), "d MMM", { locale: tr })}` : "Süre belirsiz"}
                       </span>
                     </div>
                   </CardContent>
