@@ -244,14 +244,26 @@ export default function Dashboard() {
         </div>
 
         {/* Dispute Type PieChart */}
-        {disputeTypeData.length > 0 && (
-          <Card className="mb-6">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">
-                {language === "tr" ? "Uyuşmazlık Türü Dağılımı" : "Dispute Type Distribution"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+        <Card className="mb-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">
+              {language === "tr" ? "Uyuşmazlık Türü Dağılımı" : "Dispute Type Distribution"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {disputeTypeData.length === 0 ? (
+              <div className="h-72 flex flex-col items-center justify-center text-center text-muted-foreground">
+                <Sparkles className="w-8 h-8 mb-2 opacity-50" />
+                <p className="text-sm font-medium">
+                  {language === "tr" ? "Gösterilecek veri yok" : "No data to display"}
+                </p>
+                <p className="text-xs mt-1">
+                  {language === "tr"
+                    ? "Başvuru oluşturduğunuzda uyuşmazlık türü dağılımı burada görünecek."
+                    : "Dispute type distribution will appear here once you create cases."}
+                </p>
+              </div>
+            ) : (
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -275,9 +287,9 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
 
         {/* Notifications */}
         {unreadCount > 0 && (

@@ -33,6 +33,7 @@ import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { OfficialDocumentsPanel } from "@/components/mediation/OfficialDocumentsPanel";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
 import { Phase3ErrorBoundary } from "@/components/mediation/Phase3ErrorBoundary";
+import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 
 // Safely coerce any AI-returned value into a renderable string. Prevents
 // "Objects are not valid as a React child" crashes when the model returns an
@@ -66,7 +67,7 @@ const PHASES = [
   { id: 4, label: "Arabulucu Paneli", icon: ShieldCheck },
   { id: 5, label: "Toplantı", icon: CalIcon },
   { id: 6, label: "Bilirkişi", icon: UserCheck, optional: true },
-  { id: 7, label: "Müzakere", icon: MessageSquare },
+  { id: 7, label: "Görüşme Notları", icon: MessageSquare },
   { id: 8, label: "Belgeler & Kapanış", icon: FileCheck2 },
 ] as const;
 
@@ -2578,58 +2579,13 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
 
 
 
-/* ===================== PHASE 8 - NEGOTIATION ===================== */
+/* ===================== PHASE 7 - GÖRÜŞME NOTLARI ===================== */
 
 function Phase8Negotiation({ caseRow, userId, onDone }: { caseRow: CaseRow; userId: string; onDone: () => void }) {
-  const [rounds, setRounds] = useState<any[]>([]);
-  const [proposal, setProposal] = useState("");
-
-  const load = useCallback(async () => {
-    const { data } = await supabase.from("negotiation_rounds").select("*").eq("case_id", caseRow.id).order("round_no", { ascending: true });
-    setRounds(data ?? []);
-  }, [caseRow.id]);
-
-  useEffect(() => { load(); }, [load]);
-
-  async function addRound() {
-    const round_no = (rounds[rounds.length - 1]?.round_no ?? 0) + 1;
-    const { error } = await supabase.from("negotiation_rounds").insert({
-      case_id: caseRow.id, round_no, proposal: { text: proposal } as any, status: "pending",
-    } as any);
-    if (error) toast({ title: "Hata", description: trErr(error.message), variant: "destructive" });
-    else { setProposal(""); load(); }
-  }
-
-  async function setStatus(id: string, status: string) {
-    const { error } = await supabase.from("negotiation_rounds").update({ status } as any).eq("id", id);
-    if (error) toast({ title: "Hata", description: trErr(error.message), variant: "destructive" });
-    else load();
-  }
-
   return (
     <Card className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-primary">Aşama 8 — Müzakere Turları</h2>
-      <div className="space-y-2">
-        <Textarea placeholder="Yeni öneri..." value={proposal} onChange={(e) => setProposal(e.target.value)} />
-        <Button onClick={addRound} disabled={!proposal.trim()}>Yeni Tur Başlat</Button>
-      </div>
-      <ul className="space-y-2">
-        {rounds.map((r) => (
-          <li key={r.id} className="p-3 border rounded space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <b>Tur #{r.round_no}</b>
-              <Badge>{r.status}</Badge>
-            </div>
-            <p className="text-sm whitespace-pre-wrap">{typeof r.proposal === "string" ? r.proposal : (r.proposal?.text ?? JSON.stringify(r.proposal))}</p>
-            {r.status === "pending" && (
-              <div className="flex gap-2">
-                <Button size="sm" variant="default" onClick={() => setStatus(r.id, "accepted")}>Kabul</Button>
-                <Button size="sm" variant="destructive" onClick={() => setStatus(r.id, "rejected")}>Red</Button>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+      <h2 className="text-2xl font-bold text-primary">Aşama 7 — Görüşme Notları</h2>
+      <MeetingNotesPanel caseId={caseRow.id} caseSummary={caseRow.title ?? ""} />
       <div className="flex justify-end">
         <Button onClick={onDone}>Kapanışa Geç →</Button>
       </div>

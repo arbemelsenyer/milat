@@ -12,8 +12,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Loader2, ShieldCheck, Lock, Sparkles, Upload, FileText, Users, Brain, Lightbulb,
-  Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X, History, Filter, FileDown,
+  Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X, History, Filter, FileDown, MessageSquare,
 } from "lucide-react";
+import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
 import { OfficialDocsPanel } from "@/components/mediation/OfficialDocsPanel";
@@ -224,7 +225,7 @@ export default function CaseRoom() {
           <TabsTrigger value="discovery">İhtiyaç Tespiti</TabsTrigger>
           <TabsTrigger value="sessions"><Calendar className="h-4 w-4 mr-1" />Toplantılar</TabsTrigger>
           <TabsTrigger value="experts"><Award className="h-4 w-4 mr-1" />Bilirkişi</TabsTrigger>
-          <TabsTrigger value="rounds"><Repeat className="h-4 w-4 mr-1" />Müzakere Turları</TabsTrigger>
+          <TabsTrigger value="rounds"><MessageSquare className="h-4 w-4 mr-1" />Görüşme Notları</TabsTrigger>
           <TabsTrigger value="agreement"><FileSignature className="h-4 w-4 mr-1" />Anlaşma</TabsTrigger>
         </TabsList>
 
@@ -355,7 +356,7 @@ export default function CaseRoom() {
         </TabsContent>
 
         <TabsContent value="rounds">
-          <RoundsTab caseId={caseId!} parties={parties} />
+          <MeetingNotesPanel caseId={caseId!} caseSummary={caseRow?.title ?? ""} />
         </TabsContent>
 
         <TabsContent value="agreement">
