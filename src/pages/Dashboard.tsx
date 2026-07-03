@@ -159,7 +159,7 @@ export default function Dashboard() {
   const disputeTypeData = useMemo(() => {
     const counts: Record<string, number> = {};
     cases.forEach((c) => {
-      const key = c.dispute_type || (language === "tr" ? "Belirtilmemiş" : "Unspecified");
+      const key = c.dispute_type?.trim() || (language === "tr" ? "Bilinmeyen" : "Unknown");
       counts[key] = (counts[key] ?? 0) + 1;
     });
     return Object.entries(counts)
@@ -248,7 +248,7 @@ export default function Dashboard() {
           <Card className="mb-6">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">
-                {language === "tr" ? "Uyuşmazlık Türleri Dağılımı" : "Dispute Type Distribution"}
+                {language === "tr" ? "Uyuşmazlık Türü Dağılımı" : "Dispute Type Distribution"}
               </CardTitle>
             </CardHeader>
             <CardContent>
