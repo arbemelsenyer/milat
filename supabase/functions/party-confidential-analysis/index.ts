@@ -95,6 +95,19 @@ Deno.serve(async (req) => {
       } catch { docReadFailed = true; }
     }
 
+    // Documents that already have a stored expert-report (bilirkişi) analysis — surface those findings as context.
+    const analyzedDocs = docs.filter((d: any) => d.analysis_result && typeof d.analysis_result === "object");
+    let expertAnalysisBlock = "";
+    if (analyzedDocs.length > 0) {
+      const parts = analyzedDocs.map((d: any) => {
+        const ar = d.analysis_result ?? {};
+        const findings = Array.isArray(ar.keyFindings) ? ar.keyFindings.join("; ") : "";
+        const laws = Array.isArray(ar.relevantLaw) ? ar.relevantLaw.join("; ") : "";
+        return `[Belge: ${d.file_name}]\nÖzet: ${ar.summary ?? "-"}\nBulgular: ${findings || "-"}\nRisk Seviyesi: ${ar.riskLevel ?? "-"}\nİlgili Mevzuat: ${laws || "-"}`;
+      }).join("\n\n");
+      expertAnalysisBlock = `\n═══ BELGE ANALİZ SONUÇLARI (önceden analiz edilmiş bilirkişi raporları) ═══\n${parts}\n═══════════════════════════\n`;
+    }
+
     const partyName = party.party_type === "individual"
       ? `${party.first_name ?? ""} ${party.last_name ?? ""}`.trim()
       : (party.company_name ?? "Taraf");
@@ -108,6 +121,8 @@ Deno.serve(async (req) => {
 
     const systemPrompt = `Sen bir Türk hukuk arabuluculuk uzmanı AI'sın. Bu tarafın perspektifinden detaylı bir analiz hazırlıyorsun.
 Otomatik olarak: (1) niş hukuki alanı tespit et, (2) ilgili mevzuat ve Yargıtay/BAM emsallerini tara, (3) tarafın pozisyon/ihtiyaç/BATNA analizini yap, (4) yüklenen belgelerden somut bulgular çıkar. Sana verilen "İLGİLİ KAYNAK BİLGİSİ" ve "BENZER GEÇMİŞ DAVALAR" bloklarından yararlan, alakalıysa kaynak adını parantez içinde göster.
+Eğer "BELGE ANALİZ SONUÇLARI" bloğu verilmişse, bu bloktaki her belge için önceden çıkarılmış bilirkişi raporu bulguları (özet, bulgular, risk seviyesi, mevzuat) mevcuttur. Bu bulguları document_findings[] dizisine, kaynağını "Bilirkişi raporu: <belge adı>" şeklinde belirterek yansıt. Bu blok yoksa veya bir belge bu blokta geçmiyorsa document_findings davranışını değiştirme. Bu bloktaki riskLevel ve bulguları risk_analizi değerlendirmende (kritik_faktorler, risk_puani) de dikkate al.
+KESİN KURAL (halüsinasyon yasağı): "BELGE ANALİZ SONUÇLARI" bloğundan yalnızca orada yazılı olan içerikten alıntı/özetleme yap; blokta yer almayan bulgu, mevzuat veya risk uydurma.
 
 SON ADIM — RİSK ANALİZİ & ANLAŞMA ORANI:
 A) "İLGİLİ KAYNAK BİLGİSİ" bloklarını tara: bu alanda uzlaşma istatistiği/Yargıtay eğilimi/uzlaşma engeli var mı?
@@ -125,6 +140,7 @@ UYUŞMAZLIK ÖZETİ: ${caseRow?.issue_description ?? "(belirtilmemiş)"}
 YÜKLENEN BELGELER (${docs.length}): ${docs.map((d: any) => `- ${d.file_name}`).join("\n") || "(belge yok)"}
 ${docExcerpts ? `\nBELGE İÇERİKLERİ (kısmi):\n${docExcerpts}` : ""}
 ${docReadFailed ? "\nNOT: Bazı belgeler (PDF/Word) metin olarak okunamadı; yalnızca dosya adlarından çıkarım yapıldı." : ""}
+${expertAnalysisBlock}
 ${ragBlock}
 ${similarBlock}
 Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinden somut karar referansları ver. Yukarıdaki resmi kaynaklardan ve benzer geçmiş davalardan yararlanarak risk_analizi üret; sabit/uydurma yüzde verme.`;
