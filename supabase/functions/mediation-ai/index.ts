@@ -7,6 +7,8 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { extractText, getDocumentProxy } from "npm:unpdf@0.12.1";
+import mammoth from "npm:mammoth@1.8.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,6 +39,34 @@ function serverMask(input: string): string {
     });
   }
   return working;
+}
+
+// Same extraction pattern as admin-upload-knowledge/index.ts (unpdf for PDF, mammoth
+// for DOCX). Returns "" on any failure (download, unsupported format, scanned/empty
+// PDF) so the caller can fall back to a no-data response instead of hallucinating.
+async function extractDocumentText(supabase: any, bucket: string, filePath: string): Promise<string> {
+  try {
+    const { data: blob, error } = await supabase.storage.from(bucket).download(filePath);
+    if (error || !blob) return "";
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const name = filePath.toLowerCase();
+    const mime = blob.type || "";
+    if (mime === "application/pdf" || name.endsWith(".pdf")) {
+      const pdf = await getDocumentProxy(bytes);
+      const { text } = await extractText(pdf, { mergePages: true });
+      return (Array.isArray(text) ? text.join("\n") : text).trim();
+    }
+    if (name.endsWith(".docx") || mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      const result = await mammoth.extractRawText({ buffer: bytes as any });
+      return (result.value ?? "").trim();
+    }
+    if (name.endsWith(".txt") || mime.startsWith("text/")) {
+      return new TextDecoder("utf-8").decode(bytes).trim();
+    }
+    return "";
+  } catch {
+    return "";
+  }
 }
 
 const FLASH = "google/gemini-3-flash-preview";
@@ -105,8 +135,17 @@ serve(async (req) => {
     const action = body.action as string;
 
     if (action === "analyze_document") {
-      const text = serverMask(String(body.text ?? "")).slice(0, 30000);
+      let rawText = String(body.text ?? "");
+      if (!rawText.trim() && body.file_path) {
+        rawText = await extractDocumentText(supabase, String(body.bucket ?? "case-documents"), String(body.file_path));
+      }
+      const text = serverMask(rawText).slice(0, 30000);
       const niche = String(body.niche ?? "");
+      if (!text.trim()) {
+        return new Response(JSON.stringify({ cards: [] }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const result = await jsonAi(
         PRO,
         "Sen kıdemli bir Türk hukuk analisti ve arabulucusun. Doküman içindeki hukuki çelişkileri, riskleri ve anomalileri tespit edersin.",

@@ -16,6 +16,14 @@ interface AnalysisResult {
   relevantLaw: string[];
 }
 
+const NO_DATA_RESULT: AnalysisResult = {
+  summary: 'Yeterli veri yok',
+  keyFindings: [],
+  recommendations: [],
+  riskLevel: 'low',
+  relevantLaw: [],
+};
+
 export default function ExpertWitness() {
   const { user } = useAuth();
   const { language } = useLanguage();
@@ -42,32 +50,51 @@ export default function ExpertWitness() {
 
   async function handleAnalyze() {
     if (!file || !user) return;
+    if (!caseId.trim()) {
+      setError(t('Analiz sonucunu kaydetmek için Başvuru ID gereklidir.', 'A Case ID is required to save the analysis.'));
+      return;
+    }
     setUploading(true);
     setError('');
     try {
-      const filePath = `expert-reports/${user.id}/${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage.from('case-documents').upload(filePath, file);
+      const filePath = `${user.id}/${caseId.trim()}/${Date.now()}-${file.name}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage.from('case-documents').upload(filePath, file);
       if (uploadError) throw uploadError;
       setUploading(false);
       setAnalyzing(true);
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve((reader.result as string).split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          system: `Sen bir hukuki belge analiz uzmanısın. Sadece JSON formatında yanıt ver: {"summary":"özet","keyFindings":["bulgu"],"recommendations":["öneri"],"riskLevel":"low|medium|high","relevantLaw":["yasa"]}`,
-          messages: [{ role: 'user', content: [{ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }, { type: 'text', text: 'Bu bilirkişi raporunu analiz et.' }] }],
-        }),
-      });
-      const data = await response.json();
-      const parsed: AnalysisResult = JSON.parse(data.content?.[0]?.text?.replace(/```json|```/g, '').trim() || '{}');
+
+      // mediation-ai's "analyze_document" action only reads body.text — there is no
+      // server-side PDF parser yet, so a PDF's real text can't be extracted here or
+      // there. Only call it when we actually have readable text; otherwise report
+      // "Yeterli veri yok" instead of letting the AI guess from nothing.
+      const extractedText = file.type === 'text/plain' ? (await file.text()).trim() : '';
+      let parsed: AnalysisResult = NO_DATA_RESULT;
+      if (extractedText) {
+        const { data, error: aiError } = await supabase.functions.invoke('mediation-ai', {
+          body: { action: 'analyze_document', text: extractedText, file_path: uploadData?.path ?? filePath, niche: 'bilirkişi raporu' },
+        });
+        if (aiError) throw aiError;
+        const cards: Array<{ title?: string; riskLevel?: string; description?: string; precedent?: string }> = data?.cards ?? [];
+        parsed = cards.length ? {
+          summary: `${cards.length} bulgu tespit edildi.`,
+          keyFindings: cards.map(c => c.description).filter((x): x is string => !!x),
+          recommendations: [],
+          riskLevel: cards.some(c => c.riskLevel === 'high') ? 'high' : cards.some(c => c.riskLevel === 'medium') ? 'medium' : 'low',
+          relevantLaw: cards.map(c => c.precedent).filter((x): x is string => !!x),
+        } : NO_DATA_RESULT;
+      }
+
+      const { error: docError } = await supabase.from('case_documents').insert({
+        case_id: caseId.trim(),
+        uploaded_by: user.id,
+        file_name: file.name,
+        file_path: uploadData?.path ?? filePath,
+        file_size: file.size,
+        mime_type: file.type,
+        analysis_result: parsed,
+      } as any);
+      if (docError) throw docError;
+
       setResult(parsed);
     } catch (e) {
       setError(t('Analiz sırasında hata oluştu.', 'Analysis failed.'));
@@ -83,7 +110,7 @@ export default function ExpertWitness() {
         <h1 className="text-2xl font-semibold mb-2">{t('Bilirkişi Raporu Analizi', 'Expert Witness Analysis')}</h1>
         <p className="text-muted-foreground text-sm mb-6">{t('PDF raporu yükleyin, AI analiz etsin.', 'Upload PDF report for AI analysis.')}</p>
         <div className="mb-4">
-          <label className="text-sm font-medium block mb-1">{t('Başvuru ID (isteğe bağlı)', 'Case ID (optional)')}</label>
+          <label className="text-sm font-medium block mb-1">{t('Başvuru ID', 'Case ID')}</label>
           <input value={caseId} onChange={e => setCaseId(e.target.value)} className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background" />
         </div>
         <div className="border-2 border-dashed border-border rounded-xl p-8 text-center mb-4 cursor-pointer" onClick={() => document.getElementById('pdf-input')?.click()}>

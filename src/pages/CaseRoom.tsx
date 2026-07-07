@@ -106,7 +106,7 @@ export default function CaseRoom() {
 
   async function uploadDoc(file: File) {
     if (!user || !caseId) return;
-    const path = `${caseId}/${user.id}/${Date.now()}-${file.name}`;
+    const path = `${user.id}/${caseId}/${Date.now()}-${file.name}`;
     const { error: upErr } = await supabase.storage.from("case-documents").upload(path, file);
     if (upErr) { toast({ title: "Yükleme hatası", description: upErr.message, variant: "destructive" }); return; }
     const { error: insErr } = await supabase.from("case_documents").insert({
