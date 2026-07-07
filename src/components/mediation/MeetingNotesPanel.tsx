@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,7 +16,7 @@ import { Loader2, Sparkles, Download, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 
-type SessionLite = { id: string; scheduled_at: string; session_type?: string | null; status?: string | null };
+type SessionLite = { id: string; scheduled_at: string; session_type?: string | null; status?: string | null; participants?: Array<{ user_id?: string | null }> | null };
 type Analysis = {
   yeni_tespitler?: string[];
   degisen_pozisyonlar?: string[];
@@ -30,18 +31,22 @@ type NoteRow = {
 };
 
 export function MeetingNotesPanel({ caseId, caseSummary }: { caseId: string; caseSummary?: string }) {
+  const { user } = useAuth();
   const [sessions, setSessions] = useState<SessionLite[]>([]);
   const [notes, setNotes] = useState<NoteRow[]>([]);
+  const [assignedMediatorId, setAssignedMediatorId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string>("none");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const [sRes, nRes] = await Promise.all([
-      supabase.from("case_sessions").select("id,scheduled_at,session_type,status").eq("case_id", caseId).order("scheduled_at", { ascending: false }),
+    const [sRes, nRes, cRes] = await Promise.all([
+      supabase.from("case_sessions").select("id,scheduled_at,session_type,status,participants").eq("case_id", caseId).order("scheduled_at", { ascending: false }),
       supabase.from("case_notes").select("id,created_at,content").eq("case_id", caseId).eq("phase", 7).order("created_at", { ascending: false }),
+      supabase.from("cases").select("assigned_mediator_id").eq("id", caseId).maybeSingle(),
     ]);
     setSessions((sRes.data as any) ?? []);
+    setAssignedMediatorId((cRes.data as any)?.assigned_mediator_id ?? null);
     const parsed = ((nRes.data as any[]) ?? []).map((r) => {
       let p: NoteRow["parsed"] = undefined;
       try { p = JSON.parse(r.content); } catch { p = { note: r.content }; }
@@ -50,14 +55,29 @@ export function MeetingNotesPanel({ caseId, caseSummary }: { caseId: string; cas
     setNotes(parsed);
   }, [caseId]);
 
+  // Per-case mediator check, same pattern as CaseRoom.tsx:73 (not the global role flag).
+  const isMediator = !!(user && assignedMediatorId && user.id === assignedMediatorId);
+
+  // Notes from a "private" session are visible only to that session's participants + mediator.
+  const visibleNotes = useMemo(() => {
+    return notes.filter((n) => {
+      const sid = n.parsed?.session_id;
+      if (!sid) return true;
+      const session = sessions.find((s) => s.id === sid);
+      if (!session || session.session_type !== "private") return true;
+      if (isMediator) return true;
+      return (session.participants ?? []).some((p) => p?.user_id === user?.id);
+    });
+  }, [notes, sessions, isMediator, user?.id]);
+
   useEffect(() => { void load(); }, [load]);
 
   const saveAndAnalyze = async () => {
     if (!note.trim()) return;
     setBusy(true);
     try {
-      const priorNotes = notes.map((n) => n.parsed?.note ?? "").filter(Boolean);
-      const priorAnalyses = notes.map((n) => n.parsed?.ai).filter(Boolean);
+      const priorNotes = visibleNotes.map((n) => n.parsed?.note ?? "").filter(Boolean);
+      const priorAnalyses = visibleNotes.map((n) => n.parsed?.ai).filter(Boolean);
 
       const { data: aiData, error: aiErr } = await supabase.functions.invoke("analyze-meeting-notes", {
         body: { newNote: note, priorNotes, priorAnalyses, caseSummary: caseSummary ?? "" },
@@ -102,7 +122,7 @@ export function MeetingNotesPanel({ caseId, caseSummary }: { caseId: string; cas
       .note{background:#f8f9fb;padding:12px;border-radius:8px;white-space:pre-wrap;margin:8px 0}
       ul{margin:4px 0 12px 20px}</style></head><body>
       <h1>Görüşme Notları & AI Analizleri</h1>
-      ${notes.slice().reverse().map((n) => `
+      ${visibleNotes.slice().reverse().map((n) => `
         <h2>${format(new Date(n.created_at), "dd MMM yyyy HH:mm", { locale: tr })}</h2>
         <div class="note">${(n.parsed?.note ?? "").replace(/</g, "&lt;")}</div>
         ${n.parsed?.ai ? `
@@ -160,17 +180,17 @@ export function MeetingNotesPanel({ caseId, caseSummary }: { caseId: string; cas
       <Card className="p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Geçmiş Notlar & AI Analizleri</h3>
-          {notes.length > 0 && (
+          {visibleNotes.length > 0 && (
             <Button variant="outline" size="sm" onClick={downloadPdf}>
               <Download className="h-3 w-3 mr-1" /> PDF
             </Button>
           )}
         </div>
-        {notes.length === 0 ? (
+        {visibleNotes.length === 0 ? (
           <p className="text-sm text-muted-foreground">Henüz görüşme notu eklenmemiş.</p>
         ) : (
           <Accordion type="multiple" className="w-full">
-            {notes.map((n) => {
+            {visibleNotes.map((n) => {
               const ai = n.parsed?.ai;
               return (
                 <AccordionItem key={n.id} value={n.id}>

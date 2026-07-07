@@ -510,7 +510,9 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }
     case 1: return <Phase1Summary caseRow={caseRow} />;
     case 2: return <Phase2Parties caseRow={caseRow} isMediator={isMediator} userId={userId} onDone={() => { bumpPhase(3); onAdvance(3); }} />;
     case 3: return <Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} onAdvance={onAdvance} bumpPhase={bumpPhase} /></Phase3ErrorBoundary>;
-    case 4: return <Phase4Summary caseRow={caseRow} />;
+    case 4: return isMediator
+      ? <Phase4Summary caseRow={caseRow} />
+      : <Card className="p-6 text-sm text-muted-foreground">Bu bölüm yalnızca arabulucu tarafından görüntülenebilir.</Card>;
     case 5: return <SessionScheduler caseId={caseRow.id} />;
     case 6: return <Phase7Expert caseRow={caseRow} />;
     case 7: return <Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(8); onAdvance(8); }} />;
@@ -1747,7 +1749,12 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
 
 
                   {/* Analysis result */}
-                  {a && (
+                  {a && !(isMediator || p.user_id === userId) && (
+                    <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded">
+                      Bu bölüm yalnızca arabulucu tarafından görüntülenebilir.
+                    </div>
+                  )}
+                  {a && (isMediator || p.user_id === userId) && (
                     <div className="space-y-2">
                       <RiskAnalysisCard
                         risk={an.risk_analizi ?? (a as any).risk_analizi}

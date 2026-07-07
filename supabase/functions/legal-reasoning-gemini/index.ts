@@ -45,6 +45,25 @@ Deno.serve(async (req) => {
       });
     }
 
+    // RAG grounding: embed the dispute description and pull matching chunks from the
+    // Ministry of Justice mediation knowledge base, same pattern as
+    // supabase/functions/party-confidential-analysis/index.ts.
+    const admin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+    const nisMatch = prompt.match(/Nis Alan:\s*([^\n]+)/i);
+    const uyusMatch = prompt.match(/Uyusmazlik:\s*([\s\S]*?)(?:\n\n|$)/i);
+    const ragQuery = (uyusMatch?.[1] || prompt).trim();
+    const ragCategory = mapDisputeToCategory(nisMatch?.[1] ?? null, null);
+    const { block: ragBlock, sources: ragSources } = await fetchKnowledgeBlock(admin, key, ragQuery, ragCategory);
+
+    const systemPrompt = `You are a Turkish legal expert. Always return strictly valid JSON only, no prose, no code fences.
+Sana "İLGİLİ KAYNAK BİLGİSİ" bloğu verilirse, emsal karar veya kaynak/referans alanlarını SADECE bu blokta verilen kaynaklardan doldur ve mümkünse kaynak adını belirt.
+KESİN KURAL: Blok boşsa veya sorunla ilgili kaynak yoksa ASLA uydurma karar numarası, tarih veya referans üretme. Bu durumda ilgili tekil alanlara (ör. "emsal") tam olarak "Yeterli veri yok" yaz; ilgili dizi alanlarına (ör. "kaynaklar") boş dizi ([]) döndür.`;
+
+    const userContent = `${ragBlock}${prompt}`;
+
     const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -54,8 +73,8 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          { role: 'system', content: 'You are a Turkish legal expert. Always return strictly valid JSON only, no prose, no code fences.' },
-          { role: 'user', content: prompt },
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userContent },
         ],
         response_format: { type: 'json_object' },
         temperature: 0.4,
@@ -77,7 +96,7 @@ Deno.serve(async (req) => {
 
     const data = await res.json();
     const raw: string = data.choices?.[0]?.message?.content || '';
-    console.log('AI raw length:', raw.length);
+    console.log('AI raw length:', raw.length, '| RAG sources:', ragSources.length);
 
     let text = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
     const start = text.search(/[\{\[]/);
@@ -99,3 +118,57 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+function mapDisputeToCategory(disputeType?: string | null, subtype?: string | null): string | null {
+  const CATS = ["işçi_işveren","ticari","tüketici","sağlık","fikri_mülkiyet","inşaat","sigorta","bankacılık","aile","spor","enerji_maden","kira","gayrimenkul","genel"];
+  const raw = (disputeType ?? "").trim().toLowerCase();
+  if (CATS.includes(raw)) return raw === "genel" ? null : raw;
+  const t = `${disputeType ?? ""} ${subtype ?? ""}`.toLowerCase();
+  if (/kira/.test(t)) return "kira";
+  if (/gayrimenkul|tapu|emlak/.test(t)) return "gayrimenkul";
+  if (/iş|isci|işçi|işveren|isveren|kıdem|kidem/.test(t)) return "işçi_işveren";
+  if (/ticari|ticaret|şirket|sirket/.test(t)) return "ticari";
+  if (/tüketici|tuketici/.test(t)) return "tüketici";
+  if (/aile|boşan|bosan|nafaka|velayet/.test(t)) return "aile";
+  if (/sigorta/.test(t)) return "sigorta";
+  if (/sağlık|saglik|malpraktis/.test(t)) return "sağlık";
+  if (/inşaat|insaat|yapı|yapi/.test(t)) return "inşaat";
+  if (/fikri|marka|patent|telif/.test(t)) return "fikri_mülkiyet";
+  if (/enerji|maden/.test(t)) return "enerji_maden";
+  if (/banka|finans|kredi/.test(t)) return "bankacılık";
+  if (/spor/.test(t)) return "spor";
+  return null;
+}
+
+async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, category: string | null): Promise<{ block: string; sources: any[]; embedding: number[] | null }> {
+  try {
+    if (!query || query.trim().length < 10) return { block: "", sources: [], embedding: null };
+    const embRes = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "openai/text-embedding-3-small", input: query, dimensions: 768 }),
+    });
+    if (!embRes.ok) return { block: "", sources: [], embedding: null };
+    const embJson = await embRes.json();
+    const vec = embJson?.data?.[0]?.embedding;
+    if (!vec) return { block: "", sources: [], embedding: null };
+    const { data } = await admin.rpc("match_knowledge_base", {
+      query_embedding: vec, filter_category: category, match_count: 5, match_threshold: 0.65,
+    });
+    if (!data || data.length === 0) return { block: "", sources: [], embedding: vec };
+    const sources = data.map((r: any) => ({
+      title: r.source_title,
+      url: r.source_url,
+      category: r.category,
+      excerpt: String(r.chunk_text ?? "").slice(0, 400),
+      similarity: r.similarity,
+    }));
+    const parts = data.map((r: any) =>
+      `[Kaynak: ${r.source_title}]\n${r.chunk_text}`
+    ).join("\n\n");
+    const block = `\n═══ İLGİLİ KAYNAK BİLGİSİ (Adalet Bakanlığı Arabuluculuk Daire Başkanlığı resmi yayınlarından) ═══\n${parts}\n═══════════════════════════\n\n`;
+    return { block, sources, embedding: vec };
+  } catch {
+    return { block: "", sources: [], embedding: null };
+  }
+}

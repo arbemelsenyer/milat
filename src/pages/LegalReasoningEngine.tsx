@@ -4,6 +4,7 @@ import { AppNavbar } from '@/components/AppNavbar';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { maskText } from '@/lib/masking';
 import { Loader2, Brain, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Scale } from 'lucide-react';
 
 interface CeliskilKart { baslik: string; risk: 'yuksek'|'orta'|'dusuk'; aciklama: string; emsal: string; }
@@ -23,14 +24,11 @@ const NIS_ALANLAR = [
 
 const TARAF_ILISKISI = ['Is','Ticari','Tuketici','Komsu','Aile','Diger'];
 
-function maskele(metin: string) {
-  const map: Record<string,string> = {};
-  let m = metin; let tc=0,iban=0,plaka=0;
-  m = m.replace(/\b\d{11}\b/g, x=>{const k=`[TC_${++tc}]`;map[k]=x;return k;});
-  m = m.replace(/TR\d{2}[\s\d]{20,26}/gi, x=>{const k=`[IBAN_${++iban}]`;map[k]=x;return k;});
-  m = m.replace(/\b\d{2}[A-Z]{1,3}\d{2,4}\b/g, x=>{const k=`[PLAKA_${++plaka}]`;map[k]=x;return k;});
-  return {maskelenmis:m, eslesmeler:map};
-}
+// Fixed tags for fields that must never reach the AI in plaintext, regardless of
+// whether maskText's literal-term search happens to find them inside the free text.
+const KARSI_TARAF_TAG = '[KARSI_TARAF_1]';
+const BASVURAN_ILETISIM_TAG = '[BASVURAN_ILETISIM_1]';
+const KARSI_TARAF_ILETISIM_TAG = '[KARSI_TARAF_ILETISIM_1]';
 
 async function callGemini(prompt: string): Promise<string> {
   const { data, error } = await supabase.functions.invoke('legal-reasoning-gemini', {
@@ -70,8 +68,20 @@ export default function LegalReasoningEngine() {
   const [acikKart,setAcikKart] = useState<number|null>(null);
 
   async function handleBaslat() {
-    const {maskelenmis:m, eslesmeler:e} = maskele(uyusmazlik);
-    setMaskelenmis(m); setEslesmeler(e); setAsama('maskeleme');
+    // Also catch these fields if the user happened to mention them inline in the free text.
+    const extraTerms = [
+      { value: karsiTarafAd, fieldType: 'counterparty_name' },
+      { value: basvuranIletisim, fieldType: 'phone' },
+      { value: karsiTarafIletisim, fieldType: 'phone' },
+    ];
+    const { masked, mappings } = maskText(uyusmazlik, extraTerms);
+    const e: Record<string,string> = Object.fromEntries(mappings.map(m => [m.label, m.realValue]));
+    // Guaranteed tagging: these values must never reach the AI in plaintext even if
+    // they don't literally appear inside the dispute description above.
+    if (karsiTarafAd.trim()) e[KARSI_TARAF_TAG] = karsiTarafAd;
+    if (basvuranIletisim.trim()) e[BASVURAN_ILETISIM_TAG] = basvuranIletisim;
+    if (karsiTarafIletisim.trim()) e[KARSI_TARAF_ILETISIM_TAG] = karsiTarafIletisim;
+    setMaskelenmis(masked); setEslesmeler(e); setAsama('maskeleme');
   }
 
   async function handleAnalize() {
@@ -79,11 +89,13 @@ export default function LegalReasoningEngine() {
     const nis = NIS_ALANLAR.find(n=>n.value===nisAlan)?.label||nisAlan;
     try {
       const analizText = await callGemini(`Sen Turk hukuku uzmanisin. Sadece JSON dondur, baska hicbir sey yazma:
-{"celiskilKartlar":[{"baslik":"...","risk":"yuksek|orta|dusuk","aciklama":"...","emsal":"Yargitay/BAM referansi"}]}
+{"celiskilKartlar":[{"baslik":"...","risk":"yuksek|orta|dusuk","aciklama":"...","emsal":"..."}]}
+
+KESIN KURAL: "emsal" alanina SADECE gercekten var oldugunu bildigin, dogrulanmis bir Yargitay/BAM karar numarasi yaz. Emin degilsen veya elinde dogrulanmis bir referans yoksa ASLA uydurma karar numarasi/tarihi uretme — bu alana tam olarak "Yeterli veri yok" yaz.
 
 Nis Alan: ${nis}
 Basvuran: ${basvuranAd}
-Karsi Taraf: ${karsiTarafAd}
+Karsi Taraf: ${karsiTarafAd.trim() ? KARSI_TARAF_TAG : ''}
 Iliski: ${iliski}
 Uyusmazlik: ${maskelenmis}
 
@@ -114,6 +126,8 @@ Taraflarin gercek ihtiyaclarini ortaya cikaracak 5 soru uret.`);
     try {
       const raporText = await callGemini(`Sen Turk hukuku ve uluslararasi arabuluculuk uzmanisın. Sadece JSON dondur:
 {"yoneticiOzeti":"...","riskler":["..."],"firsatlar":["..."],"kaynaklar":[{"tip":"...","referans":"...","ilgililik":"..."}],"strateji":"...","onerim":"..."}
+
+KESIN KURAL: "kaynaklar" alanina SADECE gercekten var oldugunu bildigin, dogrulanmis mevzuat/Yargitay referanslari ekle. Dogrulanmis gercek bir kaynagin yoksa ASLA uydurma referans uretme — bu durumda "kaynaklar" alanini bos dizi ([]) olarak dondur.
 
 Nis Alan: ${nis}, Uyusmazlik: ${maskelenmis}
 Celiskiler: ${JSON.stringify(celiskilKartlar)}
@@ -219,7 +233,7 @@ Kapsamli cozum raporu uret.`);
         {asama==='analiz'&&(
           <div className="space-y-4">
             {loading
-              ?<div className="text-center py-16"><Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-4"/><p className="text-sm">{t('Yargitay kararlari taranıyor...','Scanning court decisions...')}</p></div>
+              ?<div className="text-center py-16"><Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-4"/><p className="text-sm">{t('Ilgili kaynaklar taraniyor ve hukuki celiskiler analiz ediliyor...','Searching relevant sources and analyzing legal conflicts...')}</p></div>
               :celiskilKartlar.length>0&&(
                 <>
                   <p className="text-sm font-medium">{t('Tespit Edilen Celiskiler & Riskler','Detected Conflicts & Risks')}</p>
