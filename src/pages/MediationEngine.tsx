@@ -34,6 +34,7 @@ import { OfficialDocumentsPanel } from "@/components/mediation/OfficialDocuments
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
 import { Phase3ErrorBoundary } from "@/components/mediation/Phase3ErrorBoundary";
 import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
+import { ProcessTrackerPanel } from "@/components/mediation/ProcessTrackerPanel";
 
 // Safely coerce any AI-returned value into a renderable string. Prevents
 // "Objects are not valid as a React child" crashes when the model returns an
@@ -162,6 +163,13 @@ export default function MediationEngine() {
   const [phase3Complete, setPhase3Complete] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CaseRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [trackerOpen, setTrackerOpen] = useState(false);
+
+  useEffect(() => {
+    if (activeCase && (isMediator || isAdmin) && params.get("tab") === "surec") {
+      setTrackerOpen(true);
+    }
+  }, [activeCase, isMediator, isAdmin, params]);
 
   async function deleteCase(c: CaseRow) {
     setDeleting(true);
@@ -396,6 +404,12 @@ export default function MediationEngine() {
             <div className="font-mono text-sm">{activeCase.application_no || "—"}</div>
             <div className="text-xs mt-2 opacity-80 line-clamp-2">{activeCase.title}</div>
           </div>
+          {(isMediator || isAdmin) && (
+            <Button variant="outline" size="sm" className="w-full mb-4 justify-start text-sidebar-foreground"
+              onClick={() => setTrackerOpen(true)}>
+              📋 Süreç Takip Çizelgesi
+            </Button>
+          )}
           <nav className="space-y-1">
             {PHASES.map((p) => {
               const done = p.id < completed;
@@ -428,6 +442,9 @@ export default function MediationEngine() {
           />
         </main>
       </div>
+      {(isMediator || isAdmin) && (
+        <ProcessTrackerPanel caseRow={activeCase} open={trackerOpen} onOpenChange={setTrackerOpen} />
+      )}
     </div>
   );
 }
