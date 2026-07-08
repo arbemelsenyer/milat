@@ -209,7 +209,7 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Süreç Takip Çizelgesi</DialogTitle>
+          <DialogTitle className="heading-gold-underline">Süreç Takip Çizelgesi</DialogTitle>
         </DialogHeader>
 
         {loading ? (
@@ -220,7 +220,7 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
           <div className="space-y-6">
             <div>
               <h3 className="text-sm font-semibold mb-2">A. Künye</h3>
-              <table className="w-full text-sm border rounded-md overflow-hidden">
+              <table className="w-full text-sm border border-accent/40 rounded-md overflow-hidden">
                 <tbody>
                   {kunyeRows.map((row, i) => (
                     <tr key={row.label} className={i % 2 ? "bg-muted/30" : ""}>
@@ -235,7 +235,7 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
 
             <div>
               <h3 className="text-sm font-semibold mb-2">B. İş Akışı</h3>
-              <table className="w-full text-sm border rounded-md overflow-hidden">
+              <table className="w-full text-sm border border-accent/40 rounded-md overflow-hidden">
                 <tbody>
                   {WORKFLOW_ITEMS.map((item, i) => {
                     const state = item.auto ? autoState[item.key] : tracker.items[item.key];

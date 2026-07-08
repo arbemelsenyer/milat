@@ -129,6 +129,22 @@
   .bg-gradient-primary { background: var(--gradient-primary); }
   .bg-gradient-accent { background: var(--gradient-accent); }
   .bg-gradient-hero { background: var(--gradient-hero); }
+  /* Reusable gold underline accent for section/panel titles — apply via class, not globally on h2 */
+  .heading-gold-underline {
+    position: relative;
+    display: inline-block;
+    padding-bottom: 0.4rem;
+  }
+  .heading-gold-underline::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 2.5rem;
+    height: 2px;
+    background: hsl(var(--accent));
+    border-radius: 9999px;
+  }
   .shadow-elegant { box-shadow: var(--shadow-elegant); }
   .shadow-card {
     box-shadow: var(--shadow-card);

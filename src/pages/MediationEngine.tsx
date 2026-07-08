@@ -418,8 +418,8 @@ export default function MediationEngine() {
               const locked = p.id >= 4 && !phase3Complete;
               return (
                 <button key={p.id} onClick={() => { if (!locked) setPhase(p.id); else toast({ title: "Aşama kilitli", description: "Önce Aşama 3'te en az 2 tarafı analiz edip Ortak Zemin Raporu üretin." }); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition
-                    ${active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/40"}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition border-l-2
+                    ${active ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-accent" : "border-l-transparent hover:bg-sidebar-accent/40"}
                     ${locked ? "opacity-50 cursor-not-allowed" : ""}`}
                   title={locked ? "Aşama 3 tamamlanmadı" : ""}>
                   {done ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Circle className="h-4 w-4 opacity-60" />}
@@ -1671,7 +1671,9 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                 <span>Henüz analiz edilmemiş taraf var, rapor eksik olabilir. Tam karşılaştırmalı rapor için tüm tarafları analiz edip "Yeniden Üret" butonuna basın.</span>
               </div>
             )}
-            <CommonGroundView data={report.report} strategy={report.strategy} parties={parties} analyses={analyses} caseId={caseRow.id} />
+            <p className="text-sm text-muted-foreground italic">
+              Taraf analizleri tamamlandığında sentez raporları Aşama 4 — Arabulucu Paneli'nde oluşturulur.
+            </p>
           </>
         )}
       </Card>
