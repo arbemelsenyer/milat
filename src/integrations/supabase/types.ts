@@ -529,6 +529,38 @@ export type Database = {
           },
         ]
       }
+      case_process_tracker: {
+        Row: {
+          arb_no: string | null
+          buro_no: string | null
+          case_id: string
+          items: Json
+          updated_at: string
+        }
+        Insert: {
+          arb_no?: string | null
+          buro_no?: string | null
+          case_id: string
+          items?: Json
+          updated_at?: string
+        }
+        Update: {
+          arb_no?: string | null
+          buro_no?: string | null
+          case_id?: string
+          items?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_process_tracker_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: true
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_sessions: {
         Row: {
           case_id: string
