@@ -513,12 +513,34 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }
     case 4: return isMediator
       ? <Phase4Summary caseRow={caseRow} />
       : <Card className="p-6 text-sm text-muted-foreground">Bu bölüm yalnızca arabulucu tarafından görüntülenebilir.</Card>;
-    case 5: return <SessionScheduler caseId={caseRow.id} />;
+    case 5: return <Phase5Sessions caseRow={caseRow} />;
     case 6: return <Phase7Expert caseRow={caseRow} />;
     case 7: return <Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(8); onAdvance(8); }} />;
     case 8: return <Phase9Closing caseRow={caseRow} />;
     default: return null;
   }
+}
+
+// SessionScheduler needs case_parties for invite selection/presence — not lifted into
+// MediationEngine state elsewhere, so fetch it here the same way Phase2Parties does.
+function Phase5Sessions({ caseRow }: { caseRow: CaseRow }) {
+  const [parties, setParties] = useState<any[]>([]);
+  useEffect(() => {
+    supabase
+      .from("case_parties")
+      .select("id, user_id, party_role, first_name, last_name, company_name, email")
+      .eq("case_id", caseRow.id)
+      .then(({ data }) => setParties(data ?? []));
+  }, [caseRow.id]);
+  return (
+    <SessionScheduler
+      caseId={caseRow.id}
+      niche={caseRow.dispute_type ?? ""}
+      context={caseRow.title ?? ""}
+      parties={parties}
+      mediatorId={caseRow.assigned_mediator_id}
+    />
+  );
 }
 
 function Phase1Summary({ caseRow }: { caseRow: CaseRow }) {
@@ -2960,13 +2982,76 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
 
 /* ===================== PHASE 7 - EXPERT ===================== */
 
+const EXPERT_STATUS_LABEL: Record<string, string> = {
+  pending: "Onay Bekliyor",
+  accepted: "Kabul Edildi",
+};
+
 function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
   const { user } = useAuth();
   const [selected, setSelected] = useState<string | null>(null);
+  const [assignment, setAssignment] = useState<{ id: string; status: string; expertName: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [removing, setRemoving] = useState(false);
+
+  const loadAssignment = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("case_expert_assignments")
+      .select("id, status, expert_id, experts:expert_id(full_name)")
+      .eq("case_id", caseRow.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data) {
+      setAssignment({
+        id: (data as any).id,
+        status: (data as any).status,
+        expertName: (data as any).experts?.full_name ?? "Bilirkişi",
+      });
+      setSelected((data as any).expert_id);
+    } else {
+      setAssignment(null);
+      setSelected(null);
+    }
+    setLoading(false);
+  }, [caseRow.id]);
+
+  useEffect(() => { loadAssignment(); }, [loadAssignment]);
+
+  async function removeAssignment() {
+    if (!assignment) return;
+    setRemoving(true);
+    const { error } = await supabase.from("case_expert_assignments").delete().eq("id", assignment.id);
+    if (error) toast({ title: "Kaldırma hatası", description: trErr(error.message), variant: "destructive" });
+    else {
+      toast({ title: "Bilirkişi ataması kaldırıldı" });
+      setAssignment(null);
+      setSelected(null);
+    }
+    setRemoving(false);
+  }
+
   return (
     <Card className="p-6 space-y-4">
       <h2 className="text-2xl font-bold text-primary">Aşama 7 — Bilirkişi (Opsiyonel)</h2>
       <p className="text-sm text-muted-foreground">Uyuşmazlık türü: {caseRow.dispute_type}</p>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Atama bilgisi yükleniyor…</div>
+      ) : assignment && (
+        <div className="flex items-center justify-between gap-2 border rounded-md p-3 bg-muted/30">
+          <div className="text-sm">
+            <span className="font-medium">{assignment.expertName}</span>{" "}
+            <Badge variant="secondary" className="ml-1">{EXPERT_STATUS_LABEL[assignment.status] ?? assignment.status}</Badge>
+          </div>
+          <Button size="sm" variant="outline" onClick={removeAssignment} disabled={removing}>
+            {removing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+            Atamayı Kaldır
+          </Button>
+        </div>
+      )}
+
       <ExpertSelector
         niche={caseRow.dispute_type || ""}
         selectedId={selected}
@@ -2977,7 +3062,10 @@ function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
             case_id: caseRow.id, expert_id: e.id, status: "pending", assigned_by: user.id,
           } as any);
           if (error) toast({ title: "Atama hatası", description: trErr(error.message), variant: "destructive" });
-          else toast({ title: "Bilirkişi atandı (taraf onayı bekleniyor)" });
+          else {
+            toast({ title: "Bilirkişi atandı (taraf onayı bekleniyor)" });
+            loadAssignment();
+          }
         }}
       />
     </Card>

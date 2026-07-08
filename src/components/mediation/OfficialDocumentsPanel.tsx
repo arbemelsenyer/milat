@@ -43,7 +43,11 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
     setSavingOutcome(true);
     setError(null);
     try {
-      const payload: any = { outcome: nextOutcome };
+      const payload: any = {
+        outcome: nextOutcome,
+        status: nextOutcome === "anlasma" ? "agreed" : "failed",
+        current_phase: 9,
+      };
       if (nextOutcome === "anlasma") {
         payload.agreement_terms = terms || null;
         payload.agreement_amount = amount ? Number(amount) : null;
