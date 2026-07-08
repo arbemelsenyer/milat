@@ -407,12 +407,12 @@ export default function MediationEngine() {
             <div className="text-xs mt-2 opacity-80 line-clamp-2">{activeCase.title}</div>
           </div>
           {(isMediator || isAdmin) && (
-            <Button variant="outline" size="sm" className="w-full mb-4 justify-start text-sidebar-foreground"
+            <Button variant="outline" size="sm" className="w-full mb-4 justify-start border-l-2 border-l-transparent text-sidebar-foreground transition-colors hover:border-l-accent hover:text-accent"
               onClick={() => setTrackerOpen(true)}>
               📋 Süreç Takip Çizelgesi
             </Button>
           )}
-          <Button variant="outline" size="sm" className="w-full mb-4 justify-start text-sidebar-foreground"
+          <Button variant="outline" size="sm" className="w-full mb-4 justify-start border-l-2 border-l-transparent text-sidebar-foreground transition-colors hover:border-l-accent hover:text-accent"
             onClick={() => setAgentPanelOpen(true)}>
             🤖 Ajan Kontrol Paneli
           </Button>
@@ -424,8 +424,8 @@ export default function MediationEngine() {
               const locked = p.id >= 4 && !phase3Complete;
               return (
                 <button key={p.id} onClick={() => { if (!locked) setPhase(p.id); else toast({ title: "Aşama kilitli", description: "Önce Aşama 3'te en az 2 tarafı analiz edip Ortak Zemin Raporu üretin." }); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition border-l-2
-                    ${active ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-accent" : "border-l-transparent hover:bg-sidebar-accent/40"}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors border-l-2
+                    ${active ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-accent" : "border-l-transparent hover:border-l-accent hover:text-accent hover:bg-sidebar-accent/40"}
                     ${locked ? "opacity-50 cursor-not-allowed" : ""}`}
                   title={locked ? "Aşama 3 tamamlanmadı" : ""}>
                   {done ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Circle className="h-4 w-4 opacity-60" />}
@@ -1372,44 +1372,13 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   const [parties, setParties] = useState<any[]>([]);
   const [docs, setDocs] = useState<any[]>([]);
   const [analyses, setAnalyses] = useState<any[]>([]);
-  const [report, setReport] = useState<any>(null);
-  const [reportLoading, setReportLoading] = useState(true);
-  const [reportFetchError, setReportFetchError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [analysing, setAnalysing] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<{ partyId: string; msg: string } | null>(null);
-  const [reportBusy, setReportBusy] = useState(false);
-  const [reportError, setReportError] = useState<string | null>(null);
-  const [reportStatus, setReportStatus] = useState<string | null>(null);
-  const [reportAttempt, setReportAttempt] = useState(0);
   const [navigating, setNavigating] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  const fetchReport = useCallback(async () => {
-    setReportLoading(true);
-    setReportFetchError(null);
-    try {
-      const { data, error } = await supabase
-        .from("common_ground_reports")
-        .select("*")
-        .eq("case_id", caseRow.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      setReport(data ?? null);
-      setReportLoading(false);
-      return data ?? null;
-    } catch (e: any) {
-      console.error("[fetchReport] failed", e);
-      setReportFetchError(e?.message ?? "Rapor yüklenemedi.");
-      setReport(null);
-      setReportLoading(false);
-      return null;
-    }
-  }, [caseRow.id]);
 
   const loadAll = useCallback(async () => {
     setLoadError(null);
@@ -1432,8 +1401,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
     } finally {
       setInitialLoading(false);
     }
-    await fetchReport();
-  }, [caseRow.id, fetchReport]);
+  }, [caseRow.id]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
@@ -1512,51 +1480,6 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
     } finally { setAnalysing(null); }
   }
 
-  async function generateReport() {
-    setReportBusy(true);
-    setReportError(null);
-    setReportAttempt(0);
-    const MAX_ATTEMPTS = 3;
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      setReportAttempt(attempt);
-      setReportStatus(
-        attempt === 1
-          ? "Rapor hazırlanıyor…"
-          : `Yeniden deneniyor (${attempt}/${MAX_ATTEMPTS})…`,
-      );
-      try {
-        const { data, error } = await supabase.functions.invoke("common-ground-report", { body: { case_id: caseRow.id } });
-        if (error) throw error;
-        if ((data as any)?.error) throw new Error((data as any).error);
-        const fresh = await fetchReport();
-        if (!fresh) throw new Error("Rapor kaydı oluşturulamadı.");
-        toast({ title: "Ortak zemin raporu hazır" });
-        setReportStatus(null);
-        setReportBusy(false);
-        setReportAttempt(0);
-        reload();
-        return;
-      } catch (e: any) {
-        console.error(`[common-ground-report] attempt ${attempt} failed`, e);
-        const raw = e?.message || "";
-        const friendly = /multiple .* rows|JSON object requested/i.test(raw)
-          ? "Sistem hatası oluştu, lütfen tekrar deneyin."
-          : raw || "Rapor üretilemedi.";
-        if (attempt < MAX_ATTEMPTS) {
-          // Exponential backoff: 800ms, 1600ms
-          await new Promise((r) => setTimeout(r, 800 * attempt));
-          continue;
-        }
-        setReportError(friendly);
-        setReportStatus(null);
-        setReportBusy(false);
-        setReportAttempt(0);
-        toast({ title: "Rapor hatası", description: friendly, variant: "destructive" });
-        return;
-      }
-    }
-  }
-
   async function chooseMeeting(meetingType: "ozel" | "ortak") {
     setNavigating(true);
     try {
@@ -1573,7 +1496,6 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
 
   const analysedCount = analyses.length;
   const canReport = analysedCount >= 1;
-  const partialReport = analysedCount >= 1 && analysedCount < parties.length;
 
   const progressPct = parties.length ? Math.round((analysedCount / parties.length) * 100) : 0;
 
@@ -1606,93 +1528,17 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
           <div>
             <h2 className="text-2xl font-bold text-primary">Aşama 3 — Taraf Analizi</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. En az 1 taraf analiz edildiğinde Ortak Zemin Raporu üretebilirsiniz.
+              Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. Analizler tamamlandığında Ortak Zemin Raporu, Aşama 4 — Arabulucu Paneli'nde üretilir.
             </p>
           </div>
           <div className="text-right text-xs space-y-1 min-w-[180px]">
             <div className="font-medium">Taraf Analizi: {analysedCount}/{parties.length} taraf analiz edildi</div>
             <Progress value={progressPct} className="h-2" />
-            {reportLoading
-              ? <div className="text-muted-foreground flex items-center gap-1 justify-end"><Loader2 className="h-3 w-3 animate-spin" /> Rapor yükleniyor…</div>
-              : report
-                ? <div className="text-emerald-600 font-semibold">✓ Ortak Zemin Raporu Hazır</div>
-                : canReport
-                  ? <div className="text-muted-foreground">Ortak Zemin Raporu üretilebilir</div>
-                  : <div className="text-muted-foreground">Rapor için en az 1 analiz gerekli</div>}
           </div>
         </div>
       </Card>
 
       <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} />
-
-      {/* Persistent report panel — always visible right under progress */}
-      <Card className="p-6 space-y-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h3 className="text-lg font-semibold">Ortak Zemin Raporu</h3>
-          <div className="flex gap-2 flex-wrap">
-            <Button size="sm" variant="ghost" onClick={fetchReport} disabled={reportLoading} title="Raporu yeniden yükle">
-              {reportLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-            </Button>
-            {report && (
-              <>
-                <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "print" })} title="PDF olarak yazdır">
-                  PDF
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "html" })} title="HTML olarak indir">
-                  İndir
-                </Button>
-              </>
-            )}
-            <Button onClick={generateReport} disabled={!canReport || reportBusy} size="sm">
-              {reportBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {reportStatus ?? "Rapor hazırlanıyor…"}</> : <><Sparkles className="h-4 w-4 mr-1" /> {report ? "Yeniden Üret" : "Rapor Üret"}</>}
-            </Button>
-          </div>
-        </div>
-        {reportBusy && reportAttempt > 1 && (
-          <div className="text-xs text-muted-foreground flex items-center gap-2">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Geçici bir hata oluştu, otomatik olarak tekrar deneniyor ({reportAttempt}/3)…
-          </div>
-        )}
-        {reportFetchError && (
-          <div className="text-xs text-destructive flex items-center gap-2">
-            <AlertTriangle className="h-3 w-3" /> Rapor yüklenemedi: {reportFetchError}
-            <Button size="sm" variant="outline" onClick={fetchReport}><RefreshCw className="h-3 w-3 mr-1" />Tekrar Dene</Button>
-          </div>
-        )}
-        {reportError && (
-          <div className="text-xs text-destructive flex items-center gap-2">
-            <AlertTriangle className="h-3 w-3" /> {reportError}
-            <Button size="sm" variant="outline" onClick={generateReport}><RefreshCw className="h-3 w-3 mr-1" />Tekrar Dene</Button>
-          </div>
-        )}
-        {!reportLoading && !report && !reportError && (
-          <p className="text-sm text-muted-foreground italic">
-            {canReport ? "Henüz rapor üretilmedi. \"Rapor Üret\" butonuna basın." : "En az 1 taraf analiz edildikten sonra rapor üretilebilir."}
-          </p>
-        )}
-        {partialReport && !report && (
-          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 flex items-start gap-2">
-            <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
-            <span>Şu an {analysedCount}/{parties.length} taraf analiz edilmiş. Rapor üretebilirsiniz ancak eksik taraflar için içerik sınırlı olacaktır.</span>
-          </div>
-        )}
-        {report && (
-          <>
-            {partialReport && (
-              <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 flex items-start gap-2">
-                <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
-                <span>Henüz analiz edilmemiş taraf var, rapor eksik olabilir. Tam karşılaştırmalı rapor için tüm tarafları analiz edip "Yeniden Üret" butonuna basın.</span>
-              </div>
-            )}
-            <p className="text-sm text-muted-foreground italic">
-              Taraf analizleri tamamlandığında sentez raporları Aşama 4 — Arabulucu Paneli'nde oluşturulur.
-            </p>
-          </>
-        )}
-      </Card>
-
-
 
       {parties.length === 0 && (
         <Card className="p-6 space-y-2">
@@ -1733,8 +1579,6 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
                     <StepDot done={partyDocs.length > 0} label="1. Belge yüklendi" />
                     <span className="text-muted-foreground">→</span>
                     <StepDot done={!!a} active={analysing === p.id} label="2. AI analiz edildi" />
-                    <span className="text-muted-foreground">→</span>
-                    <StepDot done={!!report && !!a} label="3. Ortak zemine dahil" />
                   </div>
 
                   {/* Party info */}
@@ -1883,8 +1727,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
         })}
       </div>
 
-      {/* Next-step meeting CTA — shown only when report exists */}
-      {report && (
+      {/* Next-step meeting CTA — shown once at least one party has been analysed */}
+      {canReport && (
         <Card className="p-6 space-y-2">
           <p className="text-xs text-muted-foreground">Sonraki adım: Taraflarla görüşme planlayın</p>
           <div className="flex gap-2 flex-wrap">
@@ -2707,6 +2551,23 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   const [analyses, setAnalyses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportStatus, setReportStatus] = useState<string | null>(null);
+  const [reportAttempt, setReportAttempt] = useState(0);
+
+  const fetchReport = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("common_ground_reports")
+      .select("*")
+      .eq("case_id", caseRow.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) { console.error("[Phase4Summary fetchReport]", error); return null; }
+    setReport(data ?? null);
+    return data ?? null;
+  }, [caseRow.id]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -2731,6 +2592,53 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   }, [caseRow.id]);
   useEffect(() => { load(); }, [load]);
 
+  async function generateReport() {
+    setReportBusy(true);
+    setReportError(null);
+    setReportAttempt(0);
+    const MAX_ATTEMPTS = 3;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      setReportAttempt(attempt);
+      setReportStatus(
+        attempt === 1
+          ? "Rapor hazırlanıyor…"
+          : `Yeniden deneniyor (${attempt}/${MAX_ATTEMPTS})…`,
+      );
+      try {
+        const { data, error } = await supabase.functions.invoke("common-ground-report", { body: { case_id: caseRow.id } });
+        if (error) throw error;
+        if ((data as any)?.error) throw new Error((data as any).error);
+        const fresh = await fetchReport();
+        if (!fresh) throw new Error("Rapor kaydı oluşturulamadı.");
+        toast({ title: "Ortak zemin raporu hazır" });
+        setReportStatus(null);
+        setReportBusy(false);
+        setReportAttempt(0);
+        return;
+      } catch (e: any) {
+        console.error(`[common-ground-report] attempt ${attempt} failed`, e);
+        const raw = e?.message || "";
+        const friendly = /multiple .* rows|JSON object requested/i.test(raw)
+          ? "Sistem hatası oluştu, lütfen tekrar deneyin."
+          : raw || "Rapor üretilemedi.";
+        if (attempt < MAX_ATTEMPTS) {
+          // Exponential backoff: 800ms, 1600ms
+          await new Promise((r) => setTimeout(r, 800 * attempt));
+          continue;
+        }
+        setReportError(friendly);
+        setReportStatus(null);
+        setReportBusy(false);
+        setReportAttempt(0);
+        toast({ title: "Rapor hatası", description: friendly, variant: "destructive" });
+        return;
+      }
+    }
+  }
+
+  const analysedCount = analyses.length;
+  const canReport = analysedCount >= 1;
+
   if (loading) return (
     <Card className="p-6 flex items-center gap-2 text-sm text-muted-foreground">
       <Loader2 className="h-4 w-4 animate-spin" /> Risk verileri ve taraf analizleri yükleniyor…
@@ -2750,7 +2658,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   return (
     <Card className="p-6 space-y-4">
       <h2 className="text-2xl font-bold text-primary">Aşama 4 — Arabulucu Paneli</h2>
-      <p className="text-sm text-muted-foreground">Aşama 3'te üretilen analizlerin ve ortak zemin raporunun özet görünümü.</p>
+      <p className="text-sm text-muted-foreground">Aşama 3'te üretilen taraf analizlerinin özeti ve Ortak Zemin Raporu üretimi.</p>
       <div className="border rounded-md p-3 bg-muted/30 space-y-2">
         <Label className="text-sm">UYAP Kayıt No (varsa girin)</Label>
         <div className="flex gap-2">
@@ -2777,20 +2685,44 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
           })}
         </div>
       </div>
-      {report ? (
-        <div>
-          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-            <h3 className="font-semibold">Ortak Zemin Raporu</h3>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "print" })}>PDF</Button>
-              <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "html" })}>İndir</Button>
-            </div>
+      <div>
+        <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+          <h3 className="font-semibold">Ortak Zemin Raporu</h3>
+          <div className="flex gap-2 flex-wrap">
+            {report && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "print" })}>PDF</Button>
+                <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "html" })}>İndir</Button>
+              </>
+            )}
+            <Button size="sm" onClick={generateReport} disabled={!canReport || reportBusy}>
+              {reportBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {reportStatus ?? "Rapor hazırlanıyor…"}</> : <><Sparkles className="h-4 w-4 mr-1" /> {report ? "Yeniden Üret" : "Rapor Üret"}</>}
+            </Button>
           </div>
-          <CommonGroundView data={report.report} strategy={report.strategy} parties={analyses.map((a: any) => ({ id: a.party_id, ...(a.case_parties || {}) }))} analyses={analyses} caseId={caseRow.id} />
         </div>
-      ) : (
-        <p className="text-sm text-muted-foreground italic">Ortak zemin raporu henüz üretilmedi.</p>
-      )}
+        {reportBusy && reportAttempt > 1 && (
+          <div className="text-xs text-muted-foreground flex items-center gap-2 mb-2">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Geçici bir hata oluştu, otomatik olarak tekrar deneniyor ({reportAttempt}/3)…
+          </div>
+        )}
+        {reportError && (
+          <div className="text-xs text-destructive flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-3 w-3" /> {reportError}
+            <Button size="sm" variant="outline" onClick={generateReport}><RefreshCw className="h-3 w-3 mr-1" />Tekrar Dene</Button>
+          </div>
+        )}
+        {report ? (
+          <CommonGroundView data={report.report} strategy={report.strategy} parties={analyses.map((a: any) => ({ id: a.party_id, ...(a.case_parties || {}) }))} analyses={analyses} caseId={caseRow.id} />
+        ) : canReport ? (
+          <p className="text-sm text-muted-foreground italic">Henüz rapor üretilmedi. "Rapor Üret" butonuna basın.</p>
+        ) : (
+          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 flex items-start gap-2">
+            <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+            <span>Rapor üretmeden önce Aşama 3'te en az bir taraf analizini tamamlayın.</span>
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
