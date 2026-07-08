@@ -1904,6 +1904,51 @@ function AnaSection({ icon, title, children }: { icon: string; title: string; ch
     </div>
   );
 }
+// Numbered, checkable question cards for live mediation use: mediator taps the
+// circle to mark a question as asked and can copy the exact wording. State is
+// local/ephemeral by design — nothing here is persisted.
+function CriticalQuestionsCard({ questions }: { questions: string[] }) {
+  const [checked, setChecked] = useState<Record<number, boolean>>({});
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const toggle = (i: number) => setChecked((prev) => ({ ...prev, [i]: !prev[i] }));
+  const copy = (i: number, text: string) => {
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopiedIdx(i);
+      setTimeout(() => setCopiedIdx((cur) => (cur === i ? null : cur)), 1500);
+    }).catch(() => {});
+  };
+  return (
+    <ol className="space-y-1.5 mt-1">
+      {questions.map((q, i) => (
+        <li
+          key={i}
+          className={`flex items-start gap-2 rounded-md border px-2.5 py-1.5 text-sm transition-colors ${
+            checked[i] ? "border-emerald-400/40 bg-emerald-50/50 dark:bg-emerald-950/20" : "border-border bg-background"
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() => toggle(i)}
+            className="mt-0.5 shrink-0"
+            aria-label={checked[i] ? "Soruldu işaretini kaldır" : "Soruldu olarak işaretle"}
+          >
+            {checked[i] ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
+          </button>
+          <span className={`flex-1 ${checked[i] ? "line-through text-muted-foreground" : ""}`}>
+            <span className="font-medium text-muted-foreground mr-1">{i + 1}.</span>{q}
+          </span>
+          <button
+            type="button"
+            onClick={() => copy(i, q)}
+            className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded border border-border hover:bg-muted"
+          >
+            {copiedIdx === i ? "Kopyalandı" : "Kopyala"}
+          </button>
+        </li>
+      ))}
+    </ol>
+  );
+}
 function PosBlock({ label, items }: { label: string; items?: string[] }) {
   if (!items || items.length === 0) return null;
   return (
@@ -1919,7 +1964,14 @@ function CommonGroundView({ data, strategy, parties, analyses, caseId }: { data:
     <div className="space-y-2">
       {data.common_interests?.length > 0 && (
         <AnaSection icon="🤝" title="Ortak Çıkarlar">
-          <ul className="list-disc pl-5 text-sm">{data.common_interests.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+          <ul className="space-y-1.5 text-sm">
+            {data.common_interests.map((s: string, i: number) => (
+              <li key={i} className="flex items-start gap-2 rounded-md border border-emerald-400/50 bg-emerald-50/60 dark:bg-emerald-950/20 px-2.5 py-1.5">
+                <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
         </AnaSection>
       )}
       {data.zopa && (
@@ -1933,15 +1985,23 @@ function CommonGroundView({ data, strategy, parties, analyses, caseId }: { data:
       {data.scenarios?.length > 0 && (
         <AnaSection icon="📋" title="Çözüm Senaryoları">
           <div className="space-y-2">
-            {data.scenarios.map((sc: any, i: number) => (
-              <div key={i} className="border rounded p-2 bg-background">
-                <div className="font-medium text-sm">{sc.label}</div>
-                <p className="text-sm">{sc.summary}</p>
-                {sc.tradeoffs?.length > 0 && (
-                  <ul className="list-disc pl-5 text-xs text-muted-foreground">{sc.tradeoffs.map((t: string, j: number) => <li key={j}>{t}</li>)}</ul>
-                )}
-              </div>
-            ))}
+            {data.scenarios.map((sc: any, i: number) => {
+              const isStarred = /⭐/.test(`${sc.label ?? ""} ${sc.summary ?? ""}`);
+              return (
+                <div
+                  key={i}
+                  className={`border rounded p-2 bg-background transition-shadow hover:shadow-sm hover:border-primary/40 ${
+                    isStarred ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20" : ""
+                  }`}
+                >
+                  <div className="font-medium text-sm">{sc.label}</div>
+                  <p className="text-sm">{sc.summary}</p>
+                  {sc.tradeoffs?.length > 0 && (
+                    <ul className="list-disc pl-5 text-xs text-muted-foreground">{sc.tradeoffs.map((t: string, j: number) => <li key={j}>{t}</li>)}</ul>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </AnaSection>
       )}
@@ -1953,7 +2013,7 @@ function CommonGroundView({ data, strategy, parties, analyses, caseId }: { data:
               <div className="text-sm space-y-1">
                 {s.opening_statement && <div><b>Açılış:</b> {s.opening_statement}</div>}
                 {s.critical_questions?.length > 0 && (
-                  <div><b>Kritik Sorular:</b><ul className="list-disc pl-5">{s.critical_questions.map((q: string, i: number) => <li key={i}>{q}</li>)}</ul></div>
+                  <div><b>Kritik Sorular:</b><CriticalQuestionsCard questions={s.critical_questions} /></div>
                 )}
                 {s.deadlock_techniques?.length > 0 && (
                   <div><b>Çıkmaz Teknikleri:</b><ul className="list-disc pl-5">{s.deadlock_techniques.map((q: string, i: number) => <li key={i}>{q}</li>)}</ul></div>
@@ -1965,7 +2025,14 @@ function CommonGroundView({ data, strategy, parties, analyses, caseId }: { data:
       )}
       {data.red_lines?.length > 0 && (
         <AnaSection icon="🚧" title="Kırmızı Çizgiler">
-          <ul className="list-disc pl-5 text-sm">{data.red_lines.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+          <ul className="space-y-1.5 text-sm">
+            {data.red_lines.map((s: string, i: number) => (
+              <li key={i} className="flex items-start gap-2 rounded-md border border-red-400/50 bg-red-50/60 dark:bg-red-950/20 px-2.5 py-1.5">
+                <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
         </AnaSection>
       )}
       <ComparativeRiskAnalysis parties={parties} analyses={analyses} reportData={data} caseId={caseId} />
@@ -2427,13 +2494,27 @@ function RiskSummaryCard({ summary, sources }: { summary?: any; sources?: any[] 
       {Array.isArray(summary.ortak_kritik_faktorler) && summary.ortak_kritik_faktorler.filter(Boolean).length > 0 && (
         <div>
           <div className="text-xs font-medium mb-1">Ortak Kritik Faktörler</div>
-          <ul className="list-disc pl-5 text-sm">{summary.ortak_kritik_faktorler.filter(Boolean).map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+          <ul className="space-y-1">
+            {summary.ortak_kritik_faktorler.filter(Boolean).map((s: string, i: number) => (
+              <li key={i} className="flex items-start gap-2 rounded-md border border-foreground/15 bg-muted/50 px-2.5 py-1.5 text-sm font-medium">
+                <Brain className="h-4 w-4 mt-0.5 shrink-0 text-foreground/70" />
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {Array.isArray(summary.ortak_uzlasma_engelleri) && summary.ortak_uzlasma_engelleri.filter(Boolean).length > 0 && (
         <div>
           <div className="text-xs font-medium mb-1">Ortak Uzlaşma Engelleri</div>
-          <ul className="list-disc pl-5 text-sm">{summary.ortak_uzlasma_engelleri.filter(Boolean).map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+          <ul className="space-y-1">
+            {summary.ortak_uzlasma_engelleri.filter(Boolean).map((s: string, i: number) => (
+              <li key={i} className="flex items-start gap-2 rounded-md border border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20 px-2.5 py-1.5 text-sm">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {Array.isArray(summary.kaynak_listesi) && summary.kaynak_listesi.filter(Boolean).length > 0 && (
