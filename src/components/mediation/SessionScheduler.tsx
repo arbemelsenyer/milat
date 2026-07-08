@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { VideoCallButton } from "@/components/VideoCallButton";
 import { Calendar, Plus, Sparkles, Loader2, Users, Clock, Circle, Eye, Send, RefreshCw, CheckCircle2, XCircle, MailWarning, Ban } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
@@ -670,6 +671,7 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openPreviewForExisting(s)} disabled={s.status === "cancelled"}>
                     <Send className="h-3 w-3 mr-1" /> Davet
                   </Button>
+                  <VideoCallButton sessionId={s.id} existingRoomUrl={s.video_link} />
                   {s.status !== "cancelled" && (
                     <Button
                       size="sm"

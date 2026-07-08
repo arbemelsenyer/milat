@@ -7,12 +7,11 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 
 interface VideoCallButtonProps {
-  requestId: string;
+  sessionId: string;
   existingRoomUrl?: string | null;
-  sessionType?: string | null;
 }
 
-export function VideoCallButton({ requestId, existingRoomUrl, sessionType }: VideoCallButtonProps) {
+export function VideoCallButton({ sessionId, existingRoomUrl }: VideoCallButtonProps) {
   const { language } = useLanguage();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -32,7 +31,6 @@ export function VideoCallButton({ requestId, existingRoomUrl, sessionType }: Vid
       openRoom: 'Odayı Aç',
       roomReady: 'Görüşme odanız hazır. Aşağıdaki butona tıklayarak katılabilirsiniz.',
       error: 'Video odası oluşturulamadı',
-      notOnline: 'Bu oturum yüz yüze planlandı',
     },
     en: {
       startCall: 'Start Video Call',
@@ -45,16 +43,10 @@ export function VideoCallButton({ requestId, existingRoomUrl, sessionType }: Vid
       openRoom: 'Open Room',
       roomReady: 'Your meeting room is ready. Click the button below to join.',
       error: 'Failed to create video room',
-      notOnline: 'This session is scheduled in-person',
     }
   };
 
   const t = labels[language];
-
-  // Don't show if session is in-person
-  if (sessionType === 'in-person') {
-    return null;
-  }
 
   const handleCreateRoom = async () => {
     if (roomUrl) {
@@ -65,7 +57,7 @@ export function VideoCallButton({ requestId, existingRoomUrl, sessionType }: Vid
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-video-room', {
-        body: { requestId }
+        body: { sessionId }
       });
 
       if (error) {
@@ -91,7 +83,7 @@ export function VideoCallButton({ requestId, existingRoomUrl, sessionType }: Vid
 
   const handleCopyLink = async () => {
     if (!roomUrl) return;
-    
+
     try {
       await navigator.clipboard.writeText(roomUrl);
       setCopied(true);
@@ -138,10 +130,10 @@ export function VideoCallButton({ requestId, existingRoomUrl, sessionType }: Vid
             </DialogTitle>
             <DialogDescription>{t.description}</DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 pt-4">
             <p className="text-sm text-muted-foreground">{t.roomReady}</p>
-            
+
             {roomUrl && (
               <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
                 <input

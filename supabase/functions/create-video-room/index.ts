@@ -32,61 +32,70 @@ serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+
     if (authError || !user) {
       console.error('Auth error:', authError);
       throw new Error('Unauthorized');
     }
 
-    const { requestId } = await req.json();
+    const { sessionId } = await req.json();
 
-    if (!requestId) {
-      throw new Error('Request ID is required');
+    if (!sessionId) {
+      throw new Error('Session ID is required');
     }
 
-    console.log(`Creating video room for request: ${requestId}`);
+    console.log(`Creating video room for session: ${sessionId}`);
 
-    // Check if user has access to this request (either as owner or assigned mediator)
-    const { data: request, error: requestError } = await supabase
-      .from('mediator_requests')
-      .select('id, user_id, mediator_id, room_url, room_name')
-      .eq('id', requestId)
+    const { data: session, error: sessionError } = await supabase
+      .from('case_sessions')
+      .select('id, case_id, video_link')
+      .eq('id', sessionId)
       .single();
 
-    if (requestError || !request) {
-      console.error('Request not found:', requestError);
-      throw new Error('Request not found');
+    if (sessionError || !session) {
+      console.error('Session not found:', sessionError);
+      throw new Error('Session not found');
     }
 
-    // Verify access
-    if (request.user_id !== user.id && request.mediator_id !== user.id) {
-      // Check if user is admin
+    const { data: caseRow, error: caseError } = await supabase
+      .from('cases')
+      .select('id, user_id, assigned_mediator_id')
+      .eq('id', session.case_id)
+      .single();
+
+    if (caseError || !caseRow) {
+      console.error('Case not found:', caseError);
+      throw new Error('Case not found');
+    }
+
+    // Verify access: case owner, assigned mediator, or admin (same pattern as party-confidential-analysis)
+    if (caseRow.user_id !== user.id && caseRow.assigned_mediator_id !== user.id) {
       const { data: roles } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id);
-      
+
       const isAdmin = roles?.some(r => r.role === 'admin');
       if (!isAdmin) {
         throw new Error('Access denied');
       }
     }
 
-    // If room already exists, return it
-    if (request.room_url && request.room_name) {
-      console.log('Returning existing room:', request.room_name);
+    // If a room already exists for this session, return it — don't create a new one
+    if (session.video_link) {
+      console.log('Returning existing room:', session.video_link);
       return new Response(
-        JSON.stringify({ 
-          room_url: request.room_url, 
-          room_name: request.room_name 
+        JSON.stringify({
+          room_url: session.video_link,
+          success: true,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Create a new Daily.co room
-    const roomName = `mediation-${requestId.slice(0, 8)}-${Date.now()}`;
-    
+    const roomName = `mediation-${sessionId.slice(0, 8)}-${Date.now()}`;
+
     console.log(`Creating Daily.co room: ${roomName}`);
 
     const dailyResponse = await fetch('https://api.daily.co/v1/rooms', {
@@ -122,40 +131,38 @@ serve(async (req) => {
     const room = await dailyResponse.json();
     console.log('Daily.co room created:', room.url);
 
-    // Store room info in the database
+    // Store the room link on the case_sessions row
     const { error: updateError } = await supabase
-      .from('mediator_requests')
-      .update({
-        room_url: room.url,
-        room_name: room.name,
-      })
-      .eq('id', requestId);
+      .from('case_sessions')
+      .update({ video_link: room.url })
+      .eq('id', sessionId);
 
     if (updateError) {
-      console.error('Error updating request with room info:', updateError);
+      console.error('Error updating session with room info:', updateError);
       // Don't fail - room was created successfully
     }
 
-    // Create notifications for both parties
+    // Create notifications for the case owner and the assigned mediator
     const notifications = [];
-    
-    if (request.user_id) {
+    const caseLink = `/legal-reasoning?caseId=${caseRow.id}&phase=5`;
+
+    if (caseRow.user_id) {
       notifications.push({
-        user_id: request.user_id,
+        user_id: caseRow.user_id,
         title: 'Video Görüşme Odası Hazır',
         message: 'Arabuluculuk oturumunuz için video görüşme odası oluşturuldu.',
         type: 'info',
-        link: `/summary?case=${requestId}`,
+        link: caseLink,
       });
     }
 
-    if (request.mediator_id && request.mediator_id !== request.user_id) {
+    if (caseRow.assigned_mediator_id && caseRow.assigned_mediator_id !== caseRow.user_id) {
       notifications.push({
-        user_id: request.mediator_id,
+        user_id: caseRow.assigned_mediator_id,
         title: 'Video Görüşme Odası Hazır',
         message: 'Arabuluculuk oturumu için video görüşme odası oluşturuldu.',
         type: 'info',
-        link: `/mediator`,
+        link: caseLink,
       });
     }
 
@@ -171,9 +178,8 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ 
-        room_url: room.url, 
-        room_name: room.name,
+      JSON.stringify({
+        room_url: room.url,
         success: true
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -182,13 +188,13 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in create-video-room:', error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error instanceof Error ? error.message : 'An error occurred',
         success: false
       }),
-      { 
-        status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
