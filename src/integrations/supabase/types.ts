@@ -24,6 +24,7 @@ export type Database = {
           hallucination_risk: boolean
           id: string
           last_output: Json | null
+          party_id: string | null
           status: string
           updated_at: string
         }
@@ -36,6 +37,7 @@ export type Database = {
           hallucination_risk?: boolean
           id?: string
           last_output?: Json | null
+          party_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -48,6 +50,7 @@ export type Database = {
           hallucination_risk?: boolean
           id?: string
           last_output?: Json | null
+          party_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -57,6 +60,13 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_states_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
             referencedColumns: ["id"]
           },
         ]
@@ -1940,6 +1950,15 @@ export type Database = {
         Returns: boolean
       }
       can_access_realtime_topic: { Args: { _topic: string }; Returns: boolean }
+      can_view_agent_state: {
+        Args: {
+          _agent_type: string
+          _case_id: string
+          _party_id: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
       create_notification: {
         Args: {
           p_link?: string
