@@ -1,13 +1,40 @@
 // Mediator-only: combine both party analyses → common ground + strategy
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
+// Provided by the Supabase Edge Runtime; lets background writes (agent_states) finish
+// after the response is sent instead of a bare fire-and-forget that may get cut off.
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Activity-log upsert for the Agent Control Panel. Status-only — never store analysis
+// content here; failures here must never block the main flow, so every call site
+// wraps this in its own try-catch.
+async function upsertAgentActivityState(
+  admin: ReturnType<typeof createClient>,
+  case_id: string,
+  agent_type: string,
+  party_id: string | null,
+  patch: Record<string, unknown>,
+) {
+  let query = admin.from("agent_states").select("id").eq("case_id", case_id).eq("agent_type", agent_type);
+  query = party_id ? query.eq("party_id", party_id) : query.is("party_id", null);
+  const { data: existing } = await query.maybeSingle();
+  if (existing?.id) {
+    await admin.from("agent_states").update(patch).eq("id", existing.id);
+  } else {
+    await admin.from("agent_states").insert({ case_id, agent_type, party_id, ...patch });
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  let admin: ReturnType<typeof createClient> | null = null;
+  let case_id: string | undefined;
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -22,8 +49,9 @@ Deno.serve(async (req) => {
     const { data: userData } = await userClient.auth.getUser();
     if (!userData?.user) return new Response(JSON.stringify({ error: "Invalid session" }), { status: 401, headers: corsHeaders });
 
-    const { case_id } = await req.json();
-    const admin = createClient(supabaseUrl, serviceKey);
+    const body = await req.json();
+    case_id = body.case_id;
+    admin = createClient(supabaseUrl, serviceKey);
 
     // Only mediator/admin/case owner may run this
     const { data: caseRow } = await admin.from("cases")
@@ -35,6 +63,11 @@ Deno.serve(async (req) => {
     if (!allowed) {
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
     }
+
+    // Activity log: mark common-ground synthesis as running. Best-effort — never block the flow.
+    try {
+      await upsertAgentActivityState(admin, case_id!, "common_ground", null, { status: "running" });
+    } catch { /* activity log is non-critical */ }
 
     const { data: analyses } = await admin.from("party_analyses")
       .select("party_id, analysis, discovery_questions, risk_analizi, case_parties:party_id(party_role, first_name, last_name, company_name)")
@@ -134,11 +167,27 @@ Yukarıdaki resmi kaynaklardan ve benzer geçmiş davalardan yararlanarak ortak 
       return new Response(JSON.stringify({ error: upErr.message }), { status: 500, headers: corsHeaders });
     }
 
+    // Activity log: mark completed. Fire via waitUntil so it can't delay the response,
+    // and so it still finishes even though the response is about to be sent.
+    if (admin && case_id) {
+      const finalAdmin = admin, finalCaseId = case_id;
+      EdgeRuntime.waitUntil(
+        upsertAgentActivityState(finalAdmin, finalCaseId, "common_ground", null, { status: "completed" }).catch(() => {})
+      );
+    }
 
     return new Response(JSON.stringify({ report: inserted }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    // Activity log: mark failed with a short status summary only — never the report content.
+    if (admin && case_id) {
+      const finalAdmin = admin, finalCaseId = case_id;
+      const errorSummary = String(e?.message ?? "unknown error").slice(0, 300);
+      EdgeRuntime.waitUntil(
+        upsertAgentActivityState(finalAdmin, finalCaseId, "common_ground", null, { status: "failed", error_message: errorSummary }).catch(() => {})
+      );
+    }
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
   }
 });

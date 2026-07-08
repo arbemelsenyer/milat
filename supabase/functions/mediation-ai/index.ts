@@ -10,10 +10,34 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractText, getDocumentProxy } from "npm:unpdf@0.12.1";
 import mammoth from "npm:mammoth@1.8.0";
 
+// Provided by the Supabase Edge Runtime; lets background writes (agent_states) finish
+// after the response is sent instead of a bare fire-and-forget that may get cut off.
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Activity-log upsert for the Agent Control Panel. Status-only — never store analysis
+// content here; failures here must never block the main flow, so every call site
+// wraps this in its own try-catch.
+async function upsertAgentActivityState(
+  admin: ReturnType<typeof createClient>,
+  case_id: string,
+  agent_type: string,
+  party_id: string | null,
+  patch: Record<string, unknown>,
+) {
+  let query = admin.from("agent_states").select("id").eq("case_id", case_id).eq("agent_type", agent_type);
+  query = party_id ? query.eq("party_id", party_id) : query.is("party_id", null);
+  const { data: existing } = await query.maybeSingle();
+  if (existing?.id) {
+    await admin.from("agent_states").update(patch).eq("id", existing.id);
+  } else {
+    await admin.from("agent_states").insert({ case_id, agent_type, party_id, ...patch });
+  }
+}
 
 const PATTERNS: Array<{ type: string; label: string; re: RegExp }> = [
   { type: "iban", label: "IBAN", re: /\bTR\d{2}[ ]?(?:\d{4}[ ]?){5}\d{2}\b/g },
@@ -110,6 +134,14 @@ async function jsonAi(model: string, system: string, user: string): Promise<any>
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Activity-log context, populated once the action/case are known below. Only
+  // analyze_document and generate_agreement report to the Agent Control Panel;
+  // every other action leaves activityAgentType null and no write happens.
+  let admin: ReturnType<typeof createClient> | null = null;
+  let activityCaseId: string | undefined;
+  let activityAgentType: string | null = null;
+  let activityPartyId: string | null = null;
+
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
@@ -134,6 +166,29 @@ serve(async (req) => {
     const body = await req.json();
     const action = body.action as string;
 
+    if (action === "analyze_document" || action === "generate_agreement") {
+      activityCaseId = body.case_id ? String(body.case_id) : undefined;
+      activityAgentType = action === "analyze_document" ? "document_analysis" : "agreement_generation";
+      activityPartyId = action === "analyze_document" && body.party_id ? String(body.party_id) : null;
+      if (activityCaseId) {
+        admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        try {
+          await upsertAgentActivityState(admin, activityCaseId, activityAgentType, activityPartyId, { status: "running" });
+        } catch { /* activity log is non-critical */ }
+      }
+    }
+
+    // Fires the completed write via waitUntil so it never delays the response. No-op
+    // when activityCaseId wasn't resolved above (unknown case_id, or action doesn't track).
+    const markActivityCompleted = () => {
+      if (admin && activityCaseId && activityAgentType) {
+        const finalAdmin = admin, finalCaseId = activityCaseId, finalAgentType = activityAgentType, finalPartyId = activityPartyId;
+        EdgeRuntime.waitUntil(
+          upsertAgentActivityState(finalAdmin, finalCaseId, finalAgentType, finalPartyId, { status: "completed" }).catch(() => {})
+        );
+      }
+    };
+
     if (action === "analyze_document") {
       let rawText = String(body.text ?? "");
       if (!rawText.trim() && body.file_path) {
@@ -142,6 +197,7 @@ serve(async (req) => {
       const text = serverMask(rawText).slice(0, 30000);
       const niche = String(body.niche ?? "");
       if (!text.trim()) {
+        markActivityCompleted();
         return new Response(JSON.stringify({ cards: [] }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -151,6 +207,7 @@ serve(async (req) => {
         "Sen kıdemli bir Türk hukuk analisti ve arabulucusun. Doküman içindeki hukuki çelişkileri, riskleri ve anomalileri tespit edersin.",
         `Niş: ${niche}\n\nDoküman metni:\n${text}\n\nÇıktı şeması: { "cards": [{"title": string, "riskLevel": "low"|"medium"|"high", "description": string, "precedent": string}] } Türkçe yanıt ver, en az 4 en fazla 8 kart üret.`,
       );
+      markActivityCompleted();
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -217,6 +274,7 @@ serve(async (req) => {
         ],
         true,
       );
+      markActivityCompleted();
       return new Response(r.body, {
         headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
       });
@@ -330,6 +388,14 @@ ${ctx || "(bağlam yok)"}
     });
   } catch (e) {
     console.error("mediation-ai error", e);
+    // Activity log: mark failed with a short status summary only — never the AI output.
+    if (admin && activityCaseId && activityAgentType) {
+      const finalAdmin = admin, finalCaseId = activityCaseId, finalAgentType = activityAgentType, finalPartyId = activityPartyId;
+      const errorSummary = String((e as Error)?.message ?? e ?? "unknown error").slice(0, 300);
+      EdgeRuntime.waitUntil(
+        upsertAgentActivityState(finalAdmin, finalCaseId, finalAgentType, finalPartyId, { status: "failed", error_message: errorSummary }).catch(() => {})
+      );
+    }
     return new Response(JSON.stringify({ error: String((e as Error).message ?? e) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

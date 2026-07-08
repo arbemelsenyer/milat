@@ -1,13 +1,39 @@
 // Party-confidential analysis: only the party (and mediator via RLS) can see results
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
+// Provided by the Supabase Edge Runtime; lets background writes (agent_states) finish
+// after the response is sent instead of a bare fire-and-forget that may get cut off.
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Activity-log upsert for the Agent Control Panel. Status-only — never store analysis
+// content here (that belongs to party_analyses); failures here must never block the
+// main analysis flow, so every call site wraps this in its own try-catch.
+async function upsertPartyAnalysisState(
+  admin: ReturnType<typeof createClient>,
+  case_id: string,
+  party_id: string,
+  patch: Record<string, unknown>,
+) {
+  const { data: existing } = await admin.from("agent_states")
+    .select("id").eq("case_id", case_id).eq("agent_type", "party_analysis").eq("party_id", party_id).maybeSingle();
+  if (existing?.id) {
+    await admin.from("agent_states").update(patch).eq("id", existing.id);
+  } else {
+    await admin.from("agent_states").insert({ case_id, agent_type: "party_analysis", party_id, ...patch });
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  let admin: ReturnType<typeof createClient> | null = null;
+  let case_id: string | undefined;
+  let party_id: string | undefined;
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -34,14 +60,16 @@ Deno.serve(async (req) => {
     }
     const userId = userData.user.id;
 
-    const { case_id, party_id } = await req.json();
+    const body = await req.json();
+    case_id = body.case_id;
+    party_id = body.party_id;
     if (!case_id || !party_id) {
       return new Response(JSON.stringify({ error: "case_id and party_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const admin = createClient(supabaseUrl, serviceKey);
+    admin = createClient(supabaseUrl, serviceKey);
 
     // Authorization: caller must be the party themselves, the case owner, the assigned mediator, or an admin.
     const { data: caseRow } = await admin.from("cases")
@@ -68,6 +96,11 @@ Deno.serve(async (req) => {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Activity log: mark this party's analysis as running. Best-effort — never block the analysis.
+    try {
+      await upsertPartyAnalysisState(admin, case_id, party_id, { status: "running" });
+    } catch { /* activity log is non-critical */ }
 
     // Per-party documents (preferred). Fallback to uploads by the party's user when party_id wasn't set.
     let docsQuery = admin.from("case_documents")
@@ -232,10 +265,28 @@ Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinde
       }
     }
 
+    // Activity log: mark completed. Fire via waitUntil so it can't delay the response,
+    // and so it still finishes even though the response is about to be sent.
+    if (admin && case_id && party_id) {
+      const finalAdmin = admin, finalCaseId = case_id, finalPartyId = party_id;
+      EdgeRuntime.waitUntil(
+        upsertPartyAnalysisState(finalAdmin, finalCaseId, finalPartyId, { status: "completed" }).catch(() => {})
+      );
+    }
+
     return new Response(JSON.stringify({ analysis: parsed, sources: ragSources }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    // Activity log: mark failed with a short status summary only — never the analysis content.
+    if (admin && case_id && party_id) {
+      const finalAdmin = admin, finalCaseId = case_id, finalPartyId = party_id;
+      const errorSummary = String(e?.message ?? "unknown error").slice(0, 300);
+      EdgeRuntime.waitUntil(
+        upsertPartyAnalysisState(finalAdmin, finalCaseId, finalPartyId, { status: "failed", error_message: errorSummary }).catch(() => {})
+      );
+    }
+
     return new Response(JSON.stringify({ error: e.message }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

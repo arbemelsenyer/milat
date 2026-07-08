@@ -3,10 +3,34 @@
 // hafta/uzatma is derived from the classified court type.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
+// Provided by the Supabase Edge Runtime; lets background writes (agent_states) finish
+// after the response is sent instead of a bare fire-and-forget that may get cut off.
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Activity-log upsert for the Agent Control Panel. Status-only — never store analysis
+// content here; failures here must never block the main flow, so every call site
+// wraps this in its own try-catch.
+async function upsertAgentActivityState(
+  admin: ReturnType<typeof createClient>,
+  case_id: string,
+  agent_type: string,
+  party_id: string | null,
+  patch: Record<string, unknown>,
+) {
+  let query = admin.from("agent_states").select("id").eq("case_id", case_id).eq("agent_type", agent_type);
+  query = party_id ? query.eq("party_id", party_id) : query.is("party_id", null);
+  const { data: existing } = await query.maybeSingle();
+  if (existing?.id) {
+    await admin.from("agent_states").update(patch).eq("id", existing.id);
+  } else {
+    await admin.from("agent_states").insert({ case_id, agent_type, party_id, ...patch });
+  }
+}
 
 const COURT_RULES: Record<string, { sure_hafta: number | null; uzatma_hafta: number | null; dayanak: string; label: string }> = {
   tuketici: { sure_hafta: 3, uzatma_hafta: 1, dayanak: "TKHK 73/A", label: "Tüketici Mahkemesi" },
@@ -18,6 +42,10 @@ const COURT_RULES: Record<string, { sure_hafta: number | null; uzatma_hafta: num
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  let admin: ReturnType<typeof createClient> | null = null;
+  let case_id: string | undefined;
+
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -41,14 +69,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { case_id, dispute_type, dispute_text, persist } = await req.json();
+    const body = await req.json();
+    case_id = body.case_id;
+    const { dispute_type, dispute_text, persist } = body;
     if (!case_id || !dispute_type) {
       return new Response(JSON.stringify({ error: "case_id ve dispute_type gerekli" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const admin = createClient(supabaseUrl, serviceKey);
+    admin = createClient(supabaseUrl, serviceKey);
     const { data: canAccess } = await admin.rpc("can_access_case", {
       _case_id: case_id, _user_id: userData.user.id,
     });
@@ -57,6 +87,11 @@ Deno.serve(async (req) => {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Activity log: mark deadline detection as running. Best-effort — never block the flow.
+    try {
+      await upsertAgentActivityState(admin, case_id, "deadline_detect", null, { status: "running" });
+    } catch { /* activity log is non-critical */ }
 
     // Retrieve RAG context
     const query = `arabuluculuk mahkeme türü tüketici iş sulh ticaret dava şartı ${dispute_type} ${dispute_text ?? ""}`.slice(0, 500);
@@ -207,10 +242,27 @@ YALNIZCA aşağıdaki JSON şemasında yanıt ver:
       } as any).eq("id", case_id);
     }
 
+    // Activity log: mark completed. Fire via waitUntil so it can't delay the response,
+    // and so it still finishes even though the response is about to be sent.
+    if (admin && case_id) {
+      const finalAdmin = admin, finalCaseId = case_id;
+      EdgeRuntime.waitUntil(
+        upsertAgentActivityState(finalAdmin, finalCaseId, "deadline_detect", null, { status: "completed" }).catch(() => {})
+      );
+    }
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    // Activity log: mark failed with a short status summary only — never the deadline content.
+    if (admin && case_id) {
+      const finalAdmin = admin, finalCaseId = case_id;
+      const errorSummary = String(e?.message ?? "unknown error").slice(0, 300);
+      EdgeRuntime.waitUntil(
+        upsertAgentActivityState(finalAdmin, finalCaseId, "deadline_detect", null, { status: "failed", error_message: errorSummary }).catch(() => {})
+      );
+    }
     return new Response(JSON.stringify({ error: e?.message ?? "Unknown" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

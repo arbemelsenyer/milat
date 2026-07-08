@@ -1,10 +1,34 @@
 // Classify dispute type via Gemini using RAG context from knowledge_base_chunks.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
+// Provided by the Supabase Edge Runtime; lets background writes (agent_states) finish
+// after the response is sent instead of a bare fire-and-forget that may get cut off.
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Activity-log upsert for the Agent Control Panel. Status-only — never store analysis
+// content here; failures here must never block the main flow, so every call site
+// wraps this in its own try-catch.
+async function upsertAgentActivityState(
+  admin: ReturnType<typeof createClient>,
+  case_id: string,
+  agent_type: string,
+  party_id: string | null,
+  patch: Record<string, unknown>,
+) {
+  let query = admin.from("agent_states").select("id").eq("case_id", case_id).eq("agent_type", agent_type);
+  query = party_id ? query.eq("party_id", party_id) : query.is("party_id", null);
+  const { data: existing } = await query.maybeSingle();
+  if (existing?.id) {
+    await admin.from("agent_states").update(patch).eq("id", existing.id);
+  } else {
+    await admin.from("agent_states").insert({ case_id, agent_type, party_id, ...patch });
+  }
+}
 
 const ALLOWED = [
   "işçi_işveren", "ticari", "tüketici", "sağlık", "fikri_mülkiyet",
@@ -14,6 +38,10 @@ const ALLOWED = [
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  let admin: ReturnType<typeof createClient> | null = null;
+  let case_id: string | undefined;
+
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -37,7 +65,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { case_id, text, persist } = await req.json();
+    const body = await req.json();
+    case_id = body.case_id;
+    const { text, persist } = body;
     const query = String(text ?? "").trim();
     if (query.length < 5) {
       return new Response(JSON.stringify({ error: "Metin çok kısa" }), {
@@ -45,7 +75,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const admin = createClient(supabaseUrl, serviceKey);
+    admin = createClient(supabaseUrl, serviceKey);
 
     // Authorize case access when persisting
     if (case_id && persist) {
@@ -55,6 +85,13 @@ Deno.serve(async (req) => {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+    }
+
+    // Activity log: mark classification as running. Only when tied to a case; best-effort.
+    if (case_id) {
+      try {
+        await upsertAgentActivityState(admin, case_id, "classify_dispute", null, { status: "running" });
+      } catch { /* activity log is non-critical */ }
     }
 
     // RAG: fetch related chunks (no category filter — this IS the classification step)
@@ -139,10 +176,27 @@ KURALLAR:
       await admin.from("cases").update({ dispute_type: kategori } as any).eq("id", case_id);
     }
 
+    // Activity log: mark completed. Fire via waitUntil so it can't delay the response,
+    // and so it still finishes even though the response is about to be sent.
+    if (admin && case_id) {
+      const finalAdmin = admin, finalCaseId = case_id;
+      EdgeRuntime.waitUntil(
+        upsertAgentActivityState(finalAdmin, finalCaseId, "classify_dispute", null, { status: "completed" }).catch(() => {})
+      );
+    }
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    // Activity log: mark failed with a short status summary only — never the classification content.
+    if (admin && case_id) {
+      const finalAdmin = admin, finalCaseId = case_id;
+      const errorSummary = String(e?.message ?? "unknown error").slice(0, 300);
+      EdgeRuntime.waitUntil(
+        upsertAgentActivityState(finalAdmin, finalCaseId, "classify_dispute", null, { status: "failed", error_message: errorSummary }).catch(() => {})
+      );
+    }
     return new Response(JSON.stringify({ error: e?.message ?? "Unknown error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
