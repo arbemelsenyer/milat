@@ -37,7 +37,11 @@ export function AppSidebar() {
             <SidebarMenu>
               {userItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    className="border-l-2 border-l-transparent transition-colors hover:border-l-accent hover:text-accent data-[active=true]:border-l-accent"
+                  >
                     <NavLink to={item.url} className="flex items-center gap-2">
                       <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span>{item.title}</span>}
@@ -55,7 +59,11 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={isActive("/admin")}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive("/admin")}
+                    className="border-l-2 border-l-transparent transition-colors hover:border-l-accent hover:text-accent data-[active=true]:border-l-accent"
+                  >
                     <NavLink to="/admin" className="flex items-center gap-2">
                       <Shield className="h-4 w-4 shrink-0" />
                       {!collapsed && <span>Admin Paneli</span>}
