@@ -2087,19 +2087,22 @@ function ComparativeRiskAnalysis({
 
       <div className="grid sm:grid-cols-2 gap-2">
         {rows.map((r, i) => (
-          <div key={i} className="border rounded p-3 bg-background text-sm space-y-1">
+          <div key={i} className="border rounded p-3 bg-background text-sm space-y-2">
             <div className="flex items-center justify-between gap-2">
               <div className="font-medium truncate">{r.name}</div>
               {r.risk_puani && (
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${riskBadgeTone(r.risk_puani)}`}>{r.risk_puani}</span>
               )}
             </div>
-            <div className="text-xs"><span className="text-muted-foreground">Anlaşma oranı: </span><b>{r.uzlasma_orani || "Yeterli veri yok"}</b></div>
-            <div className="text-xs"><span className="text-muted-foreground">Mahkeme riski: </span><b>{r.mahkeme_riski || "Yeterli veri yok"}</b></div>
-            {r.uzlasma_pct !== null && (
-              <div className="h-1.5 rounded bg-muted overflow-hidden">
-                <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, Math.max(0, r.uzlasma_pct))}%` }} />
-              </div>
+            {r.uzlasma_pct !== null ? (
+              <GaugeMeter label="Anlaşma oranı" pct={r.uzlasma_pct} valueLabel={r.uzlasma_orani || `% ${r.uzlasma_pct}`} riskLabel={r.risk_puani} />
+            ) : (
+              <div className="text-xs"><span className="text-muted-foreground">Anlaşma oranı: </span><b>{r.uzlasma_orani || "Yeterli veri yok"}</b></div>
+            )}
+            {r.mahkeme_pct !== null ? (
+              <GaugeMeter label="Mahkeme riski" pct={r.mahkeme_pct} valueLabel={r.mahkeme_riski || `% ${r.mahkeme_pct}`} riskLabel={r.risk_puani} />
+            ) : (
+              <div className="text-xs"><span className="text-muted-foreground">Mahkeme riski: </span><b>{r.mahkeme_riski || "Yeterli veri yok"}</b></div>
             )}
           </div>
         ))}
@@ -2107,15 +2110,15 @@ function ComparativeRiskAnalysis({
 
       <div className="grid sm:grid-cols-2 gap-2">
         {!hasOfficialRiskOzeti && (
-          <div className="border rounded p-3 bg-background">
+          <div className="border rounded p-3 bg-background space-y-1">
             <div className="text-xs text-muted-foreground">Genel Uzlaşma Tahmini (ortalama)</div>
-            <div className="text-lg font-semibold">
-              {avgUzlasma !== null ? `% ${avgUzlasma}` : "Yeterli veri yok"}
-            </div>
-            {avgUzlasma !== null && (
-              <div className="h-2 rounded bg-muted overflow-hidden mt-1">
-                <div className="h-full bg-primary" style={{ width: `${Math.min(100, avgUzlasma)}%` }} />
-              </div>
+            {avgUzlasma !== null ? (
+              <>
+                <div className="text-lg font-semibold">% {avgUzlasma}</div>
+                <Progress value={avgUzlasma} className={`h-2 ${gaugeBarClass(pctToRiskLabel(avgUzlasma))}`} />
+              </>
+            ) : (
+              <div className="text-lg font-semibold">Yeterli veri yok</div>
             )}
             <div className="text-[11px] text-muted-foreground mt-1 italic">Basit aritmetik ortalamadır; resmi tahmin için Ortak Zemin Raporu üretin.</div>
           </div>
@@ -2125,11 +2128,10 @@ function ComparativeRiskAnalysis({
           <div className="text-xs text-muted-foreground">Uzlaşma Alanı (ZOPA)</div>
           {zopa && (zopa.lower_bound || zopa.upper_bound || zopa.description) ? (
             <>
-              <div className="text-sm font-medium">
-                {zopa.lower_bound || "?"} <span className="text-muted-foreground">↔</span> {zopa.upper_bound || "?"}
-              </div>
-              <div className="relative h-2 rounded bg-muted overflow-hidden mt-1">
-                <div className="absolute inset-y-0 left-[15%] right-[15%] bg-primary/60 rounded" />
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted">{zopa.lower_bound || "?"}</span>
+                <span className="text-muted-foreground text-xs">↔</span>
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted">{zopa.upper_bound || "?"}</span>
               </div>
               {zopa.description && <div className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{zopa.description}</div>}
             </>
@@ -2173,6 +2175,39 @@ export function riskBadgeTone(raw?: string): string {
     case "low": return "bg-emerald-600 text-white";
     default: return "bg-muted text-foreground";
   }
+}
+// Same palette as riskBadgeTone, applied to a <Progress> indicator via the
+// Radix child selector (Progress hardcodes bg-primary on its own indicator).
+function gaugeBarClass(raw?: string): string {
+  switch (normalizeRiskLevel(raw)) {
+    case "high": return "[&>div]:bg-red-600";
+    case "medium": return "[&>div]:bg-amber-500";
+    case "low": return "[&>div]:bg-emerald-600";
+    default: return "[&>div]:bg-primary";
+  }
+}
+// For percentages with no categorical risk_puani of their own (e.g. a plain
+// average): higher = more favorable, so map magnitude onto the same tone words.
+function pctToRiskLabel(pct: number): string {
+  if (pct >= 60) return "düşük";
+  if (pct >= 35) return "orta";
+  return "yüksek";
+}
+// Renders a single percentage metric as a colored <Progress> bar reusing the
+// existing risk tone palette. Callers must only use this once the value has
+// been confirmed numeric (parsePercent) — "Yeterli veri yok" stays as text.
+function GaugeMeter({
+  label, pct, valueLabel, riskLabel,
+}: { label: string; pct: number; valueLabel: string; riskLabel?: string }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-xs text-muted-foreground">{label}</span>
+        <span className="text-xs font-semibold">{valueLabel}</span>
+      </div>
+      <Progress value={Math.min(100, Math.max(0, pct))} className={`h-2 ${gaugeBarClass(riskLabel)}`} />
+    </div>
+  );
 }
 
 // Match a knowledge-base source (with excerpt/url) to a name that came back inside kaynak_listesi.
@@ -2269,13 +2304,25 @@ function RiskAnalysisCard({
       </div>
       <div className="grid sm:grid-cols-2 gap-2 text-sm">
         <div>
-          <div className="text-xs text-muted-foreground">Anlaşma Oranı</div>
-          <div className="font-medium">{safeText(risk.uzlasma_orani) || "Yeterli veri yok"}</div>
+          {parsePercent(risk.uzlasma_orani) !== null ? (
+            <GaugeMeter label="Anlaşma Oranı" pct={parsePercent(risk.uzlasma_orani)!} valueLabel={safeText(risk.uzlasma_orani)} riskLabel={risk.risk_puani} />
+          ) : (
+            <>
+              <div className="text-xs text-muted-foreground">Anlaşma Oranı</div>
+              <div className="font-medium">{safeText(risk.uzlasma_orani) || "Yeterli veri yok"}</div>
+            </>
+          )}
           {risk.uzlasma_orani_kaynak && <div className="text-[11px] text-muted-foreground italic">Kaynak: {safeText(risk.uzlasma_orani_kaynak)}</div>}
         </div>
         <div>
-          <div className="text-xs text-muted-foreground">Mahkeme Riski</div>
-          <div className="font-medium">{safeText(risk.mahkeme_riski) || "Yeterli veri yok"}</div>
+          {parsePercent(risk.mahkeme_riski) !== null ? (
+            <GaugeMeter label="Mahkeme Riski" pct={parsePercent(risk.mahkeme_riski)!} valueLabel={safeText(risk.mahkeme_riski)} riskLabel={risk.risk_puani} />
+          ) : (
+            <>
+              <div className="text-xs text-muted-foreground">Mahkeme Riski</div>
+              <div className="font-medium">{safeText(risk.mahkeme_riski) || "Yeterli veri yok"}</div>
+            </>
+          )}
           {risk.mahkeme_riski_kaynak && <div className="text-[11px] text-muted-foreground italic">Kaynak: {safeText(risk.mahkeme_riski_kaynak)}</div>}
         </div>
         {risk.tahmini_sure_tasarrufu_ay && (
@@ -2337,11 +2384,23 @@ function RiskSummaryCard({ summary, sources }: { summary?: any; sources?: any[] 
           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badgeTone}`}>{summary.genel_risk_puani} Risk</span>
         )}
       </div>
-      <div className="text-sm">
-        <span className="text-xs text-muted-foreground">Genel Anlaşma Oranı: </span>
-        <span className="font-medium">{summary.genel_uzlasma_orani || "Yeterli veri yok"}</span>
-        {summary.genel_uzlasma_orani_kaynak && <span className="text-[11px] text-muted-foreground italic"> ({summary.genel_uzlasma_orani_kaynak})</span>}
-      </div>
+      {parsePercent(summary.genel_uzlasma_orani) !== null ? (
+        <div>
+          <GaugeMeter
+            label="Genel Anlaşma Oranı"
+            pct={parsePercent(summary.genel_uzlasma_orani)!}
+            valueLabel={summary.genel_uzlasma_orani}
+            riskLabel={summary.genel_risk_puani}
+          />
+          {summary.genel_uzlasma_orani_kaynak && <div className="text-[11px] text-muted-foreground italic mt-0.5">({summary.genel_uzlasma_orani_kaynak})</div>}
+        </div>
+      ) : (
+        <div className="text-sm">
+          <span className="text-xs text-muted-foreground">Genel Anlaşma Oranı: </span>
+          <span className="font-medium">{summary.genel_uzlasma_orani || "Yeterli veri yok"}</span>
+          {summary.genel_uzlasma_orani_kaynak && <span className="text-[11px] text-muted-foreground italic"> ({summary.genel_uzlasma_orani_kaynak})</span>}
+        </div>
+      )}
       {missingHeadline && (
         <MissingDataHint>
           Karşılaştırmalı özet için tarafların risk analizinde eksik alanlar var. Her taraf kartında

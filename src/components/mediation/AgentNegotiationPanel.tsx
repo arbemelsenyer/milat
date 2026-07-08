@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,181 @@ const AGENT_META: Record<AgentType, { label: string; icon: any; color: string }>
   mediator: { label: "Arabulucu Ajan", icon: Scale, color: "text-emerald-600" },
   validator: { label: "Doğrulama Ajanı", icon: ShieldCheck, color: "text-amber-600" },
 };
+
+// ── Structured render of agent_states.last_output ──
+// Şema kaynağı: supabase/functions/multi-agent-negotiation/index.ts (partySystem/
+// mediatorSystem/validatorSystem prompt'ları, satır ~78-116). Bilinen alanlar
+// başlıklı bölümlerde, boş/eksik alanlar sessizce atlanır; şemada olmayan
+// ekstra alanlar en altta "Diğer" bölümünde (veri kaybı olmadan) gösterilir.
+type Senaryo = { tip?: string; baslik?: string; aciklama?: string; adimlar?: string[]; tahmini_sure?: string };
+type DogrulanmisSenaryo = { tip?: string; hukuki_dayanak?: string; emsal_referanslar?: string[]; risk_seviyesi?: string; onay?: boolean };
+type ElenenSenaryo = { tip?: string; neden?: string };
+
+const KNOWN_OUTPUT_KEYS: Record<AgentType, string[]> = {
+  party_a: ["pozisyonlar", "cikarlar", "oncelikler", "kirmizi_cizgiler", "muzakere_esnekligi", "ozet", "confidence"],
+  party_b: ["pozisyonlar", "cikarlar", "oncelikler", "kirmizi_cizgiler", "muzakere_esnekligi", "ozet", "confidence"],
+  mediator: ["ortak_zemin", "catismalar", "senaryolar", "confidence"],
+  validator: ["dogrulanmis_senaryolar", "elenen_senaryolar", "genel_degerlendirme", "confidence"],
+};
+
+function confidenceTone(v: number): string {
+  if (v >= 0.75) return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
+  if (v >= 0.5) return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+  return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+}
+function riskSeviyesiTone(v?: string): string {
+  const l = String(v ?? "").toLowerCase();
+  if (l.includes("yük") || l.includes("yuksek")) return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+  if (l.includes("orta")) return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+  if (l.includes("düş") || l.includes("dusuk")) return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
+  return "bg-muted text-foreground";
+}
+
+function BulletList({ items, danger }: { items?: string[]; danger?: boolean }) {
+  if (!items?.length) return null;
+  return (
+    <ul className={`text-xs space-y-0.5 pl-4 list-disc ${danger ? "text-red-700 dark:text-red-400 marker:text-red-500" : "text-muted-foreground"}`}>
+      {items.map((it, i) => <li key={i}>{it}</li>)}
+    </ul>
+  );
+}
+
+function OutputSection({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function AgentOutputView({ type, output }: { type: AgentType; output: any }) {
+  if (!output || typeof output !== "object") return null;
+  const known = KNOWN_OUTPUT_KEYS[type];
+  const sections: { label: string; node: ReactNode }[] = [];
+
+  const pushList = (label: string, items?: string[], danger?: boolean) => {
+    if (Array.isArray(items) && items.length > 0) sections.push({ label, node: <BulletList items={items} danger={danger} /> });
+  };
+  const pushText = (label: string, text?: string) => {
+    if (text) sections.push({ label, node: <p className="text-xs text-muted-foreground">{text}</p> });
+  };
+
+  if (type === "party_a" || type === "party_b") {
+    pushList("Pozisyonlar", output.pozisyonlar);
+    pushList("Çıkarlar", output.cikarlar);
+    pushList("Öncelikler", output.oncelikler);
+    pushList("Kırmızı Çizgiler", output.kirmizi_cizgiler, true);
+    if (output.muzakere_esnekligi) {
+      sections.push({ label: "Müzakere Esnekliği", node: <Badge variant="outline" className="text-[10px]">{output.muzakere_esnekligi}</Badge> });
+    }
+    pushText("Özet", output.ozet);
+  } else if (type === "mediator") {
+    pushList("Ortak Zemin", output.ortak_zemin);
+    pushList("Çatışmalar", output.catismalar);
+    if (Array.isArray(output.senaryolar) && output.senaryolar.length > 0) {
+      sections.push({
+        label: "Senaryolar",
+        node: (
+          <div className="space-y-1.5">
+            {output.senaryolar.map((sc: Senaryo, i: number) => (
+              <div key={i} className="border rounded p-2 bg-muted/30">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium">{sc.baslik || sc.tip || `Senaryo ${i + 1}`}</span>
+                  {sc.tahmini_sure && <Badge variant="outline" className="text-[10px]">{sc.tahmini_sure}</Badge>}
+                </div>
+                {sc.aciklama && <p className="text-xs text-muted-foreground mt-0.5">{sc.aciklama}</p>}
+                {Array.isArray(sc.adimlar) && sc.adimlar.length > 0 && (
+                  <ol className="text-xs text-muted-foreground pl-4 list-decimal mt-1 space-y-0.5">
+                    {sc.adimlar.map((a, j) => <li key={j}>{a}</li>)}
+                  </ol>
+                )}
+              </div>
+            ))}
+          </div>
+        ),
+      });
+    }
+  } else if (type === "validator") {
+    if (Array.isArray(output.dogrulanmis_senaryolar) && output.dogrulanmis_senaryolar.length > 0) {
+      sections.push({
+        label: "Doğrulanmış Senaryolar",
+        node: (
+          <div className="space-y-1.5">
+            {output.dogrulanmis_senaryolar.map((sc: DogrulanmisSenaryo, i: number) => (
+              <div key={i} className="border rounded p-2 bg-muted/30">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-xs font-medium flex items-center gap-1">
+                    {sc.onay ? <CheckCircle2 className="h-3 w-3 text-emerald-600" /> : <AlertTriangle className="h-3 w-3 text-red-600" />}
+                    {sc.tip || `Senaryo ${i + 1}`}
+                  </span>
+                  {sc.risk_seviyesi && (
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${riskSeviyesiTone(sc.risk_seviyesi)}`}>{sc.risk_seviyesi}</span>
+                  )}
+                </div>
+                {sc.hukuki_dayanak && <p className="text-xs text-muted-foreground mt-0.5">{sc.hukuki_dayanak}</p>}
+                {Array.isArray(sc.emsal_referanslar) && sc.emsal_referanslar.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {sc.emsal_referanslar.map((r, j) => (
+                      <span key={j} className="text-[10px] px-1.5 py-0.5 rounded bg-background border text-muted-foreground">{r}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ),
+      });
+    }
+    if (Array.isArray(output.elenen_senaryolar) && output.elenen_senaryolar.length > 0) {
+      sections.push({
+        label: "Elenen Senaryolar",
+        node: (
+          <ul className="text-xs text-muted-foreground space-y-0.5 pl-4 list-disc">
+            {output.elenen_senaryolar.map((e: ElenenSenaryo, i: number) => (
+              <li key={i}><span className="font-medium">{e.tip}</span>{e.neden ? ` — ${e.neden}` : ""}</li>
+            ))}
+          </ul>
+        ),
+      });
+    }
+    pushText("Genel Değerlendirme", output.genel_degerlendirme);
+  }
+
+  if (typeof output.confidence === "number") {
+    sections.push({
+      label: "Güven (JSON)",
+      node: (
+        <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full ${confidenceTone(output.confidence)}`}>
+          %{Math.round(output.confidence * 100)}
+        </span>
+      ),
+    });
+  }
+
+  const extraKeys = Object.keys(output).filter(
+    (k) => !known.includes(k) && output[k] != null && output[k] !== "" && !(Array.isArray(output[k]) && output[k].length === 0),
+  );
+
+  return (
+    <div className="space-y-2.5">
+      {sections.map((s, i) => <OutputSection key={i} label={s.label}>{s.node}</OutputSection>)}
+      {extraKeys.length > 0 && (
+        <div className="space-y-1 pt-1 border-t">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Diğer</div>
+          <div className="text-[11px] text-muted-foreground space-y-0.5">
+            {extraKeys.map((k) => (
+              <div key={k}>
+                <span className="font-medium">{k}:</span>{" "}
+                {Array.isArray(output[k]) ? output[k].join(", ") : typeof output[k] === "object" ? JSON.stringify(output[k]) : String(output[k])}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function AgentNegotiationPanel({ caseId, isMediator = false }: { caseId: string; isMediator?: boolean }) {
   const [states, setStates] = useState<Record<AgentType, AgentState | null>>({
@@ -125,9 +300,9 @@ export function AgentNegotiationPanel({ caseId, isMediator = false }: { caseId: 
             <p className="text-xs text-destructive">{s.error_message}</p>
           )}
           {s?.last_output && (
-            <pre className="text-[10px] bg-muted p-2 rounded max-h-48 overflow-auto whitespace-pre-wrap">
-              {JSON.stringify(s.last_output, null, 2)}
-            </pre>
+            <div className="max-h-64 overflow-auto pr-1">
+              <AgentOutputView type={type} output={s.last_output} />
+            </div>
           )}
         </CardContent>
       </Card>

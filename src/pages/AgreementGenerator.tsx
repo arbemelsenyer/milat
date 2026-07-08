@@ -6,11 +6,13 @@ import { AppNavbar } from '@/components/AppNavbar';
 import { Button } from '@/components/ui/button';
 import { Loader2, FileCheck, Copy, Download, CheckCircle } from 'lucide-react';
 
+// apiType maps this screen's doc ids onto mediation-ai's generate_agreement
+// docType values (tutanak | anlasma | mutabakat | uzlasma).
 const DOC_TYPES = [
-  { id: 'arabuluculuk_anlasmasi', label: 'Arabuluculuk Anlaşması', labelEn: 'Mediation Agreement' },
-  { id: 'mutabakat_muhtirasi', label: 'Mutabakat Muhtırası', labelEn: 'Memorandum of Agreement' },
-  { id: 'gorusme_tutanagi', label: 'Görüşme Tutanağı', labelEn: 'Session Minutes' },
-  { id: 'uzlasma_belgesi', label: 'Uzlaşma Belgesi', labelEn: 'Settlement Document' },
+  { id: 'arabuluculuk_anlasmasi', apiType: 'anlasma', label: 'Arabuluculuk Anlaşması', labelEn: 'Mediation Agreement' },
+  { id: 'mutabakat_muhtirasi', apiType: 'mutabakat', label: 'Mutabakat Muhtırası', labelEn: 'Memorandum of Agreement' },
+  { id: 'gorusme_tutanagi', apiType: 'tutanak', label: 'Görüşme Tutanağı', labelEn: 'Session Minutes' },
+  { id: 'uzlasma_belgesi', apiType: 'uzlasma', label: 'Uzlaşma Belgesi', labelEn: 'Settlement Document' },
 ];
 
 export default function AgreementGenerator() {
@@ -34,35 +36,41 @@ export default function AgreementGenerator() {
     setLoading(true);
     setDoc('');
     const today = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+    const context = `Tarih: ${today}\nTaraf A: ${tarafA}\nTaraf B: ${tarafB}\n${arabulucu ? `Arabulucu: ${arabulucu}\n` : ''}Uyuşmazlık: ${uyusmazlik}\n${sartlar ? `Anlaşılan Şartlar: ${sartlar}` : ''}`;
+    let fullText = '';
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const { data: { session } } = await supabase.auth.getSession();
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mediation-ai`;
+      const resp = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          system: `Sen Türk hukuku alanında uzman bir hukuki belge hazırlama asistanısın. 6325 sayılı Hukuk Uyuşmazlıklarında Arabuluculuk Kanunu'na uygun belgeler üretirsin.`,
-          messages: [{ role: 'user', content: `"${selectedDoc.label}" belgesi hazırla:\n\nTarih: ${today}\nTaraf A: ${tarafA}\nTaraf B: ${tarafB}\n${arabulucu ? `Arabulucu: ${arabulucu}` : ''}\nUyuşmazlık: ${uyusmazlik}\n${sartlar ? `Anlaşılan Şartlar: ${sartlar}` : ''}\n\nTam, profesyonel ve hukuken geçerli belge hazırla. İmza alanları ekle.` }],
-          stream: true,
-        }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token ?? ''}` },
+        body: JSON.stringify({ action: 'generate_agreement', docType: selectedDoc.apiType, context }),
       });
-      const reader = response.body!.getReader();
+      if (!resp.ok || !resp.body) {
+        throw new Error(t('AI servisine ulaşılamadı, lütfen tekrar deneyin.', 'Could not reach the AI service, please retry.'));
+      }
+      const reader = resp.body.getReader();
       const decoder = new TextDecoder();
-      let fullText = '';
+      let buffer = '';
       while (true) {
-        const { done, value } = await reader.read();
+        const { value, done } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
         for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
+          const data = line.slice(5).trim();
+          if (!data || data === '[DONE]') continue;
           try {
-            const data = JSON.parse(line.slice(6));
-            if (data.type === 'content_block_delta' && data.delta?.text) {
-              fullText += data.delta.text;
-              setDoc(fullText);
-            }
+            const json = JSON.parse(data);
+            const delta = json.choices?.[0]?.delta?.content ?? '';
+            if (delta) { fullText += delta; setDoc(fullText); }
           } catch {}
         }
+      }
+      if (!fullText.trim()) {
+        throw new Error(t('Belge üretilemedi, lütfen tekrar deneyin.', 'Document could not be generated, please retry.'));
       }
       if (caseId && user) {
         await supabase.from('case_documents').insert({
@@ -74,7 +82,10 @@ export default function AgreementGenerator() {
         });
       }
     } catch (e) {
-      setDoc(t('Belge oluşturulurken hata oluştu.', 'Document generation failed.'));
+      // If the stream had already produced text, keep it visible and append
+      // the error instead of wiping out what the user already saw generated.
+      const msg = e instanceof Error ? e.message : t('Belge oluşturulurken hata oluştu.', 'Document generation failed.');
+      setDoc(fullText ? `${fullText}\n\n⚠️ ${msg}` : msg);
     }
     setLoading(false);
   }
