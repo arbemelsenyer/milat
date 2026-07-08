@@ -325,7 +325,7 @@ export default function MediationEngine() {
                       <div>
                         <div className="font-medium">{c.title || "(başlıksız)"}</div>
                         <div className="text-sm text-muted-foreground">
-                          {c.application_no ?? "—"} · {c.dispute_type ?? ""} · Aşama {c.current_phase ?? 1}/9
+                          {c.application_no ?? "—"} · {c.dispute_type ?? ""} · Aşama {c.current_phase ?? 1}/8
                         </div>
                       </div>
                       <Badge variant="secondary">{c.status ?? "active"}</Badge>
@@ -942,10 +942,12 @@ function DisputeClassifierCard({
   useEffect(() => {
     if (!autoRun || ranRef.current) return;
     if (caseRow.dispute_type) return; // already classified
-    if ((initialText ?? "").trim().length < 10) return;
+    const trimmed = (initialText ?? "").trim();
+    if (trimmed.length < 10) return;
+    if (caseRow.application_no && trimmed === `Başvuru - ${caseRow.application_no}`) return; // boş başlıkta üretilen varsayılan metin, gerçek kullanıcı girdisi değil
     ranRef.current = true;
     runClassify(initialText);
-  }, [autoRun, caseRow.dispute_type, initialText, runClassify]);
+  }, [autoRun, caseRow.dispute_type, caseRow.application_no, initialText, runClassify]);
 
   async function saveManual(value: string) {
     setSavingManual(true);
@@ -1111,7 +1113,13 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
       } as any).select().single();
       if (error) throw error;
       if (draft.email) {
-        supabase.functions.invoke("send-party-invite", { body: { party_id: (inserted as any).id, app_url: window.location.origin } }).catch(()=>{});
+        supabase.functions.invoke("send-party-invite", { body: { party_id: (inserted as any).id, app_url: window.location.origin } })
+          .then(({ error: inviteError }) => {
+            if (inviteError) toast({ title: "Davet gönderilemedi", description: trErr(inviteError.message), variant: "destructive" });
+          })
+          .catch((inviteErr: any) => {
+            toast({ title: "Davet gönderilemedi", description: trErr(inviteErr?.message ?? ""), variant: "destructive" });
+          });
       }
       toast({ title: "Taraf eklendi" });
       setDraft(null);
@@ -2816,7 +2824,7 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
 
   return (
     <Card className="p-6 space-y-6">
-      <h2 className="text-2xl font-bold text-primary">Aşama 9 — Belgeler & Kapanış</h2>
+      <h2 className="text-2xl font-bold text-primary">Aşama 8 — Belgeler & Kapanış</h2>
 
       <OfficialDocumentsPanel caseRow={caseRow} />
 
@@ -3034,7 +3042,7 @@ function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
 
   return (
     <Card className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-primary">Aşama 7 — Bilirkişi (Opsiyonel)</h2>
+      <h2 className="text-2xl font-bold text-primary">Aşama 6 — Bilirkişi (Opsiyonel)</h2>
       <p className="text-sm text-muted-foreground">Uyuşmazlık türü: {caseRow.dispute_type}</p>
 
       {loading ? (

@@ -25,7 +25,7 @@ interface Note {
 
 const PHASE_LABELS: Record<number, string> = {
   1: "Başvuru", 2: "Taraflar", 3: "Taraf Analizi", 4: "Arabulucu Paneli",
-  5: "Toplantı", 6: "Bilirkişi", 7: "Müzakere", 8: "Belgeler & Kapanış",
+  5: "Toplantı", 6: "Bilirkişi", 7: "Görüşme Notları", 8: "Belgeler & Kapanış",
 };
 
 interface Props {
