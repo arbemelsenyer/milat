@@ -35,6 +35,7 @@ import { ExpertSelector } from "@/components/mediation/ExpertSelector";
 import { Phase3ErrorBoundary } from "@/components/mediation/Phase3ErrorBoundary";
 import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 import { ProcessTrackerPanel } from "@/components/mediation/ProcessTrackerPanel";
+import { AgentControlPanel } from "@/components/mediation/AgentControlPanel";
 
 // Safely coerce any AI-returned value into a renderable string. Prevents
 // "Objects are not valid as a React child" crashes when the model returns an
@@ -164,6 +165,7 @@ export default function MediationEngine() {
   const [deleteTarget, setDeleteTarget] = useState<CaseRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [trackerOpen, setTrackerOpen] = useState(false);
+  const [agentPanelOpen, setAgentPanelOpen] = useState(false);
 
   useEffect(() => {
     if (activeCase && (isMediator || isAdmin) && params.get("tab") === "surec") {
@@ -410,6 +412,10 @@ export default function MediationEngine() {
               📋 Süreç Takip Çizelgesi
             </Button>
           )}
+          <Button variant="outline" size="sm" className="w-full mb-4 justify-start text-sidebar-foreground"
+            onClick={() => setAgentPanelOpen(true)}>
+            🤖 Ajan Kontrol Paneli
+          </Button>
           <nav className="space-y-1">
             {PHASES.map((p) => {
               const done = p.id < completed;
@@ -445,6 +451,14 @@ export default function MediationEngine() {
       {(isMediator || isAdmin) && (
         <ProcessTrackerPanel caseRow={activeCase} open={trackerOpen} onOpenChange={setTrackerOpen} />
       )}
+      <Dialog open={agentPanelOpen} onOpenChange={setAgentPanelOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="heading-gold-underline">Ajan Kontrol Paneli</DialogTitle>
+          </DialogHeader>
+          <AgentControlPanel caseId={activeCase.id} isMediator={isMediator || isAdmin} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -22,6 +22,9 @@ import { StepTimeline } from "@/components/mediation/StepTimeline";
 import { downloadOfficialPdf } from "@/lib/pdfTemplates";
 import { Input } from "@/components/ui/input";
 
+const tabTriggerAccentClass =
+  "border-b-2 border-b-transparent transition-colors hover:border-b-accent hover:text-accent data-[state=active]:border-b-accent data-[state=active]:text-accent";
+
 interface CaseRow {
   id: string; title: string | null; application_no: string | null; uyap_no: string | null;
   dispute_type: string | null; dispute_subtype: string | null; current_phase: number | null;
@@ -218,15 +221,15 @@ export default function CaseRoom() {
     return (
       <Tabs defaultValue="analyses">
         <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="parties"><Users className="h-4 w-4 mr-1" />Taraflar</TabsTrigger>
-          <TabsTrigger value="documents"><FileText className="h-4 w-4 mr-1" />Belgeler</TabsTrigger>
-          <TabsTrigger value="analyses"><Brain className="h-4 w-4 mr-1" />Gizli Analizler</TabsTrigger>
-          <TabsTrigger value="common"><Lightbulb className="h-4 w-4 mr-1" />Ortak Zemin</TabsTrigger>
-          <TabsTrigger value="discovery">İhtiyaç Tespiti</TabsTrigger>
-          <TabsTrigger value="sessions"><Calendar className="h-4 w-4 mr-1" />Toplantılar</TabsTrigger>
-          <TabsTrigger value="experts"><Award className="h-4 w-4 mr-1" />Bilirkişi</TabsTrigger>
-          <TabsTrigger value="rounds"><MessageSquare className="h-4 w-4 mr-1" />Görüşme Notları</TabsTrigger>
-          <TabsTrigger value="agreement"><FileSignature className="h-4 w-4 mr-1" />Anlaşma</TabsTrigger>
+          <TabsTrigger value="parties" className={tabTriggerAccentClass}><Users className="h-4 w-4 mr-1" />Taraflar</TabsTrigger>
+          <TabsTrigger value="documents" className={tabTriggerAccentClass}><FileText className="h-4 w-4 mr-1" />Belgeler</TabsTrigger>
+          <TabsTrigger value="analyses" className={tabTriggerAccentClass}><Brain className="h-4 w-4 mr-1" />Gizli Analizler</TabsTrigger>
+          <TabsTrigger value="common" className={tabTriggerAccentClass}><Lightbulb className="h-4 w-4 mr-1" />Ortak Zemin</TabsTrigger>
+          <TabsTrigger value="discovery" className={tabTriggerAccentClass}>İhtiyaç Tespiti</TabsTrigger>
+          <TabsTrigger value="sessions" className={tabTriggerAccentClass}><Calendar className="h-4 w-4 mr-1" />Toplantılar</TabsTrigger>
+          <TabsTrigger value="experts" className={tabTriggerAccentClass}><Award className="h-4 w-4 mr-1" />Bilirkişi</TabsTrigger>
+          <TabsTrigger value="rounds" className={tabTriggerAccentClass}><MessageSquare className="h-4 w-4 mr-1" />Görüşme Notları</TabsTrigger>
+          <TabsTrigger value="agreement" className={tabTriggerAccentClass}><FileSignature className="h-4 w-4 mr-1" />Anlaşma</TabsTrigger>
         </TabsList>
 
         <TabsContent value="parties">
@@ -371,10 +374,10 @@ export default function CaseRoom() {
     return (
       <Tabs defaultValue="analysis">
         <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="documents"><Upload className="h-4 w-4 mr-1" />Belgelerim</TabsTrigger>
-          <TabsTrigger value="analysis"><Brain className="h-4 w-4 mr-1" />Gizli Analizim</TabsTrigger>
-          <TabsTrigger value="discovery">İhtiyaç Tespiti</TabsTrigger>
-          <TabsTrigger value="experts"><Award className="h-4 w-4 mr-1" />Bilirkişi Onayı</TabsTrigger>
+          <TabsTrigger value="documents" className={tabTriggerAccentClass}><Upload className="h-4 w-4 mr-1" />Belgelerim</TabsTrigger>
+          <TabsTrigger value="analysis" className={tabTriggerAccentClass}><Brain className="h-4 w-4 mr-1" />Gizli Analizim</TabsTrigger>
+          <TabsTrigger value="discovery" className={tabTriggerAccentClass}>İhtiyaç Tespiti</TabsTrigger>
+          <TabsTrigger value="experts" className={tabTriggerAccentClass}><Award className="h-4 w-4 mr-1" />Bilirkişi Onayı</TabsTrigger>
         </TabsList>
 
         <TabsContent value="documents">
