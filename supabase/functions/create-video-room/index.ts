@@ -13,14 +13,8 @@ serve(async (req) => {
   }
 
   try {
-    const DAILY_API_KEY = Deno.env.get('DAILY_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!DAILY_API_KEY) {
-      console.error('DAILY_API_KEY not configured');
-      throw new Error('Video service not configured');
-    }
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -93,48 +87,18 @@ serve(async (req) => {
       );
     }
 
-    // Create a new Daily.co room
-    const roomName = `mediation-${sessionId.slice(0, 8)}-${Date.now()}`;
+    // Jitsi rooms are public to anyone who knows the name, so the suffix must be
+    // long and unguessable rather than a predictable counter or timestamp.
+    const randomSuffix = crypto.randomUUID().replace(/-/g, '');
+    const roomName = `MediPact-${sessionId.slice(0, 8)}-${randomSuffix}`;
+    const roomUrl = `https://meet.jit.si/${roomName}`;
 
-    console.log(`Creating Daily.co room: ${roomName}`);
-
-    const dailyResponse = await fetch('https://api.daily.co/v1/rooms', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${DAILY_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: roomName,
-        properties: {
-          // Room expires after 24 hours
-          exp: Math.floor(Date.now() / 1000) + 86400,
-          // Enable features
-          enable_chat: true,
-          enable_screenshare: true,
-          enable_knocking: true,
-          enable_prejoin_ui: true,
-          // Max participants (2 parties + mediator)
-          max_participants: 5,
-          // Auto-close room when empty
-          eject_at_room_exp: true,
-        }
-      }),
-    });
-
-    if (!dailyResponse.ok) {
-      const errorText = await dailyResponse.text();
-      console.error('Daily.co API error:', errorText);
-      throw new Error('Failed to create video room');
-    }
-
-    const room = await dailyResponse.json();
-    console.log('Daily.co room created:', room.url);
+    console.log(`Generated Jitsi room: ${roomName}`);
 
     // Store the room link on the case_sessions row
     const { error: updateError } = await supabase
       .from('case_sessions')
-      .update({ video_link: room.url })
+      .update({ video_link: roomUrl })
       .eq('id', sessionId);
 
     if (updateError) {
@@ -179,7 +143,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        room_url: room.url,
+        room_url: roomUrl,
         success: true
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
