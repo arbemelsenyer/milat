@@ -1963,10 +1963,16 @@ function ComparativeRiskAnalysis({
   }, [parties, analyses]);
 
   const avgUzlasma = React.useMemo(() => {
+    // A party's explicit "Yeterli veri yok" is a deliberate judgment, not an absent
+    // value — averaging the other party's number over it would misrepresent that as consensus.
+    if (rows.some((r) => isMissing(r.uzlasma_orani))) return null;
     const vals = rows.map((r) => r.uzlasma_pct).filter((v): v is number => v !== null);
     if (!vals.length) return null;
     return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
   }, [rows]);
+
+  const hasOfficialRiskOzeti =
+    !isMissing(reportData?.risk_ozeti?.genel_uzlasma_orani) || !isMissing(reportData?.risk_ozeti?.genel_risk_puani);
 
   const strongestScenario = React.useMemo(() => {
     const scs = Array.isArray(reportData?.scenarios) ? reportData.scenarios : [];
@@ -2053,18 +2059,20 @@ function ComparativeRiskAnalysis({
       </div>
 
       <div className="grid sm:grid-cols-2 gap-2">
-        <div className="border rounded p-3 bg-background">
-          <div className="text-xs text-muted-foreground">Genel Uzlaşma Tahmini (ortalama)</div>
-          <div className="text-lg font-semibold">
-            {avgUzlasma !== null ? `% ${avgUzlasma}` : "Yeterli veri yok"}
-          </div>
-          {avgUzlasma !== null && (
-            <div className="h-2 rounded bg-muted overflow-hidden mt-1">
-              <div className="h-full bg-primary" style={{ width: `${Math.min(100, avgUzlasma)}%` }} />
+        {!hasOfficialRiskOzeti && (
+          <div className="border rounded p-3 bg-background">
+            <div className="text-xs text-muted-foreground">Genel Uzlaşma Tahmini (ortalama)</div>
+            <div className="text-lg font-semibold">
+              {avgUzlasma !== null ? `% ${avgUzlasma}` : "Yeterli veri yok"}
             </div>
-          )}
-          <div className="text-[11px] text-muted-foreground mt-1 italic">Tarafların risk_analizi verilerinden hesaplandı</div>
-        </div>
+            {avgUzlasma !== null && (
+              <div className="h-2 rounded bg-muted overflow-hidden mt-1">
+                <div className="h-full bg-primary" style={{ width: `${Math.min(100, avgUzlasma)}%` }} />
+              </div>
+            )}
+            <div className="text-[11px] text-muted-foreground mt-1 italic">Basit aritmetik ortalamadır; resmi tahmin için Ortak Zemin Raporu üretin.</div>
+          </div>
+        )}
 
         <div className="border rounded p-3 bg-background">
           <div className="text-xs text-muted-foreground">Uzlaşma Alanı (ZOPA)</div>

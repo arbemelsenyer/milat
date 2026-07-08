@@ -43,8 +43,29 @@ Deno.serve(async (req) => {
     const { data: discAnswers } = await admin.from("case_discovery_questions")
       .select("party_id, question_text, answer_text").eq("case_id", case_id);
 
+    // Meeting-note AI analyses (phase 7) — same "surface prior analysis as context" pattern as party-confidential-analysis.
+    // This function's output is mediator-only, so unlike party-confidential-analysis, private-session notes are
+    // included too: the mediator is entitled to see all of their own session notes.
+    const { data: noteRows } = await admin.from("case_notes")
+      .select("content, created_at").eq("case_id", case_id).eq("phase", 7)
+      .order("created_at", { ascending: false });
+    let meetingNotesBlock = "";
+    if (noteRows && noteRows.length > 0) {
+      const usableNotes = noteRows
+        .map((n: any) => { try { return JSON.parse(n.content); } catch { return null; } })
+        .filter((p: any) => p?.ai && (p.ai.yeni_tespitler?.length || p.ai.degisen_pozisyonlar?.length || p.ai.yeni_strateji));
+      if (usableNotes.length > 0) {
+        const parts = usableNotes.map((p: any) =>
+          `Yeni Tespitler: ${(p.ai.yeni_tespitler ?? []).join("; ") || "-"}\nDeğişen Pozisyonlar: ${(p.ai.degisen_pozisyonlar ?? []).join("; ") || "-"}\nStrateji: ${p.ai.yeni_strateji ?? "-"}`
+        ).join("\n\n");
+        meetingNotesBlock = `\n═══ GÖRÜŞME NOTLARI ANALİZİ (önceden çıkarılmış arabulucu görüşme notu analizleri) ═══\n${parts}\n═══════════════════════════\n`;
+      }
+    }
+
     const systemPrompt = `Sen kıdemli bir Türk arabuluculuk danışmanısın. Tarafların gizli analizlerini okuyup ortak zemin raporu, arabulucu stratejisi ve iki tarafın risk analizlerini karşılaştıran risk_ozeti üretiyorsun.
+Eğer "GÖRÜŞME NOTLARI ANALİZİ" bloğu verilmişse, bu bloktaki önceden çıkarılmış tespit/pozisyon/strateji bulgularını ortak zemin (common_interests), senaryolar (scenarios) ve arabulucu stratejisi (mediator_strategy) değerlendirmende dikkate al.
 KESİN KURAL: Sabit/uydurma % ASLA verme. Kaynak yoksa "Yeterli veri yok" yaz.
+KESİN KURAL (halüsinasyon yasağı): "GÖRÜŞME NOTLARI ANALİZİ" bloğundan yalnızca orada yazılı olan tespit/pozisyon/strateji içeriğinden alıntı/özetleme yap; blokta yer almayan bulgu uydurma.
 Çıktı YALNIZCA JSON: {
   "common_interests": [],
   "zopa": {"description":"", "lower_bound":"", "upper_bound":""},
@@ -81,6 +102,7 @@ ${(analyses ?? []).map((a: any) => `--- ${a.case_parties?.party_role ?? ""} (${a
 
 İHTİYAÇ TESPİTİ CEVAPLARI:
 ${(discAnswers ?? []).map((d) => `[Party ${d.party_id?.slice(0, 8)}] Q: ${d.question_text}\nA: ${d.answer_text ?? "(cevap yok)"}`).join("\n")}
+${meetingNotesBlock}
 ${ragBlock}
 ${similarBlock}
 Yukarıdaki resmi kaynaklardan ve benzer geçmiş davalardan yararlanarak ortak zemin raporu ve iki tarafı karşılaştıran risk_ozeti üret; uydurma % verme.`;
