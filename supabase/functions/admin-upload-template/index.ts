@@ -13,8 +13,25 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
 const MAX_BYTES = 20 * 1024 * 1024;
+
+// document_templates'te gerçekten var olan / generate-official-document'ın tanıdığı
+// tür kataloğu — hem detectTemplateType() hem de AI eşlemesi bu kümenin dışına çıkamaz.
+const TEMPLATE_TYPE_CATALOG = new Set([
+  "ihtiyari_davet", "isci_isveren_davet", "ticari_davet", "tuketici_davet",
+  "dava_sarti_ilk_oturum", "isci_isveren_ilk_oturum", "ticari_ilk_oturum",
+  "ihtiyari_anlasma", "ihtiyari_anlasamamama",
+  "dava_sarti_anlasma", "dava_sarti_anlasamamama",
+  "isci_isveren_anlasma", "isci_isveren_anlasamamama",
+  "ticari_anlasma", "ticari_anlasamamama",
+  "tuketici_anlasma",
+  "kira_anlasma", "kira_anlasamamama",
+  "ortaklik_anlasma", "ortaklik_anlasamamama",
+  "isci_isveren_ucret", "ticari_ucret",
+  "bilgilendirme_tutanagi",
+]);
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -76,6 +93,105 @@ function detectTemplateType(text: string): { type: string; auto: boolean } {
   return { type: "diger", auto: false };
 }
 
+// AI (Gemini, Lovable AI Gateway) ile içerik-tabanlı tespit: dosya adı/başlığa değil,
+// belgenin gerçek metnine bakar. Anahtar-kelime tespitinin göremediği durumları (başlık
+// eksik/farklı ifade edilmiş vb.) yakalamak için birincil yöntem olarak denenir.
+async function detectTemplateTypeAI(text: string): Promise<{ belge_tipi: string; uyusmazlik_turu: string } | null> {
+  if (!LOVABLE_API_KEY) return null;
+  try {
+    const excerpt = text.slice(0, 4000);
+    const systemPrompt = `Sen bir Türk arabuluculuk şablon sınıflandırma asistanısın. Sana bir arabuluculuk belgesi şablonunun metni verilecek. Metni analiz ederek belgenin türünü ve ilgili uyuşmazlık türünü tespit et.
+
+SADECE şu değerlerden birini kullanarak JSON döndür:
+{
+  "belge_tipi": "davet" | "ilk_oturum" | "son_tutanak_anlasma" | "son_tutanak_anlasamama" | "ucret_sozlesmesi",
+  "uyusmazlik_turu": "isci_isveren" | "ticari" | "tuketici" | "kira" | "ortaklik" | "genel"
+}
+
+KURALLAR:
+- "davet": arabuluculuk davet mektubu / ilk toplantı davetiyesi.
+- "ilk_oturum": ilk oturum / ilk toplantı bilgilendirme tutanağı.
+- "son_tutanak_anlasma": tarafların anlaştığı son tutanak.
+- "son_tutanak_anlasamama": tarafların anlaşamadığı son tutanak.
+- "ucret_sozlesmesi": arabulucu ücret sözleşmesi.
+- Emin değilsen "uyusmazlik_turu" için "genel" seç.
+- Yanıtın YALNIZCA geçerli JSON olmalı, başka metin yok.`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: excerpt },
+        ],
+        response_format: { type: "json_object" },
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const content = data?.choices?.[0]?.message?.content ?? "{}";
+    let parsed: any;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      return null;
+    }
+    const belge_tipi = String(parsed?.belge_tipi ?? "").trim();
+    const uyusmazlik_turu = String(parsed?.uyusmazlik_turu ?? "").trim();
+    if (!belge_tipi || !uyusmazlik_turu) return null;
+    return { belge_tipi, uyusmazlik_turu };
+  } catch {
+    return null;
+  }
+}
+
+// AI'nin (belge_tipi, uyusmazlik_turu) çıktısını mevcut template_type kataloğuna eşler.
+// Katalogda karşılığı olmayan bir kombinasyon (ör. "tüketici + anlaşamama") için null
+// döner — çağıran taraf bu durumda anahtar-kelime tespitine düşer.
+function mapAiClassificationToTemplateType(belgeTipi: string, uyusmazlikTuru: string): string | null {
+  let type: string | null;
+  switch (belgeTipi) {
+    case "davet":
+      if (uyusmazlikTuru === "isci_isveren") type = "isci_isveren_davet";
+      else if (uyusmazlikTuru === "ticari") type = "ticari_davet";
+      else if (uyusmazlikTuru === "tuketici") type = "tuketici_davet";
+      else type = "ihtiyari_davet"; // kira/ortaklik/genel için jenerik davet
+      break;
+    case "ilk_oturum":
+      if (uyusmazlikTuru === "isci_isveren") type = "isci_isveren_ilk_oturum";
+      else if (uyusmazlikTuru === "ticari") type = "ticari_ilk_oturum";
+      else type = "dava_sarti_ilk_oturum";
+      break;
+    case "son_tutanak_anlasma":
+      if (uyusmazlikTuru === "isci_isveren") type = "isci_isveren_anlasma";
+      else if (uyusmazlikTuru === "ticari") type = "ticari_anlasma";
+      else if (uyusmazlikTuru === "tuketici") type = "tuketici_anlasma";
+      else if (uyusmazlikTuru === "kira") type = "kira_anlasma";
+      else if (uyusmazlikTuru === "ortaklik") type = "ortaklik_anlasma";
+      else type = "dava_sarti_anlasma";
+      break;
+    case "son_tutanak_anlasamama":
+      if (uyusmazlikTuru === "isci_isveren") type = "isci_isveren_anlasamamama";
+      else if (uyusmazlikTuru === "ticari") type = "ticari_anlasamamama";
+      else if (uyusmazlikTuru === "kira") type = "kira_anlasamamama";
+      else if (uyusmazlikTuru === "ortaklik") type = "ortaklik_anlasamamama";
+      else type = "dava_sarti_anlasamamama"; // tüketici/genel: katalogda özel tür yok
+      break;
+    case "ucret_sozlesmesi":
+      if (uyusmazlikTuru === "isci_isveren") type = "isci_isveren_ucret";
+      else if (uyusmazlikTuru === "ticari") type = "ticari_ucret";
+      else type = null; // katalogda jenerik ücret sözleşmesi yok
+      break;
+    default:
+      type = null;
+  }
+  return type && TEMPLATE_TYPE_CATALOG.has(type) ? type : null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -116,10 +232,22 @@ Deno.serve(async (req) => {
 
     let templateType = overrideType;
     let autoDetected = false;
+    let detectedBy: "manual" | "ai" | "keyword" | "fallback" = "manual";
+
     if (!templateType) {
-      const det = detectTemplateType(text);
-      templateType = det.type;
-      autoDetected = det.auto;
+      const aiCls = await detectTemplateTypeAI(text);
+      const aiType = aiCls ? mapAiClassificationToTemplateType(aiCls.belge_tipi, aiCls.uyusmazlik_turu) : null;
+
+      if (aiType) {
+        templateType = aiType;
+        autoDetected = true;
+        detectedBy = "ai";
+      } else {
+        const det = detectTemplateType(text);
+        templateType = det.type;
+        autoDetected = det.auto;
+        detectedBy = det.auto ? "keyword" : "fallback";
+      }
     }
 
     const { error: upErr } = await admin.from("document_templates").upsert({
@@ -136,6 +264,7 @@ Deno.serve(async (req) => {
       ok: true,
       template_type: templateType,
       auto_detected: autoDetected,
+      detected_by: detectedBy,
       needs_manual: templateType === "diger",
       chars: text.length,
       filename: file.name,
