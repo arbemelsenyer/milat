@@ -190,35 +190,37 @@ Deno.serve(async (req) => {
   });
 
   // Build UDF content.xml per the real UYAP schema: <template format_id="1.8">
-  // with a single CDATA text pool (<content>) and <elements> paragraphs that
-  // reference it via character offsets (NOT byte offsets — every Turkish
-  // character and emoji counts as exactly 1, hence Array.from().length below).
-  // Empty lines are represented by a zero-width space (U+200B) per spec.
+  // with a single CDATA text pool (<content>) and <elements> paragraphs whose
+  // <content startOffset length/> children reference it via character offsets
+  // (NOT byte offsets — every Turkish character counts as exactly 1, hence
+  // Array.from().length below). Runs are contiguous: every character in the
+  // pool, including the "\n" line separators, belongs to exactly one run —
+  // verified against a real UYAP-exported .udf sample. A blank line is just
+  // a paragraph whose sole run is the "\n" itself; no placeholder character.
   const rawLines = filled.split("\n");
   let pool = "";
   const paragraphElems: string[] = [];
   let offset = 0;
   for (let i = 0; i < rawLines.length; i++) {
-    const line = rawLines[i] === "" ? "​" : rawLines[i];
-    const length = Array.from(line).length;
-    paragraphElems.push(`    <paragraph startOffset="${offset}" length="${length}"/>`);
-    pool += line;
+    const hasNext = i < rawLines.length - 1;
+    const text = hasNext ? rawLines[i] + "\n" : rawLines[i];
+    const length = Array.from(text).length;
+    if (length === 0) continue;
+    paragraphElems.push(`    <paragraph><content startOffset="${offset}" length="${length}"/></paragraph>`);
+    pool += text;
     offset += length;
-    if (i < rawLines.length - 1) {
-      pool += "\n";
-      offset += 1;
-    }
   }
 
   const udf = `<?xml version="1.0" encoding="UTF-8"?>
 <template format_id="1.8">
   <content><![CDATA[${pool}]]></content>
-  <properties pageWidth="595.28" pageHeight="841.89" marginTop="56.7" marginRight="56.7" marginBottom="56.7" marginLeft="56.7"/>
-  <elements>
+  <properties mediaSizeName="1" leftMargin="70.875" rightMargin="70.875" topMargin="70.875" bottomMargin="70.875" paperOrientation="1" headerFOffset="20.0" footerFOffset="20.0" />
+  <elements resolver="hvl-default">
 ${paragraphElems.join("\n")}
   </elements>
   <styles>
-    <style id="default" fontFamily="Times New Roman" size="11" color="-16777216" bold="false" italic="false"/>
+    <style name="default" description="Geçerli" family="Dialog" size="12" bold="false" italic="false" foreground="-13421773" FONT_ATTRIBUTE_KEY="javax.swing.plaf.FontUIResource[family=Dialog,name=Dialog,style=plain,size=12]" />
+    <style name="hvl-default" family="Times New Roman" size="12" description="Gövde" />
   </styles>
 </template>`;
 

@@ -155,7 +155,11 @@ export async function downloadOfficialUdf(opts: {
 }) {
   const zip = new JSZip();
   zip.file("content.xml", opts.udfXml);
-  const blob = await zip.generateAsync({ type: "blob", mimeType: "application/octet-stream" });
+  const blob = await zip.generateAsync({
+    type: "blob",
+    mimeType: "application/octet-stream",
+    compression: "DEFLATE",
+  });
 
   const filename = `${opts.templateType}_${opts.applicationNo || "belge"}.udf`;
   const url = URL.createObjectURL(blob);
