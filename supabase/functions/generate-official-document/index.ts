@@ -11,32 +11,74 @@ const corsHeaders = {
 const j = (obj: unknown, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-/** Map (mediation_type, outcome, disputeType, kind) → template_type */
-function selectTemplate(opts: {
+/** Uyuşmazlık türü anahtar kelimelerini admin-upload-template/detectTemplateType()'ın
+ * tanıdığı gruplara indirger — o fonksiyondaki İŞÇİ/TİCARİ/TÜKETİCİ/KİRA/ORTAKLIK
+ * anahtar kelimeleriyle birebir tutarlı olmalı. */
+function disputeGroup(dt: string): "isci" | "ticari" | "tuketici" | "kira" | "ortaklik" | null {
+  if (["isci", "isci_isveren", "iş", "işçi", "işveren", "labor", "employment"].some((k) => dt.includes(k))) return "isci";
+  if (["ticari", "commercial", "inşaat", "insaat", "bankacılık", "bankacilik", "sigorta", "fikri"].some((k) => dt.includes(k))) return "ticari";
+  if (["tüketici", "tuketici", "consumer", "sağlık", "saglik"].some((k) => dt.includes(k))) return "tuketici";
+  if (["kira", "gayrimenkul", "rent", "real_estate", "realestate"].some((k) => dt.includes(k))) return "kira";
+  if (["ortaklik", "ortaklık", "partnership", "şirket", "sirket"].some((k) => dt.includes(k))) return "ortaklik";
+  return null;
+}
+
+function uniq(arr: string[]): string[] {
+  return [...new Set(arr)];
+}
+
+/**
+ * Map (mediation_type, outcome, disputeType, kind) → ordered template_type fallback chain.
+ * İlk eleman en özel (uyuşmazlık türüne göre) şablon adayı, son eleman her zaman
+ * document_templates'te seed edilmiş garanti jenerik Bakanlık şablonudur. Hangi adayın
+ * kullanılacağı (aktif + dolu olan ilki) çağıran tarafta DB'ye bakılarak belirlenir —
+ * seçim tamamen deterministiktir, AI'ye bırakılmaz.
+ */
+function selectTemplateCandidates(opts: {
   mediation_type?: string | null;
   outcome?: string | null;
   dispute_type?: string | null;
   kind: "son_tutanak" | "davet" | "ilk_oturum";
-}): string {
+}): string[] {
   const { mediation_type, outcome, dispute_type, kind } = opts;
   const dt = (dispute_type || "").toLowerCase();
+  const group = disputeGroup(dt);
 
   if (kind === "davet") {
-    if (mediation_type === "ihtiyari") return "ihtiyari_davet";
-    if (["isci", "isci_isveren", "iş", "işçi", "işveren", "labor", "employment"].some((k) => dt.includes(k))) return "isci_isveren_davet";
-    if (["ticari", "commercial", "inşaat", "insaat", "bankacılık", "bankacilik", "sigorta", "fikri"].some((k) => dt.includes(k))) return "ticari_davet";
-    if (["tüketici", "tuketici", "consumer", "sağlık", "saglik"].some((k) => dt.includes(k))) return "tuketici_davet";
-    if (["kira", "gayrimenkul", "aile", "family", "rent"].some((k) => dt.includes(k))) return "ihtiyari_davet";
-    return "ihtiyari_davet";
+    let specific: string;
+    if (mediation_type === "ihtiyari") specific = "ihtiyari_davet";
+    else if (group === "isci") specific = "isci_isveren_davet";
+    else if (group === "ticari") specific = "ticari_davet";
+    else if (group === "tuketici") specific = "tuketici_davet";
+    else specific = "ihtiyari_davet";
+    return uniq([specific, "ihtiyari_davet"]);
   }
 
-  if (kind === "ilk_oturum") return "dava_sarti_ilk_oturum";
+  if (kind === "ilk_oturum") {
+    // admin-upload-template sadece isci_isveren_ilk_oturum ve ticari_ilk_oturum'u tanır.
+    const specific = group === "isci" ? "isci_isveren_ilk_oturum" : group === "ticari" ? "ticari_ilk_oturum" : null;
+    return uniq([...(specific ? [specific] : []), "dava_sarti_ilk_oturum"]);
+  }
 
   // son_tutanak
   const isIhtiyari = mediation_type === "ihtiyari";
   const agreed = outcome === "anlasma";
-  if (isIhtiyari) return agreed ? "ihtiyari_anlasma" : "ihtiyari_anlasamamama";
-  return agreed ? "dava_sarti_anlasma" : "dava_sarti_anlasamamama";
+  const genericType = isIhtiyari
+    ? (agreed ? "ihtiyari_anlasma" : "ihtiyari_anlasamamama")
+    : (agreed ? "dava_sarti_anlasma" : "dava_sarti_anlasamamama");
+
+  // admin-upload-template/detectTemplateType()'ın tanıdığı tür-özel adlar:
+  // isci_isveren_{anlasma,anlasamamama}, ticari_{anlasma,anlasamamama},
+  // tuketici_anlasma (anlasamamama varyantı o fonksiyonda tanımlı değil),
+  // kira_{anlasma,anlasamamama}, ortaklik_{anlasma,anlasamamama}.
+  let specific: string | null = null;
+  if (group === "isci") specific = agreed ? "isci_isveren_anlasma" : "isci_isveren_anlasamamama";
+  else if (group === "ticari") specific = agreed ? "ticari_anlasma" : "ticari_anlasamamama";
+  else if (group === "tuketici" && agreed) specific = "tuketici_anlasma";
+  else if (group === "kira") specific = agreed ? "kira_anlasma" : "kira_anlasamamama";
+  else if (group === "ortaklik") specific = agreed ? "ortaklik_anlasma" : "ortaklik_anlasamamama";
+
+  return uniq([...(specific ? [specific] : []), genericType]);
 }
 
 function fmtDate(d?: string | null): string {
@@ -134,15 +176,34 @@ Deno.serve(async (req) => {
   if (!canAccess) return j({ error: "Forbidden" }, 403);
 
   const outcome = outcome_override || caseRow.outcome;
-  const template_type = selectTemplate({
+  const candidates = selectTemplateCandidates({
     mediation_type: caseRow.mediation_type,
     outcome,
     dispute_type: caseRow.dispute_type,
     kind: kind as any,
   });
 
-  const { data: tpl } = await admin.from("document_templates").select("template_content, source_url").eq("template_type", template_type).maybeSingle();
-  if (!tpl?.template_content) {
+  // Deterministik seçim: aday listesi en özelden en jeneriğe sıralıdır. İlk AKTİF ve
+  // dolu şablon kullanılır — tür-özel şablon yüklenmemiş/pasifse hata vermeden
+  // sessizce jenerik Bakanlık şablonuna düşülür.
+  const { data: tplRows } = await admin
+    .from("document_templates")
+    .select("template_type, template_content, source_url, is_active")
+    .in("template_type", candidates);
+  const byType = new Map((tplRows || []).map((r: any) => [r.template_type, r]));
+
+  let template_type = candidates[candidates.length - 1];
+  let tpl: { template_content: string; source_url: string | null } | null = null;
+  for (const c of candidates) {
+    const row = byType.get(c);
+    if (row?.is_active && row.template_content) {
+      template_type = c;
+      tpl = row;
+      break;
+    }
+  }
+
+  if (!tpl) {
     return j({
       error: "template_missing",
       template_type,
