@@ -11,11 +11,14 @@ const corsHeaders = {
 const j = (obj: unknown, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+// admin-upload-template'in TEMPLATE_GROUPS kümesiyle birebir aynı 6 grup.
+type TemplateGroup = "ihtiyari" | "isci_isveren" | "ticari" | "tuketici" | "kira" | "ortaklik";
+
 /** Uyuşmazlık türü anahtar kelimelerini admin-upload-template/detectTemplateType()'ın
  * tanıdığı gruplara indirger — o fonksiyondaki İŞÇİ/TİCARİ/TÜKETİCİ/KİRA/ORTAKLIK
  * anahtar kelimeleriyle birebir tutarlı olmalı. */
-function disputeGroup(dt: string): "isci" | "ticari" | "tuketici" | "kira" | "ortaklik" | null {
-  if (["isci", "isci_isveren", "iş", "işçi", "işveren", "labor", "employment"].some((k) => dt.includes(k))) return "isci";
+function disputeGroup(dt: string): TemplateGroup | null {
+  if (["isci", "isci_isveren", "iş", "işçi", "işveren", "labor", "employment"].some((k) => dt.includes(k))) return "isci_isveren";
   if (["ticari", "commercial", "inşaat", "insaat", "bankacılık", "bankacilik", "sigorta", "fikri"].some((k) => dt.includes(k))) return "ticari";
   if (["tüketici", "tuketici", "consumer", "sağlık", "saglik"].some((k) => dt.includes(k))) return "tuketici";
   if (["kira", "gayrimenkul", "rent", "real_estate", "realestate"].some((k) => dt.includes(k))) return "kira";
@@ -33,6 +36,13 @@ function uniq(arr: string[]): string[] {
  * document_templates'te seed edilmiş garanti jenerik Bakanlık şablonudur. Hangi adayın
  * kullanılacağı (aktif + dolu olan ilki) çağıran tarafta DB'ye bakılarak belirlenir —
  * seçim tamamen deterministiktir, AI'ye bırakılmaz.
+ *
+ * admin-upload-template artık iki tür isim üretiyor: (a) sabit legacy adlar
+ * (isci_isveren_anlasma, dava_sarti_ilk_oturum, ihtiyari_davet vb.) ve (b) dinamik
+ * "{grup}_{belge_tipi}" deseni (ör. isci_isveren_anlasma_son_tutanak). Aday listesi
+ * önce yeni deseni, sonra legacy grup-özel adı, en sonda jenerik/dava_sarti fallback'i
+ * dener — bu sıralamayla hem yeni yüklenen tür-özel şablonlar hem de eski Bakanlık
+ * şablonları kesintisiz çalışır.
  */
 function selectTemplateCandidates(opts: {
   mediation_type?: string | null;
@@ -43,42 +53,54 @@ function selectTemplateCandidates(opts: {
   const { mediation_type, outcome, dispute_type, kind } = opts;
   const dt = (dispute_type || "").toLowerCase();
   const group = disputeGroup(dt);
+  const isIhtiyari = mediation_type === "ihtiyari";
 
   if (kind === "davet") {
-    let specific: string;
-    if (mediation_type === "ihtiyari") specific = "ihtiyari_davet";
-    else if (group === "isci") specific = "isci_isveren_davet";
-    else if (group === "ticari") specific = "ticari_davet";
-    else if (group === "tuketici") specific = "tuketici_davet";
-    else specific = "ihtiyari_davet";
+    // {grup}_davet yeni deseni, isci_isveren/ticari/tuketici/ihtiyari için zaten legacy
+    // adla birebir örtüşür; kira/ortaklik için ise önceden aday üretilmeyen ama
+    // admin-upload-template'in artık kabul ettiği yeni grup-özel adlardır.
+    const specific = isIhtiyari ? "ihtiyari_davet" : group ? `${group}_davet` : "ihtiyari_davet";
     return uniq([specific, "ihtiyari_davet"]);
   }
 
   if (kind === "ilk_oturum") {
-    // admin-upload-template sadece isci_isveren_ilk_oturum ve ticari_ilk_oturum'u tanır.
-    const specific = group === "isci" ? "isci_isveren_ilk_oturum" : group === "ticari" ? "ticari_ilk_oturum" : null;
+    // Legacy: sadece isci_isveren_ilk_oturum / ticari_ilk_oturum tanınıyordu.
+    // Yeni desenle diğer gruplar (tuketici/kira/ortaklik/ihtiyari) için de
+    // {grup}_ilk_oturum denenir, ardından jenerik dava_sarti_ilk_oturum'a düşülür.
+    const specific = group ? `${group}_ilk_oturum` : null;
     return uniq([...(specific ? [specific] : []), "dava_sarti_ilk_oturum"]);
   }
 
   // son_tutanak
-  const isIhtiyari = mediation_type === "ihtiyari";
   const agreed = outcome === "anlasma";
   const genericType = isIhtiyari
     ? (agreed ? "ihtiyari_anlasma" : "ihtiyari_anlasamamama")
     : (agreed ? "dava_sarti_anlasma" : "dava_sarti_anlasamamama");
 
-  // admin-upload-template/detectTemplateType()'ın tanıdığı tür-özel adlar:
+  const candidates: string[] = [];
+
+  // 1) Yeni desen: {grup}_anlasma_son_tutanak / {grup}_anlasamama_son_tutanak.
+  // "dava_sarti" 6 grubun içinde olmadığı için (group null && !isIhtiyari) durumunda
+  // bu adım atlanır — o durumda doğrudan jenerik dava_sarti_* şablonuna düşülür.
+  const patternGroup = group ?? (isIhtiyari ? "ihtiyari" : null);
+  if (patternGroup) candidates.push(agreed ? `${patternGroup}_anlasma_son_tutanak` : `${patternGroup}_anlasamama_son_tutanak`);
+
+  // 2) Legacy grup-özel adlar (admin-upload-template/detectTemplateType()'ın tanıdığı):
   // isci_isveren_{anlasma,anlasamamama}, ticari_{anlasma,anlasamamama},
   // tuketici_anlasma (anlasamamama varyantı o fonksiyonda tanımlı değil),
   // kira_{anlasma,anlasamamama}, ortaklik_{anlasma,anlasamamama}.
-  let specific: string | null = null;
-  if (group === "isci") specific = agreed ? "isci_isveren_anlasma" : "isci_isveren_anlasamamama";
-  else if (group === "ticari") specific = agreed ? "ticari_anlasma" : "ticari_anlasamamama";
-  else if (group === "tuketici" && agreed) specific = "tuketici_anlasma";
-  else if (group === "kira") specific = agreed ? "kira_anlasma" : "kira_anlasamamama";
-  else if (group === "ortaklik") specific = agreed ? "ortaklik_anlasma" : "ortaklik_anlasamamama";
+  let legacySpecific: string | null = null;
+  if (group === "isci_isveren") legacySpecific = agreed ? "isci_isveren_anlasma" : "isci_isveren_anlasamamama";
+  else if (group === "ticari") legacySpecific = agreed ? "ticari_anlasma" : "ticari_anlasamamama";
+  else if (group === "tuketici" && agreed) legacySpecific = "tuketici_anlasma";
+  else if (group === "kira") legacySpecific = agreed ? "kira_anlasma" : "kira_anlasamamama";
+  else if (group === "ortaklik") legacySpecific = agreed ? "ortaklik_anlasma" : "ortaklik_anlasamamama";
+  if (legacySpecific) candidates.push(legacySpecific);
 
-  return uniq([...(specific ? [specific] : []), genericType]);
+  // 3) Jenerik / dava_sarti fallback — her zaman garanti seed'lenmiş.
+  candidates.push(genericType);
+
+  return uniq(candidates);
 }
 
 function fmtDate(d?: string | null): string {
@@ -158,9 +180,16 @@ Deno.serve(async (req) => {
 
   let body: any = {};
   try { body = await req.json(); } catch {}
-  const { case_id, kind, outcome_override } = body || {};
-  if (!case_id || !kind) return j({ error: "case_id and kind required" }, 400);
-  if (!["son_tutanak", "davet", "ilk_oturum"].includes(kind)) return j({ error: "invalid kind" }, 400);
+  const { case_id, kind, outcome_override, template_type: explicitTemplateType } = body || {};
+  const requestedTemplateType = typeof explicitTemplateType === "string" ? explicitTemplateType.trim() : "";
+  if (!case_id) return j({ error: "case_id required" }, 400);
+  // template_type doğrudan verildiyse kind zorunlu değildir — aday listesi hesaplanmadan
+  // istenen tür doğrudan (aktifse) kullanılır. Bu, frontend'in ileride yeni belge tiplerini
+  // (müracaat tutanağı, yetki belgesi vb.) doğrudan istemesinin yoludur.
+  if (!requestedTemplateType) {
+    if (!kind) return j({ error: "case_id and kind required" }, 400);
+    if (!["son_tutanak", "davet", "ilk_oturum"].includes(kind)) return j({ error: "invalid kind" }, 400);
+  }
 
   // Load case, parties, session, fee, mediator profile.
   const { data: caseRow, error: caseErr } = await admin.from("cases").select("*").eq("id", case_id).maybeSingle();
@@ -176,12 +205,14 @@ Deno.serve(async (req) => {
   if (!canAccess) return j({ error: "Forbidden" }, 403);
 
   const outcome = outcome_override || caseRow.outcome;
-  const candidates = selectTemplateCandidates({
-    mediation_type: caseRow.mediation_type,
-    outcome,
-    dispute_type: caseRow.dispute_type,
-    kind: kind as any,
-  });
+  const candidates = requestedTemplateType
+    ? [requestedTemplateType]
+    : selectTemplateCandidates({
+        mediation_type: caseRow.mediation_type,
+        outcome,
+        dispute_type: caseRow.dispute_type,
+        kind: kind as any,
+      });
 
   // Deterministik seçim: aday listesi en özelden en jeneriğe sıralıdır. İlk AKTİF ve
   // dolu şablon kullanılır — tür-özel şablon yüklenmemiş/pasifse hata vermeden

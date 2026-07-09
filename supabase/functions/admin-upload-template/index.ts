@@ -17,9 +17,37 @@ const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
 const MAX_BYTES = 20 * 1024 * 1024;
 
-// document_templates'te gerçekten var olan / generate-official-document'ın tanıdığı
-// tür kataloğu — hem detectTemplateType() hem de AI eşlemesi bu kümenin dışına çıkamaz.
-const TEMPLATE_TYPE_CATALOG = new Set([
+// Uyuşmazlık grupları — her yüklenen şablon bu 6 gruptan birine atanır.
+const TEMPLATE_GROUPS = ["ihtiyari", "isci_isveren", "ticari", "tuketici", "kira", "ortaklik"] as const;
+type TemplateGroup = (typeof TEMPLATE_GROUPS)[number];
+
+// Genişletilmiş belge tipi seti. Her kombinasyon önceden üretilmez — grup + belge tipi
+// (+ varsa varyant) çalışma zamanında "{grup}_{belge_tipi}" ya da "{grup}_{varyant}_{belge_tipi}"
+// deseniyle template_type'a dönüştürülür (bkz. buildTemplateType).
+const DOCUMENT_TYPES = [
+  "davet",
+  "muracaat_tutanagi",
+  "arabulucu_belirleme",
+  "bilgilendirme",
+  "surec_baslama",
+  "ilk_oturum",
+  "oturum_erteleme",
+  "acilis_konusmasi",
+  "anlasma_belgesi",
+  "anlasma_son_tutanak",
+  "anlasamama_son_tutanak",
+  "gorusme_yapilmadan_anlasamama",
+  "ucret_sozlesmesi",
+  "yetki_belgesi",
+  "makbuz_ust_yazisi",
+  "icra_serhi_dilekce",
+] as const;
+type DocumentType = (typeof DOCUMENT_TYPES)[number];
+
+// Geriye uyumluluk: document_templates'te önceden var olan / generate-official-document'ın
+// selectTemplateCandidates() ile aradığı sabit türler. Bu isimler yeni {grup}_{belge_tipi}
+// desenine uymaz (ör. "dava_sarti_*", "*_ucret") ama aynen tanınmaya devam eder.
+const LEGACY_TEMPLATE_TYPES = new Set([
   "ihtiyari_davet", "isci_isveren_davet", "ticari_davet", "tuketici_davet",
   "dava_sarti_ilk_oturum", "isci_isveren_ilk_oturum", "ticari_ilk_oturum",
   "ihtiyari_anlasma", "ihtiyari_anlasamamama",
@@ -32,6 +60,36 @@ const TEMPLATE_TYPE_CATALOG = new Set([
   "isci_isveren_ucret", "ticari_ucret",
   "bilgilendirme_tutanagi",
 ]);
+
+function isTemplateGroup(g: string): g is TemplateGroup {
+  return (TEMPLATE_GROUPS as readonly string[]).includes(g);
+}
+
+function isDocumentType(b: string): b is DocumentType {
+  return (DOCUMENT_TYPES as readonly string[]).includes(b);
+}
+
+const TR_ASCII_MAP: Record<string, string> = {
+  ı: "i", İ: "i", ş: "s", Ş: "s", ğ: "g", Ğ: "g", ü: "u", Ü: "u", ö: "o", Ö: "o", ç: "c", Ç: "c",
+};
+
+function slugify(s: string): string {
+  const ascii = (s || "").replace(/[ışŞğĞüÜöÖçÇİ]/g, (c) => TR_ASCII_MAP[c] ?? c);
+  return ascii
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+// Grup + belge tipi (+ opsiyonel varyant, ör. "ise_iade", "nisbi") kombinasyonundan
+// template_type üretir. Katalogda önceden var olması gerekmez — dinamik ve serbesttir.
+function buildTemplateType(group: string, belgeTipi: string, variant?: string | null): string {
+  const g = slugify(group);
+  const b = slugify(belgeTipi);
+  const v = variant ? slugify(variant) : "";
+  return v ? `${g}_${v}_${b}` : `${g}_${b}`;
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -54,11 +112,33 @@ async function extractFromFile(bytes: Uint8Array, fileName: string, mime: string
   throw new Error("Desteklenmeyen dosya formatı. PDF, DOCX veya TXT yükleyin.");
 }
 
+// Metindeki grup anahtar kelimelerini tespit eder (İŞÇİ/TİCARİ/TÜKETİCİ/KİRA/ORTAKLIK/İHTİYARİ).
+// `t` zaten toUpperCase() edilmiş olmalı.
+function detectGroup(t: string): TemplateGroup | null {
+  if (t.includes("İŞÇİ")) return "isci_isveren";
+  if (t.includes("TİCARİ")) return "ticari";
+  if (t.includes("TÜKETİCİ")) return "tuketici";
+  if (t.includes("KİRA")) return "kira";
+  if (t.includes("ORTAKLIK")) return "ortaklik";
+  if (t.includes("İHTİYARİ")) return "ihtiyari";
+  return null;
+}
+
+// Bilinen varyant anahtar kelimeleri (ör. işe iade davası, nispi ücret). Serbest varyant
+// isimleri AI tespitinde (detectTemplateTypeAI) desteklenir; bu sadece anahtar-kelime
+// tespitindeki (AI'siz) en yaygın iki örnek içindir.
+function detectVariant(t: string): string | null {
+  if (t.includes("İŞE İADE")) return "ise_iade";
+  if (t.includes("NİSPİ") || t.includes("NİSBİ")) return "nisbi";
+  return null;
+}
+
 // Otomatik şablon türü tespiti — dosya metnindeki başlık/anahtar kelimelere bakar.
 function detectTemplateType(text: string): { type: string; auto: boolean } {
   const t = (text || "").toUpperCase();
   const has = (kw: string) => t.includes(kw.toUpperCase());
 
+  // --- Geriye uyumlu (legacy) eşlemeler: davranış birebir korunur ---
   if (has("ANLAŞMA BELGESİ") || has("ANLAŞMA SON TUTANA")) {
     if (has("İŞÇİ")) return { type: "isci_isveren_anlasma", auto: true };
     if (has("TİCARİ")) return { type: "ticari_anlasma", auto: true };
@@ -88,33 +168,59 @@ function detectTemplateType(text: string): { type: string; auto: boolean } {
     if (has("İŞÇİ")) return { type: "isci_isveren_ucret", auto: true };
     if (has("TİCARİ")) return { type: "ticari_ucret", auto: true };
   }
-  if (has("BİLGİLENDİRME TUTANAĞI")) return { type: "bilgilendirme_tutanagi", auto: true };
+  const group = detectGroup(t);
+  if (has("BİLGİLENDİRME TUTANAĞI") && !group) return { type: "bilgilendirme_tutanagi", auto: true };
+
+  // --- Genişletilmiş belge tipi seti: {grup}_{belge_tipi} deseni (grup tespit edilemezse "ihtiyari") ---
+  const g = group ?? "ihtiyari";
+  const variant = detectVariant(t);
+  if (has("MÜRACAAT TUTANA")) return { type: buildTemplateType(g, "muracaat_tutanagi", variant), auto: true };
+  if (has("ARABULUCU BELİRLEME") || has("ARABULUCU GÖREVLENDİRME") || has("ARABULUCU ATAMA")) {
+    return { type: buildTemplateType(g, "arabulucu_belirleme", variant), auto: true };
+  }
+  if (has("BİLGİLENDİRME")) return { type: buildTemplateType(g, "bilgilendirme", variant), auto: true };
+  if (has("SÜRECİN BAŞLA") || has("SÜREÇ BAŞLA") || has("SÜRECE BAŞLA")) {
+    return { type: buildTemplateType(g, "surec_baslama", variant), auto: true };
+  }
+  if (has("İLK OTURUM") || has("İLK TOPLANTI")) return { type: buildTemplateType(g, "ilk_oturum", variant), auto: true };
+  if (has("OTURUM ERTELE") || has("TOPLANTI ERTELE")) return { type: buildTemplateType(g, "oturum_erteleme", variant), auto: true };
+  if (has("AÇILIŞ KONUŞMA")) return { type: buildTemplateType(g, "acilis_konusmasi", variant), auto: true };
+  if (has("ANLAŞMA BELGESİ")) return { type: buildTemplateType(g, "anlasma_belgesi", variant), auto: true };
+  if (has("ANLAŞMA SON TUTANA")) return { type: buildTemplateType(g, "anlasma_son_tutanak", variant), auto: true };
+  if (has("GÖRÜŞME YAPILMADAN") && has("ANLAŞAMA")) {
+    return { type: buildTemplateType(g, "gorusme_yapilmadan_anlasamama", variant), auto: true };
+  }
+  if (has("ANLAŞAMAMA SON TUTANA") || has("ANLAŞAMAMA")) return { type: buildTemplateType(g, "anlasamama_son_tutanak", variant), auto: true };
+  if (has("DAVET MEKTUBU") || has("DAVET")) return { type: buildTemplateType(g, "davet", variant), auto: true };
+  if (has("ÜCRET SÖZLEŞMESİ")) return { type: buildTemplateType(g, "ucret_sozlesmesi", variant), auto: true };
+  if (has("YETKİ BELGESİ")) return { type: buildTemplateType(g, "yetki_belgesi", variant), auto: true };
+  if (has("MAKBUZ") && has("ÜST YAZI")) return { type: buildTemplateType(g, "makbuz_ust_yazisi", variant), auto: true };
+  if (has("İCRA ŞERHİ") || has("İCRA ŞERH")) return { type: buildTemplateType(g, "icra_serhi_dilekce", variant), auto: true };
 
   return { type: "diger", auto: false };
 }
 
 // AI (Gemini, Lovable AI Gateway) ile içerik-tabanlı tespit: dosya adı/başlığa değil,
 // belgenin gerçek metnine bakar. Anahtar-kelime tespitinin göremediği durumları (başlık
-// eksik/farklı ifade edilmiş vb.) yakalamak için birincil yöntem olarak denenir.
-async function detectTemplateTypeAI(text: string): Promise<{ belge_tipi: string; uyusmazlik_turu: string } | null> {
+// eksik/farklı ifade edilmiş, özel bir varyant vb.) yakalamak için birincil yöntem olarak denenir.
+async function detectTemplateTypeAI(text: string): Promise<{ grup: string; belge_tipi: string; varyant: string | null } | null> {
   if (!LOVABLE_API_KEY) return null;
   try {
     const excerpt = text.slice(0, 4000);
-    const systemPrompt = `Sen bir Türk arabuluculuk şablon sınıflandırma asistanısın. Sana bir arabuluculuk belgesi şablonunun metni verilecek. Metni analiz ederek belgenin türünü ve ilgili uyuşmazlık türünü tespit et.
+    const systemPrompt = `Sen bir Türk arabuluculuk şablon sınıflandırma asistanısın. Sana bir arabuluculuk belgesi şablonunun metni verilecek. Metni analiz ederek belgenin ait olduğu uyuşmazlık grubunu, belge tipini ve varsa özel bir varyantını tespit et.
 
-SADECE şu değerlerden birini kullanarak JSON döndür:
+SADECE şu şemaya uyan bir JSON döndür:
 {
-  "belge_tipi": "davet" | "ilk_oturum" | "son_tutanak_anlasma" | "son_tutanak_anlasamama" | "ucret_sozlesmesi",
-  "uyusmazlik_turu": "isci_isveren" | "ticari" | "tuketici" | "kira" | "ortaklik" | "genel"
+  "grup": "ihtiyari" | "isci_isveren" | "ticari" | "tuketici" | "kira" | "ortaklik",
+  "belge_tipi": "davet" | "muracaat_tutanagi" | "arabulucu_belirleme" | "bilgilendirme" | "surec_baslama" | "ilk_oturum" | "oturum_erteleme" | "acilis_konusmasi" | "anlasma_belgesi" | "anlasma_son_tutanak" | "anlasamama_son_tutanak" | "gorusme_yapilmadan_anlasamama" | "ucret_sozlesmesi" | "yetki_belgesi" | "makbuz_ust_yazisi" | "icra_serhi_dilekce",
+  "varyant": string | null
 }
 
 KURALLAR:
-- "davet": arabuluculuk davet mektubu / ilk toplantı davetiyesi.
-- "ilk_oturum": ilk oturum / ilk toplantı bilgilendirme tutanağı.
-- "son_tutanak_anlasma": tarafların anlaştığı son tutanak.
-- "son_tutanak_anlasamama": tarafların anlaşamadığı son tutanak.
-- "ucret_sozlesmesi": arabulucu ücret sözleşmesi.
-- Emin değilsen "uyusmazlik_turu" için "genel" seç.
+- "grup": belgenin ilişkili olduğu uyuşmazlık türü. Dava şartı arabuluculukta (işçi-işveren, ticari vb. dışında genel/belirsiz bir durumda) en yakın grubu seç; hiçbiri uymuyorsa "ihtiyari" seç.
+- "belge_tipi" açıklamaları: davet=davet mektubu/ilk toplantı daveti, muracaat_tutanagi=başvuru/müracaat tutanağı, arabulucu_belirleme=arabulucu görevlendirme/belirleme yazısı, bilgilendirme=genel bilgilendirme tutanağı, surec_baslama=sürecin başladığına dair belge, ilk_oturum=ilk oturum/toplantı tutanağı, oturum_erteleme=oturumun ertelenmesi, acilis_konusmasi=arabulucunun açılış konuşması metni, anlasma_belgesi=tarafların imzaladığı anlaşma belgesi, anlasma_son_tutanak=anlaşmayla sonuçlanan son tutanak, anlasamama_son_tutanak=anlaşamamayla sonuçlanan son tutanak, gorusme_yapilmadan_anlasamama=görüşme yapılmadan anlaşamama tutanağı, ucret_sozlesmesi=arabulucu ücret sözleşmesi, yetki_belgesi=vekile/temsilciye verilen yetki belgesi, makbuz_ust_yazisi=makbuz üst yazısı, icra_serhi_dilekce=icra şerhi verilmesi talebine ilişkin dilekçe.
+- "varyant": belge özel bir alt tür belirtiyorsa kısa bir snake_case etiket (ör. "ise_iade", "nisbi"), yoksa null.
+- Emin değilsen "grup" için "ihtiyari" seç.
 - Yanıtın YALNIZCA geçerli JSON olmalı, başka metin yok.`;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -140,56 +246,80 @@ KURALLAR:
     } catch {
       return null;
     }
+    const grup = String(parsed?.grup ?? "").trim();
     const belge_tipi = String(parsed?.belge_tipi ?? "").trim();
-    const uyusmazlik_turu = String(parsed?.uyusmazlik_turu ?? "").trim();
-    if (!belge_tipi || !uyusmazlik_turu) return null;
-    return { belge_tipi, uyusmazlik_turu };
+    const varyantRaw = parsed?.varyant;
+    const varyant = varyantRaw ? String(varyantRaw).trim() : null;
+    if (!grup || !belge_tipi) return null;
+    return { grup, belge_tipi, varyant: varyant || null };
   } catch {
     return null;
   }
 }
 
-// AI'nin (belge_tipi, uyusmazlik_turu) çıktısını mevcut template_type kataloğuna eşler.
-// Katalogda karşılığı olmayan bir kombinasyon (ör. "tüketici + anlaşamama") için null
-// döner — çağıran taraf bu durumda anahtar-kelime tespitine düşer.
-function mapAiClassificationToTemplateType(belgeTipi: string, uyusmazlikTuru: string): string | null {
-  let type: string | null;
-  switch (belgeTipi) {
-    case "davet":
-      if (uyusmazlikTuru === "isci_isveren") type = "isci_isveren_davet";
-      else if (uyusmazlikTuru === "ticari") type = "ticari_davet";
-      else if (uyusmazlikTuru === "tuketici") type = "tuketici_davet";
-      else type = "ihtiyari_davet"; // kira/ortaklik/genel için jenerik davet
-      break;
-    case "ilk_oturum":
-      if (uyusmazlikTuru === "isci_isveren") type = "isci_isveren_ilk_oturum";
-      else if (uyusmazlikTuru === "ticari") type = "ticari_ilk_oturum";
-      else type = "dava_sarti_ilk_oturum";
-      break;
-    case "son_tutanak_anlasma":
-      if (uyusmazlikTuru === "isci_isveren") type = "isci_isveren_anlasma";
-      else if (uyusmazlikTuru === "ticari") type = "ticari_anlasma";
-      else if (uyusmazlikTuru === "tuketici") type = "tuketici_anlasma";
-      else if (uyusmazlikTuru === "kira") type = "kira_anlasma";
-      else if (uyusmazlikTuru === "ortaklik") type = "ortaklik_anlasma";
-      else type = "dava_sarti_anlasma";
-      break;
-    case "son_tutanak_anlasamama":
-      if (uyusmazlikTuru === "isci_isveren") type = "isci_isveren_anlasamamama";
-      else if (uyusmazlikTuru === "ticari") type = "ticari_anlasamamama";
-      else if (uyusmazlikTuru === "kira") type = "kira_anlasamamama";
-      else if (uyusmazlikTuru === "ortaklik") type = "ortaklik_anlasamamama";
-      else type = "dava_sarti_anlasamamama"; // tüketici/genel: katalogda özel tür yok
-      break;
-    case "ucret_sozlesmesi":
-      if (uyusmazlikTuru === "isci_isveren") type = "isci_isveren_ucret";
-      else if (uyusmazlikTuru === "ticari") type = "ticari_ucret";
-      else type = null; // katalogda jenerik ücret sözleşmesi yok
-      break;
-    default:
-      type = null;
+// AI'nin (grup, belge_tipi, varyant) çıktısını template_type'a çevirir.
+// Eski, sabit katalogla birebir örtüşen kombinasyonlar (davet/ilk_oturum/anlaşma/
+// anlaşamama/ücret/bilgilendirme, varyantsız) geriye uyumluluk için aynı legacy
+// isimlerle döner. Diğer tüm kombinasyonlar "{grup}_{belge_tipi}" ya da
+// "{grup}_{varyant}_{belge_tipi}" deseniyle dinamik üretilir — katalogda önceden
+// var olması gerekmez.
+function mapAiClassificationToTemplateType(grup: string, belgeTipi: string, varyant: string | null): string | null {
+  const group = isTemplateGroup(grup) ? grup : null;
+
+  if (!varyant) {
+    switch (belgeTipi) {
+      case "davet": {
+        let type: string | null = null;
+        if (group === "isci_isveren") type = "isci_isveren_davet";
+        else if (group === "ticari") type = "ticari_davet";
+        else if (group === "tuketici") type = "tuketici_davet";
+        else if (group === "ihtiyari" || !group) type = "ihtiyari_davet";
+        if (type && LEGACY_TEMPLATE_TYPES.has(type)) return type;
+        break;
+      }
+      case "ilk_oturum": {
+        const type = group === "isci_isveren" ? "isci_isveren_ilk_oturum"
+          : group === "ticari" ? "ticari_ilk_oturum"
+          : "dava_sarti_ilk_oturum";
+        if (LEGACY_TEMPLATE_TYPES.has(type)) return type;
+        break;
+      }
+      case "anlasma_son_tutanak": {
+        const type = group === "isci_isveren" ? "isci_isveren_anlasma"
+          : group === "ticari" ? "ticari_anlasma"
+          : group === "tuketici" ? "tuketici_anlasma"
+          : group === "kira" ? "kira_anlasma"
+          : group === "ortaklik" ? "ortaklik_anlasma"
+          : group === "ihtiyari" ? "ihtiyari_anlasma"
+          : "dava_sarti_anlasma";
+        if (LEGACY_TEMPLATE_TYPES.has(type)) return type;
+        break;
+      }
+      case "anlasamama_son_tutanak": {
+        const type = group === "isci_isveren" ? "isci_isveren_anlasamamama"
+          : group === "ticari" ? "ticari_anlasamamama"
+          : group === "kira" ? "kira_anlasamamama"
+          : group === "ortaklik" ? "ortaklik_anlasamamama"
+          : group === "ihtiyari" ? "ihtiyari_anlasamamama"
+          : "dava_sarti_anlasamamama"; // tüketici/genel: katalogda özel tür yok, dava_sarti'ya düşer
+        if (LEGACY_TEMPLATE_TYPES.has(type)) return type;
+        break;
+      }
+      case "ucret_sozlesmesi": {
+        const type = group === "isci_isveren" ? "isci_isveren_ucret" : group === "ticari" ? "ticari_ucret" : null;
+        if (type && LEGACY_TEMPLATE_TYPES.has(type)) return type;
+        break;
+      }
+      case "bilgilendirme": {
+        if (!group) return "bilgilendirme_tutanagi";
+        break;
+      }
+    }
   }
-  return type && TEMPLATE_TYPE_CATALOG.has(type) ? type : null;
+
+  // --- Genişletilmiş desen: legacy eşleşme yoksa dinamik olarak üret ---
+  if (!isDocumentType(belgeTipi)) return null;
+  return buildTemplateType(group ?? "ihtiyari", belgeTipi, varyant);
 }
 
 Deno.serve(async (req) => {
@@ -236,7 +366,7 @@ Deno.serve(async (req) => {
 
     if (!templateType) {
       const aiCls = await detectTemplateTypeAI(text);
-      const aiType = aiCls ? mapAiClassificationToTemplateType(aiCls.belge_tipi, aiCls.uyusmazlik_turu) : null;
+      const aiType = aiCls ? mapAiClassificationToTemplateType(aiCls.grup, aiCls.belge_tipi, aiCls.varyant) : null;
 
       if (aiType) {
         templateType = aiType;
@@ -250,6 +380,8 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Üstüne-yazma koruması: aynı template_type zaten varsa upsert onConflict ile
+    // üzerine yazılır (mevcut davranış korunur); bu davranış değiştirilmedi.
     const { error: upErr } = await admin.from("document_templates").upsert({
       template_type: templateType,
       template_content: text,

@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, RefreshCw, FileText, ExternalLink, Upload, Plus, Trash2, Eye, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -30,16 +31,51 @@ const KNOWN_MINISTRY_TYPES = [
   "tuketici_davet",
 ];
 
-const TEMPLATE_TYPES = [
-  "isci_isveren_anlasma", "ticari_anlasma", "tuketici_anlasma", "kira_anlasma", "ortaklik_anlasma", "ihtiyari_anlasma",
-  "isci_isveren_anlasamamama", "ticari_anlasamamama", "kira_anlasamamama", "ortaklik_anlasamamama", "ihtiyari_anlasamamama",
-  "isci_isveren_ilk_oturum", "ticari_ilk_oturum",
-  "isci_isveren_davet", "ticari_davet", "tuketici_davet", "ihtiyari_davet",
-  "isci_isveren_ucret", "ticari_ucret",
-  "bilgilendirme_tutanagi",
-  "dava_sarti_anlasma", "dava_sarti_anlasamamama", "dava_sarti_ilk_oturum",
-  "diger",
+// admin-upload-template/index.ts'teki TEMPLATE_GROUPS/DOCUMENT_TYPES ile birebir aynı
+// grup ve belge tipi kümesi — manuel tür seçimi bu iki kademeli listeden template_type üretir.
+const TEMPLATE_GROUPS: { value: string; label: string }[] = [
+  { value: "ihtiyari", label: "İhtiyari" },
+  { value: "isci_isveren", label: "İşçi-İşveren" },
+  { value: "ticari", label: "Ticari" },
+  { value: "tuketici", label: "Tüketici" },
+  { value: "kira", label: "Kira" },
+  { value: "ortaklik", label: "Ortaklığın Giderilmesi" },
 ];
+
+const DOCUMENT_TYPES: { value: string; label: string }[] = [
+  { value: "davet", label: "Davet" },
+  { value: "muracaat_tutanagi", label: "Müracaat Tutanağı" },
+  { value: "arabulucu_belirleme", label: "Arabulucu Belirleme" },
+  { value: "bilgilendirme", label: "Bilgilendirme" },
+  { value: "surec_baslama", label: "Süreç Başlama" },
+  { value: "ilk_oturum", label: "İlk Oturum" },
+  { value: "oturum_erteleme", label: "Oturum Erteleme" },
+  { value: "acilis_konusmasi", label: "Açılış Konuşması" },
+  { value: "anlasma_belgesi", label: "Anlaşma Belgesi" },
+  { value: "anlasma_son_tutanak", label: "Anlaşma Son Tutanak" },
+  { value: "anlasamama_son_tutanak", label: "Anlaşamama Son Tutanak" },
+  { value: "gorusme_yapilmadan_anlasamama", label: "Görüşme Yapılmadan Anlaşamama" },
+  { value: "ucret_sozlesmesi", label: "Ücret Sözleşmesi" },
+  { value: "yetki_belgesi", label: "Yetki Belgesi" },
+  { value: "makbuz_ust_yazisi", label: "Makbuz Üst Yazısı" },
+  { value: "icra_serhi_dilekce", label: "İcra Şerhi Dilekçesi" },
+];
+
+// admin-upload-template/index.ts'teki slugify/buildTemplateType ile birebir aynı mantık —
+// grup + (opsiyonel varyant) + belge tipinden "{grup}_{varyant}_{belge_tipi}" üretir.
+const TR_ASCII_MAP: Record<string, string> = {
+  ı: "i", İ: "i", ş: "s", Ş: "s", ğ: "g", Ğ: "g", ü: "u", Ü: "u", ö: "o", Ö: "o", ç: "c", Ç: "c",
+};
+function slugify(s: string): string {
+  const ascii = (s || "").replace(/[ışŞğĞüÜöÖçÇİ]/g, (c) => TR_ASCII_MAP[c] ?? c);
+  return ascii.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+}
+function buildTemplateType(group: string, belgeTipi: string, variant?: string): string {
+  const g = slugify(group);
+  const b = slugify(belgeTipi);
+  const v = variant ? slugify(variant) : "";
+  return v ? `${g}_${v}_${b}` : `${g}_${b}`;
+}
 
 type UploadResult = {
   name: string;
@@ -63,7 +99,7 @@ export function TemplateAdmin() {
   const [uploading, setUploading] = useState(false);
   const [uploadStage, setUploadStage] = useState("");
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
-  const [manualOverride, setManualOverride] = useState<Record<string, string>>({});
+  const [manualOverride, setManualOverride] = useState<Record<string, { group: string; belgeTipi: string; variant: string }>>({});
   const [reassigning, setReassigning] = useState<string | null>(null);
 
   async function load() {
@@ -165,26 +201,44 @@ export function TemplateAdmin() {
     const projectUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
     const results: UploadResult[] = [];
 
+    // Not: admin-upload-template şu an her zaman sessizce upsert eder (conflict alanı
+    // dönmez). Bu blok forward-compatible: backend ileride bir aynı-türde-kayıt varsa
+    // upsert'ten önce conflict:true dönecek şekilde güncellenirse, burada ek işlem
+    // gerekmeden devreye girer.
+    async function postUpload(file: File, overwrite: boolean) {
+      const form = new FormData();
+      form.append("file", file);
+      if (overwrite) form.append("overwrite", "true");
+      const res = await fetch(`${projectUrl}/functions/v1/admin-upload-template`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      return data;
+    }
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       setUploadStage(`${i + 1}/${files.length} — Tür otomatik tespit ediliyor: ${file.name}`);
       try {
-        const form = new FormData();
-        form.append("file", file);
-        const res = await fetch(`${projectUrl}/functions/v1/admin-upload-template`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${session.access_token}` },
-          body: form,
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
-        results.push({
-          name: file.name,
-          ok: true,
-          template_type: data.template_type,
-          auto_detected: data.auto_detected,
-          needs_manual: data.needs_manual,
-        });
+        let data = await postUpload(file, false);
+        if (data?.conflict) {
+          const proceed = confirm(`Bu türde şablon zaten var: ${data.template_type} — üstüne yazılsın mı?`);
+          data = proceed ? await postUpload(file, true) : null;
+        }
+        if (data) {
+          results.push({
+            name: file.name,
+            ok: true,
+            template_type: data.template_type,
+            auto_detected: data.auto_detected,
+            needs_manual: data.needs_manual,
+          });
+        } else {
+          results.push({ name: file.name, ok: false, error: "Yükleme iptal edildi (mevcut şablon korundu)" });
+        }
       } catch (err: any) {
         results.push({ name: file.name, ok: false, error: err?.message ?? "Bilinmeyen hata" });
       }
@@ -204,9 +258,10 @@ export function TemplateAdmin() {
     setTimeout(() => setUploadStage(""), 8000);
   }
 
-  const reassignTemplate = async (fileName: string) => {
-    const newType = manualOverride[fileName];
+  const reassignTemplate = async (fileName: string, newType: string) => {
     if (!newType) return;
+    const existing = rows.find((r) => r.template_type === newType);
+    if (existing && !confirm(`Bu türde şablon zaten var: ${newType} — üstüne yazılsın mı?`)) return;
     setReassigning(fileName);
     try {
       const { data: row, error: readErr } = await supabase
@@ -281,32 +336,50 @@ export function TemplateAdmin() {
               <div key={r.name} className="flex items-center gap-2 flex-wrap">
                 <span className="font-mono">{r.name}</span>
                 {r.ok ? (
-                  r.needs_manual ? (
-                    <>
-                      <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50 gap-1">
-                        <AlertTriangle className="w-3 h-3" /> Tür tespit edilemedi, lütfen manuel seçin
-                      </Badge>
-                      <Select
-                        value={manualOverride[r.name] ?? ""}
-                        onValueChange={(v) => setManualOverride((p) => ({ ...p, [r.name]: v }))}
-                      >
-                        <SelectTrigger className="h-7 w-56 text-xs"><SelectValue placeholder="Şablon türü seçin" /></SelectTrigger>
-                        <SelectContent>
-                          {TEMPLATE_TYPES.filter((t) => t !== "diger").map((t) => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={!manualOverride[r.name] || reassigning === r.name}
-                        onClick={() => reassignTemplate(r.name)}
-                      >
-                        {reassigning === r.name ? <Loader2 className="w-3 h-3 animate-spin" /> : "Kaydet"}
-                      </Button>
-                    </>
-                  ) : (
+                  r.needs_manual ? (() => {
+                    const sel = manualOverride[r.name] ?? { group: "", belgeTipi: "", variant: "" };
+                    const computedType = sel.group && sel.belgeTipi ? buildTemplateType(sel.group, sel.belgeTipi, sel.variant) : "";
+                    const setSel = (patch: Partial<typeof sel>) =>
+                      setManualOverride((p) => ({ ...p, [r.name]: { ...sel, ...patch } }));
+                    return (
+                      <>
+                        <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50 gap-1">
+                          <AlertTriangle className="w-3 h-3" /> Tür tespit edilemedi, lütfen manuel seçin
+                        </Badge>
+                        <Select value={sel.group} onValueChange={(v) => setSel({ group: v })}>
+                          <SelectTrigger className="h-7 w-32 text-xs"><SelectValue placeholder="Grup" /></SelectTrigger>
+                          <SelectContent>
+                            {TEMPLATE_GROUPS.map((g) => (
+                              <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select value={sel.belgeTipi} onValueChange={(v) => setSel({ belgeTipi: v })}>
+                          <SelectTrigger className="h-7 w-48 text-xs"><SelectValue placeholder="Belge Tipi" /></SelectTrigger>
+                          <SelectContent>
+                            {DOCUMENT_TYPES.map((d) => (
+                              <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          className="h-7 w-28 text-xs"
+                          placeholder="varyant (ops.)"
+                          value={sel.variant}
+                          onChange={(e) => setSel({ variant: e.target.value })}
+                        />
+                        {computedType && <span className="font-mono text-[10px] text-muted-foreground">{computedType}</span>}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!computedType || reassigning === r.name}
+                          onClick={() => reassignTemplate(r.name, computedType)}
+                        >
+                          {reassigning === r.name ? <Loader2 className="w-3 h-3 animate-spin" /> : "Kaydet"}
+                        </Button>
+                      </>
+                    );
+                  })() : (
                     <Badge className="bg-emerald-600 hover:bg-emerald-600 gap-1">
                       <CheckCircle2 className="w-3 h-3" /> Tür: {r.template_type}
                     </Badge>
