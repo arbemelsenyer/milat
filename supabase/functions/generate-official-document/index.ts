@@ -49,8 +49,9 @@ function selectTemplateCandidates(opts: {
   outcome?: string | null;
   dispute_type?: string | null;
   kind: "son_tutanak" | "davet" | "ilk_oturum";
+  variant?: string | null;
 }): string[] {
-  const { mediation_type, outcome, dispute_type, kind } = opts;
+  const { mediation_type, outcome, dispute_type, kind, variant } = opts;
   const dt = (dispute_type || "").toLowerCase();
   const group = disputeGroup(dt);
   const isIhtiyari = mediation_type === "ihtiyari";
@@ -78,6 +79,15 @@ function selectTemplateCandidates(opts: {
     : (agreed ? "dava_sarti_anlasma" : "dava_sarti_anlasamamama");
 
   const candidates: string[] = [];
+
+  // 0) Varyant desteği: dava sonucunun özel bir alt türü belirtilmişse (ör. "ise_iade",
+  // "nisbi"), grup-özel varyant şablonları listenin en başına eklenir — en özelden
+  // en jeneriğe sıralamayı korur.
+  const patternGroup0 = group ?? (isIhtiyari ? "ihtiyari" : null);
+  if (variant && patternGroup0) {
+    candidates.push(`${patternGroup0}_${variant}_anlasma_son_tutanak`);
+    candidates.push(`${patternGroup0}_${variant}_anlasma_belgesi`);
+  }
 
   // 1) Yeni desen: {grup}_anlasma_son_tutanak / {grup}_anlasamama_son_tutanak.
   // "dava_sarti" 6 grubun içinde olmadığı için (group null && !isIhtiyari) durumunda
@@ -180,8 +190,9 @@ Deno.serve(async (req) => {
 
   let body: any = {};
   try { body = await req.json(); } catch {}
-  const { case_id, kind, outcome_override, template_type: explicitTemplateType } = body || {};
+  const { case_id, kind, outcome_override, template_type: explicitTemplateType, variant: requestedVariant } = body || {};
   const requestedTemplateType = typeof explicitTemplateType === "string" ? explicitTemplateType.trim() : "";
+  const variant = typeof requestedVariant === "string" && requestedVariant.trim() ? requestedVariant.trim() : null;
   if (!case_id) return j({ error: "case_id required" }, 400);
   // template_type doğrudan verildiyse kind zorunlu değildir — aday listesi hesaplanmadan
   // istenen tür doğrudan (aktifse) kullanılır. Bu, frontend'in ileride yeni belge tiplerini
@@ -212,6 +223,7 @@ Deno.serve(async (req) => {
         outcome,
         dispute_type: caseRow.dispute_type,
         kind: kind as any,
+        variant,
       });
 
   // Deterministik seçim: aday listesi en özelden en jeneriğe sıralıdır. İlk AKTİF ve

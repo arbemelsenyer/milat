@@ -87,7 +87,10 @@ function slugify(s: string): string {
 function buildTemplateType(group: string, belgeTipi: string, variant?: string | null): string {
   const g = slugify(group);
   const b = slugify(belgeTipi);
-  const v = variant ? slugify(variant) : "";
+  let v = variant ? slugify(variant) : "";
+  // Varyant, belge tipiyle aynıysa ya da onu içeriyorsa/onun içindeyse (ör. varyant="oturum_erteleme",
+  // tip="oturum_erteleme") çift-ek oluşmaması için varyantı at.
+  if (v && (v === b || v.includes(b) || b.includes(v))) v = "";
   return v ? `${g}_${v}_${b}` : `${g}_${b}`;
 }
 
@@ -219,7 +222,7 @@ SADECE şu şemaya uyan bir JSON döndür:
 KURALLAR:
 - "grup": belgenin ilişkili olduğu uyuşmazlık türü. Dava şartı arabuluculukta (işçi-işveren, ticari vb. dışında genel/belirsiz bir durumda) en yakın grubu seç; hiçbiri uymuyorsa "ihtiyari" seç.
 - "belge_tipi" açıklamaları: davet=davet mektubu/ilk toplantı daveti, muracaat_tutanagi=başvuru/müracaat tutanağı, arabulucu_belirleme=arabulucu görevlendirme/belirleme yazısı, bilgilendirme=genel bilgilendirme tutanağı, surec_baslama=sürecin başladığına dair belge, ilk_oturum=ilk oturum/toplantı tutanağı, oturum_erteleme=oturumun ertelenmesi, acilis_konusmasi=arabulucunun açılış konuşması metni, anlasma_belgesi=tarafların imzaladığı anlaşma belgesi, anlasma_son_tutanak=anlaşmayla sonuçlanan son tutanak, anlasamama_son_tutanak=anlaşamamayla sonuçlanan son tutanak, gorusme_yapilmadan_anlasamama=görüşme yapılmadan anlaşamama tutanağı, ucret_sozlesmesi=arabulucu ücret sözleşmesi, yetki_belgesi=vekile/temsilciye verilen yetki belgesi, makbuz_ust_yazisi=makbuz üst yazısı, icra_serhi_dilekce=icra şerhi verilmesi talebine ilişkin dilekçe.
-- "varyant": belge özel bir alt tür belirtiyorsa kısa bir snake_case etiket (ör. "ise_iade", "nisbi"), yoksa null.
+- "varyant": belge özel bir alt tür belirtiyorsa kısa bir snake_case etiket (ör. "ise_iade", "nisbi"), yoksa null. "varyant" alanına ASLA "belge_tipi" alanındaki değeri (aynısını ya da onu içeren bir ifadeyi) TEKRAR yazma — varyant sadece gerçek bir alt-tür ayrımı (ör. işe iade davası, nispi ücret) içindir, yoksa null bırak.
 - Emin değilsen "grup" için "ihtiyari" seç.
 - Yanıtın YALNIZCA geçerli JSON olmalı, başka metin yok.`;
 
