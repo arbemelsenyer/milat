@@ -37,6 +37,14 @@ function uniq(arr: string[]): string[] {
  * kullanılacağı (aktif + dolu olan ilki) çağıran tarafta DB'ye bakılarak belirlenir —
  * seçim tamamen deterministiktir, AI'ye bırakılmaz.
  *
+ * Hukuki hiyerarşi iki ayrı koldur ve BİRBİRİNE ASLA KARIŞMAZ:
+ * - "ihtiyari" (mediation_type="ihtiyari"): uyuşmazlık grubu kavramı yok, tamamen
+ *   jenerik ihtiyari_* şablonları kullanılır (dispute_type'tan türetilen grup bu kolda
+ *   hiçbir zaman dikkate alınmaz).
+ * - "dava_sarti" (mediation_type="dava_sarti"): işçi-işveren/ticari/tüketici/kira/ortaklık
+ *   bu kolun ALT TÜRLERİDİR — önce {grup}_* tür-özel aday, bulunamazsa jenerik
+ *   dava_sarti_* şablonuna düşülür. Bu kolda ihtiyari_* şablonlarına asla düşülmez.
+ *
  * admin-upload-template artık iki tür isim üretiyor: (a) sabit legacy adlar
  * (isci_isveren_anlasma, dava_sarti_ilk_oturum, ihtiyari_davet vb.) ve (b) dinamik
  * "{grup}_{belge_tipi}" deseni (ör. isci_isveren_anlasma_son_tutanak). Aday listesi
@@ -53,23 +61,25 @@ function selectTemplateCandidates(opts: {
 }): string[] {
   const { mediation_type, outcome, dispute_type, kind, variant } = opts;
   const dt = (dispute_type || "").toLowerCase();
-  const group = disputeGroup(dt);
   const isIhtiyari = mediation_type === "ihtiyari";
+  // İhtiyari kolunda grup kavramı yok — dispute_type'tan türetilen grup yalnızca
+  // dava_sarti kolunda (5 alt tür) kullanılır, ihtiyari'de her zaman görmezden gelinir.
+  const group = isIhtiyari ? null : disputeGroup(dt);
 
   if (kind === "davet") {
-    // {grup}_davet yeni deseni, isci_isveren/ticari/tuketici/ihtiyari için zaten legacy
-    // adla birebir örtüşür; kira/ortaklik için ise önceden aday üretilmeyen ama
-    // admin-upload-template'in artık kabul ettiği yeni grup-özel adlardır.
-    const specific = isIhtiyari ? "ihtiyari_davet" : group ? `${group}_davet` : "ihtiyari_davet";
-    return uniq([specific, "ihtiyari_davet"]);
+    if (isIhtiyari) return ["ihtiyari_davet"];
+    // {grup}_davet yeni deseni, isci_isveren/ticari/tuketici için zaten legacy adla
+    // birebir örtüşür; kira/ortaklik için admin-upload-template'in kabul ettiği yeni
+    // grup-özel adlardır. Bulunamazsa jenerik dava_sarti_davet'e düşülür.
+    return uniq([...(group ? [`${group}_davet`] : []), "dava_sarti_davet"]);
   }
 
   if (kind === "ilk_oturum") {
+    if (isIhtiyari) return ["ihtiyari_ilk_oturum"];
     // Legacy: sadece isci_isveren_ilk_oturum / ticari_ilk_oturum tanınıyordu.
-    // Yeni desenle diğer gruplar (tuketici/kira/ortaklik/ihtiyari) için de
-    // {grup}_ilk_oturum denenir, ardından jenerik dava_sarti_ilk_oturum'a düşülür.
-    const specific = group ? `${group}_ilk_oturum` : null;
-    return uniq([...(specific ? [specific] : []), "dava_sarti_ilk_oturum"]);
+    // Yeni desenle diğer gruplar (tuketici/kira/ortaklik) için de {grup}_ilk_oturum
+    // denenir, ardından jenerik dava_sarti_ilk_oturum'a düşülür.
+    return uniq([...(group ? [`${group}_ilk_oturum`] : []), "dava_sarti_ilk_oturum"]);
   }
 
   // son_tutanak
@@ -78,22 +88,22 @@ function selectTemplateCandidates(opts: {
     ? (agreed ? "ihtiyari_anlasma" : "ihtiyari_anlasamamama")
     : (agreed ? "dava_sarti_anlasma" : "dava_sarti_anlasamamama");
 
+  if (isIhtiyari) return [genericType];
+
   const candidates: string[] = [];
 
   // 0) Varyant desteği: dava sonucunun özel bir alt türü belirtilmişse (ör. "ise_iade",
   // "nisbi"), grup-özel varyant şablonları listenin en başına eklenir — en özelden
   // en jeneriğe sıralamayı korur.
-  const patternGroup0 = group ?? (isIhtiyari ? "ihtiyari" : null);
-  if (variant && patternGroup0) {
-    candidates.push(`${patternGroup0}_${variant}_anlasma_son_tutanak`);
-    candidates.push(`${patternGroup0}_${variant}_anlasma_belgesi`);
+  if (variant && group) {
+    candidates.push(`${group}_${variant}_anlasma_son_tutanak`);
+    candidates.push(`${group}_${variant}_anlasma_belgesi`);
   }
 
   // 1) Yeni desen: {grup}_anlasma_son_tutanak / {grup}_anlasamama_son_tutanak.
-  // "dava_sarti" 6 grubun içinde olmadığı için (group null && !isIhtiyari) durumunda
-  // bu adım atlanır — o durumda doğrudan jenerik dava_sarti_* şablonuna düşülür.
-  const patternGroup = group ?? (isIhtiyari ? "ihtiyari" : null);
-  if (patternGroup) candidates.push(agreed ? `${patternGroup}_anlasma_son_tutanak` : `${patternGroup}_anlasamama_son_tutanak`);
+  // group null ise (dava_sarti ama 5 alt türden hiçbirine uymuyor) bu adım atlanır —
+  // o durumda doğrudan jenerik dava_sarti_* şablonuna düşülür.
+  if (group) candidates.push(agreed ? `${group}_anlasma_son_tutanak` : `${group}_anlasamama_son_tutanak`);
 
   // 2) Legacy grup-özel adlar (admin-upload-template/detectTemplateType()'ın tanıdığı):
   // isci_isveren_{anlasma,anlasamamama}, ticari_{anlasma,anlasamamama},
@@ -107,7 +117,7 @@ function selectTemplateCandidates(opts: {
   else if (group === "ortaklik") legacySpecific = agreed ? "ortaklik_anlasma" : "ortaklik_anlasamamama";
   if (legacySpecific) candidates.push(legacySpecific);
 
-  // 3) Jenerik / dava_sarti fallback — her zaman garanti seed'lenmiş.
+  // 3) Jenerik dava_sarti fallback — her zaman garanti seed'lenmiş.
   candidates.push(genericType);
 
   return uniq(candidates);

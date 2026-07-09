@@ -31,10 +31,19 @@ const KNOWN_MINISTRY_TYPES = [
   "tuketici_davet",
 ];
 
+// Hukuki hiyerarşinin en üst kademesi: ihtiyari ayrı bir koldur; işçi-işveren/ticari/
+// tüketici/kira/ortaklık ise DAVA ŞARTI'nın alt türleridir. Manuel seçim önce bu üst
+// türü sorar — İhtiyari seçilirse grup adımı atlanır (tip doğrudan ihtiyari_{belge_tipi}),
+// Dava Şartı seçilirse aşağıdaki 5 alt tür grubundan biri + belge tipi seçilir.
+const UST_TUR_OPTIONS: { value: string; label: string }[] = [
+  { value: "ihtiyari", label: "İhtiyari" },
+  { value: "dava_sarti", label: "Dava Şartı" },
+];
+
 // admin-upload-template/index.ts'teki TEMPLATE_GROUPS/DOCUMENT_TYPES ile birebir aynı
 // grup ve belge tipi kümesi — manuel tür seçimi bu iki kademeli listeden template_type üretir.
+// "ihtiyari" burada yer almaz: o, üst tür seçimiyle (UST_TUR_OPTIONS) ayrıca ele alınır.
 const TEMPLATE_GROUPS: { value: string; label: string }[] = [
-  { value: "ihtiyari", label: "İhtiyari" },
   { value: "isci_isveren", label: "İşçi-İşveren" },
   { value: "ticari", label: "Ticari" },
   { value: "tuketici", label: "Tüketici" },
@@ -99,7 +108,7 @@ export function TemplateAdmin() {
   const [uploading, setUploading] = useState(false);
   const [uploadStage, setUploadStage] = useState("");
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
-  const [manualOverride, setManualOverride] = useState<Record<string, { group: string; belgeTipi: string; variant: string }>>({});
+  const [manualOverride, setManualOverride] = useState<Record<string, { ustTur: string; group: string; belgeTipi: string; variant: string }>>({});
   const [reassigning, setReassigning] = useState<string | null>(null);
 
   async function load() {
@@ -337,8 +346,9 @@ export function TemplateAdmin() {
                 <span className="font-mono">{r.name}</span>
                 {r.ok ? (
                   r.needs_manual ? (() => {
-                    const sel = manualOverride[r.name] ?? { group: "", belgeTipi: "", variant: "" };
-                    const computedType = sel.group && sel.belgeTipi ? buildTemplateType(sel.group, sel.belgeTipi, sel.variant) : "";
+                    const sel = manualOverride[r.name] ?? { ustTur: "", group: "", belgeTipi: "", variant: "" };
+                    const effectiveGroup = sel.ustTur === "ihtiyari" ? "ihtiyari" : sel.group;
+                    const computedType = effectiveGroup && sel.belgeTipi ? buildTemplateType(effectiveGroup, sel.belgeTipi, sel.variant) : "";
                     const setSel = (patch: Partial<typeof sel>) =>
                       setManualOverride((p) => ({ ...p, [r.name]: { ...sel, ...patch } }));
                     return (
@@ -346,14 +356,27 @@ export function TemplateAdmin() {
                         <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50 gap-1">
                           <AlertTriangle className="w-3 h-3" /> Tür tespit edilemedi, lütfen manuel seçin
                         </Badge>
-                        <Select value={sel.group} onValueChange={(v) => setSel({ group: v })}>
-                          <SelectTrigger className="h-7 w-32 text-xs"><SelectValue placeholder="Grup" /></SelectTrigger>
+                        <Select
+                          value={sel.ustTur}
+                          onValueChange={(v) => setSel({ ustTur: v, group: v === "ihtiyari" ? "" : sel.group })}
+                        >
+                          <SelectTrigger className="h-7 w-32 text-xs"><SelectValue placeholder="İhtiyari / Dava Şartı" /></SelectTrigger>
                           <SelectContent>
-                            {TEMPLATE_GROUPS.map((g) => (
-                              <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                            {UST_TUR_OPTIONS.map((u) => (
+                              <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
+                        {sel.ustTur === "dava_sarti" && (
+                          <Select value={sel.group} onValueChange={(v) => setSel({ group: v })}>
+                            <SelectTrigger className="h-7 w-32 text-xs"><SelectValue placeholder="Grup" /></SelectTrigger>
+                            <SelectContent>
+                              {TEMPLATE_GROUPS.map((g) => (
+                                <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                         <Select value={sel.belgeTipi} onValueChange={(v) => setSel({ belgeTipi: v })}>
                           <SelectTrigger className="h-7 w-48 text-xs"><SelectValue placeholder="Belge Tipi" /></SelectTrigger>
                           <SelectContent>
