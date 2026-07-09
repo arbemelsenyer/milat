@@ -214,7 +214,7 @@ Deno.serve(async (req) => {
   const udf = `<?xml version="1.0" encoding="UTF-8"?>
 <template format_id="1.8">
   <content><![CDATA[${pool}]]></content>
-  <properties mediaSizeName="1" leftMargin="70.875" rightMargin="70.875" topMargin="70.875" bottomMargin="70.875" paperOrientation="1" headerFOffset="20.0" footerFOffset="20.0" />
+  <properties><pageFormat mediaSizeName="1" leftMargin="70.875" rightMargin="70.875" topMargin="70.875" bottomMargin="70.875" paperOrientation="1" headerFOffset="20.0" footerFOffset="20.0" /></properties>
   <elements resolver="hvl-default">
 ${paragraphElems.join("\n")}
   </elements>
