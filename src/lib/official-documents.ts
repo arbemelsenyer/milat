@@ -144,9 +144,9 @@ export async function downloadOfficialDocx(opts: {
 }
 
 /**
- * UYAP UDF is actually a ZIP archive containing `content.xml` (+ optional
- * `properties.xml`). Writing raw XML with a `.udf` extension causes the OS to
- * open it in Notepad. Packaging as a ZIP lets UYAP editor recognize it.
+ * UYAP UDF is a ZIP archive containing a single `content.xml` (root
+ * `<template format_id="1.8">` — see generate-official-document for the
+ * schema). No `properties.xml` or other sibling file is part of the format.
  */
 export async function downloadOfficialUdf(opts: {
   templateType: string;
@@ -155,10 +155,6 @@ export async function downloadOfficialUdf(opts: {
 }) {
   const zip = new JSZip();
   zip.file("content.xml", opts.udfXml);
-  zip.file(
-    "properties.xml",
-    `<?xml version="1.0" encoding="UTF-8"?>\n<properties>\n  <format>UDF</format>\n  <version>1.7</version>\n  <generator>Medipact</generator>\n</properties>`
-  );
   const blob = await zip.generateAsync({ type: "blob", mimeType: "application/octet-stream" });
 
   const filename = `${opts.templateType}_${opts.applicationNo || "belge"}.udf`;

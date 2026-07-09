@@ -189,40 +189,38 @@ Deno.serve(async (req) => {
     mediator_name: (profile as any)?.full_name || "",
   });
 
-  // Build UDF XML
-  const esc = (s: string) => String(s ?? "").replace(/[<>&'"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" }[c]!));
-  const partiesXml = partiesArr.map((p: any) => {
-    const isCorp = p.party_type === "corporate";
-    const name = isCorp ? p.company_name : `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim();
-    return `    <Party role="${esc(p.role || "party")}">
-      <Name>${esc(name)}</Name>
-      ${isCorp ? `<TaxNo>${esc(p.tax_number || "")}</TaxNo>` : `<TCKN>${esc(p.tc_kimlik || "")}</TCKN>`}
-      <Address>${esc(p.address || "")}</Address>
-    </Party>`;
-  }).join("\n");
-  const sigXml = [
-    `    <Signature role="mediator">${esc((profile as any)?.full_name || "")}</Signature>`,
-    ...partiesArr.map((p: any, i: number) => {
-      const name = p.party_type === "corporate" ? p.company_name : `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim();
-      return `    <Signature role="party${i + 1}">${esc(name)}</Signature>`;
-    }),
-  ].join("\n");
+  // Build UDF content.xml per the real UYAP schema: <template format_id="1.8">
+  // with a single CDATA text pool (<content>) and <elements> paragraphs that
+  // reference it via character offsets (NOT byte offsets — every Turkish
+  // character and emoji counts as exactly 1, hence Array.from().length below).
+  // Empty lines are represented by a zero-width space (U+200B) per spec.
+  const rawLines = filled.split("\n");
+  let pool = "";
+  const paragraphElems: string[] = [];
+  let offset = 0;
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i] === "" ? "​" : rawLines[i];
+    const length = Array.from(line).length;
+    paragraphElems.push(`    <paragraph startOffset="${offset}" length="${length}"/>`);
+    pool += line;
+    offset += length;
+    if (i < rawLines.length - 1) {
+      pool += "\n";
+      offset += 1;
+    }
+  }
 
   const udf = `<?xml version="1.0" encoding="UTF-8"?>
-<UDF>
-  <Header>
-    <DocumentType>${esc(template_type)}</DocumentType>
-    <DocumentDate>${new Date().toISOString()}</DocumentDate>
-    <FileNumber>${esc(caseRow.application_no || "")}</FileNumber>
-  </Header>
-  <Parties>
-${partiesXml}
-  </Parties>
-  <Content>${esc(filled)}</Content>
-  <Signatures>
-${sigXml}
-  </Signatures>
-</UDF>`;
+<template format_id="1.8">
+  <content><![CDATA[${pool}]]></content>
+  <properties pageWidth="595.28" pageHeight="841.89" marginTop="56.7" marginRight="56.7" marginBottom="56.7" marginLeft="56.7"/>
+  <elements>
+${paragraphElems.join("\n")}
+  </elements>
+  <styles>
+    <style id="default" fontFamily="Times New Roman" size="11" color="-16777216" bold="false" italic="false"/>
+  </styles>
+</template>`;
 
   return j({
     template_type,
