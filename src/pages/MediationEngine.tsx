@@ -162,6 +162,7 @@ export default function MediationEngine() {
   const [showNew, setShowNew] = useState(false);
   const [activeCase, setActiveCase] = useState<CaseRow | null>(null);
   const [phase3Complete, setPhase3Complete] = useState(false);
+  const [phaseStatus, setPhaseStatus] = useState<Record<number, boolean>>({});
   const [deleteTarget, setDeleteTarget] = useState<CaseRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [trackerOpen, setTrackerOpen] = useState(false);
@@ -242,6 +243,32 @@ export default function MediationEngine() {
   useEffect(() => {
     if (caseId) checkPhase3(caseId);
   }, [caseId, checkPhase3, phaseParam]);
+
+  // Faz tamamlanma koşulları — mevcut verilerden türetilir, tek toplu sorgu.
+  // Faz1/Faz8 caseRow alanlarından, Faz6 (bilirkişi) opsiyonel olduğu için hiç sorgulanmaz.
+  const checkPhaseCompletion = useCallback(async (id: string, c: CaseRow) => {
+    const [parties, analyses, reports, sessions, notes] = await Promise.all([
+      supabase.from("case_parties").select("id", { count: "exact", head: true }).eq("case_id", id),
+      supabase.from("party_analyses").select("id", { count: "exact", head: true }).eq("case_id", id),
+      supabase.from("common_ground_reports").select("id", { count: "exact", head: true }).eq("case_id", id),
+      supabase.from("case_sessions").select("id", { count: "exact", head: true }).eq("case_id", id),
+      supabase.from("case_notes").select("id", { count: "exact", head: true }).eq("case_id", id).eq("phase", 7),
+    ]);
+    setPhaseStatus({
+      1: !!c.dispute_type,
+      2: (parties.count ?? 0) >= 2,
+      3: (analyses.count ?? 0) >= 1,
+      4: (reports.count ?? 0) >= 1,
+      5: (sessions.count ?? 0) >= 1,
+      6: false, // opsiyonel — tamamlanma aranmaz
+      7: (notes.count ?? 0) >= 1,
+      8: c.status === "agreed" || c.status === "failed",
+    });
+  }, []);
+
+  useEffect(() => {
+    if (caseId && activeCase) checkPhaseCompletion(caseId, activeCase);
+  }, [caseId, phaseParam, activeCase, checkPhaseCompletion]);
 
   useEffect(() => {
     if (params.get("new") === "1") {
@@ -389,6 +416,18 @@ export default function MediationEngine() {
 
   const completed = activeCase.current_phase ?? 1;
 
+  // Sıradaki erişilebilir (kilidi açık, tamamlanmamış) en küçük numaralı faz — opsiyonel Faz 6 hiçbir zaman engellemez.
+  const nextActionablePhase = useMemo(() => {
+    for (const p of PHASES) {
+      const locked = p.id >= 4 && !phase3Complete;
+      if (locked) continue;
+      const optional = "optional" in p && p.optional;
+      if (optional) continue;
+      if (!phaseStatus[p.id]) return p.id;
+    }
+    return null;
+  }, [phaseStatus, phase3Complete]);
+
   return (
     <div className="min-h-screen bg-background">
       <AppNavbar />
@@ -415,20 +454,35 @@ export default function MediationEngine() {
           </Button>
           <nav className="space-y-1">
             {PHASES.map((p) => {
-              const done = p.id < completed;
+              const optional = "optional" in p && p.optional;
+              const done = optional ? p.id < completed : !!phaseStatus[p.id];
               const active = p.id === phaseParam;
               const Icon = p.icon;
               const locked = p.id >= 4 && !phase3Complete;
+              const isNext = !locked && !active && p.id === nextActionablePhase;
               return (
                 <button key={p.id} onClick={() => { if (!locked) setPhase(p.id); else toast({ title: "Aşama kilitli", description: "Önce Aşama 3'te en az bir taraf analizini tamamlayın." }); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors border-l-2
+                  className={`relative w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors border-l-2
                     ${active ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-accent" : "border-l-transparent hover:border-l-accent hover:text-accent hover:bg-sidebar-accent/40"}
-                    ${locked ? "opacity-50 cursor-not-allowed" : ""}`}
-                  title={locked ? "Aşama 3 tamamlanmadı" : ""}>
-                  {done ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Circle className="h-4 w-4 opacity-60" />}
+                    ${locked ? "opacity-50 cursor-not-allowed" : ""}
+                    ${isNext ? "border-l-accent/60" : ""}`}
+                  title={locked ? "Aşama 3 tamamlanmadı" : isNext ? "Sıradaki aşama" : ""}>
+                  {optional
+                    ? <span className="h-4 w-4 rounded-full border border-current/50 flex items-center justify-center shrink-0" title="Opsiyonel — atlanabilir">
+                        <span className="h-1.5 w-1.5 rounded-full bg-current/50" />
+                      </span>
+                    : done
+                      ? <CheckCircle2 className="h-4 w-4 text-green-400 shrink-0" />
+                      : <Circle className="h-4 w-4 opacity-60 shrink-0" />}
                   <Icon className="h-4 w-4" />
                   <span className="flex-1 text-left">{p.id}. {p.label}</span>
-                  {("optional" in p && p.optional) && <span className="text-[10px] opacity-60">opsiyonel</span>}
+                  {optional && <span className="text-[10px] opacity-60">opsiyonel</span>}
+                  {isNext && (
+                    <span className="relative flex h-2 w-2 shrink-0">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -438,7 +492,7 @@ export default function MediationEngine() {
           <PhaseRenderer
             phase={phaseParam}
             caseRow={activeCase}
-            reload={() => { loadCase(activeCase.id); checkPhase3(activeCase.id); }}
+            reload={() => { loadCase(activeCase.id); checkPhase3(activeCase.id); checkPhaseCompletion(activeCase.id, activeCase); }}
             isMediator={isMediator || isAdmin}
             userId={user!.id}
             onAdvance={(next) => setPhase(next)}
