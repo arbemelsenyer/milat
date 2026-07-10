@@ -31,6 +31,9 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
   // Tracks the agreement_documents row inserted per kind at generation time, so an
   // edit made in the Textarea afterwards can be synced back into that same record.
   const [docRecords, setDocRecords] = useState<Record<string, { id: string; metadata: any }>>({});
+  // Text last successfully persisted to agreement_documents per kind, so the
+  // manual save button can stay disabled when there's nothing new to write.
+  const [savedTexts, setSavedTexts] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
 
@@ -96,6 +99,11 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
         metadata: metadata as any,
       } as any).select("id, metadata").single();
       if (row) setDocRecords((prev) => ({ ...prev, [kind]: { id: (row as any).id, metadata: (row as any).metadata } }));
+      setSavedTexts((prev) => {
+        const next = { ...prev };
+        delete next[kind];
+        return next;
+      });
 
       return result;
     } catch (e: any) {
@@ -138,15 +146,33 @@ ${paragraphElems.join("\n")}
 
   // If a metadata record was created for this kind at generation time, keep it in sync
   // with whatever the mediator has edited so far — best-effort, never blocks a download.
-  async function syncEditedRecord(kind: DocKind, filledText: string) {
+  async function syncEditedRecord(kind: DocKind, filledText: string): Promise<boolean> {
     const rec = docRecords[kind];
-    if (!rec) return;
+    if (!rec) return false;
     try {
       const baseMeta = rec.metadata && typeof rec.metadata === "object" ? rec.metadata : {};
       await supabase.from("agreement_documents").update({
         metadata: { ...baseMeta, filled_text: filledText, edited_at: new Date().toISOString() } as any,
       }).eq("id", rec.id);
-    } catch {}
+      setSavedTexts((prev) => ({ ...prev, [kind]: filledText }));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // Manual save from the edit Textarea — writes immediately, without waiting for a download.
+  async function handleSaveEdit(kind: DocKind) {
+    const doc = generatedDocs[kind];
+    if (!doc) return;
+    setGenerating(`${kind}_save`);
+    try {
+      const ok = await syncEditedRecord(kind, doc.filled_text);
+      if (ok) toast({ title: "Düzenleme kaydedildi" });
+      else setError("Düzenleme kaydedilemedi");
+    } finally {
+      setGenerating(null);
+    }
   }
 
   async function handleFormat(kind: DocKind, fmt: "pdf" | "docx" | "udf") {
@@ -319,6 +345,15 @@ ${paragraphElems.join("\n")}
                       value={doc.filled_text}
                       onChange={(e) => setGeneratedDocs((prev) => ({ ...prev, [kind]: { ...prev[kind], filled_text: e.target.value } }))}
                     />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={!!generating || savedTexts[kind] === doc.filled_text}
+                      onClick={() => handleSaveEdit(kind)}
+                    >
+                      {generating === `${kind}_save` && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                      Kaydet
+                    </Button>
                   </div>
                 )}
               </li>
