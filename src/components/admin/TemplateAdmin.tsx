@@ -520,7 +520,7 @@ export function TemplateAdmin() {
     </Dialog>
 
     <Dialog open={!!editingRow} onOpenChange={(o) => !o && setEditingRow(null)}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="font-mono text-sm">Türü Düzenle — {editingRow?.template_type}</DialogTitle>
         </DialogHeader>
@@ -531,55 +531,60 @@ export function TemplateAdmin() {
           const setSel = (patch: Partial<typeof editSel>) => setEditSel((p) => ({ ...p, ...patch }));
           const busy = reassigning === row.template_type;
           return (
-            <div className="space-y-3">
-              <Select value={editSel.ustTur} onValueChange={(v) => setSel({ ustTur: v, group: v === "ihtiyari" ? "" : editSel.group })}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="İhtiyari / Dava Şartı" /></SelectTrigger>
-                <SelectContent>
-                  {UST_TUR_OPTIONS.map((u) => (
-                    <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {editSel.ustTur === "dava_sarti" && (
-                <Select value={editSel.group} onValueChange={(v) => setSel({ group: v })}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Grup" /></SelectTrigger>
+            <div className="flex flex-col md:flex-row gap-4 overflow-hidden flex-1 min-h-0">
+              <pre className="text-xs whitespace-pre-wrap overflow-auto flex-1 min-h-[200px] max-h-[65vh] bg-muted/30 p-3 rounded border">
+                {row.template_content || "(boş)"}
+              </pre>
+              <div className="space-y-3 md:w-72 shrink-0">
+                <Select value={editSel.ustTur} onValueChange={(v) => setSel({ ustTur: v, group: v === "ihtiyari" ? "" : editSel.group })}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="İhtiyari / Dava Şartı" /></SelectTrigger>
                   <SelectContent>
-                    {TEMPLATE_GROUPS.map((g) => (
-                      <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                    {UST_TUR_OPTIONS.map((u) => (
+                      <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              )}
-              <Select value={editSel.belgeTipi} onValueChange={(v) => setSel({ belgeTipi: v })}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Belge Tipi" /></SelectTrigger>
-                <SelectContent>
-                  {DOCUMENT_TYPES.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                className="h-8 text-xs"
-                placeholder="varyant (ops.)"
-                value={editSel.variant}
-                onChange={(e) => setSel({ variant: e.target.value })}
-              />
-              {computedType && (
-                <div className="font-mono text-[11px] text-muted-foreground">
-                  {row.template_type} → {computedType}
-                </div>
-              )}
-              <Button
-                size="sm"
-                disabled={!computedType || computedType === row.template_type || busy}
-                onClick={async () => {
-                  await reassignTemplate(row.template_type, computedType, row.template_type);
-                  setEditingRow(null);
-                }}
-              >
-                {busy && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
-                Kaydet
-              </Button>
+                {editSel.ustTur === "dava_sarti" && (
+                  <Select value={editSel.group} onValueChange={(v) => setSel({ group: v })}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Grup" /></SelectTrigger>
+                    <SelectContent>
+                      {TEMPLATE_GROUPS.map((g) => (
+                        <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Select value={editSel.belgeTipi} onValueChange={(v) => setSel({ belgeTipi: v })}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Belge Tipi" /></SelectTrigger>
+                  <SelectContent>
+                    {DOCUMENT_TYPES.map((d) => (
+                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  className="h-8 text-xs"
+                  placeholder="varyant (ops.)"
+                  value={editSel.variant}
+                  onChange={(e) => setSel({ variant: e.target.value })}
+                />
+                {computedType && (
+                  <div className="font-mono text-[11px] text-muted-foreground break-all">
+                    {row.template_type} → {computedType}
+                  </div>
+                )}
+                <Button
+                  size="sm"
+                  disabled={!computedType || computedType === row.template_type || busy}
+                  onClick={async () => {
+                    await reassignTemplate(row.template_type, computedType, row.template_type);
+                    setEditingRow(null);
+                  }}
+                >
+                  {busy && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
+                  Kaydet
+                </Button>
+              </div>
             </div>
           );
         })()}
