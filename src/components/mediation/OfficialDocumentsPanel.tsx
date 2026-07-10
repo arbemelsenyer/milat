@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Loader2, FileText, FileType, FileCode2, Download, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, FileText, FileType, FileCode2, Download, AlertTriangle, CheckCircle2, XCircle, Eye } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { downloadOfficialPdf, downloadOfficialDocx, downloadOfficialUdf, officialTitle } from "@/lib/official-documents";
 
@@ -28,6 +28,9 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
   const [savingOutcome, setSavingOutcome] = useState(false);
   const [generating, setGenerating] = useState<string | null>(null);
   const [generatedDocs, setGeneratedDocs] = useState<Record<string, { template_type: string; filled_text: string; udf_xml: string }>>({});
+  // Tracks the agreement_documents row inserted per kind at generation time, so an
+  // edit made in the Textarea afterwards can be synced back into that same record.
+  const [docRecords, setDocRecords] = useState<Record<string, { id: string; metadata: any }>>({});
   const [error, setError] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
 
@@ -85,18 +88,65 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
       const result = data as any;
       setGeneratedDocs((prev) => ({ ...prev, [kind]: result }));
 
-      // Persist metadata record.
-      await supabase.from("agreement_documents").insert({
+      // Persist metadata record; keep its id so later edits can be synced back into it.
+      const metadata = { template_type: result.template_type, kind, generated_at: new Date().toISOString() };
+      const { data: row } = await supabase.from("agreement_documents").insert({
         case_id: caseRow.id,
         doc_type: officialTitle(result.template_type),
-        metadata: { template_type: result.template_type, kind, generated_at: new Date().toISOString() } as any,
-      } as any);
+        metadata: metadata as any,
+      } as any).select("id, metadata").single();
+      if (row) setDocRecords((prev) => ({ ...prev, [kind]: { id: (row as any).id, metadata: (row as any).metadata } }));
 
       return result;
     } catch (e: any) {
       setError(e.message || "Belge üretilemedi");
       return null;
     }
+  }
+
+  // UDF is normally rendered server-side (generate-official-document), so its udf_xml
+  // wouldn't reflect a later Textarea edit. Rebuilding it here — same offset-based
+  // paragraph schema the edge function uses — makes UDF generation client-side too,
+  // so it always matches the text currently on screen.
+  function buildUdfXml(text: string): string {
+    const rawLines = text.split("\n");
+    let pool = "";
+    const paragraphElems: string[] = [];
+    let offset = 0;
+    for (let i = 0; i < rawLines.length; i++) {
+      const hasNext = i < rawLines.length - 1;
+      const line = hasNext ? rawLines[i] + "\n" : rawLines[i];
+      const length = Array.from(line).length;
+      if (length === 0) continue;
+      paragraphElems.push(`    <paragraph><content startOffset="${offset}" length="${length}"/></paragraph>`);
+      pool += line;
+      offset += length;
+    }
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<template format_id="1.8">
+  <content><![CDATA[${pool}]]></content>
+  <properties><pageFormat mediaSizeName="1" leftMargin="70.875" rightMargin="70.875" topMargin="70.875" bottomMargin="70.875" paperOrientation="1" headerFOffset="20.0" footerFOffset="20.0" /></properties>
+  <elements resolver="hvl-default">
+${paragraphElems.join("\n")}
+  </elements>
+  <styles>
+    <style name="default" description="Geçerli" family="Dialog" size="12" bold="false" italic="false" foreground="-13421773" FONT_ATTRIBUTE_KEY="javax.swing.plaf.FontUIResource[family=Dialog,name=Dialog,style=plain,size=12]" />
+    <style name="hvl-default" family="Times New Roman" size="12" description="Gövde" />
+  </styles>
+</template>`;
+  }
+
+  // If a metadata record was created for this kind at generation time, keep it in sync
+  // with whatever the mediator has edited so far — best-effort, never blocks a download.
+  async function syncEditedRecord(kind: DocKind, filledText: string) {
+    const rec = docRecords[kind];
+    if (!rec) return;
+    try {
+      const baseMeta = rec.metadata && typeof rec.metadata === "object" ? rec.metadata : {};
+      await supabase.from("agreement_documents").update({
+        metadata: { ...baseMeta, filled_text: filledText, edited_at: new Date().toISOString() } as any,
+      }).eq("id", rec.id);
+    } catch {}
   }
 
   async function handleFormat(kind: DocKind, fmt: "pdf" | "docx" | "udf") {
@@ -108,7 +158,8 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
         if (!r) return;
         doc = r;
       }
-      const opts = { templateType: doc.template_type, applicationNo: caseRow.application_no, filledText: doc.filled_text, udfXml: doc.udf_xml };
+      await syncEditedRecord(kind, doc.filled_text);
+      const opts = { templateType: doc.template_type, applicationNo: caseRow.application_no, filledText: doc.filled_text, udfXml: buildUdfXml(doc.filled_text) };
       if (fmt === "pdf") await downloadOfficialPdf(opts);
       else if (fmt === "docx") await downloadOfficialDocx(opts);
       else await downloadOfficialUdf(opts);
@@ -130,11 +181,12 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
           if (!r) continue;
           doc = r;
         }
+        await syncEditedRecord(kind, doc.filled_text);
         const base = `${doc.template_type}_${caseRow.application_no || "belge"}`;
         zip.file(`${base}.txt`, doc.filled_text);
         // Wrap UDF as a ZIP-in-ZIP so UYAP editor recognizes the .udf entry.
         const inner = new JSZip();
-        inner.file("content.xml", doc.udf_xml);
+        inner.file("content.xml", buildUdfXml(doc.filled_text));
         inner.file(
           "properties.xml",
           `<?xml version="1.0" encoding="UTF-8"?>\n<properties><format>UDF</format><version>1.7</version></properties>`
@@ -221,28 +273,57 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
         <div className="space-y-2">
           <div className="text-sm font-medium">Otomatik seçilen belgeler:</div>
           <ul className="space-y-2">
-            {setKinds.map((kind) => (
-              <li key={kind} className="flex flex-wrap items-center justify-between gap-2 p-3 border rounded">
-                <div className="flex-1 min-w-[200px]">
-                  <div className="font-medium text-sm">{KIND_LABEL[kind]}</div>
-                  {generatedDocs[kind] && (
-                    <div className="text-xs text-muted-foreground mt-0.5">Şablon: {generatedDocs[kind].template_type}</div>
-                  )}
+            {setKinds.map((kind) => {
+              const previewBusy = generating === `${kind}_preview`;
+              const doc = generatedDocs[kind];
+              return (
+              <li key={kind} className="flex flex-col gap-2 p-3 border rounded">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex-1 min-w-[200px]">
+                    <div className="font-medium text-sm">{KIND_LABEL[kind]}</div>
+                    {doc && (
+                      <div className="text-xs text-muted-foreground mt-0.5">Şablon: {doc.template_type}</div>
+                    )}
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={!!generating}
+                      onClick={async () => {
+                        setGenerating(`${kind}_preview`);
+                        try { await generate(kind); } finally { setGenerating(null); }
+                      }}
+                    >
+                      {previewBusy ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Eye className="h-3 w-3 mr-1" />}
+                      {doc ? "Yeniden Üret" : "Üret / Önizle"}
+                    </Button>
+                    {(["pdf", "docx", "udf"] as const).map((fmt) => {
+                      const busy = generating === `${kind}_${fmt}`;
+                      const Icon = fmt === "pdf" ? FileText : fmt === "docx" ? FileType : FileCode2;
+                      return (
+                        <Button key={fmt} size="sm" variant="outline" disabled={!!generating} onClick={() => handleFormat(kind, fmt)}>
+                          {busy ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Icon className="h-3 w-3 mr-1" />}
+                          {fmt.toUpperCase()}
+                        </Button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="flex gap-1">
-                  {(["pdf", "docx", "udf"] as const).map((fmt) => {
-                    const busy = generating === `${kind}_${fmt}`;
-                    const Icon = fmt === "pdf" ? FileText : fmt === "docx" ? FileType : FileCode2;
-                    return (
-                      <Button key={fmt} size="sm" variant="outline" disabled={!!generating} onClick={() => handleFormat(kind, fmt)}>
-                        {busy ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Icon className="h-3 w-3 mr-1" />}
-                        {fmt.toUpperCase()}
-                      </Button>
-                    );
-                  })}
-                </div>
+                {doc && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Belge metni — indirmeden önce düzenleyebilirsiniz</Label>
+                    <Textarea
+                      rows={8}
+                      className="font-mono text-xs"
+                      value={doc.filled_text}
+                      onChange={(e) => setGeneratedDocs((prev) => ({ ...prev, [kind]: { ...prev[kind], filled_text: e.target.value } }))}
+                    />
+                  </div>
+                )}
               </li>
-            ))}
+              );
+            })}
           </ul>
 
           {outcome === "anlasma" && (

@@ -537,11 +537,11 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }
   switch (phase) {
     case 1: return <Phase1Summary caseRow={caseRow} />;
     case 2: return <Phase2Parties caseRow={caseRow} isMediator={isMediator} userId={userId} onDone={() => { bumpPhase(3); onAdvance(3); }} />;
-    case 3: return <Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} onAdvance={onAdvance} bumpPhase={bumpPhase} /></Phase3ErrorBoundary>;
+    case 3: return <Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} /></Phase3ErrorBoundary>;
     case 4: return isMediator
       ? <Phase4Summary caseRow={caseRow} />
       : <Card className="p-6 text-sm text-muted-foreground">Bu bölüm yalnızca arabulucu tarafından görüntülenebilir.</Card>;
-    case 5: return <Phase5Sessions caseRow={caseRow} />;
+    case 5: return <Phase5Sessions caseRow={caseRow} bumpPhase={bumpPhase} onAdvance={onAdvance} />;
     case 6: return <Phase7Expert caseRow={caseRow} />;
     case 7: return <Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(8); onAdvance(8); }} />;
     case 8: return <Phase9Closing caseRow={caseRow} />;
@@ -551,8 +551,11 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }
 
 // SessionScheduler needs case_parties for invite selection/presence — not lifted into
 // MediationEngine state elsewhere, so fetch it here the same way Phase2Parties does.
-function Phase5Sessions({ caseRow }: { caseRow: CaseRow }) {
+function Phase5Sessions({ caseRow, bumpPhase, onAdvance }: {
+  caseRow: CaseRow; bumpPhase: (n: number) => Promise<void>; onAdvance: (n: number) => void;
+}) {
   const [parties, setParties] = useState<any[]>([]);
+  const [navigating, setNavigating] = useState(false);
   useEffect(() => {
     supabase
       .from("case_parties")
@@ -560,14 +563,42 @@ function Phase5Sessions({ caseRow }: { caseRow: CaseRow }) {
       .eq("case_id", caseRow.id)
       .then(({ data }) => setParties(data ?? []));
   }, [caseRow.id]);
+
+  async function chooseMeeting(meetingType: "ozel" | "ortak") {
+    setNavigating(true);
+    try {
+      // Pre-create a placeholder session with the chosen meeting_type (user can edit below)
+      await supabase.from("case_sessions").insert({
+        case_id: caseRow.id, session_type: "joint", meeting_type: meetingType, status: "draft",
+      } as any).select().maybeSingle();
+      await bumpPhase(5);
+      onAdvance(5);
+    } catch (e: any) {
+      toast({ title: "Geçiş hatası", description: trErr(e.message), variant: "destructive" });
+    } finally { setNavigating(false); }
+  }
+
   return (
-    <SessionScheduler
-      caseId={caseRow.id}
-      niche={caseRow.dispute_type ?? ""}
-      context={caseRow.title ?? ""}
-      parties={parties}
-      mediatorId={caseRow.assigned_mediator_id}
-    />
+    <div className="space-y-4">
+      <Card className="p-6 space-y-2">
+        <p className="text-xs text-muted-foreground">Sonraki adım: Taraflarla görüşme planlayın</p>
+        <div className="flex gap-2 flex-wrap">
+          <Button onClick={() => chooseMeeting("ozel")} disabled={navigating} variant="outline">
+            <CalIcon className="h-4 w-4 mr-1" /> Özel Görüşme Planla
+          </Button>
+          <Button onClick={() => chooseMeeting("ortak")} disabled={navigating}>
+            <CalIcon className="h-4 w-4 mr-1" /> Ortak Görüşme Planla
+          </Button>
+        </div>
+      </Card>
+      <SessionScheduler
+        caseId={caseRow.id}
+        niche={caseRow.dispute_type ?? ""}
+        context={caseRow.title ?? ""}
+        parties={parties}
+        mediatorId={caseRow.assigned_mediator_id}
+      />
+    </div>
   );
 }
 
@@ -1362,9 +1393,8 @@ function roleLabel(r?: string) {
   return r === "applicant" ? "Başvurucu" : r === "respondent" ? "Karşı Taraf" : "Üçüncü Taraf";
 }
 
-function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, bumpPhase }: {
+function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
   caseRow: CaseRow; userId: string; isMediator: boolean; reload: () => void;
-  onAdvance: (n: number) => void; bumpPhase: (n: number) => Promise<void>;
 }) {
   const [parties, setParties] = useState<any[]>([]);
   const [docs, setDocs] = useState<any[]>([]);
@@ -1373,7 +1403,6 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
   const [uploading, setUploading] = useState<string | null>(null);
   const [analysing, setAnalysing] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<{ partyId: string; msg: string } | null>(null);
-  const [navigating, setNavigating] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -1477,22 +1506,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
     } finally { setAnalysing(null); }
   }
 
-  async function chooseMeeting(meetingType: "ozel" | "ortak") {
-    setNavigating(true);
-    try {
-      // Pre-create a placeholder session with the chosen meeting_type (user can edit in Phase 5)
-      await supabase.from("case_sessions").insert({
-        case_id: caseRow.id, session_type: "joint", meeting_type: meetingType, status: "draft",
-      } as any).select().maybeSingle();
-      await bumpPhase(5);
-      onAdvance(5);
-    } catch (e: any) {
-      toast({ title: "Geçiş hatası", description: trErr(e.message), variant: "destructive" });
-    } finally { setNavigating(false); }
-  }
-
   const analysedCount = analyses.length;
-  const canReport = analysedCount >= 1;
 
   const progressPct = parties.length ? Math.round((analysedCount / parties.length) * 100) : 0;
 
@@ -1724,20 +1738,6 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, onAdvance, b
         })}
       </div>
 
-      {/* Next-step meeting CTA — shown once at least one party has been analysed */}
-      {canReport && (
-        <Card className="p-6 space-y-2">
-          <p className="text-xs text-muted-foreground">Sonraki adım: Taraflarla görüşme planlayın</p>
-          <div className="flex gap-2 flex-wrap">
-            <Button onClick={() => chooseMeeting("ozel")} disabled={navigating} variant="outline">
-              <CalIcon className="h-4 w-4 mr-1" /> Özel Görüşme Planla
-            </Button>
-            <Button onClick={() => chooseMeeting("ortak")} disabled={navigating}>
-              <CalIcon className="h-4 w-4 mr-1" /> Ortak Görüşme Planla
-            </Button>
-          </div>
-        </Card>
-      )}
       </>
       )}
     </div>

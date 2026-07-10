@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, RefreshCw, FileText, ExternalLink, Upload, Plus, Trash2, Eye, AlertTriangle, CheckCircle2, Pencil } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -131,6 +132,9 @@ export function TemplateAdmin() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [preview, setPreview] = useState<TemplateRow | null>(null);
+  const [previewEditing, setPreviewEditing] = useState(false);
+  const [previewContent, setPreviewContent] = useState("");
+  const [savingPreview, setSavingPreview] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -205,6 +209,23 @@ export function TemplateAdmin() {
       setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, is_active: !row.is_active } : r)));
     }
     setTogglingId(null);
+  }
+
+  async function saveContent(row: TemplateRow, content: string) {
+    setSavingPreview(true);
+    const { error } = await supabase
+      .from("document_templates" as any)
+      .update({ template_content: content })
+      .eq("id", row.id);
+    if (error) {
+      toast({ title: "Kaydetme başarısız", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "İçerik kaydedildi" });
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, template_content: content } : r)));
+      setPreview((p) => (p && p.id === row.id ? { ...p, template_content: content } : p));
+      setPreviewEditing(false);
+    }
+    setSavingPreview(false);
   }
 
   async function deleteRow(row: TemplateRow) {
@@ -501,7 +522,7 @@ export function TemplateAdmin() {
                         </td>
                         <td className="py-2 pr-4">
                           <div className="flex items-center gap-1 justify-end">
-                            <Button size="sm" variant="ghost" onClick={() => setPreview(r)} title="Önizleme">
+                            <Button size="sm" variant="ghost" onClick={() => { setPreview(r); setPreviewEditing(false); }} title="Önizleme">
                               <Eye className="w-3 h-3" />
                             </Button>
                             <Button
@@ -536,14 +557,42 @@ export function TemplateAdmin() {
       </CardContent>
     </Card>
 
-    <Dialog open={!!preview} onOpenChange={(o) => !o && setPreview(null)}>
+    <Dialog open={!!preview} onOpenChange={(o) => { if (!o) { setPreview(null); setPreviewEditing(false); } }}>
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+        <DialogHeader className="flex flex-row items-center justify-between gap-2 pr-8">
           <DialogTitle className="font-mono text-sm">{preview?.template_type}</DialogTitle>
+          {preview && !previewEditing && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => { setPreviewContent(preview.template_content ?? ""); setPreviewEditing(true); }}
+            >
+              <Pencil className="w-3 h-3 mr-2" /> Düzenle
+            </Button>
+          )}
         </DialogHeader>
-        <pre className="text-xs whitespace-pre-wrap overflow-auto flex-1 bg-muted/30 p-3 rounded">
-          {preview?.template_content || "(boş)"}
-        </pre>
+        {previewEditing ? (
+          <>
+            <Textarea
+              className="text-xs font-mono flex-1 min-h-[300px] resize-none"
+              value={previewContent}
+              onChange={(e) => setPreviewContent(e.target.value)}
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button size="sm" variant="ghost" disabled={savingPreview} onClick={() => setPreviewEditing(false)}>
+                Vazgeç
+              </Button>
+              <Button size="sm" disabled={savingPreview} onClick={() => preview && saveContent(preview, previewContent)}>
+                {savingPreview && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
+                Kaydet
+              </Button>
+            </div>
+          </>
+        ) : (
+          <pre className="text-xs whitespace-pre-wrap overflow-auto flex-1 bg-muted/30 p-3 rounded">
+            {preview?.template_content || "(boş)"}
+          </pre>
+        )}
       </DialogContent>
     </Dialog>
 
