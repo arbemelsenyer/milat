@@ -86,6 +86,34 @@ function buildTemplateType(group: string, belgeTipi: string, variant?: string): 
   return v ? `${g}_${v}_${b}` : `${g}_${b}`;
 }
 
+// Türü Düzenle dialogu açılırken mevcut template_type'ı ustTur/group/belgeTipi/variant'a
+// geri çözer — aksi halde varyantı olan bir şablon "varyant yok" gibi görünüp Kaydet'te
+// varyant sessizce silinirdi.
+function parseTemplateType(type: string): { ustTur: string; group: string; belgeTipi: string; variant: string } {
+  let ustTur = "";
+  let group = "";
+  let rest = type;
+  if (rest === "ihtiyari" || rest.startsWith("ihtiyari_")) {
+    ustTur = "ihtiyari";
+    rest = rest.slice("ihtiyari".length).replace(/^_/, "");
+  } else {
+    const matchedGroup = [...TEMPLATE_GROUPS]
+      .sort((a, b) => b.value.length - a.value.length)
+      .find((g) => rest === g.value || rest.startsWith(g.value + "_"));
+    if (matchedGroup) {
+      ustTur = "dava_sarti";
+      group = matchedGroup.value;
+      rest = rest.slice(matchedGroup.value.length).replace(/^_/, "");
+    }
+  }
+  const matchedDoc = [...DOCUMENT_TYPES]
+    .sort((a, b) => b.value.length - a.value.length)
+    .find((d) => rest === d.value || rest.endsWith("_" + d.value));
+  const belgeTipi = matchedDoc?.value ?? "";
+  const variant = matchedDoc ? rest.slice(0, rest.length - matchedDoc.value.length).replace(/_$/, "") : rest;
+  return { ustTur, group, belgeTipi, variant };
+}
+
 type UploadResult = {
   name: string;
   ok: boolean;
@@ -480,7 +508,7 @@ export function TemplateAdmin() {
                               size="sm"
                               variant="ghost"
                               onClick={() => {
-                                setEditSel({ ustTur: "", group: "", belgeTipi: "", variant: "" });
+                                setEditSel(parseTemplateType(r.template_type));
                                 setEditingRow(r);
                               }}
                               title="Türü Düzenle"
