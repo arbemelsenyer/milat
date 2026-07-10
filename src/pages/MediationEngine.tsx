@@ -420,7 +420,7 @@ export default function MediationEngine() {
               const Icon = p.icon;
               const locked = p.id >= 4 && !phase3Complete;
               return (
-                <button key={p.id} onClick={() => { if (!locked) setPhase(p.id); else toast({ title: "Aşama kilitli", description: "Önce Aşama 3'te en az 2 tarafı analiz edip Ortak Zemin Raporu üretin." }); }}
+                <button key={p.id} onClick={() => { if (!locked) setPhase(p.id); else toast({ title: "Aşama kilitli", description: "Önce Aşama 3'te en az bir taraf analizini tamamlayın." }); }}
                   className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors border-l-2
                     ${active ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-accent" : "border-l-transparent hover:border-l-accent hover:text-accent hover:bg-sidebar-accent/40"}
                     ${locked ? "opacity-50 cursor-not-allowed" : ""}`}
