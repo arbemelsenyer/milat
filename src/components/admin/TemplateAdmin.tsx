@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, RefreshCw, FileText, ExternalLink, Upload, Plus, Trash2, Eye, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Loader2, RefreshCw, FileText, ExternalLink, Upload, Plus, Trash2, Eye, AlertTriangle, CheckCircle2, Pencil } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface TemplateRow {
@@ -110,6 +110,8 @@ export function TemplateAdmin() {
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
   const [manualOverride, setManualOverride] = useState<Record<string, { ustTur: string; group: string; belgeTipi: string; variant: string }>>({});
   const [reassigning, setReassigning] = useState<string | null>(null);
+  const [editingRow, setEditingRow] = useState<TemplateRow | null>(null);
+  const [editSel, setEditSel] = useState({ ustTur: "", group: "", belgeTipi: "", variant: "" });
 
   async function load() {
     setLoading(true);
@@ -267,8 +269,11 @@ export function TemplateAdmin() {
     setTimeout(() => setUploadStage(""), 8000);
   }
 
-  const reassignTemplate = async (fileName: string, newType: string) => {
-    if (!newType) return;
+  // currentType: değiştirilecek kaydın şu anki template_type'ı. Yükleme akışında bu her
+  // zaman "diger" (tür tespit edilemeyen yeni yüklemeler); tür düzenleme dialog'unda ise
+  // mevcut satırın kendi template_type'ı — içerik/kaynak dokunulmadan sadece tür taşınır.
+  const reassignTemplate = async (fileName: string, newType: string, currentType: string = "diger") => {
+    if (!newType || newType === currentType) return;
     const existing = rows.find((r) => r.template_type === newType);
     if (existing && !confirm(`Bu türde şablon zaten var: ${newType} — üstüne yazılsın mı?`)) return;
     setReassigning(fileName);
@@ -276,10 +281,10 @@ export function TemplateAdmin() {
       const { data: row, error: readErr } = await supabase
         .from("document_templates" as any)
         .select("template_content, source_url")
-        .eq("template_type", "diger")
+        .eq("template_type", currentType)
         .maybeSingle();
       if (readErr) throw readErr;
-      if (!row) throw new Error("'diger' kaydı bulunamadı — yeniden yükleyin.");
+      if (!row) throw new Error(`'${currentType}' kaydı bulunamadı — yeniden yükleyin.`);
       const { error: upErr } = await supabase.from("document_templates" as any).upsert({
         template_type: newType,
         template_content: (row as any).template_content,
@@ -288,7 +293,7 @@ export function TemplateAdmin() {
         uploaded_at: new Date().toISOString(),
       }, { onConflict: "template_type" });
       if (upErr) throw upErr;
-      await supabase.from("document_templates" as any).delete().eq("template_type", "diger");
+      await supabase.from("document_templates" as any).delete().eq("template_type", currentType);
       toast({ title: "Tür güncellendi", description: `${fileName} → ${newType}` });
       setUploadResults((prev) => prev.map((r) => r.name === fileName ? { ...r, template_type: newType, needs_manual: false, auto_detected: false } : r));
       await load();
@@ -471,6 +476,17 @@ export function TemplateAdmin() {
                             <Button size="sm" variant="ghost" onClick={() => setPreview(r)} title="Önizleme">
                               <Eye className="w-3 h-3" />
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditSel({ ustTur: "", group: "", belgeTipi: "", variant: "" });
+                                setEditingRow(r);
+                              }}
+                              title="Türü Düzenle"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </Button>
                             {isMinistry && (
                               <Button size="sm" variant="outline" disabled={singleBusy === r.template_type} onClick={() => refreshSingle(r)} title="Bakanlıktan güncelle">
                                 {singleBusy === r.template_type ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
@@ -500,6 +516,73 @@ export function TemplateAdmin() {
         <pre className="text-xs whitespace-pre-wrap overflow-auto flex-1 bg-muted/30 p-3 rounded">
           {preview?.template_content || "(boş)"}
         </pre>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={!!editingRow} onOpenChange={(o) => !o && setEditingRow(null)}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-mono text-sm">Türü Düzenle — {editingRow?.template_type}</DialogTitle>
+        </DialogHeader>
+        {editingRow && (() => {
+          const row = editingRow;
+          const effectiveGroup = editSel.ustTur === "ihtiyari" ? "ihtiyari" : editSel.group;
+          const computedType = effectiveGroup && editSel.belgeTipi ? buildTemplateType(effectiveGroup, editSel.belgeTipi, editSel.variant) : "";
+          const setSel = (patch: Partial<typeof editSel>) => setEditSel((p) => ({ ...p, ...patch }));
+          const busy = reassigning === row.template_type;
+          return (
+            <div className="space-y-3">
+              <Select value={editSel.ustTur} onValueChange={(v) => setSel({ ustTur: v, group: v === "ihtiyari" ? "" : editSel.group })}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="İhtiyari / Dava Şartı" /></SelectTrigger>
+                <SelectContent>
+                  {UST_TUR_OPTIONS.map((u) => (
+                    <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {editSel.ustTur === "dava_sarti" && (
+                <Select value={editSel.group} onValueChange={(v) => setSel({ group: v })}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Grup" /></SelectTrigger>
+                  <SelectContent>
+                    {TEMPLATE_GROUPS.map((g) => (
+                      <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Select value={editSel.belgeTipi} onValueChange={(v) => setSel({ belgeTipi: v })}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Belge Tipi" /></SelectTrigger>
+                <SelectContent>
+                  {DOCUMENT_TYPES.map((d) => (
+                    <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                className="h-8 text-xs"
+                placeholder="varyant (ops.)"
+                value={editSel.variant}
+                onChange={(e) => setSel({ variant: e.target.value })}
+              />
+              {computedType && (
+                <div className="font-mono text-[11px] text-muted-foreground">
+                  {row.template_type} → {computedType}
+                </div>
+              )}
+              <Button
+                size="sm"
+                disabled={!computedType || computedType === row.template_type || busy}
+                onClick={async () => {
+                  await reassignTemplate(row.template_type, computedType, row.template_type);
+                  setEditingRow(null);
+                }}
+              >
+                {busy && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
+                Kaydet
+              </Button>
+            </div>
+          );
+        })()}
       </DialogContent>
     </Dialog>
     </>
