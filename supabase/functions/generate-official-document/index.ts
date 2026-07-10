@@ -100,7 +100,13 @@ function selectTemplateCandidates(opts: {
     ? (agreed ? "ihtiyari_anlasma" : "ihtiyari_anlasamamama")
     : (agreed ? "dava_sarti_anlasma" : "dava_sarti_anlasamamama");
 
-  if (isIhtiyari) return [genericType];
+  // İhtiyari kolunda da yeni "{grup}_{belge_tipi}" deseniyle tutarlı olması için önce
+  // ihtiyari_{anlasma,anlasamama}_son_tutanak denenir, bulunamazsa legacy jenerik ada düşülür.
+  if (isIhtiyari) {
+    return agreed
+      ? ["ihtiyari_anlasma_son_tutanak", "ihtiyari_anlasma"]
+      : ["ihtiyari_anlasamama_son_tutanak", "ihtiyari_anlasamamama"];
+  }
 
   const candidates: string[] = [];
 
