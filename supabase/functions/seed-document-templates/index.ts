@@ -81,15 +81,9 @@ Deno.serve(async (req) => {
       if (error) throw error;
       results.push({ template_type: t.template_type, ok: true, chars: content.length });
     } catch (e) {
-      console.error("template fetch failed", t.template_type, e);
-      // Insert placeholder row so admin sees the gap
-      await admin.from("document_templates").upsert({
-        template_type: t.template_type,
-        template_content: "",
-        source_url: t.url,
-        is_active: false,
-        uploaded_at: new Date().toISOString(),
-      }, { onConflict: "template_type" });
+      // Fetch başarısız oldu diye mevcut aktif şablonun üzerine boş/pasif kayıt yazma —
+      // önceden yüklenmiş çalışan bir şablon varsa onu koru, sadece logla.
+      console.error("template fetch failed, existing row (if any) left untouched", t.template_type, e);
       results.push({ template_type: t.template_type, ok: false, error: (e as Error).message });
     }
   }
