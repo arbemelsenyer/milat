@@ -2453,8 +2453,8 @@ function SourcesPanel({ sources }: { sources?: any[] }) {
   );
 }
 
-function buildReportHtml(opts: { caseTitle?: string; caseId: string; report: any; strategy: any; sources: any[]; generatedAt: Date; }): string {
-  const { caseTitle, caseId, report, strategy, sources, generatedAt } = opts;
+function buildReportHtml(opts: { caseTitle?: string; caseId: string; report: any; strategy: any; sources: any[]; analyses?: any[]; generatedAt: Date; }): string {
+  const { caseTitle, caseId, report, strategy, sources, analyses, generatedAt } = opts;
   const r = report || {};
   const s = strategy || r.mediator_strategy || {};
   const esc = (v: any) => String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" } as any)[c]);
@@ -2465,6 +2465,58 @@ function buildReportHtml(opts: { caseTitle?: string; caseId: string; report: any
       <p>${esc(sc.summary || "")}</p>
       ${sc.tradeoffs?.length ? `<p class="muted"><b>Ödünler:</b></p>${list(sc.tradeoffs)}` : ""}
     </div>`).join("");
+
+  const partyList = Array.isArray(analyses) ? analyses : [];
+  const partyAnalysesHtml = partyList.map((a: any, i: number) => {
+    const cp = a.case_parties || {};
+    const name = cp.company_name || `${cp.first_name ?? ""} ${cp.last_name ?? ""}`.trim() || `Taraf ${i + 1}`;
+    const an = a.analysis || {};
+    const pp = an.party_position || {};
+    const risk = a.risk_analizi ?? an.risk_analizi ?? {};
+    return `
+    <div class="card">
+      <h4>${esc(name)}${cp.party_role ? ` <span class="muted">(${esc(roleLabel(cp.party_role))})</span>` : ""}</h4>
+      ${an.dispute_area ? `<p><b>Uyuşmazlık Türü:</b> ${esc(an.dispute_area)}</p>` : ""}
+      <p class="muted"><b>Pozisyon — Güçlü Yanlar:</b></p>${list(pp.strengths || [])}
+      <p class="muted"><b>Pozisyon — Zayıf Yanlar:</b></p>${list(pp.weaknesses || [])}
+      <p class="muted"><b>Çıkarlar / İhtiyaçlar:</b></p>${list(pp.interests || [])}
+      <p><b>BATNA:</b> ${esc(pp.batna || "Yeterli veri yok")}</p>
+      <p><b>WATNA:</b> ${esc(pp.watna || "Yeterli veri yok")}</p>
+      <p><b>Risk Değerlendirmesi:</b></p>
+      <ul>
+        <li>Risk Puanı: ${esc(risk.risk_puani || "Yeterli veri yok")}</li>
+        <li>Anlaşma Oranı: ${esc(risk.uzlasma_orani || "Yeterli veri yok")}${risk.uzlasma_orani_kaynak ? ` <span class="muted">(${esc(risk.uzlasma_orani_kaynak)})</span>` : ""}</li>
+        <li>Mahkeme Riski: ${esc(risk.mahkeme_riski || "Yeterli veri yok")}${risk.mahkeme_riski_kaynak ? ` <span class="muted">(${esc(risk.mahkeme_riski_kaynak)})</span>` : ""}</li>
+        <li>Tahmini Süre Tasarrufu: ${esc(risk.tahmini_sure_tasarrufu_ay || "Yeterli veri yok")}</li>
+      </ul>
+      ${risk.kritik_faktorler?.filter(Boolean)?.length ? `<p class="muted"><b>Kritik Faktörler:</b></p>${list(risk.kritik_faktorler)}` : ""}
+      ${risk.uzlasma_engelleri?.filter(Boolean)?.length ? `<p class="muted"><b>Uzlaşma Engelleri:</b></p>${list(risk.uzlasma_engelleri)}` : ""}
+      ${risk.oneri ? `<p><b>Öneri:</b> ${esc(risk.oneri)}</p>` : ""}
+    </div>`;
+  }).join("");
+
+  const comparativeRows = partyList.map((a: any, i: number) => {
+    const cp = a.case_parties || {};
+    const name = cp.company_name || `${cp.first_name ?? ""} ${cp.last_name ?? ""}`.trim() || `Taraf ${i + 1}`;
+    const risk = a.risk_analizi || {};
+    return `<li><b>${esc(name)}</b> — Risk Puanı: ${esc(risk.risk_puani || "Yeterli veri yok")}; Anlaşma Oranı: ${esc(risk.uzlasma_orani || "Yeterli veri yok")}; Mahkeme Riski: ${esc(risk.mahkeme_riski || "Yeterli veri yok")}</li>`;
+  }).join("");
+  const comparativeHtml = partyList.length
+    ? `<ul>${comparativeRows}</ul>`
+    : `<p class="muted">Karşılaştırmalı risk verisi için taraf analizi bulunamadı.</p>`;
+
+  const ozet = r.risk_ozeti || {};
+  const hasOzet = ozet && Object.keys(ozet).length > 0;
+  const ozetTarafKarsilastirma = Array.isArray(ozet.taraf_karsilastirma) ? ozet.taraf_karsilastirma : [];
+  const riskOzetiHtml = hasOzet ? `
+    <p><b>Genel Uzlaşma Tahmini:</b> ${esc(ozet.genel_uzlasma_orani || "Yeterli veri yok")}${ozet.genel_uzlasma_orani_kaynak ? ` <span class="muted">(${esc(ozet.genel_uzlasma_orani_kaynak)})</span>` : ""}</p>
+    <p><b>Genel Risk Puanı:</b> ${esc(ozet.genel_risk_puani || "Yeterli veri yok")}</p>
+    ${ozetTarafKarsilastirma.length ? `<p class="muted"><b>Taraf Karşılaştırması:</b></p><ul>${ozetTarafKarsilastirma.map((t: any) => `<li><b>${esc(t.taraf || "Taraf")}</b>${t.risk_puani ? ` (${esc(t.risk_puani)})` : ""}${t.guclu_yon ? ` — ✓ ${esc(t.guclu_yon)}` : ""}${t.zayif_yon ? ` — ✗ ${esc(t.zayif_yon)}` : ""}</li>`).join("")}</ul>` : ""}
+    ${ozet.ortak_kritik_faktorler?.filter(Boolean)?.length ? `<p class="muted"><b>Ortak Kritik Faktörler:</b></p>${list(ozet.ortak_kritik_faktorler)}` : ""}
+    ${ozet.ortak_uzlasma_engelleri?.filter(Boolean)?.length ? `<p class="muted"><b>Ortak Uzlaşma Engelleri:</b></p>${list(ozet.ortak_uzlasma_engelleri)}` : ""}
+    ${ozet.arabulucu_onerisi ? `<p><b>Arabulucu Önerisi:</b> ${esc(ozet.arabulucu_onerisi)}</p>` : ""}
+  ` : `<p class="muted">Yeterli veri yok</p>`;
+
   const srcHtml = (sources && sources.length)
     ? `<ol>${sources.map((x: any) => `
         <li>
@@ -2485,10 +2537,14 @@ h4{margin:6px 0}
 blockquote{border-left:3px solid #14b8a6;margin:6px 0;padding:4px 10px;color:#374151;font-style:italic;background:#f0fdfa}
 ul,ol{padding-left:20px}
 .meta{color:#6b7280;font-size:12px;margin-bottom:18px}
+.confidential{background:#fef2f2;border:2px solid #dc2626;color:#991b1b;font-weight:600;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px}
 @media print{body{margin:0}}
 </style></head><body>
+<div class="confidential">GİZLİ — Yalnızca Arabulucu İçindir (6325 s.K. m.4/m.33)</div>
 <h1>Ortak Zemin Raporu</h1>
 <div class="meta"><b>Başvuru:</b> ${esc(caseTitle || "—")} &nbsp;•&nbsp; <b>ID:</b> ${esc(caseId)} &nbsp;•&nbsp; <b>Oluşturulma:</b> ${generatedAt.toLocaleString("tr-TR")}</div>
+
+<h2>Taraf Analizleri</h2>${partyAnalysesHtml || `<p class="muted">Taraf analizi bulunamadı.</p>`}
 
 <h2>Ortak Çıkarlar</h2>${list(r.common_interests || [])}
 
@@ -2504,6 +2560,10 @@ ${s.deadlock_techniques?.length ? `<p><b>Tıkanıklık Teknikleri:</b></p>${list
 
 <h2>Kırmızı Çizgiler</h2>${list(r.red_lines || [])}
 
+<h2>Karşılaştırmalı Risk Analizi</h2>${comparativeHtml}
+
+<h2>Risk Özeti</h2>${riskOzetiHtml}
+
 <h2>📚 Kullanılan Kaynaklar (${(sources || []).length})</h2>
 <p class="muted">Adalet Bakanlığı Arabuluculuk Daire Başkanlığı resmi yayınlarından.</p>
 ${srcHtml}
@@ -2512,9 +2572,9 @@ ${srcHtml}
 </body></html>`;
 }
 
-function downloadReport(opts: { caseTitle?: string; caseId: string; report: any; strategy: any; mode: "print" | "html" }) {
+function downloadReport(opts: { caseTitle?: string; caseId: string; report: any; strategy: any; analyses?: any[]; mode: "print" | "html" }) {
   const sources = opts.report?.sources || [];
-  const html = buildReportHtml({ caseTitle: opts.caseTitle, caseId: opts.caseId, report: opts.report, strategy: opts.strategy, sources, generatedAt: new Date() });
+  const html = buildReportHtml({ caseTitle: opts.caseTitle, caseId: opts.caseId, report: opts.report, strategy: opts.strategy, sources, analyses: opts.analyses, generatedAt: new Date() });
   if (opts.mode === "print") {
     const w = window.open("", "_blank");
     if (!w) return;
@@ -2688,8 +2748,8 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
           <div className="flex gap-2 flex-wrap">
             {report && (
               <>
-                <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "print" })}>PDF</Button>
-                <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, mode: "html" })}>İndir</Button>
+                <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, analyses, mode: "print" })}>PDF</Button>
+                <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, analyses, mode: "html" })}>İndir</Button>
               </>
             )}
             <Button size="sm" onClick={generateReport} disabled={!canReport || reportBusy}>
