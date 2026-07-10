@@ -16,9 +16,9 @@ interface Props {
   onOutcomeSaved?: () => void;
 }
 
-type DocKind = "son_tutanak" | "davet" | "ilk_oturum";
+type DocKind = "son_tutanak" | "davet" | "ilk_oturum" | "anlasma_belgesi";
 
-const DOC_SET_AGREED: DocKind[] = ["ilk_oturum", "son_tutanak", "davet"];
+const DOC_SET_AGREED: DocKind[] = ["ilk_oturum", "son_tutanak", "anlasma_belgesi", "davet"];
 const DOC_SET_FAILED: DocKind[] = ["son_tutanak"];
 
 export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
@@ -153,7 +153,8 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
 
   const KIND_LABEL: Record<DocKind, string> = {
     ilk_oturum: "İlk Oturum Tutanağı",
-    son_tutanak: outcome === "anlasma" ? "Anlaşma Son Tutanağı" : "Anlaşamama Son Tutanağı",
+    son_tutanak: outcome === "anlasma" ? "Anlaşma Son Tutanağı (m.17)" : "Anlaşamama Son Tutanağı",
+    anlasma_belgesi: "Anlaşma Belgesi (m.18)",
     davet: "Davet Mektubu (türe uygun)",
   };
 

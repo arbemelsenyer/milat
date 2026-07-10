@@ -56,7 +56,7 @@ function selectTemplateCandidates(opts: {
   mediation_type?: string | null;
   outcome?: string | null;
   dispute_type?: string | null;
-  kind: "son_tutanak" | "davet" | "ilk_oturum";
+  kind: "son_tutanak" | "davet" | "ilk_oturum" | "anlasma_belgesi";
   variant?: string | null;
 }): string[] {
   const { mediation_type, outcome, dispute_type, kind, variant } = opts;
@@ -65,6 +65,18 @@ function selectTemplateCandidates(opts: {
   // İhtiyari kolunda grup kavramı yok — dispute_type'tan türetilen grup yalnızca
   // dava_sarti kolunda (5 alt tür) kullanılır, ihtiyari'de her zaman görmezden gelinir.
   const group = isIhtiyari ? null : disputeGroup(dt);
+
+  // anlasma_belgesi (m.18): şartların tam metnini içeren ayrı belge — son_tutanak (m.17)
+  // zincirinden TAMAMEN bağımsız. Jenerik dava_sarti/ihtiyari fallback'i BİLEREK yok:
+  // tür-özel anlaşma belgesi şablonu yüklenmemişse 424 dönmeli, asla son_tutanak
+  // şablonuna sessizce düşmemeli (iki belge birbirinin yerine geçemez).
+  if (kind === "anlasma_belgesi") {
+    if (isIhtiyari) return ["ihtiyari_anlasma_belgesi"];
+    const candidates: string[] = [];
+    if (variant && group) candidates.push(`${group}_${variant}_anlasma_belgesi`);
+    if (group) candidates.push(`${group}_anlasma_belgesi`);
+    return uniq(candidates);
+  }
 
   if (kind === "davet") {
     if (isIhtiyari) return ["ihtiyari_davet"];
@@ -93,11 +105,11 @@ function selectTemplateCandidates(opts: {
   const candidates: string[] = [];
 
   // 0) Varyant desteği: dava sonucunun özel bir alt türü belirtilmişse (ör. "ise_iade",
-  // "nisbi"), grup-özel varyant şablonları listenin en başına eklenir — en özelden
-  // en jeneriğe sıralamayı korur.
+  // "nisbi"), grup-özel varyant şablonu listenin en başına eklenir. anlasma_belgesi
+  // adayı BİLEREK burada yok — son_tutanak (m.17) zinciri anlaşma belgesi (m.18)
+  // şablonunu asla döndürmemeli, iki tür karışmamalı.
   if (variant && group) {
     candidates.push(`${group}_${variant}_anlasma_son_tutanak`);
-    candidates.push(`${group}_${variant}_anlasma_belgesi`);
   }
 
   // 1) Yeni desen: {grup}_anlasma_son_tutanak / {grup}_anlasamama_son_tutanak.
@@ -145,7 +157,7 @@ function partyBlock(p: any): string {
 }
 
 /** Very simple placeholder-fill: replaces common patterns like ……, ___, blank-after-colon rows. */
-function fillTemplate(content: string, data: Record<string, string>): string {
+function fillTemplate(content: string, data: Record<string, string>, kind?: string): string {
   let out = content;
 
   // Row-based replacement: for known labels ending with ":" replace value.
@@ -171,10 +183,19 @@ function fillTemplate(content: string, data: Record<string, string>): string {
   out = out.replace(/{{dosya_no}}/g, data.dosya_no || "");
   out = out.replace(/{{anlasma_bedeli}}/g, data.anlasma_bedeli || "");
   out = out.replace(/{{anlasma_konusu}}/g, data.anlasma_konusu || "");
+  // 6325 s. Kanun m.17/m.18 ayrımı: son tutanak (m.17) yalnızca anlaşmanın varlığını
+  // usuli olarak bildirir, şart metnini içermez — o yüzden {{anlasma_ozeti}} burada
+  // nötr bir ifadeye çözülür, gerçek şartlara asla dönmez (bkz. aşağıdaki ek bloğu).
+  out = out.replace(
+    /{{anlasma_ozeti}}/g,
+    kind === "anlasma_belgesi" ? data.agreement_terms || "" : data.outcome === "anlasma" ? "Taraflar aralarında anlaşmışlardır." : ""
+  );
 
   // Append parties + agreement info as an appendix
   if (data.parties_block) out += `\n\n--- TARAFLAR ---\n${data.parties_block}\n`;
-  if (data.agreement_terms) out += `\n--- ANLAŞMA ŞARTLARI ---\n${data.agreement_terms}\n`;
+  // Anlaşma şartlarının tam metni YALNIZCA m.18 "Anlaşma Belgesi"ne eklenir — m.17 son
+  // tutanak, davet ve ilk oturum belgeleri bu metni asla içermemelidir (gizlilik).
+  if (kind === "anlasma_belgesi" && data.agreement_terms) out += `\n--- ANLAŞMA ŞARTLARI ---\n${data.agreement_terms}\n`;
   if (data.agreement_amount) out += `\nAnlaşma Bedeli: ${data.agreement_amount} TL\n`;
   if (data.session_date) out += `\nToplantı Tarihi: ${data.session_date}\n`;
   if (data.fee_block) out += `\n--- ÜCRET BİLGİSİ ---\n${data.fee_block}\n`;
@@ -209,7 +230,7 @@ Deno.serve(async (req) => {
   // (müracaat tutanağı, yetki belgesi vb.) doğrudan istemesinin yoludur.
   if (!requestedTemplateType) {
     if (!kind) return j({ error: "case_id and kind required" }, 400);
-    if (!["son_tutanak", "davet", "ilk_oturum"].includes(kind)) return j({ error: "invalid kind" }, 400);
+    if (!["son_tutanak", "davet", "ilk_oturum", "anlasma_belgesi"].includes(kind)) return j({ error: "invalid kind" }, 400);
   }
 
   // Load case, parties, session, fee, mediator profile.
@@ -245,7 +266,7 @@ Deno.serve(async (req) => {
     .in("template_type", candidates);
   const byType = new Map((tplRows || []).map((r: any) => [r.template_type, r]));
 
-  let template_type = candidates[candidates.length - 1];
+  let template_type = candidates[candidates.length - 1] ?? kind;
   let tpl: { template_content: string; source_url: string | null } | null = null;
   for (const c of candidates) {
     const row = byType.get(c);
@@ -301,7 +322,8 @@ Deno.serve(async (req) => {
     session_date,
     fee_block,
     mediator_name: (profile as any)?.full_name || "",
-  });
+    outcome: outcome || "",
+  }, kind);
 
   // Build UDF content.xml per the real UYAP schema: <template format_id="1.8">
   // with a single CDATA text pool (<content>) and <elements> paragraphs whose
