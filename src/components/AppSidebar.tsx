@@ -62,14 +62,14 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Süreç Yönetimi</SidebarGroupLabel>
+          <SidebarGroupLabel>Dosyalar</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>{renderItems(processItems)}</SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Ofis Yönetimi</SidebarGroupLabel>
+          <SidebarGroupLabel>Ofis</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>{renderItems(officeItems)}</SidebarMenu>
           </SidebarGroupContent>
