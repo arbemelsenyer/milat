@@ -181,6 +181,7 @@ export default function MediationEngine() {
   const [deleting, setDeleting] = useState(false);
   const [trackerOpen, setTrackerOpen] = useState(false);
   const [agentPanelOpen, setAgentPanelOpen] = useState(false);
+  const [paymentPanelOpen, setPaymentPanelOpen] = useState(false);
   // Faz tamamlanma daveti — sadece tamamlanmadı→tamamlandı GEÇİŞİNDE toast/parlama tetiklenir.
   // null = henüz hiç hesaplanmadı (dosya ilk açılışı); ilk hesaplamada geçiş sayılmaz.
   const prevPhaseStatusRef = useRef<Record<number, boolean> | null>(null);
@@ -487,6 +488,9 @@ export default function MediationEngine() {
             <div className="font-mono text-sm">{activeCase.application_no || "—"}</div>
             <div className="text-xs mt-2 opacity-80 line-clamp-2">{activeCase.title}</div>
           </div>
+          <div className="border-t border-sidebar-foreground/10 pt-3 mb-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Ofis Yönetimi
+          </div>
           {(isMediator || isAdmin) && (
             <Button variant="outline" size="sm" className="w-full mb-4 justify-start border-l-2 border-l-transparent text-sidebar-foreground transition-colors hover:border-l-accent hover:text-accent"
               onClick={() => setTrackerOpen(true)}>
@@ -497,6 +501,13 @@ export default function MediationEngine() {
             onClick={() => setAgentPanelOpen(true)}>
             🤖 Ajan Kontrol Paneli
           </Button>
+          <Button variant="outline" size="sm" className="w-full mb-4 justify-start border-l-2 border-l-transparent text-sidebar-foreground transition-colors hover:border-l-accent hover:text-accent"
+            onClick={() => setPaymentPanelOpen(true)}>
+            💰 Ödeme & Muhasebe
+          </Button>
+          <div className="mb-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Süreç Yönetimi
+          </div>
           <nav className="space-y-1">
             {PHASES.map((p) => {
               const optional = "optional" in p && p.optional;
@@ -565,6 +576,14 @@ export default function MediationEngine() {
             <DialogTitle className="heading-gold-underline">Ajan Kontrol Paneli</DialogTitle>
           </DialogHeader>
           <AgentControlPanel caseId={activeCase.id} isMediator={isMediator || isAdmin} />
+        </DialogContent>
+      </Dialog>
+      <Dialog open={paymentPanelOpen} onOpenChange={setPaymentPanelOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="heading-gold-underline">Ödeme & Muhasebe</DialogTitle>
+          </DialogHeader>
+          <PaymentAccountingPanel caseRow={activeCase} />
         </DialogContent>
       </Dialog>
     </div>
@@ -2926,11 +2945,7 @@ function Phase8Negotiation({ caseRow, userId, onDone }: { caseRow: CaseRow; user
 
 /* ===================== PHASE 9 - CLOSING ===================== */
 
-function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
-  const [docs, setDocs] = useState<any[]>([]);
-  const [busy, setBusy] = useState(false);
-
-  // Fee calculation state
+function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
   const [disputeValue, setDisputeValue] = useState<string>("");
   const [sessionCount, setSessionCount] = useState<string>("1");
   const [hoursPerSession, setHoursPerSession] = useState<string>("2");
@@ -2953,40 +2968,6 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
   }>(null);
   const [existingFeeId, setExistingFeeId] = useState<string | null>(null);
   const [invoiceBusy, setInvoiceBusy] = useState(false);
-
-  useEffect(() => { (async () => {
-    const { data } = await supabase.from("agreement_documents").select("*").eq("case_id", caseRow.id);
-    setDocs(data ?? []);
-  })(); }, [caseRow.id]);
-
-  async function generateDocs(agreed: boolean) {
-    setBusy(true);
-    try {
-      const templates = agreed
-        ? ["İlk Oturum Belirleme Tutanağı", "Anlaşma Son Tutanağı", "Anlaşma Belgesi", "Ücret Sözleşmesi", "Davet Mektubu"]
-        : ["Anlaşamama Son Tutanağı"];
-      for (const t of templates) {
-        await supabase.from("agreement_documents").insert({
-          case_id: caseRow.id, doc_type: t,
-          metadata: { content: `${t}\n\nSistem No: ${caseRow.application_no}\nUYAP No: ${caseRow.uyap_no || "Henüz kaydedilmedi"}\nTarih: ${new Date().toLocaleDateString("tr-TR")}\nKonu: ${caseRow.title}\nUyuşmazlık: ${caseRow.dispute_type || "AI tarafından henüz tespit edilmedi"}` } as any,
-        } as any);
-      }
-      await supabase.from("cases").update({ status: agreed ? "agreed" : "failed", current_phase: 9 } as any).eq("id", caseRow.id);
-      const { data } = await supabase.from("agreement_documents").select("*").eq("case_id", caseRow.id);
-      setDocs(data ?? []);
-      toast({ title: "Belgeler oluşturuldu" });
-    } catch (e: any) {
-      toast({ title: "Hata", description: trErr(e.message), variant: "destructive" });
-    } finally { setBusy(false); }
-  }
-
-  function download(d: any) {
-    const text = d.metadata?.content || d.doc_type;
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `${d.doc_type}.txt`; a.click();
-    URL.revokeObjectURL(url);
-  }
 
   const fmtTL = (n: number) =>
     new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(n);
@@ -3109,6 +3090,179 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
   );
 
   return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">Aktif AAÜT tarifesine göre deterministik hesaplama.</p>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="space-y-1">
+          <Label>Sonuç Türü</Label>
+          <Select value={feeType} onValueChange={(v) => setFeeType(v as any)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="anlasma">Anlaşma</SelectItem>
+              <SelectItem value="anlasamama">Anlaşamama</SelectItem>
+              <SelectItem value="ihtiyari">İhtiyari</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label>Arabulucu Sayısı</Label>
+          <div className="flex gap-2">
+            <Button type="button" size="sm" variant={arabulucuSayisi === 1 ? "default" : "outline"} onClick={() => setArabulucuSayisi(1)}>1 Arabulucu</Button>
+            <Button type="button" size="sm" variant={arabulucuSayisi === 2 ? "default" : "outline"} onClick={() => setArabulucuSayisi(2)}>Birden Fazla</Button>
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label>Taraf Sayısı</Label>
+          <div className="flex gap-2 flex-wrap">
+            <PartyBtn v={2} label="2" /><PartyBtn v={3} label="3–5" /><PartyBtn v={6} label="6–10" /><PartyBtn v={11} label="11+" />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="space-y-1">
+          <Label>Uyuşmazlık Değeri (TL)</Label>
+          <Input type="text" inputMode="decimal" placeholder="Anlaşma için gerekli"
+            value={disputeValue} onChange={(e) => setDisputeValue(e.target.value)} disabled={feeBusy || isSeri} />
+        </div>
+        <div className="space-y-1">
+          <Label>Oturum Sayısı</Label>
+          <Input type="number" min={1} step={1} value={sessionCount}
+            onChange={(e) => setSessionCount(e.target.value)} disabled={feeBusy} />
+        </div>
+        <div className="space-y-1">
+          <Label>Oturum Başına Saat</Label>
+          <Input type="number" min={1} step={1} value={hoursPerSession}
+            onChange={(e) => setHoursPerSession(e.target.value)} disabled={feeBusy} />
+        </div>
+      </div>
+
+      <div className="border rounded p-3 bg-muted/20 space-y-2">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={isSeri} onChange={(e) => setIsSeri(e.target.checked)} />
+          <span className="font-medium text-sm">Seri Uyuşmazlık</span>
+        </label>
+        <p className="text-xs text-muted-foreground">Aynı taraflardan biri ortak olmalı ve aynı ay içinde en az 10 başvuru gereklidir.</p>
+        {isSeri && (
+          <div className="grid gap-3 md:grid-cols-2 pt-2">
+            <div className="space-y-1">
+              <Label>Dosya Sayısı</Label>
+              <Input type="number" min={10} step={1} value={seriDosyaSayisi} onChange={(e) => setSeriDosyaSayisi(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Tür</Label>
+              <Select value={seriTur} onValueChange={(v) => setSeriTur(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ticari">Ticari</SelectItem>
+                  <SelectItem value="diger">Diğer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <Button onClick={calculateFee} disabled={feeBusy}>
+          {feeBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}Ücret Hesapla
+        </Button>
+        <Button variant="outline" onClick={createInvoice} disabled={!feeResult || invoiceBusy}>
+          {invoiceBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FileText className="h-4 w-4 mr-1" />}
+          Fatura Oluştur
+        </Button>
+      </div>
+
+      {feeError && (
+        <div className="p-3 rounded border border-amber-300 bg-amber-50 text-amber-900 text-sm flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div>
+              <div className="font-medium">Hesaplama yapılamadı</div>
+              <div>{feeError}</div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => setFeeError(null)}>Geri Dön</Button>
+            <Button size="sm" onClick={calculateFee}>Tekrar Dene</Button>
+          </div>
+        </div>
+      )}
+
+      {feeResult && (
+        <div className="rounded border overflow-hidden">
+          <table className="w-full text-sm">
+            <tbody>
+              <tr className="border-b"><td className="px-3 py-2 text-muted-foreground">Brüt Ücret</td><td className="px-3 py-2 text-right font-medium">{fmtTL(feeResult.brut_ucret)}</td></tr>
+              <tr className="border-b"><td className="px-3 py-2 text-muted-foreground">KDV (%20)</td><td className="px-3 py-2 text-right">{fmtTL(feeResult.kdv)}</td></tr>
+              <tr className="border-b"><td className="px-3 py-2 text-muted-foreground">GV Stopaj (%20)</td><td className="px-3 py-2 text-right">-{fmtTL(feeResult.gv_stopaj)}</td></tr>
+              <tr className="border-b bg-muted/30"><td className="px-3 py-2 font-semibold">Net Ücret</td><td className="px-3 py-2 text-right font-semibold">{fmtTL(feeResult.net_ucret)}</td></tr>
+              <tr className="border-b"><td className="px-3 py-2 text-muted-foreground">KDV Tevkifatı</td><td className="px-3 py-2 text-right">{fmtTL(feeResult.kdv_tevkifati)}</td></tr>
+              <tr className="border-b"><td className="px-3 py-2 text-muted-foreground">Tahsil Edilen KDV</td><td className="px-3 py-2 text-right">{fmtTL(feeResult.tahsil_edilen_kdv)}</td></tr>
+              <tr className="bg-primary text-primary-foreground"><td className="px-3 py-3 font-bold">NET TAHSİLAT</td><td className="px-3 py-3 text-right font-bold">{fmtTL(feeResult.net_tahsilat)}</td></tr>
+            </tbody>
+          </table>
+          <div className="p-3 text-xs text-muted-foreground border-t bg-muted/20 space-y-1">
+            <div><span className="font-medium">Tarife: </span>{feeResult.tarife_yili} Yılı Arabuluculuk Asgari Ücret Tarifesi</div>
+            {feeResult.tarife_maddesi && <div><span className="font-medium">Tarife Maddesi: </span>{feeResult.tarife_maddesi}</div>}
+            {feeResult.aciklama && <div>{feeResult.aciklama}</div>}
+            {feeResult.breakdown && feeResult.breakdown.length > 0 && (
+              <div className="pt-2">
+                <div className="font-medium mb-1">Dilim Dökümü:</div>
+                <ul className="space-y-0.5">
+                  {feeResult.breakdown.map((b, i) => (
+                    <li key={i}>• {b.dilim} — {b.oran} → {fmtTL(b.tutar)}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
+  const [docs, setDocs] = useState<any[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { (async () => {
+    const { data } = await supabase.from("agreement_documents").select("*").eq("case_id", caseRow.id);
+    setDocs(data ?? []);
+  })(); }, [caseRow.id]);
+
+  async function generateDocs(agreed: boolean) {
+    setBusy(true);
+    try {
+      const templates = agreed
+        ? ["İlk Oturum Belirleme Tutanağı", "Anlaşma Son Tutanağı", "Anlaşma Belgesi", "Ücret Sözleşmesi", "Davet Mektubu"]
+        : ["Anlaşamama Son Tutanağı"];
+      for (const t of templates) {
+        await supabase.from("agreement_documents").insert({
+          case_id: caseRow.id, doc_type: t,
+          metadata: { content: `${t}\n\nSistem No: ${caseRow.application_no}\nUYAP No: ${caseRow.uyap_no || "Henüz kaydedilmedi"}\nTarih: ${new Date().toLocaleDateString("tr-TR")}\nKonu: ${caseRow.title}\nUyuşmazlık: ${caseRow.dispute_type || "AI tarafından henüz tespit edilmedi"}` } as any,
+        } as any);
+      }
+      await supabase.from("cases").update({ status: agreed ? "agreed" : "failed", current_phase: 9 } as any).eq("id", caseRow.id);
+      const { data } = await supabase.from("agreement_documents").select("*").eq("case_id", caseRow.id);
+      setDocs(data ?? []);
+      toast({ title: "Belgeler oluşturuldu" });
+    } catch (e: any) {
+      toast({ title: "Hata", description: trErr(e.message), variant: "destructive" });
+    } finally { setBusy(false); }
+  }
+
+  function download(d: any) {
+    const text = d.metadata?.content || d.doc_type;
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `${d.doc_type}.txt`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
     <Card className="p-6 space-y-8">
       <h2 className="text-2xl font-bold text-primary">Aşama 8 — Belgeler & Kapanış</h2>
 
@@ -3116,140 +3270,6 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
       <section className="space-y-4">
         <h3 className="text-lg font-semibold heading-gold-underline">Belgeler</h3>
         <OfficialDocumentsPanel caseRow={caseRow} />
-      </section>
-
-      {/* ===== ÖDEME & MUHASEBE ===== */}
-      <section className="border-t pt-6 space-y-4">
-        <h3 className="text-lg font-semibold heading-gold-underline">Ödeme & Muhasebe</h3>
-        <p className="text-sm text-muted-foreground">Aktif AAÜT tarifesine göre deterministik hesaplama.</p>
-
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="space-y-1">
-            <Label>Sonuç Türü</Label>
-            <Select value={feeType} onValueChange={(v) => setFeeType(v as any)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="anlasma">Anlaşma</SelectItem>
-                <SelectItem value="anlasamama">Anlaşamama</SelectItem>
-                <SelectItem value="ihtiyari">İhtiyari</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Arabulucu Sayısı</Label>
-            <div className="flex gap-2">
-              <Button type="button" size="sm" variant={arabulucuSayisi === 1 ? "default" : "outline"} onClick={() => setArabulucuSayisi(1)}>1 Arabulucu</Button>
-              <Button type="button" size="sm" variant={arabulucuSayisi === 2 ? "default" : "outline"} onClick={() => setArabulucuSayisi(2)}>Birden Fazla</Button>
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label>Taraf Sayısı</Label>
-            <div className="flex gap-2 flex-wrap">
-              <PartyBtn v={2} label="2" /><PartyBtn v={3} label="3–5" /><PartyBtn v={6} label="6–10" /><PartyBtn v={11} label="11+" />
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="space-y-1">
-            <Label>Uyuşmazlık Değeri (TL)</Label>
-            <Input type="text" inputMode="decimal" placeholder="Anlaşma için gerekli"
-              value={disputeValue} onChange={(e) => setDisputeValue(e.target.value)} disabled={feeBusy || isSeri} />
-          </div>
-          <div className="space-y-1">
-            <Label>Oturum Sayısı</Label>
-            <Input type="number" min={1} step={1} value={sessionCount}
-              onChange={(e) => setSessionCount(e.target.value)} disabled={feeBusy} />
-          </div>
-          <div className="space-y-1">
-            <Label>Oturum Başına Saat</Label>
-            <Input type="number" min={1} step={1} value={hoursPerSession}
-              onChange={(e) => setHoursPerSession(e.target.value)} disabled={feeBusy} />
-          </div>
-        </div>
-
-        <div className="border rounded p-3 bg-muted/20 space-y-2">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={isSeri} onChange={(e) => setIsSeri(e.target.checked)} />
-            <span className="font-medium text-sm">Seri Uyuşmazlık</span>
-          </label>
-          <p className="text-xs text-muted-foreground">Aynı taraflardan biri ortak olmalı ve aynı ay içinde en az 10 başvuru gereklidir.</p>
-          {isSeri && (
-            <div className="grid gap-3 md:grid-cols-2 pt-2">
-              <div className="space-y-1">
-                <Label>Dosya Sayısı</Label>
-                <Input type="number" min={10} step={1} value={seriDosyaSayisi} onChange={(e) => setSeriDosyaSayisi(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label>Tür</Label>
-                <Select value={seriTur} onValueChange={(v) => setSeriTur(v as any)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ticari">Ticari</SelectItem>
-                    <SelectItem value="diger">Diğer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex gap-2">
-          <Button onClick={calculateFee} disabled={feeBusy}>
-            {feeBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}Ücret Hesapla
-          </Button>
-          <Button variant="outline" onClick={createInvoice} disabled={!feeResult || invoiceBusy}>
-            {invoiceBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FileText className="h-4 w-4 mr-1" />}
-            Fatura Oluştur
-          </Button>
-        </div>
-
-        {feeError && (
-          <div className="p-3 rounded border border-amber-300 bg-amber-50 text-amber-900 text-sm flex items-start justify-between gap-2">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-              <div>
-                <div className="font-medium">Hesaplama yapılamadı</div>
-                <div>{feeError}</div>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setFeeError(null)}>Geri Dön</Button>
-              <Button size="sm" onClick={calculateFee}>Tekrar Dene</Button>
-            </div>
-          </div>
-        )}
-
-        {feeResult && (
-          <div className="rounded border overflow-hidden">
-            <table className="w-full text-sm">
-              <tbody>
-                <tr className="border-b"><td className="px-3 py-2 text-muted-foreground">Brüt Ücret</td><td className="px-3 py-2 text-right font-medium">{fmtTL(feeResult.brut_ucret)}</td></tr>
-                <tr className="border-b"><td className="px-3 py-2 text-muted-foreground">KDV (%20)</td><td className="px-3 py-2 text-right">{fmtTL(feeResult.kdv)}</td></tr>
-                <tr className="border-b"><td className="px-3 py-2 text-muted-foreground">GV Stopaj (%20)</td><td className="px-3 py-2 text-right">-{fmtTL(feeResult.gv_stopaj)}</td></tr>
-                <tr className="border-b bg-muted/30"><td className="px-3 py-2 font-semibold">Net Ücret</td><td className="px-3 py-2 text-right font-semibold">{fmtTL(feeResult.net_ucret)}</td></tr>
-                <tr className="border-b"><td className="px-3 py-2 text-muted-foreground">KDV Tevkifatı</td><td className="px-3 py-2 text-right">{fmtTL(feeResult.kdv_tevkifati)}</td></tr>
-                <tr className="border-b"><td className="px-3 py-2 text-muted-foreground">Tahsil Edilen KDV</td><td className="px-3 py-2 text-right">{fmtTL(feeResult.tahsil_edilen_kdv)}</td></tr>
-                <tr className="bg-primary text-primary-foreground"><td className="px-3 py-3 font-bold">NET TAHSİLAT</td><td className="px-3 py-3 text-right font-bold">{fmtTL(feeResult.net_tahsilat)}</td></tr>
-              </tbody>
-            </table>
-            <div className="p-3 text-xs text-muted-foreground border-t bg-muted/20 space-y-1">
-              <div><span className="font-medium">Tarife: </span>{feeResult.tarife_yili} Yılı Arabuluculuk Asgari Ücret Tarifesi</div>
-              {feeResult.tarife_maddesi && <div><span className="font-medium">Tarife Maddesi: </span>{feeResult.tarife_maddesi}</div>}
-              {feeResult.aciklama && <div>{feeResult.aciklama}</div>}
-              {feeResult.breakdown && feeResult.breakdown.length > 0 && (
-                <div className="pt-2">
-                  <div className="font-medium mb-1">Dilim Dökümü:</div>
-                  <ul className="space-y-0.5">
-                    {feeResult.breakdown.map((b, i) => (
-                      <li key={i}>• {b.dilim} — {b.oran} → {fmtTL(b.tutar)}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </section>
 
       {/* ===== KAPANIŞ ===== */}
