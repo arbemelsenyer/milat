@@ -39,6 +39,16 @@ import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 import { ProcessTrackerPanel } from "@/components/mediation/ProcessTrackerPanel";
 import { AgentControlPanel } from "@/components/mediation/AgentControlPanel";
 
+// Paylaşılan giriş animasyonu deseni — Dashboard.tsx'teki containerVariants/itemVariants ile aynı.
+const containerVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
+};
+const itemVariants = {
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const } },
+};
+
 // Safely coerce any AI-returned value into a renderable string. Prevents
 // "Objects are not valid as a React child" crashes when the model returns an
 // object/array where we expected a scalar.
@@ -557,14 +567,24 @@ export default function MediationEngine() {
           </nav>
         </aside>
         <main className="flex-1 p-6 max-w-5xl mx-auto w-full">
-          <PhaseRenderer
-            phase={phaseParam}
-            caseRow={activeCase}
-            reload={() => { loadCase(activeCase.id); checkPhase3(activeCase.id); checkPhaseCompletion(activeCase.id, activeCase); }}
-            isMediator={isMediator || isAdmin}
-            userId={user!.id}
-            onAdvance={(next) => setPhase(next)}
-          />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={phaseParam}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <PhaseRenderer
+                phase={phaseParam}
+                caseRow={activeCase}
+                reload={() => { loadCase(activeCase.id); checkPhase3(activeCase.id); checkPhaseCompletion(activeCase.id, activeCase); }}
+                isMediator={isMediator || isAdmin}
+                userId={user!.id}
+                onAdvance={(next) => setPhase(next)}
+              />
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
       {(isMediator || isAdmin) && (
@@ -722,49 +742,59 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance }: {
   }
 
   return (
-    <div className="space-y-4">
-      <Card className="p-6 space-y-2">
-        <p className="text-xs text-muted-foreground">Sonraki adım: Taraflarla görüşme planlayın</p>
-        <div className="flex gap-2 flex-wrap">
-          <Button onClick={() => chooseMeeting("ozel")} disabled={navigating} variant="outline">
-            <CalIcon className="h-4 w-4 mr-1" /> Özel Görüşme Planla
-          </Button>
-          <Button onClick={() => chooseMeeting("ortak")} disabled={navigating}>
-            <CalIcon className="h-4 w-4 mr-1" /> Ortak Görüşme Planla
-          </Button>
-        </div>
-      </Card>
-      <SessionScheduler
-        caseId={caseRow.id}
-        niche={caseRow.dispute_type ?? ""}
-        context={caseRow.title ?? ""}
-        parties={parties}
-        mediatorId={caseRow.assigned_mediator_id}
-      />
-    </div>
+    <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+      <motion.div variants={itemVariants}>
+        <Card className="p-6 space-y-2">
+          <p className="text-xs text-muted-foreground">Sonraki adım: Taraflarla görüşme planlayın</p>
+          <div className="flex gap-2 flex-wrap">
+            <Button onClick={() => chooseMeeting("ozel")} disabled={navigating} variant="outline">
+              <CalIcon className="h-4 w-4 mr-1" /> Özel Görüşme Planla
+            </Button>
+            <Button onClick={() => chooseMeeting("ortak")} disabled={navigating}>
+              <CalIcon className="h-4 w-4 mr-1" /> Ortak Görüşme Planla
+            </Button>
+          </div>
+        </Card>
+      </motion.div>
+      <motion.div variants={itemVariants}>
+        <SessionScheduler
+          caseId={caseRow.id}
+          niche={caseRow.dispute_type ?? ""}
+          context={caseRow.title ?? ""}
+          parties={parties}
+          mediatorId={caseRow.assigned_mediator_id}
+        />
+      </motion.div>
+    </motion.div>
   );
 }
 
 function Phase1Summary({ caseRow }: { caseRow: CaseRow }) {
   return (
-    <div className="space-y-4">
-      <Card className="p-6 space-y-3">
-        <h2 className="text-2xl font-bold text-primary">Aşama 1 — Başvuru Özeti</h2>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div><span className="text-muted-foreground">Sistem No:</span> <b className="font-mono">{caseRow.application_no}</b></div>
-          <div><span className="text-muted-foreground">Başlık:</span> {caseRow.title}</div>
-          <div><span className="text-muted-foreground">Uyuşmazlık Türü:</span> {caseRow.dispute_type || <span className="italic text-muted-foreground">Aşağıdaki karttan otomatik tespit edilebilir</span>}</div>
-          <div><span className="text-muted-foreground">Tarih:</span> {caseRow.application_date ? new Date(caseRow.application_date).toLocaleDateString("tr-TR") : new Date(caseRow.created_at).toLocaleDateString("tr-TR")}</div>
-          <div><span className="text-muted-foreground">Durum:</span> {caseRow.status}</div>
-          <div><span className="text-muted-foreground">UYAP Kayıt No:</span> {caseRow.uyap_no || <span className="italic text-muted-foreground">Henüz kaydedilmedi</span>}</div>
-        </div>
-        <p className="text-xs text-muted-foreground border-t pt-3">
-          UYAP Kayıt Numarası, başvuru resmi sisteme kaydedildiğinde Aşama 4 (Arabulucu Paneli) üzerinden eklenebilir.
-        </p>
-      </Card>
-      <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} autoRun />
-      <DeadlineCard caseRow={caseRow} />
-    </div>
+    <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+      <motion.div variants={itemVariants}>
+        <Card className="p-6 space-y-3">
+          <h2 className="text-2xl font-bold text-primary">Aşama 1 — Başvuru Özeti</h2>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div><span className="text-muted-foreground">Sistem No:</span> <b className="font-mono">{caseRow.application_no}</b></div>
+            <div><span className="text-muted-foreground">Başlık:</span> {caseRow.title}</div>
+            <div><span className="text-muted-foreground">Uyuşmazlık Türü:</span> {caseRow.dispute_type || <span className="italic text-muted-foreground">Aşağıdaki karttan otomatik tespit edilebilir</span>}</div>
+            <div><span className="text-muted-foreground">Tarih:</span> {caseRow.application_date ? new Date(caseRow.application_date).toLocaleDateString("tr-TR") : new Date(caseRow.created_at).toLocaleDateString("tr-TR")}</div>
+            <div><span className="text-muted-foreground">Durum:</span> {caseRow.status}</div>
+            <div><span className="text-muted-foreground">UYAP Kayıt No:</span> {caseRow.uyap_no || <span className="italic text-muted-foreground">Henüz kaydedilmedi</span>}</div>
+          </div>
+          <p className="text-xs text-muted-foreground border-t pt-3">
+            UYAP Kayıt Numarası, başvuru resmi sisteme kaydedildiğinde Aşama 4 (Arabulucu Paneli) üzerinden eklenebilir.
+          </p>
+        </Card>
+      </motion.div>
+      <motion.div variants={itemVariants}>
+        <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} autoRun />
+      </motion.div>
+      <motion.div variants={itemVariants}>
+        <DeadlineCard caseRow={caseRow} />
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -1376,7 +1406,8 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
 
   return (
 
-    <div className="space-y-4">
+    <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+      <motion.div variants={itemVariants}>
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-primary">Aşama 2 — Taraflar</h2>
@@ -1389,7 +1420,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         ) : (
           <div className="space-y-2">
             {parties.map((p) => (
-              <div key={p.id} className="flex items-center justify-between p-3 border rounded">
+              <motion.div variants={itemVariants} key={p.id} className="flex items-center justify-between p-3 border rounded">
                 <div>
                   <div className="font-medium">{p.full_name || p.company_name || "(isimsiz)"}</div>
                   <div className="text-xs text-muted-foreground">
@@ -1406,7 +1437,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         )}
@@ -1416,8 +1447,10 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
           </div>
         )}
       </Card>
+      </motion.div>
 
       {draft && (
+        <motion.div variants={itemVariants}>
         <Card className="p-6 space-y-4">
           <h3 className="text-lg font-semibold">Yeni Taraf</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1473,6 +1506,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
             <Button onClick={save} disabled={busy}>{busy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Kaydediliyor…</> : "Tarafı Kaydet"}</Button>
           </div>
         </Card>
+        </motion.div>
       )}
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && !savingEdit && setEditing(null)}>
@@ -1513,7 +1547,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </motion.div>
   );
 }
 
@@ -1676,7 +1710,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
           <Button size="sm" onClick={loadAll}><RefreshCw className="h-4 w-4 mr-1" /> Yenile</Button>
         </Card>
       ) : (
-      <>
+      <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+      <motion.div variants={itemVariants}>
       <Card className="p-6 space-y-3">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -1691,14 +1726,19 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
           </div>
         </div>
       </Card>
+      </motion.div>
 
-      <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} />
+      <motion.div variants={itemVariants}>
+        <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} />
+      </motion.div>
 
       {parties.length === 0 && (
+        <motion.div variants={itemVariants}>
         <Card className="p-6 space-y-2">
           <div className="font-semibold">Taraflar bulunamadı</div>
           <p className="text-sm text-muted-foreground">Bu başvuruya henüz taraf eklenmemiş. Aşama 2 — Taraf Bilgileri ekranından en az iki taraf ekleyin, ardından bu adımda belge yükleyip analiz başlatabilirsiniz.</p>
         </Card>
+        </motion.div>
       )}
 
       <div className="space-y-3">
@@ -1708,7 +1748,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
           const open = openId === p.id;
           const an = a?.analysis ?? {};
           return (
-            <Card key={p.id} className="overflow-hidden">
+            <motion.div variants={itemVariants} key={p.id}>
+            <Card className="overflow-hidden">
               <button
                 type="button"
                 onClick={() => setOpenId(open ? null : p.id)}
@@ -1761,11 +1802,17 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
                     ) : (
                       <ul className="space-y-1">
                         {partyDocs.map((d) => (
-                          <li key={d.id} className="flex items-center gap-2 text-sm p-2 border rounded">
+                          <motion.li
+                            key={d.id}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.25 }}
+                            className="flex items-center gap-2 text-sm p-2 border rounded"
+                          >
                             <FileText className="h-4 w-4 text-primary" />
                             <span className="flex-1 truncate">{d.file_name}</span>
                             <Button variant="ghost" size="sm" onClick={() => deleteDoc(d)}><Trash2 className="h-3 w-3" /></Button>
-                          </li>
+                          </motion.li>
                         ))}
                       </ul>
                     )}
@@ -1877,11 +1924,12 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
                 </div>
               )}
             </Card>
+            </motion.div>
           );
         })}
       </div>
 
-      </>
+      </motion.div>
       )}
     </div>
   );
@@ -2856,10 +2904,11 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   );
 
   return (
+    <motion.div variants={containerVariants} initial="hidden" animate="show">
     <Card className="p-6 space-y-4">
       <h2 className="text-2xl font-bold text-primary">Aşama 4 — Arabulucu Paneli</h2>
       <p className="text-sm text-muted-foreground">Aşama 3'te üretilen taraf analizlerinin özeti ve Ortak Zemin Raporu üretimi.</p>
-      <div className="border rounded-md p-3 bg-muted/30 space-y-2">
+      <motion.div variants={itemVariants} className="border rounded-md p-3 bg-muted/30 space-y-2">
         <Label className="text-sm">UYAP Kayıt No (varsa girin)</Label>
         <div className="flex gap-2">
           <Input value={uyap} onChange={(e) => setUyap(e.target.value)} placeholder="Örn. 2026/12345" className="font-mono" />
@@ -2868,24 +2917,24 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">Başvuru UYAP sistemine kaydedildiğinde devlet tarafından verilen resmi numarayı buraya girin. Boş bırakılırsa belgelerde "UYAP No: Henüz kaydedilmedi" görünür.</p>
-      </div>
-      <div>
+      </motion.div>
+      <motion.div variants={itemVariants}>
         <h3 className="font-semibold mb-2">Taraf Analizleri ({analyses.length})</h3>
         <div className="space-y-2">
           {analyses.map((a: any, i) => {
             const cp = a.case_parties || {};
             const name = cp.company_name || `${cp.first_name ?? ""} ${cp.last_name ?? ""}`.trim() || "Taraf";
             return (
-              <div key={i} className="border rounded p-3 text-sm">
+              <motion.div variants={itemVariants} key={i} className="border rounded p-3 text-sm">
                 <div className="font-medium">{name} <span className="text-xs text-muted-foreground">({roleLabel(cp.party_role)})</span></div>
                 {a.analysis?.dispute_area && <div className="text-xs">📋 {a.analysis.dispute_area}</div>}
                 {a.analysis?.party_position?.batna && <div className="text-xs">BATNA: {a.analysis.party_position.batna}</div>}
-              </div>
+              </motion.div>
             );
           })}
         </div>
-      </div>
-      <div>
+      </motion.div>
+      <motion.div variants={itemVariants}>
         <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
           <h3 className="font-semibold">Ortak Zemin Raporu</h3>
           <div className="flex gap-2 flex-wrap">
@@ -2922,8 +2971,9 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
             <span>Rapor üretmeden önce Aşama 3'te en az bir taraf analizini tamamlayın.</span>
           </div>
         )}
-      </div>
+      </motion.div>
     </Card>
+    </motion.div>
   );
 }
 
@@ -2933,13 +2983,17 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
 
 function Phase8Negotiation({ caseRow, userId, onDone }: { caseRow: CaseRow; userId: string; onDone: () => void }) {
   return (
+    <motion.div variants={containerVariants} initial="hidden" animate="show">
     <Card className="p-6 space-y-4">
       <h2 className="text-2xl font-bold text-primary">Aşama 7 — Görüşme Notları</h2>
-      <MeetingNotesPanel caseId={caseRow.id} caseSummary={caseRow.title ?? ""} />
+      <motion.div variants={itemVariants}>
+        <MeetingNotesPanel caseId={caseRow.id} caseSummary={caseRow.title ?? ""} />
+      </motion.div>
       <div className="flex justify-end">
         <Button onClick={onDone}>Kapanışa Geç →</Button>
       </div>
     </Card>
+    </motion.div>
   );
 }
 
@@ -3263,17 +3317,18 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
   }
 
   return (
+    <motion.div variants={containerVariants} initial="hidden" animate="show">
     <Card className="p-6 space-y-8">
       <h2 className="text-2xl font-bold text-primary">Aşama 8 — Belgeler & Kapanış</h2>
 
       {/* ===== BELGELER ===== */}
-      <section className="space-y-4">
+      <motion.section variants={itemVariants} className="space-y-4">
         <h3 className="text-lg font-semibold heading-gold-underline">Belgeler</h3>
         <OfficialDocumentsPanel caseRow={caseRow} />
-      </section>
+      </motion.section>
 
       {/* ===== KAPANIŞ ===== */}
-      <section className="border-t pt-6 space-y-3">
+      <motion.section variants={itemVariants} className="border-t pt-6 space-y-3">
         <h3 className="text-lg font-semibold heading-gold-underline">Kapanış</h3>
         <details className="text-xs text-muted-foreground border rounded p-3">
           <summary className="cursor-pointer font-medium">Basit metin belgeler (eski)</summary>
@@ -3289,16 +3344,23 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
           {docs.length > 0 && (
             <ul className="space-y-1 mt-2">
               {docs.map((d) => (
-                <li key={d.id} className="flex items-center justify-between p-2 border rounded">
+                <motion.li
+                  key={d.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="flex items-center justify-between p-2 border rounded"
+                >
                   <span>{d.doc_type}</span>
                   <Button size="sm" variant="ghost" onClick={() => download(d)}><Download className="h-3 w-3 mr-1" /> İndir</Button>
-                </li>
+                </motion.li>
               ))}
             </ul>
           )}
         </details>
-      </section>
+      </motion.section>
     </Card>
+    </motion.div>
   );
 }
 
@@ -3356,6 +3418,7 @@ function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
   }
 
   return (
+    <motion.div variants={containerVariants} initial="hidden" animate="show">
     <Card className="p-6 space-y-4">
       <h2 className="text-2xl font-bold text-primary">Aşama 6 — Bilirkişi (Opsiyonel)</h2>
       <p className="text-sm text-muted-foreground">Uyuşmazlık türü: {caseRow.dispute_type}</p>
@@ -3363,7 +3426,7 @@ function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Atama bilgisi yükleniyor…</div>
       ) : assignment && (
-        <div className="flex items-center justify-between gap-2 border rounded-md p-3 bg-muted/30">
+        <motion.div variants={itemVariants} className="flex items-center justify-between gap-2 border rounded-md p-3 bg-muted/30">
           <div className="text-sm">
             <span className="font-medium">{assignment.expertName}</span>{" "}
             <Badge variant="secondary" className="ml-1">{EXPERT_STATUS_LABEL[assignment.status] ?? assignment.status}</Badge>
@@ -3372,9 +3435,10 @@ function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
             {removing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
             Atamayı Kaldır
           </Button>
-        </div>
+        </motion.div>
       )}
 
+      <motion.div variants={itemVariants}>
       <ExpertSelector
         niche={caseRow.dispute_type || ""}
         selectedId={selected}
@@ -3391,6 +3455,8 @@ function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
           }
         }}
       />
+      </motion.div>
     </Card>
+    </motion.div>
   );
 }
