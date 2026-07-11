@@ -310,6 +310,20 @@ export default function MediationEngine() {
     setParams(p);
   }
 
+  // Sıradaki erişilebilir (kilidi açık, tamamlanmamış) en küçük numaralı faz — opsiyonel Faz 6 hiçbir zaman engellemez.
+  // NOT: Bu hook, aşağıdaki koşullu return'lerden (loading / !caseId / !activeCase) ÖNCE
+  // durmalı — Hooks Rules gereği hook çağrı sırası her render'da sabit kalmalı (React #310).
+  const nextActionablePhase = useMemo(() => {
+    for (const p of PHASES) {
+      const locked = p.id >= 4 && !phase3Complete;
+      if (locked) continue;
+      const optional = "optional" in p && p.optional;
+      if (optional) continue;
+      if (!phaseStatus[p.id]) return p.id;
+    }
+    return null;
+  }, [phaseStatus, phase3Complete]);
+
   if (isLoading || !user) {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
   }
@@ -415,18 +429,6 @@ export default function MediationEngine() {
   }
 
   const completed = activeCase.current_phase ?? 1;
-
-  // Sıradaki erişilebilir (kilidi açık, tamamlanmamış) en küçük numaralı faz — opsiyonel Faz 6 hiçbir zaman engellemez.
-  const nextActionablePhase = useMemo(() => {
-    for (const p of PHASES) {
-      const locked = p.id >= 4 && !phase3Complete;
-      if (locked) continue;
-      const optional = "optional" in p && p.optional;
-      if (optional) continue;
-      if (!phaseStatus[p.id]) return p.id;
-    }
-    return null;
-  }, [phaseStatus, phase3Complete]);
 
   return (
     <div className="min-h-screen bg-background">
