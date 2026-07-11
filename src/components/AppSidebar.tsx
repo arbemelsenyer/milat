@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, FolderOpen, Archive, Calendar, Shield } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Archive, Calendar, Shield, Workflow } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -19,6 +19,7 @@ const overviewItems = [
 
 const processItems = [
   { title: "Aktif Başvurular", url: "/cases", icon: FolderOpen },
+  { title: "Süreç Motoru", url: "/legal-reasoning", icon: Workflow },
 ];
 
 const officeItems = [
