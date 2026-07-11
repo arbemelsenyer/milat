@@ -21,6 +21,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
+import { ToastAction } from "@/components/ui/toast";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -72,6 +74,18 @@ const PHASES = [
   { id: 7, label: "Görüşme Notları", icon: MessageSquare },
   { id: 8, label: "Belgeler & Kapanış", icon: FileCheck2 },
 ] as const;
+
+// Sıradaki erişilebilir (kilidi açık, tamamlanmamış) en küçük numaralı faz — opsiyonel Faz 6 hiçbir zaman engellemez.
+function computeNextActionablePhase(phaseStatus: Record<number, boolean>, phase3Complete: boolean): number | null {
+  for (const p of PHASES) {
+    const locked = p.id >= 4 && !phase3Complete;
+    if (locked) continue;
+    const optional = "optional" in p && p.optional;
+    if (optional) continue;
+    if (!phaseStatus[p.id]) return p.id;
+  }
+  return null;
+}
 
 type CaseRow = {
   id: string;
@@ -167,6 +181,10 @@ export default function MediationEngine() {
   const [deleting, setDeleting] = useState(false);
   const [trackerOpen, setTrackerOpen] = useState(false);
   const [agentPanelOpen, setAgentPanelOpen] = useState(false);
+  // Faz tamamlanma daveti — sadece tamamlanmadı→tamamlandı GEÇİŞİNDE toast/parlama tetiklenir.
+  // null = henüz hiç hesaplanmadı (dosya ilk açılışı); ilk hesaplamada geçiş sayılmaz.
+  const prevPhaseStatusRef = useRef<Record<number, boolean> | null>(null);
+  const [glowPhase, setGlowPhase] = useState<number | null>(null);
 
   useEffect(() => {
     if (activeCase && (isMediator || isAdmin) && params.get("tab") === "surec") {
@@ -254,7 +272,7 @@ export default function MediationEngine() {
       supabase.from("case_sessions").select("id", { count: "exact", head: true }).eq("case_id", id),
       supabase.from("case_notes").select("id", { count: "exact", head: true }).eq("case_id", id).eq("phase", 7),
     ]);
-    setPhaseStatus({
+    const nextStatus: Record<number, boolean> = {
       1: !!c.dispute_type,
       2: (parties.count ?? 0) >= 2,
       3: (analyses.count ?? 0) >= 1,
@@ -263,8 +281,33 @@ export default function MediationEngine() {
       6: false, // opsiyonel — tamamlanma aranmaz
       7: (notes.count ?? 0) >= 1,
       8: c.status === "agreed" || c.status === "failed",
-    });
-  }, []);
+    };
+
+    // Davet modeli: sadece tamamlanmadı→tamamlandı geçişinde tetikle (ilk yüklemede sessiz kal).
+    const prev = prevPhaseStatusRef.current;
+    if (prev) {
+      for (const p of PHASES) {
+        if ("optional" in p && p.optional) continue;
+        if (!prev[p.id] && nextStatus[p.id]) {
+          const target = computeNextActionablePhase(nextStatus, phase3Complete);
+          setGlowPhase(p.id);
+          toast({
+            title: `✓ Aşama ${p.id} tamamlandı`,
+            description: p.label,
+            action: target
+              ? (
+                <ToastAction altText={`Aşama ${target}'e geç`} onClick={() => setPhase(target)}>
+                  {`Aşama ${target}'e Geç`}
+                </ToastAction>
+              )
+              : undefined,
+          });
+        }
+      }
+    }
+    prevPhaseStatusRef.current = nextStatus;
+    setPhaseStatus(nextStatus);
+  }, [phase3Complete]);
 
   useEffect(() => {
     if (caseId && activeCase) checkPhaseCompletion(caseId, activeCase);
@@ -310,19 +353,19 @@ export default function MediationEngine() {
     setParams(p);
   }
 
-  // Sıradaki erişilebilir (kilidi açık, tamamlanmamış) en küçük numaralı faz — opsiyonel Faz 6 hiçbir zaman engellemez.
   // NOT: Bu hook, aşağıdaki koşullu return'lerden (loading / !caseId / !activeCase) ÖNCE
   // durmalı — Hooks Rules gereği hook çağrı sırası her render'da sabit kalmalı (React #310).
-  const nextActionablePhase = useMemo(() => {
-    for (const p of PHASES) {
-      const locked = p.id >= 4 && !phase3Complete;
-      if (locked) continue;
-      const optional = "optional" in p && p.optional;
-      if (optional) continue;
-      if (!phaseStatus[p.id]) return p.id;
-    }
-    return null;
-  }, [phaseStatus, phase3Complete]);
+  const nextActionablePhase = useMemo(
+    () => computeNextActionablePhase(phaseStatus, phase3Complete),
+    [phaseStatus, phase3Complete]
+  );
+
+  // Altın parlama: tamamlanma geçişinde bir defalık, ~1.3sn sonra kendiliğinden söner.
+  useEffect(() => {
+    if (glowPhase == null) return;
+    const t = setTimeout(() => setGlowPhase(null), 1300);
+    return () => clearTimeout(t);
+  }, [glowPhase]);
 
   if (isLoading || !user) {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
@@ -469,6 +512,18 @@ export default function MediationEngine() {
                     ${locked ? "opacity-50 cursor-not-allowed" : ""}
                     ${isNext ? "border-l-accent/60" : ""}`}
                   title={locked ? "Aşama 3 tamamlanmadı" : isNext ? "Sıradaki aşama" : ""}>
+                  <AnimatePresence>
+                    {glowPhase === p.id && (
+                      <motion.span
+                        key="gold-glow"
+                        className="pointer-events-none absolute inset-0 rounded-md ring-2 ring-amber-400"
+                        initial={{ opacity: 0, boxShadow: "0 0 0px rgba(251,191,36,0)" }}
+                        animate={{ opacity: [0, 1, 1, 0], boxShadow: ["0 0 0px rgba(251,191,36,0)", "0 0 14px rgba(251,191,36,0.8)", "0 0 14px rgba(251,191,36,0.8)", "0 0 0px rgba(251,191,36,0)"] }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 1.3, times: [0, 0.15, 0.75, 1], ease: "easeOut" }}
+                      />
+                    )}
+                  </AnimatePresence>
                   {optional
                     ? <span className="h-4 w-4 rounded-full border border-current/50 flex items-center justify-center shrink-0" title="Opsiyonel — atlanabilir">
                         <span className="h-1.5 w-1.5 rounded-full bg-current/50" />
