@@ -635,6 +635,16 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
 
 /* ===================== PHASE RENDERER ===================== */
 
+// Arabulucunun ne zaman geçeceğine kendisinin karar verdiği, her zaman görünür ileri butonu.
+// Koşula bağlı değil — mevcut tamamlanma/toast akışından bağımsız, manuel geçiş kapısı.
+function NextPhaseButton({ phase, onAdvance }: { phase: number; onAdvance: (n: number) => void }) {
+  return (
+    <div className="mt-6 pt-4 border-t flex justify-end">
+      <Button onClick={() => onAdvance(phase + 1)}>{`Aşama ${phase + 1}'e Geç →`}</Button>
+    </div>
+  );
+}
+
 function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }: {
   phase: number; caseRow: CaseRow; reload: () => void; isMediator: boolean; userId: string;
   onAdvance: (n: number) => void;
@@ -646,15 +656,18 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }
     }
   }
   switch (phase) {
-    case 1: return <Phase1Summary caseRow={caseRow} />;
-    case 2: return <Phase2Parties caseRow={caseRow} isMediator={isMediator} userId={userId} onDone={() => { bumpPhase(3); onAdvance(3); }} />;
-    case 3: return <Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} /></Phase3ErrorBoundary>;
-    case 4: return isMediator
-      ? <Phase4Summary caseRow={caseRow} />
-      : <Card className="p-6 text-sm text-muted-foreground">Bu bölüm yalnızca arabulucu tarafından görüntülenebilir.</Card>;
-    case 5: return <Phase5Sessions caseRow={caseRow} bumpPhase={bumpPhase} onAdvance={onAdvance} />;
-    case 6: return <Phase7Expert caseRow={caseRow} />;
-    case 7: return <Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(8); onAdvance(8); }} />;
+    case 1: return <><Phase1Summary caseRow={caseRow} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 2: return <><Phase2Parties caseRow={caseRow} isMediator={isMediator} userId={userId} onDone={() => { bumpPhase(3); onAdvance(3); }} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 3: return <><Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} /></Phase3ErrorBoundary><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 4: return <>
+      {isMediator
+        ? <Phase4Summary caseRow={caseRow} />
+        : <Card className="p-6 text-sm text-muted-foreground">Bu bölüm yalnızca arabulucu tarafından görüntülenebilir.</Card>}
+      <NextPhaseButton phase={phase} onAdvance={onAdvance} />
+    </>;
+    case 5: return <><Phase5Sessions caseRow={caseRow} bumpPhase={bumpPhase} onAdvance={onAdvance} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 6: return <><Phase7Expert caseRow={caseRow} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 7: return <><Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(8); onAdvance(8); }} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 8: return <Phase9Closing caseRow={caseRow} />;
     default: return null;
   }
