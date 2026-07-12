@@ -586,16 +586,16 @@ export default function MediationEngine() {
             Dosya Araçları
           </div>
           {(isMediator || isAdmin) && (
-            <Button variant="outline" size="sm" className="w-full mb-4 justify-start border-l-2 border-l-transparent text-sidebar-foreground transition-colors hover:border-l-accent hover:text-accent"
+            <Button variant="outline" size="sm" className="w-full mb-4 justify-start border-l-2 border-l-transparent text-sidebar-foreground transition-colors hover:border-l-accent hover:text-accent hover:bg-sidebar-accent/40"
               onClick={() => setTrackerOpen(true)}>
               📋 Süreç Takip Çizelgesi
             </Button>
           )}
-          <Button variant="outline" size="sm" className="w-full mb-4 justify-start border-l-2 border-l-transparent text-sidebar-foreground transition-colors hover:border-l-accent hover:text-accent"
+          <Button variant="outline" size="sm" className="w-full mb-4 justify-start border-l-2 border-l-transparent text-sidebar-foreground transition-colors hover:border-l-accent hover:text-accent hover:bg-sidebar-accent/40"
             onClick={() => setAgentPanelOpen(true)}>
             🤖 Ajan Kontrol Paneli
           </Button>
-          <Button variant="outline" size="sm" className="w-full mb-4 justify-start border-l-2 border-l-transparent text-sidebar-foreground transition-colors hover:border-l-accent hover:text-accent"
+          <Button variant="outline" size="sm" className="w-full mb-4 justify-start border-l-2 border-l-transparent text-sidebar-foreground transition-colors hover:border-l-accent hover:text-accent hover:bg-sidebar-accent/40"
             onClick={() => setPaymentPanelOpen(true)}>
             💰 Ödeme & Muhasebe
           </Button>
