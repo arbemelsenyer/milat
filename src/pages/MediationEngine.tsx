@@ -2984,6 +2984,157 @@ function downloadReport(opts: { caseTitle?: string; caseId: string; report: any;
   }
 }
 
+/* ===================== PHASE 4 KOKPİT — Genel Bakış sekmesi bileşenleri ===================== */
+// Dashboard'daki hero istatistik kartı (koyu bg-sidebar, CountUp altın rakamlar) deseninin
+// Faz 4 "Genel Bakış" sekmesi için komuta-merkezi yerleşimine uyarlanmış hali. Sadece görsel
+// sunum — veri kaynakları mevcut report.report / analyses alanlarıyla birebir aynı.
+const COCKPIT_TONE_BG: Record<"low" | "medium" | "high" | "unknown", string> = {
+  low: "bg-emerald-400", medium: "bg-amber-400", high: "bg-red-400", unknown: "bg-accent",
+};
+const COCKPIT_TONE_TEXT: Record<"low" | "medium" | "high" | "unknown", string> = {
+  low: "text-emerald-400", medium: "text-amber-400", high: "text-red-400", unknown: "text-accent",
+};
+
+function CockpitGauge({ pct, riskLabel, sourceHint }: { pct: number | null; riskLabel?: string; sourceHint?: string }) {
+  const tone = normalizeRiskLevel(riskLabel);
+  const empty = pct === null;
+  const clamped = empty ? 0 : Math.min(100, Math.max(0, pct));
+  const r = 80;
+  const circumference = Math.PI * r;
+  const dashOffset = circumference * (1 - clamped / 100);
+  return (
+    <div className="flex flex-col items-center justify-center h-full">
+      <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-1">Uzlaşma Tahmini</div>
+      <div className="relative w-full max-w-[220px]">
+        <svg viewBox="0 0 200 100" className="w-full">
+          <path d="M20,90 A80,80 0 0 1 180,90" fill="none" stroke="currentColor" strokeWidth="14" strokeLinecap="round" className="text-sidebar-accent/60" />
+          <path
+            d="M20,90 A80,80 0 0 1 180,90" fill="none" stroke="currentColor" strokeWidth="14" strokeLinecap="round"
+            strokeDasharray={circumference} strokeDashoffset={dashOffset}
+            className={empty ? "text-sidebar-foreground/15" : COCKPIT_TONE_TEXT[tone]}
+            style={{ transition: "stroke-dashoffset 1s ease-out" }}
+          />
+        </svg>
+        <div className="absolute inset-x-0 bottom-0 flex justify-center">
+          <div className={`font-display font-bold tabular-nums leading-none ${empty ? "text-3xl text-sidebar-foreground/30" : `text-5xl ${COCKPIT_TONE_TEXT[tone]}`}`}>
+            {empty ? "—" : <PhaseHeroCountUp value={clamped} suffix="%" />}
+          </div>
+        </div>
+      </div>
+      {riskLabel && !empty && (
+        <span className={`mt-2 text-[11px] font-medium px-2 py-0.5 rounded-full ${riskBadgeTone(riskLabel)}`}>{riskLabel} Risk</span>
+      )}
+      {sourceHint && <div className="text-[11px] text-sidebar-foreground/45 mt-1.5 italic text-center max-w-[220px]">{sourceHint}</div>}
+    </div>
+  );
+}
+
+function CockpitZopaBand({ zopa, lowerName, upperName }: { zopa: any; lowerName?: string; upperName?: string }) {
+  const hasData = zopa && (zopa.lower_bound || zopa.upper_bound || zopa.description);
+  if (!hasData) {
+    return (
+      <div className="rounded-xl border border-dashed border-sidebar-border/70 bg-sidebar-accent/20 p-5 flex flex-col items-center justify-center text-center h-full min-h-[140px]">
+        <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-2">Uzlaşma Alanı (ZOPA)</div>
+        <p className="text-sm text-sidebar-foreground/50 italic">ZOPA için rapor üretin</p>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-xl border border-sidebar-border bg-sidebar-accent/20 p-5 space-y-3 h-full">
+      <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Uzlaşma Alanı (ZOPA)</div>
+      <div className="flex items-center gap-3">
+        <div className="shrink-0">
+          <div className="text-[10px] text-sidebar-foreground/50 uppercase tracking-wide">{lowerName ? `${lowerName} alt teklifi` : "Alt teklif"}</div>
+          <div className="font-display text-lg font-bold text-sidebar-foreground">{zopa.lower_bound || "?"}</div>
+        </div>
+        <div className="flex-1 h-3 rounded-full bg-sidebar-border/60 relative overflow-hidden">
+          <div className="absolute inset-y-0 left-[15%] right-[15%] rounded-full bg-accent/80" />
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="text-[10px] text-sidebar-foreground/50 uppercase tracking-wide">{upperName ? `${upperName} üst talebi` : "Üst talep"}</div>
+          <div className="font-display text-lg font-bold text-sidebar-foreground">{zopa.upper_bound || "?"}</div>
+        </div>
+      </div>
+      {zopa.description && <p className="text-xs text-sidebar-foreground/60 leading-snug">{zopa.description}</p>}
+    </div>
+  );
+}
+
+function CockpitMiniBar({ label, pct, valueLabel, tone }: { label: string; pct: number | null; valueLabel: string; tone: "low" | "medium" | "high" | "unknown" }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[11px] text-sidebar-foreground/50">{label}</span>
+        <span className="text-xs font-semibold text-sidebar-foreground">{valueLabel}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-sidebar-border/60 overflow-hidden">
+        <div className={`h-full rounded-full ${COCKPIT_TONE_BG[tone]}`} style={{ width: pct !== null ? `${Math.min(100, Math.max(0, pct))}%` : "0%" }} />
+      </div>
+    </div>
+  );
+}
+
+function CockpitPartyColumn({
+  name, riskPuani, uzlasmaPct, uzlasmaLabel, mahkemePct, mahkemeLabel, batna,
+}: {
+  name: string; riskPuani?: string; uzlasmaPct: number | null; uzlasmaLabel: string;
+  mahkemePct: number | null; mahkemeLabel: string; batna: string;
+}) {
+  const tone = normalizeRiskLevel(riskPuani);
+  return (
+    <div className="rounded-xl border border-sidebar-border bg-sidebar-accent/25 p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-display font-semibold text-sidebar-foreground truncate">{name}</div>
+        <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${riskBadgeTone(riskPuani)}`}>{riskPuani || "—"}</span>
+      </div>
+      <CockpitMiniBar label="Anlaşma Oranı" pct={uzlasmaPct} valueLabel={uzlasmaLabel} tone={tone} />
+      <CockpitMiniBar label="Mahkeme Riski" pct={mahkemePct} valueLabel={mahkemeLabel} tone={tone} />
+      <div>
+        <div className="text-[11px] text-sidebar-foreground/50 uppercase tracking-wide mb-0.5">BATNA Gücü</div>
+        <div className="text-xs text-sidebar-foreground/80 leading-snug line-clamp-2">{batna || "—"}</div>
+      </div>
+    </div>
+  );
+}
+
+function CockpitScenarioCard({ letter, scenario, recommended }: { letter: string; scenario: any; recommended: boolean }) {
+  return (
+    <div className={`rounded-xl border p-3 space-y-1.5 ${recommended ? "border-accent/60 bg-accent/10" : "border-sidebar-border bg-sidebar-accent/20"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-display font-bold text-accent">{letter}</span>
+        {recommended && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-sidebar-background">⭐ Önerilen</span>}
+      </div>
+      <div className="text-sm font-medium text-sidebar-foreground line-clamp-1">{scenario.label || "Senaryo"}</div>
+      <p className="text-xs text-sidebar-foreground/60 line-clamp-2">{scenario.summary}</p>
+    </div>
+  );
+}
+
+function CockpitBadgeFlow({ items }: { items: string[] }) {
+  if (items.length === 0) return <p className="text-xs text-sidebar-foreground/40 italic">Henüz belirlenmedi</p>;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((f, i) => (
+        <span key={i} className="text-[11px] px-2 py-1 rounded-full bg-sidebar-accent/40 border border-sidebar-border text-sidebar-foreground/80">{f}</span>
+      ))}
+    </div>
+  );
+}
+
+function CockpitRedLines({ items }: { items: string[] }) {
+  if (items.length === 0) return <p className="text-xs text-sidebar-foreground/40 italic">Henüz belirlenmedi</p>;
+  return (
+    <ul className="space-y-1">
+      {items.map((r, i) => (
+        <li key={i} className="flex items-start gap-1.5 text-xs text-sidebar-foreground/80">
+          <ShieldCheck className="h-3 w-3 mt-0.5 shrink-0 text-red-400" />
+          <span>{r}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /* ===================== PHASE 4 - MEDIATOR PANEL (READ-ONLY SUMMARY) ===================== */
 
 function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
@@ -3121,6 +3272,36 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
     return { name, risk_puani: a.risk_analizi?.risk_puani as string | undefined };
   });
 
+  // ── Genel Bakış kokpiti için türetilen görünüm verisi — hepsi report.report /
+  // analyses üzerinde zaten var olan alanlardan; yeni veri kaynağı yok.
+  const cockpitReportData = report?.report;
+  const cockpitRiskOzeti = cockpitReportData?.risk_ozeti;
+  const cockpitRows = analyses.map((a: any, i: number) => {
+    const cp = a.case_parties || {};
+    const name = cp.company_name || `${cp.first_name ?? ""} ${cp.last_name ?? ""}`.trim() || `Taraf ${i + 1}`;
+    const r = a.risk_analizi || {};
+    return {
+      name,
+      risk_puani: r.risk_puani as string | undefined,
+      uzlasma_pct: parsePercent(r.uzlasma_orani),
+      uzlasma_label: safeText(r.uzlasma_orani) || "Yeterli veri yok",
+      mahkeme_pct: parsePercent(r.mahkeme_riski),
+      mahkeme_label: safeText(r.mahkeme_riski) || "Yeterli veri yok",
+      batna: safeText(a.analysis?.party_position?.batna),
+    };
+  });
+  const cockpitRiskPuani = cockpitRiskOzeti?.genel_risk_puani
+    || cockpitRows.find((r) => /yük/i.test(String(r.risk_puani)))?.risk_puani
+    || cockpitRows.find((r) => /orta/i.test(String(r.risk_puani)))?.risk_puani
+    || cockpitRows[0]?.risk_puani;
+  const cockpitScenarios = Array.isArray(cockpitReportData?.scenarios) ? cockpitReportData.scenarios.slice(0, 3) : [];
+  const cockpitStrongestScenario = cockpitScenarios.find((s: any) => /dengeli/i.test(String(s?.label))) || cockpitScenarios[0] || null;
+  const cockpitCriticalFactors = Array.from(new Set([
+    ...safeList(cockpitRiskOzeti?.ortak_kritik_faktorler),
+    ...analyses.flatMap((a: any) => safeList(a.risk_analizi?.kritik_faktorler)),
+  ])).slice(0, 12);
+  const cockpitRedLines = safeList(cockpitReportData?.red_lines).slice(0, 8);
+
   return (
     <div className="space-y-4">
       <PhaseHero
@@ -3156,27 +3337,94 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
 
         <TabsContent value="genel-bakis">
           <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
-            <motion.div variants={itemVariants} className="border rounded-md p-3 bg-muted/30 space-y-2">
-              <Label className="text-sm">UYAP Kayıt No (varsa girin)</Label>
-              <div className="flex gap-2">
-                <Input value={uyap} onChange={(e) => setUyap(e.target.value)} placeholder="Örn. 2026/12345" className="font-mono" />
-                <Button onClick={saveUyap} disabled={savingUyap}>
-                  {savingUyap ? <Loader2 className="h-4 w-4 animate-spin" /> : "Kaydet"}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">Başvuru UYAP sistemine kaydedildiğinde devlet tarafından verilen resmi numarayı buraya girin. Boş bırakılırsa belgelerde "UYAP No: Henüz kaydedilmedi" görünür.</p>
-            </motion.div>
+            {/* Karşılaştırmalı risk_ozeti otomatik-üretim efekti sessizce çalışmaya devam eder;
+                görünümü aşağıdaki kokpit panelleri devralır, mükerrer kart göstermez. */}
             {report?.report && (
-              <motion.div variants={itemVariants} className="space-y-2">
+              <div className="hidden" aria-hidden="true">
                 <ComparativeRiskAnalysis
                   parties={analyses.map((a: any) => ({ id: a.party_id, ...(a.case_parties || {}) }))}
                   analyses={analyses}
                   reportData={report.report}
                   caseId={caseRow.id}
                 />
-                <RiskSummaryCard summary={report.report?.risk_ozeti} sources={report.report?.sources} />
+              </div>
+            )}
+
+            {analyses.length === 0 ? (
+              <motion.div variants={itemVariants} className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground italic text-center">
+                Kokpit, Aşama 3'te en az bir taraf analizi tamamlandığında dolmaya başlar.
+              </motion.div>
+            ) : (
+              <motion.div variants={itemVariants} className="rounded-2xl border border-sidebar-border bg-sidebar text-sidebar-foreground p-6 shadow-elegant space-y-6">
+                {/* Üst şerit: Uzlaşma Tahmini gauge'ı + ZOPA bandı */}
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(240px,340px)_1fr] gap-4 items-stretch">
+                  <CockpitGauge pct={heroUzlasmaPct} riskLabel={cockpitRiskPuani} sourceHint={cockpitRiskOzeti?.genel_uzlasma_orani_kaynak} />
+                  <CockpitZopaBand
+                    zopa={cockpitReportData?.zopa}
+                    lowerName={cockpitRows[1]?.name}
+                    upperName={cockpitRows[0]?.name}
+                  />
+                </div>
+
+                {/* Taraf karşılaştırma sütunları */}
+                {cockpitRows.length > 0 && (
+                  <div className={`grid gap-4 ${cockpitRows.length > 1 ? "sm:grid-cols-2" : ""}`}>
+                    {cockpitRows.map((r, i) => (
+                      <CockpitPartyColumn
+                        key={i}
+                        name={r.name}
+                        riskPuani={r.risk_puani}
+                        uzlasmaPct={r.uzlasma_pct}
+                        uzlasmaLabel={r.uzlasma_label}
+                        mahkemePct={r.mahkeme_pct}
+                        mahkemeLabel={r.mahkeme_label}
+                        batna={r.batna}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Senaryo kartları */}
+                {cockpitScenarios.length > 0 && (
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-2">Çözüm Senaryoları</div>
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      {cockpitScenarios.map((sc: any, i: number) => (
+                        <CockpitScenarioCard
+                          key={i}
+                          letter={String.fromCharCode(65 + i)}
+                          scenario={sc}
+                          recommended={sc === cockpitStrongestScenario || /⭐/.test(`${sc?.label ?? ""} ${sc?.summary ?? ""}`)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Alt şerit: Kritik Faktörler rozet akışı + Kırmızı Çizgiler */}
+                <div className="grid sm:grid-cols-2 gap-4 pt-2 border-t border-sidebar-border/60">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-2">Kritik Faktörler</div>
+                    <CockpitBadgeFlow items={cockpitCriticalFactors} />
+                  </div>
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-2">Kırmızı Çizgiler</div>
+                    <CockpitRedLines items={cockpitRedLines} />
+                  </div>
+                </div>
               </motion.div>
             )}
+
+            <motion.div variants={itemVariants} className="border rounded-md px-3 py-2 bg-muted/30 flex items-center gap-2 flex-wrap">
+              <Label className="text-xs text-muted-foreground shrink-0">UYAP Kayıt No</Label>
+              <Input
+                value={uyap} onChange={(e) => setUyap(e.target.value)} placeholder="Örn. 2026/12345"
+                className="font-mono h-8 text-sm max-w-[200px]"
+              />
+              <Button onClick={saveUyap} disabled={savingUyap} size="sm" className="h-8">
+                {savingUyap ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Kaydet"}
+              </Button>
+            </motion.div>
           </motion.div>
         </TabsContent>
 
