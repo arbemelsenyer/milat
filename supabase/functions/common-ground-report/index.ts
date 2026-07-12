@@ -99,6 +99,8 @@ Deno.serve(async (req) => {
 Eğer "GÖRÜŞME NOTLARI ANALİZİ" bloğu verilmişse, bu bloktaki önceden çıkarılmış tespit/pozisyon/strateji bulgularını ortak zemin (common_interests), senaryolar (scenarios) ve arabulucu stratejisi (mediator_strategy) değerlendirmende dikkate al.
 KESİN KURAL: Sabit/uydurma % ASLA verme. Kaynak yoksa "Yeterli veri yok" yaz.
 KESİN KURAL (halüsinasyon yasağı): "GÖRÜŞME NOTLARI ANALİZİ" bloğundan yalnızca orada yazılı olan tespit/pozisyon/strateji içeriğinden alıntı/özetleme yap; blokta yer almayan bulgu uydurma.
+KESİN KURAL (uzlaşma ortalaması ZORUNLU): "TARAF ANALİZLERİ" bloğundaki her tarafın risk_analizi.uzlasma_orani alanını oku. İki tarafın da uzlasma_orani değeri mevcutsa (sayısal % olarak parse edilebiliyorsa), risk_ozeti.genel_uzlasma_orani alanına bu değerlerin ortalamasını (ağırlıklı veri yoksa basit ortalama) "%68" formatında SAYISAL YÜZDE olarak yaz — ayrı ayrı iki % vermek yerine tek bir ortalama % üret; genel_uzlasma_orani_kaynak alanına hangi iki taraf oranından ve nasıl hesaplandığını belirt (ör. "Taraf A %72 ve Taraf B %64 ortalaması"). "Yeterli veri yok" cevabı YALNIZCA iki taraf analizinde de uzlasma_orani mevcut değilse kabul edilir; tek taraf verisi bile varsa onu temel alıp genel_uzlasma_orani_kaynak alanında bunun tek taraf verisine dayandığını belirt, boş bırakma.
+KESİN KURAL (yüzdesel risk formatı): risk_ozeti.genel_risk_puani ve taraf_karsilastirma[].risk_puani alanlarında yalnızca sözel derece (Düşük/Orta/Yüksek) YETERSİZDİR — MUTLAKA yanına sayısal yüzde ekle, "Yüksek (%75)", "Orta (%45)", "Düşük (%20)" formatında yaz. Bu yüzdeyi kaynak disiplini kurallarına uyarak (taraf risk_analizi verisi, resmi kaynak veya benzer dava istatistiklerinden) türet; hiçbir kaynağa dayanmıyorsa sözel dereceyi ver ama % kısmını "Yeterli veri yok" yaz, uydurma % ekleme.
 Çıktı YALNIZCA JSON: {
   "common_interests": [],
   "zopa": {"description":"", "lower_bound":"", "upper_bound":""},
@@ -110,10 +112,10 @@ KESİN KURAL (halüsinasyon yasağı): "GÖRÜŞME NOTLARI ANALİZİ" bloğundan
   "mediator_strategy": {"opening_statement":"","critical_questions":[],"deadlock_techniques":[]},
   "red_lines": [],
   "risk_ozeti": {
-    "genel_uzlasma_orani":"",
+    "genel_uzlasma_orani":"iki taraf uzlasma_orani ortalaması, örn. %68",
     "genel_uzlasma_orani_kaynak":"",
-    "genel_risk_puani":"Düşük|Orta|Yüksek",
-    "taraf_karsilastirma":[{"taraf":"","risk_puani":"","guclu_yon":"","zayif_yon":""}],
+    "genel_risk_puani":"Düşük (%..)|Orta (%..)|Yüksek (%..)",
+    "taraf_karsilastirma":[{"taraf":"","risk_puani":"Düşük (%..)|Orta (%..)|Yüksek (%..)","guclu_yon":"","zayif_yon":""}],
     "ortak_kritik_faktorler":[],
     "ortak_uzlasma_engelleri":[],
     "kaynak_listesi":[],
