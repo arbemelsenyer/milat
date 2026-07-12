@@ -1711,6 +1711,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
   const [analysisError, setAnalysisError] = useState<{ partyId: string; msg: string } | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [statementDrafts, setStatementDrafts] = useState<Record<string, string>>({});
+  const [savingStatement, setSavingStatement] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
     setLoadError(null);
@@ -1790,6 +1792,20 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
     await supabase.storage.from("case-documents").remove([d.file_path]);
     await supabase.from("case_documents").delete().eq("id", d.id);
     loadAll();
+  }
+
+  async function saveStatement(partyId: string, text: string) {
+    setSavingStatement(partyId);
+    try {
+      const { error } = await supabase.from("case_parties").update({ statement: text }).eq("id", partyId);
+      if (error) throw error;
+      toast({ title: "Taraf beyanı kaydedildi" });
+      loadAll();
+    } catch (e: any) {
+      toast({ title: "Beyan kaydedilemedi", description: trErr(e.message), variant: "destructive" });
+    } finally {
+      setSavingStatement(null);
+    }
   }
 
   async function runAnalysis(partyId: string) {
@@ -1931,6 +1947,28 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
                     {p.email && <div><span className="text-muted-foreground">E-posta:</span> {p.email}</div>}
                     {p.gsm && <div><span className="text-muted-foreground">GSM:</span> {p.gsm}</div>}
                     {p.address && <div className="col-span-2"><span className="text-muted-foreground">Adres:</span> {p.address}</div>}
+                  </div>
+
+                  {/* Party statement */}
+                  <div>
+                    <div className="text-sm font-medium mb-2">Taraf Beyanı / Anlatımı</div>
+                    <Textarea
+                      rows={4}
+                      placeholder="Tarafın uyuşmazlığa ilişkin kendi anlatımı, talepleri, pozisyonu..."
+                      value={statementDrafts[p.id] ?? p.statement ?? ""}
+                      onChange={(e) => setStatementDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                    />
+                    <div className="flex justify-end mt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => saveStatement(p.id, statementDrafts[p.id] ?? p.statement ?? "")}
+                        disabled={savingStatement === p.id}
+                      >
+                        {savingStatement === p.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                        Beyanı Kaydet
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Per-party docs */}

@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
       });
     }
     const { data: party } = await admin
-      .from("case_parties").select("id, user_id, case_id, party_role, party_type, first_name, last_name, company_name, email, gsm, phone, address, authorized_person")
+      .from("case_parties").select("id, user_id, case_id, party_role, party_type, first_name, last_name, company_name, email, gsm, phone, address, authorized_person, statement")
       .eq("id", party_id).eq("case_id", case_id).maybeSingle();
     if (!party) {
       return new Response(JSON.stringify({ error: "Party not found" }), {
@@ -166,6 +166,12 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Party's own free-text statement — primary source when present; the AI should
+    // ground the analysis in the party's own words before leaning on documents.
+    const statementBlock = (party.statement ?? "").trim()
+      ? `\n═══ TARAF BEYANI (tarafın kendi anlatımı — birincil kaynak) ═══\n${party.statement.trim()}\n═══════════════════════════\n`
+      : "";
+
     const partyName = party.party_type === "individual"
       ? `${party.first_name ?? ""} ${party.last_name ?? ""}`.trim()
       : (party.company_name ?? "Taraf");
@@ -179,6 +185,7 @@ Deno.serve(async (req) => {
 
     const systemPrompt = `Sen bir Türk hukuk arabuluculuk uzmanı AI'sın. Bu tarafın perspektifinden detaylı bir analiz hazırlıyorsun.
 Otomatik olarak: (1) niş hukuki alanı tespit et, (2) ilgili mevzuat ve Yargıtay/BAM emsallerini tara, (3) tarafın pozisyon/ihtiyaç/BATNA analizini yap, (4) yüklenen belgelerden somut bulgular çıkar. Sana verilen "İLGİLİ KAYNAK BİLGİSİ" ve "BENZER GEÇMİŞ DAVALAR" bloklarından yararlan, alakalıysa kaynak adını parantez içinde göster.
+Eğer "TARAF BEYANI" bloğu verilmişse, bu tarafın kendi ağzından anlatımıdır ve party_position (pozisyon/ihtiyaç/BATNA) analizinin birincil kaynağıdır; belgeler ve dava özeti bunu tamamlayıcı ikincil kaynaklardır. Beyan ile belgeler çelişirse bu çelişkiyi risks[] içinde belirt.
 Eğer "BELGE ANALİZ SONUÇLARI" bloğu verilmişse, bu bloktaki her belge için önceden çıkarılmış bilirkişi raporu bulguları (özet, bulgular, risk seviyesi, mevzuat) mevcuttur. Bu bulguları document_findings[] dizisine, kaynağını "Bilirkişi raporu: <belge adı>" şeklinde belirterek yansıt. Bu blok yoksa veya bir belge bu blokta geçmiyorsa document_findings davranışını değiştirme. Bu bloktaki riskLevel ve bulguları risk_analizi değerlendirmende (kritik_faktorler, risk_puani) de dikkate al.
 Eğer "GÖRÜŞME NOTLARI ANALİZİ" bloğu verilmişse, bu bloktaki her görüşmeden önceden çıkarılmış tespit/pozisyon/strateji bulguları mevcuttur. Bu bulguları document_findings[] dizisine, kaynağını "Görüşme notu" şeklinde belirterek yansıt; ayrıca risk_analizi değerlendirmende (kritik_faktorler, risk_puani) de dikkate al.
 KESİN KURAL (halüsinasyon yasağı): "BELGE ANALİZ SONUÇLARI" ve "GÖRÜŞME NOTLARI ANALİZİ" bloklarından yalnızca orada yazılı olan içerikten alıntı/özetleme yap; blokta yer almayan bulgu, mevzuat veya risk uydurma.
@@ -197,6 +204,7 @@ BAŞLIK: ${caseRow?.title ?? ""}
 TARAF: ${partyName} (rol: ${party.party_role ?? "?"}, tür: ${party.party_type ?? ""})
 İLETİŞİM: ${party.email ?? ""} ${party.gsm ?? ""}
 UYUŞMAZLIK ÖZETİ: ${caseRow?.issue_description ?? "(belirtilmemiş)"}
+${statementBlock}
 YÜKLENEN BELGELER (${docs.length}): ${docs.map((d: any) => `- ${d.file_name}`).join("\n") || "(belge yok)"}
 ${docExcerpts ? `\nBELGE İÇERİKLERİ (kısmi):\n${docExcerpts}` : ""}
 ${docReadFailed ? "\nNOT: Bazı belgeler (PDF/Word) metin olarak okunamadı; yalnızca dosya adlarından çıkarım yapıldı." : ""}
