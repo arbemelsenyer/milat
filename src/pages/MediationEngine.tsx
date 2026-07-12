@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -30,7 +31,12 @@ import {
   Plus, Loader2, FolderOpen, FileText, Users, Brain, ShieldCheck,
   Calendar as CalIcon, UserCheck, MessageSquare, FileCheck2, CheckCircle2, XCircle, Circle,
   Trash2, ArrowLeft, Sparkles, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Pencil,
+  LayoutDashboard, Lightbulb, Target,
 } from "lucide-react";
+
+// CaseRoom.tsx'teki altın sekme diliyle aynı — data-[state=active] alt çizgisi accent renginde.
+const tabTriggerAccentClass =
+  "border-b-2 border-b-transparent transition-colors hover:border-b-accent hover:text-accent data-[state=active]:border-b-accent data-[state=active]:text-accent";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { OfficialDocumentsPanel } from "@/components/mediation/OfficialDocumentsPanel";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
@@ -2193,7 +2199,8 @@ function PosBlock({ label, items }: { label: string; items?: string[] }) {
     </div>
   );
 }
-function CommonGroundView({ data, strategy, parties, analyses, caseId }: { data: any; strategy: any; parties?: any[]; analyses?: any[]; caseId?: string }) {
+// Faz 4 sekmeli yerleşiminde "Ortak Zemin" sekmesi için — Ortak Çıkarlar + ZOPA + Çözüm Senaryoları.
+function CommonGroundZeminSection({ data }: { data: any }) {
   if (!data) return null;
   return (
     <div className="space-y-2">
@@ -2240,6 +2247,15 @@ function CommonGroundView({ data, strategy, parties, analyses, caseId }: { data:
           </div>
         </AnaSection>
       )}
+    </div>
+  );
+}
+
+// Faz 4 sekmeli yerleşiminde "Strateji" sekmesi için — Arabulucu Stratejisi + Kırmızı Çizgiler + Kaynaklar.
+function CommonGroundStrategySection({ data, strategy }: { data: any; strategy: any }) {
+  if (!data) return null;
+  return (
+    <div className="space-y-2">
       {(strategy || data.mediator_strategy) && (
         <AnaSection icon="🎯" title="Arabulucu Stratejisi">
           {(() => {
@@ -2270,8 +2286,6 @@ function CommonGroundView({ data, strategy, parties, analyses, caseId }: { data:
           </ul>
         </AnaSection>
       )}
-      <ComparativeRiskAnalysis parties={parties} analyses={analyses} reportData={data} caseId={caseId} />
-      <RiskSummaryCard summary={data.risk_ozeti} sources={data.sources} />
       <SourcesPanel sources={data.sources} />
     </div>
   );
@@ -3129,76 +3143,120 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
           ) : undefined
         }
       />
-    <motion.div variants={containerVariants} initial="hidden" animate="show">
     <Card className="p-6 space-y-4">
       <h2 className="text-2xl font-bold text-primary">Aşama 4 — Arabulucu Paneli</h2>
       <p className="text-sm text-muted-foreground">Aşama 3'te üretilen taraf analizlerinin özeti ve Ortak Zemin Raporu üretimi.</p>
-      <motion.div variants={itemVariants} className="border rounded-md p-3 bg-muted/30 space-y-2">
-        <Label className="text-sm">UYAP Kayıt No (varsa girin)</Label>
-        <div className="flex gap-2">
-          <Input value={uyap} onChange={(e) => setUyap(e.target.value)} placeholder="Örn. 2026/12345" className="font-mono" />
-          <Button onClick={saveUyap} disabled={savingUyap}>
-            {savingUyap ? <Loader2 className="h-4 w-4 animate-spin" /> : "Kaydet"}
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground">Başvuru UYAP sistemine kaydedildiğinde devlet tarafından verilen resmi numarayı buraya girin. Boş bırakılırsa belgelerde "UYAP No: Henüz kaydedilmedi" görünür.</p>
-      </motion.div>
-      <motion.div variants={itemVariants}>
-        <h3 className="font-semibold mb-2">Taraf Analizleri ({analyses.length})</h3>
-        <div className="space-y-2">
-          {analyses.map((a: any, i) => {
-            const cp = a.case_parties || {};
-            const name = cp.company_name || `${cp.first_name ?? ""} ${cp.last_name ?? ""}`.trim() || "Taraf";
-            return (
-              <motion.div variants={itemVariants} key={i} className="border rounded p-3 text-sm">
-                <div className="font-medium">{name} <span className="text-xs text-muted-foreground">({roleLabel(cp.party_role)})</span></div>
-                {a.analysis?.dispute_area && <div className="text-xs">📋 {a.analysis.dispute_area}</div>}
-                {a.analysis?.party_position?.batna && <div className="text-xs">BATNA: {a.analysis.party_position.batna}</div>}
+      <Tabs defaultValue="genel-bakis" className="space-y-4">
+        <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="genel-bakis" className={tabTriggerAccentClass}><LayoutDashboard className="h-4 w-4 mr-1" />Genel Bakış</TabsTrigger>
+          <TabsTrigger value="taraf-analizleri" className={tabTriggerAccentClass}><Users className="h-4 w-4 mr-1" />Taraf Analizleri</TabsTrigger>
+          <TabsTrigger value="ortak-zemin" className={tabTriggerAccentClass}><Lightbulb className="h-4 w-4 mr-1" />Ortak Zemin</TabsTrigger>
+          <TabsTrigger value="strateji" className={tabTriggerAccentClass}><Target className="h-4 w-4 mr-1" />Strateji</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="genel-bakis">
+          <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+            <motion.div variants={itemVariants} className="border rounded-md p-3 bg-muted/30 space-y-2">
+              <Label className="text-sm">UYAP Kayıt No (varsa girin)</Label>
+              <div className="flex gap-2">
+                <Input value={uyap} onChange={(e) => setUyap(e.target.value)} placeholder="Örn. 2026/12345" className="font-mono" />
+                <Button onClick={saveUyap} disabled={savingUyap}>
+                  {savingUyap ? <Loader2 className="h-4 w-4 animate-spin" /> : "Kaydet"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Başvuru UYAP sistemine kaydedildiğinde devlet tarafından verilen resmi numarayı buraya girin. Boş bırakılırsa belgelerde "UYAP No: Henüz kaydedilmedi" görünür.</p>
+            </motion.div>
+            {report?.report && (
+              <motion.div variants={itemVariants} className="space-y-2">
+                <ComparativeRiskAnalysis
+                  parties={analyses.map((a: any) => ({ id: a.party_id, ...(a.case_parties || {}) }))}
+                  analyses={analyses}
+                  reportData={report.report}
+                  caseId={caseRow.id}
+                />
+                <RiskSummaryCard summary={report.report?.risk_ozeti} sources={report.report?.sources} />
               </motion.div>
-            );
-          })}
-        </div>
-      </motion.div>
-      <motion.div variants={itemVariants}>
-        <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-          <h3 className="font-semibold">Ortak Zemin Raporu</h3>
-          <div className="flex gap-2 flex-wrap">
-            {report && (
-              <>
-                <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, analyses, mode: "print" })}>PDF</Button>
-                <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, analyses, mode: "html" })}>İndir</Button>
-              </>
             )}
-            <Button size="sm" onClick={generateReport} disabled={!canReport || reportBusy}>
-              {reportBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {reportStatus ?? "Rapor hazırlanıyor…"}</> : <><Sparkles className="h-4 w-4 mr-1" /> {report ? "Yeniden Üret" : "Rapor Üret"}</>}
-            </Button>
-          </div>
-        </div>
-        {reportBusy && reportAttempt > 1 && (
-          <div className="text-xs text-muted-foreground flex items-center gap-2 mb-2">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Geçici bir hata oluştu, otomatik olarak tekrar deneniyor ({reportAttempt}/3)…
-          </div>
-        )}
-        {reportError && (
-          <div className="text-xs text-destructive flex items-center gap-2 mb-2">
-            <AlertTriangle className="h-3 w-3" /> {reportError}
-            <Button size="sm" variant="outline" onClick={generateReport}><RefreshCw className="h-3 w-3 mr-1" />Tekrar Dene</Button>
-          </div>
-        )}
-        {report ? (
-          <CommonGroundView data={report.report} strategy={report.strategy} parties={analyses.map((a: any) => ({ id: a.party_id, ...(a.case_parties || {}) }))} analyses={analyses} caseId={caseRow.id} />
-        ) : canReport ? (
-          <p className="text-sm text-muted-foreground italic">Henüz rapor üretilmedi. "Rapor Üret" butonuna basın.</p>
-        ) : (
-          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 flex items-start gap-2">
-            <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
-            <span>Rapor üretmeden önce Aşama 3'te en az bir taraf analizini tamamlayın.</span>
-          </div>
-        )}
-      </motion.div>
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="taraf-analizleri">
+          <motion.div variants={containerVariants} initial="hidden" animate="show">
+            <motion.div variants={itemVariants}>
+              <h3 className="font-semibold mb-2">Taraf Analizleri ({analyses.length})</h3>
+              <div className="space-y-2">
+                {analyses.map((a: any, i) => {
+                  const cp = a.case_parties || {};
+                  const name = cp.company_name || `${cp.first_name ?? ""} ${cp.last_name ?? ""}`.trim() || "Taraf";
+                  return (
+                    <motion.div variants={itemVariants} key={i} className="border rounded p-3 text-sm">
+                      <div className="font-medium">{name} <span className="text-xs text-muted-foreground">({roleLabel(cp.party_role)})</span></div>
+                      {a.analysis?.dispute_area && <div className="text-xs">📋 {a.analysis.dispute_area}</div>}
+                      {a.analysis?.party_position?.batna && <div className="text-xs">BATNA: {a.analysis.party_position.batna}</div>}
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="ortak-zemin">
+          <motion.div variants={containerVariants} initial="hidden" animate="show">
+            <motion.div variants={itemVariants}>
+              <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                <h3 className="font-semibold">Ortak Zemin Raporu</h3>
+                <div className="flex gap-2 flex-wrap">
+                  {report && (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, analyses, mode: "print" })}>PDF</Button>
+                      <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, analyses, mode: "html" })}>İndir</Button>
+                    </>
+                  )}
+                  <Button size="sm" onClick={generateReport} disabled={!canReport || reportBusy}>
+                    {reportBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {reportStatus ?? "Rapor hazırlanıyor…"}</> : <><Sparkles className="h-4 w-4 mr-1" /> {report ? "Yeniden Üret" : "Rapor Üret"}</>}
+                  </Button>
+                </div>
+              </div>
+              {reportBusy && reportAttempt > 1 && (
+                <div className="text-xs text-muted-foreground flex items-center gap-2 mb-2">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Geçici bir hata oluştu, otomatik olarak tekrar deneniyor ({reportAttempt}/3)…
+                </div>
+              )}
+              {reportError && (
+                <div className="text-xs text-destructive flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-3 w-3" /> {reportError}
+                  <Button size="sm" variant="outline" onClick={generateReport}><RefreshCw className="h-3 w-3 mr-1" />Tekrar Dene</Button>
+                </div>
+              )}
+              {report ? (
+                <CommonGroundZeminSection data={report.report} />
+              ) : canReport ? (
+                <p className="text-sm text-muted-foreground italic">Henüz rapor üretilmedi. "Rapor Üret" butonuna basın.</p>
+              ) : (
+                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 flex items-start gap-2">
+                  <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                  <span>Rapor üretmeden önce Aşama 3'te en az bir taraf analizini tamamlayın.</span>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="strateji">
+          <motion.div variants={containerVariants} initial="hidden" animate="show">
+            <motion.div variants={itemVariants}>
+              {report?.report ? (
+                <CommonGroundStrategySection data={report.report} strategy={report.strategy} />
+              ) : (
+                <p className="text-sm text-muted-foreground italic">Strateji, Ortak Zemin Raporu üretildikten sonra burada görünecek.</p>
+              )}
+            </motion.div>
+          </motion.div>
+        </TabsContent>
+      </Tabs>
     </Card>
-    </motion.div>
     </div>
   );
 }
