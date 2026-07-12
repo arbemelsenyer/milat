@@ -3140,6 +3140,73 @@ function CockpitRedLines({ items }: { items: string[] }) {
   );
 }
 
+// risk_ozeti'nin AI tarafından üretilmiş resmi taraf karşılaştırma tablosu — CockpitPartyColumn'daki
+// tarafın kendi risk_analizi'nden anlık hesaplanan verilerle karışmasın diye ayrı, koyu tema kart.
+function CockpitOfficialComparisonTable({ items }: { items: any[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-sidebar-border bg-sidebar-accent/20 p-4 space-y-3">
+      <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Resmi Taraf Karşılaştırması</div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        {items.map((t: any, i: number) => (
+          <div key={i} className="rounded-lg border border-sidebar-border/70 bg-sidebar-accent/25 p-3 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-display font-semibold text-sm text-sidebar-foreground truncate">{safeText(t?.taraf) || `Taraf ${i + 1}`}</span>
+              {t?.risk_puani && (
+                <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${riskBadgeTone(t.risk_puani)}`}>{t.risk_puani}</span>
+              )}
+            </div>
+            {t?.guclu_yon && <div className="text-xs text-emerald-400/90 flex items-start gap-1.5"><span className="shrink-0">✓</span><span>{t.guclu_yon}</span></div>}
+            {t?.zayif_yon && <div className="text-xs text-red-400/90 flex items-start gap-1.5"><span className="shrink-0">✗</span><span>{t.zayif_yon}</span></div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CockpitObstacles({ items }: { items: string[] }) {
+  if (items.length === 0) return <p className="text-xs text-sidebar-foreground/40 italic">Henüz belirlenmedi</p>;
+  return (
+    <ul className="space-y-1.5">
+      {items.map((o, i) => (
+        <li key={i} className="flex items-start gap-1.5 text-xs text-sidebar-foreground/80 rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-1.5">
+          <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0 text-amber-400" />
+          <span>{o}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// Kokpitin "sonuç cümlesi" — altın çerçeveli vurgu kartı.
+function CockpitMediatorRecommendation({ text }: { text?: string }) {
+  if (!text) return null;
+  return (
+    <div className="rounded-xl border border-accent/50 bg-accent/10 p-4 flex items-start gap-3">
+      <Target className="h-4 w-4 mt-0.5 shrink-0 text-accent" />
+      <div>
+        <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-1">Arabulucu Önerisi</div>
+        <p className="text-sm text-sidebar-foreground/90 italic leading-relaxed">{text}</p>
+      </div>
+    </div>
+  );
+}
+
+function CockpitSources({ items, sources }: { items: string[]; sources?: any[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/40 font-semibold mb-1.5">Kaynaklar</div>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((name, i) => (
+          <SourceChip key={i} name={name} source={matchSource(name, sources)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ===================== PHASE 4 - MEDIATOR PANEL (READ-ONLY SUMMARY) ===================== */
 
 function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
@@ -3307,6 +3374,10 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
     ...analyses.flatMap((a: any) => safeList(a.risk_analizi?.kritik_faktorler)),
   ])).slice(0, 12);
   const cockpitRedLines = safeList(cockpitReportData?.red_lines).slice(0, 8);
+  const cockpitTarafKarsilastirma = Array.isArray(cockpitRiskOzeti?.taraf_karsilastirma) ? cockpitRiskOzeti.taraf_karsilastirma : [];
+  const cockpitObstacleList = safeList(cockpitRiskOzeti?.ortak_uzlasma_engelleri).slice(0, 8);
+  const cockpitMediatorOneri = safeText(cockpitRiskOzeti?.arabulucu_onerisi);
+  const cockpitKaynakListesi = safeList(cockpitRiskOzeti?.kaynak_listesi).slice(0, 10);
 
   return (
     <div className="space-y-4">
@@ -3423,6 +3494,31 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                     <CockpitRedLines items={cockpitRedLines} />
                   </div>
                 </div>
+
+                {/* Resmi risk_ozeti — AI'ın ürettiği taraf karşılaştırması + uzlaşma engelleri */}
+                {(cockpitTarafKarsilastirma.length > 0 || cockpitObstacleList.length > 0) && (
+                  <div className="grid sm:grid-cols-2 gap-4 pt-2 border-t border-sidebar-border/60 items-start">
+                    <CockpitOfficialComparisonTable items={cockpitTarafKarsilastirma} />
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-2">Uzlaşma Engelleri</div>
+                      <CockpitObstacles items={cockpitObstacleList} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Arabulucu önerisi — kokpitin sonuç cümlesi */}
+                {cockpitMediatorOneri && (
+                  <div className="pt-2 border-t border-sidebar-border/60">
+                    <CockpitMediatorRecommendation text={cockpitMediatorOneri} />
+                  </div>
+                )}
+
+                {/* Kaynaklar — en altta küçük */}
+                {cockpitKaynakListesi.length > 0 && (
+                  <div className="pt-2 border-t border-sidebar-border/60">
+                    <CockpitSources items={cockpitKaynakListesi} sources={cockpitReportData?.sources} />
+                  </div>
+                )}
               </motion.div>
             )}
 
