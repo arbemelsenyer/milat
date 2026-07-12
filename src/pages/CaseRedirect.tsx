@@ -7,5 +7,5 @@ import { Navigate, useParams } from "react-router-dom";
 export default function CaseRedirect() {
   const { id } = useParams<{ id: string }>();
   if (!id) return <Navigate to="/cases" replace />;
-  return <Navigate to={`/legal-reasoning?tab=surec&resume=${id}`} replace />;
+  return <Navigate to={`/legal-reasoning?caseId=${id}`} replace />;
 }

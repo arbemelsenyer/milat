@@ -7,9 +7,9 @@ function NotesMount() {
   const { pathname } = useLocation();
   const params = useParams();
   const [sp] = useSearchParams();
-  // Extract case id from /case-room/:id, /case/:id, /cases/:id, or ?resume=
+  // Extract case id from /case-room/:id, /case/:id, /cases/:id, or ?caseId=
   const idFromPath = /^\/(case-room|case|cases)\/([0-9a-f-]{36})/i.exec(pathname)?.[2];
-  const idFromQuery = sp.get("resume");
+  const idFromQuery = sp.get("caseId");
   const caseId = idFromPath || idFromQuery || (params.id as string | undefined);
   if (!caseId) return null;
   return <CaseNotesFAB caseId={caseId} />;
