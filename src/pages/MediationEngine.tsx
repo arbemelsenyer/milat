@@ -28,8 +28,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Plus, Loader2, FolderOpen, FileText, Users, Brain, ShieldCheck,
-  Calendar as CalIcon, UserCheck, MessageSquare, FileCheck2, CheckCircle2, Circle,
-  Trash2, ArrowLeft, Download, Sparkles, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Pencil,
+  Calendar as CalIcon, UserCheck, MessageSquare, FileCheck2, CheckCircle2, XCircle, Circle,
+  Trash2, ArrowLeft, Sparkles, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Pencil,
 } from "lucide-react";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { OfficialDocumentsPanel } from "@/components/mediation/OfficialDocumentsPanel";
@@ -791,7 +791,7 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }
     case 5: return <><Phase5Sessions caseRow={caseRow} bumpPhase={bumpPhase} onAdvance={onAdvance} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 6: return <><Phase7Expert caseRow={caseRow} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 7: return <><Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(8); onAdvance(8); }} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
-    case 8: return <Phase9Closing caseRow={caseRow} />;
+    case 8: return <Phase9Closing caseRow={caseRow} reload={reload} />;
     default: return null;
   }
 }
@@ -3486,53 +3486,54 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
   );
 }
 
-function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
-  const [docs, setDocs] = useState<any[]>([]);
-  const [busy, setBusy] = useState(false);
+function Phase9Closing({ caseRow, reload }: { caseRow: CaseRow; reload: () => void }) {
+  const [docCount, setDocCount] = useState(0);
+  const [status, setStatus] = useState<string | null>(caseRow.status);
+  const [closedAt, setClosedAt] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"agreed" | "failed" | null>(null);
 
   useEffect(() => { (async () => {
-    const { data } = await supabase.from("agreement_documents").select("*").eq("case_id", caseRow.id);
-    setDocs(data ?? []);
+    const { count } = await supabase.from("agreement_documents").select("id", { count: "exact", head: true }).eq("case_id", caseRow.id);
+    setDocCount(count ?? 0);
   })(); }, [caseRow.id]);
 
-  async function generateDocs(agreed: boolean) {
-    setBusy(true);
+  useEffect(() => {
+    setStatus(caseRow.status);
+    if (caseRow.status === "agreed" || caseRow.status === "failed") {
+      (async () => {
+        const { data } = await supabase.from("cases").select("updated_at").eq("id", caseRow.id).maybeSingle();
+        setClosedAt((data as any)?.updated_at ?? null);
+      })();
+    } else {
+      setClosedAt(null);
+    }
+  }, [caseRow.id, caseRow.status]);
+
+  async function closeCase(agreed: boolean) {
+    const outcome = agreed ? "agreed" : "failed";
+    setBusy(outcome);
     try {
-      const templates = agreed
-        ? ["İlk Oturum Belirleme Tutanağı", "Anlaşma Son Tutanağı", "Anlaşma Belgesi", "Ücret Sözleşmesi", "Davet Mektubu"]
-        : ["Anlaşamama Son Tutanağı"];
-      for (const t of templates) {
-        await supabase.from("agreement_documents").insert({
-          case_id: caseRow.id, doc_type: t,
-          metadata: { content: `${t}\n\nSistem No: ${caseRow.application_no}\nUYAP No: ${caseRow.uyap_no || "Henüz kaydedilmedi"}\nTarih: ${new Date().toLocaleDateString("tr-TR")}\nKonu: ${caseRow.title}\nUyuşmazlık: ${caseRow.dispute_type || "AI tarafından henüz tespit edilmedi"}` } as any,
-        } as any);
-      }
-      await supabase.from("cases").update({ status: agreed ? "agreed" : "failed", current_phase: 9 } as any).eq("id", caseRow.id);
-      const { data } = await supabase.from("agreement_documents").select("*").eq("case_id", caseRow.id);
-      setDocs(data ?? []);
-      toast({ title: "Belgeler oluşturuldu" });
+      const { error } = await supabase.from("cases").update({ status: outcome, current_phase: 9 } as any).eq("id", caseRow.id);
+      if (error) throw error;
+      setStatus(outcome);
+      setClosedAt(new Date().toISOString());
+      toast({ title: agreed ? "Dosya anlaşma ile kapatıldı" : "Dosya anlaşamama ile kapatıldı" });
+      reload();
     } catch (e: any) {
       toast({ title: "Hata", description: trErr(e.message), variant: "destructive" });
-    } finally { setBusy(false); }
+    } finally { setBusy(null); }
   }
 
-  function download(d: any) {
-    const text = d.metadata?.content || d.doc_type;
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `${d.doc_type}.txt`; a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  const closingLabel = caseRow.status === "agreed" ? "Anlaşma" : caseRow.status === "failed" ? "Anlaşamama" : "Devam Ediyor";
-  const closingTone = caseRow.status === "agreed" ? "low" : caseRow.status === "failed" ? "high" : "medium";
+  const closingLabel = status === "agreed" ? "Anlaşma" : status === "failed" ? "Anlaşamama" : "Devam Ediyor";
+  const closingTone = status === "agreed" ? "low" : status === "failed" ? "high" : "medium";
+  const isClosed = status === "agreed" || status === "failed";
 
   return (
     <div className="space-y-4">
       <PhaseHero
         label="Faz 8 — Belgeler & Kapanış"
         metrics={[
-          { label: "Üretilen Belge", value: docs.length },
+          { label: "Üretilen Belge", value: docCount },
           { label: "Kapanış Durumu", value: closingLabel, tone: closingTone },
         ]}
       />
@@ -3543,40 +3544,64 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
       {/* ===== BELGELER ===== */}
       <motion.section variants={itemVariants} className="space-y-4">
         <h3 className="text-lg font-semibold heading-gold-underline">Belgeler</h3>
-        <OfficialDocumentsPanel caseRow={caseRow} />
+        <OfficialDocumentsPanel caseRow={caseRow} onOutcomeSaved={reload} />
       </motion.section>
 
       {/* ===== KAPANIŞ ===== */}
-      <motion.section variants={itemVariants} className="border-t pt-6 space-y-3">
+      <motion.section variants={itemVariants} className="border-t pt-6 space-y-4">
         <h3 className="text-lg font-semibold heading-gold-underline">Kapanış</h3>
-        <details className="text-xs text-muted-foreground border rounded p-3">
-          <summary className="cursor-pointer font-medium">Basit metin belgeler (eski)</summary>
-          <div className="mt-2 flex gap-2">
-            <Button size="sm" onClick={() => generateDocs(true)} disabled={busy}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4 mr-1" />}
-              Anlaşma
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => generateDocs(false)} disabled={busy}>
-              Anlaşamama
-            </Button>
+
+        {isClosed ? (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className={`rounded-2xl border p-6 flex items-center gap-4 ${
+              status === "agreed" ? "border-emerald-400/40 bg-emerald-400/5" : "border-red-400/40 bg-red-400/5"
+            }`}
+          >
+            {status === "agreed"
+              ? <CheckCircle2 className="h-8 w-8 text-emerald-400 shrink-0" />
+              : <XCircle className="h-8 w-8 text-red-400 shrink-0" />}
+            <div>
+              <div className="font-display font-semibold text-lg">
+                Bu dosya {status === "agreed" ? "Anlaşma" : "Anlaşamama"} ile kapanmıştır
+              </div>
+              {closedAt && (
+                <div className="text-sm text-muted-foreground mt-0.5">
+                  {new Date(closedAt).toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" })}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => closeCase(true)}
+              className="group text-left rounded-2xl border border-sidebar-border p-5 transition-colors hover:border-emerald-400/50 hover:bg-emerald-400/5 disabled:opacity-50 disabled:pointer-events-none"
+            >
+              {busy === "agreed"
+                ? <Loader2 className="h-6 w-6 text-emerald-400 mb-2 animate-spin" />
+                : <CheckCircle2 className="h-6 w-6 text-emerald-400 mb-2" />}
+              <div className="font-semibold">Anlaşma ile Kapat</div>
+              <div className="text-xs text-muted-foreground mt-1">Taraflar anlaşmaya vardı; dosya anlaşma ile sonuçlandırılır.</div>
+            </button>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => closeCase(false)}
+              className="group text-left rounded-2xl border border-sidebar-border p-5 transition-colors hover:border-red-400/50 hover:bg-red-400/5 disabled:opacity-50 disabled:pointer-events-none"
+            >
+              {busy === "failed"
+                ? <Loader2 className="h-6 w-6 text-red-400 mb-2 animate-spin" />
+                : <XCircle className="h-6 w-6 text-red-400 mb-2" />}
+              <div className="font-semibold">Anlaşamama ile Kapat</div>
+              <div className="text-xs text-muted-foreground mt-1">Taraflar anlaşamadı; dosya anlaşamama ile sonuçlandırılır.</div>
+            </button>
           </div>
-          {docs.length > 0 && (
-            <ul className="space-y-1 mt-2">
-              {docs.map((d) => (
-                <motion.li
-                  key={d.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className="flex items-center justify-between p-2 border rounded"
-                >
-                  <span>{d.doc_type}</span>
-                  <Button size="sm" variant="ghost" onClick={() => download(d)}><Download className="h-3 w-3 mr-1" /> İndir</Button>
-                </motion.li>
-              ))}
-            </ul>
-          )}
-        </details>
+        )}
       </motion.section>
     </Card>
     </motion.div>
