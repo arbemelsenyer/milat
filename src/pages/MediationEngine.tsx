@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, animate, useMotionValue, useMotionValueEvent } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -48,6 +48,70 @@ const itemVariants = {
   hidden: { opacity: 0, y: 18 },
   show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const } },
 };
+
+// ── Faz Kahramanı (PhaseHero) ──
+// Dashboard.tsx'teki HeroStatTile/CountUp deseninin faz ekranları için ortak versiyonu:
+// koyu lacivert zemin, altın faz etiketi, sayarak dolan büyük metrikler. Kendi giriş
+// animasyonuna sahiptir — altındaki içerik bölümlerinin staggered girişini (Katman 1)
+// etkilemez, her zaman ayrı bir üst şerit olarak render edilir.
+type PhaseHeroTone = "low" | "medium" | "high";
+type PhaseHeroMetricDef = {
+  label: string;
+  value: number | string | null | undefined;
+  suffix?: string;
+  tone?: PhaseHeroTone;
+};
+
+const PHASE_HERO_TONE_TEXT: Record<PhaseHeroTone, string> = {
+  low: "text-emerald-400",
+  medium: "text-amber-400",
+  high: "text-red-400",
+};
+
+function PhaseHeroCountUp({ value, suffix = "" }: { value: number; suffix?: string }) {
+  const mv = useMotionValue(0);
+  const [text, setText] = useState(`0${suffix}`);
+  useEffect(() => {
+    const controls = animate(mv, value, { duration: 1.1, ease: "easeOut" });
+    return () => controls.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  useMotionValueEvent(mv, "change", (latest) => setText(`${Math.round(latest)}${suffix}`));
+  return <>{text}</>;
+}
+
+function PhaseHeroMetric({ label, value, suffix = "", tone }: PhaseHeroMetricDef) {
+  const empty = value === null || value === undefined || value === "";
+  return (
+    <div className="min-w-[120px]">
+      <div className="text-[11px] uppercase tracking-[0.14em] text-sidebar-foreground/55 font-medium mb-1">{label}</div>
+      <div className={`font-display font-bold tabular-nums leading-none ${empty ? "text-2xl text-sidebar-foreground/30" : `text-3xl sm:text-4xl ${tone ? PHASE_HERO_TONE_TEXT[tone] : "text-accent"}`}`}>
+        {empty ? "—" : typeof value === "number" ? <PhaseHeroCountUp value={value} suffix={suffix} /> : `${value}${suffix}`}
+      </div>
+    </div>
+  );
+}
+
+function PhaseHero({ label, metrics, aside }: { label: string; metrics: PhaseHeroMetricDef[]; aside?: React.ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="rounded-2xl border border-sidebar-border bg-sidebar text-sidebar-foreground p-6 shadow-elegant"
+    >
+      <div className="flex items-start justify-between gap-6 flex-wrap">
+        <div className="flex-1 min-w-[220px] space-y-4">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">{label}</div>
+          <div className="flex flex-wrap gap-8">
+            {metrics.map((m, i) => <PhaseHeroMetric key={i} {...m} />)}
+          </div>
+        </div>
+        {aside && <div className="shrink-0">{aside}</div>}
+      </div>
+    </motion.div>
+  );
+}
 
 // Safely coerce any AI-returned value into a renderable string. Prevents
 // "Objects are not valid as a React child" crashes when the model returns an
@@ -770,8 +834,17 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance }: {
 }
 
 function Phase1Summary({ caseRow }: { caseRow: CaseRow }) {
+  const classified = !!caseRow.dispute_type;
   return (
-    <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+    <div className="space-y-4">
+      <PhaseHero
+        label="Faz 1 — Başvuru"
+        metrics={[
+          { label: "Uyuşmazlık Türü", value: classified ? catLabel(caseRow.dispute_type) : null },
+          { label: "Sınıflandırma Durumu", value: classified ? "Tamamlandı" : "Bekliyor", tone: classified ? "low" : "medium" },
+        ]}
+      />
+      <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
       <motion.div variants={itemVariants}>
         <Card className="p-6 space-y-3">
           <h2 className="text-2xl font-bold text-primary">Aşama 1 — Başvuru Özeti</h2>
@@ -794,7 +867,8 @@ function Phase1Summary({ caseRow }: { caseRow: CaseRow }) {
       <motion.div variants={itemVariants}>
         <DeadlineCard caseRow={caseRow} />
       </motion.div>
-    </motion.div>
+      </motion.div>
+    </div>
   );
 }
 
@@ -1404,8 +1478,21 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
     }
   }
 
-  return (
+  const withEmail = parties.filter((p: any) => p.email);
+  const acceptedCount = withEmail.filter((p: any) => p.invite_status === "accepted").length;
+  const inviteSummary: string | null = withEmail.length
+    ? `${acceptedCount}/${withEmail.length} Kabul`
+    : parties.length ? "Davet gönderilmedi" : null;
 
+  return (
+    <div className="space-y-4">
+      <PhaseHero
+        label="Faz 2 — Taraflar"
+        metrics={[
+          { label: "Kayıtlı Taraf", value: parties.length },
+          { label: "Davet Durumu", value: inviteSummary, tone: acceptedCount && acceptedCount === withEmail.length ? "low" : undefined },
+        ]}
+      />
     <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
       <motion.div variants={itemVariants}>
       <Card className="p-6">
@@ -1548,6 +1635,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         </DialogContent>
       </Dialog>
     </motion.div>
+    </div>
   );
 }
 
@@ -1687,6 +1775,17 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
 
   const progressPct = parties.length ? Math.round((analysedCount / parties.length) * 100) : 0;
 
+  const riskLevels = analyses
+    .map((a: any) => normalizeRiskLevel(a.risk_analizi?.risk_puani))
+    .filter((l): l is "low" | "medium" | "high" => l !== "unknown");
+  let dominantRisk: "low" | "medium" | "high" | null = null;
+  if (riskLevels.length) {
+    const counts: Record<string, number> = {};
+    riskLevels.forEach((l) => { counts[l] = (counts[l] ?? 0) + 1; });
+    dominantRisk = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0] as "low" | "medium" | "high";
+  }
+  const dominantRiskLabel = dominantRisk ? { low: "Düşük", medium: "Orta", high: "Yüksek" }[dominantRisk] : null;
+
   return (
     <div className="space-y-4">
       {initialLoading ? (
@@ -1710,6 +1809,14 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
           <Button size="sm" onClick={loadAll}><RefreshCw className="h-4 w-4 mr-1" /> Yenile</Button>
         </Card>
       ) : (
+      <>
+      <PhaseHero
+        label="Faz 3 — Taraf Analizi"
+        metrics={[
+          { label: "Taraf Analizi", value: parties.length ? analysedCount : null, suffix: parties.length ? ` / ${parties.length}` : "" },
+          { label: "Ortalama Risk Puanı", value: dominantRiskLabel, tone: dominantRisk ?? undefined },
+        ]}
+      />
       <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
       <motion.div variants={itemVariants}>
       <Card className="p-6 space-y-3">
@@ -1930,6 +2037,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
       </div>
 
       </motion.div>
+      </>
       )}
     </div>
   );
@@ -2903,7 +3011,45 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
     </Card>
   );
 
+  const heroUzlasmaPct = (() => {
+    const fromReport = parsePercent(report?.risk_ozeti?.genel_uzlasma_orani);
+    if (fromReport !== null) return fromReport;
+    if (analyses.some((a: any) => isMissing(a.risk_analizi?.uzlasma_orani))) return null;
+    const vals = analyses
+      .map((a: any) => parsePercent(a.risk_analizi?.uzlasma_orani))
+      .filter((v): v is number => v !== null);
+    if (!vals.length) return null;
+    return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+  })();
+
+  const heroRiskRows = analyses.slice(0, 2).map((a: any, i: number) => {
+    const cp = a.case_parties || {};
+    const name = cp.company_name || `${cp.first_name ?? ""} ${cp.last_name ?? ""}`.trim() || `Taraf ${i + 1}`;
+    return { name, risk_puani: a.risk_analizi?.risk_puani as string | undefined };
+  });
+
   return (
+    <div className="space-y-4">
+      <PhaseHero
+        label="Faz 4 — Arabulucu Paneli"
+        metrics={[
+          { label: "Uzlaşma Tahmini", value: heroUzlasmaPct, suffix: "%" },
+        ]}
+        aside={
+          heroRiskRows.length > 0 ? (
+            <div className="flex gap-3">
+              {heroRiskRows.map((r, i) => (
+                <div key={i} className="rounded-lg bg-sidebar-accent/40 border border-sidebar-border px-3 py-2 min-w-[110px]">
+                  <div className="text-[10px] uppercase tracking-wide text-sidebar-foreground/50 truncate max-w-[100px]">{r.name}</div>
+                  <span className={`inline-block mt-1 text-[11px] font-medium px-1.5 py-0.5 rounded-full ${riskBadgeTone(r.risk_puani)}`}>
+                    {r.risk_puani || "Yeterli veri yok"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : undefined
+        }
+      />
     <motion.div variants={containerVariants} initial="hidden" animate="show">
     <Card className="p-6 space-y-4">
       <h2 className="text-2xl font-bold text-primary">Aşama 4 — Arabulucu Paneli</h2>
@@ -2974,6 +3120,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
       </motion.div>
     </Card>
     </motion.div>
+    </div>
   );
 }
 
