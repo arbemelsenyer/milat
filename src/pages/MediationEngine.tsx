@@ -3097,16 +3097,21 @@ function CockpitPartyColumn({
   );
 }
 
-function CockpitScenarioCard({ letter, scenario, recommended }: { letter: string; scenario: any; recommended: boolean }) {
+function CockpitScenarioCard({ letter, scenario, recommended, onClick }: { letter: string; scenario: any; recommended: boolean; onClick: () => void }) {
   return (
-    <div className={`rounded-xl border p-3 space-y-1.5 ${recommended ? "border-accent/60 bg-accent/10" : "border-sidebar-border bg-sidebar-accent/20"}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative w-full text-left rounded-xl border p-3 space-y-1.5 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${recommended ? "border-accent/60 bg-accent/10 hover:border-accent" : "border-sidebar-border bg-sidebar-accent/20 hover:border-accent/40"}`}
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-display font-bold text-accent">{letter}</span>
         {recommended && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-sidebar-background">⭐ Önerilen</span>}
       </div>
       <div className="text-sm font-medium text-sidebar-foreground line-clamp-1">{scenario.label || "Senaryo"}</div>
       <p className="text-xs text-sidebar-foreground/60 line-clamp-2">{scenario.summary}</p>
-    </div>
+      <div className="text-[10px] font-medium text-accent opacity-0 group-hover:opacity-100 transition-opacity text-right">Detay →</div>
+    </button>
   );
 }
 
@@ -3155,6 +3160,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportStatus, setReportStatus] = useState<string | null>(null);
   const [reportAttempt, setReportAttempt] = useState(0);
+  const [openScenario, setOpenScenario] = useState<{ letter: string; scenario: any; recommended: boolean } | null>(null);
 
   const fetchReport = useCallback(async () => {
     const { data, error } = await supabase
@@ -3389,14 +3395,19 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                   <div>
                     <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-2">Çözüm Senaryoları</div>
                     <div className="grid sm:grid-cols-3 gap-3">
-                      {cockpitScenarios.map((sc: any, i: number) => (
-                        <CockpitScenarioCard
-                          key={i}
-                          letter={String.fromCharCode(65 + i)}
-                          scenario={sc}
-                          recommended={sc === cockpitStrongestScenario || /⭐/.test(`${sc?.label ?? ""} ${sc?.summary ?? ""}`)}
-                        />
-                      ))}
+                      {cockpitScenarios.map((sc: any, i: number) => {
+                        const letter = String.fromCharCode(65 + i);
+                        const recommended = sc === cockpitStrongestScenario || /⭐/.test(`${sc?.label ?? ""} ${sc?.summary ?? ""}`);
+                        return (
+                          <CockpitScenarioCard
+                            key={i}
+                            letter={letter}
+                            scenario={sc}
+                            recommended={recommended}
+                            onClick={() => setOpenScenario({ letter, scenario: sc, recommended })}
+                          />
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -3505,6 +3516,35 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
         </TabsContent>
       </Tabs>
     </Card>
+    <Dialog open={!!openScenario} onOpenChange={(o) => !o && setOpenScenario(null)}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto bg-sidebar text-sidebar-foreground border-sidebar-border">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-display font-bold text-accent">{openScenario?.letter}</span>
+            {openScenario?.recommended && (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-sidebar-background">⭐ Önerilen</span>
+            )}
+          </div>
+          <DialogTitle className="heading-gold-underline">{safeText(openScenario?.scenario?.label) || "Senaryo"}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <p className="leading-relaxed text-sidebar-foreground/90">{safeText(openScenario?.scenario?.summary) || "—"}</p>
+          {safeList(openScenario?.scenario?.tradeoffs).length > 0 && (
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-1.5">Taraf Ödünleri & Riskleri</div>
+              <ul className="space-y-1.5">
+                {safeList(openScenario?.scenario?.tradeoffs).map((t, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sidebar-foreground/80">
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-400" />
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
     </div>
   );
 }
