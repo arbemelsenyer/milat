@@ -113,6 +113,26 @@ function PhaseHero({ label, metrics, aside }: { label: string; metrics: PhaseHer
   );
 }
 
+// Faz 5 heroundaki "sıradaki oturum" geri sayımı — gün/saat çözünürlüğünde.
+function formatPhaseCountdown(targetIso: string): string | null {
+  const ms = new Date(targetIso).getTime() - Date.now();
+  if (ms <= 0) return null;
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor((ms % 86400000) / 3600000);
+  return d > 0 ? `${d}g ${h}s` : `${h}s`;
+}
+
+// Faz 7 heroundaki "son not zamanı" — Dashboard.tsx'teki formatRelativeTime ile aynı basamaklar.
+function formatPhaseRelative(iso: string): string {
+  const diffSec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diffSec < 60) return "az önce";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} dk önce`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} sa önce`;
+  return `${Math.floor(diffHour / 24)} gün önce`;
+}
+
 // Safely coerce any AI-returned value into a renderable string. Prevents
 // "Objects are not valid as a React child" crashes when the model returns an
 // object/array where we expected a scalar.
@@ -782,6 +802,7 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance }: {
   caseRow: CaseRow; bumpPhase: (n: number) => Promise<void>; onAdvance: (n: number) => void;
 }) {
   const [parties, setParties] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<{ scheduled_at: string | null; status: string }[]>([]);
   const [navigating, setNavigating] = useState(false);
   useEffect(() => {
     supabase
@@ -790,6 +811,17 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance }: {
       .eq("case_id", caseRow.id)
       .then(({ data }) => setParties(data ?? []));
   }, [caseRow.id]);
+  useEffect(() => {
+    supabase
+      .from("case_sessions")
+      .select("scheduled_at, status")
+      .eq("case_id", caseRow.id)
+      .order("scheduled_at", { ascending: true })
+      .then(({ data }) => setSessions(data ?? []));
+  }, [caseRow.id]);
+
+  const plannedSessions = sessions.filter((s) => s.status !== "cancelled");
+  const nextSession = plannedSessions.find((s) => s.scheduled_at && new Date(s.scheduled_at).getTime() > Date.now());
 
   async function chooseMeeting(meetingType: "ozel" | "ortak") {
     setNavigating(true);
@@ -806,6 +838,14 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance }: {
   }
 
   return (
+    <div className="space-y-4">
+      <PhaseHero
+        label="Faz 5 — Oturumlar"
+        metrics={[
+          { label: "Sıradaki Oturum", value: nextSession?.scheduled_at ? formatPhaseCountdown(nextSession.scheduled_at) : null },
+          { label: "Planlanan Oturum", value: plannedSessions.length },
+        ]}
+      />
     <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
       <motion.div variants={itemVariants}>
         <Card className="p-6 space-y-2">
@@ -830,6 +870,7 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance }: {
         />
       </motion.div>
     </motion.div>
+    </div>
   );
 }
 
@@ -3129,7 +3170,26 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
 /* ===================== PHASE 7 - GÖRÜŞME NOTLARI ===================== */
 
 function Phase8Negotiation({ caseRow, userId, onDone }: { caseRow: CaseRow; userId: string; onDone: () => void }) {
+  const [notesMeta, setNotesMeta] = useState<{ count: number; lastAt: string | null }>({ count: 0, lastAt: null });
+  useEffect(() => {
+    (async () => {
+      const [{ count }, { data: last }] = await Promise.all([
+        supabase.from("case_notes").select("id", { count: "exact", head: true }).eq("case_id", caseRow.id).eq("phase", 7),
+        supabase.from("case_notes").select("created_at").eq("case_id", caseRow.id).eq("phase", 7).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      setNotesMeta({ count: count ?? 0, lastAt: (last as any)?.created_at ?? null });
+    })();
+  }, [caseRow.id]);
+
   return (
+    <div className="space-y-4">
+      <PhaseHero
+        label="Faz 7 — Görüşme Notları"
+        metrics={[
+          { label: "Görüşme Notu", value: notesMeta.count },
+          { label: "Son Not", value: notesMeta.lastAt ? formatPhaseRelative(notesMeta.lastAt) : null },
+        ]}
+      />
     <motion.div variants={containerVariants} initial="hidden" animate="show">
     <Card className="p-6 space-y-4">
       <h2 className="text-2xl font-bold text-primary">Aşama 7 — Görüşme Notları</h2>
@@ -3141,6 +3201,7 @@ function Phase8Negotiation({ caseRow, userId, onDone }: { caseRow: CaseRow; user
       </div>
     </Card>
     </motion.div>
+    </div>
   );
 }
 
@@ -3463,7 +3524,18 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
     URL.revokeObjectURL(url);
   }
 
+  const closingLabel = caseRow.status === "agreed" ? "Anlaşma" : caseRow.status === "failed" ? "Anlaşamama" : "Devam Ediyor";
+  const closingTone = caseRow.status === "agreed" ? "low" : caseRow.status === "failed" ? "high" : "medium";
+
   return (
+    <div className="space-y-4">
+      <PhaseHero
+        label="Faz 8 — Belgeler & Kapanış"
+        metrics={[
+          { label: "Üretilen Belge", value: docs.length },
+          { label: "Kapanış Durumu", value: closingLabel, tone: closingTone },
+        ]}
+      />
     <motion.div variants={containerVariants} initial="hidden" animate="show">
     <Card className="p-6 space-y-8">
       <h2 className="text-2xl font-bold text-primary">Aşama 8 — Belgeler & Kapanış</h2>
@@ -3508,6 +3580,7 @@ function Phase9Closing({ caseRow }: { caseRow: CaseRow }) {
       </motion.section>
     </Card>
     </motion.div>
+    </div>
   );
 }
 
@@ -3565,6 +3638,22 @@ function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
   }
 
   return (
+    <div className="space-y-4">
+      <PhaseHero
+        label="Faz 6 — Bilirkişi"
+        metrics={[
+          {
+            label: "Bilirkişi Durumu",
+            value: loading ? null : assignment ? (EXPERT_STATUS_LABEL[assignment.status] ?? assignment.status) : "Atanmadı",
+            tone: assignment?.status === "accepted" ? "low" : assignment ? "medium" : undefined,
+          },
+        ]}
+        aside={
+          <span className="inline-block text-[11px] font-medium px-2.5 py-1 rounded-full bg-sidebar-accent/40 border border-sidebar-border text-sidebar-foreground/70">
+            Opsiyonel
+          </span>
+        }
+      />
     <motion.div variants={containerVariants} initial="hidden" animate="show">
     <Card className="p-6 space-y-4">
       <h2 className="text-2xl font-bold text-primary">Aşama 6 — Bilirkişi (Opsiyonel)</h2>
@@ -3605,5 +3694,6 @@ function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
       </motion.div>
     </Card>
     </motion.div>
+    </div>
   );
 }
