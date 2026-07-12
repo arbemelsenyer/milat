@@ -301,7 +301,7 @@ function mapDisputeToCategory(disputeType?: string | null, subtype?: string | nu
   // taksonomi slug'ı ("fikri_mulkiyet", başvuru formu) ile marka/patent/tasarım/telif
   // içeren serbest metin tespitlerini tek bilgi tabanı kategorisinde birleştir.
   if (raw === "fikri_mulkiyet" || raw === "fikri_mülkiyet" || /fikri|marka|patent|tasarım|tasarim|telif/.test(t)) {
-    return "fikri_mulkiyet";
+    return "fikri_mülkiyet";
   }
   if (CATS.includes(raw)) return raw === "genel" ? null : raw;
   if (/kira/.test(t)) return "kira";

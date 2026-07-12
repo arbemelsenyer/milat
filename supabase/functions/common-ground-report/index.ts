@@ -197,7 +197,7 @@ function mapDisputeToCategory(disputeType?: string | null, subtype?: string | nu
   // IP pilotu adım 1: eski slug ("fikri_mülkiyet", classify-dispute çıktısı) ve yeni
   // taksonomi slug'ı ("fikri_mulkiyet", başvuru formu) ile marka/patent/tasarım/telif
   // içeren serbest metin tespitlerini tek bilgi tabanı kategorisinde birleştir.
-  if (/fikri|marka|patent|tasarım|tasarim|telif/.test(t)) return "fikri_mulkiyet";
+  if (/fikri|marka|patent|tasarım|tasarim|telif/.test(t)) return "fikri_mülkiyet";
   if (/iş|isci|işçi|işveren|isveren|kıdem|kidem/.test(t)) return "işçi_işveren";
   if (/ticari|ticaret|şirket|sirket/.test(t)) return "ticari";
   if (/tüketici|tuketici/.test(t)) return "tüketici";
