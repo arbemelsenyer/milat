@@ -431,7 +431,6 @@ export type Database = {
           party_type: string
           phone: string | null
           role: string
-          statement: string | null
           tax_number: string | null
           tax_office: string | null
           tc_kimlik: string | null
@@ -459,7 +458,6 @@ export type Database = {
           party_type?: string
           phone?: string | null
           role: string
-          statement?: string | null
           tax_number?: string | null
           tax_office?: string | null
           tc_kimlik?: string | null
@@ -487,7 +485,6 @@ export type Database = {
           party_type?: string
           phone?: string | null
           role?: string
-          statement?: string | null
           tax_number?: string | null
           tax_office?: string | null
           tc_kimlik?: string | null
