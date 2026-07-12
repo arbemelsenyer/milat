@@ -87,7 +87,7 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
           .select("id, dispute_type, dispute_subtype, assigned_mediator_id, created_at, deadline_total, deadline_extended, outcome, status")
           .eq("id", caseId)
           .maybeSingle(),
-        supabase.from("case_parties").select("id, role, full_name, company_name").eq("case_id", caseId),
+        supabase.from("case_parties").select("id, role, party_role, full_name, company_name").eq("case_id", caseId),
         supabase.from("case_assignments").select("assigned_at").eq("case_id", caseId).order("assigned_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("agreement_documents").select("id, metadata, created_at").eq("case_id", caseId),
         supabase.from("case_sessions").select("id, status, scheduled_at").eq("case_id", caseId).order("scheduled_at", { ascending: true }),
@@ -156,8 +156,10 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
     persistTracker(tracker);
   }
 
-  const claimants = useMemo(() => parties.filter((p) => p.role === "claimant"), [parties]);
-  const respondents = useMemo(() => parties.filter((p) => p.role === "respondent"), [parties]);
+  // party_role is canonical (applicant/respondent/third_party); role is legacy and may still
+  // hold older "claimant" values on rows written before the intake form was aligned to it.
+  const claimants = useMemo(() => parties.filter((p) => p.party_role === "applicant" || p.role === "applicant" || p.role === "claimant"), [parties]);
+  const respondents = useMemo(() => parties.filter((p) => p.party_role === "respondent" || p.role === "respondent"), [parties]);
 
   const arbKonusu = useMemo(() => {
     if (!caseData?.dispute_type) return "—";

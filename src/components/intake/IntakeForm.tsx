@@ -600,11 +600,15 @@ function getIntakePartyDisplayName(party: IntakePartyDetails): string {
 function intakePartyToRow(caseId: string, userId: string | null, index: number, party: IntakePartyDetails) {
   const isIndividual = party.role !== 'business';
   const fullName = getIntakePartyDisplayName(party);
+  // Canonical vocabulary used across the app (Phase2Parties, roleLabel, cockpit, ProcessTrackerPanel)
+  // is applicant/respondent/third_party — must match, not the legacy claimant/respondent naming.
+  const canonicalRole = index === 0 ? 'applicant' : index === 1 ? 'respondent' : 'third_party';
 
   return {
     case_id: caseId,
     user_id: userId,
-    role: index === 0 ? 'claimant' : index === 1 ? 'respondent' : `party_${index + 1}`,
+    role: canonicalRole,
+    party_role: canonicalRole,
     party_type: party.role === 'business' ? 'corporate' : 'individual',
     is_individual: isIndividual,
     full_name: fullName || null,

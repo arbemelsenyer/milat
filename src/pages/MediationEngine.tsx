@@ -3006,6 +3006,128 @@ function downloadReport(opts: { caseTitle?: string; caseId: string; report: any;
   }
 }
 
+// Genel Bakış kokpitinin kendisinin brifing çıktısı — Ortak Zemin Raporu'ndan (buildReportHtml)
+// ayrı: kokpit sırasını (uzlaşma → ZOPA → karşılaştırma → senaryolar → engeller → öneri) birebir izler.
+function buildCockpitBriefingHtml(opts: {
+  caseTitle?: string; caseId: string; generatedAt: Date;
+  uzlasmaPct: number | null; uzlasmaKaynak?: string; riskPuani?: string;
+  zopa: any; tarafKarsilastirma: any[]; scenarios: any[];
+  criticalFactors: string[]; redLines: string[]; obstacles: string[];
+  mediatorOneri?: string; kaynakListesi: string[]; sources?: any[];
+}): string {
+  const { caseTitle, caseId, generatedAt, uzlasmaPct, uzlasmaKaynak, riskPuani, zopa, tarafKarsilastirma, scenarios, criticalFactors, redLines, obstacles, mediatorOneri, kaynakListesi, sources } = opts;
+  const esc = (v: any) => String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" } as any)[c]);
+  const list = (arr: string[]) => (arr && arr.length ? `<ul>${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="muted">Yeterli veri yok</p>`);
+  const dateLabel = generatedAt.toLocaleString("tr-TR");
+  const fileTitle = `Kokpit Brifingi — ${caseTitle || caseId} — ${generatedAt.toLocaleDateString("tr-TR")}`;
+
+  const zopaHtml = (zopa && (zopa.lower_bound || zopa.upper_bound || zopa.description))
+    ? `<p><b>Alt Sınır:</b> ${esc(zopa.lower_bound || "—")} &nbsp;•&nbsp; <b>Üst Sınır:</b> ${esc(zopa.upper_bound || "—")}</p>
+       <p><b>Örtüşme:</b> ${esc(zopa.description || "Yeterli veri yok")}</p>`
+    : `<p class="muted">Yeterli veri yok</p>`;
+
+  const comparisonHtml = tarafKarsilastirma.length
+    ? `<table><thead><tr><th>Taraf</th><th>Risk Puanı</th><th>Güçlü Yön</th><th>Zayıf Yön</th></tr></thead><tbody>
+        ${tarafKarsilastirma.map((t: any) => `<tr>
+          <td>${esc(t?.taraf || "Taraf")}</td>
+          <td>${esc(t?.risk_puani || "—")}</td>
+          <td>${esc(t?.guclu_yon || "—")}</td>
+          <td>${esc(t?.zayif_yon || "—")}</td>
+        </tr>`).join("")}
+       </tbody></table>`
+    : `<p class="muted">Yeterli veri yok</p>`;
+
+  const scenariosHtml = scenarios.length
+    ? scenarios.map((sc: any, i: number) => `
+      <div class="card">
+        <h4>${String.fromCharCode(65 + i)}) ${esc(sc?.label || "Senaryo")}</h4>
+        <p>${esc(sc?.summary || "Yeterli veri yok")}</p>
+        ${sc?.tradeoffs?.length ? `<p class="muted"><b>Ödünler:</b></p>${list(sc.tradeoffs)}` : ""}
+      </div>`).join("")
+    : `<p class="muted">Yeterli veri yok</p>`;
+
+  const kaynaklarHtml = kaynakListesi.length
+    ? `<ol>${kaynakListesi.map((name) => {
+        const src = matchSource(name, sources);
+        return `<li>${esc(name)}${src?.url ? ` — <a href="${esc(src.url)}">${esc(src.url)}</a>` : ""}</li>`;
+      }).join("")}</ol>`
+    : `<p class="muted">Yeterli veri yok</p>`;
+
+  return `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>${esc(fileTitle)}</title>
+<style>
+body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;max-width:780px;margin:20px auto;padding:0 20px;color:#1f2937;line-height:1.45;font-size:13px}
+h1{color:#0f766e;border-bottom:2px solid #0f766e;padding-bottom:5px;font-size:20px;margin-bottom:4px}
+h2{color:#0f766e;margin:16px 0 6px;border-bottom:1px solid #e5e7eb;padding-bottom:3px;font-size:14px}
+h4{margin:4px 0;font-size:13px}
+.muted{color:#6b7280;font-size:12px}
+.card{border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px;margin:6px 0;background:#f9fafb}
+ul,ol{padding-left:18px;margin:4px 0}
+table{width:100%;border-collapse:collapse;margin:6px 0;font-size:12px}
+th,td{border:1px solid #e5e7eb;padding:4px 6px;text-align:left;vertical-align:top}
+th{background:#f0fdfa;color:#0f766e}
+.meta{color:#6b7280;font-size:11px;margin-bottom:12px}
+.confidential{background:#fef2f2;border:2px solid #dc2626;color:#991b1b;font-weight:600;text-align:center;padding:6px 10px;border-radius:6px;margin-bottom:12px;font-size:12px}
+.hero{background:#f0fdfa;border:1px solid #0f766e;border-radius:8px;padding:10px 14px;margin:10px 0;text-align:center}
+.hero .pct{font-size:34px;font-weight:700;color:#0f766e}
+.hero .label{font-size:11px;color:#0f766e;text-transform:uppercase;letter-spacing:.08em}
+.recommendation{border:2px solid #0f766e;background:#f0fdfa;border-radius:8px;padding:10px 12px;font-style:italic}
+@media print{body{margin:0;font-size:12px}.card{break-inside:avoid}}
+</style></head><body>
+<div class="confidential">GİZLİ — Yalnızca Arabulucu İçindir (6325 s.K. m.4/m.33)</div>
+<h1>Kokpit Brifingi</h1>
+<div class="meta"><b>Başvuru:</b> ${esc(caseTitle || "—")} &nbsp;•&nbsp; <b>ID:</b> ${esc(caseId)} &nbsp;•&nbsp; <b>Oluşturulma:</b> ${dateLabel}</div>
+
+<div class="hero">
+  <div class="pct">${uzlasmaPct !== null ? `%${uzlasmaPct}` : "Yeterli veri yok"}</div>
+  <div class="label">Genel Uzlaşma Tahmini${riskPuani ? ` &nbsp;•&nbsp; Risk: ${esc(riskPuani)}` : ""}</div>
+  ${uzlasmaKaynak ? `<div class="muted">${esc(uzlasmaKaynak)}</div>` : ""}
+</div>
+
+<h2>Uzlaşma Alanı (ZOPA)</h2>${zopaHtml}
+
+<h2>Taraf Karşılaştırması</h2>${comparisonHtml}
+
+<h2>Çözüm Senaryoları</h2>${scenariosHtml}
+
+<h2>Kritik Faktörler</h2>${list(criticalFactors)}
+
+<h2>Kırmızı Çizgiler</h2>${list(redLines)}
+
+<h2>Uzlaşma Engelleri</h2>${list(obstacles)}
+
+<h2>Arabulucu Önerisi</h2>${mediatorOneri ? `<div class="recommendation">${esc(mediatorOneri)}</div>` : `<p class="muted">Yeterli veri yok</p>`}
+
+<h2>Kaynaklar</h2>${kaynaklarHtml}
+
+<div class="meta" style="margin-top:20px;text-align:center">MediPact AI tarafından oluşturuldu • ${dateLabel}</div>
+</body></html>`;
+}
+
+function downloadCockpitBriefing(opts: {
+  caseTitle?: string; caseId: string; mode: "print" | "html";
+  uzlasmaPct: number | null; uzlasmaKaynak?: string; riskPuani?: string;
+  zopa: any; tarafKarsilastirma: any[]; scenarios: any[];
+  criticalFactors: string[]; redLines: string[]; obstacles: string[];
+  mediatorOneri?: string; kaynakListesi: string[]; sources?: any[];
+}) {
+  const html = buildCockpitBriefingHtml({ ...opts, generatedAt: new Date() });
+  if (opts.mode === "print") {
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.onload = () => w.print();
+  } else {
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `kokpit-brifingi-${opts.caseId}.html`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+}
+
 /* ===================== PHASE 4 KOKPİT — Genel Bakış sekmesi bileşenleri ===================== */
 // Dashboard'daki hero istatistik kartı (koyu bg-sidebar, CountUp altın rakamlar) deseninin
 // Faz 4 "Genel Bakış" sekmesi için komuta-merkezi yerleşimine uyarlanmış hali. Sadece görsel
@@ -3436,6 +3558,24 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
 
         <TabsContent value="genel-bakis">
           <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+            {report && analyses.length > 0 && (
+              <motion.div variants={itemVariants} className="flex justify-end gap-2">
+                <Button size="sm" variant="outline" onClick={() => downloadCockpitBriefing({
+                  caseTitle: caseRow.title, caseId: caseRow.id, mode: "print",
+                  uzlasmaPct: heroUzlasmaPct, uzlasmaKaynak: cockpitRiskOzeti?.genel_uzlasma_orani_kaynak, riskPuani: cockpitRiskPuani,
+                  zopa: cockpitReportData?.zopa, tarafKarsilastirma: cockpitTarafKarsilastirma, scenarios: cockpitScenarios,
+                  criticalFactors: cockpitCriticalFactors, redLines: cockpitRedLines, obstacles: cockpitObstacleList,
+                  mediatorOneri: cockpitMediatorOneri, kaynakListesi: cockpitKaynakListesi, sources: cockpitReportData?.sources,
+                })}>PDF</Button>
+                <Button size="sm" variant="outline" onClick={() => downloadCockpitBriefing({
+                  caseTitle: caseRow.title, caseId: caseRow.id, mode: "html",
+                  uzlasmaPct: heroUzlasmaPct, uzlasmaKaynak: cockpitRiskOzeti?.genel_uzlasma_orani_kaynak, riskPuani: cockpitRiskPuani,
+                  zopa: cockpitReportData?.zopa, tarafKarsilastirma: cockpitTarafKarsilastirma, scenarios: cockpitScenarios,
+                  criticalFactors: cockpitCriticalFactors, redLines: cockpitRedLines, obstacles: cockpitObstacleList,
+                  mediatorOneri: cockpitMediatorOneri, kaynakListesi: cockpitKaynakListesi, sources: cockpitReportData?.sources,
+                })}>Kaydet (HTML)</Button>
+              </motion.div>
+            )}
             {/* Karşılaştırmalı risk_ozeti otomatik-üretim efekti sessizce çalışmaya devam eder;
                 görünümü aşağıdaki kokpit panelleri devralır, mükerrer kart göstermez. */}
             {report?.report && (
