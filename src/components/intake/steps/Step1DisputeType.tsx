@@ -2,7 +2,18 @@ import { IntakeFormData } from '@/types/intake';
 import { FormField } from '../FormField';
 import { SelectableCard } from '../SelectableCard';
 import { Textarea } from '@/components/ui/textarea';
-import { Briefcase, Lightbulb, Heart, HelpCircle } from 'lucide-react';
+import {
+  Briefcase,
+  Building2,
+  ShoppingCart,
+  Home,
+  Users,
+  Lightbulb,
+  HeartPulse,
+  ShieldCheck,
+  HeartHandshake,
+  HelpCircle,
+} from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Step1Props {
@@ -11,21 +22,35 @@ interface Step1Props {
 }
 
 const disputeIcons = {
-  commercial: Briefcase,
-  ip: Lightbulb,
-  healthcare: Heart,
-  other: HelpCircle,
+  isci_isveren: Briefcase,
+  ticari: Building2,
+  tuketici: ShoppingCart,
+  kira: Home,
+  ortaklik: Users,
+  fikri_mulkiyet: Lightbulb,
+  saglik: HeartPulse,
+  sigorta: ShieldCheck,
+  aile: HeartHandshake,
+  diger: HelpCircle,
 };
+
+// Türk arabuluculuk taksonomisi — value'lar StepMediationType'ın dava şartı rozet
+// eşlemesiyle birebir aynı olmalı (isci_isveren/ticari/tuketici/kira/ortaklik).
+const disputeTypes = [
+  { value: 'isci_isveren' as const, label: 'İşçi-İşveren', description: 'İş sözleşmesi, kıdem/ihbar tazminatı, işe iade uyuşmazlıkları' },
+  { value: 'ticari' as const, label: 'Ticari', description: 'Şirketler arası sözleşme, alacak ve ticaret hukuku uyuşmazlıkları' },
+  { value: 'tuketici' as const, label: 'Tüketici', description: 'Ayıplı mal/hizmet, abonelik, satış sözleşmesi uyuşmazlıkları' },
+  { value: 'kira' as const, label: 'Kira', description: 'Kira bedeli, tahliye, depozito uyuşmazlıkları' },
+  { value: 'ortaklik' as const, label: 'Ortaklığın Giderilmesi', description: 'Şirket veya paydaşlık ortaklığının sona erdirilmesi' },
+  { value: 'fikri_mulkiyet' as const, label: 'Fikri Mülkiyet', description: 'Patent, marka, telif hakkı ve ticari sır uyuşmazlıkları' },
+  { value: 'saglik' as const, label: 'Sağlık / Malpraktis', description: 'Hekim/hastane sorumluluğu, tıbbi müdahale uyuşmazlıkları' },
+  { value: 'sigorta' as const, label: 'Sigorta', description: 'Poliçe, hasar ve tazminat uyuşmazlıkları' },
+  { value: 'aile' as const, label: 'Aile', description: 'Boşanma sonrası mal paylaşımı, nafaka gibi ihtiyari konular' },
+  { value: 'diger' as const, label: 'Diğer', description: 'Yukarıdakilere girmeyen durumu açıklayın' },
+];
 
 export function Step1DisputeType({ data, onChange }: Step1Props) {
   const { t } = useLanguage();
-
-  const disputeTypes = [
-    { value: 'commercial' as const, label: t('step1.commercial'), description: t('step1.commercialDesc') },
-    { value: 'ip' as const, label: t('step1.ip'), description: t('step1.ipDesc') },
-    { value: 'healthcare' as const, label: t('step1.healthcare'), description: t('step1.healthcareDesc') },
-    { value: 'other' as const, label: t('step1.other'), description: t('step1.otherDesc') },
-  ];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -54,7 +79,7 @@ export function Step1DisputeType({ data, onChange }: Step1Props) {
         })}
       </div>
 
-      {data.disputeType === 'other' && (
+      {data.disputeType === 'diger' && (
         <FormField
           label={t('step1.describeDispute')}
           required

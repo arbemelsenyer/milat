@@ -4,6 +4,17 @@ import { IntakeFormData, CaseSummary } from '@/types/intake';
 // In production, this would call an actual AI service
 export function generateCaseSummary(data: IntakeFormData): CaseSummary {
   const disputeTypeLabels: Record<string, string> = {
+    isci_isveren: 'İşçi-İşveren',
+    ticari: 'Ticari',
+    tuketici: 'Tüketici',
+    kira: 'Kira',
+    ortaklik: 'Ortaklığın Giderilmesi',
+    fikri_mulkiyet: 'Fikri Mülkiyet',
+    saglik: 'Sağlık / Malpraktis',
+    sigorta: 'Sigorta',
+    aile: 'Aile',
+    diger: data.disputeTypeOther || 'Diğer',
+    // Geriye uyumluluk: eski Step1 taksonomisiyle kaydedilmiş başvurular
     commercial: 'Commercial Dispute',
     ip: 'Intellectual Property Dispute',
     healthcare: 'Healthcare-Related Dispute',

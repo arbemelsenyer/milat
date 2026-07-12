@@ -11,6 +11,7 @@ import {
   Step5Documents,
 } from './steps';
 import StepNextStepDecision from './steps/StepNextStepDecision';
+import { StepMediationType, type MediationTypeValue } from './steps/StepMediationType';
 import StepAiExploration from './steps/StepAiExploration';
 import StepMediatorScheduling from './steps/StepMediatorScheduling';
 import { IntakeChat } from './IntakeChat';
@@ -33,6 +34,7 @@ export function IntakeForm() {
   const [searchParams] = useSearchParams();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<IntakeFormData>(initialFormData);
+  const [mediationType, setMediationType] = useState<MediationTypeValue>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [flowPhase, setFlowPhase] = useState<FlowPhase>('intake');
@@ -86,6 +88,7 @@ export function IntakeForm() {
 
   const STEP_LABELS = [
     t('stepLabel.disputeType'),
+    'Arabuluculuk Türü',
     t('stepLabel.parties'),
     t('stepLabel.whatHappened'),
     t('stepLabel.outcome'),
@@ -142,7 +145,7 @@ export function IntakeForm() {
           });
           return false;
         }
-        if (formData.disputeType === 'other' && !formData.disputeTypeOther?.trim()) {
+        if (formData.disputeType === 'diger' && !formData.disputeTypeOther?.trim()) {
           toast({
             title: t('toast.describeDispute'),
             variant: 'destructive',
@@ -151,6 +154,18 @@ export function IntakeForm() {
         }
         return true;
       case 1:
+        if (!mediationType) {
+          toast({
+            title: language === 'tr' ? 'Arabuluculuk türü seçin' : 'Select mediation type',
+            description: language === 'tr'
+              ? 'Devam etmek için dava şartı veya ihtiyari arabuluculuktan birini seçmelisiniz.'
+              : 'You must select either mandatory or voluntary mediation to continue.',
+            variant: 'destructive',
+          });
+          return false;
+        }
+        return true;
+      case 2:
         if (!getIntakePartyDisplayName(getPrimaryParty(formData)).trim() || !getIntakePartyDisplayName(getRespondentParty(formData)).trim()) {
           toast({
             title: t('toast.provideNames'),
@@ -160,7 +175,7 @@ export function IntakeForm() {
           return false;
         }
         return true;
-      case 2:
+      case 3:
         if (!formData.issueDescription.trim()) {
           toast({
             title: t('toast.describeHappened'),
@@ -170,7 +185,7 @@ export function IntakeForm() {
           return false;
         }
         return true;
-      case 3:
+      case 4:
         if (!formData.desiredOutcome.trim()) {
           toast({
             title: t('toast.describeOutcome'),
@@ -234,6 +249,7 @@ export function IntakeForm() {
           status: 'submitted',
           title,
           category,
+          mediation_type: mediationType || null,
           ai_summary: summary as unknown as import('@/integrations/supabase/types').Json,
         }).eq('id', caseId);
 
@@ -334,12 +350,20 @@ export function IntakeForm() {
       case 0:
         return <Step1DisputeType data={formData} onChange={updateFormData} />;
       case 1:
-        return <Step2Parties data={formData} onChange={updateFormData} />;
+        return (
+          <StepMediationType
+            disputeType={formData.disputeType}
+            value={mediationType}
+            onChange={setMediationType}
+          />
+        );
       case 2:
-        return <Step3WhatHappened data={formData} onChange={updateFormData} />;
+        return <Step2Parties data={formData} onChange={updateFormData} />;
       case 3:
-        return <Step4DesiredOutcome data={formData} onChange={updateFormData} />;
+        return <Step3WhatHappened data={formData} onChange={updateFormData} />;
       case 4:
+        return <Step4DesiredOutcome data={formData} onChange={updateFormData} />;
+      case 5:
         return <Step5Documents data={formData} onChange={updateFormData} />;
       default:
         return null;
