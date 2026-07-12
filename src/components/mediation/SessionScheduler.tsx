@@ -745,7 +745,7 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
                   <iframe
                     title="email-preview"
                     srcDoc={previews[activePreviewIdx].html}
-                    className="w-full h-[400px] border rounded-md bg-white"
+                    className="w-full h-[400px] border rounded-md bg-card"
                   />
                 </div>
               )}

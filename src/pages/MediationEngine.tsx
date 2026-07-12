@@ -582,7 +582,7 @@ export default function MediationEngine() {
             <div className="font-mono text-sm">{activeCase.application_no || "—"}</div>
             <div className="text-xs mt-2 opacity-80 line-clamp-2">{activeCase.title}</div>
           </div>
-          <div className="border-t border-sidebar-foreground/10 pt-3 mb-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div className="border-t border-sidebar-foreground/10 pt-3 mb-2 px-3 text-xs font-medium text-sidebar-foreground/60 uppercase tracking-wider">
             Dosya Araçları
           </div>
           {(isMediator || isAdmin) && (
@@ -599,7 +599,7 @@ export default function MediationEngine() {
             onClick={() => setPaymentPanelOpen(true)}>
             💰 Ödeme & Muhasebe
           </Button>
-          <div className="mb-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div className="mb-2 px-3 text-xs font-medium text-sidebar-foreground/60 uppercase tracking-wider">
             Süreç
           </div>
           <nav className="space-y-1">
