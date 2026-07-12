@@ -2137,7 +2137,16 @@ function StepDot({ done, active, label }: { done: boolean; active?: boolean; lab
   );
 }
 
+// Treats null/undefined/boolean/whitespace-only children (the shape `{cond && ...}` leaves
+// behind when cond is false) as "nothing to show" — real elements/numbers are never blank.
+function isBlankNode(node: React.ReactNode): boolean {
+  if (node === null || node === undefined || typeof node === "boolean") return true;
+  if (typeof node === "string") return node.trim().length === 0;
+  if (Array.isArray(node)) return node.every(isBlankNode);
+  return false;
+}
 function AnaSection({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+  if (isBlankNode(children)) return null;
   return (
     <div className="border rounded-md p-3 bg-muted/30">
       <div className="font-medium text-sm mb-1">{icon} {title}</div>
@@ -2254,30 +2263,43 @@ function CommonGroundZeminSection({ data }: { data: any }) {
 // Faz 4 sekmeli yerleşiminde "Strateji" sekmesi için — Arabulucu Stratejisi + Kırmızı Çizgiler + Kaynaklar.
 function CommonGroundStrategySection({ data, strategy }: { data: any; strategy: any }) {
   if (!data) return null;
+  // `report.report.mediator_strategy` (data.mediator_strategy) is the freshly-parsed AI
+  // output written on every regenerate and is the field this tab is meant to show. The
+  // separate `strategy` column is a denormalized copy from the same write — for rows saved
+  // before its shape settled it can hold different/legacy keys while still being non-empty,
+  // so treating it as the priority source shows stale content even though data.mediator_strategy
+  // is populated. Read data.mediator_strategy first; `strategy` is only a fallback for the
+  // (now hypothetical) case where the report JSON itself never got a mediator_strategy key.
+  const rawStrategy = data.mediator_strategy && Object.keys(data.mediator_strategy).length > 0
+    ? data.mediator_strategy
+    : (strategy || {});
+  const openingStatement = safeText(rawStrategy.opening_statement);
+  // AI output occasionally returns array items as objects instead of strings (see safeList) —
+  // mapping them straight into JSX throws "Objects are not valid as a React child" and, since
+  // Phase4Summary has no error boundary, blanks the whole Strateji tab.
+  const criticalQuestions = safeList(rawStrategy.critical_questions);
+  const deadlockTechniques = safeList(rawStrategy.deadlock_techniques);
+  const redLines = safeList(data.red_lines);
+  const hasStrategyContent = !!openingStatement || criticalQuestions.length > 0 || deadlockTechniques.length > 0;
   return (
     <div className="space-y-2">
-      {(strategy || data.mediator_strategy) && (
+      {hasStrategyContent && (
         <AnaSection icon="🎯" title="Arabulucu Stratejisi">
-          {(() => {
-            const s = strategy || data.mediator_strategy || {};
-            return (
-              <div className="text-sm space-y-1">
-                {s.opening_statement && <div><b>Açılış:</b> {s.opening_statement}</div>}
-                {s.critical_questions?.length > 0 && (
-                  <div><b>Kritik Sorular:</b><CriticalQuestionsCard questions={s.critical_questions} /></div>
-                )}
-                {s.deadlock_techniques?.length > 0 && (
-                  <div><b>Çıkmaz Teknikleri:</b><ul className="list-disc pl-5">{s.deadlock_techniques.map((q: string, i: number) => <li key={i}>{q}</li>)}</ul></div>
-                )}
-              </div>
-            );
-          })()}
+          <div className="text-sm space-y-1">
+            {openingStatement && <div><b>Açılış:</b> {openingStatement}</div>}
+            {criticalQuestions.length > 0 && (
+              <div><b>Kritik Sorular:</b><CriticalQuestionsCard questions={criticalQuestions} /></div>
+            )}
+            {deadlockTechniques.length > 0 && (
+              <div><b>Çıkmaz Teknikleri:</b><ul className="list-disc pl-5">{deadlockTechniques.map((q, i) => <li key={i}>{q}</li>)}</ul></div>
+            )}
+          </div>
         </AnaSection>
       )}
-      {data.red_lines?.length > 0 && (
+      {redLines.length > 0 && (
         <AnaSection icon="🚧" title="Kırmızı Çizgiler">
           <ul className="space-y-1.5 text-sm">
-            {data.red_lines.map((s: string, i: number) => (
+            {redLines.map((s, i) => (
               <li key={i} className="flex items-start gap-2 rounded-md border border-red-400/50 bg-red-50/60 dark:bg-red-950/20 px-2.5 py-1.5">
                 <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
                 <span>{s}</span>
