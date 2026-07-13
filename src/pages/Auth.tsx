@@ -70,7 +70,7 @@ export default function AuthPage() {
   const [signupAwaitingConfirm, setSignupAwaitingConfirm] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, isLoading: authLoading, isMediator, isAdmin, signIn, signUp } = useAuth();
+  const { user, isLoading: authLoading, isMediator, isAdmin, signIn, signUp, inviteSignUp } = useAuth();
   const { language } = useLanguage();
   const inviteToken = getInviteToken();
 
@@ -178,17 +178,43 @@ export default function AuthPage() {
 
   const handleSignup = async (data: SignupFormData) => {
     setIsLoading(true);
-    // Preserve ?invite= (and ?next=) across the email-confirmation round trip so
-    // the invite is still accepted once the user clicks the confirmation link.
-    const redirectParams = new URLSearchParams();
-    if (inviteToken) redirectParams.set('invite', inviteToken);
-    const nextPath = getSafeNextPath();
-    if (nextPath) redirectParams.set('next', nextPath);
-    const emailRedirectTo = `${window.location.origin}/auth${
-      redirectParams.toString() ? `?${redirectParams.toString()}` : ''
-    }`;
 
-    const { data: signUpData, error } = await signUp(data.email, data.password, data.fullName, emailRedirectTo);
+    // Invited signups: public self-signup is disabled project-wide, so this goes
+    // through a service-role edge function that validates the invite token and
+    // creates the account directly (no email-confirmation round trip needed —
+    // the invite link already proves the person controls that inbox). Uninvited
+    // signups keep going through the normal signUp() call below, which stays
+    // blocked by the disabled public signup endpoint.
+    if (inviteToken) {
+      const { error } = await inviteSignUp(inviteToken, data.email, data.password, data.fullName);
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: language === 'tr' ? 'Kayıt başarısız' : 'Registration failed',
+          description: error.message,
+        });
+        setIsLoading(false);
+        return;
+      }
+      const { error: signInError } = await signIn(data.email, data.password);
+      setIsLoading(false);
+      if (signInError) {
+        toast({
+          variant: 'destructive',
+          title: language === 'tr' ? 'Giriş başarısız' : 'Login failed',
+          description: signInError.message,
+        });
+        return;
+      }
+      toast({
+        title: language === 'tr' ? 'Kayıt başarılı' : 'Registration successful',
+        description: language === 'tr' ? 'Hesabınız oluşturuldu.' : 'Your account has been created.',
+      });
+      // The effect below (triggered by `user` changing) handles the invite-accept + redirect.
+      return;
+    }
+
+    const { data: signUpData, error } = await signUp(data.email, data.password, data.fullName);
     setIsLoading(false);
     if (error) {
       let errorMessage = error.message;

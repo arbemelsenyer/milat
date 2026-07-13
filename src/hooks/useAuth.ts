@@ -127,6 +127,20 @@ export function useAuth() {
     return { data, error };
   };
 
+  // For invited signups only: public self-signup is disabled at the project
+  // level, so this goes through a service-role edge function that validates
+  // the party-invite token and creates the account, bypassing that gate.
+  // Uninvited signups keep going through signUp() above, which stays blocked.
+  const inviteSignUp = async (token: string, email: string, password: string, fullName?: string) => {
+    const { data, error } = await supabase.functions.invoke('invite-signup', {
+      body: { token, email, password, fullName },
+    });
+    if (error || (data as any)?.error) {
+      return { error: new Error((data as any)?.error ?? error?.message ?? 'Signup failed') };
+    }
+    return { error: null };
+  };
+
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -143,6 +157,7 @@ export function useAuth() {
   return {
     ...authState,
     signUp,
+    inviteSignUp,
     signIn,
     signOut,
     refetchProfile: () => authState.user && fetchProfileAndRoles(authState.user.id),
