@@ -31,7 +31,7 @@ import {
   Plus, Loader2, FolderOpen, FileText, Users, Brain, ShieldCheck,
   Calendar as CalIcon, UserCheck, MessageSquare, FileCheck2, CheckCircle2, XCircle, Circle,
   Trash2, ArrowLeft, Sparkles, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Pencil,
-  LayoutDashboard, Lightbulb, Target, EyeOff,
+  LayoutDashboard, Lightbulb, Target, EyeOff, Mail,
 } from "lucide-react";
 
 // CaseRoom.tsx'teki altın sekme diliyle aynı — data-[state=active] alt çizgisi accent renginde.
@@ -1407,6 +1407,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
   const [savingEdit, setSavingEdit] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [invitingId, setInvitingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1416,6 +1417,22 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
   }, [caseRow.id]);
 
   useEffect(() => { load(); }, [load]);
+
+  const sendInvite = useCallback(async (partyId: string) => {
+    setInvitingId(partyId);
+    try {
+      const { error } = await supabase.functions.invoke("send-party-invite", {
+        body: { party_id: partyId, app_url: window.location.origin },
+      });
+      if (error) throw error;
+      toast({ title: "Davet gönderildi" });
+    } catch (e: any) {
+      toast({ title: "Davet gönderilemedi", description: trErr(e?.message ?? ""), variant: "destructive" });
+    } finally {
+      setInvitingId(null);
+      load();
+    }
+  }, [load]);
 
   function validateParty(p: any, isInd: boolean): string | null {
     if (isInd) {
@@ -1466,13 +1483,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
       } as any).select().single();
       if (error) throw error;
       if (draft.email) {
-        supabase.functions.invoke("send-party-invite", { body: { party_id: (inserted as any).id, app_url: window.location.origin } })
-          .then(({ error: inviteError }) => {
-            if (inviteError) toast({ title: "Davet gönderilemedi", description: trErr(inviteError.message), variant: "destructive" });
-          })
-          .catch((inviteErr: any) => {
-            toast({ title: "Davet gönderilemedi", description: trErr(inviteErr?.message ?? ""), variant: "destructive" });
-          });
+        sendInvite((inserted as any).id);
       }
       toast({ title: "Taraf eklendi" });
       setDraft(null);
@@ -1498,6 +1509,10 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
       const full_name = isInd
         ? `${editing.first_name ?? ""} ${editing.last_name ?? ""}`.trim()
         : (editing.company_name ?? "");
+      const original = parties.find((p: any) => p.id === editing.id);
+      const newEmail = String(editing.email ?? "").trim();
+      const oldEmail = String(original?.email ?? "").trim();
+      const emailChanged = !!newEmail && newEmail !== oldEmail;
       const patch: any = {
         first_name: editing.first_name ?? null,
         last_name: editing.last_name ?? null,
@@ -1518,6 +1533,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
       toast({ title: "Taraf bilgileri güncellendi" });
       setEditing(null);
       load();
+      if (emailChanged) sendInvite(editing.id);
     } catch (e: any) {
       toast({ title: "Güncelleme başarısız", description: trErr(e.message), variant: "destructive" });
     } finally {
@@ -1564,6 +1580,18 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
+                  {p.email && p.invite_status !== "accepted" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => sendInvite(p.id)}
+                      disabled={invitingId === p.id}
+                      title="Davet Gönder / Yeniden Gönder"
+                    >
+                      {invitingId === p.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Mail className="h-4 w-4 mr-1" />}
+                      Davet Gönder / Yeniden Gönder
+                    </Button>
+                  )}
                   <Button variant="ghost" size="sm" onClick={() => setEditing({ ...p })} title="Düzenle">
                     <Pencil className="h-4 w-4 mr-1" /> Düzenle
                   </Button>
