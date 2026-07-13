@@ -31,7 +31,7 @@ import {
   Plus, Loader2, FolderOpen, FileText, Users, Brain, ShieldCheck,
   Calendar as CalIcon, UserCheck, MessageSquare, FileCheck2, CheckCircle2, XCircle, Circle,
   Trash2, ArrowLeft, Sparkles, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Pencil,
-  LayoutDashboard, Lightbulb, Target,
+  LayoutDashboard, Lightbulb, Target, EyeOff,
 } from "lucide-react";
 
 // CaseRoom.tsx'teki altın sekme diliyle aynı — data-[state=active] alt çizgisi accent renginde.
@@ -791,7 +791,7 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }
     case 4: return <>
       {isMediator
         ? <Phase4Summary caseRow={caseRow} />
-        : <Card className="p-6 text-sm text-muted-foreground">Bu bölüm yalnızca arabulucu tarafından görüntülenebilir.</Card>}
+        : <BlindBidPartyForm caseId={caseRow.id} userId={userId} />}
       <NextPhaseButton phase={phase} onAdvance={onAdvance} />
     </>;
     case 5: return <><Phase5Sessions caseRow={caseRow} bumpPhase={bumpPhase} onAdvance={onAdvance} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
@@ -3554,6 +3554,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
           <TabsTrigger value="taraf-analizleri" className={tabTriggerAccentClass}><Users className="h-4 w-4 mr-1" />Taraf Analizleri</TabsTrigger>
           <TabsTrigger value="ortak-zemin" className={tabTriggerAccentClass}><Lightbulb className="h-4 w-4 mr-1" />Ortak Zemin</TabsTrigger>
           <TabsTrigger value="strateji" className={tabTriggerAccentClass}><Target className="h-4 w-4 mr-1" />Strateji</TabsTrigger>
+          <TabsTrigger value="kor-teklif" className={tabTriggerAccentClass}><EyeOff className="h-4 w-4 mr-1" />Kör Teklif</TabsTrigger>
         </TabsList>
 
         <TabsContent value="genel-bakis">
@@ -3772,6 +3773,14 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
             </motion.div>
           </motion.div>
         </TabsContent>
+
+        <TabsContent value="kor-teklif">
+          <motion.div variants={containerVariants} initial="hidden" animate="show">
+            <motion.div variants={itemVariants}>
+              <BlindBidMediatorPanel caseId={caseRow.id} />
+            </motion.div>
+          </motion.div>
+        </TabsContent>
       </Tabs>
     </Card>
     <Dialog open={!!openScenario} onOpenChange={(o) => !o && setOpenScenario(null)}>
@@ -3807,7 +3816,268 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   );
 }
 
+function formatBidAmount(v: number | null, currency: string): string {
+  if (v === null || v === undefined) return "—";
+  try {
+    return new Intl.NumberFormat("tr-TR", { style: "currency", currency: currency || "TRY", maximumFractionDigits: 0 }).format(v);
+  } catch {
+    return `${v.toLocaleString("tr-TR")} ${currency}`;
+  }
+}
 
+function blindBidPartyName(p: any, i: number): string {
+  return p.company_name || `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || `Taraf ${i + 1}`;
+}
+
+type BlindBidRow = {
+  party_id: string;
+  min_amount: number | null;
+  max_amount: number | null;
+  currency: string;
+  note: string | null;
+};
+
+// Faz 4 "Kör Teklif" sekmesi — Smartsettle ONE tarzı arabulucu-asist kör pazarlık.
+// Taraflar birbirinin teklifini hiçbir zaman görmez (RLS: case_parties.user_id = auth.uid());
+// bu panel yalnızca arabulucu/admin erişimindeki Faz 4 içinde render edilir.
+function BlindBidMediatorPanel({ caseId }: { caseId: string }) {
+  const [parties, setParties] = useState<any[]>([]);
+  const [bids, setBids] = useState<BlindBidRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadErr(null);
+    try {
+      const [p, b] = await Promise.all([
+        supabase.from("case_parties").select("id, party_role, first_name, last_name, company_name").eq("case_id", caseId).order("created_at"),
+        supabase.from("blind_bids").select("party_id, min_amount, max_amount, currency, note").eq("case_id", caseId),
+      ]);
+      if (p.error) throw p.error;
+      if (b.error) throw b.error;
+      setParties(Array.isArray(p.data) ? p.data : []);
+      setBids(Array.isArray(b.data) ? (b.data as any) : []);
+    } catch (e: any) {
+      console.error("[BlindBidMediatorPanel] load failed", e);
+      setLoadErr(e?.message ?? "Bilinmeyen hata");
+    } finally {
+      setLoading(false);
+    }
+  }, [caseId]);
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return (
+    <Card className="p-6 flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" /> Kör teklifler yükleniyor…
+    </Card>
+  );
+  if (loadErr) return (
+    <Card className="p-6 space-y-3">
+      <div className="flex items-center gap-2 text-destructive font-semibold text-sm">
+        <AlertTriangle className="h-4 w-4" /> Kör teklif verileri yüklenemedi
+      </div>
+      <p className="text-xs text-muted-foreground break-words">{trErr(loadErr)}</p>
+      <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-3 w-3 mr-1" /> Tekrar Dene</Button>
+    </Card>
+  );
+
+  const bidByParty = new Map(bids.map((b) => [b.party_id, b]));
+  const rows = parties.map((p, i) => ({ party: p, name: blindBidPartyName(p, i), bid: bidByParty.get(p.id) ?? null }));
+  const withBid = rows.filter((r) => r.bid && (r.bid.min_amount !== null || r.bid.max_amount !== null));
+
+  // Örtüşme (ZOPA) hesabı yalnızca iki taraf da tam bir min-maks aralığı girdiğinde yapılır.
+  let overlap: { lower: number; upper: number } | null = null;
+  let gap: number | null = null;
+  let overlapCurrency = "TRY";
+  let incomplete = false;
+  if (withBid.length >= 2) {
+    const [a, b] = withBid;
+    if (a.bid!.min_amount !== null && a.bid!.max_amount !== null && b.bid!.min_amount !== null && b.bid!.max_amount !== null) {
+      const lower = Math.max(a.bid!.min_amount, b.bid!.min_amount);
+      const upper = Math.min(a.bid!.max_amount, b.bid!.max_amount);
+      overlapCurrency = a.bid!.currency || b.bid!.currency || "TRY";
+      if (upper >= lower) overlap = { lower, upper };
+      else gap = lower - upper;
+    } else {
+      incomplete = true;
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-sidebar-border bg-sidebar text-sidebar-foreground p-6 shadow-elegant space-y-4">
+      <div className="flex items-center gap-2">
+        <EyeOff className="h-4 w-4 text-accent" />
+        <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Kör Teklif Durumu</div>
+      </div>
+      <p className="text-xs text-sidebar-foreground/60 leading-snug">
+        Taraflar birbirinin teklifini göremez — yalnızca siz (arabulucu) her iki tarafın teklif
+        durumunu ve, ikisi de teklif girdiğinde, örtüşme (tatmin) bölgesini görürsünüz. Taraflara,
+        kendi Kör Teklif formlarını Aşama 4 sekmesinden doldurmalarını hatırlatabilirsiniz.
+      </p>
+
+      {rows.length === 0 ? (
+        <p className="text-sm text-sidebar-foreground/50 italic">Bu vakada henüz taraf tanımlanmamış.</p>
+      ) : (
+        <div className={`grid gap-4 ${rows.length > 1 ? "sm:grid-cols-2" : ""}`}>
+          {rows.map(({ party, name, bid }) => {
+            const entered = !!bid && (bid.min_amount !== null || bid.max_amount !== null);
+            return (
+              <div key={party.id} className="rounded-xl border border-sidebar-border bg-sidebar-accent/25 p-4 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-display font-semibold truncate">
+                    {name} <span className="text-xs text-sidebar-foreground/50 font-normal">({roleLabel(party.party_role)})</span>
+                  </div>
+                  <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${entered ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-sidebar-border/60 text-sidebar-foreground/50"}`}>
+                    {entered ? "Girdi" : "Girmedi"}
+                  </span>
+                </div>
+                {entered && (
+                  <div className="text-sm font-display font-bold">
+                    {formatBidAmount(bid!.min_amount, bid!.currency)}
+                    <span className="text-sidebar-foreground/50 mx-1 font-normal">–</span>
+                    {formatBidAmount(bid!.max_amount, bid!.currency)}
+                  </div>
+                )}
+                {entered && bid!.note && <p className="text-xs text-sidebar-foreground/60 leading-snug">{bid!.note}</p>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {overlap && (
+        <div className="rounded-xl border border-accent/60 bg-accent/10 p-4 space-y-1">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Tatmin Bölgesi</div>
+          <div className="font-display text-lg font-bold text-sidebar-foreground">
+            {formatBidAmount(overlap.lower, overlapCurrency)} – {formatBidAmount(overlap.upper, overlapCurrency)}
+          </div>
+          <p className="text-xs text-sidebar-foreground/60">İki tarafın kör teklif aralıkları örtüşüyor — bu bant üzerinden anlaşma önerilebilir.</p>
+        </div>
+      )}
+      {gap !== null && (
+        <div className="rounded-xl border border-dashed border-destructive/50 bg-destructive/5 p-4 space-y-1">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-destructive font-semibold">Örtüşme Yok</div>
+          <div className="font-display text-lg font-bold text-sidebar-foreground">Fark: {formatBidAmount(gap, overlapCurrency)}</div>
+          <p className="text-xs text-sidebar-foreground/60">Taraflar arasındaki aralıklar kesişmiyor; ek tur veya yüz yüze kolaylaştırma gerekebilir.</p>
+        </div>
+      )}
+      {incomplete && (
+        <p className="text-xs text-amber-600 dark:text-amber-400 italic">Bir tarafın teklifi eksik (yalnızca alt veya yalnızca üst sınır girilmiş) — örtüşme hesaplanamıyor.</p>
+      )}
+      {withBid.length < 2 && rows.length >= 2 && (
+        <p className="text-xs text-sidebar-foreground/50 italic">Örtüşme hesabı için her iki tarafın da kör teklif girmesi gerekir.</p>
+      )}
+    </div>
+  );
+}
+
+// Faz 4 "Kör Teklif" — taraf görünümü. Yalnızca kendi teklifini görür/düzenler;
+// karşı tarafın teklifinin var olup olmadığını dahi göremez (RLS bunu garanti eder).
+function BlindBidPartyForm({ caseId, userId }: { caseId: string; userId: string }) {
+  const [partyId, setPartyId] = useState<string | null>(null);
+  const [minAmount, setMinAmount] = useState("");
+  const [maxAmount, setMaxAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadErr(null);
+    try {
+      const { data: party, error: partyErr } = await supabase
+        .from("case_parties").select("id").eq("case_id", caseId).eq("user_id", userId).maybeSingle();
+      if (partyErr) throw partyErr;
+      if (!party) { setPartyId(null); return; }
+      setPartyId(party.id);
+      const { data: bid, error: bidErr } = await supabase
+        .from("blind_bids").select("min_amount, max_amount, note").eq("case_id", caseId).eq("party_id", party.id).maybeSingle();
+      if (bidErr) throw bidErr;
+      setMinAmount(bid?.min_amount != null ? String(bid.min_amount) : "");
+      setMaxAmount(bid?.max_amount != null ? String(bid.max_amount) : "");
+      setNote(bid?.note ?? "");
+    } catch (e: any) {
+      console.error("[BlindBidPartyForm] load failed", e);
+      setLoadErr(e?.message ?? "Bilinmeyen hata");
+    } finally {
+      setLoading(false);
+    }
+  }, [caseId, userId]);
+  useEffect(() => { load(); }, [load]);
+
+  async function save() {
+    if (!partyId) return;
+    const min = minAmount.trim() ? Number(minAmount.replace(",", ".")) : null;
+    const max = maxAmount.trim() ? Number(maxAmount.replace(",", ".")) : null;
+    if ((min !== null && Number.isNaN(min)) || (max !== null && Number.isNaN(max))) {
+      toast({ title: "Geçersiz tutar", description: "Lütfen min ve maks alanlarına sayı girin.", variant: "destructive" });
+      return;
+    }
+    if (min !== null && max !== null && min > max) {
+      toast({ title: "Geçersiz aralık", description: "Min tutar, maks tutardan büyük olamaz.", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    const { error } = await supabase.from("blind_bids").upsert({
+      case_id: caseId, party_id: partyId, min_amount: min, max_amount: max, note: note.trim() || null,
+    } as any, { onConflict: "case_id,party_id" });
+    setSaving(false);
+    if (error) toast({ title: "Kaydedilemedi", description: trErr(error.message), variant: "destructive" });
+    else toast({ title: "Kör teklifiniz kaydedildi" });
+  }
+
+  if (loading) return (
+    <Card className="p-6 flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" /> Teklifiniz yükleniyor…
+    </Card>
+  );
+  if (loadErr) return (
+    <Card className="p-6 space-y-3">
+      <div className="flex items-center gap-2 text-destructive font-semibold text-sm">
+        <AlertTriangle className="h-4 w-4" /> Teklif verileri yüklenemedi
+      </div>
+      <p className="text-xs text-muted-foreground break-words">{trErr(loadErr)}</p>
+      <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-3 w-3 mr-1" /> Tekrar Dene</Button>
+    </Card>
+  );
+  if (!partyId) return (
+    <Card className="p-6 text-sm text-muted-foreground">Bu vakada size ait bir taraf kaydı bulunamadı.</Card>
+  );
+
+  return (
+    <Card className="p-6 space-y-4">
+      <div className="flex items-center gap-2">
+        <EyeOff className="h-4 w-4 text-primary" />
+        <h3 className="font-semibold">Kör Teklif</h3>
+      </div>
+      <p className="text-sm text-muted-foreground leading-snug">
+        Karşı tarafın teklifini göremezsiniz, karşı taraf da sizinkini görmez — yalnızca arabulucu
+        ikisini birlikte değerlendirebilir. Anlaşabileceğiniz min-maks tutar aralığını girin;
+        dilediğiniz zaman güncelleyebilirsiniz.
+      </p>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Min. Tutar</Label>
+          <Input inputMode="decimal" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} placeholder="Örn. 50000" />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Maks. Tutar</Label>
+          <Input inputMode="decimal" value={maxAmount} onChange={(e) => setMaxAmount(e.target.value)} placeholder="Örn. 80000" />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs">Not (yalnızca arabulucu görür)</Label>
+        <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="Arabulucuya iletmek istediğiniz ek açıklama…" />
+      </div>
+      <Button onClick={save} disabled={saving}>
+        {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+        Kaydet
+      </Button>
+    </Card>
+  );
+}
 
 /* ===================== PHASE 7 - GÖRÜŞME NOTLARI ===================== */
 
