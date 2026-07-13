@@ -112,6 +112,57 @@ export type Database = {
           },
         ]
       }
+      blind_bids: {
+        Row: {
+          case_id: string
+          created_at: string
+          currency: string
+          id: string
+          max_amount: number | null
+          min_amount: number | null
+          note: string | null
+          party_id: string
+          updated_at: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          currency?: string
+          id?: string
+          max_amount?: number | null
+          min_amount?: number | null
+          note?: string | null
+          party_id: string
+          updated_at?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          max_amount?: number | null
+          min_amount?: number | null
+          note?: string | null
+          party_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blind_bids_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blind_bids_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_assignments: {
         Row: {
           assigned_at: string
@@ -1990,6 +2041,10 @@ export type Database = {
       }
       is_case_party: {
         Args: { _case_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_own_case_party: {
+        Args: { _party_id: string; _user_id: string }
         Returns: boolean
       }
       list_experts_for_mediator: {
