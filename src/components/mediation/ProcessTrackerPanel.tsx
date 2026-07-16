@@ -5,10 +5,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Pencil } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { officialTitle } from "@/lib/official-documents";
 
 // case_process_tracker isn't in the generated Supabase types yet.
 const trackerTable = () => (supabase as any).from("case_process_tracker");
@@ -45,6 +44,59 @@ const WORKFLOW_ITEMS: { key: string; label: string; auto?: boolean }[] = [
   { key: "son_durum", label: "Son Durum", auto: true },
 ];
 
+// Bilinen {grup}_{belge_tipi} kalıplarını okunur Türkçe ada çevirir (ör.
+// "ticari_anlasma_son_tutanak" → "Ticari Anlaşma Son Tutanağı"). Eşleşmeyen
+// bir değer gelirse ham template_type olduğu gibi döner.
+const TEMPLATE_GROUP_LABELS: Record<string, string> = {
+  dava_sarti: "Dava Şartı",
+  isci_isveren: "İşçi-İşveren",
+  ihtiyari: "İhtiyari",
+  ticari: "Ticari",
+  tuketici: "Tüketici",
+  kira: "Kira",
+  ortaklik: "Ortaklığın Giderilmesi",
+};
+
+const TEMPLATE_BELGE_TIPI_LABELS: Record<string, string> = {
+  davet: "Davet",
+  muracaat_tutanagi: "Müracaat Tutanağı",
+  arabulucu_belirleme: "Arabulucu Belirleme",
+  bilgilendirme: "Bilgilendirme",
+  surec_baslama: "Süreç Başlama",
+  ilk_oturum: "İlk Oturum",
+  oturum_erteleme: "Oturum Erteleme",
+  acilis_konusmasi: "Açılış Konuşması",
+  anlasma_belgesi: "Anlaşma Belgesi",
+  anlasma_son_tutanak: "Anlaşma Son Tutanağı",
+  anlasamama_son_tutanak: "Anlaşamama Son Tutanağı",
+  gorusme_yapilmadan_anlasamama: "Görüşme Yapılmadan Anlaşamama",
+  ucret_sozlesmesi: "Ücret Sözleşmesi",
+  yetki_belgesi: "Yetki Belgesi",
+  makbuz_ust_yazisi: "Makbuz Üst Yazısı",
+  icra_serhi_dilekce: "İcra Şerhi Dilekçesi",
+  anlasma: "Anlaşma",
+  anlasamamama: "Anlaşamama",
+  ucret: "Ücret",
+};
+
+// Grup önekiyle ayrıştırılamayan, tek parça sabit adlar.
+const TEMPLATE_FULL_NAME_LABELS: Record<string, string> = {
+  bilgilendirme_tutanagi: "Bilgilendirme Tutanağı",
+};
+
+function humanizeTemplateType(type: string): string {
+  if (TEMPLATE_FULL_NAME_LABELS[type]) return TEMPLATE_FULL_NAME_LABELS[type];
+  const groupKey = Object.keys(TEMPLATE_GROUP_LABELS)
+    .sort((a, b) => b.length - a.length)
+    .find((g) => type === g || type.startsWith(`${g}_`));
+  if (!groupKey) return type;
+  const remainder = type === groupKey ? "" : type.slice(groupKey.length + 1);
+  if (!remainder) return TEMPLATE_GROUP_LABELS[groupKey];
+  const belgeLabel = TEMPLATE_BELGE_TIPI_LABELS[remainder];
+  if (!belgeLabel) return type;
+  return `${TEMPLATE_GROUP_LABELS[groupKey]} ${belgeLabel}`;
+}
+
 function fmtDate(d?: string | null): string {
   if (!d) return "—";
   try {
@@ -71,6 +123,7 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
   const [outcomeAnalytics, setOutcomeAnalytics] = useState<any>(null);
   const [agreementAmountDraft, setAgreementAmountDraft] = useState<string>("");
   const [savingAmount, setSavingAmount] = useState(false);
+  const [editingAmount, setEditingAmount] = useState(false);
 
   useEffect(() => {
     if (!open || !caseRow?.id) return;
@@ -194,6 +247,7 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
       const { error } = await supabase.from("cases").update({ agreement_amount: amount }).eq("id", caseRow.id);
       if (error) throw error;
       setCaseData((prev: any) => ({ ...prev, agreement_amount: amount }));
+      setEditingAmount(false);
       toast({ title: "Anlaşma tutarı kaydedildi" });
     } catch (e: any) {
       toast({ title: "Kaydedilemedi", description: e.message, variant: "destructive" });
@@ -274,30 +328,50 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
         { label: "Oturum Sayısı", value: outcomeAnalytics?.oturum_sayisi ?? "—" },
         {
           label: "Kapanış Belgesi",
-          value: outcomeAnalytics?.kapanis_belgesi_tipi ? officialTitle(outcomeAnalytics.kapanis_belgesi_tipi) : "—",
+          value: outcomeAnalytics?.kapanis_belgesi_tipi ? humanizeTemplateType(outcomeAnalytics.kapanis_belgesi_tipi) : "—",
         },
         { label: "Kullanılan Araçlar", value: araclar },
         {
           label: "Anlaşma Tutarı",
-          value: caseData.agreement_amount ? (
-            `${Number(caseData.agreement_amount).toLocaleString("tr-TR")} ₺`
-          ) : isMediator || isAdmin ? (
-            <div className="flex items-center gap-2">
-              <Input
-                className="h-8 max-w-[160px]"
-                type="number"
-                min={0}
-                value={agreementAmountDraft}
-                onChange={(e) => setAgreementAmountDraft(e.target.value)}
-                placeholder="Tutar (₺)"
-              />
-              <Button size="sm" className="h-8" disabled={savingAmount} onClick={saveAgreementAmount}>
-                {savingAmount ? <Loader2 className="h-3 w-3 animate-spin" /> : "Kaydet"}
-              </Button>
-            </div>
-          ) : (
-            "—"
-          ),
+          value: (() => {
+            const canEdit = isMediator || isAdmin;
+            const hasAmount = !!caseData.agreement_amount;
+            if (hasAmount && !editingAmount) {
+              return (
+                <div className="flex items-center gap-2">
+                  <span>{Number(caseData.agreement_amount).toLocaleString("tr-TR")} ₺</span>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={() => setEditingAmount(true)}
+                      title="Düzenle"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            }
+            if (canEdit) {
+              return (
+                <div className="flex items-center gap-2">
+                  <Input
+                    className="h-8 max-w-[160px]"
+                    type="number"
+                    min={0}
+                    value={agreementAmountDraft}
+                    onChange={(e) => setAgreementAmountDraft(e.target.value)}
+                    placeholder="Tutar (₺)"
+                  />
+                  <Button size="sm" className="h-8" disabled={savingAmount} onClick={saveAgreementAmount}>
+                    {savingAmount ? <Loader2 className="h-3 w-3 animate-spin" /> : "Kaydet"}
+                  </Button>
+                </div>
+              );
+            }
+            return "—";
+          })(),
         },
       ]
     : null;
