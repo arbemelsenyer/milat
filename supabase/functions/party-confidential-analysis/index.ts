@@ -247,6 +247,11 @@ Bu tarafın perspektifinden detaylı analiz üret. Yukarıdaki bloklarda somut b
     const content = aiJson?.choices?.[0]?.message?.content ?? "{}";
     let parsed: any = {};
     try { parsed = JSON.parse(content); } catch { parsed = { raw: content }; }
+
+    // Deterministic backstop for the prompt's citation-hallucination ban: strips any
+    // Yargıtay/BAM E./K. number not verbatim in the RAG context the model actually saw.
+    parsed = sanitizeCitationHallucinations(parsed, `${ragBlock}\n${similarBlock}`);
+
     // Attach the sources actually used by RAG so the UI can show transparency info.
     parsed.sources = ragSources;
 
@@ -386,4 +391,91 @@ async function fetchSimilarCases(admin: any, embedding: number[] | null, categor
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Deterministic citation guard (no extra AI call, no schema change).
+// The system prompt bans fabricated Yargıtay/BAM esas-karar (E./K.) numbers,
+// but a model can still ignore that instruction — this is the code-level
+// backstop that runs after JSON.parse, before the row is ever persisted.
+// ─────────────────────────────────────────────────────────────────────────
+
+// Matches "2016/10292 E.", "E. 2017/3257", "K. 2018/7889", "2010/8939 K.",
+// and placeholder-digit variants like "2020/XXXX E." — number/E-or-K token
+// pairs in either order.
+const CITATION_PATTERN = /\b(\d{4}\/[0-9X]{1,7}\s*(?:E|K)\.?)\b|\b((?:E|K)\.?\s*\d{4}\/[0-9X]{1,7})\b/gi;
+
+function extractCitations(text: string): string[] {
+  const out: string[] = [];
+  const re = new RegExp(CITATION_PATTERN);
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) out.push((m[1] ?? m[2] ?? m[0]).trim());
+  return out;
+}
+
+function normalizeForCompare(s: string): string {
+  return s.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function citationInContext(citation: string, context: string): boolean {
+  return normalizeForCompare(context).includes(normalizeForCompare(citation));
+}
+
+// Replaces any citation not verbatim in `context` with a generic phrase,
+// then tidies the double-space/empty-parenthesis artifacts that leaves behind.
+function scrubCitationsInString(text: string, context: string): { text: string; removed: number } {
+  let removed = 0;
+  const re = new RegExp(CITATION_PATTERN);
+  const scrubbed = text.replace(re, (match) => {
+    if (citationInContext(match, context)) return match;
+    removed++;
+    return "yerleşik içtihadı";
+  });
+  const cleaned = scrubbed
+    .replace(/\(\s*\)/g, "")
+    .replace(/ {2,}/g, " ")
+    .trim();
+  return { text: cleaned, removed };
+}
+
+function sanitizeStringsDeep(value: any, context: string, stats: { removed: number }): any {
+  if (typeof value === "string") {
+    const { text, removed } = scrubCitationsInString(value, context);
+    stats.removed += removed;
+    return text;
+  }
+  if (Array.isArray(value)) return value.map((v) => sanitizeStringsDeep(v, context, stats));
+  if (value && typeof value === "object") {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(value)) out[k] = sanitizeStringsDeep(v, context, stats);
+    return out;
+  }
+  return value;
+}
+
+// legal_framework.precedents gets the stricter treatment: an item whose `decision`
+// cites an E./K. number not present in the RAG context is dropped entirely (a
+// fabricated-but-plausible-sounding precedent is worse than no precedent). Items
+// with no numeric citation (a generic "yerleşik içtihat" statement) are kept.
+function sanitizeCitationHallucinations(parsed: any, context: string): any {
+  const stats = { removed: 0, precedentsDropped: 0 };
+
+  if (Array.isArray(parsed?.legal_framework?.precedents)) {
+    const before = parsed.legal_framework.precedents.length;
+    parsed.legal_framework.precedents = parsed.legal_framework.precedents.filter((p: any) => {
+      const citations = extractCitations(String(p?.decision ?? ""));
+      if (citations.length === 0) return true;
+      return citations.every((c) => citationInContext(c, context));
+    });
+    stats.precedentsDropped = before - parsed.legal_framework.precedents.length;
+  }
+
+  const sanitized = sanitizeStringsDeep(parsed, context, stats);
+
+  if (stats.removed > 0 || stats.precedentsDropped > 0) {
+    console.log(
+      `[party-confidential-analysis] citation guard: ${stats.removed} inline künye temizlendi, ${stats.precedentsDropped} precedent kaydı bağlamda doğrulanamadığı için silindi`
+    );
+  }
+
+  return sanitized;
+}
 
