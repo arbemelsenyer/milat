@@ -1,6 +1,7 @@
 // generate-official-document: selects template based on case metadata and fills placeholders.
 // Returns filled text + selected template metadata. Client renders PDF/DOCX/UDF.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildUdfXml } from "../_shared/udf-xml.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -331,40 +332,8 @@ Deno.serve(async (req) => {
     outcome: outcome || "",
   }, kind);
 
-  // Build UDF content.xml per the real UYAP schema: <template format_id="1.8">
-  // with a single CDATA text pool (<content>) and <elements> paragraphs whose
-  // <content startOffset length/> children reference it via character offsets
-  // (NOT byte offsets — every Turkish character counts as exactly 1, hence
-  // Array.from().length below). Runs are contiguous: every character in the
-  // pool, including the "\n" line separators, belongs to exactly one run —
-  // verified against a real UYAP-exported .udf sample. A blank line is just
-  // a paragraph whose sole run is the "\n" itself; no placeholder character.
-  const rawLines = filled.split("\n");
-  let pool = "";
-  const paragraphElems: string[] = [];
-  let offset = 0;
-  for (let i = 0; i < rawLines.length; i++) {
-    const hasNext = i < rawLines.length - 1;
-    const text = hasNext ? rawLines[i] + "\n" : rawLines[i];
-    const length = Array.from(text).length;
-    if (length === 0) continue;
-    paragraphElems.push(`    <paragraph><content startOffset="${offset}" length="${length}"/></paragraph>`);
-    pool += text;
-    offset += length;
-  }
-
-  const udf = `<?xml version="1.0" encoding="UTF-8"?>
-<template format_id="1.8">
-  <content><![CDATA[${pool}]]></content>
-  <properties><pageFormat mediaSizeName="1" leftMargin="70.875" rightMargin="70.875" topMargin="70.875" bottomMargin="70.875" paperOrientation="1" headerFOffset="20.0" footerFOffset="20.0" /></properties>
-  <elements resolver="hvl-default">
-${paragraphElems.join("\n")}
-  </elements>
-  <styles>
-    <style name="default" description="Geçerli" family="Dialog" size="12" bold="false" italic="false" foreground="-13421773" FONT_ATTRIBUTE_KEY="javax.swing.plaf.FontUIResource[family=Dialog,name=Dialog,style=plain,size=12]" />
-    <style name="hvl-default" family="Times New Roman" size="12" description="Gövde" />
-  </styles>
-</template>`;
+  // UDF content.xml per the real UYAP schema — see _shared/udf-xml.ts for details.
+  const udf = buildUdfXml(filled);
 
   return j({
     template_type,
