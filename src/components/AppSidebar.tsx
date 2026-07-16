@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, FolderOpen, Archive, Calendar, Shield, Workflow } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Archive, Calendar, Shield, Workflow, BarChart3 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -31,7 +31,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { pathname } = useLocation();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isMediator } = useAuth();
   const isActive = (p: string) =>
     pathname === p || (p !== "/dashboard" && pathname.startsWith(p));
 
@@ -89,6 +89,28 @@ export function AppSidebar() {
                     <NavLink to="/admin" className="flex items-center gap-2">
                       <Shield className="h-4 w-4 shrink-0" />
                       {!collapsed && <span>Admin Paneli</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {(isAdmin || isMediator) && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Raporlama</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive("/outcome-analytics")}
+                    className="border-l-2 border-l-transparent transition-colors hover:border-l-accent hover:text-accent data-[active=true]:border-l-accent"
+                  >
+                    <NavLink to="/outcome-analytics" className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 shrink-0" />
+                      {!collapsed && <span>Sonuç İstatistikleri</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

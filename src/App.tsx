@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import MediatorDashboard from "./pages/MediatorDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import Analytics from "./pages/Analytics";
+import OutcomeAnalytics from "./pages/OutcomeAnalytics";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import ExpertWitness from "./pages/ExpertWitness";
@@ -68,6 +69,7 @@ const App = () => (
               <Route path="/case-room/:id" element={<CaseRoom />} />
               <Route path="/case/:id" element={<CaseDetail />} />
               <Route path="/analytics" element={<Analytics />} />
+              <Route path="/outcome-analytics" element={<OutcomeAnalytics />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/summary" element={<SummaryPage />} />
               <Route path="/expert-witness" element={<ExpertWitness />} />
