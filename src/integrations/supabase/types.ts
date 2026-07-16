@@ -59,6 +59,13 @@ export type Database = {
             foreignKeyName: "agent_states_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "agent_states_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -107,6 +114,13 @@ export type Database = {
             foreignKeyName: "agreement_documents_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "agreement_documents_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -151,6 +165,13 @@ export type Database = {
             foreignKeyName: "blind_bids_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "blind_bids_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -189,6 +210,13 @@ export type Database = {
           note?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "case_assignments_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
           {
             foreignKeyName: "case_assignments_case_id_fkey"
             columns: ["case_id"]
@@ -239,6 +267,13 @@ export type Database = {
           win_win_scenario?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "case_discovery_questions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
           {
             foreignKeyName: "case_discovery_questions_case_id_fkey"
             columns: ["case_id"]
@@ -297,6 +332,13 @@ export type Database = {
             foreignKeyName: "case_documents_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "case_documents_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -344,6 +386,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "case_expert_assignments_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
           {
             foreignKeyName: "case_expert_assignments_case_id_fkey"
             columns: ["case_id"]
@@ -417,6 +466,13 @@ export type Database = {
             foreignKeyName: "case_fees_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "case_fees_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -451,6 +507,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "case_notes_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
           {
             foreignKeyName: "case_notes_case_id_fkey"
             columns: ["case_id"]
@@ -550,6 +613,13 @@ export type Database = {
             foreignKeyName: "case_parties_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "case_parties_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -620,6 +690,13 @@ export type Database = {
             foreignKeyName: "case_process_tracker_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: true
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "case_process_tracker_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: true
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -676,6 +753,13 @@ export type Database = {
             foreignKeyName: "case_sessions_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "case_sessions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -693,6 +777,7 @@ export type Database = {
           assigned_mediator_id: string | null
           attempted_resolution: string | null
           category: string | null
+          closed_at: string | null
           created_at: string
           current_phase: number
           deadline_conflict: boolean | null
@@ -744,6 +829,7 @@ export type Database = {
           assigned_mediator_id?: string | null
           attempted_resolution?: string | null
           category?: string | null
+          closed_at?: string | null
           created_at?: string
           current_phase?: number
           deadline_conflict?: boolean | null
@@ -795,6 +881,7 @@ export type Database = {
           assigned_mediator_id?: string | null
           attempted_resolution?: string | null
           category?: string | null
+          closed_at?: string | null
           created_at?: string
           current_phase?: number
           deadline_conflict?: boolean | null
@@ -875,6 +962,13 @@ export type Database = {
             foreignKeyName: "cases_private_keys_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "cases_private_keys_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -906,6 +1000,13 @@ export type Database = {
           niche_area?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cases_vector_pool_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
           {
             foreignKeyName: "cases_vector_pool_case_id_fkey"
             columns: ["case_id"]
@@ -947,6 +1048,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "common_ground_reports_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
           {
             foreignKeyName: "common_ground_reports_case_id_fkey"
             columns: ["case_id"]
@@ -1024,6 +1132,13 @@ export type Database = {
           id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "expert_assignment_logs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
           {
             foreignKeyName: "expert_assignment_logs_case_id_fkey"
             columns: ["case_id"]
@@ -1330,6 +1445,13 @@ export type Database = {
             foreignKeyName: "mediator_requests_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "mediator_requests_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -1437,6 +1559,13 @@ export type Database = {
             foreignKeyName: "meeting_invite_logs_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "meeting_invite_logs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -1475,6 +1604,13 @@ export type Database = {
           sender_role?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "messages_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
           {
             foreignKeyName: "messages_case_id_fkey"
             columns: ["case_id"]
@@ -1519,6 +1655,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "negotiation_rounds_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
           {
             foreignKeyName: "negotiation_rounds_case_id_fkey"
             columns: ["case_id"]
@@ -1618,6 +1761,13 @@ export type Database = {
             foreignKeyName: "notifications_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "notifications_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -1668,6 +1818,13 @@ export type Database = {
             foreignKeyName: "party_analyses_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "party_analyses_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -1706,6 +1863,13 @@ export type Database = {
           party_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "party_invite_logs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
           {
             foreignKeyName: "party_invite_logs_case_id_fkey"
             columns: ["case_id"]
@@ -1915,6 +2079,13 @@ export type Database = {
             foreignKeyName: "sessions_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "sessions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
@@ -1943,6 +2114,60 @@ export type Database = {
       }
     }
     Views: {
+      case_outcome_analytics: {
+        Row: {
+          agreement_amount: number | null
+          application_date: string | null
+          case_id: string | null
+          closed_at: string | null
+          current_phase: number | null
+          dispute_subtype: string | null
+          dispute_type: string | null
+          kapanis_belgesi_tipi: string | null
+          kokpit_kullanildi: boolean | null
+          kor_teklif_kullanildi: boolean | null
+          oturum_sayisi: number | null
+          outcome: string | null
+          status: string | null
+          sure_gun: number | null
+          uzman_kullanildi: boolean | null
+        }
+        Insert: {
+          agreement_amount?: number | null
+          application_date?: string | null
+          case_id?: string | null
+          closed_at?: string | null
+          current_phase?: number | null
+          dispute_subtype?: string | null
+          dispute_type?: string | null
+          kapanis_belgesi_tipi?: never
+          kokpit_kullanildi?: never
+          kor_teklif_kullanildi?: never
+          oturum_sayisi?: never
+          outcome?: string | null
+          status?: string | null
+          sure_gun?: never
+          uzman_kullanildi?: never
+        }
+        Update: {
+          agreement_amount?: number | null
+          application_date?: string | null
+          case_id?: string | null
+          closed_at?: string | null
+          current_phase?: number | null
+          dispute_subtype?: string | null
+          dispute_type?: string | null
+          kapanis_belgesi_tipi?: never
+          kokpit_kullanildi?: never
+          kor_teklif_kullanildi?: never
+          oturum_sayisi?: never
+          outcome?: string | null
+          status?: string | null
+          sure_gun?: never
+          uzman_kullanildi?: never
+        }
+        Relationships: []
+      }
       mediators_public: {
         Row: {
           avg_resolution_days: number | null
