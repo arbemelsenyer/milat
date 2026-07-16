@@ -10,7 +10,6 @@ import { Card } from "@/components/ui/card";
 import { Loader2, FileText, FileType, FileCode2, Download, AlertTriangle, CheckCircle2, XCircle, Eye } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { downloadOfficialPdf, downloadOfficialDocx, downloadOfficialUdf, officialTitle } from "@/lib/official-documents";
-import { buildUdfXml } from "../../../supabase/functions/_shared/udf-xml";
 
 interface Props {
   caseRow: any;
@@ -114,9 +113,36 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
   }
 
   // UDF is normally rendered server-side (generate-official-document), so its udf_xml
-  // wouldn't reflect a later Textarea edit. Rebuilding it here with the same shared
-  // helper the edge function uses makes UDF generation client-side too, so it always
-  // matches the text currently on screen.
+  // wouldn't reflect a later Textarea edit. Rebuilding it here — same offset-based
+  // paragraph schema the edge function uses — makes UDF generation client-side too,
+  // so it always matches the text currently on screen.
+  function buildUdfXml(text: string): string {
+    const rawLines = text.split("\n");
+    let pool = "";
+    const paragraphElems: string[] = [];
+    let offset = 0;
+    for (let i = 0; i < rawLines.length; i++) {
+      const hasNext = i < rawLines.length - 1;
+      const line = hasNext ? rawLines[i] + "\n" : rawLines[i];
+      const length = Array.from(line).length;
+      if (length === 0) continue;
+      paragraphElems.push(`    <paragraph><content startOffset="${offset}" length="${length}"/></paragraph>`);
+      pool += line;
+      offset += length;
+    }
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<template format_id="1.8">
+  <content><![CDATA[${pool}]]></content>
+  <properties><pageFormat mediaSizeName="1" leftMargin="70.875" rightMargin="70.875" topMargin="70.875" bottomMargin="70.875" paperOrientation="1" headerFOffset="20.0" footerFOffset="20.0" /></properties>
+  <elements resolver="hvl-default">
+${paragraphElems.join("\n")}
+  </elements>
+  <styles>
+    <style name="default" description="Geçerli" family="Dialog" size="12" bold="false" italic="false" foreground="-13421773" FONT_ATTRIBUTE_KEY="javax.swing.plaf.FontUIResource[family=Dialog,name=Dialog,style=plain,size=12]" />
+    <style name="hvl-default" family="Times New Roman" size="12" description="Gövde" />
+  </styles>
+</template>`;
+  }
 
   // If a metadata record was created for this kind at generation time, keep it in sync
   // with whatever the mediator has edited so far — best-effort, never blocks a download.
