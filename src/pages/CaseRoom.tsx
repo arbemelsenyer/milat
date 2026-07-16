@@ -12,13 +12,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Loader2, ShieldCheck, Lock, Sparkles, Upload, FileText, Users, Brain, Lightbulb,
-  Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X, History, Filter, FileDown, MessageSquare,
+  Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X, History, Filter, FileDown, MessageSquare, Bot,
 } from "lucide-react";
 import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
 import { ExpertSelector } from "@/components/mediation/ExpertSelector";
 import { OfficialDocsPanel } from "@/components/mediation/OfficialDocsPanel";
 import { StepTimeline } from "@/components/mediation/StepTimeline";
+import { AgentControlPanel } from "@/components/mediation/AgentControlPanel";
 import { downloadOfficialPdf } from "@/lib/pdfTemplates";
 import { Input } from "@/components/ui/input";
 
@@ -230,6 +231,7 @@ export default function CaseRoom() {
           <TabsTrigger value="experts" className={tabTriggerAccentClass}><Award className="h-4 w-4 mr-1" />Bilirkişi</TabsTrigger>
           <TabsTrigger value="rounds" className={tabTriggerAccentClass}><MessageSquare className="h-4 w-4 mr-1" />Görüşme Notları</TabsTrigger>
           <TabsTrigger value="agreement" className={tabTriggerAccentClass}><FileSignature className="h-4 w-4 mr-1" />Anlaşma</TabsTrigger>
+          <TabsTrigger value="agents" className={tabTriggerAccentClass}><Bot className="h-4 w-4 mr-1" />Ajan Kontrol Paneli</TabsTrigger>
         </TabsList>
 
         <TabsContent value="parties">
@@ -365,6 +367,10 @@ export default function CaseRoom() {
         <TabsContent value="agreement">
           <AgreementTab caseRow={caseRow!} parties={parties} onChanged={loadAll} />
         </TabsContent>
+
+        <TabsContent value="agents">
+          <AgentControlPanel caseId={caseId!} isMediator={isMediator} />
+        </TabsContent>
       </Tabs>
     );
   }
@@ -378,6 +384,7 @@ export default function CaseRoom() {
           <TabsTrigger value="analysis" className={tabTriggerAccentClass}><Brain className="h-4 w-4 mr-1" />Gizli Analizim</TabsTrigger>
           <TabsTrigger value="discovery" className={tabTriggerAccentClass}>İhtiyaç Tespiti</TabsTrigger>
           <TabsTrigger value="experts" className={tabTriggerAccentClass}><Award className="h-4 w-4 mr-1" />Bilirkişi Onayı</TabsTrigger>
+          <TabsTrigger value="agents" className={tabTriggerAccentClass}><Bot className="h-4 w-4 mr-1" />AI Aktivitelerim</TabsTrigger>
         </TabsList>
 
         <TabsContent value="documents">
@@ -438,6 +445,10 @@ export default function CaseRoom() {
 
         <TabsContent value="experts">
           <PartyExpertApproval caseId={caseId!} partyId={myParty!.id} />
+        </TabsContent>
+
+        <TabsContent value="agents">
+          <AgentControlPanel caseId={caseId!} isMediator={false} />
         </TabsContent>
       </Tabs>
     );
