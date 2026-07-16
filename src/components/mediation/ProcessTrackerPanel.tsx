@@ -130,12 +130,11 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
       setLoading(false);
     }
 
-    // Kapanış Özeti: ayrı, izole sorgu — case_outcome_analytics bu projenin
-    // generated types'ında yok (migration olarak repoda da yok), bu yüzden
-    // yukarıdaki ana yüklemenin Promise.all'ından bilerek dışarıda tutuluyor:
-    // bu görünüm eksik/hatalıysa föyün geri kalanı hiç etkilenmesin.
+    // Kapanış Özeti: ayrı, izole sorgu — yukarıdaki ana yüklemenin Promise.
+    // all'ından bilerek dışarıda tutuluyor: bu view'dan veri gelmese/hata
+    // verse bile föyün geri kalanı hiç etkilenmesin.
     try {
-      const { data: analyticsRow, error: analyticsErr } = await (supabase as any)
+      const { data: analyticsRow, error: analyticsErr } = await supabase
         .from("case_outcome_analytics")
         .select("*")
         .eq("case_id", caseId)
