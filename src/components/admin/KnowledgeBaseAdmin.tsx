@@ -52,6 +52,53 @@ function statusIcon(status?: string) {
   return <Clock3 className="w-4 h-4" />;
 }
 
+// Yükleme öncesi opsiyonel manuel şablon türü seçimi — TemplateAdmin.tsx'teki
+// preUploadSel deseniyle birebir aynı: doluysa AI/anahtar-kelime tespiti hiç
+// devreye girmez (bkz. admin-upload-template: overrideType varsa AI atlanır),
+// boşsa mevcut otomatik tespit akışı değişmeden çalışır.
+const UST_TUR_OPTIONS: { value: string; label: string }[] = [
+  { value: "ihtiyari", label: "İhtiyari" },
+  { value: "dava_sarti", label: "Dava Şartı" },
+];
+const KB_TEMPLATE_GROUPS: { value: string; label: string }[] = [
+  { value: "isci_isveren", label: "İşçi-İşveren" },
+  { value: "ticari", label: "Ticari" },
+  { value: "tuketici", label: "Tüketici" },
+  { value: "kira", label: "Kira" },
+  { value: "ortaklik", label: "Ortaklığın Giderilmesi" },
+];
+const KB_DOCUMENT_TYPES: { value: string; label: string }[] = [
+  { value: "davet", label: "Davet" },
+  { value: "muracaat_tutanagi", label: "Müracaat Tutanağı" },
+  { value: "arabulucu_belirleme", label: "Arabulucu Belirleme" },
+  { value: "bilgilendirme", label: "Bilgilendirme" },
+  { value: "surec_baslama", label: "Süreç Başlama" },
+  { value: "ilk_oturum", label: "İlk Oturum" },
+  { value: "oturum_erteleme", label: "Oturum Erteleme" },
+  { value: "acilis_konusmasi", label: "Açılış Konuşması" },
+  { value: "anlasma_belgesi", label: "Anlaşma Belgesi" },
+  { value: "anlasma_son_tutanak", label: "Anlaşma Son Tutanak" },
+  { value: "anlasamama_son_tutanak", label: "Anlaşamama Son Tutanak" },
+  { value: "gorusme_yapilmadan_anlasamama", label: "Görüşme Yapılmadan Anlaşamama" },
+  { value: "ucret_sozlesmesi", label: "Ücret Sözleşmesi" },
+  { value: "yetki_belgesi", label: "Yetki Belgesi" },
+  { value: "makbuz_ust_yazisi", label: "Makbuz Üst Yazısı" },
+  { value: "icra_serhi_dilekce", label: "İcra Şerhi Dilekçesi" },
+];
+const KB_TR_ASCII_MAP: Record<string, string> = {
+  ı: "i", İ: "i", ş: "s", Ş: "s", ğ: "g", Ğ: "g", ü: "u", Ü: "u", ö: "o", Ö: "o", ç: "c", Ç: "c",
+};
+function kbSlugify(s: string): string {
+  const ascii = (s || "").replace(/[ışŞğĞüÜöÖçÇİ]/g, (c) => KB_TR_ASCII_MAP[c] ?? c);
+  return ascii.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+}
+function kbBuildTemplateType(group: string, belgeTipi: string, variant?: string): string {
+  const g = kbSlugify(group);
+  const b = kbSlugify(belgeTipi);
+  const v = variant ? kbSlugify(variant) : "";
+  return v ? `${g}_${v}_${b}` : `${g}_${b}`;
+}
+
 export function KnowledgeBaseAdmin() {
   const { toast } = useToast();
   const [job, setJob] = useState<Job | null>(null);
@@ -180,6 +227,11 @@ export function KnowledgeBaseAdmin() {
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
   const [manualOverride, setManualOverride] = useState<Record<string, string>>({});
   const [reassigning, setReassigning] = useState<string | null>(null);
+  const [preUploadSel, setPreUploadSel] = useState({ ustTur: "", group: "", belgeTipi: "", variant: "" });
+  const preUploadEffectiveGroup = preUploadSel.ustTur === "ihtiyari" ? "ihtiyari" : preUploadSel.group;
+  const preUploadType = preUploadEffectiveGroup && preUploadSel.belgeTipi
+    ? kbBuildTemplateType(preUploadEffectiveGroup, preUploadSel.belgeTipi, preUploadSel.variant)
+    : "";
 
   const handleUpload = async () => {
     if (!uploadFiles.length) { toast({ title: "Dosya seçin", variant: "destructive" }); return; }
@@ -205,7 +257,9 @@ export function KnowledgeBaseAdmin() {
       const file = uploadFiles[i];
       setUploadStage(
         uploadMode === "template"
-          ? `${i + 1}/${uploadFiles.length} — Tür otomatik tespit ediliyor: ${file.name}`
+          ? preUploadType
+            ? `${i + 1}/${uploadFiles.length} — Manuel tür (${preUploadType}) uygulanıyor: ${file.name}`
+            : `${i + 1}/${uploadFiles.length} — Tür otomatik tespit ediliyor: ${file.name}`
           : `${i + 1}/${uploadFiles.length} dosya işleniyor: ${file.name}`
       );
       try {
@@ -213,7 +267,9 @@ export function KnowledgeBaseAdmin() {
         form.append("file", file);
         let endpoint = "";
         if (uploadMode === "template") {
-          // template_type göndermiyoruz — sunucu otomatik tespit edecek.
+          // Manuel tür seçiliyse template_type geçilir (AI/anahtar kelime tespiti hiç
+          // çalışmaz); boşsa sunucu otomatik tespit eder.
+          if (preUploadType) form.append("template_type", preUploadType);
           endpoint = "admin-upload-template";
         } else {
           const title = (uploadFiles.length === 1 && uploadTitle.trim()) ? uploadTitle.trim() : file.name.replace(/\.[^.]+$/, "");
@@ -487,9 +543,67 @@ export function KnowledgeBaseAdmin() {
               </div>
             ) : (
               <div className="space-y-1.5 sm:col-span-2">
-                <Label>Şablon Türü</Label>
+                <Label>Şablon Türü (manuel, ops.)</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select
+                    value={preUploadSel.ustTur}
+                    onValueChange={(v) => setPreUploadSel((p) => ({ ...p, ustTur: v, group: v === "ihtiyari" ? "" : p.group }))}
+                    disabled={uploading}
+                  >
+                    <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="İhtiyari / Dava Şartı" /></SelectTrigger>
+                    <SelectContent>
+                      {UST_TUR_OPTIONS.map((u) => (
+                        <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {preUploadSel.ustTur === "dava_sarti" && (
+                    <Select value={preUploadSel.group} onValueChange={(v) => setPreUploadSel((p) => ({ ...p, group: v }))} disabled={uploading}>
+                      <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Grup" /></SelectTrigger>
+                      <SelectContent>
+                        {KB_TEMPLATE_GROUPS.map((g) => (
+                          <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {preUploadSel.ustTur && (
+                    <Select value={preUploadSel.belgeTipi} onValueChange={(v) => setPreUploadSel((p) => ({ ...p, belgeTipi: v }))} disabled={uploading}>
+                      <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="Belge Tipi" /></SelectTrigger>
+                      <SelectContent>
+                        {KB_DOCUMENT_TYPES.map((d) => (
+                          <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {preUploadSel.ustTur && (
+                    <Input
+                      className="h-8 w-28 text-xs"
+                      placeholder="varyant (ops.)"
+                      value={preUploadSel.variant}
+                      onChange={(e) => setPreUploadSel((p) => ({ ...p, variant: e.target.value }))}
+                      disabled={uploading}
+                    />
+                  )}
+                  {preUploadSel.ustTur && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 text-xs"
+                      onClick={() => setPreUploadSel({ ustTur: "", group: "", belgeTipi: "", variant: "" })}
+                      disabled={uploading}
+                    >
+                      Temizle
+                    </Button>
+                  )}
+                </div>
                 <div className="rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground">
-                  Tür: <span className="italic">otomatik tespit ediliyor (dosya içeriğinden)</span>
+                  {preUploadType ? (
+                    <>Tür: <span className="font-mono">{preUploadType}</span></>
+                  ) : (
+                    <>Tür: <span className="italic">otomatik tespit ediliyor (dosya içeriğinden)</span></>
+                  )}
                 </div>
               </div>
             )}
