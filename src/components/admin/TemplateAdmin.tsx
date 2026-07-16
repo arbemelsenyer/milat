@@ -141,6 +141,11 @@ export function TemplateAdmin() {
   const [uploadStage, setUploadStage] = useState("");
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
   const [manualOverride, setManualOverride] = useState<Record<string, { ustTur: string; group: string; belgeTipi: string; variant: string }>>({});
+  // Yükleme öncesi opsiyonel manuel tür seçimi — doluysa AI/anahtar-kelime tespiti hiç
+  // devreye girmez (bkz. admin-upload-template: overrideType varsa AI atlanır), boşsa
+  // mevcut otomatik tespit akışı değişmeden çalışır. Seçilen tür, o an seçili tüm
+  // dosyalara uygulanır — farklı türde dosyalar tek tek yüklenmelidir.
+  const [preUploadSel, setPreUploadSel] = useState({ ustTur: "", group: "", belgeTipi: "", variant: "" });
   const [reassigning, setReassigning] = useState<string | null>(null);
   const [editingRow, setEditingRow] = useState<TemplateRow | null>(null);
   const [editSel, setEditSel] = useState({ ustTur: "", group: "", belgeTipi: "", variant: "" });
@@ -265,10 +270,16 @@ export function TemplateAdmin() {
     // dönmez). Bu blok forward-compatible: backend ileride bir aynı-türde-kayıt varsa
     // upsert'ten önce conflict:true dönecek şekilde güncellenirse, burada ek işlem
     // gerekmeden devreye girer.
+    const preUploadEffectiveGroup = preUploadSel.ustTur === "ihtiyari" ? "ihtiyari" : preUploadSel.group;
+    const preUploadType = preUploadEffectiveGroup && preUploadSel.belgeTipi
+      ? buildTemplateType(preUploadEffectiveGroup, preUploadSel.belgeTipi, preUploadSel.variant)
+      : "";
+
     async function postUpload(file: File, overwrite: boolean) {
       const form = new FormData();
       form.append("file", file);
       if (overwrite) form.append("overwrite", "true");
+      if (preUploadType) form.append("template_type", preUploadType);
       const res = await fetch(`${projectUrl}/functions/v1/admin-upload-template`, {
         method: "POST",
         headers: { Authorization: `Bearer ${session.access_token}` },
@@ -281,7 +292,11 @@ export function TemplateAdmin() {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      setUploadStage(`${i + 1}/${files.length} — Tür otomatik tespit ediliyor: ${file.name}`);
+      setUploadStage(
+        preUploadType
+          ? `${i + 1}/${files.length} — Manuel tür (${preUploadType}) uygulanıyor: ${file.name}`
+          : `${i + 1}/${files.length} — Tür otomatik tespit ediliyor: ${file.name}`
+      );
       try {
         let data = await postUpload(file, false);
         if (data?.conflict) {
@@ -367,6 +382,58 @@ export function TemplateAdmin() {
           <CardDescription>
             Bakanlık şablonları + manuel yüklenen şablonlar — belge üretiminde kullanılır.
           </CardDescription>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground">Manuel tür (ops.):</span>
+          <Select
+            value={preUploadSel.ustTur}
+            onValueChange={(v) => setPreUploadSel((p) => ({ ...p, ustTur: v, group: v === "ihtiyari" ? "" : p.group }))}
+          >
+            <SelectTrigger className="h-8 w-32 text-xs"><SelectValue placeholder="İhtiyari / Dava Şartı" /></SelectTrigger>
+            <SelectContent>
+              {UST_TUR_OPTIONS.map((u) => (
+                <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {preUploadSel.ustTur === "dava_sarti" && (
+            <Select value={preUploadSel.group} onValueChange={(v) => setPreUploadSel((p) => ({ ...p, group: v }))}>
+              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue placeholder="Grup" /></SelectTrigger>
+              <SelectContent>
+                {TEMPLATE_GROUPS.map((g) => (
+                  <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {preUploadSel.ustTur && (
+            <Select value={preUploadSel.belgeTipi} onValueChange={(v) => setPreUploadSel((p) => ({ ...p, belgeTipi: v }))}>
+              <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Belge Tipi" /></SelectTrigger>
+              <SelectContent>
+                {DOCUMENT_TYPES.map((d) => (
+                  <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {preUploadSel.ustTur && (
+            <Input
+              className="h-8 w-24 text-xs"
+              placeholder="varyant (ops.)"
+              value={preUploadSel.variant}
+              onChange={(e) => setPreUploadSel((p) => ({ ...p, variant: e.target.value }))}
+            />
+          )}
+          {preUploadSel.ustTur && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 text-xs"
+              onClick={() => setPreUploadSel({ ustTur: "", group: "", belgeTipi: "", variant: "" })}
+            >
+              Temizle
+            </Button>
+          )}
         </div>
         <div className="flex gap-2 flex-wrap">
           <input
