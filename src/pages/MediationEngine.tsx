@@ -22,7 +22,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
-import { ToastAction } from "@/components/ui/toast";
 import { motion, AnimatePresence, animate, useMotionValue, useMotionValueEvent } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -390,18 +389,10 @@ export default function MediationEngine() {
       for (const p of PHASES) {
         if ("optional" in p && p.optional) continue;
         if (!prev[p.id] && nextStatus[p.id]) {
-          const target = computeNextActionablePhase(nextStatus, phase3Complete);
           setGlowPhase(p.id);
           toast({
             title: `✓ Aşama ${p.id} tamamlandı`,
             description: p.label,
-            action: target
-              ? (
-                <ToastAction altText={`Aşama ${target}'e geç`} onClick={() => setPhase(target)}>
-                  {`Aşama ${target}'e Geç`}
-                </ToastAction>
-              )
-              : undefined,
           });
         }
       }
