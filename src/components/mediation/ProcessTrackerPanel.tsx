@@ -4,8 +4,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { officialTitle } from "@/lib/official-documents";
 
 // case_process_tracker isn't in the generated Supabase types yet.
 const trackerTable = () => (supabase as any).from("case_process_tracker");
@@ -56,6 +59,7 @@ function partyName(p: any): string {
 }
 
 export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
+  const { isMediator, isAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [caseData, setCaseData] = useState<any>(caseRow);
   const [parties, setParties] = useState<any[]>([]);
@@ -64,12 +68,19 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
   const [agreementDocs, setAgreementDocs] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
   const [tracker, setTracker] = useState<Tracker>({ buro_no: "", arb_no: "", items: {} });
+  const [outcomeAnalytics, setOutcomeAnalytics] = useState<any>(null);
+  const [agreementAmountDraft, setAgreementAmountDraft] = useState<string>("");
+  const [savingAmount, setSavingAmount] = useState(false);
 
   useEffect(() => {
     if (!open || !caseRow?.id) return;
     void loadAll(caseRow.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, caseRow?.id]);
+
+  useEffect(() => {
+    setAgreementAmountDraft(caseData?.agreement_amount ? String(caseData.agreement_amount) : "");
+  }, [caseData?.agreement_amount]);
 
   async function loadAll(caseId: string) {
     setLoading(true);
@@ -84,7 +95,7 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
       ] = await Promise.all([
         supabase
           .from("cases")
-          .select("id, dispute_type, dispute_subtype, assigned_mediator_id, created_at, deadline_total, deadline_extended, outcome, status")
+          .select("id, dispute_type, dispute_subtype, assigned_mediator_id, created_at, deadline_total, deadline_extended, outcome, status, agreement_amount")
           .eq("id", caseId)
           .maybeSingle(),
         supabase.from("case_parties").select("id, role, party_role, full_name, company_name").eq("case_id", caseId),
@@ -117,6 +128,23 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
       toast({ title: "Yüklenemedi", description: e.message, variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+
+    // Kapanış Özeti: ayrı, izole sorgu — case_outcome_analytics bu projenin
+    // generated types'ında yok (migration olarak repoda da yok), bu yüzden
+    // yukarıdaki ana yüklemenin Promise.all'ından bilerek dışarıda tutuluyor:
+    // bu görünüm eksik/hatalıysa föyün geri kalanı hiç etkilenmesin.
+    try {
+      const { data: analyticsRow, error: analyticsErr } = await (supabase as any)
+        .from("case_outcome_analytics")
+        .select("*")
+        .eq("case_id", caseId)
+        .maybeSingle();
+      if (analyticsErr) throw analyticsErr;
+      setOutcomeAnalytics(analyticsRow ?? null);
+    } catch (e) {
+      console.warn("[ProcessTrackerPanel] case_outcome_analytics yüklenemedi", e);
+      setOutcomeAnalytics(null);
     }
   }
 
@@ -154,6 +182,25 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
 
   function commitMeta() {
     persistTracker(tracker);
+  }
+
+  async function saveAgreementAmount() {
+    const amount = Number(agreementAmountDraft);
+    if (!agreementAmountDraft.trim() || Number.isNaN(amount) || amount <= 0) {
+      toast({ title: "Geçerli bir tutar girin", variant: "destructive" });
+      return;
+    }
+    setSavingAmount(true);
+    try {
+      const { error } = await supabase.from("cases").update({ agreement_amount: amount }).eq("id", caseRow.id);
+      if (error) throw error;
+      setCaseData((prev: any) => ({ ...prev, agreement_amount: amount }));
+      toast({ title: "Anlaşma tutarı kaydedildi" });
+    } catch (e: any) {
+      toast({ title: "Kaydedilemedi", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingAmount(false);
+    }
   }
 
   // party_role is canonical (applicant/respondent/third_party); role is legacy and may still
@@ -206,6 +253,55 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
     { label: "Dosya Atama Tarihi", value: fmtDate(assignedAt ?? caseData?.created_at) },
     { label: "Son Gün Tarihi", value: fmtDate(sonGunTarihi) },
   ];
+
+  const araclar = useMemo(() => {
+    const list: string[] = [];
+    if (outcomeAnalytics?.kokpit_kullanildi) list.push("Kokpit Analizi");
+    if (outcomeAnalytics?.kor_teklif_kullanildi) list.push("Kör Teklif");
+    if (outcomeAnalytics?.uzman_kullanildi) list.push("Uzman Ajan");
+    return list.length ? list.join(", ") : "—";
+  }, [outcomeAnalytics]);
+
+  // Yalnızca dosya kapanmışsa (outcome doluysa) gösterilir. Görünürlük bu
+  // koşula bağlı — case_outcome_analytics sorgusu başarısız/eksik olsa bile
+  // bölüm görünür kalır, sadece view'a dayalı satırlar "—" düşer.
+  const kapanisRows: { label: string; value: React.ReactNode }[] | null = caseData?.outcome
+    ? [
+        {
+          label: "Sonuç",
+          value: caseData.outcome === "anlasma" ? "Anlaşma" : caseData.outcome === "anlasamamama" ? "Anlaşamama" : caseData.outcome,
+        },
+        { label: "Süre", value: outcomeAnalytics?.sure_gun != null ? `${outcomeAnalytics.sure_gun} gün` : "—" },
+        { label: "Oturum Sayısı", value: outcomeAnalytics?.oturum_sayisi ?? "—" },
+        {
+          label: "Kapanış Belgesi",
+          value: outcomeAnalytics?.kapanis_belgesi_tipi ? officialTitle(outcomeAnalytics.kapanis_belgesi_tipi) : "—",
+        },
+        { label: "Kullanılan Araçlar", value: araclar },
+        {
+          label: "Anlaşma Tutarı",
+          value: caseData.agreement_amount ? (
+            `${Number(caseData.agreement_amount).toLocaleString("tr-TR")} ₺`
+          ) : isMediator || isAdmin ? (
+            <div className="flex items-center gap-2">
+              <Input
+                className="h-8 max-w-[160px]"
+                type="number"
+                min={0}
+                value={agreementAmountDraft}
+                onChange={(e) => setAgreementAmountDraft(e.target.value)}
+                placeholder="Tutar (₺)"
+              />
+              <Button size="sm" className="h-8" disabled={savingAmount} onClick={saveAgreementAmount}>
+                {savingAmount ? <Loader2 className="h-3 w-3 animate-spin" /> : "Kaydet"}
+              </Button>
+            </div>
+          ) : (
+            "—"
+          ),
+        },
+      ]
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -272,6 +368,23 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
                 </tbody>
               </table>
             </div>
+
+            {kapanisRows && (
+              <div>
+                <h3 className="text-sm font-semibold mb-2">C. Kapanış Özeti</h3>
+                <table className="w-full text-sm border border-accent/40 rounded-md overflow-hidden">
+                  <tbody>
+                    {kapanisRows.map((row, i) => (
+                      <tr key={row.label} className={i % 2 ? "bg-muted/30" : ""}>
+                        <td className="border-t px-3 py-2 w-10 text-muted-foreground">{i + 100}</td>
+                        <td className="border-t px-3 py-2 w-56 font-medium">{row.label}</td>
+                        <td className="border-t px-3 py-2">{row.value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </DialogContent>
