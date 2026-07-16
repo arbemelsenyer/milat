@@ -195,6 +195,7 @@ Eğer "TARAF BEYANI" bloğu verilmişse, bu tarafın kendi ağzından anlatımı
 Eğer "BELGE ANALİZ SONUÇLARI" bloğu verilmişse, bu bloktaki her belge için önceden çıkarılmış bilirkişi raporu bulguları (özet, bulgular, risk seviyesi, mevzuat) mevcuttur. Bu bulguları document_findings[] dizisine, kaynağını "Bilirkişi raporu: <belge adı>" şeklinde belirterek yansıt. Bu blok yoksa veya bir belge bu blokta geçmiyorsa document_findings davranışını değiştirme. Bu bloktaki riskLevel ve bulguları risk_analizi değerlendirmende (kritik_faktorler, risk_puani) de dikkate al.
 Eğer "GÖRÜŞME NOTLARI ANALİZİ" bloğu verilmişse, bu bloktaki her görüşmeden önceden çıkarılmış tespit/pozisyon/strateji bulguları mevcuttur. Bu bulguları document_findings[] dizisine, kaynağını "Görüşme notu" şeklinde belirterek yansıt; ayrıca risk_analizi değerlendirmende (kritik_faktorler, risk_puani) de dikkate al.
 KESİN KURAL (halüsinasyon yasağı): "BELGE ANALİZ SONUÇLARI" ve "GÖRÜŞME NOTLARI ANALİZİ" bloklarından yalnızca orada yazılı olan içerikten alıntı/özetleme yap; blokta yer almayan bulgu, mevzuat veya risk uydurma.
+KESİN KURAL (emsal/künye halüsinasyon yasağı): legal_framework.precedents'a yalnızca "İLGİLİ KAYNAK BİLGİSİ" veya "BENZER GEÇMİŞ DAVALAR" bloklarında birebir geçen bir E./K. numarası/karar metni referans olarak eklenebilir. Bu bloklarda somut bir karar künyesi yoksa precedents'ı boş dizi bırak ve risk_analizi.kaynak_listesi'ne "Emsal için doğrulanmış kaynak bulunamadı" yaz. Hafızandan Yargıtay/BAM esas-karar numarası üretmek YASAKTIR. Bu kısıtlama yalnızca precedents içindir — legal_framework.statutes (mevzuat maddesi atıfları) bu kurala tabi değildir.
 
 SON ADIM — RİSK ANALİZİ & ANLAŞMA ORANI:
 A) "İLGİLİ KAYNAK BİLGİSİ" bloklarını tara: bu alanda uzlaşma istatistiği/Yargıtay eğilimi/uzlaşma engeli var mı?
@@ -219,7 +220,7 @@ ${expertAnalysisBlock}
 ${meetingNotesBlock}
 ${ragBlock}
 ${similarBlock}
-Bu tarafın perspektifinden detaylı analiz üret. Yargıtay ve BAM emsallerinden somut karar referansları ver. Yukarıdaki resmi kaynaklardan ve benzer geçmiş davalardan yararlanarak risk_analizi üret; sabit/uydurma yüzde verme.`;
+Bu tarafın perspektifinden detaylı analiz üret. Yukarıdaki bloklarda somut bir Yargıtay/BAM karar referansı varsa ver; yoksa precedents'ı boş bırak. Yukarıdaki resmi kaynaklardan ve benzer geçmiş davalardan yararlanarak risk_analizi üret; sabit/uydurma yüzde verme.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
