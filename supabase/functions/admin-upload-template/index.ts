@@ -54,7 +54,7 @@ const LEGACY_TEMPLATE_TYPES = new Set([
   "dava_sarti_anlasma", "dava_sarti_anlasamamama",
   "isci_isveren_anlasma", "isci_isveren_anlasamamama",
   "ticari_anlasma", "ticari_anlasamamama",
-  "tuketici_anlasma",
+  "tuketici_anlasma", "tuketici_anlasamama",
   "kira_anlasma", "kira_anlasamamama",
   "ortaklik_anlasma", "ortaklik_anlasamamama",
   "isci_isveren_ucret", "ticari_ucret",
@@ -153,6 +153,7 @@ function detectTemplateType(text: string): { type: string; auto: boolean } {
   if (has("ANLAŞAMAMA")) {
     if (has("İŞÇİ")) return { type: "isci_isveren_anlasamamama", auto: true };
     if (has("TİCARİ")) return { type: "ticari_anlasamamama", auto: true };
+    if (has("TÜKETİCİ")) return { type: "tuketici_anlasamama", auto: true };
     if (has("KİRA")) return { type: "kira_anlasamamama", auto: true };
     if (has("ORTAKLIK")) return { type: "ortaklik_anlasamamama", auto: true };
     if (has("İHTİYARİ")) return { type: "ihtiyari_anlasamamama", auto: true };
@@ -301,10 +302,11 @@ function mapAiClassificationToTemplateType(grup: string, belgeTipi: string, vary
       case "anlasamama_son_tutanak": {
         const type = group === "isci_isveren" ? "isci_isveren_anlasamamama"
           : group === "ticari" ? "ticari_anlasamamama"
+          : group === "tuketici" ? "tuketici_anlasamama"
           : group === "kira" ? "kira_anlasamamama"
           : group === "ortaklik" ? "ortaklik_anlasamamama"
           : group === "ihtiyari" ? "ihtiyari_anlasamamama"
-          : "dava_sarti_anlasamamama"; // tüketici/genel: katalogda özel tür yok, dava_sarti'ya düşer
+          : "dava_sarti_anlasamamama"; // genel/belirsiz: katalogda özel tür yok, dava_sarti'ya düşer
         if (LEGACY_TEMPLATE_TYPES.has(type)) return type;
         break;
       }

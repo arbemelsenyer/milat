@@ -126,12 +126,11 @@ function selectTemplateCandidates(opts: {
 
   // 2) Legacy grup-özel adlar (admin-upload-template/detectTemplateType()'ın tanıdığı):
   // isci_isveren_{anlasma,anlasamamama}, ticari_{anlasma,anlasamamama},
-  // tuketici_anlasma (anlasamamama varyantı o fonksiyonda tanımlı değil),
-  // kira_{anlasma,anlasamamama}, ortaklik_{anlasma,anlasamamama}.
+  // tuketici_{anlasma,anlasamama}, kira_{anlasma,anlasamamama}, ortaklik_{anlasma,anlasamamama}.
   let legacySpecific: string | null = null;
   if (group === "isci_isveren") legacySpecific = agreed ? "isci_isveren_anlasma" : "isci_isveren_anlasamamama";
   else if (group === "ticari") legacySpecific = agreed ? "ticari_anlasma" : "ticari_anlasamamama";
-  else if (group === "tuketici" && agreed) legacySpecific = "tuketici_anlasma";
+  else if (group === "tuketici") legacySpecific = agreed ? "tuketici_anlasma" : "tuketici_anlasamama";
   else if (group === "kira") legacySpecific = agreed ? "kira_anlasma" : "kira_anlasamamama";
   else if (group === "ortaklik") legacySpecific = agreed ? "ortaklik_anlasma" : "ortaklik_anlasamamama";
   if (legacySpecific) candidates.push(legacySpecific);
