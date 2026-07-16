@@ -697,6 +697,7 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
   onCancel: () => void; onCreated: (id: string) => void; userId: string; isMediator: boolean;
 }) {
   const [title, setTitle] = useState("");
+  const [disputeType, setDisputeType] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function create() {
@@ -708,7 +709,7 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
         user_id: userId,
         assigned_mediator_id: isMediator ? userId : null,
         title: title || `Başvuru - ${application_no}`,
-        dispute_type: null,
+        dispute_type: disputeType || null,
         application_no,
         uyap_no: null,
         status: "active",
@@ -727,12 +728,23 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
     <Card className="p-6 mb-6 space-y-4">
       <h2 className="text-xl font-semibold">Yeni Başvuru</h2>
       <div className="text-xs text-muted-foreground bg-muted/50 border rounded p-3">
-        ℹ️ Uyuşmazlık türünü AI, taraf bilgileri ve açıklamanızı girdikten sonra (Aşama 3) otomatik tespit edecek.
+        ℹ️ Seçim yapmazsanız AI, dosya özetinden türü otomatik tespit eder (Aşama 1); seçim yaparsanız sizin seçiminiz esastır.
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="md:col-span-2">
           <Label>Başvuru Başlığı</Label>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Örn. Kira sözleşmesinden doğan uyuşmazlık" />
+        </div>
+        <div className="md:col-span-2">
+          <Label>Uyuşmazlık Türü (opsiyonel)</Label>
+          <Select value={disputeType || undefined} onValueChange={setDisputeType}>
+            <SelectTrigger><SelectValue placeholder="Otomatik tespit edilsin (boş bırakabilirsiniz)" /></SelectTrigger>
+            <SelectContent>
+              {DISPUTE_CATEGORIES.map((c) => (
+                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div>
           <Label>Sistem No</Label>
