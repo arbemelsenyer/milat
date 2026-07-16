@@ -68,7 +68,7 @@ function toolLabels(row: OutcomeRow): string {
 }
 
 function outcomeLabel(outcome: string | null): string {
-  return outcome === "anlasma" ? "Anlaşma" : outcome === "anlasamamama" ? "Anlaşamama" : outcome ?? "—";
+  return outcome === "anlasma" ? "Anlaşma" : outcome === "anlasamama" ? "Anlaşamama" : outcome ?? "—";
 }
 
 interface OutcomeRow {

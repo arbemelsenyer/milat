@@ -45,7 +45,7 @@ export default function Archive() {
         .select("id,title,application_no,dispute_type,your_name,other_party_name,outcome,status,updated_at")
         .order("updated_at", { ascending: false });
       const closed = (data as Row[] ?? []).filter(
-        (r) => CLOSED_STATUSES.includes(r.status) || ["anlasma", "anlasamamama"].includes(r.outcome ?? "")
+        (r) => CLOSED_STATUSES.includes(r.status) || ["anlasma", "anlasamama"].includes(r.outcome ?? "")
       );
       setRows(closed);
       setLoading(false);
@@ -88,7 +88,7 @@ export default function Archive() {
             <SelectContent>
               <SelectItem value="all">Tüm sonuçlar</SelectItem>
               <SelectItem value="anlasma">Anlaşma</SelectItem>
-              <SelectItem value="anlasamamama">Anlaşamama</SelectItem>
+              <SelectItem value="anlasamama">Anlaşamama</SelectItem>
             </SelectContent>
           </Select>
           <Select value={type} onValueChange={setType}>
@@ -119,7 +119,7 @@ export default function Archive() {
                       <span className="font-mono text-xs text-muted-foreground">{r.application_no ?? "—"}</span>
                       {r.dispute_type && <Badge variant="outline">{r.dispute_type}</Badge>}
                       <Badge variant={r.outcome === "anlasma" ? "default" : "secondary"}>
-                        {r.outcome === "anlasma" ? "Anlaşma" : r.outcome === "anlasamamama" ? "Anlaşamama" : "Kapandı"}
+                        {r.outcome === "anlasma" ? "Anlaşma" : r.outcome === "anlasamama" ? "Anlaşamama" : "Kapandı"}
                       </Badge>
                     </div>
                     <h3 className="font-medium mt-1 truncate">

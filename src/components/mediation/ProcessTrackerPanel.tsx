@@ -276,7 +276,7 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
     const cancelled = sessions.find((s) => s.status === "cancelled");
     const outcome = caseData?.outcome;
     const status = caseData?.status;
-    const sonucText = outcome === "anlasma" ? "Anlaşma" : outcome === "anlasamamama" ? "Anlaşamama" : "";
+    const sonucText = outcome === "anlasma" ? "Anlaşma" : outcome === "anlasamama" ? "Anlaşamama" : "";
     const sonDurumText = status === "agreed" ? "Anlaşma ile kapandı" : status === "failed" ? "Anlaşamama ile kapandı" : "Devam ediyor";
 
     return {
@@ -322,7 +322,7 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
     ? [
         {
           label: "Sonuç",
-          value: caseData.outcome === "anlasma" ? "Anlaşma" : caseData.outcome === "anlasamamama" ? "Anlaşamama" : caseData.outcome,
+          value: caseData.outcome === "anlasma" ? "Anlaşma" : caseData.outcome === "anlasamama" ? "Anlaşamama" : caseData.outcome,
         },
         { label: "Süre", value: outcomeAnalytics?.sure_gun != null ? `${outcomeAnalytics.sure_gun} gün` : "—" },
         { label: "Oturum Sayısı", value: outcomeAnalytics?.oturum_sayisi ?? "—" },

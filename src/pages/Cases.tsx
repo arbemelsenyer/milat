@@ -68,7 +68,7 @@ export default function Cases() {
   }, [user]);
 
   const active = useMemo(
-    () => cases.filter((c) => !CLOSED.includes(c.status) && !["anlasma", "anlasamamama"].includes(c.outcome ?? "")),
+    () => cases.filter((c) => !CLOSED.includes(c.status) && !["anlasma", "anlasamama"].includes(c.outcome ?? "")),
     [cases]
   );
 

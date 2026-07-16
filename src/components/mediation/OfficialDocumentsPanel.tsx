@@ -22,7 +22,7 @@ const DOC_SET_AGREED: DocKind[] = ["ilk_oturum", "son_tutanak", "anlasma_belgesi
 const DOC_SET_FAILED: DocKind[] = ["son_tutanak"];
 
 export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
-  const [outcome, setOutcome] = useState<"anlasma" | "anlasamamama" | null>(caseRow?.outcome ?? null);
+  const [outcome, setOutcome] = useState<"anlasma" | "anlasamama" | null>(caseRow?.outcome ?? null);
   const [terms, setTerms] = useState<string>(caseRow?.agreement_terms ?? "");
   const [amount, setAmount] = useState<string>(caseRow?.agreement_amount ? String(caseRow.agreement_amount) : "");
   const [savingOutcome, setSavingOutcome] = useState(false);
@@ -37,7 +37,7 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
 
-  const setKinds: DocKind[] = outcome === "anlasma" ? DOC_SET_AGREED : outcome === "anlasamamama" ? DOC_SET_FAILED : [];
+  const setKinds: DocKind[] = outcome === "anlasma" ? DOC_SET_AGREED : outcome === "anlasamama" ? DOC_SET_FAILED : [];
 
   useEffect(() => {
     setOutcome(caseRow?.outcome ?? null);
@@ -45,7 +45,7 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
     setAmount(caseRow?.agreement_amount ? String(caseRow.agreement_amount) : "");
   }, [caseRow?.id]);
 
-  async function saveOutcome(nextOutcome: "anlasma" | "anlasamamama") {
+  async function saveOutcome(nextOutcome: "anlasma" | "anlasamama") {
     setSavingOutcome(true);
     setError(null);
     try {
@@ -254,8 +254,8 @@ ${paragraphElems.join("\n")}
         </Button>
         <Button
           type="button"
-          variant={outcome === "anlasamamama" ? "default" : "outline"}
-          onClick={() => saveOutcome("anlasamamama")}
+          variant={outcome === "anlasamama" ? "default" : "outline"}
+          onClick={() => saveOutcome("anlasamama")}
           disabled={savingOutcome}
         >
           <XCircle className="h-4 w-4 mr-1" /> Anlaşma Sağlanamadı
