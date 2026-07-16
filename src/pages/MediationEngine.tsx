@@ -4469,71 +4469,91 @@ function Phase9Closing({ caseRow, reload }: { caseRow: CaseRow; reload: () => vo
         ]}
       />
     <motion.div variants={containerVariants} initial="hidden" animate="show">
-    <Card className="p-6 space-y-8">
+    <Card className="p-6 space-y-6">
       <h2 className="text-2xl font-bold text-primary">Aşama 8 — Belgeler & Kapanış</h2>
 
-      {/* ===== BELGELER ===== */}
-      <motion.section variants={itemVariants} className="space-y-4">
-        <h3 className="text-lg font-semibold heading-gold-underline">Belgeler</h3>
-        <OfficialDocumentsPanel caseRow={caseRow} onOutcomeSaved={reload} />
-      </motion.section>
+      <Tabs defaultValue="belgeler">
+        <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="belgeler" className={tabTriggerAccentClass}>Belgeler</TabsTrigger>
+          <TabsTrigger value="kapanis" className={tabTriggerAccentClass}>Kapanış</TabsTrigger>
+          <TabsTrigger value="odeme" className={tabTriggerAccentClass}>Ödeme & Muhasebe</TabsTrigger>
+        </TabsList>
 
-      {/* ===== KAPANIŞ ===== */}
-      <motion.section variants={itemVariants} className="border-t pt-6 space-y-4">
-        <h3 className="text-lg font-semibold heading-gold-underline">Kapanış</h3>
+        {/* ===== BELGELER ===== */}
+        <TabsContent value="belgeler">
+          <motion.section variants={itemVariants} className="space-y-4">
+            <h3 className="text-lg font-semibold heading-gold-underline">Belgeler</h3>
+            <OfficialDocumentsPanel caseRow={caseRow} onOutcomeSaved={reload} />
+          </motion.section>
+        </TabsContent>
 
-        {isClosed ? (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className={`rounded-2xl border p-6 flex items-center gap-4 ${
-              status === "agreed" ? "border-emerald-400/40 bg-emerald-400/5" : "border-red-400/40 bg-red-400/5"
-            }`}
-          >
-            {status === "agreed"
-              ? <CheckCircle2 className="h-8 w-8 text-emerald-400 shrink-0" />
-              : <XCircle className="h-8 w-8 text-red-400 shrink-0" />}
-            <div>
-              <div className="font-display font-semibold text-lg">
-                Bu dosya {status === "agreed" ? "Anlaşma" : "Anlaşamama"} ile kapanmıştır
-              </div>
-              {closedAt && (
-                <div className="text-sm text-muted-foreground mt-0.5">
-                  {new Date(closedAt).toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" })}
+        {/* ===== KAPANIŞ ===== */}
+        <TabsContent value="kapanis">
+          <motion.section variants={itemVariants} className="space-y-4">
+            <h3 className="text-lg font-semibold heading-gold-underline">Kapanış</h3>
+
+            {isClosed ? (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                className={`rounded-2xl border p-6 flex items-center gap-4 ${
+                  status === "agreed" ? "border-emerald-400/40 bg-emerald-400/5" : "border-red-400/40 bg-red-400/5"
+                }`}
+              >
+                {status === "agreed"
+                  ? <CheckCircle2 className="h-8 w-8 text-emerald-400 shrink-0" />
+                  : <XCircle className="h-8 w-8 text-red-400 shrink-0" />}
+                <div>
+                  <div className="font-display font-semibold text-lg">
+                    Bu dosya {status === "agreed" ? "Anlaşma" : "Anlaşamama"} ile kapanmıştır
+                  </div>
+                  {closedAt && (
+                    <div className="text-sm text-muted-foreground mt-0.5">
+                      {new Date(closedAt).toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" })}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </motion.div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              disabled={busy !== null}
-              onClick={() => closeCase(true)}
-              className="group text-left rounded-2xl border border-sidebar-border p-5 transition-colors hover:border-emerald-400/50 hover:bg-emerald-400/5 disabled:opacity-50 disabled:pointer-events-none"
-            >
-              {busy === "agreed"
-                ? <Loader2 className="h-6 w-6 text-emerald-400 mb-2 animate-spin" />
-                : <CheckCircle2 className="h-6 w-6 text-emerald-400 mb-2" />}
-              <div className="font-semibold">Anlaşma ile Kapat</div>
-              <div className="text-xs text-muted-foreground mt-1">Taraflar anlaşmaya vardı; dosya anlaşma ile sonuçlandırılır.</div>
-            </button>
-            <button
-              type="button"
-              disabled={busy !== null}
-              onClick={() => closeCase(false)}
-              className="group text-left rounded-2xl border border-sidebar-border p-5 transition-colors hover:border-red-400/50 hover:bg-red-400/5 disabled:opacity-50 disabled:pointer-events-none"
-            >
-              {busy === "failed"
-                ? <Loader2 className="h-6 w-6 text-red-400 mb-2 animate-spin" />
-                : <XCircle className="h-6 w-6 text-red-400 mb-2" />}
-              <div className="font-semibold">Anlaşamama ile Kapat</div>
-              <div className="text-xs text-muted-foreground mt-1">Taraflar anlaşamadı; dosya anlaşamama ile sonuçlandırılır.</div>
-            </button>
-          </div>
-        )}
-      </motion.section>
+              </motion.div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => closeCase(true)}
+                  className="group text-left rounded-2xl border border-sidebar-border p-5 transition-colors hover:border-emerald-400/50 hover:bg-emerald-400/5 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {busy === "agreed"
+                    ? <Loader2 className="h-6 w-6 text-emerald-400 mb-2 animate-spin" />
+                    : <CheckCircle2 className="h-6 w-6 text-emerald-400 mb-2" />}
+                  <div className="font-semibold">Anlaşma ile Kapat</div>
+                  <div className="text-xs text-muted-foreground mt-1">Taraflar anlaşmaya vardı; dosya anlaşma ile sonuçlandırılır.</div>
+                </button>
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => closeCase(false)}
+                  className="group text-left rounded-2xl border border-sidebar-border p-5 transition-colors hover:border-red-400/50 hover:bg-red-400/5 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {busy === "failed"
+                    ? <Loader2 className="h-6 w-6 text-red-400 mb-2 animate-spin" />
+                    : <XCircle className="h-6 w-6 text-red-400 mb-2" />}
+                  <div className="font-semibold">Anlaşamama ile Kapat</div>
+                  <div className="text-xs text-muted-foreground mt-1">Taraflar anlaşamadı; dosya anlaşamama ile sonuçlandırılır.</div>
+                </button>
+              </div>
+            )}
+          </motion.section>
+        </TabsContent>
+
+        {/* ===== ÖDEME & MUHASEBE ===== */}
+        <TabsContent value="odeme">
+          <motion.section variants={itemVariants} className="space-y-4">
+            <h3 className="text-lg font-semibold heading-gold-underline">Ödeme & Muhasebe</h3>
+            <PaymentAccountingPanel caseRow={caseRow} />
+          </motion.section>
+        </TabsContent>
+      </Tabs>
     </Card>
     </motion.div>
     </div>
