@@ -129,11 +129,16 @@ KESİN KURAL (yüzdesel risk formatı): risk_ozeti.genel_risk_puani ve taraf_kar
     const { block: ragBlock, sources: ragSources, embedding: queryEmb } = await fetchKnowledgeBlock(admin, apiKey, ragQuery, ragCategory);
     const { block: similarBlock } = await fetchSimilarCases(admin, queryEmb, ragCategory);
 
+    // Extracted into a named const so the citation guard (below) can treat any
+    // künye already present here — verified upstream by party-confidential-analysis
+    // against its own RAG context — as legitimate "context" too, not a fresh hallucination.
+    const partyAnalysesBlock = (analyses ?? []).map((a: any) => `--- ${a.case_parties?.party_role ?? ""} (${a.case_parties?.first_name ?? a.case_parties?.company_name ?? ""}) ---\nanalysis: ${JSON.stringify(a.analysis, null, 2)}\nrisk_analizi: ${JSON.stringify(a.risk_analizi ?? {}, null, 2)}`).join("\n\n");
+
     const userPrompt = `BAŞVURU: ${caseRow.title ?? ""} — ${caseRow.dispute_type ?? ""} / ${caseRow.dispute_subtype ?? ""}
 ÖZET: ${caseRow.issue_description ?? ""}
 
 TARAF ANALİZLERİ (risk_analizi dahil):
-${(analyses ?? []).map((a: any) => `--- ${a.case_parties?.party_role ?? ""} (${a.case_parties?.first_name ?? a.case_parties?.company_name ?? ""}) ---\nanalysis: ${JSON.stringify(a.analysis, null, 2)}\nrisk_analizi: ${JSON.stringify(a.risk_analizi ?? {}, null, 2)}`).join("\n\n")}
+${partyAnalysesBlock}
 
 İHTİYAÇ TESPİTİ CEVAPLARI:
 ${(discAnswers ?? []).map((d) => `[Party ${d.party_id?.slice(0, 8)}] Q: ${d.question_text}\nA: ${d.answer_text ?? "(cevap yok)"}`).join("\n")}
@@ -158,6 +163,13 @@ Yukarıdaki resmi kaynaklardan ve benzer geçmiş davalardan yararlanarak ortak 
     const aiJson = await aiRes.json();
     let parsed: any = {};
     try { parsed = JSON.parse(aiJson.choices[0].message.content); } catch { parsed = {}; }
+
+    // Deterministic backstop for citation hallucination: strips any Yargıtay/BAM
+    // E./K. number not verbatim in the context this model actually saw (its own
+    // RAG blocks, plus the party analyses text embedded in userPrompt above —
+    // a künye already vetted at the party level counts as legitimate context here).
+    parsed = sanitizeCitationHallucinations(parsed, `${ragBlock}\n${similarBlock}\n${partyAnalysesBlock}`);
+
     parsed.sources = ragSources;
 
     const { data: inserted, error: upErr } = await admin.from("common_ground_reports").upsert({
@@ -263,4 +275,108 @@ async function fetchSimilarCases(admin: any, embedding: number[] | null, categor
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Deterministic citation guard (no extra AI call, no schema change). Copied
+// verbatim from party-confidential-analysis/index.ts — this repo has no
+// _shared/ module between edge functions, so each function stays self-contained.
+// Runs after JSON.parse, before the row is ever persisted.
+// ─────────────────────────────────────────────────────────────────────────
 
+// Matches "2016/10292 E.", "E. 2017/3257", "K. 2018/7889", "2010/8939 K.",
+// placeholder-digit variants like "2020/XXXX E." (number/E-or-K token pairs in
+// either order), AND bare "YYYY/NNN+" case numbers with no E./K. label at all
+// (min 3-digit docket segment so tarife/madde references like "2026/17" don't
+// match). A bare match whose second segment is exactly 4 digits and within ±1
+// of the first (e.g. "2024/2025") is a year range, not a citation — excluded
+// via isYearRangeFalsePositive below, not in the regex itself.
+const CITATION_PATTERN = /\b(\d{4}\/[0-9X]{1,7}\s*(?:E|K)\.?)\b|\b((?:E|K)\.?\s*\d{4}\/[0-9X]{1,7})\b|\b(\d{4})\/([0-9X]{3,7})\b/gi;
+
+function isYearRangeFalsePositive(yearStr: string, secondStr: string): boolean {
+  if (!/^\d{4}$/.test(secondStr)) return false;
+  const y1 = Number(yearStr), y2 = Number(secondStr);
+  return Math.abs(y2 - y1) === 1;
+}
+
+function extractCitations(text: string): string[] {
+  const out: string[] = [];
+  const re = new RegExp(CITATION_PATTERN);
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m[3] !== undefined) {
+      if (isYearRangeFalsePositive(m[3], m[4])) continue;
+      out.push(`${m[3]}/${m[4]}`);
+    } else {
+      out.push((m[1] ?? m[2] ?? m[0]).trim());
+    }
+  }
+  return out;
+}
+
+function normalizeForCompare(s: string): string {
+  return s.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function citationInContext(citation: string, context: string): boolean {
+  return normalizeForCompare(context).includes(normalizeForCompare(citation));
+}
+
+// Replaces any citation not verbatim in `context` with a generic phrase,
+// then tidies the double-space/empty-parenthesis artifacts that leaves behind.
+function scrubCitationsInString(text: string, context: string): { text: string; removed: number } {
+  let removed = 0;
+  const re = new RegExp(CITATION_PATTERN);
+  const scrubbed = text.replace(re, (match: string, g1: string, g2: string, g3: string, g4: string) => {
+    if (g3 !== undefined && isYearRangeFalsePositive(g3, g4)) return match;
+    if (citationInContext(match, context)) return match;
+    removed++;
+    return "yerleşik içtihadı";
+  });
+  const cleaned = scrubbed
+    .replace(/\(\s*\)/g, "")
+    .replace(/ {2,}/g, " ")
+    .trim();
+  return { text: cleaned, removed };
+}
+
+function sanitizeStringsDeep(value: any, context: string, stats: { removed: number }): any {
+  if (typeof value === "string") {
+    const { text, removed } = scrubCitationsInString(value, context);
+    stats.removed += removed;
+    return text;
+  }
+  if (Array.isArray(value)) return value.map((v) => sanitizeStringsDeep(v, context, stats));
+  if (value && typeof value === "object") {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(value)) out[k] = sanitizeStringsDeep(v, context, stats);
+    return out;
+  }
+  return value;
+}
+
+// legal_framework.precedents gets the stricter treatment: an item whose `decision`
+// cites an E./K. number not present in context is dropped entirely. This function's
+// own output schema has no precedents field, so this block is a no-op here — kept
+// for parity with party-confidential-analysis so both stay identical, copy-paste-able.
+function sanitizeCitationHallucinations(parsed: any, context: string): any {
+  const stats = { removed: 0, precedentsDropped: 0 };
+
+  if (Array.isArray(parsed?.legal_framework?.precedents)) {
+    const before = parsed.legal_framework.precedents.length;
+    parsed.legal_framework.precedents = parsed.legal_framework.precedents.filter((p: any) => {
+      const citations = extractCitations(String(p?.decision ?? ""));
+      if (citations.length === 0) return true;
+      return citations.every((c) => citationInContext(c, context));
+    });
+    stats.precedentsDropped = before - parsed.legal_framework.precedents.length;
+  }
+
+  const sanitized = sanitizeStringsDeep(parsed, context, stats);
+
+  if (stats.removed > 0 || stats.precedentsDropped > 0) {
+    console.log(
+      `[common-ground-report] citation guard: ${stats.removed} inline künye temizlendi, ${stats.precedentsDropped} precedent kaydı bağlamda doğrulanamadığı için silindi`
+    );
+  }
+
+  return sanitized;
+}

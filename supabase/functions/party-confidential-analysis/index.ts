@@ -399,15 +399,32 @@ async function fetchSimilarCases(admin: any, embedding: number[] | null, categor
 // ─────────────────────────────────────────────────────────────────────────
 
 // Matches "2016/10292 E.", "E. 2017/3257", "K. 2018/7889", "2010/8939 K.",
-// and placeholder-digit variants like "2020/XXXX E." — number/E-or-K token
-// pairs in either order.
-const CITATION_PATTERN = /\b(\d{4}\/[0-9X]{1,7}\s*(?:E|K)\.?)\b|\b((?:E|K)\.?\s*\d{4}\/[0-9X]{1,7})\b/gi;
+// placeholder-digit variants like "2020/XXXX E." (number/E-or-K token pairs in
+// either order), AND bare "YYYY/NNN+" case numbers with no E./K. label at all
+// (min 3-digit docket segment so tarife/madde references like "2026/17" don't
+// match). A bare match whose second segment is exactly 4 digits and within ±1
+// of the first (e.g. "2024/2025") is a year range, not a citation — excluded
+// via isYearRangeFalsePositive below, not in the regex itself.
+const CITATION_PATTERN = /\b(\d{4}\/[0-9X]{1,7}\s*(?:E|K)\.?)\b|\b((?:E|K)\.?\s*\d{4}\/[0-9X]{1,7})\b|\b(\d{4})\/([0-9X]{3,7})\b/gi;
+
+function isYearRangeFalsePositive(yearStr: string, secondStr: string): boolean {
+  if (!/^\d{4}$/.test(secondStr)) return false;
+  const y1 = Number(yearStr), y2 = Number(secondStr);
+  return Math.abs(y2 - y1) === 1;
+}
 
 function extractCitations(text: string): string[] {
   const out: string[] = [];
   const re = new RegExp(CITATION_PATTERN);
   let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) out.push((m[1] ?? m[2] ?? m[0]).trim());
+  while ((m = re.exec(text))) {
+    if (m[3] !== undefined) {
+      if (isYearRangeFalsePositive(m[3], m[4])) continue;
+      out.push(`${m[3]}/${m[4]}`);
+    } else {
+      out.push((m[1] ?? m[2] ?? m[0]).trim());
+    }
+  }
   return out;
 }
 
@@ -424,7 +441,8 @@ function citationInContext(citation: string, context: string): boolean {
 function scrubCitationsInString(text: string, context: string): { text: string; removed: number } {
   let removed = 0;
   const re = new RegExp(CITATION_PATTERN);
-  const scrubbed = text.replace(re, (match) => {
+  const scrubbed = text.replace(re, (match: string, g1: string, g2: string, g3: string, g4: string) => {
+    if (g3 !== undefined && isYearRangeFalsePositive(g3, g4)) return match;
     if (citationInContext(match, context)) return match;
     removed++;
     return "yerleşik içtihadı";
