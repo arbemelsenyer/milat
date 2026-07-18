@@ -127,6 +127,7 @@ KESİN KURAL (yüzdesel risk formatı): risk_ozeti.genel_risk_puani ve taraf_kar
       .filter(Boolean).join(" — ");
     const ragCategory = mapDisputeToCategory(caseRow.dispute_type, caseRow.dispute_subtype);
     const { block: ragBlock, sources: ragSources, embedding: queryEmb } = await fetchKnowledgeBlock(admin, apiKey, ragQuery, ragCategory);
+    console.log(`[common-ground-report] RAG category=${ragCategory} sources=${ragSources.length}`);
     const { block: similarBlock } = await fetchSimilarCases(admin, queryEmb, ragCategory);
 
     // Extracted into a named const so the citation guard (below) can treat any

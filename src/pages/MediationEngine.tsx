@@ -2655,6 +2655,12 @@ function RiskAnalysisCard({
   const badgeTone = riskBadgeTone(risk.risk_puani);
   const missingAny =
     isMissing(risk.uzlasma_orani) || isMissing(risk.mahkeme_riski) || isMissing(risk.tahmini_sure_tasarrufu_ay);
+  // Deterministic — dedup'd straight from the RAG chunks actually retrieved, not the
+  // model's own kaynak_listesi (which the künye/precedent-hallucination rule can blank
+  // out even when real non-precedent sources were used).
+  const kaynakNames = Array.from(new Set(
+    (Array.isArray(sources) ? sources : []).map((s: any) => String(s?.title ?? "").trim()).filter(Boolean)
+  ));
   return (
     <div className={`border rounded-lg p-4 space-y-3 ${tone}`}>
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -2722,11 +2728,11 @@ function RiskAnalysisCard({
           <ul className="list-disc pl-5 text-sm">{safeList(risk.uzlasma_engelleri).map((s, i) => <li key={i}>{s}</li>)}</ul>
         </div>
       )}
-      {safeList(risk.kaynak_listesi).length > 0 && (
+      {kaynakNames.length > 0 && (
         <div className="text-xs">
           <div className="font-medium mb-1">Kullanılan Kaynaklar</div>
           <div className="flex flex-wrap gap-1">
-            {safeList(risk.kaynak_listesi).map((name, i) => (
+            {kaynakNames.map((name, i) => (
               <SourceChip key={i} name={name} source={matchSource(name, sources)} />
             ))}
           </div>
@@ -3552,7 +3558,13 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   const cockpitTarafKarsilastirma = Array.isArray(cockpitRiskOzeti?.taraf_karsilastirma) ? cockpitRiskOzeti.taraf_karsilastirma : [];
   const cockpitObstacleList = safeList(cockpitRiskOzeti?.ortak_uzlasma_engelleri).slice(0, 8);
   const cockpitMediatorOneri = safeText(cockpitRiskOzeti?.arabulucu_onerisi);
-  const cockpitKaynakListesi = safeList(cockpitRiskOzeti?.kaynak_listesi).slice(0, 10);
+  // Deterministic — dedup'd straight from the RAG chunks actually retrieved (cockpitReportData.sources),
+  // not the model's own risk_ozeti.kaynak_listesi (see RiskAnalysisCard's kaynakNames for why).
+  const cockpitKaynakListesi = Array.from(new Set<string>(
+    (Array.isArray(cockpitReportData?.sources) ? cockpitReportData.sources : [])
+      .map((s: any) => String(s?.title ?? "").trim())
+      .filter(Boolean)
+  )).slice(0, 10);
 
   return (
     <div className="space-y-4">
