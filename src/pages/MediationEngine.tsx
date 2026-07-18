@@ -4551,15 +4551,26 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
     setInvoiceBusy(true);
     try {
       const [{ data: parties }, { data: profile }] = await Promise.all([
-        supabase.from("case_parties").select("first_name, last_name, company_name, party_type").eq("case_id", caseRow.id),
+        supabase.from("case_parties")
+          .select("first_name, last_name, company_name, party_type, party_role, tc_kimlik, tax_number, tax_office, authorized_person, address")
+          .eq("case_id", caseRow.id),
         caseRow.assigned_mediator_id
           ? supabase.from("profiles").select("full_name").eq("user_id", caseRow.assigned_mediator_id).maybeSingle()
           : Promise.resolve({ data: null } as any),
       ]);
-      const partyList = (parties ?? []).map((p: any) => ({
-        name: p.party_type === "corporate" ? (p.company_name || "-") : `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "-",
-        role: p.party_type === "corporate" ? "Kurumsal" : "Bireysel",
-      }));
+      const partyList = (parties ?? []).map((p: any) => {
+        const isCorp = p.party_type === "corporate";
+        return {
+          name: isCorp ? (p.company_name || "-") : `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "-",
+          typeLabel: isCorp ? "Kurumsal" : "Bireysel",
+          roleLabel: p.party_role ? roleLabel(p.party_role) : null,
+          tcKimlik: isCorp ? null : (p.tc_kimlik || null),
+          taxNumber: isCorp ? (p.tax_number || null) : null,
+          taxOffice: isCorp ? (p.tax_office || null) : null,
+          authorizedPerson: isCorp ? (p.authorized_person || null) : null,
+          address: p.address || null,
+        };
+      });
 
       const { downloadInvoicePdf } = await import("@/lib/invoice-pdf");
       downloadInvoicePdf({

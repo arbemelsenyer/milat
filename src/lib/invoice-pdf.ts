@@ -1,11 +1,22 @@
 import { jsPDF } from "jspdf";
 
+export interface InvoicePartyInfo {
+  name: string;
+  typeLabel: string;
+  roleLabel?: string | null;
+  tcKimlik?: string | null;
+  taxNumber?: string | null;
+  taxOffice?: string | null;
+  authorizedPerson?: string | null;
+  address?: string | null;
+}
+
 export interface InvoiceData {
   applicationNo: string;
   disputeSubject: string;
   mediatorName: string;
   mediatorRegistryNo?: string | null;
-  parties: Array<{ name: string; role?: string | null }>;
+  parties: InvoicePartyInfo[];
   feeType: "anlasma" | "anlasamama" | "ihtiyari";
   disputeValue: number;
   sessionCount: number;
@@ -64,8 +75,29 @@ export function generateInvoicePdf(data: InvoiceData): jsPDF {
   doc.text(`Sicil No: ${data.mediatorRegistryNo || "-"}`, margin, y); y += 22;
 
   drawSectionTitle(doc, "Taraflar", margin, y); y += 18;
-  if (data.parties.length === 0) { doc.text("-", margin, y); y += 14; }
-  else data.parties.forEach((p) => { doc.text(`• ${p.role ? `${p.name} (${p.role})` : p.name}`, margin, y); y += 14; });
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+  if (data.parties.length === 0) {
+    doc.text("-", margin, y); y += 14;
+  } else {
+    data.parties.forEach((p, i) => {
+      const header = p.roleLabel ? `${i + 1}. ${p.name} (${p.typeLabel}, ${p.roleLabel})` : `${i + 1}. ${p.name} (${p.typeLabel})`;
+      doc.setFont("helvetica", "bold");
+      doc.text(header, margin, y); y += 14;
+      doc.setFont("helvetica", "normal");
+      const lines: string[] = [];
+      if (p.tcKimlik) lines.push(`T.C. Kimlik No: ${p.tcKimlik}`);
+      if (p.taxNumber) lines.push(`Vergi No: ${p.taxNumber}`);
+      if (p.taxOffice) lines.push(`Vergi Dairesi: ${p.taxOffice}`);
+      if (p.authorizedPerson) lines.push(`Yetkili: ${p.authorizedPerson}`);
+      if (p.address) lines.push(`Adres: ${p.address}`);
+      lines.forEach((line) => {
+        const wrapped = doc.splitTextToSize(`   ${line}`, pageWidth - 2 * margin);
+        doc.text(wrapped, margin, y);
+        y += wrapped.length * 13;
+      });
+      y += 4;
+    });
+  }
   y += 8;
 
   drawSectionTitle(doc, "Uyusmazlik", margin, y); y += 18;
