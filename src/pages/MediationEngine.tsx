@@ -4162,6 +4162,54 @@ function Phase8Negotiation({ caseRow, userId, onDone }: { caseRow: CaseRow; user
 
 /* ===================== PHASE 9 - CLOSING ===================== */
 
+type PaymentScenario = {
+  key: "anlasma" | "bakanlik" | "ihtiyari_anlasamama" | "pending" | "undetermined";
+  label: string;
+  badgeClass: string;
+};
+
+function computePaymentScenario(caseRow: CaseRow): PaymentScenario {
+  const outcome = caseRow.status;
+  if (outcome === "agreed") {
+    return { key: "anlasma", label: "Taraflar öder", badgeClass: "bg-emerald-600 text-white border-transparent" };
+  }
+  if (outcome === "failed") {
+    if (caseRow.mediation_type === "dava_sarti") {
+      return {
+        key: "bakanlik",
+        label: "Bakanlık ödemesi (2 saatlik tarife) — taraflardan tahsilat yok",
+        badgeClass: "bg-blue-600 text-white border-transparent",
+      };
+    }
+    if (caseRow.mediation_type === "ihtiyari") {
+      return {
+        key: "ihtiyari_anlasamama",
+        label: "Taraflar öder (2 saatlik ücret)",
+        badgeClass: "bg-amber-600 text-white border-transparent",
+      };
+    }
+    return {
+      key: "undetermined",
+      label: "Anlaşamama — arabuluculuk türü belirlenmemiş, senaryo netleştirilemedi",
+      badgeClass: "bg-destructive text-destructive-foreground border-transparent",
+    };
+  }
+  return {
+    key: "pending",
+    label: "Dosya kapanınca senaryo belirlenecek",
+    badgeClass: "bg-muted text-muted-foreground border-transparent",
+  };
+}
+
+type PartyOption = { id: string; name: string };
+type CasePaymentRow = {
+  id: string; case_id: string; payment_date: string; payer_party_id: string | null;
+  payer_label: string; kind: "ucret" | "masraf"; description: string | null;
+  amount: number; status: "bekliyor" | "odendi"; receipt_no: string | null;
+  paid_at: string | null; created_at: string;
+};
+type StagedRow = { payer_party_id: string | null; payer_label: string; kind: "ucret"; description: string; amount: number };
+
 function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
   const [disputeValue, setDisputeValue] = useState<string>("");
   const [sessionCount, setSessionCount] = useState<string>("1");
@@ -4185,6 +4233,251 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
   }>(null);
   const [existingFeeId, setExistingFeeId] = useState<string | null>(null);
   const [invoiceBusy, setInvoiceBusy] = useState(false);
+
+  // --- Faz 4b: Ödeme senaryosu, ücret sözleşmesi, ödeme defteri ---
+  const scenario = useMemo(() => computePaymentScenario(caseRow), [caseRow.status, caseRow.mediation_type]);
+
+  const [ucretSozlesmesi, setUcretSozlesmesi] = useState(false);
+  const [kararlastirilanUcret, setKararlastirilanUcret] = useState<string>("");
+  const [contractBusy, setContractBusy] = useState(false);
+  const [contractError, setContractError] = useState<string | null>(null);
+
+  const [parties, setParties] = useState<PartyOption[]>([]);
+  const [payments, setPayments] = useState<CasePaymentRow[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+
+  const [rowDate, setRowDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [rowPayerId, setRowPayerId] = useState<string>("bakanlik");
+  const [rowKind, setRowKind] = useState<"ucret" | "masraf">("ucret");
+  const [rowDesc, setRowDesc] = useState<string>("");
+  const [rowAmount, setRowAmount] = useState<string>("");
+  const [rowBusy, setRowBusy] = useState(false);
+  const [rowError, setRowError] = useState<string | null>(null);
+
+  const [markingId, setMarkingId] = useState<string | null>(null);
+  const [receiptDraft, setReceiptDraft] = useState<string>("");
+  const [markBusy, setMarkBusy] = useState(false);
+
+  const [stagedRows, setStagedRows] = useState<StagedRow[]>([]);
+  const [stageBusy, setStageBusy] = useState(false);
+  const [stageError, setStageError] = useState<string | null>(null);
+
+  const parseAmount = (s: string) => Number(s.replace(/[^\d.,-]/g, "").replace(",", ".")) || 0;
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+
+  const loadPayments = useCallback(async () => {
+    setPaymentsLoading(true);
+    const { data, error } = await supabase
+      .from("case_payments" as any)
+      .select("*")
+      .eq("case_id", caseRow.id)
+      .order("payment_date", { ascending: false })
+      .order("created_at", { ascending: false });
+    if (!error) setPayments(((data ?? []) as any[]) as CasePaymentRow[]);
+    setPaymentsLoading(false);
+  }, [caseRow.id]);
+
+  useEffect(() => { loadPayments(); }, [loadPayments]);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("case_parties")
+        .select("id, first_name, last_name, company_name, party_type")
+        .eq("case_id", caseRow.id);
+      setParties((data ?? []).map((p: any) => ({
+        id: p.id,
+        name: p.party_type === "corporate" ? (p.company_name || "-") : `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "-",
+      })));
+    })();
+  }, [caseRow.id]);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("cases" as any)
+        .select("ucret_sozlesmesi, kararlastirilan_ucret")
+        .eq("id", caseRow.id)
+        .maybeSingle();
+      if (data) {
+        setUcretSozlesmesi(!!(data as any).ucret_sozlesmesi);
+        setKararlastirilanUcret((data as any).kararlastirilan_ucret != null ? String((data as any).kararlastirilan_ucret) : "");
+      }
+    })();
+  }, [caseRow.id]);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("case_fees" as any)
+        .select("id, ai_breakdown")
+        .eq("case_id", caseRow.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const r = (data as any)?.ai_breakdown;
+      if (r) {
+        setFeeResult(r);
+        setExistingFeeId((data as any).id ?? null);
+      }
+    })();
+  }, [caseRow.id]);
+
+  const taban = feeResult?.net_tahsilat ?? null;
+  const existingUcretSum = useMemo(
+    () => round2(payments.filter((p) => p.kind === "ucret").reduce((s, p) => s + Number(p.amount || 0), 0)),
+    [payments]
+  );
+  const kararlastirilanUcretNum = ucretSozlesmesi ? parseAmount(kararlastirilanUcret) : 0;
+  const effectiveBasis = ucretSozlesmesi && kararlastirilanUcretNum > 0 ? kararlastirilanUcretNum : taban;
+
+  async function saveUcretSozlesmesi() {
+    setContractError(null);
+    const val = ucretSozlesmesi ? parseAmount(kararlastirilanUcret) : 0;
+    if (ucretSozlesmesi && val > 0 && taban != null && val < taban) {
+      setContractError(`AAÜT tabanının altına inilemez (taban: ${fmtTL(taban)})`);
+      return;
+    }
+    setContractBusy(true);
+    try {
+      const { error } = await supabase.from("cases" as any).update({
+        ucret_sozlesmesi: ucretSozlesmesi,
+        kararlastirilan_ucret: ucretSozlesmesi && val > 0 ? val : null,
+      } as any).eq("id", caseRow.id);
+      if (error) throw error;
+      toast({ title: "Ücret sözleşmesi kaydedildi" });
+    } catch (e: any) {
+      toast({ title: "Kaydedilemedi", description: trErr(e.message), variant: "destructive" });
+    } finally {
+      setContractBusy(false);
+    }
+  }
+
+  async function addPaymentRow() {
+    setRowError(null);
+    const amt = round2(parseAmount(rowAmount));
+    if (!amt || amt <= 0) {
+      setRowError("Geçerli bir tutar girin.");
+      return;
+    }
+    if (rowKind === "ucret" && taban != null && round2(existingUcretSum + amt) < taban) {
+      setRowError(`AAÜT tabanının altına inilemez (taban: ${fmtTL(taban)})`);
+      return;
+    }
+    const payerLabel = rowPayerId === "bakanlik" ? "Bakanlık" : (parties.find((p) => p.id === rowPayerId)?.name ?? "-");
+    setRowBusy(true);
+    try {
+      const { error } = await supabase.from("case_payments" as any).insert({
+        case_id: caseRow.id,
+        payment_date: rowDate,
+        payer_party_id: rowPayerId === "bakanlik" ? null : rowPayerId,
+        payer_label: payerLabel,
+        kind: rowKind,
+        description: rowDesc.trim() || null,
+        amount: amt,
+        status: "bekliyor",
+      } as any);
+      if (error) throw error;
+      setRowDesc(""); setRowAmount("");
+      await loadPayments();
+      toast({ title: "Kayıt eklendi" });
+    } catch (e: any) {
+      setRowError(trErr(e.message));
+    } finally {
+      setRowBusy(false);
+    }
+  }
+
+  async function confirmMarkPaid(id: string) {
+    setMarkBusy(true);
+    try {
+      const { error } = await supabase.from("case_payments" as any).update({
+        status: "odendi",
+        paid_at: new Date().toISOString(),
+        receipt_no: receiptDraft.trim() || null,
+      } as any).eq("id", id);
+      if (error) throw error;
+      setMarkingId(null); setReceiptDraft("");
+      await loadPayments();
+      toast({ title: "Ödendi olarak işaretlendi" });
+    } catch (e: any) {
+      toast({ title: "Hata", description: trErr(e.message), variant: "destructive" });
+    } finally {
+      setMarkBusy(false);
+    }
+  }
+
+  function transferScenarioToLedger() {
+    setStageError(null);
+    if (!effectiveBasis || effectiveBasis <= 0) {
+      setStageError("Önce ücret hesaplayın veya kararlaştırılan ücreti girin.");
+      return;
+    }
+    if (scenario.key === "bakanlik") {
+      setStagedRows([{
+        payer_party_id: null, payer_label: "Bakanlık", kind: "ucret",
+        description: "Anlaşamama - Bakanlık ödemesi (2 saatlik tarife)",
+        amount: effectiveBasis,
+      }]);
+      return;
+    }
+    if (scenario.key === "anlasma" || scenario.key === "ihtiyari_anlasamama") {
+      if (parties.length === 0) {
+        setStageError("Dosyada kayıtlı taraf bulunamadı.");
+        return;
+      }
+      const share = round2(Math.floor((effectiveBasis / parties.length) * 100) / 100);
+      const rows: StagedRow[] = parties.map((p) => ({
+        payer_party_id: p.id,
+        payer_label: p.name,
+        kind: "ucret",
+        description: scenario.key === "anlasma" ? "Anlaşma ücreti - dosya payı" : "Anlaşamama (ihtiyari) - ücret payı",
+        amount: share,
+      }));
+      const remainder = round2(effectiveBasis - round2(share * parties.length));
+      if (remainder !== 0 && rows.length > 0) {
+        rows[rows.length - 1] = { ...rows[rows.length - 1], amount: round2(rows[rows.length - 1].amount + remainder) };
+      }
+      setStagedRows(rows);
+      return;
+    }
+    setStageError("Dosya henüz kapanmadı veya arabuluculuk türü belirlenmemiş; senaryo netleşmeden aktarım yapılamaz.");
+  }
+
+  function updateStagedRow(index: number, patch: Partial<StagedRow>) {
+    setStagedRows((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
+  async function saveStagedRows() {
+    setStageError(null);
+    const ucretTotal = round2(stagedRows.filter((r) => r.kind === "ucret").reduce((s, r) => s + Number(r.amount || 0), 0));
+    if (taban != null && round2(existingUcretSum + ucretTotal) < taban) {
+      setStageError(`AAÜT tabanının altına inilemez (taban: ${fmtTL(taban)})`);
+      return;
+    }
+    setStageBusy(true);
+    try {
+      const rows = stagedRows.map((r) => ({
+        case_id: caseRow.id,
+        payment_date: new Date().toISOString().slice(0, 10),
+        payer_party_id: r.payer_party_id,
+        payer_label: r.payer_label,
+        kind: r.kind,
+        description: r.description || null,
+        amount: round2(r.amount),
+        status: "bekliyor",
+      }));
+      const { error } = await supabase.from("case_payments" as any).insert(rows as any);
+      if (error) throw error;
+      setStagedRows([]);
+      await loadPayments();
+      toast({ title: "Senaryo deftere aktarıldı" });
+    } catch (e: any) {
+      setStageError(trErr(e.message));
+    } finally {
+      setStageBusy(false);
+    }
+  }
 
   const fmtTL = (n: number) =>
     new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(n);
@@ -4308,6 +4601,10 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge className={`whitespace-normal text-left h-auto py-1 px-2 ${scenario.badgeClass}`}>{scenario.label}</Badge>
+      </div>
+
       <p className="text-sm text-muted-foreground">Aktif AAÜT tarifesine göre deterministik hesaplama.</p>
 
       <div className="grid gap-3 md:grid-cols-3">
@@ -4437,6 +4734,185 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
           </div>
         </div>
       )}
+
+      <div className="border rounded p-3 space-y-2">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={ucretSozlesmesi} onChange={(e) => setUcretSozlesmesi(e.target.checked)} />
+          <span className="font-medium text-sm">Ücret Sözleşmesi</span>
+        </label>
+        {ucretSozlesmesi && (
+          <div className="grid gap-3 md:grid-cols-2 pt-1">
+            <div className="space-y-1">
+              <Label>Kararlaştırılan Ücret (TL)</Label>
+              <Input type="text" inputMode="decimal" value={kararlastirilanUcret}
+                onChange={(e) => setKararlastirilanUcret(e.target.value)} disabled={contractBusy} />
+            </div>
+          </div>
+        )}
+        {taban != null && (
+          <p className="text-xs text-muted-foreground">Taban (hesaplanan tarife — NET TAHSİLAT): {fmtTL(taban)}</p>
+        )}
+        {contractError && (
+          <div className="text-sm text-destructive flex items-center gap-1"><AlertTriangle className="h-4 w-4" />{contractError}</div>
+        )}
+        <Button size="sm" variant="outline" onClick={saveUcretSozlesmesi} disabled={contractBusy}>
+          {contractBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}Sözleşmeyi Kaydet
+        </Button>
+      </div>
+
+      <div className="border rounded p-3 space-y-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h4 className="font-medium text-sm">Senaryoyu Deftere Aktar</h4>
+          <Button size="sm" onClick={transferScenarioToLedger} disabled={stageBusy}>
+            Senaryoyu Deftere Aktar
+          </Button>
+        </div>
+        {stageError && (
+          <div className="text-sm text-destructive flex items-center gap-1"><AlertTriangle className="h-4 w-4" />{stageError}</div>
+        )}
+        {stagedRows.length > 0 && (
+          <div className="space-y-2">
+            <div className="rounded border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40">
+                  <tr>
+                    <th className="px-2 py-1 text-left">Ödeyen</th>
+                    <th className="px-2 py-1 text-left">Açıklama</th>
+                    <th className="px-2 py-1 text-right">Tutar (TL)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stagedRows.map((r, i) => (
+                    <tr key={i} className="border-t">
+                      <td className="px-2 py-1">{r.payer_label}</td>
+                      <td className="px-2 py-1">
+                        <Input value={r.description} onChange={(e) => updateStagedRow(i, { description: e.target.value })} className="h-8" />
+                      </td>
+                      <td className="px-2 py-1">
+                        <Input type="text" inputMode="decimal" value={String(r.amount)}
+                          onChange={(e) => updateStagedRow(i, { amount: parseAmount(e.target.value) })}
+                          className="h-8 text-right" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={saveStagedRows} disabled={stageBusy}>
+                {stageBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}Onayla ve Kaydet
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setStagedRows([])} disabled={stageBusy}>Vazgeç</Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="border rounded p-3 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h4 className="font-medium text-sm">Ödeme Defteri</h4>
+          <span className="text-xs text-muted-foreground">
+            Kayıtlı ücret toplamı: {fmtTL(existingUcretSum)}{taban != null ? ` / Taban: ${fmtTL(taban)}` : ""}
+          </span>
+        </div>
+
+        <div className="rounded border overflow-hidden overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40">
+              <tr>
+                <th className="px-2 py-1 text-left">Tarih</th>
+                <th className="px-2 py-1 text-left">Ödeyen</th>
+                <th className="px-2 py-1 text-left">Tür</th>
+                <th className="px-2 py-1 text-left">Açıklama</th>
+                <th className="px-2 py-1 text-right">Tutar</th>
+                <th className="px-2 py-1 text-left">Durum</th>
+                <th className="px-2 py-1 text-left">Makbuz No</th>
+                <th className="px-2 py-1"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {paymentsLoading && (
+                <tr><td colSpan={8} className="px-2 py-3 text-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin inline mr-1" />Yükleniyor...</td></tr>
+              )}
+              {!paymentsLoading && payments.length === 0 && (
+                <tr><td colSpan={8} className="px-2 py-3 text-center text-muted-foreground">Kayıt yok</td></tr>
+              )}
+              {payments.map((p) => (
+                <tr key={p.id} className="border-t align-top">
+                  <td className="px-2 py-2 whitespace-nowrap">{p.payment_date}</td>
+                  <td className="px-2 py-2">{p.payer_label}</td>
+                  <td className="px-2 py-2">{p.kind === "ucret" ? "Ücret" : "Masraf"}</td>
+                  <td className="px-2 py-2">{p.description || "-"}</td>
+                  <td className="px-2 py-2 text-right whitespace-nowrap">{fmtTL(Number(p.amount))}</td>
+                  <td className="px-2 py-2">
+                    <Badge variant={p.status === "odendi" ? "default" : "outline"}>
+                      {p.status === "odendi" ? "Ödendi" : "Bekliyor"}
+                    </Badge>
+                  </td>
+                  <td className="px-2 py-2">{p.receipt_no || "-"}</td>
+                  <td className="px-2 py-2">
+                    {p.status === "bekliyor" && (
+                      markingId === p.id ? (
+                        <div className="flex items-center gap-1">
+                          <Input placeholder="Makbuz no" value={receiptDraft} onChange={(e) => setReceiptDraft(e.target.value)} className="h-8 w-28" />
+                          <Button size="sm" onClick={() => confirmMarkPaid(p.id)} disabled={markBusy}>
+                            {markBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => { setMarkingId(null); setReceiptDraft(""); }}>İptal</Button>
+                        </div>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => { setMarkingId(p.id); setReceiptDraft(""); }}>Ödendi işaretle</Button>
+                      )
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-6 items-end border-t pt-3">
+          <div className="space-y-1">
+            <Label>Tarih</Label>
+            <Input type="date" value={rowDate} onChange={(e) => setRowDate(e.target.value)} disabled={rowBusy} />
+          </div>
+          <div className="space-y-1">
+            <Label>Ödeyen</Label>
+            <Select value={rowPayerId} onValueChange={setRowPayerId}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bakanlik">Bakanlık</SelectItem>
+                {parties.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Tür</Label>
+            <Select value={rowKind} onValueChange={(v) => setRowKind(v as any)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ucret">Ücret</SelectItem>
+                <SelectItem value="masraf">Masraf</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1 md:col-span-2">
+            <Label>Açıklama</Label>
+            <Input value={rowDesc} onChange={(e) => setRowDesc(e.target.value)} disabled={rowBusy} />
+          </div>
+          <div className="space-y-1">
+            <Label>Tutar (TL)</Label>
+            <Input type="text" inputMode="decimal" value={rowAmount} onChange={(e) => setRowAmount(e.target.value)} disabled={rowBusy} />
+          </div>
+        </div>
+        {rowError && (
+          <div className="text-sm text-destructive flex items-center gap-1"><AlertTriangle className="h-4 w-4" />{rowError}</div>
+        )}
+        <Button size="sm" onClick={addPaymentRow} disabled={rowBusy}>
+          {rowBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+          Satır Ekle
+        </Button>
+      </div>
     </div>
   );
 }
