@@ -343,20 +343,35 @@ function mapDisputeToCategory(disputeType?: string | null, subtype?: string | nu
 
 async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, category: string | null): Promise<{ block: string; sources: any[]; embedding: number[] | null }> {
   try {
-    if (!query || query.trim().length < 10) return { block: "", sources: [], embedding: null };
+    if (!query || query.trim().length < 10) {
+      console.log(`[party-confidential-analysis] RAG skip: query too short (${query?.trim().length ?? 0} chars)`);
+      return { block: "", sources: [], embedding: null };
+    }
     const embRes = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: "openai/text-embedding-3-small", input: query, dimensions: 768 }),
     });
-    if (!embRes.ok) return { block: "", sources: [], embedding: null };
+    if (!embRes.ok) {
+      console.error(`[party-confidential-analysis] RAG embeddings HTTP ${embRes.status}: ${(await embRes.text()).slice(0, 300)}`);
+      return { block: "", sources: [], embedding: null };
+    }
     const embJson = await embRes.json();
     const vec = embJson?.data?.[0]?.embedding;
-    if (!vec) return { block: "", sources: [], embedding: null };
-    const { data } = await admin.rpc("match_knowledge_base", {
+    if (!vec) {
+      console.error(`[party-confidential-analysis] RAG embeddings response had no vector: ${JSON.stringify(embJson).slice(0, 300)}`);
+      return { block: "", sources: [], embedding: null };
+    }
+    const { data, error } = await admin.rpc("match_knowledge_base", {
       query_embedding: vec, filter_category: category, match_count: 5, match_threshold: 0.65,
     });
-    if (!data || data.length === 0) return { block: "", sources: [], embedding: vec };
+    if (error) {
+      console.error(`[party-confidential-analysis] RAG match_knowledge_base RPC error: ${error.message}`);
+    }
+    if (!data || data.length === 0) {
+      console.log(`[party-confidential-analysis] RAG match_knowledge_base returned 0 rows (category=${category})`);
+      return { block: "", sources: [], embedding: vec };
+    }
     const sources = data.map((r: any) => ({
       title: r.source_title,
       url: r.source_url,
@@ -369,7 +384,8 @@ async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, ca
     ).join("\n\n");
     const block = `\n═══ İLGİLİ KAYNAK BİLGİSİ (Adalet Bakanlığı Arabuluculuk Daire Başkanlığı resmi yayınlarından) ═══\n${parts}\n═══════════════════════════\n`;
     return { block, sources, embedding: vec };
-  } catch {
+  } catch (e: any) {
+    console.error(`[party-confidential-analysis] RAG fetchKnowledgeBlock exception: ${e?.message ?? String(e)}`);
     return { block: "", sources: [], embedding: null };
   }
 }
