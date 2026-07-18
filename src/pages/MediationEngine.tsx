@@ -4233,6 +4233,10 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
   }>(null);
   const [existingFeeId, setExistingFeeId] = useState<string | null>(null);
   const [invoiceBusy, setInvoiceBusy] = useState(false);
+  // profiles tablosunda vergi dairesi/VKN-TCKN alanı yok; makbuzda basılması isteniyorsa
+  // burada opsiyonel olarak elle girilir.
+  const [mediatorTaxOffice, setMediatorTaxOffice] = useState<string>("");
+  const [mediatorTaxId, setMediatorTaxId] = useState<string>("");
 
   // --- Faz 4b: Ödeme senaryosu, ücret sözleşmesi, ödeme defteri ---
   const scenario = useMemo(() => computePaymentScenario(caseRow), [caseRow.status, caseRow.mediation_type]);
@@ -4572,12 +4576,21 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
         };
       });
 
+      const paymentList = payments.map((p) => ({
+        payerLabel: p.payer_label,
+        amount: Number(p.amount),
+        status: p.status,
+        receiptNo: p.receipt_no,
+      }));
+
       const { downloadInvoicePdf } = await import("@/lib/invoice-pdf");
-      downloadInvoicePdf({
+      await downloadInvoicePdf({
         applicationNo: caseRow.application_no || "",
         disputeSubject: caseRow.title || caseRow.dispute_type || "-",
         mediatorName: (profile as any)?.full_name || "-",
         mediatorRegistryNo: null,
+        mediatorTaxOffice: mediatorTaxOffice.trim() || null,
+        mediatorTaxId: mediatorTaxId.trim() || null,
         parties: partyList,
         feeType,
         disputeValue: Number(disputeValue.replace(/[^\d.,-]/g, "").replace(",", ".")) || 0,
@@ -4592,15 +4605,16 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
         tarifeYili: feeResult.tarife_yili,
         tarifeMaddesi: feeResult.tarife_maddesi,
         dilimBreakdown: feeResult.breakdown,
+        payments: paymentList,
         createdAt: new Date(),
       });
 
       if (existingFeeId) {
         await supabase.from("case_fees" as any).update({ invoice_generated: true } as any).eq("id", existingFeeId);
       }
-      toast({ title: "Fatura indirildi" });
+      toast({ title: "Makbuz taslağı indirildi" });
     } catch (e: any) {
-      toast({ title: "Fatura oluşturulamadı", description: trErr(e.message), variant: "destructive" });
+      toast({ title: "Makbuz taslağı oluşturulamadı", description: trErr(e.message), variant: "destructive" });
     } finally {
       setInvoiceBusy(false);
     }
@@ -4689,13 +4703,24 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
         )}
       </div>
 
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="space-y-1">
+          <Label>Vergi Dairesi (opsiyonel — makbuza basılır)</Label>
+          <Input value={mediatorTaxOffice} onChange={(e) => setMediatorTaxOffice(e.target.value)} disabled={invoiceBusy} />
+        </div>
+        <div className="space-y-1">
+          <Label>VKN/TCKN (opsiyonel — makbuza basılır)</Label>
+          <Input value={mediatorTaxId} onChange={(e) => setMediatorTaxId(e.target.value)} disabled={invoiceBusy} />
+        </div>
+      </div>
+
       <div className="flex gap-2">
         <Button onClick={calculateFee} disabled={feeBusy}>
           {feeBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}Ücret Hesapla
         </Button>
         <Button variant="outline" onClick={createInvoice} disabled={!feeResult || invoiceBusy}>
           {invoiceBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FileText className="h-4 w-4 mr-1" />}
-          Fatura Oluştur
+          Makbuz Taslağı Oluştur
         </Button>
       </div>
 
