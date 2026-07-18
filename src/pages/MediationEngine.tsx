@@ -4233,10 +4233,48 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
   }>(null);
   const [existingFeeId, setExistingFeeId] = useState<string | null>(null);
   const [invoiceBusy, setInvoiceBusy] = useState(false);
-  // profiles tablosunda vergi dairesi/VKN-TCKN alanı yok; makbuzda basılması isteniyorsa
-  // burada opsiyonel olarak elle girilir.
+  // profiles.vergi_dairesi / profiles.vkn_tckn: generated types'ta henüz yok
+  // (canlıda migration'sız elle eklendi) — bu yüzden ilgili select/update'lerde
+  // "as any" cast kullanılıyor.
+  const { user: currentUser } = useAuth();
   const [mediatorTaxOffice, setMediatorTaxOffice] = useState<string>("");
   const [mediatorTaxId, setMediatorTaxId] = useState<string>("");
+  const [profileTaxSaveBusy, setProfileTaxSaveBusy] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles" as any)
+        .select("vergi_dairesi, vkn_tckn")
+        .eq("user_id", currentUser.id)
+        .maybeSingle();
+      if (data) {
+        setMediatorTaxOffice(((data as any).vergi_dairesi as string) || "");
+        setMediatorTaxId(((data as any).vkn_tckn as string) || "");
+      }
+    })();
+  }, [currentUser?.id]);
+
+  async function saveMediatorTaxInfoToProfile() {
+    if (!currentUser?.id) return;
+    setProfileTaxSaveBusy(true);
+    try {
+      const { error } = await supabase
+        .from("profiles" as any)
+        .update({
+          vergi_dairesi: mediatorTaxOffice.trim() || null,
+          vkn_tckn: mediatorTaxId.trim() || null,
+        } as any)
+        .eq("user_id", currentUser.id);
+      if (error) throw error;
+      toast({ title: "Profile kaydedildi" });
+    } catch (e: any) {
+      toast({ title: "Kaydedilemedi", description: trErr(e.message), variant: "destructive" });
+    } finally {
+      setProfileTaxSaveBusy(false);
+    }
+  }
 
   // --- Faz 4b: Ödeme senaryosu, ücret sözleşmesi, ödeme defteri ---
   const scenario = useMemo(() => computePaymentScenario(caseRow), [caseRow.status, caseRow.mediation_type]);
@@ -4703,7 +4741,7 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
         )}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] items-end">
         <div className="space-y-1">
           <Label>Vergi Dairesi (opsiyonel — makbuza basılır)</Label>
           <Input value={mediatorTaxOffice} onChange={(e) => setMediatorTaxOffice(e.target.value)} disabled={invoiceBusy} />
@@ -4712,6 +4750,9 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
           <Label>VKN/TCKN (opsiyonel — makbuza basılır)</Label>
           <Input value={mediatorTaxId} onChange={(e) => setMediatorTaxId(e.target.value)} disabled={invoiceBusy} />
         </div>
+        <Button type="button" size="sm" variant="outline" onClick={saveMediatorTaxInfoToProfile} disabled={profileTaxSaveBusy || !currentUser?.id}>
+          {profileTaxSaveBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}Profilime Kaydet
+        </Button>
       </div>
 
       <div className="flex gap-2">
