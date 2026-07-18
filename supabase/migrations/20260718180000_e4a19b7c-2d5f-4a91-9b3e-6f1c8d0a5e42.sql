@@ -27,25 +27,30 @@ GRANT ALL ON public.case_payments TO service_role;
 
 ALTER TABLE public.case_payments ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Case mediator or admin can view payments" ON public.case_payments;
 CREATE POLICY "Case mediator or admin can view payments"
   ON public.case_payments FOR SELECT TO authenticated
   USING (public.is_case_mediator(case_id, auth.uid()) OR public.has_role(auth.uid(), 'admin'::app_role));
 
+DROP POLICY IF EXISTS "Case mediator or admin can insert payments" ON public.case_payments;
 CREATE POLICY "Case mediator or admin can insert payments"
   ON public.case_payments FOR INSERT TO authenticated
   WITH CHECK (public.is_case_mediator(case_id, auth.uid()) OR public.has_role(auth.uid(), 'admin'::app_role));
 
+DROP POLICY IF EXISTS "Case mediator or admin can update payments" ON public.case_payments;
 CREATE POLICY "Case mediator or admin can update payments"
   ON public.case_payments FOR UPDATE TO authenticated
   USING (public.is_case_mediator(case_id, auth.uid()) OR public.has_role(auth.uid(), 'admin'::app_role))
   WITH CHECK (public.is_case_mediator(case_id, auth.uid()) OR public.has_role(auth.uid(), 'admin'::app_role));
 
+DROP POLICY IF EXISTS "Case mediator or admin can delete payments" ON public.case_payments;
 CREATE POLICY "Case mediator or admin can delete payments"
   ON public.case_payments FOR DELETE TO authenticated
   USING (public.is_case_mediator(case_id, auth.uid()) OR public.has_role(auth.uid(), 'admin'::app_role));
 
 CREATE INDEX IF NOT EXISTS idx_case_payments_case ON public.case_payments(case_id);
 
+DROP TRIGGER IF EXISTS trg_case_payments_updated_at ON public.case_payments;
 CREATE TRIGGER trg_case_payments_updated_at
   BEFORE UPDATE ON public.case_payments
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
