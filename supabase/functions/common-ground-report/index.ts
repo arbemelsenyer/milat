@@ -207,11 +207,18 @@ Yukarıdaki resmi kaynaklardan ve benzer geçmiş davalardan yararlanarak ortak 
 });
 
 function mapDisputeToCategory(disputeType?: string | null, subtype?: string | null): string | null {
+  const CATS = ["işçi_işveren","ticari","tüketici","sağlık","inşaat","sigorta","bankacılık","aile","spor","enerji_maden","kira","gayrimenkul","genel"];
+  const raw = (disputeType ?? "").trim().toLowerCase();
   const t = `${disputeType ?? ""} ${subtype ?? ""}`.toLowerCase();
   // IP pilotu adım 1: eski slug ("fikri_mülkiyet", classify-dispute çıktısı) ve yeni
   // taksonomi slug'ı ("fikri_mulkiyet", başvuru formu) ile marka/patent/tasarım/telif
   // içeren serbest metin tespitlerini tek bilgi tabanı kategorisinde birleştir.
-  if (/fikri|marka|patent|tasarım|tasarim|telif/.test(t)) return "fikri_mülkiyet";
+  if (raw === "fikri_mulkiyet" || raw === "fikri_mülkiyet" || /fikri|marka|patent|tasarım|tasarim|telif/.test(t)) {
+    return "fikri_mülkiyet";
+  }
+  if (CATS.includes(raw)) return raw === "genel" ? null : raw;
+  if (/kira/.test(t)) return "kira";
+  if (/gayrimenkul|tapu|emlak/.test(t)) return "gayrimenkul";
   if (/iş|isci|işçi|işveren|isveren|kıdem|kidem/.test(t)) return "işçi_işveren";
   if (/ticari|ticaret|şirket|sirket/.test(t)) return "ticari";
   if (/tüketici|tuketici/.test(t)) return "tüketici";
