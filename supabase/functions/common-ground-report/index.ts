@@ -255,7 +255,7 @@ async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, ca
       return { block: "", sources: [], embedding: null };
     }
     const { data, error } = await admin.rpc("match_knowledge_base", {
-      query_embedding: vec, filter_category: category, match_count: 5, match_threshold: 0.65,
+      query_embedding: vec, filter_category: category, match_count: 5, match_threshold: 0.45,
     });
     if (error) {
       console.error(`[common-ground-report] RAG match_knowledge_base RPC error: ${error.message}`);
