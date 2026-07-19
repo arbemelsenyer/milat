@@ -60,13 +60,15 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    // pg_cron çağrısı için: Authorization header yoksa cron modu (yalnızca admin
-    // bildirimleri üretir, dış veri sızıntısı yoktur). Manuel çağrıda admin JWT şart.
+    // pg_cron çağrısı için: x-cron-secret header'ı CRON_SECRET ile eşleşmeli
+    // (default-deny — header eksikse veya secret yanlışsa cron modu sayılmaz).
+    // Manuel çağrıda admin JWT şart.
     const authHeader = req.headers.get("Authorization");
     const cronHeader = req.headers.get("x-cron-secret");
-    const isCron = !authHeader || (!!CRON_SECRET && cronHeader === CRON_SECRET);
+    const isCron = !!CRON_SECRET && cronHeader === CRON_SECRET;
     if (!isCron) {
-      const token = authHeader!.replace("Bearer ", "");
+      if (!authHeader) return json({ error: "Oturum doğrulanamadı" }, 401);
+      const token = authHeader.replace("Bearer ", "");
       const admin0 = createClient(SUPABASE_URL, SERVICE_KEY);
       const { data: userRes } = await admin0.auth.getUser(token);
       if (!userRes?.user) return json({ error: "Oturum doğrulanamadı" }, 401);

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,10 +22,55 @@ async function callAi(messages: any[]) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const { newNote, priorNotes = [], priorAnalyses = [], caseSummary = "" } = await req.json();
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData.user) {
+      return new Response(JSON.stringify({ error: "Invalid session" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { newNote, priorNotes = [], priorAnalyses = [], caseSummary = "", case_id } = await req.json();
     if (!newNote || typeof newNote !== "string") {
       return new Response(JSON.stringify({ error: "newNote required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!case_id) {
+      return new Response(JSON.stringify({ error: "case_id required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const admin = createClient(supabaseUrl, serviceKey);
+    const { data: caseRow } = await admin.from("cases")
+      .select("id, user_id, assigned_mediator_id").eq("id", case_id).maybeSingle();
+    if (!caseRow) {
+      return new Response(JSON.stringify({ error: "Case not found" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: roleRow } = await admin.from("user_roles")
+      .select("role").eq("user_id", userData.user.id).in("role", ["admin", "mediator"]).maybeSingle();
+    const allowed = caseRow.assigned_mediator_id === userData.user.id
+      || caseRow.user_id === userData.user.id
+      || !!roleRow;
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 

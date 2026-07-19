@@ -80,7 +80,7 @@ export function MeetingNotesPanel({ caseId, caseSummary }: { caseId: string; cas
       const priorAnalyses = visibleNotes.map((n) => n.parsed?.ai).filter(Boolean);
 
       const { data: aiData, error: aiErr } = await supabase.functions.invoke("analyze-meeting-notes", {
-        body: { newNote: note, priorNotes, priorAnalyses, caseSummary: caseSummary ?? "" },
+        body: { newNote: note, priorNotes, priorAnalyses, caseSummary: caseSummary ?? "", case_id: caseId },
       });
       if (aiErr) throw aiErr;
       const analysis: Analysis = (aiData as any)?.analysis ?? {};
