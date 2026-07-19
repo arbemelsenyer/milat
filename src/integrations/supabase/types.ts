@@ -663,6 +663,95 @@ export type Database = {
           },
         ]
       }
+      case_payments: {
+        Row: {
+          amount: number
+          case_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          kind: string
+          notes: string | null
+          paid_at: string | null
+          party_id: string | null
+          payer_label: string
+          payer_party_id: string | null
+          payer_type: string
+          payment_date: string
+          receipt_no: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          case_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          kind?: string
+          notes?: string | null
+          paid_at?: string | null
+          party_id?: string | null
+          payer_label?: string
+          payer_party_id?: string | null
+          payer_type?: string
+          payment_date?: string
+          receipt_no?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          case_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          kind?: string
+          notes?: string | null
+          paid_at?: string | null
+          party_id?: string | null
+          payer_label?: string
+          payer_party_id?: string | null
+          payer_type?: string
+          payment_date?: string
+          receipt_no?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_payments_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "case_payments_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_payments_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_payments_payer_party_id_fkey"
+            columns: ["payer_party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_process_tracker: {
         Row: {
           arb_no: string | null
@@ -796,6 +885,7 @@ export type Database = {
           id: string
           is_mandatory: boolean | null
           issue_description: string | null
+          kararlastirilan_ucret: number | null
           legal_basis: string | null
           legal_duration_days: number | null
           mahkeme_turu: string | null
@@ -811,6 +901,7 @@ export type Database = {
           sure_hafta: number | null
           timeline: string | null
           title: string | null
+          ucret_sozlesmesi: boolean
           updated_at: string
           user_id: string
           uyap_no: string | null
@@ -848,6 +939,7 @@ export type Database = {
           id?: string
           is_mandatory?: boolean | null
           issue_description?: string | null
+          kararlastirilan_ucret?: number | null
           legal_basis?: string | null
           legal_duration_days?: number | null
           mahkeme_turu?: string | null
@@ -863,6 +955,7 @@ export type Database = {
           sure_hafta?: number | null
           timeline?: string | null
           title?: string | null
+          ucret_sozlesmesi?: boolean
           updated_at?: string
           user_id?: string
           uyap_no?: string | null
@@ -900,6 +993,7 @@ export type Database = {
           id?: string
           is_mandatory?: boolean | null
           issue_description?: string | null
+          kararlastirilan_ucret?: number | null
           legal_basis?: string | null
           legal_duration_days?: number | null
           mahkeme_turu?: string | null
@@ -915,6 +1009,7 @@ export type Database = {
           sure_hafta?: number | null
           timeline?: string | null
           title?: string | null
+          ucret_sozlesmesi?: boolean
           updated_at?: string
           user_id?: string
           uyap_no?: string | null
@@ -1938,6 +2033,8 @@ export type Database = {
           phone: string | null
           updated_at: string
           user_id: string
+          vergi_dairesi: string | null
+          vkn_tckn: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -1948,6 +2045,8 @@ export type Database = {
           phone?: string | null
           updated_at?: string
           user_id: string
+          vergi_dairesi?: string | null
+          vkn_tckn?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -1958,6 +2057,8 @@ export type Database = {
           phone?: string | null
           updated_at?: string
           user_id?: string
+          vergi_dairesi?: string | null
+          vkn_tckn?: string | null
         }
         Relationships: []
       }
