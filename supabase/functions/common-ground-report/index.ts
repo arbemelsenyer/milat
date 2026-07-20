@@ -188,7 +188,7 @@ Yukarıdaki resmi kaynaklardan ve benzer geçmiş davalardan yararlanarak ortak 
     if (admin && case_id) {
       const finalAdmin = admin, finalCaseId = case_id;
       EdgeRuntime.waitUntil(
-        upsertAgentActivityState(finalAdmin, finalCaseId, "common_ground", null, { status: "completed" }).catch(() => {})
+        upsertAgentActivityState(finalAdmin, finalCaseId, "common_ground", null, { status: "completed", error_message: null }).catch(() => {})
       );
     }
 
