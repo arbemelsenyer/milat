@@ -22,6 +22,7 @@ import { OfficialDocsPanel } from "@/components/mediation/OfficialDocsPanel";
 import { StepTimeline } from "@/components/mediation/StepTimeline";
 import { AgentControlPanel } from "@/components/mediation/AgentControlPanel";
 import { downloadOfficialPdf } from "@/lib/pdfTemplates";
+import { downloadPaymentInfoPdf } from "@/lib/invoice-pdf";
 import { Input } from "@/components/ui/input";
 
 const tabTriggerAccentClass =
@@ -86,6 +87,7 @@ export default function CaseRoom() {
   const [mediatorPaymentInfo, setMediatorPaymentInfo] = useState<MediatorPaymentInfo | null>(null);
   const [arbNo, setArbNo] = useState<string>("");
   const [buroNo, setBuroNo] = useState<string>("");
+  const [pdfWorking, setPdfWorking] = useState(false);
 
   const myParty = parties.find((p) => p.user_id === user?.id) ?? null;
   const isOwner = !!(caseRow && user && caseRow.user_id === user.id);
@@ -154,6 +156,28 @@ export default function CaseRoom() {
       return `${buroNo || "—"} büro / ${arb} arabuluculuk no.lu dosya arabuluculuk ücreti`;
     }
     return `${arb} no.lu dosya arabuluculuk ücreti`;
+  }
+
+  async function downloadMyPaymentInfo() {
+    if (myPayments.length === 0) return;
+    setPdfWorking(true);
+    try {
+      await downloadPaymentInfoPdf({
+        fileDescription: paymentDescription(),
+        payments: myPayments.map((p) => ({
+          kind: p.kind,
+          amount: Number(p.amount),
+          status: p.status === "odendi" ? "odendi" : "bekliyor",
+        })),
+        mediatorName: mediatorPaymentInfo?.full_name ?? null,
+        mediatorBank: mediatorPaymentInfo?.banka_adi ?? null,
+        mediatorIban: mediatorPaymentInfo?.iban ?? null,
+      });
+    } catch (e: any) {
+      toast({ title: "PDF oluşturulamadı", description: e.message, variant: "destructive" });
+    } finally {
+      setPdfWorking(false);
+    }
   }
 
   async function uploadDoc(file: File) {
@@ -499,9 +523,17 @@ export default function CaseRoom() {
         <TabsContent value="payment">
           <div className="space-y-4">
             <Card className="p-5 space-y-3">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Wallet className="h-4 w-4" /> Ödeme Bilgim
-              </h3>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Wallet className="h-4 w-4" /> Ödeme Bilgim
+                </h3>
+                {myPayments.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={downloadMyPaymentInfo} disabled={pdfWorking}>
+                    {pdfWorking ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileDown className="h-4 w-4 mr-1" />}
+                    Bilgi Yazısı İndir
+                  </Button>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
                 <ShieldCheck className="inline h-3 w-3 mr-1" />
                 Yalnız size ait ödeme kayıtlarını görürsünüz. Diğer tarafın bilgisi asla gösterilmez.

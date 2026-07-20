@@ -279,3 +279,119 @@ export async function downloadInvoicePdf(data: InvoiceData) {
   const doc = await generateInvoicePdf(data);
   doc.save(`arabuluculuk-makbuz-taslak-${data.applicationNo || Date.now()}.pdf`);
 }
+
+// -------- Taraf Ödeme Bilgi Yazısı (Ödeme Bilgi Servisi — Parça 3) --------
+// Bu PDF yalnızca çağıran tarafın kendi verisiyle (ekranda zaten gösterilen
+// myPayments/mediatorPaymentInfo/get_case_payment_reference sonucu) beslenir;
+// üretim sırasında hiçbir yeni sorgu atılmaz, karşı tarafın bilgisi girmez.
+export interface PaymentInfoNoticePayment {
+  kind: string;
+  amount: number;
+  status: "bekliyor" | "odendi";
+}
+
+export interface PaymentInfoNoticeData {
+  fileDescription: string;
+  payments: PaymentInfoNoticePayment[];
+  mediatorName?: string | null;
+  mediatorBank?: string | null;
+  mediatorIban?: string | null;
+}
+
+const paymentKindLabel: Record<string, string> = {
+  ucret: "Ücret",
+  masraf: "Masraf",
+};
+
+export async function generatePaymentInfoPdf(data: PaymentInfoNoticeData): Promise<jsPDF> {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 40;
+  let y = 0;
+
+  const b64 = await loadUnicodeFontBase64();
+  let fontName = "helvetica";
+  if (b64) {
+    try {
+      doc.addFileToVFS("Roboto-Regular.ttf", b64);
+      doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
+      doc.addFont("Roboto-Regular.ttf", "Roboto", "bold");
+      fontName = "Roboto";
+    } catch {
+      fontName = "helvetica";
+    }
+  }
+
+  const ensureSpace = (need: number) => {
+    if (y + need > pageHeight - margin) {
+      doc.addPage();
+      y = margin;
+    }
+  };
+
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, pageWidth, 90, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont(fontName, "bold");
+  doc.setFontSize(16);
+  doc.text("ARABULUCULUK ÜCRETİ ÖDEME BİLGİ YAZISI", margin, 40, { maxWidth: pageWidth - 2 * margin });
+  doc.setFontSize(10);
+  doc.setFont(fontName, "normal");
+  const dateStr = new Date().toLocaleDateString("tr-TR");
+  doc.text(`Tarih: ${dateStr}`, pageWidth - margin, 40, { align: "right" });
+
+  y = 120;
+  doc.setTextColor(30, 30, 30);
+
+  drawSectionTitle(doc, fontName, "Dosya", margin, y); y += 18;
+  doc.setFont(fontName, "normal"); doc.setFontSize(10);
+  const descLines = doc.splitTextToSize(data.fileDescription || "-", pageWidth - 2 * margin);
+  doc.text(descLines, margin, y); y += descLines.length * 14 + 10;
+
+  ensureSpace(40);
+  drawSectionTitle(doc, fontName, "Ödeme Kalemlerim", margin, y); y += 18;
+  doc.setFont(fontName, "normal"); doc.setFontSize(10);
+  if (data.payments.length === 0) {
+    doc.text("Bu dosyada sizden tahsilat kaydı bulunmuyor.", margin, y); y += 16;
+  } else {
+    const colLabelX = margin;
+    const colValueX = pageWidth - margin;
+    const rowH = 22;
+    doc.setDrawColor(...BEIGE);
+    doc.setLineWidth(0.5);
+    data.payments.forEach((p, idx) => {
+      ensureSpace(rowH);
+      if (idx % 2 === 0) { doc.setFillColor(248, 244, 236); doc.rect(margin, y, pageWidth - 2 * margin, rowH, "F"); }
+      const label = `${paymentKindLabel[p.kind] ?? p.kind}`;
+      const status = p.status === "odendi" ? "Ödendi" : "Bekliyor";
+      doc.text(label, colLabelX + 6, y + 15);
+      doc.text(`${fmtTL(p.amount)}  ·  ${status}`, colValueX - 6, y + 15, { align: "right" });
+      y += rowH;
+    });
+  }
+  y += 16;
+
+  ensureSpace(80);
+  drawSectionTitle(doc, fontName, "Arabulucu Banka Bilgisi", margin, y); y += 18;
+  doc.setFont(fontName, "normal"); doc.setFontSize(10);
+  if (!data.mediatorBank && !data.mediatorIban) {
+    doc.text("Arabulucu banka bilgisi henüz girilmemiş.", margin, y); y += 14;
+  } else {
+    doc.text(`Ad Soyad: ${data.mediatorName || "-"}`, margin, y); y += 14;
+    doc.text(`Banka: ${data.mediatorBank || "-"}`, margin, y); y += 14;
+    doc.text(`IBAN: ${data.mediatorIban || "-"}`, margin, y); y += 14;
+  }
+  y += 20;
+
+  ensureSpace(30);
+  doc.setTextColor(90, 90, 90); doc.setFontSize(9);
+  doc.text("Bu belge bilgilendirme amaçlıdır.", margin, y);
+
+  return doc;
+}
+
+export async function downloadPaymentInfoPdf(data: PaymentInfoNoticeData) {
+  const doc = await generatePaymentInfoPdf(data);
+  doc.save(`odeme-bilgi-yazisi-${Date.now()}.pdf`);
+}
