@@ -173,8 +173,8 @@ def _pending_zaten_var_mi(url):
         )
         if r.status_code == 200:
             return len(r.json()) > 0
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"_pending_zaten_var_mi (pending_pool) hata: {e}")
     # knowledge_base_chunks'da da onaylanmış olabilir
     try:
         r = requests.get(
@@ -183,8 +183,8 @@ def _pending_zaten_var_mi(url):
         )
         if r.status_code == 200 and len(r.json()) > 0:
             return True
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"_pending_zaten_var_mi (knowledge_base_chunks) hata: {e}")
     return False
 
 
@@ -226,46 +226,29 @@ def _metin_alakali(metin):
 
 def scrape_resmi_gazete():
     """
-    Resmi Gazete son 30 günlük arşivini tarar, 'arabuluculuk' geçen
-    tebliğ/yönetmelik/kanunları pending_pool'a ekler.
+    Resmi Gazete son 30 günlük arşivini tarar; her günün PDF fihristini
+    indirip 'arabuluculuk' geçiyorsa pending_pool'a tek kayıt olarak ekler.
     """
     import datetime as _dt
     yeni = 0
     today = _dt.date.today()
     for offset in range(0, 30):
         gun = today - _dt.timedelta(days=offset)
-        # Resmi Gazete günlük fihrist URL kalıbı
-        url = f"https://www.resmigazete.gov.tr/{gun.year:04d}/{gun.month:02d}/{gun.year:04d}{gun.month:02d}{gun.day:02d}.htm"
+        # Resmi Gazete günlük PDF fihrist URL kalıbı
+        url = f"https://www.resmigazete.gov.tr/eskiler/{gun.year:04d}/{gun.month:02d}/{gun.year:04d}{gun.month:02d}{gun.day:02d}.pdf"
         try:
-            res = requests.get(url, timeout=20, headers={'User-Agent': 'Mozilla/5.0'})
+            res = requests.get(url, timeout=30, headers={'User-Agent': 'Mozilla/5.0'})
             if res.status_code != 200:
+                print(f"[Resmi Gazete] {url} -> HTTP {res.status_code}")
                 continue
-            soup = BeautifulSoup(res.text, 'html.parser')
-            # Fihristte 'arabuluculuk' geçen linkleri bul
-            for a in soup.find_all('a', href=True):
-                text = a.get_text(" ", strip=True)
-                if not _metin_alakali(text):
-                    continue
-                link = a['href']
-                if link.startswith("/"):
-                    link = "https://www.resmigazete.gov.tr" + link
-                elif not link.startswith("http"):
-                    link = f"https://www.resmigazete.gov.tr/{gun.year:04d}/{gun.month:02d}/" + link
-                if _pending_zaten_var_mi(link):
-                    continue
-                try:
-                    detay = requests.get(link, timeout=20, headers={'User-Agent': 'Mozilla/5.0'})
-                    d_soup = BeautifulSoup(detay.text, 'html.parser')
-                    for el in d_soup(["script", "style", "nav", "footer", "header"]):
-                        el.decompose()
-                    ham = d_soup.get_text("\n", strip=True)
-                    if not _metin_alakali(ham) or len(ham) < 300:
-                        continue
-                    if _pending_ekle(text, link, ham, {"provider": "resmi_gazete", "yayin_tarihi": gun.isoformat()}):
-                        yeni += 1
-                        print(f"[Resmi Gazete] +1: {text[:80]}")
-                except Exception as e:
-                    print(f"[Resmi Gazete] detay hata: {e}")
+            if _pending_zaten_var_mi(url):
+                continue
+            ham = pdf_metin_ayikla(res.content)
+            if not _metin_alakali(ham) or len(ham) < 300:
+                continue
+            if _pending_ekle(f"Resmi Gazete {gun.isoformat()}", url, ham, {"provider": "resmi_gazete", "yayin_tarihi": gun.isoformat()}):
+                yeni += 1
+                print(f"[Resmi Gazete] +1: {gun.isoformat()}")
         except Exception as e:
             print(f"[Resmi Gazete] gün hata {gun}: {e}")
     return yeni
@@ -286,6 +269,7 @@ def scrape_tbmm():
         try:
             res = requests.get(surl, timeout=25, headers={'User-Agent': 'Mozilla/5.0'})
             if res.status_code != 200:
+                print(f"[TBMM] {surl} -> HTTP {res.status_code}")
                 continue
             soup = BeautifulSoup(res.text, 'html.parser')
             for a in soup.find_all('a', href=True):
