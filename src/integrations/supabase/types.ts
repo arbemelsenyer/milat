@@ -2026,9 +2026,11 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          banka_adi: string | null
           created_at: string
           email: string | null
           full_name: string | null
+          iban: string | null
           id: string
           phone: string | null
           updated_at: string
@@ -2038,9 +2040,11 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          banka_adi?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
+          iban?: string | null
           id?: string
           phone?: string | null
           updated_at?: string
@@ -2050,9 +2054,11 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          banka_adi?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
+          iban?: string | null
           id?: string
           phone?: string | null
           updated_at?: string
@@ -2350,6 +2356,22 @@ export type Database = {
         Returns: string
       }
       generate_application_no: { Args: never; Returns: string }
+      get_case_mediator_payment_info: {
+        Args: { p_case_id: string }
+        Returns: {
+          banka_adi: string
+          full_name: string
+          iban: string
+        }[]
+      }
+      get_case_payment_reference: {
+        Args: { p_case_id: string }
+        Returns: {
+          arb_no: string
+          buro_no: string
+          mediation_type: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
