@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   Loader2, ShieldCheck, Lock, Sparkles, Upload, FileText, Users, Brain, Lightbulb,
   Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X, History, Filter, FileDown, MessageSquare, Bot,
+  Wallet,
 } from "lucide-react";
 import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
@@ -30,7 +31,14 @@ interface CaseRow {
   id: string; title: string | null; application_no: string | null; uyap_no: string | null;
   dispute_type: string | null; dispute_subtype: string | null; current_phase: number | null;
   round_number: number | null; assigned_mediator_id: string | null; issue_description: string | null;
-  user_id: string;
+  user_id: string; mediation_type: string | null;
+}
+interface PaymentRow {
+  id: string; kind: string; amount: number; status: string;
+  payment_date: string; description: string | null;
+}
+interface MediatorPaymentInfo {
+  full_name: string | null; banka_adi: string | null; iban: string | null;
 }
 interface Party {
   id: string; case_id: string; user_id: string | null; party_role: string | null;
@@ -71,6 +79,9 @@ export default function CaseRoom() {
   const [discovery, setDiscovery] = useState<DiscoveryQ[]>([]);
   const [commonGround, setCommonGround] = useState<any | null>(null);
   const [working, setWorking] = useState(false);
+  const [myPayments, setMyPayments] = useState<PaymentRow[]>([]);
+  const [mediatorPaymentInfo, setMediatorPaymentInfo] = useState<MediatorPaymentInfo | null>(null);
+  const [buroNo, setBuroNo] = useState<string>("");
 
   const myParty = parties.find((p) => p.user_id === user?.id) ?? null;
   const isOwner = !!(caseRow && user && caseRow.user_id === user.id);
@@ -103,9 +114,43 @@ export default function CaseRoom() {
       setDocs((dc ?? []) as any);
       setDiscovery((dq ?? []) as any);
       setCommonGround(cg);
+
+      const ownPartyId = (ps ?? []).find((p: any) => p.user_id === user?.id)?.id ?? null;
+      if (ownPartyId) {
+        const [{ data: pay }, rpcRes] = await Promise.all([
+          supabase.from("case_payments")
+            .select("id, kind, amount, status, payment_date, description")
+            .eq("case_id", caseId).eq("payer_party_id", ownPartyId),
+          (supabase.rpc as any)("get_case_mediator_payment_info", { p_case_id: caseId }),
+        ]);
+        setMyPayments((pay ?? []) as any);
+        const rpcRows = !rpcRes.error ? (rpcRes.data as MediatorPaymentInfo[] | null) : null;
+        setMediatorPaymentInfo(rpcRows && rpcRows.length > 0 ? rpcRows[0] : null);
+
+        if ((cr as any)?.mediation_type === "dava_sarti") {
+          const { data: trk } = await supabase.from("case_process_tracker")
+            .select("buro_no").eq("case_id", caseId).maybeSingle();
+          setBuroNo((trk as any)?.buro_no ?? "");
+        } else {
+          setBuroNo("");
+        }
+      } else {
+        setMyPayments([]);
+        setMediatorPaymentInfo(null);
+        setBuroNo("");
+      }
     } finally {
       setLoading(false);
     }
+  }
+
+  function paymentDescription(): string {
+    if (!caseRow) return "";
+    const arbNo = caseRow.uyap_no || "—";
+    if (caseRow.mediation_type === "dava_sarti") {
+      return `${buroNo || "—"} büro / ${arbNo} arabuluculuk no.lu dosya arabuluculuk ücreti`;
+    }
+    return `${arbNo} no.lu dosya arabuluculuk ücreti`;
   }
 
   async function uploadDoc(file: File) {
@@ -384,6 +429,7 @@ export default function CaseRoom() {
           <TabsTrigger value="analysis" className={tabTriggerAccentClass}><Brain className="h-4 w-4 mr-1" />Gizli Analizim</TabsTrigger>
           <TabsTrigger value="discovery" className={tabTriggerAccentClass}>İhtiyaç Tespiti</TabsTrigger>
           <TabsTrigger value="experts" className={tabTriggerAccentClass}><Award className="h-4 w-4 mr-1" />Bilirkişi Onayı</TabsTrigger>
+          <TabsTrigger value="payment" className={tabTriggerAccentClass}><Wallet className="h-4 w-4 mr-1" />Ödeme Bilgim</TabsTrigger>
           <TabsTrigger value="agents" className={tabTriggerAccentClass}><Bot className="h-4 w-4 mr-1" />AI Aktivitelerim</TabsTrigger>
         </TabsList>
 
@@ -445,6 +491,52 @@ export default function CaseRoom() {
 
         <TabsContent value="experts">
           <PartyExpertApproval caseId={caseId!} partyId={myParty!.id} />
+        </TabsContent>
+
+        <TabsContent value="payment">
+          <div className="space-y-4">
+            <Card className="p-5 space-y-3">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Wallet className="h-4 w-4" /> Ödeme Bilgim
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                <ShieldCheck className="inline h-3 w-3 mr-1" />
+                Yalnız size ait ödeme kayıtlarını görürsünüz. Diğer tarafın bilgisi asla gösterilmez.
+              </p>
+              {myPayments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Bu dosyada sizden tahsilat kaydı bulunmuyor.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {myPayments.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between border-b pb-2 last:border-0 text-sm">
+                      <div>
+                        <div className="font-medium">
+                          {p.kind === "ucret" ? "Ücret" : "Masraf"} · {Number(p.amount).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{paymentDescription()}</div>
+                      </div>
+                      <Badge variant={p.status === "odendi" ? "default" : "outline"}>
+                        {p.status === "odendi" ? "Ödendi ✓" : "Ödeme bekleniyor"}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+
+            <Card className="p-5 space-y-2">
+              <h3 className="font-semibold text-sm">Arabulucu Banka Bilgisi</h3>
+              {mediatorPaymentInfo && (mediatorPaymentInfo.iban || mediatorPaymentInfo.banka_adi) ? (
+                <div className="text-sm space-y-1">
+                  <div>{mediatorPaymentInfo.full_name}</div>
+                  {mediatorPaymentInfo.banka_adi && <div className="text-muted-foreground">{mediatorPaymentInfo.banka_adi}</div>}
+                  {mediatorPaymentInfo.iban && <div className="font-mono">{mediatorPaymentInfo.iban}</div>}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Arabulucu banka bilgisi henüz girilmemiş.</p>
+              )}
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="agents">
