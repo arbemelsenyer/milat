@@ -40,6 +40,9 @@ interface PaymentRow {
 interface MediatorPaymentInfo {
   full_name: string | null; banka_adi: string | null; iban: string | null;
 }
+interface PaymentReference {
+  arb_no: string | null; buro_no: string | null; mediation_type: string | null;
+}
 interface Party {
   id: string; case_id: string; user_id: string | null; party_role: string | null;
   party_type: string | null; first_name: string | null; last_name: string | null;
@@ -81,6 +84,7 @@ export default function CaseRoom() {
   const [working, setWorking] = useState(false);
   const [myPayments, setMyPayments] = useState<PaymentRow[]>([]);
   const [mediatorPaymentInfo, setMediatorPaymentInfo] = useState<MediatorPaymentInfo | null>(null);
+  const [arbNo, setArbNo] = useState<string>("");
   const [buroNo, setBuroNo] = useState<string>("");
 
   const myParty = parties.find((p) => p.user_id === user?.id) ?? null;
@@ -117,26 +121,25 @@ export default function CaseRoom() {
 
       const ownPartyId = (ps ?? []).find((p: any) => p.user_id === user?.id)?.id ?? null;
       if (ownPartyId) {
-        const [{ data: pay }, rpcRes] = await Promise.all([
+        const [{ data: pay }, rpcRes, refRes] = await Promise.all([
           supabase.from("case_payments")
             .select("id, kind, amount, status, payment_date, description")
             .eq("case_id", caseId).eq("payer_party_id", ownPartyId),
           (supabase.rpc as any)("get_case_mediator_payment_info", { p_case_id: caseId }),
+          (supabase.rpc as any)("get_case_payment_reference", { p_case_id: caseId }),
         ]);
         setMyPayments((pay ?? []) as any);
         const rpcRows = !rpcRes.error ? (rpcRes.data as MediatorPaymentInfo[] | null) : null;
         setMediatorPaymentInfo(rpcRows && rpcRows.length > 0 ? rpcRows[0] : null);
 
-        if ((cr as any)?.mediation_type === "dava_sarti") {
-          const { data: trk } = await supabase.from("case_process_tracker")
-            .select("buro_no").eq("case_id", caseId).maybeSingle();
-          setBuroNo((trk as any)?.buro_no ?? "");
-        } else {
-          setBuroNo("");
-        }
+        const refRows = !refRes.error ? (refRes.data as PaymentReference[] | null) : null;
+        const ref = refRows && refRows.length > 0 ? refRows[0] : null;
+        setArbNo(ref?.arb_no ?? "");
+        setBuroNo(ref?.buro_no ?? "");
       } else {
         setMyPayments([]);
         setMediatorPaymentInfo(null);
+        setArbNo("");
         setBuroNo("");
       }
     } finally {
@@ -146,11 +149,11 @@ export default function CaseRoom() {
 
   function paymentDescription(): string {
     if (!caseRow) return "";
-    const arbNo = caseRow.uyap_no || "—";
+    const arb = arbNo || "[dosya no girilmemiş]";
     if (caseRow.mediation_type === "dava_sarti") {
-      return `${buroNo || "—"} büro / ${arbNo} arabuluculuk no.lu dosya arabuluculuk ücreti`;
+      return `${buroNo || "—"} büro / ${arb} arabuluculuk no.lu dosya arabuluculuk ücreti`;
     }
-    return `${arbNo} no.lu dosya arabuluculuk ücreti`;
+    return `${arb} no.lu dosya arabuluculuk ücreti`;
   }
 
   async function uploadDoc(file: File) {
