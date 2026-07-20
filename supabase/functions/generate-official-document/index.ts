@@ -149,16 +149,29 @@ function fmtDate(d?: string | null): string {
   }
 }
 
+function partyRoleLabel(r?: string | null): string {
+  // MediationEngine.tsx'teki roleLabel() ile birebir aynı sözleşme.
+  if (r === "applicant") return "Başvurucu";
+  if (r === "respondent") return "Karşı Taraf";
+  if (r === "third_party") return "Üçüncü Taraf";
+  return "";
+}
+
 function partyBlock(p: any): string {
   const isCorp = p.party_type === "corporate";
   const name = isCorp ? p.company_name || "-" : `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "-";
-  return [
+  const lines = [
     isCorp ? `Unvanı: ${name}` : `Adı ve Soyadı: ${name}`,
     isCorp ? `Vergi Kimlik Numarası: ${p.tax_number ?? "-"}` : `T.C. Kimlik Numarası: ${p.tc_kimlik ?? "-"}`,
     `Adresi: ${p.address ?? "-"}`,
     `Telefon: ${p.phone ?? "-"}`,
     `E-posta: ${p.email ?? "-"}`,
-  ].join("\n");
+  ];
+  // Sadece dolu olanlar basılır — boş "Vergi Dairesi: —" satırı üretilmez.
+  if (p.authorized_person) lines.push(`Yetkili: ${p.authorized_person}`);
+  if (p.tax_office) lines.push(`Vergi Dairesi: ${p.tax_office}`);
+  if (p.trade_registry_no) lines.push(`Ticaret Sicil No: ${p.trade_registry_no}`);
+  return lines.join("\n");
 }
 
 /** Very simple placeholder-fill: replaces common patterns like ……, ___, blank-after-colon rows. */
@@ -167,9 +180,11 @@ function fillTemplate(content: string, data: Record<string, string>, kind?: stri
 
   // Row-based replacement: for known labels ending with ":" replace value.
   const rowMap: Record<string, string> = {
-    "Büro Dosya Numarası": data.dosya_no,
+    // "Büro Dosya Numarası" bu büronun kendi iç dosya no'su (case_process_tracker.arb_no) —
+    // "Arabuluculuk Dosya Numarası" (UYAP/Bakanlık düzeyi application_no/uyap_no) ile karıştırılmaz.
+    "Büro Dosya Numarası": data.arb_no,
     "Arabuluculuk Dosya Numarası": data.dosya_no,
-    "Arabuluculuk Bürosu": data.buro,
+    "Arabuluculuk Bürosu": data.buro_no,
     "Arabuluculuk Bürosuna Başvuru Tarihi": data.basvuru_tarihi,
     "Arabulucunun Görevlendirildiği Tarih": data.gorevlendirme_tarihi,
     "Tutanağın Düzenlendiği Tarih": data.tutanak_tarihi,
@@ -205,6 +220,8 @@ function fillTemplate(content: string, data: Record<string, string>, kind?: stri
   if (data.session_date) out += `\nToplantı Tarihi: ${data.session_date}\n`;
   if (data.fee_block) out += `\n--- ÜCRET BİLGİSİ ---\n${data.fee_block}\n`;
   if (data.mediator_name) out += `\n--- ARABULUCU ---\nArabulucu Adı: ${data.mediator_name}\nSicil No: [Arabulucu dolduracak]\nBüro: [Arabulucu dolduracak]\n`;
+  if (data.closed_at) out += `\nSürecin Bitiş Tarihi: ${data.closed_at}\n`;
+  if (data.dava_sarti_son_tarih) out += `\nDava Şartı Süreç Son Tarihi: ${data.dava_sarti_son_tarih}\n`;
 
   return out;
 }
@@ -290,17 +307,23 @@ Deno.serve(async (req) => {
     }, 424);
   }
 
-  const [{ data: parties }, { data: sessions }, { data: fee }, { data: profile }] = await Promise.all([
+  const [{ data: parties }, { data: sessions }, { data: fee }, { data: profile }, { data: tracker }] = await Promise.all([
     admin.from("case_parties").select("*").eq("case_id", case_id),
     admin.from("case_sessions").select("*").eq("case_id", case_id).order("scheduled_at", { ascending: true }).limit(1),
     admin.from("case_fees").select("*").eq("case_id", case_id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     caseRow.assigned_mediator_id
       ? admin.from("profiles").select("full_name").eq("user_id", caseRow.assigned_mediator_id).maybeSingle()
       : Promise.resolve({ data: null } as any),
+    admin.from("case_process_tracker").select("buro_no, arb_no").eq("case_id", case_id).maybeSingle(),
   ]);
 
   const partiesArr = parties || [];
-  const parties_block = partiesArr.map((p: any, i: number) => `Taraf ${i + 1} (${p.party_type === "corporate" ? "Tüzel Kişi" : "Gerçek Kişi"}):\n${partyBlock(p)}`).join("\n\n");
+  const parties_block = partiesArr.map((p: any, i: number) => {
+    const typeLabel = p.party_type === "corporate" ? "Tüzel Kişi" : "Gerçek Kişi";
+    const role = partyRoleLabel(p.party_role);
+    const header = role ? `Taraf ${i + 1} (${typeLabel}, ${role}):` : `Taraf ${i + 1} (${typeLabel}):`;
+    return `${header}\n${partyBlock(p)}`;
+  }).join("\n\n");
 
   const sess = sessions?.[0] as any;
   const session_date = sess?.scheduled_at ? `${fmtDate(sess.scheduled_at)} ${new Date(sess.scheduled_at).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}` : "";
@@ -312,9 +335,16 @@ Deno.serve(async (req) => {
     `Tarife: ${(fee as any).tarife_yili ?? ""} - ${(fee as any).tarife_maddesi ?? ""}`,
   ].join("\n") : "";
 
+  // Dava şartı yasal son tarih: uzatılmışsa deadline_extended, yoksa deadline_total.
+  // Sadece dava_sarti kolunda basılır — ihtiyari'de yasal süre kavramı yok.
+  const davaSartiSonTarih = caseRow.mediation_type === "dava_sarti"
+    ? fmtDate(caseRow.deadline_extended || caseRow.deadline_total)
+    : "";
+
   const filled = fillTemplate(tpl.template_content, {
     dosya_no: caseRow.application_no || caseRow.uyap_no || "",
-    buro: "",
+    buro_no: (tracker as any)?.buro_no || "",
+    arb_no: (tracker as any)?.arb_no || "",
     basvuru_tarihi: fmtDate(caseRow.application_date || caseRow.created_at),
     gorevlendirme_tarihi: fmtDate(caseRow.created_at),
     tutanak_tarihi: new Date().toLocaleDateString("tr-TR"),
@@ -328,6 +358,8 @@ Deno.serve(async (req) => {
     fee_block,
     mediator_name: (profile as any)?.full_name || "",
     outcome: outcome || "",
+    closed_at: fmtDate(caseRow.closed_at),
+    dava_sarti_son_tarih: davaSartiSonTarih,
   }, kind);
 
   // Build UDF content.xml per the real UYAP schema: <template format_id="1.8">
