@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "@/components/ui/use-toast";
 import {
   Activity,
   AlertTriangle,
@@ -12,14 +16,21 @@ import {
   FileSearch,
   FileSignature,
   Lightbulb,
+  Loader2,
   MessageSquare,
+  PlayCircle,
+  RotateCcw,
   Scale,
   ShieldCheck,
   Sparkles,
   Users,
+  XCircle,
 } from "lucide-react";
 
 type AgentStatus = "pending" | "running" | "completed" | "failed" | "flagged";
+
+type OrchestratorStep = { step: string; status: "completed" | "skipped" | "failed"; detail?: string };
+type OrchestratorOutput = { current_step?: string; steps?: OrchestratorStep[] } | null;
 
 type AgentStateRow = {
   id: string;
@@ -29,7 +40,86 @@ type AgentStateRow = {
   status: string;
   error_message: string | null;
   updated_at: string;
+  last_output?: OrchestratorOutput;
 };
+
+type CaseSummaryInfo = {
+  dispute_type: string | null;
+  deadline_total: string | null;
+  is_mandatory: boolean | null;
+};
+
+type CommonGroundReportRow = {
+  id: string;
+  risk_ozeti: { genel_uzlasma_orani?: string } | null;
+  created_at: string;
+};
+
+const ORCHESTRATOR_STEPS: { key: string; label: string }[] = [
+  { key: "classify_dispute", label: "Sınıflandırılıyor" },
+  { key: "deadline_detect", label: "Süreler" },
+  { key: "party_analysis", label: "Taraf analizleri" },
+  { key: "common_ground", label: "Ortak zemin" },
+];
+
+type StepVisualState = "done" | "active" | "pending" | "failed" | "skipped";
+
+function getStepStates(row: AgentStateRow | undefined): Record<string, StepVisualState> {
+  const result: Record<string, StepVisualState> = {};
+  ORCHESTRATOR_STEPS.forEach((s) => (result[s.key] = "pending"));
+  if (!row?.last_output) return result;
+  const { current_step, steps } = row.last_output;
+  if (Array.isArray(steps) && steps.length > 0) {
+    steps.forEach((s) => {
+      if (s.status === "completed") result[s.step] = "done";
+      else if (s.status === "skipped") result[s.step] = "skipped";
+      else if (s.status === "failed") result[s.step] = "failed";
+    });
+    return result;
+  }
+  if (current_step) {
+    const idx = ORCHESTRATOR_STEPS.findIndex((s) => s.key === current_step);
+    if (idx !== -1) {
+      ORCHESTRATOR_STEPS.forEach((s, i) => {
+        if (i < idx) result[s.key] = "done";
+        else if (i === idx) result[s.key] = row.status === "failed" ? "failed" : "active";
+      });
+    }
+  }
+  return result;
+}
+
+function OrchestratorProgress({ row }: { row: AgentStateRow }) {
+  const states = getStepStates(row);
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs pt-1">
+      {ORCHESTRATOR_STEPS.map((s) => {
+        const state = states[s.key];
+        return (
+          <span key={s.key} className="flex items-center gap-1.5">
+            <span
+              className={
+                state === "done"
+                  ? "text-emerald-600"
+                  : state === "failed"
+                    ? "text-red-600"
+                    : state === "active"
+                      ? "text-accent font-medium"
+                      : "text-muted-foreground"
+              }
+            >
+              {s.label}...
+            </span>
+            {state === "done" && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />}
+            {state === "active" && <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />}
+            {state === "failed" && <XCircle className="h-3.5 w-3.5 text-red-600" />}
+            {state === "skipped" && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 const AGENT_TYPE_META: Record<string, { label: string; icon: any; color: string }> = {
   party_analysis: { label: "Taraf Analizi", icon: Users, color: "text-blue-600" },
@@ -43,6 +133,7 @@ const AGENT_TYPE_META: Record<string, { label: string; icon: any; color: string 
   party_b: { label: "Taraf B Ajanı", icon: Users, color: "text-purple-600" },
   mediator: { label: "Arabulucu Ajan", icon: Scale, color: "text-emerald-600" },
   validator: { label: "Doğrulama Ajanı", icon: ShieldCheck, color: "text-amber-600" },
+  orchestrator: { label: "Tüm Analiz (Orkestratör)", icon: Sparkles, color: "text-primary" },
 };
 
 function formatRelativeTime(iso: string): string {
@@ -89,21 +180,29 @@ function StatusIndicator({ row }: { row: AgentStateRow }) {
 }
 
 export function AgentControlPanel({ caseId, isMediator }: { caseId: string; isMediator: boolean }) {
+  const navigate = useNavigate();
   const [rows, setRows] = useState<AgentStateRow[]>([]);
   const [partyNames, setPartyNames] = useState<Record<string, string>>({});
+  const [documentCount, setDocumentCount] = useState<number | null>(null);
+  const [caseInfo, setCaseInfo] = useState<CaseSummaryInfo | null>(null);
+  const [commonGroundReport, setCommonGroundReport] = useState<CommonGroundReportRow | null>(null);
+  const [invoking, setInvoking] = useState(false);
+  const [summaryDismissed, setSummaryDismissed] = useState(false);
   const [, setTick] = useState(0);
 
   useEffect(() => {
     let active = true;
 
     const load = async () => {
-      const [{ data: states }, { data: parties }] = await Promise.all([
+      const [{ data: states }, { data: parties }, { count: docCount }, { data: caseRow }] = await Promise.all([
         supabase
           .from("agent_states")
-          .select("id, case_id, agent_type, party_id, status, error_message, updated_at")
+          .select("id, case_id, agent_type, party_id, status, error_message, updated_at, last_output")
           .eq("case_id", caseId)
           .order("updated_at", { ascending: false }),
         supabase.from("case_parties").select("id, party_type, first_name, last_name, company_name").eq("case_id", caseId),
+        supabase.from("case_documents").select("id", { count: "exact", head: true }).eq("case_id", caseId),
+        supabase.from("cases").select("dispute_type, deadline_total, is_mandatory").eq("id", caseId).maybeSingle(),
       ]);
       if (!active) return;
       if (states) setRows(states as AgentStateRow[]);
@@ -114,6 +213,8 @@ export function AgentControlPanel({ caseId, isMediator }: { caseId: string; isMe
         });
         setPartyNames(map);
       }
+      setDocumentCount(docCount ?? 0);
+      if (caseRow) setCaseInfo(caseRow as CaseSummaryInfo);
     };
     load();
 
@@ -151,8 +252,160 @@ export function AgentControlPanel({ caseId, isMediator }: { caseId: string; isMe
     [rows],
   );
 
+  const orchestratorRow = useMemo(
+    () => rows.find((r) => r.agent_type === "orchestrator" && r.party_id === null),
+    [rows],
+  );
+  const partyCount = Object.keys(partyNames).length;
+
+  const missingReasons: string[] = [];
+  if (partyCount < 2) missingReasons.push("2. taraf bekleniyor");
+  if ((documentCount ?? 0) < 1) missingReasons.push("Belge bekleniyor");
+  const readyToRun = missingReasons.length === 0 && documentCount !== null;
+  const orchestratorBusy = invoking || orchestratorRow?.status === "running";
+
+  useEffect(() => {
+    if (orchestratorRow?.status === "running") setSummaryDismissed(false);
+  }, [orchestratorRow?.status]);
+
+  useEffect(() => {
+    if (orchestratorRow?.status !== "completed") return;
+    let active = true;
+    supabase
+      .from("common_ground_reports")
+      .select("id, risk_ozeti, created_at")
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active) setCommonGroundReport((data as CommonGroundReportRow) ?? null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [caseId, orchestratorRow?.status, orchestratorRow?.updated_at]);
+
+  const handleStartOrchestrator = async () => {
+    if (invoking || orchestratorRow?.status === "running") return;
+    setInvoking(true);
+    try {
+      const { error } = await supabase.functions.invoke("orchestrator-run", { body: { case_id: caseId } });
+      if (error) throw error;
+    } catch (e: any) {
+      toast({
+        title: "Analiz başlatılamadı",
+        description: e?.message ?? "Bilinmeyen bir hata oluştu.",
+        variant: "destructive",
+      });
+    } finally {
+      setInvoking(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      <Card
+        className={
+          readyToRun && !orchestratorBusy
+            ? "border-accent ring-1 ring-accent/40 shadow-[0_0_16px_-4px] shadow-accent/40"
+            : undefined
+        }
+      >
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-semibold">Tüm Analizi Başlat</span>
+              {readyToRun && !orchestratorBusy && (
+                <Badge className="bg-accent/15 text-accent border-accent/30 hover:bg-accent/15">Analize hazır</Badge>
+              )}
+            </div>
+            {!readyToRun && !orchestratorBusy && (
+              <p className="text-xs text-muted-foreground mt-1">{missingReasons.join(" · ")}</p>
+            )}
+            {orchestratorRow && orchestratorRow.status === "running" && <OrchestratorProgress row={orchestratorRow} />}
+          </div>
+          <Button
+            onClick={handleStartOrchestrator}
+            disabled={!readyToRun || orchestratorBusy}
+            className={readyToRun && !orchestratorBusy ? "shadow-md shadow-accent/30" : "opacity-60"}
+          >
+            {orchestratorBusy ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Analiz çalışıyor...
+              </>
+            ) : (
+              <>
+                <PlayCircle className="h-4 w-4 mr-2" />
+                Tüm Analizi Başlat
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {orchestratorRow?.status === "completed" && !summaryDismissed && (
+        <Card className="border-emerald-500/40">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2 text-emerald-700">
+              <CheckCircle2 className="h-4 w-4" />
+              Analiz Tamamlandı
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <div>
+                <dt className="text-xs text-muted-foreground">Uyuşmazlık Türü</dt>
+                <dd className="font-medium">{caseInfo?.dispute_type || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Taraf Sayısı</dt>
+                <dd className="font-medium">{partyCount}</dd>
+              </div>
+              {caseInfo?.is_mandatory && caseInfo?.deadline_total && (
+                <div>
+                  <dt className="text-xs text-muted-foreground">Son Tarih (Dava Şartı)</dt>
+                  <dd className="font-medium">{new Date(caseInfo.deadline_total).toLocaleDateString("tr-TR")}</dd>
+                </div>
+              )}
+              {commonGroundReport?.risk_ozeti?.genel_uzlasma_orani && (
+                <div>
+                  <dt className="text-xs text-muted-foreground">Uzlaşma Tahmini</dt>
+                  <dd className="font-medium">{commonGroundReport.risk_ozeti.genel_uzlasma_orani}</dd>
+                </div>
+              )}
+            </dl>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button size="sm" variant="outline" onClick={() => navigate(`/legal-reasoning?caseId=${caseId}&phase=4`)}>
+                Açıkla
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => navigate(`/case/${caseId}`)}>
+                Düzelt
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSummaryDismissed(true)}>
+                Gördüm
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {orchestratorRow?.status === "failed" && (
+        <Card className="border-red-500/40 bg-red-500/5">
+          <CardContent className="space-y-2 py-4">
+            <p className="text-sm text-red-700 flex items-start gap-2">
+              <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              Analiz durdu: {orchestratorRow.error_message ?? "bilinmeyen hata"}
+            </p>
+            <Button size="sm" variant="outline" onClick={handleStartOrchestrator} disabled={orchestratorBusy}>
+              <RotateCcw className="h-3.5 w-3.5 mr-2" />
+              Tekrar Dene
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
