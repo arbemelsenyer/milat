@@ -3278,6 +3278,80 @@ function CockpitPartyColumn({
   );
 }
 
+// Kök neden katmanının güven_seviyesi rozeti — riskBadgeTone'dan bilinçli olarak ayrı:
+// "Düşük" burada bir tehlike değil, sadece zayıf dayanaklı bir çıkarım anlamına gelir (nötr gri).
+function confidenceBadgeTone(raw?: string): string {
+  switch (normalizeRiskLevel(raw)) {
+    case "high": return "bg-emerald-600 text-white";
+    case "medium": return "bg-amber-500 text-white";
+    case "low": return "bg-slate-500 text-white";
+    default: return "bg-muted text-foreground";
+  }
+}
+
+// Faz 4 kokpiti, mediator-only: party_root_cause_analysis satırı hiç yoksa veya kok_neden
+// boş {} ise nazik boş durum gösterir — uydurma metin YOK.
+function CockpitRootCauseCard({
+  name, rootCause,
+}: {
+  name: string;
+  rootCause?: { gorunen_talep?: string; asil_mesele?: string; dayanak?: string; guven_seviyesi?: string } | null;
+}) {
+  const [showBasis, setShowBasis] = useState(false);
+  const asilMesele = safeText(rootCause?.asil_mesele);
+  const gorunenTalep = safeText(rootCause?.gorunen_talep);
+  const dayanak = safeText(rootCause?.dayanak);
+  const isInsufficient = asilMesele === "Yeterli veri yok";
+  const hasData = !!(asilMesele || gorunenTalep) && !isInsufficient;
+
+  return (
+    <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 space-y-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50">Kök Neden Analizi</span>
+        {rootCause?.guven_seviyesi && (
+          <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${confidenceBadgeTone(rootCause.guven_seviyesi)}`}>
+            {rootCause.guven_seviyesi}
+          </span>
+        )}
+      </div>
+      <div className="text-xs font-medium text-sidebar-foreground/70 truncate">{name}</div>
+
+      {!hasData && !isInsufficient ? (
+        <p className="text-xs text-sidebar-foreground/50 italic">
+          Kök neden analizi henüz üretilmedi — taraf analizi çalıştırıldığında oluşur.
+        </p>
+      ) : isInsufficient ? (
+        <p className="text-xs text-sidebar-foreground/50 italic">Yeterli veri yok.</p>
+      ) : (
+        <div className="space-y-1.5">
+          <div className="text-xs text-sidebar-foreground/80 leading-snug">
+            <span className="text-sidebar-foreground/50">Görünen talep: </span>{gorunenTalep || "—"}
+          </div>
+          <div className="text-xs text-sidebar-foreground/80 leading-snug">
+            <span className="text-sidebar-foreground/50">Asıl mesele: </span>{asilMesele || "—"}
+          </div>
+          {dayanak && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowBasis((v) => !v)}
+                className="text-[11px] font-medium text-accent hover:underline"
+              >
+                {showBasis ? "Gizle" : "Açıkla"}
+              </button>
+              {showBasis && (
+                <p className="mt-1 text-[11px] text-sidebar-foreground/60 leading-snug italic">
+                  Dayanak: {dayanak}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CockpitScenarioCard({ letter, scenario, recommended, onClick }: { letter: string; scenario: any; recommended: boolean; onClick: () => void }) {
   return (
     <button
@@ -3402,6 +3476,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   }
   const [report, setReport] = useState<any>(null);
   const [analyses, setAnalyses] = useState<any[]>([]);
+  const [rootCauses, setRootCauses] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
@@ -3427,19 +3502,33 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
     setLoading(true);
     setLoadErr(null);
     try {
-      const [r, a] = await Promise.all([
+      const [r, a, rc] = await Promise.all([
         supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("party_analyses").select("party_id, analysis, risk_analizi, case_parties:party_id(first_name, last_name, company_name, party_role)").eq("case_id", caseRow.id),
+        // Kök Neden Katmanı: mediator-only, ayrı tablo. Bu sorgu ana yüklemeyi bloklamaz —
+        // hata olursa boş kart yerine sessizce boş durum gösterilir.
+        supabase.from("party_root_cause_analysis").select("party_id, kok_neden, created_at").eq("case_id", caseRow.id).order("created_at", { ascending: false }),
       ]);
       if (r.error) throw r.error;
       if (a.error) throw a.error;
       setReport(r.data);
       setAnalyses(Array.isArray(a.data) ? a.data : []);
+      if (rc.error) {
+        console.error("[Phase4Summary rootCause]", rc.error);
+        setRootCauses({});
+      } else {
+        const rcMap: Record<string, any> = {};
+        (rc.data ?? []).forEach((row: any) => {
+          if (!rcMap[row.party_id]) rcMap[row.party_id] = row.kok_neden;
+        });
+        setRootCauses(rcMap);
+      }
     } catch (e: any) {
       console.error("[Phase4Summary] load failed", e);
       setLoadErr(e?.message ?? "Bilinmeyen hata");
       setReport(null);
       setAnalyses([]);
+      setRootCauses({});
     } finally {
       setLoading(false);
     }
@@ -3535,6 +3624,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
     const name = cp.company_name || `${cp.first_name ?? ""} ${cp.last_name ?? ""}`.trim() || `Taraf ${i + 1}`;
     const r = a.risk_analizi || {};
     return {
+      party_id: a.party_id as string | undefined,
       name,
       risk_puani: r.risk_puani as string | undefined,
       uzlasma_pct: parsePercent(r.uzlasma_orani),
@@ -3664,6 +3754,22 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                         batna={r.batna}
                       />
                     ))}
+                  </div>
+                )}
+
+                {/* Kök Neden Analizi — arabulucuya özel stratejik içgörü, party_root_cause_analysis'ten */}
+                {cockpitRows.length > 0 && (
+                  <div className="pt-2 border-t border-sidebar-border/60">
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-2">Kök Neden Analizi</div>
+                    <div className={`grid gap-4 ${cockpitRows.length > 1 ? "sm:grid-cols-2" : ""}`}>
+                      {cockpitRows.map((r, i) => (
+                        <CockpitRootCauseCard
+                          key={i}
+                          name={r.name}
+                          rootCause={r.party_id ? rootCauses[r.party_id] : undefined}
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
 
