@@ -4342,7 +4342,15 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
   // profiles.vergi_dairesi / profiles.vkn_tckn: generated types'ta henüz yok
   // (canlıda migration'sız elle eklendi) — bu yüzden ilgili select/update'lerde
   // "as any" cast kullanılıyor.
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isAdmin: isRoleAdmin } = useAuth();
+  // Yalnızca UX kısıtı — gerçek güvenlik sınırı case_payments RLS'inde
+  // (is_case_mediator OR admin); dosya sahibi burada RLS'te ayrı bir kural
+  // olmadığı için mediator/admin değilse update/delete zaten reddedilir.
+  const canManagePayments = !!currentUser && (
+    currentUser.id === caseRow.assigned_mediator_id ||
+    currentUser.id === caseRow.user_id ||
+    isRoleAdmin
+  );
   const [mediatorTaxOffice, setMediatorTaxOffice] = useState<string>("");
   const [mediatorTaxId, setMediatorTaxId] = useState<string>("");
   const [profileTaxSaveBusy, setProfileTaxSaveBusy] = useState(false);
@@ -4405,6 +4413,19 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [receiptDraft, setReceiptDraft] = useState<string>("");
   const [markBusy, setMarkBusy] = useState(false);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{
+    payment_date: string; payer_party_id: string; kind: "ucret" | "masraf";
+    description: string; amount: string; status: "bekliyor" | "odendi"; receipt_no: string;
+  } | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  // status="odendi" bir satırda tutar/tür değişikliği istenirse önce bu dolar,
+  // AlertDialog onayından sonra performSaveEdit gerçek kaydı yapar.
+  const [sensitiveEditConfirm, setSensitiveEditConfirm] = useState<CasePaymentRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CasePaymentRow | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const [stagedRows, setStagedRows] = useState<StagedRow[]>([]);
   const [stageBusy, setStageBusy] = useState(false);
@@ -4552,6 +4573,109 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
       toast({ title: "Hata", description: trErr(e.message), variant: "destructive" });
     } finally {
       setMarkBusy(false);
+    }
+  }
+
+  // addPaymentRow'daki AAÜT taban guard'ının aynısı — düzenlenen satır kendi eski
+  // tutarıyla toplama dahil edilmez, guard yeni tutar/tür varsayımıyla hesaplanır.
+  function ucretGuardError(excludeId: string, newKind: "ucret" | "masraf", newAmount: number): string | null {
+    const otherUcretSum = round2(
+      payments.filter((p) => p.id !== excludeId && p.kind === "ucret").reduce((s, p) => s + Number(p.amount || 0), 0)
+    );
+    const newTotal = round2(otherUcretSum + (newKind === "ucret" ? newAmount : 0));
+    if (taban != null && newTotal < taban) {
+      return `AAÜT tabanının altına inilemez (taban: ${fmtTL(taban)})`;
+    }
+    return null;
+  }
+
+  function startEditRow(p: CasePaymentRow) {
+    setEditingId(p.id);
+    setEditForm({
+      payment_date: p.payment_date,
+      payer_party_id: p.payer_party_id ?? "bakanlik",
+      kind: p.kind,
+      description: p.description ?? "",
+      amount: String(p.amount),
+      status: p.status,
+      receipt_no: p.receipt_no ?? "",
+    });
+    setEditError(null);
+  }
+
+  function cancelEditRow() {
+    setEditingId(null);
+    setEditForm(null);
+    setEditError(null);
+  }
+
+  async function performSaveEdit(original: CasePaymentRow) {
+    if (!editForm) return;
+    const amt = round2(parseAmount(editForm.amount));
+    const payerLabel = editForm.payer_party_id === "bakanlik"
+      ? "Bakanlık"
+      : (parties.find((pp) => pp.id === editForm.payer_party_id)?.name ?? original.payer_label);
+    setEditBusy(true);
+    try {
+      const { error } = await supabase.from("case_payments" as any).update({
+        payment_date: editForm.payment_date,
+        payer_party_id: editForm.payer_party_id === "bakanlik" ? null : editForm.payer_party_id,
+        payer_label: payerLabel,
+        kind: editForm.kind,
+        description: editForm.description.trim() || null,
+        amount: amt,
+        status: editForm.status,
+        receipt_no: editForm.receipt_no.trim() || null,
+        paid_at: editForm.status === "odendi" ? (original.paid_at ?? new Date().toISOString()) : null,
+      } as any).eq("id", original.id);
+      if (error) throw error;
+      setEditingId(null);
+      setEditForm(null);
+      setSensitiveEditConfirm(null);
+      await loadPayments();
+      toast({ title: "Kayıt güncellendi" });
+    } catch (e: any) {
+      setEditError(trErr(e.message));
+    } finally {
+      setEditBusy(false);
+    }
+  }
+
+  function requestSaveEdit(original: CasePaymentRow) {
+    if (!editForm) return;
+    setEditError(null);
+    const amt = round2(parseAmount(editForm.amount));
+    if (!amt || amt <= 0) {
+      setEditError("Geçerli bir tutar girin.");
+      return;
+    }
+    const guardErr = ucretGuardError(original.id, editForm.kind, amt);
+    if (guardErr) {
+      setEditError(guardErr);
+      return;
+    }
+    const sensitiveChange = original.status === "odendi"
+      && (round2(Number(original.amount)) !== amt || original.kind !== editForm.kind);
+    if (sensitiveChange) {
+      setSensitiveEditConfirm(original);
+      return;
+    }
+    performSaveEdit(original);
+  }
+
+  async function deletePaymentRow() {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    try {
+      const { error } = await supabase.from("case_payments" as any).delete().eq("id", deleteTarget.id);
+      if (error) throw error;
+      setDeleteTarget(null);
+      await loadPayments();
+      toast({ title: "Kayıt silindi" });
+    } catch (e: any) {
+      toast({ title: "Silinemedi", description: trErr(e.message), variant: "destructive" });
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -5020,36 +5144,119 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
               {!paymentsLoading && payments.length === 0 && (
                 <tr><td colSpan={8} className="px-2 py-3 text-center text-muted-foreground">Kayıt yok</td></tr>
               )}
-              {payments.map((p) => (
-                <tr key={p.id} className="border-t align-top">
-                  <td className="px-2 py-2 whitespace-nowrap">{p.payment_date}</td>
-                  <td className="px-2 py-2">{p.payer_label}</td>
-                  <td className="px-2 py-2">{p.kind === "ucret" ? "Ücret" : "Masraf"}</td>
-                  <td className="px-2 py-2">{p.description || "-"}</td>
-                  <td className="px-2 py-2 text-right whitespace-nowrap">{fmtTL(Number(p.amount))}</td>
-                  <td className="px-2 py-2">
-                    <Badge variant={p.status === "odendi" ? "default" : "outline"}>
-                      {p.status === "odendi" ? "Ödendi" : "Bekliyor"}
-                    </Badge>
-                  </td>
-                  <td className="px-2 py-2">{p.receipt_no || "-"}</td>
-                  <td className="px-2 py-2">
-                    {p.status === "bekliyor" && (
-                      markingId === p.id ? (
-                        <div className="flex items-center gap-1">
-                          <Input placeholder="Makbuz no" value={receiptDraft} onChange={(e) => setReceiptDraft(e.target.value)} className="h-8 w-28" />
-                          <Button size="sm" onClick={() => confirmMarkPaid(p.id)} disabled={markBusy}>
-                            {markBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => { setMarkingId(null); setReceiptDraft(""); }}>İptal</Button>
+              {payments.map((p) => {
+                const isEditing = editingId === p.id && editForm;
+                if (isEditing && editForm) {
+                  return (
+                    <tr key={p.id} className="border-t align-top bg-muted/20">
+                      <td className="px-2 py-2">
+                        <Input type="date" value={editForm.payment_date}
+                          onChange={(e) => setEditForm({ ...editForm, payment_date: e.target.value })}
+                          className="h-8 w-36" disabled={editBusy} />
+                      </td>
+                      <td className="px-2 py-2">
+                        <Select value={editForm.payer_party_id} onValueChange={(v) => setEditForm({ ...editForm, payer_party_id: v })}>
+                          <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="bakanlik">Bakanlık</SelectItem>
+                            {parties.map((pp) => <SelectItem key={pp.id} value={pp.id}>{pp.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <Select value={editForm.kind} onValueChange={(v) => setEditForm({ ...editForm, kind: v as "ucret" | "masraf" })}>
+                          <SelectTrigger className="h-8 w-24"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ucret">Ücret</SelectItem>
+                            <SelectItem value="masraf">Masraf</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <Input value={editForm.description}
+                          onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                          className="h-8" disabled={editBusy} />
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        <Input type="text" inputMode="decimal" value={editForm.amount}
+                          onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
+                          className="h-8 w-24 text-right" disabled={editBusy} />
+                      </td>
+                      <td className="px-2 py-2">
+                        <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as "bekliyor" | "odendi" })}>
+                          <SelectTrigger className="h-8 w-28"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="bekliyor">Bekliyor</SelectItem>
+                            <SelectItem value="odendi">Ödendi</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <Input placeholder="Makbuz no" value={editForm.receipt_no}
+                          onChange={(e) => setEditForm({ ...editForm, receipt_no: e.target.value })}
+                          className="h-8 w-28" disabled={editBusy} />
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1">
+                            <Button size="sm" onClick={() => requestSaveEdit(p)} disabled={editBusy}>
+                              {editBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Kaydet"}
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={cancelEditRow} disabled={editBusy}>İptal</Button>
+                          </div>
+                          {editError && (
+                            <div className="text-xs text-destructive flex items-center gap-1 max-w-[220px]">
+                              <AlertTriangle className="h-3 w-3 shrink-0" />{editError}
+                            </div>
+                          )}
                         </div>
-                      ) : (
-                        <Button size="sm" variant="outline" onClick={() => { setMarkingId(p.id); setReceiptDraft(""); }}>Ödendi işaretle</Button>
-                      )
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      </td>
+                    </tr>
+                  );
+                }
+                return (
+                  <tr key={p.id} className="border-t align-top">
+                    <td className="px-2 py-2 whitespace-nowrap">{p.payment_date}</td>
+                    <td className="px-2 py-2">{p.payer_label}</td>
+                    <td className="px-2 py-2">{p.kind === "ucret" ? "Ücret" : "Masraf"}</td>
+                    <td className="px-2 py-2">{p.description || "-"}</td>
+                    <td className="px-2 py-2 text-right whitespace-nowrap">{fmtTL(Number(p.amount))}</td>
+                    <td className="px-2 py-2">
+                      <Badge variant={p.status === "odendi" ? "default" : "outline"}>
+                        {p.status === "odendi" ? "Ödendi" : "Bekliyor"}
+                      </Badge>
+                    </td>
+                    <td className="px-2 py-2">{p.receipt_no || "-"}</td>
+                    <td className="px-2 py-2">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {p.status === "bekliyor" && (
+                          markingId === p.id ? (
+                            <div className="flex items-center gap-1">
+                              <Input placeholder="Makbuz no" value={receiptDraft} onChange={(e) => setReceiptDraft(e.target.value)} className="h-8 w-28" />
+                              <Button size="sm" onClick={() => confirmMarkPaid(p.id)} disabled={markBusy}>
+                                {markBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => { setMarkingId(null); setReceiptDraft(""); }}>İptal</Button>
+                            </div>
+                          ) : (
+                            <Button size="sm" variant="outline" onClick={() => { setMarkingId(p.id); setReceiptDraft(""); }}>Ödendi işaretle</Button>
+                          )
+                        )}
+                        {canManagePayments && markingId !== p.id && (
+                          <>
+                            <Button size="sm" variant="ghost" onClick={() => startEditRow(p)} title="Düzenle">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(p)} title="Sil">
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -5096,6 +5303,52 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
           Satır Ekle
         </Button>
       </div>
+
+      <AlertDialog open={!!sensitiveEditConfirm} onOpenChange={(o) => !o && !editBusy && setSensitiveEditConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ödenmiş kayıt değiştirilecek</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bu satır zaten ödendi işaretli, tutarı/türü değiştirmek muhasebe kaydını bozabilir. Devam edilsin mi?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={editBusy}>Vazgeç</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={editBusy}
+              onClick={(e) => { e.preventDefault(); if (sensitiveEditConfirm) performSaveEdit(sensitiveEditConfirm); }}
+            >
+              {editBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Kaydediliyor…</> : "Evet, Devam Et"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleteBusy && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bu defter satırı silinecek, emin misiniz?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.payer_label} — {deleteTarget ? fmtTL(Number(deleteTarget.amount)) : ""} tutarındaki kayıt kalıcı olarak silinecek.
+              {deleteTarget?.status === "odendi" && (
+                <span className="block mt-2 text-destructive font-medium">
+                  Bu kayıt "Ödendi" işaretli{deleteTarget?.receipt_no ? ` (Makbuz No: ${deleteTarget.receipt_no})` : ""}. Ödenmiş/makbuzlu bir kaydı silmek muhasebe geçmişini bozar.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteBusy}>Vazgeç</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteBusy}
+              onClick={(e) => { e.preventDefault(); deletePaymentRow(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Siliniyor…</> : "Evet, Sil"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
