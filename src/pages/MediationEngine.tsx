@@ -5149,66 +5149,75 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
                 if (isEditing && editForm) {
                   return (
                     <tr key={p.id} className="border-t align-top bg-muted/20">
-                      <td className="px-2 py-2">
-                        <Input type="date" value={editForm.payment_date}
-                          onChange={(e) => setEditForm({ ...editForm, payment_date: e.target.value })}
-                          className="h-8 w-36" disabled={editBusy} />
-                      </td>
-                      <td className="px-2 py-2">
-                        <Select value={editForm.payer_party_id} onValueChange={(v) => setEditForm({ ...editForm, payer_party_id: v })}>
-                          <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="bakanlik">Bakanlık</SelectItem>
-                            {parties.map((pp) => <SelectItem key={pp.id} value={pp.id}>{pp.name}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-2 py-2">
-                        <Select value={editForm.kind} onValueChange={(v) => setEditForm({ ...editForm, kind: v as "ucret" | "masraf" })}>
-                          <SelectTrigger className="h-8 w-24"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ucret">Ücret</SelectItem>
-                            <SelectItem value="masraf">Masraf</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-2 py-2">
-                        <Input value={editForm.description}
-                          onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                          className="h-8" disabled={editBusy} />
-                      </td>
-                      <td className="px-2 py-2 text-right">
-                        <Input type="text" inputMode="decimal" value={editForm.amount}
-                          onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
-                          className="h-8 w-24 text-right" disabled={editBusy} />
-                      </td>
-                      <td className="px-2 py-2">
-                        <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as "bekliyor" | "odendi" })}>
-                          <SelectTrigger className="h-8 w-28"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="bekliyor">Bekliyor</SelectItem>
-                            <SelectItem value="odendi">Ödendi</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-2 py-2">
-                        <Input placeholder="Makbuz no" value={editForm.receipt_no}
-                          onChange={(e) => setEditForm({ ...editForm, receipt_no: e.target.value })}
-                          className="h-8 w-28" disabled={editBusy} />
-                      </td>
-                      <td className="px-2 py-2">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1">
-                            <Button size="sm" onClick={() => requestSaveEdit(p)} disabled={editBusy}>
-                              {editBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Kaydet"}
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={cancelEditRow} disabled={editBusy}>İptal</Button>
+                      <td colSpan={8} className="px-2 py-2">
+                        <div className="flex flex-wrap items-end gap-2">
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs text-muted-foreground">Tarih</Label>
+                            <Input type="date" value={editForm.payment_date}
+                              onChange={(e) => setEditForm({ ...editForm, payment_date: e.target.value })}
+                              className="h-8 w-36" disabled={editBusy} />
                           </div>
-                          {editError && (
-                            <div className="text-xs text-destructive flex items-center gap-1 max-w-[220px]">
-                              <AlertTriangle className="h-3 w-3 shrink-0" />{editError}
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs text-muted-foreground">Ödeyen</Label>
+                            <Select value={editForm.payer_party_id} onValueChange={(v) => setEditForm({ ...editForm, payer_party_id: v })}>
+                              <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="bakanlik">Bakanlık</SelectItem>
+                                {parties.map((pp) => <SelectItem key={pp.id} value={pp.id}>{pp.name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs text-muted-foreground">Tür</Label>
+                            <Select value={editForm.kind} onValueChange={(v) => setEditForm({ ...editForm, kind: v as "ucret" | "masraf" })}>
+                              <SelectTrigger className="h-8 w-24"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ucret">Ücret</SelectItem>
+                                <SelectItem value="masraf">Masraf</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex flex-col gap-1 min-w-0 flex-1 basis-40">
+                            <Label className="text-xs text-muted-foreground">Açıklama</Label>
+                            <Input value={editForm.description}
+                              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                              className="h-8 w-full min-w-0" disabled={editBusy} />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs text-muted-foreground">Tutar</Label>
+                            <Input type="text" inputMode="decimal" value={editForm.amount}
+                              onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
+                              className="h-8 w-24 text-right" disabled={editBusy} />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs text-muted-foreground">Durum</Label>
+                            <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as "bekliyor" | "odendi" })}>
+                              <SelectTrigger className="h-8 w-28"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="bekliyor">Bekliyor</SelectItem>
+                                <SelectItem value="odendi">Ödendi</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs text-muted-foreground">Makbuz No</Label>
+                            <Input placeholder="Makbuz no" value={editForm.receipt_no}
+                              onChange={(e) => setEditForm({ ...editForm, receipt_no: e.target.value })}
+                              className="h-8 w-28" disabled={editBusy} />
+                          </div>
+                          <div className="flex flex-col gap-1 shrink-0">
+                            <div className="flex items-center gap-1">
+                              <Button size="sm" onClick={() => requestSaveEdit(p)} disabled={editBusy}>
+                                {editBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Kaydet"}
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={cancelEditRow} disabled={editBusy}>İptal</Button>
                             </div>
-                          )}
+                            {editError && (
+                              <div className="text-xs text-destructive flex items-center gap-1 max-w-[220px]">
+                                <AlertTriangle className="h-3 w-3 shrink-0" />{editError}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
