@@ -206,7 +206,9 @@ KESİN KURAL: Sabit/uydurma % ASLA verme. Kaynak yoksa "Yeterli veri yok" yaz. V
 KESİN KURAL (uzlaşma oranı tahmini ZORUNLU): uzlasma_orani için doğrudan istatistiksel kaynak (resmi kaynak/benzer dava) yoksa bile BATNA, ZOPA, belge güç durumu ve uyuşmazlık türünden MUTLAKA bir % tahmini türet; uzlasma_orani_kaynak alanında bunun türetilmiş bir tahmin olduğunu belirt (ör. "BATNA ve belge gücüne dayalı tahmin"). "Yeterli veri yok" YALNIZCA hiçbir sinyal (kaynak, benzer dava, BATNA, belge gücü, ZOPA) mevcut değilse kabul edilir.
 KESİN KURAL (uzlasma_orani format ZORUNLU): uzlasma_orani alanı MUTLAKA ve YALNIZCA şu formatta olmalı: "Düşük (%NN)" | "Orta (%NN)" | "Yüksek (%NN)" — serbest cümle YASAKTIR; gerekçe/türetim açıklaması uzlasma_orani_kaynak alanına yazılır.
 
-Çıktı YALNIZCA JSON: {"dispute_area":"","legal_framework":{"statutes":[],"precedents":[{"court":"","decision":"","relevance":""}]},"document_findings":[],"party_position":{"strengths":[],"weaknesses":[],"interests":[],"batna":"","watna":""},"risks":[],"opportunities":[],"discovery_questions":[{"id":1,"question":""}],"risk_analizi":{"uzlasma_orani":"","uzlasma_orani_kaynak":"","risk_puani":"Düşük|Orta|Yüksek","mahkeme_riski":"","mahkeme_riski_kaynak":"","tahmini_sure_tasarrufu_ay":"","kritik_faktorler":["","",""],"uzlasma_engelleri":["",""],"kaynak_listesi":[],"oneri":""}} — tam 5 ihtiyaç tespiti sorusu üret.`;
+KÖK NEDEN KATMANI (kok_neden — yalnızca arabulucuya gösterilecek ayrı bir alan): "TARAF BEYANI", "BELGE ANALİZ SONUÇLARI", "GÖRÜŞME NOTLARI ANALİZİ" ve kaynak bloklarındaki tekrar eden temaları, tonu ve tarafın hangi noktaya ağırlık verdiğini değerlendirerek görünen talep ile altta yatan asıl meseleyi ayırt et. gorunen_talep: tarafın açıkça talep ettiği şey. asil_mesele: KESİN dille değil, olasılık belirten dille yaz (ör. "...olabileceğine işaret ediyor", "...ihtimalini düşündürüyor") — asla kesinlik iddia etme. dayanak: bu çıkarımı hangi somut gözleme dayandırdığını belirt (ör. "beyanda üç kez X teması tekrarlanıyor", "belge bulgularında Y vurgusu öne çıkıyor") — dayanak göstermeden asil_mesele doldurma. guven_seviyesi: dayanağın gücüne göre "Düşük"|"Orta"|"Yüksek". Beyan/belge/görüşme notu bloklarının hiçbirinde asıl meseleye işaret eden somut bir sinyal yoksa asil_mesele="Yeterli veri yok" yaz ve dayanak boş kalsın — ASLA uydurma çıkarım yapma.
+
+Çıktı YALNIZCA JSON: {"dispute_area":"","legal_framework":{"statutes":[],"precedents":[{"court":"","decision":"","relevance":""}]},"document_findings":[],"party_position":{"strengths":[],"weaknesses":[],"interests":[],"batna":"","watna":""},"risks":[],"opportunities":[],"discovery_questions":[{"id":1,"question":""}],"risk_analizi":{"uzlasma_orani":"","uzlasma_orani_kaynak":"","risk_puani":"Düşük|Orta|Yüksek","mahkeme_riski":"","mahkeme_riski_kaynak":"","tahmini_sure_tasarrufu_ay":"","kritik_faktorler":["","",""],"uzlasma_engelleri":["",""],"kaynak_listesi":[],"oneri":""},"kok_neden":{"gorunen_talep":"","asil_mesele":"","dayanak":"","guven_seviyesi":"Düşük|Orta|Yüksek"}} — tam 5 ihtiyaç tespiti sorusu üret.`;
 
     const userPrompt = `UYUŞMAZLIK TÜRÜ: ${caseRow?.dispute_type ?? ""} / ${caseRow?.dispute_subtype ?? ""}
 BAŞLIK: ${caseRow?.title ?? ""}
@@ -272,6 +274,25 @@ Bu tarafın perspektifinden detaylı analiz üret. Yukarıdaki bloklarda somut b
         discovery_questions: parsed.discovery_questions ?? [],
         risk_analizi: parsed.risk_analizi ?? null,
       });
+    }
+
+    // Kök Neden Katmanı: ayrı, mediator-only tabloya ek yazım (party_analyses'ten bağımsız,
+    // party_root_cause_analysis'in RLS'i tarafa hiç SELECT vermiyor). Best-effort — bu yazım
+    // başarısız olsa bile ana party_analyses sonucu ve response etkilenmemeli.
+    if (parsed.kok_neden && typeof parsed.kok_neden === "object") {
+      try {
+        const { data: existingRootCause } = await admin.from("party_root_cause_analysis")
+          .select("id").eq("case_id", case_id).eq("party_id", party_id).maybeSingle();
+        if (existingRootCause) {
+          await admin.from("party_root_cause_analysis")
+            .update({ kok_neden: parsed.kok_neden }).eq("id", existingRootCause.id);
+        } else {
+          await admin.from("party_root_cause_analysis")
+            .insert({ case_id, party_id, kok_neden: parsed.kok_neden });
+        }
+      } catch (e: any) {
+        console.error(`[party-confidential-analysis] kok_neden yazımı başarısız: ${e?.message ?? String(e)}`);
+      }
     }
 
     // Seed discovery question rows (party-scoped)
