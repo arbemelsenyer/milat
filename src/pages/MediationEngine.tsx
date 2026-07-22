@@ -4764,6 +4764,12 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
     setStagedRows((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   }
 
+  // "Tümünü buna yükle" kısayolu — tek satıra effectiveBasis'i tam verip diğerlerini
+  // sıfırlar; sadece anlasma/ihtiyari_anlasamama senaryolarında anlamlı (bakanlik zaten tek satır).
+  function assignFullAmountToRow(index: number) {
+    setStagedRows((rows) => rows.map((r, i) => ({ ...r, amount: i === index ? effectiveBasis : 0 })));
+  }
+
   async function saveStagedRows() {
     setStageError(null);
     const ucretTotal = round2(stagedRows.filter((r) => r.kind === "ucret").reduce((s, r) => s + Number(r.amount || 0), 0));
@@ -5140,9 +5146,17 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
                         <Input value={r.description} onChange={(e) => updateStagedRow(i, { description: e.target.value })} className="h-8" />
                       </td>
                       <td className="px-2 py-1">
-                        <Input type="text" inputMode="decimal" value={String(r.amount)}
-                          onChange={(e) => updateStagedRow(i, { amount: parseAmount(e.target.value) })}
-                          className="h-8 text-right" />
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Input type="text" inputMode="decimal" value={String(r.amount)}
+                            onChange={(e) => updateStagedRow(i, { amount: parseAmount(e.target.value) })}
+                            className="h-8 text-right" />
+                          {(scenario.key === "anlasma" || scenario.key === "ihtiyari_anlasamama") && (
+                            <Button size="sm" variant="secondary" className="h-8 px-2 text-xs whitespace-nowrap"
+                              onClick={() => assignFullAmountToRow(i)}>
+                              Tümünü buna yükle
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
