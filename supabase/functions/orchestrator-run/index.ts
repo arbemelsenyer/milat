@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
 
     // Aynı yetki kapısı common-ground-report ile birebir: sadece arabulucu/dosya sahibi/admin.
     const { data: roleRow } = await admin.from("user_roles")
-      .select("role").eq("user_id", userData.user.id).in("role", ["admin", "mediator"]).maybeSingle();
+      .select("role").eq("user_id", userData.user.id).eq("role", "admin").maybeSingle();
     const allowed = caseRow.assigned_mediator_id === userData.user.id || caseRow.user_id === userData.user.id || !!roleRow;
     if (!allowed) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
 

@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
       });
     }
     const { data: roleRow } = await admin.from("user_roles")
-      .select("role").eq("user_id", userId).in("role", ["admin", "mediator"]).maybeSingle();
+      .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
     const isPrivileged = !!roleRow || caseRow.user_id === userId || caseRow.assigned_mediator_id === userId;
     if (!isPrivileged && party.user_id !== userId) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {

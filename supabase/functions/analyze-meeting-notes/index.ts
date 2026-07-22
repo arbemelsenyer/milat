@@ -64,7 +64,7 @@ serve(async (req) => {
       });
     }
     const { data: roleRow } = await admin.from("user_roles")
-      .select("role").eq("user_id", userData.user.id).in("role", ["admin", "mediator"]).maybeSingle();
+      .select("role").eq("user_id", userData.user.id).eq("role", "admin").maybeSingle();
     const allowed = caseRow.assigned_mediator_id === userData.user.id
       || caseRow.user_id === userData.user.id
       || !!roleRow;
