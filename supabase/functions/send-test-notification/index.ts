@@ -13,7 +13,7 @@ async function sendResend(to: string, subject: string, html: string) {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: "MediPact AI <notifications@resend.dev>",
+      from: "MİLAT Arabuluculuk <info@milatmediation.com>",
       to: [to],
       subject,
       html,

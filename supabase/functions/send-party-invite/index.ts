@@ -8,6 +8,10 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  // Declared outside the try block so the catch clause can still surface
+  // invite_url/token if the failure happened after they were minted (e.g. Resend error).
+  let token: string | undefined;
+  let inviteUrl: string | undefined;
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
@@ -25,16 +29,22 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceKey);
 
     const { data: party } = await admin.from("case_parties")
-      .select("id, case_id, email, first_name, last_name, company_name, party_type, cases:case_id(assigned_mediator_id, application_no)")
+      .select("id, case_id, email, first_name, last_name, company_name, party_type, cases:case_id(assigned_mediator_id, application_no, user_id)")
       .eq("id", party_id).maybeSingle();
     if (!party) return new Response(JSON.stringify({ error: "Party not found" }), { status: 404, headers: corsHeaders });
-    if ((party as any).cases?.assigned_mediator_id !== u.user.id) {
+
+    const { data: roleRow } = await admin.from("user_roles")
+      .select("role").eq("user_id", u.user.id).eq("role", "admin").maybeSingle();
+    const isPrivileged = !!roleRow
+      || (party as any).cases?.assigned_mediator_id === u.user.id
+      || (party as any).cases?.user_id === u.user.id;
+    if (!isPrivileged) {
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
     }
 
     // Always mint a fresh token; only its SHA-256 hash is persisted so the
     // plaintext value never leaves this response.
-    const token = crypto.randomUUID();
+    token = crypto.randomUUID();
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
     const tokenHash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 
@@ -70,7 +80,7 @@ Deno.serve(async (req) => {
         if (allowedOrigins.includes(origin)) baseUrl = origin;
       } catch { /* invalid URL -> fallback */ }
     }
-    const inviteUrl = `${baseUrl}/auth?invite=${token}`;
+    inviteUrl = `${baseUrl}/auth?invite=${token}`;
     const applicationNo = (party as any).cases?.application_no ?? "";
 
     if (resendKey && party.email) {
@@ -78,7 +88,7 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: "MediPact AI <onboarding@resend.dev>",
+          from: "MİLAT Arabuluculuk <info@milatmediation.com>",
           to: [party.email],
           subject: `Arabuluculuk Davet - ${applicationNo}`,
           html: `<p>Sayın ${name},</p>
@@ -88,13 +98,18 @@ Deno.serve(async (req) => {
                  <p>MediPact AI</p>`,
         }),
       });
-      if (!emailRes.ok) console.error("Resend error", await emailRes.text());
+      if (!emailRes.ok) {
+        const errText = await emailRes.text();
+        throw new Error(`Resend API error: ${emailRes.status} - ${errText}`);
+      }
     }
 
     return new Response(JSON.stringify({ invite_url: inviteUrl, token }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
+    return new Response(JSON.stringify({ error: e.message, invite_url: inviteUrl, token }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

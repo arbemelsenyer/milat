@@ -187,7 +187,7 @@ serve(async (req) => {
 
     // Send confirmation email to the user
     const userEmailResponse = await resend.emails.send({
-      from: "MediPact AI <onboarding@resend.dev>",
+      from: "MİLAT Arabuluculuk <info@milatmediation.com>",
       to: [email],
       subject: isEnglish 
         ? "Your Mediation Session Request Received" 

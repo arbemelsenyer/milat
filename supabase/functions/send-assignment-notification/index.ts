@@ -93,7 +93,7 @@ serve(async (req) => {
     // Email to case owner
     if (ownerProfile?.email) {
       await sendEmail({
-        from: "MediPact AI <onboarding@resend.dev>",
+        from: "MİLAT Arabuluculuk <info@milatmediation.com>",
         to: [ownerProfile.email],
         subject: isEn ? "Mediator Assigned to Your Case" : "Başvurunuza Arabulucu Atandı",
         html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;">
@@ -108,7 +108,7 @@ serve(async (req) => {
     // Email to mediator
     if (mediatorProfile?.email) {
       await sendEmail({
-        from: "MediPact AI <onboarding@resend.dev>",
+        from: "MİLAT Arabuluculuk <info@milatmediation.com>",
         to: [mediatorProfile.email],
         subject: isEn ? "New Case Assignment" : "Yeni Başvuru Ataması",
         html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;">

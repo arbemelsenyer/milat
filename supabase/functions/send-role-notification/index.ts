@@ -224,7 +224,7 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "MediPact AI <onboarding@resend.dev>",
+            from: "MİLAT Arabuluculuk <info@milatmediation.com>",
             to: [profile.email],
             subject: emailSubject,
             html: emailHtml,

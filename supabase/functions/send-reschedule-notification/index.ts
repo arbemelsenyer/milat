@@ -185,7 +185,7 @@ serve(async (req) => {
         method: "POST",
         headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: "MediPact AI <onboarding@resend.dev>",
+          from: "MİLAT Arabuluculuk <info@milatmediation.com>",
           to: [profile.email],
           subject,
           html: htmlContent,

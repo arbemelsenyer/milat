@@ -168,7 +168,7 @@ serve(async (req) => {
       const html = buildCancelHtml({ displayName, dateStr, timeStr, typeLabel, reason });
       try {
         const resp = await sendResend({
-          from: "MediPact AI <onboarding@resend.dev>",
+          from: "MİLAT Arabuluculuk <info@milatmediation.com>",
           to: [p.email],
           subject: `Toplantı İptal Edildi - ${typeLabel} - ${dateStr}`,
           html,

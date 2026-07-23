@@ -246,7 +246,7 @@ serve(async (req) => {
     `;
 
     const emailResponse = await resend.emails.send({
-      from: "MediPact AI <onboarding@resend.dev>",
+      from: "MİLAT Arabuluculuk <info@milatmediation.com>",
       to: [userEmail],
       subject: isEnglish 
         ? `Your Mediation Session is Scheduled - ${formattedDate}` 

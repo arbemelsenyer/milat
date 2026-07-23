@@ -198,7 +198,7 @@ serve(async (req) => {
 
       try {
         const resp = await sendResend({
-          from: "MediPact AI <onboarding@resend.dev>",
+          from: "MİLAT Arabuluculuk <info@milatmediation.com>",
           to: [p.email],
           subject: `Toplantı Daveti - ${typeLabel} - ${dateStr}`,
           html,

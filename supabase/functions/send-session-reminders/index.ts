@@ -225,7 +225,7 @@ serve(async (req: Request): Promise<Response> => {
           `;
 
           await resend.emails.send({
-            from: "MediPact AI <onboarding@resend.dev>",
+            from: "MİLAT Arabuluculuk <info@milatmediation.com>",
             to: [userProfile.email],
             subject: `⏰ Reminder: Your Mediation Session is Tomorrow - ${formattedDate}`,
             html: userEmailHtml,
@@ -273,7 +273,7 @@ serve(async (req: Request): Promise<Response> => {
           `;
 
           await resend.emails.send({
-            from: "MediPact AI <onboarding@resend.dev>",
+            from: "MİLAT Arabuluculuk <info@milatmediation.com>",
             to: [mediatorProfile.email],
             subject: `⏰ Mediator Reminder: Session Tomorrow - ${formattedDate}`,
             html: mediatorEmailHtml,
