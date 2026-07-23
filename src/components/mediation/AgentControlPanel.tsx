@@ -47,6 +47,7 @@ type CaseSummaryInfo = {
   dispute_type: string | null;
   deadline_total: string | null;
   is_mandatory: boolean | null;
+  issue_description: string | null;
 };
 
 type CommonGroundReportRow = {
@@ -202,7 +203,7 @@ export function AgentControlPanel({ caseId, isMediator }: { caseId: string; isMe
           .order("updated_at", { ascending: false }),
         supabase.from("case_parties").select("id, party_type, first_name, last_name, company_name").eq("case_id", caseId),
         supabase.from("case_documents").select("id", { count: "exact", head: true }).eq("case_id", caseId),
-        supabase.from("cases").select("dispute_type, deadline_total, is_mandatory").eq("id", caseId).maybeSingle(),
+        supabase.from("cases").select("dispute_type, deadline_total, is_mandatory, issue_description").eq("id", caseId).maybeSingle(),
       ]);
       if (!active) return;
       if (states) setRows(states as AgentStateRow[]);
@@ -260,7 +261,7 @@ export function AgentControlPanel({ caseId, isMediator }: { caseId: string; isMe
 
   const missingReasons: string[] = [];
   if (partyCount < 2) missingReasons.push("2. taraf bekleniyor");
-  if ((documentCount ?? 0) < 1) missingReasons.push("Belge bekleniyor");
+  if ((documentCount ?? 0) < 1 && !caseInfo?.issue_description?.trim()) missingReasons.push("Belge veya uyuşmazlık konusu bekleniyor");
   const readyToRun = missingReasons.length === 0 && documentCount !== null;
   const orchestratorBusy = invoking || orchestratorRow?.status === "running";
 
