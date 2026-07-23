@@ -30,7 +30,7 @@ import {
   Plus, Loader2, FolderOpen, FileText, Users, Brain, ShieldCheck,
   Calendar as CalIcon, UserCheck, MessageSquare, FileCheck2, CheckCircle2, XCircle, Circle,
   Trash2, ArrowLeft, Sparkles, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Pencil,
-  LayoutDashboard, Lightbulb, Target, EyeOff, Mail,
+  LayoutDashboard, Lightbulb, Target, EyeOff, Mail, Copy,
 } from "lucide-react";
 
 // CaseRoom.tsx'teki altın sekme diliyle aynı — data-[state=active] alt çizgisi accent renginde.
@@ -1525,6 +1525,8 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [invitingId, setInvitingId] = useState<string | null>(null);
+  const [inviteUrls, setInviteUrls] = useState<Record<string, string>>({});
+  const [revealedId, setRevealedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1538,10 +1540,14 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
   const sendInvite = useCallback(async (partyId: string) => {
     setInvitingId(partyId);
     try {
-      const { error } = await supabase.functions.invoke("send-party-invite", {
+      const { data, error } = await supabase.functions.invoke("send-party-invite", {
         body: { party_id: partyId, app_url: window.location.origin },
       });
       if (error) throw error;
+      if ((data as any)?.invite_url) {
+        setInviteUrls((prev) => ({ ...prev, [partyId]: (data as any).invite_url }));
+        setRevealedId(partyId);
+      }
       toast({ title: "Davet gönderildi" });
     } catch (e: any) {
       toast({ title: "Davet gönderilemedi", description: trErr(e?.message ?? ""), variant: "destructive" });
@@ -1550,6 +1556,37 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
       load();
     }
   }, [load]);
+
+  function getPartyPhone(p: any): string | null {
+    const gsm = (p.gsm ?? "").trim();
+    if (gsm) return gsm;
+    const phone = (p.phone ?? "").trim();
+    return phone || null;
+  }
+
+  function normalizePhoneForWhatsapp(raw: string): string {
+    let cleaned = raw.replace(/[\s()-]/g, "").replace(/^\+/, "");
+    if (cleaned.startsWith("0")) cleaned = cleaned.slice(1);
+    if (!cleaned.startsWith("90")) cleaned = "90" + cleaned;
+    return cleaned;
+  }
+
+  function openWhatsapp(p: any, inviteUrl: string) {
+    const phone = getPartyPhone(p);
+    if (!phone) return;
+    const number = normalizePhoneForWhatsapp(phone);
+    const message = `${partyDisplay(p)}, ${caseRow.application_no ?? ""} numaralı arabuluculuk sürecine katılmak için: ${inviteUrl}`;
+    window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+  }
+
+  async function copyInviteLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Link kopyalandı" });
+    } catch {
+      toast({ title: "Kopyalanamadı", description: "Linki elle seçip kopyalayın.", variant: "destructive" });
+    }
+  }
 
   function validateParty(p: any, isInd: boolean): string | null {
     if (isInd) {
@@ -1693,43 +1730,80 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         ) : (
           <div className="space-y-2">
             {parties.map((p) => (
-              <motion.div variants={itemVariants} key={p.id} className="flex items-center justify-between p-3 border rounded">
-                <div>
-                  <div className="font-medium">{p.full_name || p.company_name || "(isimsiz)"}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {p.party_role === "applicant" ? "Başvurucu" : p.party_role === "respondent" ? "Karşı Taraf" : "Üçüncü Taraf"}
-                    {" · "}{p.party_type === "corporate" ? "Kurumsal" : "Bireysel"}
-                    {" · "}{p.email || "e-posta yok"}
+              <motion.div variants={itemVariants} key={p.id} className="p-3 border rounded space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">{p.full_name || p.company_name || "(isimsiz)"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {p.party_role === "applicant" ? "Başvurucu" : p.party_role === "respondent" ? "Karşı Taraf" : "Üçüncü Taraf"}
+                      {" · "}{p.party_type === "corporate" ? "Kurumsal" : "Bireysel"}
+                      {" · "}{p.email || "e-posta yok"}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  {p.email && p.invite_status !== "accepted" && (
+                  <div className="flex items-center gap-1">
+                    {p.email && p.invite_status !== "accepted" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => sendInvite(p.id)}
+                        disabled={invitingId === p.id}
+                        title="Davet Gönder / Yeniden Gönder"
+                      >
+                        {invitingId === p.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Mail className="h-4 w-4 mr-1" />}
+                        Davet Gönder / Yeniden Gönder
+                      </Button>
+                    )}
+                    {inviteUrls[p.id] && revealedId !== p.id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setRevealedId(p.id)}
+                        title="Davet linkini göster"
+                      >
+                        Davet Linkini Göster
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => sendInvite(p.id)}
-                      disabled={invitingId === p.id}
-                      title="Davet Gönder / Yeniden Gönder"
+                      onClick={() => {
+                        setEditing({ ...p });
+                        setVekilEditOpen(!!(p.vekil_ad_soyad || p.vekil_baro || p.vekil_sicil_no));
+                      }}
+                      title="Düzenle"
                     >
-                      {invitingId === p.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Mail className="h-4 w-4 mr-1" />}
-                      Davet Gönder / Yeniden Gönder
+                      <Pencil className="h-4 w-4 mr-1" /> Düzenle
                     </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setEditing({ ...p });
-                      setVekilEditOpen(!!(p.vekil_ad_soyad || p.vekil_baro || p.vekil_sicil_no));
-                    }}
-                    title="Düzenle"
-                  >
-                    <Pencil className="h-4 w-4 mr-1" /> Düzenle
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => remove(p.id)} title="Sil">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                    <Button variant="ghost" size="sm" onClick={() => remove(p.id)} title="Sil">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
+                {revealedId === p.id && inviteUrls[p.id] && (
+                  <div className="flex items-center gap-2 flex-wrap bg-muted/40 rounded p-2">
+                    <Input
+                      readOnly
+                      value={inviteUrls[p.id]}
+                      className="text-xs flex-1 min-w-[220px] h-8"
+                      onFocus={(e) => e.currentTarget.select()}
+                    />
+                    <Button size="sm" variant="outline" onClick={() => copyInviteLink(inviteUrls[p.id])}>
+                      <Copy className="h-3 w-3 mr-1" /> Linki Kopyala
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openWhatsapp(p, inviteUrls[p.id])}
+                      disabled={!getPartyPhone(p)}
+                      title={!getPartyPhone(p) ? "Telefon numarası girilmemiş" : undefined}
+                    >
+                      <MessageSquare className="h-3 w-3 mr-1" /> WhatsApp'tan Gönder
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setRevealedId(null)}>
+                      Gizle
+                    </Button>
+                  </div>
+                )}
               </motion.div>
             ))}
           </div>
