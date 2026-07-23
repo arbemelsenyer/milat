@@ -268,6 +268,10 @@ type PartyDraft = {
   phone?: string;
   email?: string;
   kvkk_ok?: boolean;
+  // vekil (opsiyonel, bireysel/kurumsal fark etmez)
+  vekil_ad_soyad?: string;
+  vekil_baro?: string;
+  vekil_sicil_no?: string;
 };
 
 function emptyParty(role: PartyDraft["party_role"] = "applicant"): PartyDraft {
@@ -1440,6 +1444,8 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
   const [parties, setParties] = useState<any[]>([]);
   const [draft, setDraft] = useState<PartyDraft | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
+  const [vekilDraftOpen, setVekilDraftOpen] = useState(false);
+  const [vekilEditOpen, setVekilEditOpen] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -1516,6 +1522,9 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         tax_number: draft.tax_number ?? null,
         trade_registry_no: draft.trade_registry_no ?? null,
         authorized_person: draft.authorized_person ?? null,
+        vekil_ad_soyad: draft.vekil_ad_soyad ?? null,
+        vekil_baro: draft.vekil_baro ?? null,
+        vekil_sicil_no: draft.vekil_sicil_no ?? null,
       } as any).select().single();
       if (error) throw error;
       if (draft.email) {
@@ -1563,6 +1572,9 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         tax_number: editing.tax_number ?? null,
         trade_registry_no: editing.trade_registry_no ?? null,
         authorized_person: editing.authorized_person ?? null,
+        vekil_ad_soyad: editing.vekil_ad_soyad ?? null,
+        vekil_baro: editing.vekil_baro ?? null,
+        vekil_sicil_no: editing.vekil_sicil_no ?? null,
       };
       const { error } = await supabase.from("case_parties").update(patch).eq("id", editing.id);
       if (error) throw error;
@@ -1628,7 +1640,15 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
                       Davet Gönder / Yeniden Gönder
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" onClick={() => setEditing({ ...p })} title="Düzenle">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setEditing({ ...p });
+                      setVekilEditOpen(!!(p.vekil_ad_soyad || p.vekil_baro || p.vekil_sicil_no));
+                    }}
+                    title="Düzenle"
+                  >
                     <Pencil className="h-4 w-4 mr-1" /> Düzenle
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => remove(p.id)} title="Sil">
@@ -1695,6 +1715,25 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
             <div className="md:col-span-2"><Label>Adres</Label><Input value={draft.address ?? ""} onChange={(e) => setDraft({ ...draft, address: e.target.value })} /></div>
             <div className="md:col-span-2"><Label>E-posta (davet için)</Label><Input type="email" value={draft.email ?? ""} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></div>
           </div>
+
+          <div className="border-t pt-3">
+            <button
+              type="button"
+              onClick={() => setVekilDraftOpen((o) => !o)}
+              className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition"
+            >
+              {vekilDraftOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              Vekil Bilgisi (opsiyonel)
+            </button>
+            {vekilDraftOpen && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                <div><Label>Vekil Adı Soyadı</Label><Input value={draft.vekil_ad_soyad ?? ""} onChange={(e) => setDraft({ ...draft, vekil_ad_soyad: e.target.value })} /></div>
+                <div><Label>Baro</Label><Input value={draft.vekil_baro ?? ""} onChange={(e) => setDraft({ ...draft, vekil_baro: e.target.value })} /></div>
+                <div><Label>Sicil No</Label><Input value={draft.vekil_sicil_no ?? ""} onChange={(e) => setDraft({ ...draft, vekil_sicil_no: e.target.value })} /></div>
+              </div>
+            )}
+          </div>
+
           <label className="flex items-start gap-2 text-sm">
             <Checkbox checked={!!draft.kvkk_ok} onCheckedChange={(v) => setDraft({ ...draft, kvkk_ok: !!v })} />
             <span>KVKK kapsamında kişisel verilerin işlenmesini onaylıyorum.</span>
@@ -1735,6 +1774,24 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
               )}
               <div className="md:col-span-2"><Label>Adres</Label><Input value={editing.address ?? ""} onChange={(e) => setEditing({ ...editing, address: e.target.value })} /></div>
               <div className="md:col-span-2"><Label>E-posta</Label><Input type="email" value={editing.email ?? ""} onChange={(e) => setEditing({ ...editing, email: e.target.value })} /></div>
+
+              <div className="md:col-span-2 border-t pt-3">
+                <button
+                  type="button"
+                  onClick={() => setVekilEditOpen((o) => !o)}
+                  className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition"
+                >
+                  {vekilEditOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  Vekil Bilgisi (opsiyonel)
+                </button>
+                {vekilEditOpen && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                    <div><Label>Vekil Adı Soyadı</Label><Input value={editing.vekil_ad_soyad ?? ""} onChange={(e) => setEditing({ ...editing, vekil_ad_soyad: e.target.value })} /></div>
+                    <div><Label>Baro</Label><Input value={editing.vekil_baro ?? ""} onChange={(e) => setEditing({ ...editing, vekil_baro: e.target.value })} /></div>
+                    <div><Label>Sicil No</Label><Input value={editing.vekil_sicil_no ?? ""} onChange={(e) => setEditing({ ...editing, vekil_sicil_no: e.target.value })} /></div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           <DialogFooter>

@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { X } from "lucide-react";
+import { ChevronDown, ChevronUp, X } from "lucide-react";
 
 export type Party = {
   partyType: "individual" | "corporate";
@@ -22,6 +23,10 @@ export type Party = {
   gsm: string;
   phone: string;
   email: string;
+  // vekil (opsiyonel, bireysel/kurumsal fark etmez)
+  vekilAdSoyad: string;
+  vekilBaro: string;
+  vekilSicilNo: string;
 };
 
 export const emptyParty = (): Party => ({
@@ -39,6 +44,9 @@ export const emptyParty = (): Party => ({
   gsm: "",
   phone: "",
   email: "",
+  vekilAdSoyad: "",
+  vekilBaro: "",
+  vekilSicilNo: "",
 });
 
 interface Props {
@@ -51,6 +59,7 @@ interface Props {
 export function PartyForm({ index, value, onChange, onRemove }: Props) {
   const set = <K extends keyof Party>(k: K, v: Party[K]) => onChange({ ...value, [k]: v });
   const isInd = value.partyType === "individual";
+  const [vekilOpen, setVekilOpen] = useState(false);
 
   return (
     <Card className="p-5 space-y-4 relative">
@@ -104,6 +113,24 @@ export function PartyForm({ index, value, onChange, onRemove }: Props) {
           <Field label="E-posta" type="email" value={value.email} onChange={(v) => set("email", v)} />
         </div>
       )}
+
+      <div className="border-t pt-3">
+        <button
+          type="button"
+          onClick={() => setVekilOpen((o) => !o)}
+          className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition"
+        >
+          {vekilOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          Vekil Bilgisi (opsiyonel)
+        </button>
+        {vekilOpen && (
+          <div className="grid sm:grid-cols-3 gap-3 mt-3">
+            <Field label="Vekil Adı Soyadı" value={value.vekilAdSoyad} onChange={(v) => set("vekilAdSoyad", v)} />
+            <Field label="Baro" value={value.vekilBaro} onChange={(v) => set("vekilBaro", v)} />
+            <Field label="Sicil No" value={value.vekilSicilNo} onChange={(v) => set("vekilSicilNo", v)} />
+          </div>
+        )}
+      </div>
     </Card>
   );
 }

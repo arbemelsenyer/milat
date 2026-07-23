@@ -171,6 +171,13 @@ function partyBlock(p: any): string {
   if (p.authorized_person) lines.push(`Yetkili: ${p.authorized_person}`);
   if (p.tax_office) lines.push(`Vergi Dairesi: ${p.tax_office}`);
   if (p.trade_registry_no) lines.push(`Ticaret Sicil No: ${p.trade_registry_no}`);
+  if (p.vekil_ad_soyad) {
+    const vekilDetails = [
+      p.vekil_baro ? `Baro: ${p.vekil_baro}` : null,
+      p.vekil_sicil_no ? `Sicil No: ${p.vekil_sicil_no}` : null,
+    ].filter(Boolean).join(", ");
+    lines.push(`Vekili: ${p.vekil_ad_soyad}${vekilDetails ? ` (${vekilDetails})` : ""}`);
+  }
   return lines.join("\n");
 }
 

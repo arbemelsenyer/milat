@@ -11,9 +11,12 @@ import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Loader2, ShieldCheck, Lock, Sparkles, Upload, FileText, Users, Brain, Lightbulb,
   Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X, History, Filter, FileDown, MessageSquare, Bot,
-  Wallet,
+  Wallet, Pencil,
 } from "lucide-react";
 import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
@@ -74,7 +77,7 @@ const PROCESS_STEPS = [
 export default function CaseRoom() {
   const { id: caseId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [caseRow, setCaseRow] = useState<CaseRow | null>(null);
   const [parties, setParties] = useState<Party[]>([]);
@@ -88,6 +91,9 @@ export default function CaseRoom() {
   const [arbNo, setArbNo] = useState<string>("");
   const [buroNo, setBuroNo] = useState<string>("");
   const [pdfWorking, setPdfWorking] = useState(false);
+  const [editIssueOpen, setEditIssueOpen] = useState(false);
+  const [issueDescDraft, setIssueDescDraft] = useState("");
+  const [savingIssue, setSavingIssue] = useState(false);
 
   const myParty = parties.find((p) => p.user_id === user?.id) ?? null;
   const isOwner = !!(caseRow && user && caseRow.user_id === user.id);
@@ -229,6 +235,40 @@ export default function CaseRoom() {
     await loadAll();
   }
 
+  function openEditIssue() {
+    setIssueDescDraft(caseRow?.issue_description ?? "");
+    setEditIssueOpen(true);
+  }
+
+  async function saveIssueDescription() {
+    if (!caseId || !caseRow) return;
+    setSavingIssue(true);
+    try {
+      const previous = caseRow.issue_description ?? "";
+      const next = issueDescDraft;
+      const changed = previous.trim() !== next.trim();
+      const { error } = await supabase.from("cases").update({ issue_description: next || null }).eq("id", caseId);
+      if (error) throw error;
+      // NOT: party_analyses / common_ground_reports / party_root_cause_analysis kasıtlı olarak
+      // dokunulmuyor — kök neden ve önceki analizler kaybolmasın diye. Bunlar sadece "Tüm Analizi
+      // Başlat" yeniden çalıştırılınca güncellenir.
+      setCaseRow((prev) => (prev ? { ...prev, issue_description: next || null } : prev));
+      setEditIssueOpen(false);
+      if (changed) {
+        toast({
+          title: "Uyuşmazlık konusu güncellendi",
+          description: "Mevcut analizler eski metne göre üretilmiştir; güncellemek için Tüm Analizi Başlat'ı yeniden çalıştırın.",
+        });
+      } else {
+        toast({ title: "Kaydedildi" });
+      }
+    } catch (e: any) {
+      toast({ title: "Kaydedilemedi", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingIssue(false);
+    }
+  }
+
   if (loading || isLoading) {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
   }
@@ -273,7 +313,42 @@ export default function CaseRoom() {
               </Badge>
             </div>
           </div>
+          {(isMediator || isAdmin) && (
+            <div className="mt-4 border-t pt-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Uyuşmazlık Konusu</Label>
+                  <p className="text-sm mt-1 whitespace-pre-wrap">
+                    {caseRow.issue_description || <span className="text-muted-foreground italic">Girilmemiş.</span>}
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={openEditIssue}>
+                  <Pencil className="h-4 w-4 mr-1" /> Düzenle
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
+
+        <Dialog open={editIssueOpen} onOpenChange={(o) => !o && !savingIssue && setEditIssueOpen(false)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Uyuşmazlık Konusunu Düzenle</DialogTitle>
+            </DialogHeader>
+            <Textarea
+              value={issueDescDraft}
+              onChange={(e) => setIssueDescDraft(e.target.value)}
+              rows={6}
+              placeholder="Uyuşmazlık konusunu yazın..."
+            />
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setEditIssueOpen(false)} disabled={savingIssue}>İptal</Button>
+              <Button onClick={saveIssueDescription} disabled={savingIssue}>
+                {savingIssue ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Kaydediliyor…</> : "Kaydet"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <ProcessOverview
           currentPhase={caseRow.current_phase ?? 1}

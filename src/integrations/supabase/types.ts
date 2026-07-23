@@ -551,6 +551,9 @@ export type Database = {
           tc_kimlik: string | null
           trade_registry_no: string | null
           user_id: string | null
+          vekil_ad_soyad: string | null
+          vekil_baro: string | null
+          vekil_sicil_no: string | null
         }
         Insert: {
           address?: string | null
@@ -579,6 +582,9 @@ export type Database = {
           tc_kimlik?: string | null
           trade_registry_no?: string | null
           user_id?: string | null
+          vekil_ad_soyad?: string | null
+          vekil_baro?: string | null
+          vekil_sicil_no?: string | null
         }
         Update: {
           address?: string | null
@@ -607,6 +613,9 @@ export type Database = {
           tc_kimlik?: string | null
           trade_registry_no?: string | null
           user_id?: string | null
+          vekil_ad_soyad?: string | null
+          vekil_baro?: string | null
+          vekil_sicil_no?: string | null
         }
         Relationships: [
           {
