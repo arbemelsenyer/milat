@@ -26,6 +26,7 @@ import { motion, AnimatePresence, animate, useMotionValue, useMotionValueEvent }
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { getPartyPhone, normalizePhoneForWhatsapp } from "@/lib/phone";
 import {
   Plus, Loader2, FolderOpen, FileText, Users, Brain, ShieldCheck,
   Calendar as CalIcon, UserCheck, MessageSquare, FileCheck2, CheckCircle2, XCircle, Circle,
@@ -854,7 +855,7 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance }: {
   useEffect(() => {
     supabase
       .from("case_parties")
-      .select("id, user_id, party_role, first_name, last_name, company_name, email")
+      .select("id, user_id, party_role, first_name, last_name, company_name, email, gsm, phone")
       .eq("case_id", caseRow.id)
       .then(({ data }) => setParties(data ?? []));
   }, [caseRow.id]);
@@ -1556,20 +1557,6 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
       load();
     }
   }, [load]);
-
-  function getPartyPhone(p: any): string | null {
-    const gsm = (p.gsm ?? "").trim();
-    if (gsm) return gsm;
-    const phone = (p.phone ?? "").trim();
-    return phone || null;
-  }
-
-  function normalizePhoneForWhatsapp(raw: string): string {
-    let cleaned = raw.replace(/[\s()-]/g, "").replace(/^\+/, "");
-    if (cleaned.startsWith("0")) cleaned = cleaned.slice(1);
-    if (!cleaned.startsWith("90")) cleaned = "90" + cleaned;
-    return cleaned;
-  }
 
   function openWhatsapp(p: any, inviteUrl: string) {
     const phone = getPartyPhone(p);

@@ -9,8 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { VideoCallButton } from "@/components/VideoCallButton";
-import { Calendar, Plus, Sparkles, Loader2, Users, Clock, Circle, Eye, Send, RefreshCw, CheckCircle2, XCircle, MailWarning, Ban } from "lucide-react";
+import { Calendar, Plus, Sparkles, Loader2, Users, Clock, Circle, Eye, Send, RefreshCw, CheckCircle2, XCircle, MailWarning, Ban, Copy, MessageSquare } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { getPartyPhone, normalizePhoneForWhatsapp } from "@/lib/phone";
 
 const TYPES = [
   { key: "preliminary", label: "Ön Görüşme" },
@@ -37,6 +38,8 @@ interface PartyLite {
   last_name?: string | null;
   company_name?: string | null;
   email?: string | null;
+  gsm?: string | null;
+  phone?: string | null;
 }
 
 interface Props {
@@ -63,6 +66,34 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
     `Taraf ${p.party_role ?? "?"} · ${
       p.company_name || `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email || "—"
     }`;
+
+  const partyName = (p: PartyLite) =>
+    p.company_name || `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "Sayın Taraf";
+
+  function buildMeetingShareMessage(p: PartyLite, session: any): string {
+    const typeLabel = TYPES.find((t) => t.key === session.session_type)?.label ?? session.session_type;
+    const when = session.scheduled_at ? new Date(session.scheduled_at) : null;
+    const dateStr = when ? when.toLocaleDateString("tr-TR") : "";
+    const timeStr = when ? when.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }) : "";
+    return `${partyName(p)}, ${typeLabel} — ${dateStr} ${timeStr} — Katılım linki: ${session.video_link}`;
+  }
+
+  async function copyMeetingLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Link kopyalandı" });
+    } catch {
+      toast({ title: "Kopyalanamadı", description: "Linki elle seçip kopyalayın.", variant: "destructive" });
+    }
+  }
+
+  function openMeetingWhatsapp(p: PartyLite, session: any) {
+    const phone = getPartyPhone(p);
+    if (!phone) return;
+    const number = normalizePhoneForWhatsapp(phone);
+    const message = buildMeetingShareMessage(p, session);
+    window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+  }
 
   const load = async () => {
     const { data } = await supabase
@@ -252,6 +283,16 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
     }
   };
 
+  // Mints (or fetches the already-persisted) video_link so the meeting has a
+  // real join link to share, the same way VideoCallButton lazily creates one.
+  const ensureVideoLink = async (sessionId: string): Promise<string | null> => {
+    const { data, error } = await supabase.functions.invoke("create-video-room", {
+      body: { sessionId },
+    });
+    if (error || !data?.room_url) return null;
+    return data.room_url as string;
+  };
+
   const add = async () => {
     if (!composedDateTime) return;
     if (conflicts.length > 0) {
@@ -291,7 +332,11 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
     setLastResults([]);
     setAlreadySent(false);
     setPreviewOpen(true);
-    if (inserted?.id) await loadPreview(inserted.id);
+    if (inserted?.id) {
+      await loadPreview(inserted.id);
+      const link = await ensureVideoLink(inserted.id);
+      if (link) setActiveSession((prev: any) => (prev ? { ...prev, video_link: link } : prev));
+    }
     setDate("");
     setNotes("");
     load();
@@ -350,6 +395,10 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
     setAlreadySent(!!s.invite_sent_at);
     setPreviewOpen(true);
     await loadPreview(s.id);
+    if (!s.video_link) {
+      const link = await ensureVideoLink(s.id);
+      if (link) setActiveSession((prev: any) => (prev ? { ...prev, video_link: link } : prev));
+    }
   };
 
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -706,6 +755,38 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
               Aşağıdaki içerik her bir alıcıya ayrı ayrı gönderilecektir. Göndermeden önce kontrol edin.
             </DialogDescription>
           </DialogHeader>
+
+          {activeSession && (
+            <div className="space-y-2 border rounded-md p-3">
+              <Label className="text-xs flex items-center gap-1"><Users className="h-3 w-3" /> Katılım Linkini Paylaş</Label>
+              {!activeSession.video_link ? (
+                <p className="text-xs text-muted-foreground">Katılım linki hazırlanıyor…</p>
+              ) : (
+                <div className="space-y-2">
+                  {((activeSession.participants ?? []) as any[])
+                    .map((pp: any) => parties.find((p) => p.id === pp.party_id))
+                    .filter((p): p is PartyLite => !!p)
+                    .map((p) => (
+                      <div key={p.id} className="flex items-center gap-2 flex-wrap text-sm">
+                        <span className="min-w-[140px]">{partyName(p)}</span>
+                        <Button size="sm" variant="outline" onClick={() => copyMeetingLink(activeSession.video_link)}>
+                          <Copy className="h-3 w-3 mr-1" /> Linki Kopyala
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openMeetingWhatsapp(p, activeSession)}
+                          disabled={!getPartyPhone(p)}
+                          title={!getPartyPhone(p) ? "Telefon numarası girilmemiş" : undefined}
+                        >
+                          <MessageSquare className="h-3 w-3 mr-1" /> WhatsApp'tan Gönder
+                        </Button>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {previewLoading ? (
             <div className="py-12 flex items-center justify-center text-muted-foreground">
