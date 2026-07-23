@@ -2091,6 +2091,12 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
             <Progress value={progressPct} className="h-2" />
           </div>
         </div>
+        <div className="border-t pt-3">
+          <Label className="text-xs text-muted-foreground">Uyuşmazlık Konusu</Label>
+          <p className="text-sm mt-1 whitespace-pre-wrap">
+            {caseRow.issue_description || <span className="text-muted-foreground italic">Girilmemiş.</span>}
+          </p>
+        </div>
       </Card>
       </motion.div>
 
@@ -2113,6 +2119,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
           const a = analyses.find((x) => x.party_id === p.id);
           const open = openId === p.id;
           const an = a?.analysis ?? {};
+          const analysisStale = !!a && a.issue_description_snapshot != null && a.issue_description_snapshot !== caseRow.issue_description;
           return (
             <motion.div variants={itemVariants} key={p.id}>
             <Card className="overflow-hidden">
@@ -2129,6 +2136,11 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
                 </div>
                 <div className="flex items-center gap-2">
                   {a && <Badge variant="secondary">Analiz hazır</Badge>}
+                  {analysisStale && (
+                    <Badge className="bg-amber-500 text-white gap-1">
+                      <AlertTriangle className="h-3 w-3" /> Uyuşmazlık konusu değişti
+                    </Badge>
+                  )}
                   {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </div>
               </button>
@@ -2212,6 +2224,13 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
                     )}
                   </div>
 
+
+                  {analysisStale && (
+                    <p className="text-[11px] text-amber-600 flex items-start gap-1">
+                      <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                      Uyuşmazlık konusu bu analizden sonra değişti — Analizi yeniden çalıştırın.
+                    </p>
+                  )}
 
                   {/* Analysis trigger */}
                   <div className="flex gap-2 flex-wrap">

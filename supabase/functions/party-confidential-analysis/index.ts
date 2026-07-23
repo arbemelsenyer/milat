@@ -266,6 +266,7 @@ Bu tarafın perspektifinden detaylı analiz üret. Yukarıdaki bloklarda somut b
         analysis: parsed,
         discovery_questions: parsed.discovery_questions ?? [],
         risk_analizi: parsed.risk_analizi ?? null,
+        issue_description_snapshot: caseRow?.issue_description ?? null,
       }).eq("id", existing.id);
     } else {
       await admin.from("party_analyses").insert({
@@ -273,6 +274,7 @@ Bu tarafın perspektifinden detaylı analiz üret. Yukarıdaki bloklarda somut b
         analysis: parsed,
         discovery_questions: parsed.discovery_questions ?? [],
         risk_analizi: parsed.risk_analizi ?? null,
+        issue_description_snapshot: caseRow?.issue_description ?? null,
       });
     }
 

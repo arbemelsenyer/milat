@@ -1884,6 +1884,7 @@ export type Database = {
           created_at: string
           discovery_questions: Json
           id: string
+          issue_description_snapshot: string | null
           party_id: string
           prep_notes: Json
           risk_analizi: Json | null
@@ -1897,6 +1898,7 @@ export type Database = {
           created_at?: string
           discovery_questions?: Json
           id?: string
+          issue_description_snapshot?: string | null
           party_id: string
           prep_notes?: Json
           risk_analizi?: Json | null
@@ -1910,6 +1912,7 @@ export type Database = {
           created_at?: string
           discovery_questions?: Json
           id?: string
+          issue_description_snapshot?: string | null
           party_id?: string
           prep_notes?: Json
           risk_analizi?: Json | null
