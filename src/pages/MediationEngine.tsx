@@ -230,6 +230,7 @@ type CaseRow = {
   current_phase: number | null;
   application_date: string | null;
   assigned_mediator_id: string | null;
+  issue_description: string | null;
   created_at: string;
   is_mandatory?: boolean | null;
   legal_duration_days?: number | null;
@@ -455,7 +456,7 @@ export default function MediationEngine() {
     setLoading(true);
     const { data, error } = await supabase
       .from("cases")
-      .select("id, user_id, title, application_no, uyap_no, dispute_type, status, current_phase, application_date, assigned_mediator_id, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta")
+      .select("id, user_id, title, application_no, uyap_no, dispute_type, status, current_phase, application_date, assigned_mediator_id, issue_description, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta")
       .order("created_at", { ascending: false });
     if (error) toast({ title: "Yükleme hatası", description: trErr(error.message), variant: "destructive" });
     else setCases((data ?? []) as CaseRow[]);
@@ -465,7 +466,7 @@ export default function MediationEngine() {
   async function loadCase(id: string) {
     const { data, error } = await supabase
       .from("cases")
-      .select("id, user_id, title, application_no, uyap_no, dispute_type, status, current_phase, application_date, assigned_mediator_id, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta")
+      .select("id, user_id, title, application_no, uyap_no, dispute_type, status, current_phase, application_date, assigned_mediator_id, issue_description, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta")
       .eq("id", id).maybeSingle();
     if (error) { toast({ title: "Başvuru yüklenemedi", description: trErr(error.message), variant: "destructive" }); return; }
     setActiveCase(data as CaseRow);
@@ -825,7 +826,7 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }
     }
   }
   switch (phase) {
-    case 1: return <><Phase1Summary caseRow={caseRow} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 1: return <><Phase1Summary caseRow={caseRow} reload={reload} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 2: return <><Phase2Parties caseRow={caseRow} isMediator={isMediator} userId={userId} onDone={() => { bumpPhase(3); onAdvance(3); }} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 3: return <><Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} /></Phase3ErrorBoundary><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 4: return <>
@@ -920,8 +921,47 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance }: {
   );
 }
 
-function Phase1Summary({ caseRow }: { caseRow: CaseRow }) {
+function Phase1Summary({ caseRow, reload }: { caseRow: CaseRow; reload: () => void }) {
   const classified = !!caseRow.dispute_type;
+  const { user, isAdmin } = useAuth();
+  const canEditIssue = caseRow.assigned_mediator_id === user?.id || isAdmin;
+  const [editIssueOpen, setEditIssueOpen] = useState(false);
+  const [issueDescDraft, setIssueDescDraft] = useState("");
+  const [savingIssue, setSavingIssue] = useState(false);
+
+  function openEditIssue() {
+    setIssueDescDraft(caseRow.issue_description ?? "");
+    setEditIssueOpen(true);
+  }
+
+  async function saveIssueDescription() {
+    setSavingIssue(true);
+    try {
+      const previous = caseRow.issue_description ?? "";
+      const next = issueDescDraft;
+      const changed = previous.trim() !== next.trim();
+      const { error } = await supabase.from("cases").update({ issue_description: next || null }).eq("id", caseRow.id);
+      if (error) throw error;
+      // NOT: party_analyses / common_ground_reports / party_root_cause_analysis kasıtlı olarak
+      // dokunulmuyor — kök neden ve önceki analizler kaybolmasın diye. Bunlar sadece "Tüm Analizi
+      // Başlat" yeniden çalıştırılınca güncellenir.
+      reload();
+      setEditIssueOpen(false);
+      if (changed) {
+        toast({
+          title: "Uyuşmazlık konusu güncellendi",
+          description: "Mevcut analizler eski metne göre üretilmiştir; güncellemek için Tüm Analizi Başlat'ı yeniden çalıştırın.",
+        });
+      } else {
+        toast({ title: "Kaydedildi" });
+      }
+    } catch (e: any) {
+      toast({ title: "Kaydedilemedi", description: trErr(e.message), variant: "destructive" });
+    } finally {
+      setSavingIssue(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <PhaseHero
@@ -946,6 +986,21 @@ function Phase1Summary({ caseRow }: { caseRow: CaseRow }) {
           <p className="text-xs text-muted-foreground border-t pt-3">
             UYAP Kayıt Numarası, başvuru resmi sisteme kaydedildiğinde Aşama 4 (Arabulucu Paneli) üzerinden eklenebilir.
           </p>
+          {canEditIssue && (
+            <div className="border-t pt-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Uyuşmazlık Konusu</Label>
+                  <p className="text-sm mt-1 whitespace-pre-wrap">
+                    {caseRow.issue_description || <span className="text-muted-foreground italic">Girilmemiş.</span>}
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={openEditIssue}>
+                  <Pencil className="h-4 w-4 mr-1" /> Düzenle
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       </motion.div>
       <motion.div variants={itemVariants}>
@@ -955,6 +1010,26 @@ function Phase1Summary({ caseRow }: { caseRow: CaseRow }) {
         <DeadlineCard caseRow={caseRow} />
       </motion.div>
       </motion.div>
+
+      <Dialog open={editIssueOpen} onOpenChange={(o) => !o && !savingIssue && setEditIssueOpen(false)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Uyuşmazlık Konusunu Düzenle</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={issueDescDraft}
+            onChange={(e) => setIssueDescDraft(e.target.value)}
+            rows={6}
+            placeholder="Uyuşmazlık konusunu yazın..."
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditIssueOpen(false)} disabled={savingIssue}>İptal</Button>
+            <Button onClick={saveIssueDescription} disabled={savingIssue}>
+              {savingIssue ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Kaydediliyor…</> : "Kaydet"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
