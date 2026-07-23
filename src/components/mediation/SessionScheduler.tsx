@@ -79,7 +79,7 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
   // default: invite everyone
   useEffect(() => {
     if (parties.length && selectedPartyIds.length === 0) {
-      setSelectedPartyIds(parties.filter((p) => p.user_id).map((p) => p.id));
+      setSelectedPartyIds(parties.filter((p) => p.user_id || p.email).map((p) => p.id));
     }
   }, [parties]);
 
@@ -568,11 +568,14 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
                   <Checkbox
                     checked={selectedPartyIds.includes(p.id)}
                     onCheckedChange={() => toggleParty(p.id)}
-                    disabled={!p.user_id}
+                    disabled={!p.user_id && !p.email}
                   />
                   <span>{partyLabel(p)}</span>
-                  {!p.user_id && (
+                  {!p.user_id && !p.email && (
                     <span className="text-xs text-muted-foreground">(davet bekliyor)</span>
+                  )}
+                  {!p.user_id && p.email && (
+                    <span className="text-xs text-muted-foreground">(e-posta ile davet edilecek)</span>
                   )}
                 </label>
               ))}
