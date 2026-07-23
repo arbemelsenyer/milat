@@ -1537,11 +1537,11 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
 
   useEffect(() => { load(); }, [load]);
 
-  const sendInvite = useCallback(async (partyId: string) => {
+  const sendInvite = useCallback(async (partyId: string, opts?: { skipEmail?: boolean }) => {
     setInvitingId(partyId);
     try {
       const { data, error } = await supabase.functions.invoke("send-party-invite", {
-        body: { party_id: partyId, app_url: window.location.origin },
+        body: { party_id: partyId, app_url: window.location.origin, skip_email: !!opts?.skipEmail },
       });
       if (error) throw error;
       if ((data as any)?.invite_url) {
@@ -1751,6 +1751,18 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
                       >
                         {invitingId === p.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Mail className="h-4 w-4 mr-1" />}
                         Davet Gönder / Yeniden Gönder
+                      </Button>
+                    )}
+                    {!p.email && p.invite_status !== "accepted" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => sendInvite(p.id, { skipEmail: true })}
+                        disabled={invitingId === p.id}
+                        title="Davet Linki Oluştur"
+                      >
+                        {invitingId === p.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Mail className="h-4 w-4 mr-1" />}
+                        Davet Linki Oluştur
                       </Button>
                     )}
                     {inviteUrls[p.id] && revealedId !== p.id && (

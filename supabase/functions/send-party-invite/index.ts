@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
     const { data: u } = await userClient.auth.getUser();
     if (!u?.user) return new Response(JSON.stringify({ error: "Invalid session" }), { status: 401, headers: corsHeaders });
 
-    const { party_id, app_url } = await req.json();
+    const { party_id, app_url, skip_email } = await req.json();
     const admin = createClient(supabaseUrl, serviceKey);
 
     const { data: party } = await admin.from("case_parties")
@@ -83,7 +83,12 @@ Deno.serve(async (req) => {
     inviteUrl = `${baseUrl}/auth?invite=${token}`;
     const applicationNo = (party as any).cases?.application_no ?? "";
 
-    if (resendKey && party.email) {
+    // Explicit skip_email, or no email on file at all: mint the link/token and
+    // persist it as usual, but never attempt Resend and never treat the
+    // missing email as a failure.
+    const shouldSkipEmail = skip_email === true || !party.email;
+
+    if (!shouldSkipEmail && resendKey && party.email) {
       const emailRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
