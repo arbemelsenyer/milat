@@ -313,7 +313,7 @@ export default function CaseRoom() {
               </Badge>
             </div>
           </div>
-          {(isMediator || isAdmin) && (
+          {(isMediator || isOwner || isAdmin) && (
             <div className="mt-4 border-t pt-3">
               <div className="flex items-start justify-between gap-3">
                 <div>

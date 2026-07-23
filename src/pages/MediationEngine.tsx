@@ -924,7 +924,7 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance }: {
 function Phase1Summary({ caseRow, reload }: { caseRow: CaseRow; reload: () => void }) {
   const classified = !!caseRow.dispute_type;
   const { user, isAdmin } = useAuth();
-  const canEditIssue = caseRow.assigned_mediator_id === user?.id || isAdmin;
+  const canEditIssue = caseRow.assigned_mediator_id === user?.id || caseRow.user_id === user?.id || isAdmin;
   const [editIssueOpen, setEditIssueOpen] = useState(false);
   const [issueDescDraft, setIssueDescDraft] = useState("");
   const [savingIssue, setSavingIssue] = useState(false);
