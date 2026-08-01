@@ -3114,6 +3114,24 @@ function cleanExcerpt(raw?: string): string {
   return slice.slice(0, cut).replace(/[\s,;:]+$/g, "") + "…";
 }
 
+const STORAGE_SOURCE_PREFIX = "storage://case-documents/";
+
+// Elle yüklenen kaynaklar storage://case-documents/... sözde-URL'i ile geliyor; bu tarayıcıda
+// açılamaz. CaseDocuments.tsx:88-104'teki desenin aynısı: prefix'i ayıklayıp Supabase Storage'dan
+// authenticated indirip blob URL olarak yeni sekmede açıyoruz.
+async function openStorageSource(sourceUrl: string) {
+  try {
+    const path = sourceUrl.replace(STORAGE_SOURCE_PREFIX, "");
+    const { data, error } = await supabase.storage.from("case-documents").download(path);
+    if (error || !data) throw error ?? new Error("Dosya indirilemedi.");
+    const blobUrl = URL.createObjectURL(data);
+    window.open(blobUrl, "_blank", "noopener,noreferrer");
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
+  } catch (e: any) {
+    toast({ title: "Kaynak açılamadı", description: e?.message || "Dosya indirilemedi.", variant: "destructive" });
+  }
+}
+
 function SourcesPanel({ sources }: { sources?: any[] }) {
   const list = Array.isArray(sources) ? sources : [];
   if (list.length === 0) {
@@ -3134,28 +3152,42 @@ function SourcesPanel({ sources }: { sources?: any[] }) {
         )}
       </p>
       <ol className="space-y-2 text-sm list-decimal pl-5">
-        {list.map((s: any, i: number) => (
-          <li key={i} className="border rounded p-2 bg-background">
-            <div className="flex items-start justify-between gap-2">
-              <div className="font-medium">
-                {s.url ? (
-                  <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                    {s.title || "Kaynak"}
-                  </a>
-                ) : (s.title || "Kaynak")}
-                {s.category && <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">[{s.category}]</span>}
+        {list.map((s: any, i: number) => {
+          const isStorageSource = typeof s.url === "string" && s.url.startsWith(STORAGE_SOURCE_PREFIX);
+          const href = typeof s.url === "string" && s.url.startsWith("https") && s.page
+            ? `${s.url}#page=${s.page}`
+            : s.url;
+          return (
+            <li key={i} className="border rounded p-2 bg-background">
+              <div className="flex items-start justify-between gap-2">
+                <div className="font-medium">
+                  {isStorageSource ? (
+                    <button
+                      type="button"
+                      onClick={() => openStorageSource(s.url)}
+                      className="text-primary hover:underline cursor-pointer bg-transparent border-0 p-0 font-medium"
+                    >
+                      {s.title || "Kaynak"}
+                    </button>
+                  ) : s.url ? (
+                    <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      {s.title || "Kaynak"}
+                    </a>
+                  ) : (s.title || "Kaynak")}
+                  {s.category && <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">[{s.category}]</span>}
+                </div>
+                {typeof s.similarity === "number" && (
+                  <span className="text-[10px] text-muted-foreground shrink-0">benzerlik %{Math.round(s.similarity * 100)}</span>
+                )}
               </div>
-              {typeof s.similarity === "number" && (
-                <span className="text-[10px] text-muted-foreground shrink-0">benzerlik %{Math.round(s.similarity * 100)}</span>
+              {s.excerpt && (
+                <blockquote className="mt-1 text-xs text-muted-foreground italic border-l-2 pl-2">
+                  "{cleanExcerpt(s.excerpt)}"
+                </blockquote>
               )}
-            </div>
-            {s.excerpt && (
-              <blockquote className="mt-1 text-xs text-muted-foreground italic border-l-2 pl-2">
-                "{cleanExcerpt(s.excerpt)}"
-              </blockquote>
-            )}
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ol>
     </AnaSection>
   );
