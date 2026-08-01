@@ -1341,34 +1341,40 @@ export type Database = {
       }
       knowledge_base_chunks: {
         Row: {
+          alan: string | null
           category: string
           chunk_index: number
           chunk_text: string
           created_at: string
           embedding: string | null
           id: string
+          katman: string | null
           metadata: Json
           source_title: string
           source_url: string
         }
         Insert: {
+          alan?: string | null
           category?: string
           chunk_index?: number
           chunk_text: string
           created_at?: string
           embedding?: string | null
           id?: string
+          katman?: string | null
           metadata?: Json
           source_title: string
           source_url: string
         }
         Update: {
+          alan?: string | null
           category?: string
           chunk_index?: number
           chunk_text?: string
           created_at?: string
           embedding?: string | null
           id?: string
+          katman?: string | null
           metadata?: Json
           source_title?: string
           source_url?: string
@@ -1723,6 +1729,120 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      mevzuat_alert_prefs: {
+        Row: {
+          aktif: boolean
+          kanunlar: string[]
+          taslaklari_da_bildir: boolean
+          updated_at: string
+          user_id: string
+          uyusmazlik_turleri: string[]
+        }
+        Insert: {
+          aktif?: boolean
+          kanunlar?: string[]
+          taslaklari_da_bildir?: boolean
+          updated_at?: string
+          user_id: string
+          uyusmazlik_turleri?: string[]
+        }
+        Update: {
+          aktif?: boolean
+          kanunlar?: string[]
+          taslaklari_da_bildir?: boolean
+          updated_at?: string
+          user_id?: string
+          uyusmazlik_turleri?: string[]
+        }
+        Relationships: []
+      }
+      mevzuat_changes: {
+        Row: {
+          baslik: string
+          content_hash: string | null
+          created_at: string
+          degisiklik_ozeti: string | null
+          durum: string
+          eski_metin: string | null
+          id: string
+          ilgili_kanun: string | null
+          inceleme_durumu: string
+          kaynak: string
+          kaynak_url: string | null
+          madde_no: string | null
+          sayi: string | null
+          yayim_tarihi: string | null
+          yeni_metin: string | null
+        }
+        Insert: {
+          baslik: string
+          content_hash?: string | null
+          created_at?: string
+          degisiklik_ozeti?: string | null
+          durum?: string
+          eski_metin?: string | null
+          id?: string
+          ilgili_kanun?: string | null
+          inceleme_durumu?: string
+          kaynak: string
+          kaynak_url?: string | null
+          madde_no?: string | null
+          sayi?: string | null
+          yayim_tarihi?: string | null
+          yeni_metin?: string | null
+        }
+        Update: {
+          baslik?: string
+          content_hash?: string | null
+          created_at?: string
+          degisiklik_ozeti?: string | null
+          durum?: string
+          eski_metin?: string | null
+          id?: string
+          ilgili_kanun?: string | null
+          inceleme_durumu?: string
+          kaynak?: string
+          kaynak_url?: string | null
+          madde_no?: string | null
+          sayi?: string | null
+          yayim_tarihi?: string | null
+          yeni_metin?: string | null
+        }
+        Relationships: []
+      }
+      mevzuat_impact_map: {
+        Row: {
+          aciklama: string | null
+          aktif: boolean
+          created_at: string
+          hedef_ref: string
+          hedef_tip: string
+          id: string
+          ilgili_kanun: string
+          madde_no: string | null
+        }
+        Insert: {
+          aciklama?: string | null
+          aktif?: boolean
+          created_at?: string
+          hedef_ref: string
+          hedef_tip: string
+          id?: string
+          ilgili_kanun: string
+          madde_no?: string | null
+        }
+        Update: {
+          aciklama?: string | null
+          aktif?: boolean
+          created_at?: string
+          hedef_ref?: string
+          hedef_tip?: string
+          id?: string
+          ilgili_kanun?: string
+          madde_no?: string | null
+        }
+        Relationships: []
       }
       negotiation_rounds: {
         Row: {
