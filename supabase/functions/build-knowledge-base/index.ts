@@ -182,7 +182,13 @@ async function embed(texts: string[]): Promise<number[][]> {
 }
 
 // ============ Whole-book mode ============
-async function processBookWhole(admin: any, jobId: string, book: Book, existingChunks: number): Promise<{ chunks: number }> {
+async function processBookWhole(
+  admin: any,
+  jobId: string,
+  book: Book,
+  existingChunks: number,
+  jobStartedAt: string,
+): Promise<{ chunks: number; cleanupNote?: string }> {
   // extractText/getDocumentProxy statik olarak import edildi.
   console.log(`[${jobId}] Processing book (whole): ${book.title}`);
   await updateJob(admin, jobId, { current_book: `${book.title} — PDF indiriliyor` });
@@ -200,9 +206,6 @@ async function processBookWhole(admin: any, jobId: string, book: Book, existingC
   if (chunks.length > MAX_CHUNKS_PER_BOOK) {
     throw new Error(`Anormal parça sayısı (${chunks.length} > ${MAX_CHUNKS_PER_BOOK}). PDF içeriği bozuk veya yanlış indirilmiş olabilir.`);
   }
-  await updateJob(admin, jobId, { current_book: `${book.title} — eski parçalar temizleniyor` });
-  await admin.from("knowledge_base_chunks").delete().eq("source_url", book.url);
-
   let total = 0;
   const BATCH = 8;
   for (let i = 0; i < chunks.length; i += BATCH) {
@@ -223,8 +226,26 @@ async function processBookWhole(admin: any, jobId: string, book: Book, existingC
       current_book: `${book.title} — ${total}/${chunks.length} parça kaydedildi`,
     });
   }
+
+  // Kitap başarıyla tamamlandı: yalnızca bu job'tan ÖNCE var olan eski parçaları temizle
+  // (yeni eklenenlerin created_at'i jobStartedAt'ten sonra, silinmezler). Temizlik başarısız
+  // olursa kitabı başarısız saymadan devam et — eski+yeni bir süre birlikte durabilir.
+  let cleanupNote: string | undefined;
+  await updateJob(admin, jobId, { current_book: `${book.title} — eski parçalar temizleniyor` });
+  try {
+    const { error: cleanupErr } = await admin
+      .from("knowledge_base_chunks")
+      .delete()
+      .eq("source_url", book.url)
+      .lt("created_at", jobStartedAt);
+    if (cleanupErr) throw cleanupErr;
+  } catch (e: any) {
+    cleanupNote = `Eski parçalar temizlenemedi (kitap yine de başarılı sayıldı): ${e?.message ?? e}`;
+    console.error(`[${jobId}] Cleanup failed for ${book.title}:`, e?.message ?? e);
+  }
+
   console.log(`[${jobId}] Completed (whole): ${book.title}, chunks=${total}`);
-  return { chunks: total };
+  return { chunks: total, cleanupNote };
 }
 
 // ============ Page-chunked mode ============
@@ -236,7 +257,8 @@ async function processBookPageSlice(
   startPage: number,
   bookProgress: Record<string, any>,
   totalChunksSoFar: number,
-): Promise<{ pagesProcessed: number; totalPages: number; chunksAdded: number; bookDone: boolean }> {
+  jobStartedAt: string,
+): Promise<{ pagesProcessed: number; totalPages: number; chunksAdded: number; bookDone: boolean; cleanupNote?: string }> {
   console.log(`[${jobId}] Page-slice: ${book.title} from page ${startPage}`);
   await updateJob(admin, jobId, { current_book: `${book.title} — sayfa ${startPage + 1}+ indiriliyor` });
   const resp = await withTimeout("PDF indirme", PDF_DOWNLOAD_TIMEOUT_MS, () =>
@@ -249,11 +271,6 @@ async function processBookPageSlice(
   const pdf: any = await getDocumentProxy(buf);
   const totalPages: number = pdf.numPages;
   const endPage = Math.min(startPage + PAGE_BATCH_SIZE, totalPages);
-
-  // İlk dilimde eski chunk'ları temizle.
-  if (startPage === 0) {
-    await admin.from("knowledge_base_chunks").delete().eq("source_url", book.url);
-  }
 
   await updateJob(admin, jobId, { current_book: `${book.title} — metin çıkarılıyor (sayfa ${startPage + 1}-${endPage}/${totalPages})` });
   const pageTexts: string[] = await withTimeout("Sayfa metin çıkarma", PAGE_EXTRACT_TIMEOUT_MS, async () => {
@@ -290,7 +307,25 @@ async function processBookPageSlice(
   }
 
   const bookDone = endPage >= totalPages;
-  return { pagesProcessed: endPage - startPage, totalPages, chunksAdded: chunkAdded, bookDone };
+  let cleanupNote: string | undefined;
+  if (bookDone) {
+    // Kitabın son sayfa dilimi de tamamlandı: yalnızca bu job'tan ÖNCE var olan eski parçaları
+    // temizle. Temizlik başarısız olursa kitabı başarısız saymadan devam et.
+    await updateJob(admin, jobId, { current_book: `${book.title} — eski parçalar temizleniyor` });
+    try {
+      const { error: cleanupErr } = await admin
+        .from("knowledge_base_chunks")
+        .delete()
+        .eq("source_url", book.url)
+        .lt("created_at", jobStartedAt);
+      if (cleanupErr) throw cleanupErr;
+    } catch (e: any) {
+      cleanupNote = `Eski parçalar temizlenemedi (kitap yine de başarılı sayıldı): ${e?.message ?? e}`;
+      console.error(`[${jobId}] Cleanup failed for ${book.title}:`, e?.message ?? e);
+    }
+  }
+
+  return { pagesProcessed: endPage - startPage, totalPages, chunksAdded: chunkAdded, bookDone, cleanupNote };
 }
 
 const MAX_ATTEMPTS_PER_BOOK = 2;
@@ -351,10 +386,10 @@ async function runOne(admin: any, jobId: string) {
 
     let totalChunks: number = Number(job.total_chunks ?? 0);
     try {
-      const { pagesProcessed, totalPages, chunksAdded, bookDone } = await withTimeout(
+      const { pagesProcessed, totalPages, chunksAdded, bookDone, cleanupNote } = await withTimeout(
         `Sayfa dilimi: ${next.title}`,
         PAGE_SLICE_TIMEOUT_MS,
-        () => processBookPageSlice(admin, jobId, next, Number(progress.pages_done ?? 0), bookProgress, totalChunks),
+        () => processBookPageSlice(admin, jobId, next, Number(progress.pages_done ?? 0), bookProgress, totalChunks, job.started_at),
       );
       progress.pages_done = Number(progress.pages_done ?? 0) + pagesProcessed;
       progress.total_pages = totalPages;
@@ -366,11 +401,12 @@ async function runOne(admin: any, jobId: string) {
       if (bookDone) {
         processedUrls.push(next.url);
         console.log(`[${jobId}] Book done (chunked): ${next.title}, total chunks=${progress.chunk_offset}`);
+        if (cleanupNote) errors.push({ book: next.title, url: next.url, error: cleanupNote });
       }
 
       await updateJob(admin, jobId, {
         processed_books: processedUrls.length, processed_urls: processedUrls,
-        total_chunks: totalChunks, book_progress: bookProgress,
+        total_chunks: totalChunks, book_progress: bookProgress, errors,
         current_book: bookDone ? null : `${next.title} — ${progress.pages_done}/${totalPages} sayfa tamamlandı`,
       });
       if (processedUrls.length >= books.length) {
@@ -413,11 +449,12 @@ async function runOne(admin: any, jobId: string) {
   let totalChunks: number = Number(job.total_chunks ?? 0);
   let bookSucceeded = false;
   try {
-    const { chunks } = await withTimeout(`Kitap işleme: ${next.title}`, BOOK_TIMEOUT_MS, () =>
-      processBookWhole(admin, jobId, next, totalChunks),
+    const { chunks, cleanupNote } = await withTimeout(`Kitap işleme: ${next.title}`, BOOK_TIMEOUT_MS, () =>
+      processBookWhole(admin, jobId, next, totalChunks, job.started_at),
     );
     totalChunks += chunks;
     bookSucceeded = true;
+    if (cleanupNote) errors.push({ book: next.title, url: next.url, error: cleanupNote });
   } catch (e: any) {
     console.error(`[${jobId}] Book failed: ${next.title}`, e?.message);
     if (newAttempts >= MAX_ATTEMPTS_PER_BOOK) {
