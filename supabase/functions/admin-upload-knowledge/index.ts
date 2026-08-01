@@ -67,18 +67,62 @@ function chunkText(text: string, target = 1800, overlap = 150): string[] {
   return chunks.filter((c) => c.length > 200);
 }
 
-async function embed(texts: string[]): Promise<number[][]> {
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "openai/text-embedding-3-small", input: texts, dimensions: 768 }),
+const EMBEDDING_TIMEOUT_MS = 45_000;
+const EMBED_429_RETRY_DELAYS_MS = [3_000, 8_000, 20_000, 45_000]; // yalnızca 429 için ayrı bekleme politikası
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function withTimeout<T>(label: string, timeoutMs: number, task: () => Promise<T>): Promise<T> {
+  let to: number | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    to = setTimeout(() => reject(new Error(`${label} zaman aşımına uğradı (${Math.round(timeoutMs / 1000)} sn)`)), timeoutMs) as unknown as number;
   });
+  try {
+    return await Promise.race([task(), timeout]);
+  } finally {
+    if (to !== undefined) clearTimeout(to);
+  }
+}
+
+async function requestEmbeddingsOnce(texts: string[], label: string): Promise<number[][]> {
+  const res = await withTimeout(label, EMBEDDING_TIMEOUT_MS, () =>
+    fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "openai/text-embedding-3-small", input: texts, dimensions: 768 }),
+    })
+  );
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Embedding hatası ${res.status}: ${body.slice(0, 300)}`);
+    const err = new Error(`Embedding hatası ${res.status}: ${body.slice(0, 300)}`) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
   }
   const j = await res.json();
   return j.data.map((d: any) => d.embedding);
+}
+
+async function embed(texts: string[]): Promise<number[][]> {
+  try {
+    return await requestEmbeddingsOnce(texts, "Embedding isteği");
+  } catch (e: any) {
+    if ((e as { status?: number })?.status !== 429) throw e;
+    // Yalnızca 429'da: 4 deneme, bekleme 3sn/8sn/20sn/45sn. Her denemenin kendi timeout'u var
+    // (bekleme EMBEDDING_TIMEOUT_MS'e dahil değil, withTimeout her çağrıda yeniden başlar).
+    let lastError: Error = e instanceof Error ? e : new Error(String(e));
+    for (let r = 0; r < EMBED_429_RETRY_DELAYS_MS.length; r += 1) {
+      await delay(EMBED_429_RETRY_DELAYS_MS[r]);
+      try {
+        return await requestEmbeddingsOnce(
+          texts,
+          `Embedding isteği 429 yeniden deneme (${r + 1}/${EMBED_429_RETRY_DELAYS_MS.length})`,
+        );
+      } catch (e2: any) {
+        lastError = e2 instanceof Error ? e2 : new Error(String(e2));
+      }
+    }
+    throw lastError;
+  }
 }
 
 async function extractFromFile(bytes: Uint8Array, fileName: string, mime: string): Promise<string> {
@@ -168,7 +212,7 @@ Deno.serve(async (req) => {
     await admin.from("knowledge_base_chunks").delete().eq("source_url", sourceUrl);
 
     let total = 0;
-    const BATCH = 16;
+    const BATCH = 8;
     for (let i = 0; i < chunks.length; i += BATCH) {
       const slice = chunks.slice(i, i + BATCH);
       let vectors: number[][];
