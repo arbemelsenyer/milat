@@ -66,6 +66,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -131,11 +132,16 @@ const MAX_CHUNKS_PER_BOOK = 1200;
 const EMBED_429_RETRY_DELAYS_MS = [2_000, 5_000, 12_000]; // yalnızca 429 için ayrı bekleme politikası
 
 async function requestEmbeddingsOnce(texts: string[], label: string): Promise<number[][]> {
+  // OPENAI_API_KEY tanımlıysa doğrudan OpenAI'a git (paylaşımlı Lovable gateway kuyruğunu atla);
+  // tanımlı değilse eski davranışa (Lovable gateway + LOVABLE_API_KEY) dön.
+  const url = OPENAI_API_KEY ? "https://api.openai.com/v1/embeddings" : "https://ai.gateway.lovable.dev/v1/embeddings";
+  const authKey = OPENAI_API_KEY || LOVABLE_API_KEY;
+  const model = OPENAI_API_KEY ? "text-embedding-3-small" : "openai/text-embedding-3-small";
   const res = await withTimeout(label, EMBEDDING_TIMEOUT_MS, () =>
-    fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+    fetch(url, {
       method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "openai/text-embedding-3-small", input: texts, dimensions: 768 }),
+      headers: { Authorization: `Bearer ${authKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, input: texts, dimensions: 768 }),
     })
   );
   if (res.status === 429 || res.status >= 500) {
