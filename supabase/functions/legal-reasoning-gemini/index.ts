@@ -174,6 +174,7 @@ async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, ca
       category: r.category,
       excerpt: String(r.chunk_text ?? "").slice(0, 400),
       similarity: r.similarity,
+      page: r.metadata?.page ?? null,
     }));
     const parts = data.map((r: any) =>
       `[Kaynak: ${r.source_title}]\n${r.chunk_text}`
