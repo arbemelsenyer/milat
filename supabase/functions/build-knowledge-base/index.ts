@@ -128,29 +128,53 @@ function chunkText(text: string, target = 1800, overlap = 150): string[] {
 
 const MAX_CHUNKS_PER_BOOK = 1200;
 
+const EMBED_429_RETRY_DELAYS_MS = [2_000, 5_000, 12_000]; // yalnızca 429 için ayrı bekleme politikası
+
+async function requestEmbeddingsOnce(texts: string[], label: string): Promise<number[][]> {
+  const res = await withTimeout(label, EMBEDDING_TIMEOUT_MS, () =>
+    fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "openai/text-embedding-3-small", input: texts, dimensions: 768 }),
+    })
+  );
+  if (res.status === 429 || res.status >= 500) {
+    const body = await res.text();
+    const err = new Error(`Embedding geçici hatası ${res.status}: ${body.slice(0, 200)}`) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
+  }
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Embedding hatası ${res.status}: ${body.slice(0, 300)}`);
+  }
+  const j = await res.json();
+  return j.data.map((d: any) => d.embedding);
+}
+
 async function embed(texts: string[]): Promise<number[][]> {
   let lastError: Error | null = null;
   for (let attempt = 1; attempt <= MAX_EMBED_RETRIES; attempt += 1) {
     try {
-      const res = await withTimeout(`Embedding isteği (${attempt}/${MAX_EMBED_RETRIES})`, EMBEDDING_TIMEOUT_MS, () =>
-        fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ model: "openai/text-embedding-3-small", input: texts, dimensions: 768 }),
-        })
-      );
-      if (res.status === 429 || res.status >= 500) {
-        const body = await res.text();
-        throw new Error(`Embedding geçici hatası ${res.status}: ${body.slice(0, 200)}`);
-      }
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`Embedding hatası ${res.status}: ${body.slice(0, 300)}`);
-      }
-      const j = await res.json();
-      return j.data.map((d: any) => d.embedding);
+      return await requestEmbeddingsOnce(texts, `Embedding isteği (${attempt}/${MAX_EMBED_RETRIES})`);
     } catch (e: any) {
       lastError = e instanceof Error ? e : new Error(String(e));
+      if ((e as { status?: number })?.status === 429) {
+        // Yalnızca 429'da: 3 deneme, bekleme 2sn/5sn/12sn. Her denemenin kendi timeout'u var
+        // (bekleme EMBEDDING_TIMEOUT_MS'e dahil değil, withTimeout her çağrıda yeniden başlar).
+        for (let r = 0; r < EMBED_429_RETRY_DELAYS_MS.length; r += 1) {
+          await delay(EMBED_429_RETRY_DELAYS_MS[r]);
+          try {
+            return await requestEmbeddingsOnce(
+              texts,
+              `Embedding isteği 429 yeniden deneme (${r + 1}/${EMBED_429_RETRY_DELAYS_MS.length})`,
+            );
+          } catch (e2: any) {
+            lastError = e2 instanceof Error ? e2 : new Error(String(e2));
+          }
+        }
+        throw lastError;
+      }
       if (attempt < MAX_EMBED_RETRIES) await delay(1_500 * attempt * attempt);
     }
   }
@@ -180,7 +204,7 @@ async function processBookWhole(admin: any, jobId: string, book: Book, existingC
   await admin.from("knowledge_base_chunks").delete().eq("source_url", book.url);
 
   let total = 0;
-  const BATCH = 16;
+  const BATCH = 8;
   for (let i = 0; i < chunks.length; i += BATCH) {
     await updateJob(admin, jobId, {
       current_book: `${book.title} — embedding ${i + 1}-${Math.min(i + BATCH, chunks.length)}/${chunks.length}`,
@@ -247,7 +271,7 @@ async function processBookPageSlice(
   let chunkAdded = 0;
   const baseIndex = Number(bookProgress[book.url]?.chunk_offset ?? 0);
   if (chunks.length) {
-    const BATCH = 16;
+    const BATCH = 8;
     for (let i = 0; i < chunks.length; i += BATCH) {
       await updateJob(admin, jobId, {
         current_book: `${book.title} — embedding sayfa ${startPage + 1}-${endPage}/${totalPages} (${i + 1}-${Math.min(i + BATCH, chunks.length)}/${chunks.length})`,
