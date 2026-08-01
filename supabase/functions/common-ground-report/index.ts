@@ -10,6 +10,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// OPENAI_API_KEY tanımlıysa embedding çağrıları doğrudan OpenAI'a gider (paylaşımlı
+// Lovable gateway kuyruğunu atlar); tanımlı değilse Lovable gateway + LOVABLE_API_KEY'e döner.
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+
 // Activity-log upsert for the Agent Control Panel. Status-only — never store analysis
 // content here; failures here must never block the main flow, so every call site
 // wraps this in its own try-catch.
@@ -240,10 +244,13 @@ async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, ca
       console.log(`[common-ground-report] RAG skip: query too short (${query?.trim().length ?? 0} chars)`);
       return { block: "", sources: [], embedding: null };
     }
-    const embRes = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+    const embUrl = OPENAI_API_KEY ? "https://api.openai.com/v1/embeddings" : "https://ai.gateway.lovable.dev/v1/embeddings";
+    const embAuthKey = OPENAI_API_KEY || apiKey;
+    const embModel = OPENAI_API_KEY ? "text-embedding-3-small" : "openai/text-embedding-3-small";
+    const embRes = await fetch(embUrl, {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "openai/text-embedding-3-small", input: query, dimensions: 768 }),
+      headers: { Authorization: `Bearer ${embAuthKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: embModel, input: query, dimensions: 768 }),
     });
     if (!embRes.ok) {
       console.error(`[common-ground-report] RAG embeddings HTTP ${embRes.status}: ${(await embRes.text()).slice(0, 300)}`);

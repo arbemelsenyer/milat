@@ -1,6 +1,10 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2.49.4';
 
+// OPENAI_API_KEY tanımlıysa embedding çağrıları doğrudan OpenAI'a gider (paylaşımlı
+// Lovable gateway kuyruğunu atlar); tanımlı değilse Lovable gateway + LOVABLE_API_KEY'e döner.
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -148,10 +152,13 @@ function mapDisputeToCategory(disputeType?: string | null, subtype?: string | nu
 async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, category: string | null): Promise<{ block: string; sources: any[]; embedding: number[] | null }> {
   try {
     if (!query || query.trim().length < 10) return { block: "", sources: [], embedding: null };
-    const embRes = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+    const embUrl = OPENAI_API_KEY ? "https://api.openai.com/v1/embeddings" : "https://ai.gateway.lovable.dev/v1/embeddings";
+    const embAuthKey = OPENAI_API_KEY || apiKey;
+    const embModel = OPENAI_API_KEY ? "text-embedding-3-small" : "openai/text-embedding-3-small";
+    const embRes = await fetch(embUrl, {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "openai/text-embedding-3-small", input: query, dimensions: 768 }),
+      headers: { Authorization: `Bearer ${embAuthKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: embModel, input: query, dimensions: 768 }),
     });
     if (!embRes.ok) return { block: "", sources: [], embedding: null };
     const embJson = await embRes.json();
