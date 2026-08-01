@@ -69,6 +69,7 @@ serve(async (req) => {
       .from("pending_pool")
       .select("*")
       .eq("status", "pending")
+      .neq("niche_area", "mevzuat")
       .limit(20);
     if (error) throw error;
 

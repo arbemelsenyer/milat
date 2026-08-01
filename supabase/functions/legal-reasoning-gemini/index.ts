@@ -158,7 +158,7 @@ async function fetchKnowledgeBlock(admin: any, apiKey: string, query: string, ca
     const vec = embJson?.data?.[0]?.embedding;
     if (!vec) return { block: "", sources: [], embedding: null };
     const { data } = await admin.rpc("match_knowledge_base", {
-      query_embedding: vec, filter_category: category, match_count: 5, match_threshold: 0.65,
+      query_embedding: vec, filter_category: category, match_count: 5, match_threshold: 0.25,
     });
     if (!data || data.length === 0) return { block: "", sources: [], embedding: vec };
     const sources = data.map((r: any) => ({
