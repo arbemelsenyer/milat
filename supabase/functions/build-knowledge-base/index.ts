@@ -5,7 +5,7 @@
 //     (büyük PDF'ler için; CPU/zaman limitine takılan kitaplar bu modla yeniden işlenir).
 // İstemci (KnowledgeBaseAdmin) job running iken bizi resume_job_id ile yeniden çağırır.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { extractText, getDocumentProxy } from "npm:unpdf@0.12.1";
+import { getDocumentProxy } from "npm:unpdf@0.12.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -127,6 +127,48 @@ function chunkText(text: string, target = 1800, overlap = 150): string[] {
   return chunks.filter((c) => c.length > 200);
 }
 
+// Sayfa metinlerinin uzunluğunu biriktirerek her chunk'ın PDF'te BAŞLADIĞI sayfayı tahmin
+// eder. chunkText() boşlukları normalize ettiği için chunk'ın ham metindeki konumu kesin
+// bilinmez; chunk'ın ilk ~60 karakteri (boşluklar esnek \s+ ile) regex ile ham metinde
+// aranır. Bulunamazsa (veya regex kurulamazsa) o chunk için null döner — çağıran taraf
+// kendi fallback'ini uygular (processBookWhole: metadata boş; processBookPageSlice: startPage+1).
+function computeChunkPages(
+  rawText: string,
+  pageTexts: string[],
+  firstPageNumber: number,
+  chunks: string[],
+): (number | null)[] {
+  const pageOffsets: number[] = [];
+  let acc = 0;
+  for (const pt of pageTexts) {
+    pageOffsets.push(acc);
+    acc += pt.length + 1; // sayfalar join("\n") ile birleştiriliyor
+  }
+  let searchCursor = 0;
+  return chunks.map((chunk) => {
+    const probe = chunk.trim().slice(0, 60);
+    if (!probe) return null;
+    const pattern = probe.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    try {
+      const re = new RegExp(pattern);
+      const from = Math.max(0, searchCursor - 200);
+      const match = rawText.slice(from).match(re);
+      if (match && match.index !== undefined) {
+        const idx = from + match.index;
+        searchCursor = idx;
+        let pageIdx = 0;
+        for (let i = 0; i < pageOffsets.length; i++) {
+          if (idx >= pageOffsets[i]) pageIdx = i; else break;
+        }
+        return firstPageNumber + pageIdx;
+      }
+    } catch {
+      // geçersiz regex/eşleşme — bu chunk için null dön, fallback çağıran tarafta
+    }
+    return null;
+  });
+}
+
 const MAX_CHUNKS_PER_BOOK = 1200;
 
 const EMBED_429_RETRY_DELAYS_MS = [2_000, 5_000, 12_000]; // yalnızca 429 için ayrı bekleme politikası
@@ -195,7 +237,7 @@ async function processBookWhole(
   existingChunks: number,
   jobStartedAt: string,
 ): Promise<{ chunks: number; cleanupNote?: string }> {
-  // extractText/getDocumentProxy statik olarak import edildi.
+  // getDocumentProxy statik olarak import edildi.
   console.log(`[${jobId}] Processing book (whole): ${book.title}`);
   await updateJob(admin, jobId, { current_book: `${book.title} — PDF indiriliyor` });
   const resp = await withTimeout("PDF indirme", PDF_DOWNLOAD_TIMEOUT_MS, () =>
@@ -204,13 +246,32 @@ async function processBookWhole(
   if (!resp.ok) throw new Error(`PDF indirilemedi ${resp.status}`);
   const buf = new Uint8Array(await resp.arrayBuffer());
   await updateJob(admin, jobId, { current_book: `${book.title} — metin çıkarılıyor` });
-  const pdf = await getDocumentProxy(buf);
-  const { text } = await withTimeout("PDF metin çıkarma", PAGE_EXTRACT_TIMEOUT_MS, () => extractText(pdf, { mergePages: true }));
-  const fullText = Array.isArray(text) ? text.join("\n") : text;
+  const pdf: any = await getDocumentProxy(buf);
+  const totalPages: number = pdf.numPages;
+  // mergePages:true yerine sayfa sayfa çıkarılıyor ki chunk'ların hangi sayfaya denk
+  // geldiği (computeChunkPages ile) hesaplanabilsin — sayfa sınırları chunklamadan önce
+  // kaybolmasın.
+  const pageTexts: string[] = await withTimeout("PDF metin çıkarma", PAGE_EXTRACT_TIMEOUT_MS, async () => {
+    const out: string[] = [];
+    for (let p = 1; p <= totalPages; p++) {
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+      out.push(tc.items.map((it: any) => ("str" in it ? it.str : "")).join(" "));
+    }
+    return out;
+  });
+  const fullText = pageTexts.join("\n");
   const chunks = chunkText(fullText);
   if (!chunks.length) return { chunks: 0 };
   if (chunks.length > MAX_CHUNKS_PER_BOOK) {
     throw new Error(`Anormal parça sayısı (${chunks.length} > ${MAX_CHUNKS_PER_BOOK}). PDF içeriği bozuk veya yanlış indirilmiş olabilir.`);
+  }
+  let chunkPages: (number | null)[];
+  try {
+    chunkPages = computeChunkPages(fullText, pageTexts, 1, chunks);
+  } catch (e: any) {
+    console.error(`[${jobId}] Page estimation failed for ${book.title}:`, e?.message ?? e);
+    chunkPages = chunks.map(() => null);
   }
   let total = 0;
   const BATCH = 8;
@@ -220,10 +281,14 @@ async function processBookWhole(
     });
     const slice = chunks.slice(i, i + BATCH);
     const vectors = await embed(slice);
-    const rows = slice.map((c, j) => ({
-      source_title: book.title, source_url: book.url, category: book.category,
-      chunk_text: c, chunk_index: i + j, embedding: vectors[j] as any,
-    }));
+    const rows = slice.map((c, j) => {
+      const page = chunkPages[i + j];
+      return {
+        source_title: book.title, source_url: book.url, category: book.category,
+        chunk_text: c, chunk_index: i + j, embedding: vectors[j] as any,
+        metadata: page != null ? { page } : {},
+      };
+    });
     const { error } = await admin.from("knowledge_base_chunks").insert(rows);
     if (error) throw new Error(error.message);
     total += rows.length;
@@ -291,6 +356,14 @@ async function processBookPageSlice(
 
   const sliceText = pageTexts.join("\n");
   const chunks = chunkText(sliceText);
+  let chunkPages: number[];
+  try {
+    chunkPages = computeChunkPages(sliceText, pageTexts, startPage + 1, chunks)
+      .map((p) => p ?? (startPage + 1));
+  } catch (e: any) {
+    console.error(`[${jobId}] Page estimation failed for ${book.title} (slice):`, e?.message ?? e);
+    chunkPages = chunks.map(() => startPage + 1);
+  }
   let chunkAdded = 0;
   const baseIndex = Number(bookProgress[book.url]?.chunk_offset ?? 0);
   if (chunks.length) {
@@ -304,6 +377,7 @@ async function processBookPageSlice(
       const rows = slice.map((c, j) => ({
         source_title: book.title, source_url: book.url, category: book.category,
         chunk_text: c, chunk_index: baseIndex + i + j, embedding: vectors[j] as any,
+        metadata: { page: chunkPages[i + j] },
       }));
       const { error } = await admin.from("knowledge_base_chunks").insert(rows);
       if (error) throw new Error(error.message);
