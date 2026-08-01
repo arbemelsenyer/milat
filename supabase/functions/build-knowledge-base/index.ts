@@ -292,16 +292,18 @@ async function runOne(admin: any, jobId: string) {
     return { done: true };
   }
 
-  // ---------- page_chunked mode ----------
-  if (mode === "page_chunked") {
+  // ---------- page_chunked mode (job.mode="page_chunked" ile manuel giriş, ya da
+  // whole_book denemeleri tükenince aşağıdaki forced_chunked bayrağıyla otomatik giriş) ----------
+  const bookIsChunked = mode === "page_chunked" || !!bookProgress[next.url]?.forced_chunked;
+  if (bookIsChunked) {
     const progress = bookProgress[next.url] ?? { pages_done: 0, total_pages: 0, chunk_offset: 0, slice_attempts: 0 };
     const sliceAttempts = Number(progress.slice_attempts ?? 0) + 1;
     progress.slice_attempts = sliceAttempts;
     bookProgress[next.url] = progress;
 
     if (sliceAttempts > MAX_ATTEMPTS_PER_SLICE) {
-      // Bu sayfa dilimi 2 denemede de çöktü; kitabı atla.
-      errors.push({ book: next.title, url: next.url, error: `Sayfa ${progress.pages_done + 1}+ dilimi ${MAX_ATTEMPTS_PER_SLICE} denemede de işlenemedi.` });
+      // Sayfa bazlı modda da MAX_ATTEMPTS_PER_SLICE denemede çöktü; son çare olarak kitabı atla.
+      errors.push({ book: next.title, url: next.url, error: `Sayfa bazlı işlemede de tamamlanamadı (sayfa ${progress.pages_done + 1}+, ${MAX_ATTEMPTS_PER_SLICE} deneme).` });
       processedUrls.push(next.url);
       progress.slice_attempts = 0;
       await updateJob(admin, jobId, {
@@ -368,19 +370,15 @@ async function runOne(admin: any, jobId: string) {
   attemptCounts[next.url] = newAttempts;
 
   if (newAttempts > MAX_ATTEMPTS_PER_BOOK) {
-    errors.push({ book: next.title, url: next.url, error: `Kitap ${MAX_ATTEMPTS_PER_BOOK} denemede de işlenemedi (worker CPU/zaman limiti). Atlandı.` });
-    processedUrls.push(next.url);
+    // whole_book modunda deneme hakkı tükendi; atlamak yerine page_chunked moduna otomatik geç.
+    console.log(`[${jobId}] Whole-book attempts exhausted for ${next.title}; switching to page_chunked mode.`);
+    attemptCounts[next.url] = 0;
+    bookProgress[next.url] = { pages_done: 0, total_pages: 0, chunk_offset: 0, slice_attempts: 0, forced_chunked: true };
     await updateJob(admin, jobId, {
-      processed_books: processedUrls.length, processed_urls: processedUrls,
-      attempt_counts: attemptCounts, errors, current_book: null,
+      attempt_counts: attemptCounts, book_progress: bookProgress,
+      current_book: `${next.title} — sayfa bazlı moda geçiliyor`,
     });
-    if (processedUrls.length >= books.length) {
-      await updateJob(admin, jobId, {
-        status: errors.length ? "completed_with_errors" : "completed",
-        current_book: null, finished_at: new Date().toISOString(),
-      });
-    }
-    return { done: processedUrls.length >= books.length, processed: processedUrls.length, total: books.length, skipped: next.title };
+    return { done: false, switched_to_page_chunked: next.title };
   }
 
   await updateJob(admin, jobId, {
@@ -460,13 +458,30 @@ Deno.serve(async (req) => {
       books = BOOKS;
     }
 
+    // Zaten knowledge_base_chunks'ta chunk'ı bulunan kitapları önceden "işlendi" işaretle
+    // (aynı kitabı tekrar indirip embed etmeyi önler). Sorgu hata verirse boş dizi ile devam.
+    let preExistingProcessedUrls: string[] = [];
+    try {
+      const { data: existingRows, error: existingErr } = await admin
+        .from("knowledge_base_chunks")
+        .select("source_url")
+        .in("source_url", BOOKS.map((b) => b.url));
+      if (existingErr) throw existingErr;
+      preExistingProcessedUrls = Array.from(
+        new Set((existingRows ?? []).map((r: any) => r.source_url).filter(Boolean)),
+      );
+    } catch (e: any) {
+      console.error("Existing knowledge_base_chunks check failed", e?.message ?? e);
+      preExistingProcessedUrls = [];
+    }
+
     const { data: job, error: jobErr } = await admin.from("knowledge_base_jobs").insert({
       status: "running",
       total_books: books.length,
       processed_books: 0,
       total_chunks: 0,
       current_book: books[0]?.title ?? null,
-      processed_urls: [],
+      processed_urls: preExistingProcessedUrls,
       book_queue: books,
       mode,
       book_progress: {},
