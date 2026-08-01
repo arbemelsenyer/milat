@@ -126,7 +126,7 @@ function chunkText(text: string, target = 1800, overlap = 150): string[] {
   return chunks.filter((c) => c.length > 200);
 }
 
-const MAX_CHUNKS_PER_BOOK = 600;
+const MAX_CHUNKS_PER_BOOK = 1200;
 
 async function embed(texts: string[]): Promise<number[][]> {
   let lastError: Error | null = null;
