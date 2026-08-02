@@ -194,11 +194,13 @@ Deno.serve(async (req) => {
 
     const bytes = new Uint8Array(await file.arrayBuffer());
 
-    // Upload to storage (case-documents bucket, admin/knowledge path)
-    const storagePath = `admin/knowledge/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    // Deterministik yol: aynı kategori + aynı dosya adı => aynı source_url (zaman damgası yok)
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const safeCategory = category.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = `admin/knowledge/${safeCategory}/${safeFileName}`;
     const { error: upErr } = await admin.storage
       .from("case-documents")
-      .upload(storagePath, bytes, { contentType: file.type || "application/octet-stream", upsert: false });
+      .upload(storagePath, bytes, { contentType: file.type || "application/octet-stream", upsert: true });
     if (upErr) console.error("Storage upload failed (non-fatal):", upErr.message);
     const sourceUrl = `storage://case-documents/${storagePath}`;
 
