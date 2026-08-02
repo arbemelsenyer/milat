@@ -216,26 +216,47 @@ Deno.serve(async (req) => {
     if (!chunks.length) return json({ error: "Bu dosya işlenemedi, lütfen başka bir dosya deneyin" }, 400);
     if (chunks.length > 800) return json({ error: `Anormal parça sayısı (${chunks.length}). Daha küçük bir dosya deneyin.` }, 400);
 
-    // Remove any existing chunks with same source_url (idempotency for re-upload)
-    await admin.from("knowledge_base_chunks").delete().eq("source_url", sourceUrl);
-
-    let total = 0;
+    // 1) ÖNCE tüm embedding'leri bellekte üret. Hata olursa hiçbir şey silinmez.
+    const cleanTitle = sanitizeUnicode(title);
+    const allVectors: number[][] = [];
     const BATCH = 8;
     for (let i = 0; i < chunks.length; i += BATCH) {
       const slice = chunks.slice(i, i + BATCH);
-      let vectors: number[][];
       try {
-        vectors = await embed(slice);
+        const vectors = await embed(slice);
+        allVectors.push(...vectors);
       } catch (e: any) {
-        return json({ error: `Bu dosya işlenemedi, lütfen başka bir dosya deneyin (${e?.message ?? "embedding hatası"})` }, 400);
+        return json({ error: `Bu dosya işlenemedi, mevcut içerik korundu (${e?.message ?? "embedding hatası"})` }, 400);
       }
+    }
+    if (allVectors.length !== chunks.length) {
+      return json({ error: "Embedding sayısı parça sayısıyla eşleşmedi, mevcut içerik korundu" }, 400);
+    }
+
+    // 2) Embedding tamamen başarılı: aynı source_title + category eski satırları sil
+    const { data: deletedRows, error: delErr } = await admin
+      .from("knowledge_base_chunks")
+      .delete()
+      .eq("source_title", cleanTitle)
+      .eq("category", category)
+      .select("id");
+    if (delErr) {
+      console.error("delete failed", delErr.message);
+      return json({ error: "Eski kayıtlar silinemedi, mevcut içerik korundu" }, 400);
+    }
+    const deletedCount = deletedRows?.length ?? 0;
+
+    // 3) Yeni parçaları yaz
+    let total = 0;
+    for (let i = 0; i < chunks.length; i += BATCH) {
+      const slice = chunks.slice(i, i + BATCH);
       const rows = slice.map((c, j) => ({
-        source_title: sanitizeUnicode(title),
+        source_title: cleanTitle,
         source_url: sourceUrl,
         category,
         chunk_text: c,
         chunk_index: i + j,
-        embedding: vectors[j] as any,
+        embedding: allVectors[i + j] as any,
         metadata: { uploaded_by: userId, file_name: sanitizeUnicode(file.name), uploaded_at: new Date().toISOString() },
       }));
       const { error } = await admin.from("knowledge_base_chunks").insert(rows);
@@ -252,6 +273,9 @@ Deno.serve(async (req) => {
       source_url: sourceUrl,
       category,
       chunks: total,
+      deleted_chunks: deletedCount,
+      inserted_chunks: total,
+      message: `${deletedCount} eski parça silindi, ${total} yeni parça yazıldı.`,
     });
   } catch (e: any) {
     console.error("admin-upload-knowledge error", e);
