@@ -2094,14 +2094,17 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
             : `Depolama hatası: ${upErr.message}`;
           throw new Error(msg);
         }
-        const { error: insErr } = await supabase.from("case_documents").insert({
+        const { data: inserted, error: insErr } = await supabase.from("case_documents").insert({
           case_id: caseRow.id, party_id: partyId,
           file_name: f.name, file_path: path, file_size: f.size, mime_type: f.type, uploaded_by: userId,
-        } as any);
+        } as any).select("id").single();
         if (insErr) {
           await supabase.storage.from("case-documents").remove([path]);
           throw new Error(`Veritabanı hatası: ${insErr.message}`);
         }
+        // Metin çıkarma: beklemesiz (fire-and-forget) — yüklemeyi bloklamaz, hata sessizce loglanır.
+        supabase.functions.invoke("extract-document-text", { body: { document_id: inserted?.id } })
+          .catch((e) => console.error("[extract-document-text] tetiklenemedi", e));
       }
       toast({ title: "Belge yüklendi" });
       loadAll();

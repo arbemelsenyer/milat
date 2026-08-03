@@ -108,29 +108,44 @@ Deno.serve(async (req) => {
 
     // Per-party documents (preferred). Fallback to uploads by the party's user when party_id wasn't set.
     let docsQuery = admin.from("case_documents")
-      .select("file_name, file_path, mime_type, analysis_result, party_id, uploaded_by")
+      .select("file_name, file_path, mime_type, analysis_result, extracted_text, extraction_status, party_id, uploaded_by")
       .eq("case_id", case_id);
     const { data: allDocs } = await docsQuery;
     const docs = (allDocs ?? []).filter((d: any) =>
       d.party_id === party_id || (!d.party_id && party.user_id && d.uploaded_by === party.user_id)
     );
 
-    // Try to read the document text from storage (best-effort) so the AI can analyse content.
+    // Belge içeriği: extract-document-text (upload sonrası fire-and-forget çalışır) zaten
+    // extracted_text'i doldurmuş olmalı — asıl kaynak bu. Boşsa (extraction henüz koşmadı/
+    // desteklenmeyen format/hata) .txt dosyaları için storage'dan doğrudan okuma yedek olarak
+    // kalır; PDF/Word'de extracted_text yoksa şimdiki gibi yalnızca dosya adı gider.
+    // Karakter bütçesi: belge başına en fazla 6.000, toplamda en fazla 24.000 — sırayla
+    // eklenir, toplam bütçe dolunca kalan belgeler dahil edilmez (tümü tek satır notla özetlenir).
+    const PER_DOC_CHAR_BUDGET = 6_000;
+    const TOTAL_CHAR_BUDGET = 24_000;
     let docExcerpts = "";
     let docReadFailed = false;
-    for (const d of docs.slice(0, 5)) {
-      try {
-        const { data: blob, error: dlErr } = await admin.storage.from("case-documents").download(d.file_path);
-        if (dlErr || !blob) { docReadFailed = true; continue; }
-        if ((d.mime_type ?? "").startsWith("text/") || d.file_name.toLowerCase().endsWith(".txt")) {
-          const txt = await blob.text();
-          docExcerpts += `\n--- ${d.file_name} ---\n${txt.slice(0, 4000)}\n`;
-        } else {
-          // For PDF/Word we send only filenames; full extraction would need a parser.
-          docReadFailed = true;
-        }
-      } catch { docReadFailed = true; }
+    let totalUsed = 0;
+    let fullCount = 0, truncatedCount = 0, notIncludedCount = 0;
+    for (const d of docs) {
+      if (totalUsed >= TOTAL_CHAR_BUDGET) { notIncludedCount++; continue; }
+      let text = String(d.extracted_text ?? "").trim();
+      if (!text && ((d.mime_type ?? "").startsWith("text/") || d.file_name.toLowerCase().endsWith(".txt"))) {
+        try {
+          const { data: blob, error: dlErr } = await admin.storage.from("case-documents").download(d.file_path);
+          if (!dlErr && blob) text = (await blob.text()).trim();
+        } catch { /* okunamadı, aşağıda işaretlenecek */ }
+      }
+      if (!text) { docReadFailed = true; notIncludedCount++; continue; }
+      const perDocLimit = Math.min(PER_DOC_CHAR_BUDGET, TOTAL_CHAR_BUDGET - totalUsed);
+      const slice = text.slice(0, perDocLimit);
+      docExcerpts += `\n--- ${d.file_name} ---\n${slice}\n`;
+      totalUsed += slice.length;
+      if (slice.length < text.length) truncatedCount++; else fullCount++;
     }
+    const docBudgetNote = docs.length > 0
+      ? `\nNOT (belge içerik bütçesi): ${docs.length} belgeden ${fullCount} tam, ${truncatedCount} kırpılarak, ${notIncludedCount} dahil edilemeden işlendi.`
+      : "";
 
     // Documents that already have a stored expert-report (bilirkişi) analysis — surface those findings as context.
     const analyzedDocs = docs.filter((d: any) => d.analysis_result && typeof d.analysis_result === "object");
@@ -226,6 +241,7 @@ ${statementBlock}
 YÜKLENEN BELGELER (${docs.length}): ${docs.map((d: any) => `- ${d.file_name}`).join("\n") || "(belge yok)"}
 ${docExcerpts ? `\nBELGE İÇERİKLERİ (kısmi):\n${docExcerpts}` : ""}
 ${docReadFailed ? "\nNOT: Bazı belgeler (PDF/Word) metin olarak okunamadı; yalnızca dosya adlarından çıkarım yapıldı." : ""}
+${docBudgetNote}
 ${expertAnalysisBlock}
 ${meetingNotesBlock}
 ${ragBlock}

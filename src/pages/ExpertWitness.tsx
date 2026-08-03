@@ -84,7 +84,7 @@ export default function ExpertWitness() {
         } : NO_DATA_RESULT;
       }
 
-      const { error: docError } = await supabase.from('case_documents').insert({
+      const { data: inserted, error: docError } = await supabase.from('case_documents').insert({
         case_id: caseId.trim(),
         uploaded_by: user.id,
         file_name: file.name,
@@ -92,8 +92,11 @@ export default function ExpertWitness() {
         file_size: file.size,
         mime_type: file.type,
         analysis_result: parsed,
-      } as any);
+      } as any).select('id').single();
       if (docError) throw docError;
+      // Metin çıkarma: beklemesiz (fire-and-forget) — yüklemeyi bloklamaz, hata sessizce loglanır.
+      supabase.functions.invoke('extract-document-text', { body: { document_id: inserted?.id } })
+        .catch((e) => console.error('[extract-document-text] tetiklenemedi', e));
 
       setResult(parsed);
     } catch (e) {

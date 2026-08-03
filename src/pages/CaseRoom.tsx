@@ -191,11 +191,14 @@ export default function CaseRoom() {
     const path = `${user.id}/${caseId}/${Date.now()}-${file.name}`;
     const { error: upErr } = await supabase.storage.from("case-documents").upload(path, file);
     if (upErr) { toast({ title: "Yükleme hatası", description: upErr.message, variant: "destructive" }); return; }
-    const { error: insErr } = await supabase.from("case_documents").insert({
+    const { data: inserted, error: insErr } = await supabase.from("case_documents").insert({
       case_id: caseId, uploaded_by: user.id, file_name: file.name, file_path: path,
       file_size: file.size, mime_type: file.type,
-    });
+    }).select("id").single();
     if (insErr) { toast({ title: "Kayıt hatası", description: insErr.message, variant: "destructive" }); return; }
+    // Metin çıkarma: beklemesiz (fire-and-forget) — yüklemeyi bloklamaz, hata sessizce loglanır.
+    supabase.functions.invoke("extract-document-text", { body: { document_id: inserted?.id } })
+      .catch((e) => console.error("[extract-document-text] tetiklenemedi", e));
     toast({ title: "Belge yüklendi" });
     await loadAll();
   }
