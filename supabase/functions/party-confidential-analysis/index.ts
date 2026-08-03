@@ -213,7 +213,9 @@ KESİN KURAL (uzlasma_orani format ZORUNLU): uzlasma_orani alanı MUTLAKA ve YAL
 
 KÖK NEDEN KATMANI (kok_neden — yalnızca arabulucuya gösterilecek ayrı bir alan): "TARAF BEYANI", "BELGE ANALİZ SONUÇLARI", "GÖRÜŞME NOTLARI ANALİZİ" ve kaynak bloklarındaki tekrar eden temaları, tonu ve tarafın hangi noktaya ağırlık verdiğini değerlendirerek görünen talep ile altta yatan asıl meseleyi ayırt et. gorunen_talep: tarafın açıkça talep ettiği şey. asil_mesele: KESİN dille değil, olasılık belirten dille yaz (ör. "...olabileceğine işaret ediyor", "...ihtimalini düşündürüyor") — asla kesinlik iddia etme. dayanak: bu çıkarımı hangi somut gözleme dayandırdığını belirt (ör. "beyanda üç kez X teması tekrarlanıyor", "belge bulgularında Y vurgusu öne çıkıyor") — dayanak göstermeden asil_mesele doldurma. guven_seviyesi: dayanağın gücüne göre "Düşük"|"Orta"|"Yüksek". Beyan/belge/görüşme notu bloklarının hiçbirinde asıl meseleye işaret eden somut bir sinyal yoksa asil_mesele="Yeterli veri yok" yaz ve dayanak boş kalsın — ASLA uydurma çıkarım yapma.
 
-Çıktı YALNIZCA JSON: {"dispute_area":"","legal_framework":{"statutes":[],"precedents":[{"court":"","decision":"","relevance":""}]},"document_findings":[],"party_position":{"strengths":[],"weaknesses":[],"interests":[],"batna":"","watna":""},"risks":[],"opportunities":[],"discovery_questions":[{"id":1,"question":""}],"risk_analizi":{"uzlasma_orani":"","uzlasma_orani_kaynak":"","risk_puani":"Düşük|Orta|Yüksek","mahkeme_riski":"","mahkeme_riski_kaynak":"","tahmini_sure_tasarrufu_ay":"","kritik_faktorler":["","",""],"uzlasma_engelleri":["",""],"kaynak_listesi":[],"oneri":""},"kok_neden":{"gorunen_talep":"","asil_mesele":"","dayanak":"","guven_seviyesi":"Düşük|Orta|Yüksek"}} — tam 5 ihtiyaç tespiti sorusu üret.`;
+Analiz sırasında değerlendirip rapora almadığın hususları rapor_disi_degerlendirmeler dizisine yaz: dayanağı zayıf bulduğun iddialar, veri yetersizliğinden sonuca bağlayamadıkların, belgeler arasında çelişkili kalanlar, ancak ek görüşme veya ek analizle netleşebilecek konular. Her öğede hangi belge/beyana baktığını neden_rapora_girmedi içinde belirt. Her öğenin onerilen_adim alanına bu boşluğu kapatmak için somut sıradaki adımı yaz: sorulacak soru, istenecek belge veya yapılacak ek görüşmenin konusu — tarafın asıl ihtiyacını ortaya çıkarmaya hizmet edecek şekilde. Hiç yoksa boş dizi döndür. Bu alan yalnız arabulucuya gösterilir; temkinli dil kullan, kesin yargı verme.
+
+Çıktı YALNIZCA JSON: {"dispute_area":"","legal_framework":{"statutes":[],"precedents":[{"court":"","decision":"","relevance":""}]},"document_findings":[],"party_position":{"strengths":[],"weaknesses":[],"interests":[],"batna":"","watna":""},"risks":[],"opportunities":[],"discovery_questions":[{"id":1,"question":""}],"risk_analizi":{"uzlasma_orani":"","uzlasma_orani_kaynak":"","risk_puani":"Düşük|Orta|Yüksek","mahkeme_riski":"","mahkeme_riski_kaynak":"","tahmini_sure_tasarrufu_ay":"","kritik_faktorler":["","",""],"uzlasma_engelleri":["",""],"kaynak_listesi":[],"oneri":""},"kok_neden":{"gorunen_talep":"","asil_mesele":"","dayanak":"","guven_seviyesi":"Düşük|Orta|Yüksek"},"rapor_disi_degerlendirmeler":[{"husus":"","neden_rapora_girmedi":"","kategori":"zayif_dayanak|veri_yetersiz|celiskili|ek_gorusme_gerekli","onerilen_adim":""}]} — tam 5 ihtiyaç tespiti sorusu üret.`;
 
     const userPrompt = `UYUŞMAZLIK TÜRÜ: ${caseRow?.dispute_type ?? ""} / ${caseRow?.dispute_subtype ?? ""}
 BAŞLIK: ${caseRow?.title ?? ""}
@@ -300,6 +302,31 @@ Bu tarafın perspektifinden detaylı analiz üret. Yukarıdaki bloklarda somut b
       } catch (e: any) {
         console.error(`[party-confidential-analysis] kok_neden yazımı başarısız: ${e?.message ?? String(e)}`);
       }
+    }
+
+    // Ajan Çalışma Defteri (agent_worklog): mediator-only, birikimli — her koşum yeni
+    // satır ekler, eski satırlar silinmez/güncellenmez. Best-effort — bu yazım başarısız
+    // olsa bile ana party_analyses sonucu ve response etkilenmemeli.
+    try {
+      const worklogRows: Record<string, unknown>[] = [];
+      if (Array.isArray(parsed.rapor_disi_degerlendirmeler) && parsed.rapor_disi_degerlendirmeler.length > 0) {
+        for (const item of parsed.rapor_disi_degerlendirmeler) {
+          worklogRows.push({
+            case_id, party_id, agent_type: "party_analysis", entry_type: "rapor_disi", content: item,
+          });
+        }
+      }
+      worklogRows.push({
+        case_id, party_id, agent_type: "party_analysis", entry_type: "rapor_ici",
+        content: {
+          ozet_bulgular: parsed.risk_analizi ?? null,
+          kok_neden_ozeti: parsed.kok_neden?.asil_mesele ?? null,
+          discovery_soru_sayisi: Array.isArray(parsed.discovery_questions) ? parsed.discovery_questions.length : 0,
+        },
+      });
+      await admin.from("agent_worklog").insert(worklogRows);
+    } catch (e: any) {
+      console.error(`[party-confidential-analysis] agent_worklog yazımı başarısız: ${e?.message ?? String(e)}`);
     }
 
     // Seed discovery question rows (party-scoped)
