@@ -78,6 +78,58 @@ export type Database = {
           },
         ]
       }
+      agent_worklog: {
+        Row: {
+          agent_type: string
+          case_id: string
+          content: Json
+          created_at: string
+          entry_type: string
+          id: string
+          party_id: string | null
+        }
+        Insert: {
+          agent_type: string
+          case_id: string
+          content: Json
+          created_at?: string
+          entry_type: string
+          id?: string
+          party_id?: string | null
+        }
+        Update: {
+          agent_type?: string
+          case_id?: string
+          content?: Json
+          created_at?: string
+          entry_type?: string
+          id?: string
+          party_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_worklog_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "agent_worklog_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_worklog_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agreement_documents: {
         Row: {
           case_id: string
