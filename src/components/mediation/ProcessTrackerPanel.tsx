@@ -97,6 +97,56 @@ function humanizeTemplateType(type: string): string {
   return `${TEMPLATE_GROUP_LABELS[groupKey]} ${belgeLabel}`;
 }
 
+// Uyuşmazlık türü / alt uzmanlık etiketleri — diğer ekranlarla birebir aynı
+// metni üretmek için burada yerel olarak tanımlı (dosyalar arası import yok).
+const DISPUTE_TYPE_LABELS: Record<string, string> = {
+  isci_isveren: "İşçi-İşveren",
+  ticari: "Ticari",
+  tuketici: "Tüketici",
+  kira: "Kira",
+  ortaklik: "Ortaklığın Giderilmesi",
+  fikri_mulkiyet: "Fikri Mülkiyet",
+  saglik: "Sağlık / Malpraktis",
+  sigorta: "Sigorta",
+  aile: "Aile",
+  diger: "Diğer",
+  commercial: "Ticari",
+  ip: "Fikri Mülkiyet",
+  healthcare: "Sağlık / Malpraktis",
+  health: "Sağlık / Malpraktis",
+  other: "Diğer",
+};
+
+const DISPUTE_SUBTYPE_LABELS: Record<string, string> = {
+  fikri_sinai_haklar: "Fikri-Sınai Haklar",
+  "fikri_sınai_haklar": "Fikri-Sınai Haklar",
+  marka: "Marka",
+  patent: "Patent",
+  telif: "Telif Hakkı",
+  ticari_sir: "Ticari Sır",
+  alacak: "Alacak",
+  sozlesme: "Sözleşme",
+  cek_senet: "Çek-Senet",
+  haksiz_rekabet: "Haksız Rekabet",
+  kidem_ihbar: "Kıdem-İhbar Tazminatı",
+  ise_iade: "İşe İade",
+  fazla_mesai: "Fazla Mesai",
+  is_kazasi: "İş Kazası",
+  ayipli_mal: "Ayıplı Mal",
+  ayipli_hizmet: "Ayıplı Hizmet",
+  abonelik: "Abonelik",
+  kira_bedeli: "Kira Bedeli",
+  tahliye: "Tahliye",
+  depozito: "Depozito",
+  malpraktis: "Malpraktis",
+  police: "Poliçe",
+  hasar: "Hasar",
+  tazminat: "Tazminat",
+  nafaka: "Nafaka",
+  mal_paylasimi: "Mal Paylaşımı",
+  diger: "Diğer",
+};
+
 function fmtDate(d?: string | null): string {
   if (!d) return "—";
   try {
@@ -263,7 +313,10 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
 
   const arbKonusu = useMemo(() => {
     if (!caseData?.dispute_type) return "—";
-    return caseData.dispute_subtype ? `${caseData.dispute_type} / ${caseData.dispute_subtype}` : caseData.dispute_type;
+    const main = DISPUTE_TYPE_LABELS[caseData.dispute_type] ?? caseData.dispute_type;
+    if (!caseData.dispute_subtype) return main;
+    const sub = DISPUTE_SUBTYPE_LABELS[caseData.dispute_subtype] ?? caseData.dispute_subtype;
+    return `${main} — ${sub}`;
   }, [caseData]);
 
   const sonGunTarihi = caseData?.deadline_extended ?? caseData?.deadline_total ?? null;
