@@ -263,7 +263,10 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
 
   const arbKonusu = useMemo(() => {
     if (!caseData?.dispute_type) return "—";
-    return caseData.dispute_subtype ? `${caseData.dispute_type} / ${caseData.dispute_subtype}` : caseData.dispute_type;
+    const main = DISPUTE_TYPE_LABELS[caseData.dispute_type] ?? caseData.dispute_type;
+    if (!caseData.dispute_subtype) return main;
+    const sub = DISPUTE_SUBTYPE_LABELS[caseData.dispute_subtype] ?? caseData.dispute_subtype;
+    return `${main} — ${sub}`;
   }, [caseData]);
 
   const sonGunTarihi = caseData?.deadline_extended ?? caseData?.deadline_total ?? null;
