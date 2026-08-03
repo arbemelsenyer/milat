@@ -40,6 +40,7 @@ interface CaseRow {
   title: string | null;
   category: string | null;
   dispute_type: string | null;
+  dispute_subtype: string | null;
   your_name: string | null;
   other_party_name: string | null;
   assigned_mediator_id: string | null;
@@ -78,6 +79,34 @@ interface MessageRow {
   sender_role: string | null;
   content: string;
   created_at: string;
+}
+
+// Ana uyuşmazlık türü / alt uzmanlık alanı görüntüleme etiketleri. Değerler
+// dosya açılış formunda (MediationEngine.tsx) seçilen slug'larla eşleşir;
+// eşleşmeyen (eski) değerler ham haliyle gösterilir.
+const ANA_TUR_LABELS: Record<string, string> = {
+  işçi_işveren: "İşçi-İşveren",
+  ticari: "Ticari",
+  tüketici: "Tüketici",
+  kira: "Kira",
+  aile: "Aile",
+  ortaklık: "Ortaklığın Giderilmesi",
+};
+const ALT_UZMANLIK_LABELS: Record<string, string> = {
+  sağlık: "Sağlık",
+  sigorta: "Sigorta",
+  fikri_sınai_haklar: "Fikri-Sınai Haklar",
+  inşaat: "İnşaat",
+  bankacılık: "Bankacılık",
+  spor: "Spor",
+  enerji_maden: "Enerji-Maden",
+};
+function anaAltDisplay(c: Pick<CaseRow, "category" | "dispute_type" | "dispute_subtype">): string {
+  if (c.category) return c.category;
+  if (!c.dispute_type) return "—";
+  const ana = ANA_TUR_LABELS[c.dispute_type] ?? c.dispute_type;
+  const alt = c.dispute_subtype ? ALT_UZMANLIK_LABELS[c.dispute_subtype] ?? c.dispute_subtype : null;
+  return alt ? `${ana} — ${alt}` : ana;
 }
 
 export default function CaseDetail() {
@@ -248,7 +277,7 @@ export default function CaseDetail() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 <Badge className="bg-accent text-accent-foreground border-0">
-                  {c.category ?? c.dispute_type ?? "—"}
+                  {anaAltDisplay(c)}
                 </Badge>
                 <Badge variant="outline" className="border-primary-foreground/30 text-primary-foreground">
                   {c.status}

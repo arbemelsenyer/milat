@@ -227,6 +227,7 @@ type CaseRow = {
   application_no: string | null;
   uyap_no: string | null;
   dispute_type: string | null;
+  dispute_subtype?: string | null;
   status: string | null;
   current_phase: number | null;
   application_date: string | null;
@@ -457,7 +458,7 @@ export default function MediationEngine() {
     setLoading(true);
     const { data, error } = await supabase
       .from("cases")
-      .select("id, user_id, title, application_no, uyap_no, dispute_type, status, current_phase, application_date, assigned_mediator_id, issue_description, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta")
+      .select("id, user_id, title, application_no, uyap_no, dispute_type, dispute_subtype, status, current_phase, application_date, assigned_mediator_id, issue_description, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta")
       .order("created_at", { ascending: false });
     if (error) toast({ title: "Yükleme hatası", description: trErr(error.message), variant: "destructive" });
     else setCases((data ?? []) as CaseRow[]);
@@ -467,7 +468,7 @@ export default function MediationEngine() {
   async function loadCase(id: string) {
     const { data, error } = await supabase
       .from("cases")
-      .select("id, user_id, title, application_no, uyap_no, dispute_type, status, current_phase, application_date, assigned_mediator_id, issue_description, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta")
+      .select("id, user_id, title, application_no, uyap_no, dispute_type, dispute_subtype, status, current_phase, application_date, assigned_mediator_id, issue_description, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta")
       .eq("id", id).maybeSingle();
     if (error) { toast({ title: "Başvuru yüklenemedi", description: trErr(error.message), variant: "destructive" }); return; }
     setActiveCase(data as CaseRow);
@@ -547,7 +548,7 @@ export default function MediationEngine() {
                       <div>
                         <div className="font-medium">{c.title || "(başlıksız)"}</div>
                         <div className="text-sm text-muted-foreground">
-                          {c.application_no ?? "—"} · {c.dispute_type ?? ""} · Aşama {c.current_phase ?? 1}/8
+                          {c.application_no ?? "—"} · {c.dispute_type ? anaAltLabel(c.dispute_type, c.dispute_subtype) : ""} · Aşama {c.current_phase ?? 1}/8
                         </div>
                       </div>
                       <Badge variant="secondary">{c.status ?? "active"}</Badge>
@@ -732,14 +733,52 @@ export default function MediationEngine() {
 
 /* ===================== NEW CASE (Phase 1) ===================== */
 
+// Ana uyuşmazlık türü (zorunlu) — dava şartı/süre hesabına dokunmayan, sadece
+// dosya açılışında seçilen 6 kanuni ana kategori.
+const ANA_UYUSMAZLIK_TURLERI: { value: string; label: string }[] = [
+  { value: "işçi_işveren", label: "İşçi-İşveren" },
+  { value: "ticari", label: "Ticari" },
+  { value: "tüketici", label: "Tüketici" },
+  { value: "kira", label: "Kira" },
+  { value: "aile", label: "Aile" },
+  { value: "ortaklık", label: "Ortaklığın Giderilmesi" },
+];
+
+// Alt uzmanlık alanı (isteğe bağlı) — sağlık/sigorta/fikri-sınai gibi alanlar
+// hukuken birden fazla ana türe bağlanabildiği için ayrı ve opsiyonel tutulur.
+const ALT_UZMANLIK_ALANLARI: { value: string; label: string }[] = [
+  { value: "sağlık", label: "Sağlık" },
+  { value: "sigorta", label: "Sigorta" },
+  { value: "fikri_sınai_haklar", label: "Fikri-Sınai Haklar" },
+  { value: "inşaat", label: "İnşaat" },
+  { value: "bankacılık", label: "Bankacılık" },
+  { value: "spor", label: "Spor" },
+  { value: "enerji_maden", label: "Enerji-Maden" },
+];
+const ALT_UZMANLIK_YOK = "yok";
+function altUzmanlikLabel(v?: string | null) {
+  return ALT_UZMANLIK_ALANLARI.find((c) => c.value === v)?.label ?? v ?? null;
+}
+// "Ana — Alt" birleşik gösterim; alt uzmanlık yoksa sadece ana tür döner.
+function anaAltLabel(disputeType?: string | null, altUzmanlik?: string | null) {
+  const ana = catLabel(disputeType);
+  const alt = altUzmanlikLabel(altUzmanlik);
+  return alt ? `${ana} — ${alt}` : ana;
+}
+
 function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
   onCancel: () => void; onCreated: (id: string) => void; userId: string; isMediator: boolean;
 }) {
   const [title, setTitle] = useState("");
   const [disputeType, setDisputeType] = useState("");
+  const [altUzmanlik, setAltUzmanlik] = useState(ALT_UZMANLIK_YOK);
   const [busy, setBusy] = useState(false);
 
   async function create() {
+    if (!disputeType) {
+      toast({ title: "Ana uyuşmazlık türü zorunlu", description: "Devam etmeden önce bir ana tür seçin.", variant: "destructive" });
+      return;
+    }
     setBusy(true);
     try {
       const { data: appNoData } = await supabase.rpc("generate_application_no" as any);
@@ -748,7 +787,8 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
         user_id: userId,
         assigned_mediator_id: isMediator ? userId : null,
         title: title || `Başvuru - ${application_no}`,
-        dispute_type: disputeType || null,
+        dispute_type: disputeType,
+        dispute_subtype: altUzmanlik !== ALT_UZMANLIK_YOK ? altUzmanlik : null,
         application_no,
         uyap_no: null,
         status: "active",
@@ -766,20 +806,29 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
   return (
     <Card className="p-6 mb-6 space-y-4">
       <h2 className="text-xl font-semibold">Yeni Başvuru</h2>
-      <div className="text-xs text-muted-foreground bg-muted/50 border rounded p-3">
-        ℹ️ Seçim yapmazsanız AI, dosya özetinden türü otomatik tespit eder (Aşama 1); seçim yaparsanız sizin seçiminiz esastır.
-      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="md:col-span-2">
           <Label>Başvuru Başlığı</Label>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Örn. Kira sözleşmesinden doğan uyuşmazlık" />
         </div>
-        <div className="md:col-span-2">
-          <Label>Uyuşmazlık Türü (opsiyonel)</Label>
+        <div>
+          <Label>Ana Uyuşmazlık Türü *</Label>
           <Select value={disputeType || undefined} onValueChange={setDisputeType}>
-            <SelectTrigger><SelectValue placeholder="Otomatik tespit edilsin (boş bırakabilirsiniz)" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Bir ana tür seçin" /></SelectTrigger>
             <SelectContent>
-              {DISPUTE_CATEGORIES.map((c) => (
+              {ANA_UYUSMAZLIK_TURLERI.map((c) => (
+                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Alt Uzmanlık Alanı (isteğe bağlı)</Label>
+          <Select value={altUzmanlik} onValueChange={setAltUzmanlik}>
+            <SelectTrigger><SelectValue placeholder="Yok" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALT_UZMANLIK_YOK}>Yok</SelectItem>
+              {ALT_UZMANLIK_ALANLARI.map((c) => (
                 <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
               ))}
             </SelectContent>
@@ -796,7 +845,7 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
       </div>
       <div className="flex gap-2 justify-end">
         <Button variant="ghost" onClick={onCancel}>İptal</Button>
-        <Button onClick={create} disabled={busy}>
+        <Button onClick={create} disabled={busy || !disputeType}>
           {busy ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Oluşturuluyor</> : "Başvuruyu Oluştur"}
         </Button>
       </div>
@@ -968,7 +1017,7 @@ function Phase1Summary({ caseRow, reload }: { caseRow: CaseRow; reload: () => vo
       <PhaseHero
         label="Faz 1 — Başvuru"
         metrics={[
-          { label: "Uyuşmazlık Türü", value: classified ? catLabel(caseRow.dispute_type) : null },
+          { label: "Uyuşmazlık Türü", value: classified ? anaAltLabel(caseRow.dispute_type, caseRow.dispute_subtype) : null },
           { label: "Sınıflandırma Durumu", value: classified ? "Tamamlandı" : "Bekliyor", tone: classified ? "low" : "medium" },
         ]}
       />
@@ -979,7 +1028,7 @@ function Phase1Summary({ caseRow, reload }: { caseRow: CaseRow; reload: () => vo
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div><span className="text-muted-foreground">Sistem No:</span> <b className="font-mono">{caseRow.application_no}</b></div>
             <div><span className="text-muted-foreground">Başlık:</span> {caseRow.title}</div>
-            <div><span className="text-muted-foreground">Uyuşmazlık Türü:</span> {caseRow.dispute_type || <span className="italic text-muted-foreground">Aşağıdaki karttan otomatik tespit edilebilir</span>}</div>
+            <div><span className="text-muted-foreground">Uyuşmazlık Türü:</span> {caseRow.dispute_type ? anaAltLabel(caseRow.dispute_type, caseRow.dispute_subtype) : <span className="italic text-muted-foreground">Aşağıdaki karttan otomatik tespit edilebilir</span>}</div>
             <div><span className="text-muted-foreground">Tarih:</span> {caseRow.application_date ? new Date(caseRow.application_date).toLocaleDateString("tr-TR") : new Date(caseRow.created_at).toLocaleDateString("tr-TR")}</div>
             <div><span className="text-muted-foreground">Durum:</span> {caseRow.status}</div>
             <div><span className="text-muted-foreground">UYAP Kayıt No:</span> {caseRow.uyap_no || <span className="italic text-muted-foreground">Henüz kaydedilmedi</span>}</div>
@@ -1372,6 +1421,7 @@ const DISPUTE_CATEGORIES: { value: string; label: string }[] = [
   { value: "kira", label: "Kira" },
   { value: "gayrimenkul", label: "Gayrimenkul" },
   { value: "genel", label: "Genel" },
+  { value: "ortaklık", label: "Ortaklığın Giderilmesi" },
 ];
 function catLabel(v?: string | null) {
   return DISPUTE_CATEGORIES.find((c) => c.value === v)?.label ?? v ?? "—";
