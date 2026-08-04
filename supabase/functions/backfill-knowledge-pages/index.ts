@@ -41,6 +41,12 @@ function pageForOffset(pageOffsets: number[], firstPageNumber: number, offset: n
   return firstPageNumber + pageIdx;
 }
 
+// Ardışık boşlukları teke indirip kırpar — hem parça arama anahtarına hem tam metne
+// AYNI normalizasyon uygulanır ki indexOf karşılaştırması tutarlı olsun.
+function normalizeWs(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -55,10 +61,11 @@ Deno.serve(async (req) => {
     const { data: isAdmin } = await admin0.rpc("has_role", { _user_id: userRes.user.id, _role: "admin" });
     if (!isAdmin) return json({ error: "Admin gereklidir" }, 403);
 
-    const { source_title, category } = await req.json();
+    const { source_title, category, force } = await req.json();
     if (!source_title || !category) {
       return json({ error: "source_title ve category zorunludur" }, 400);
     }
+    const forceRecalc = force === true;
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -74,13 +81,15 @@ Deno.serve(async (req) => {
     const sourceUrl = String(rows[0].source_url ?? "");
     if (!sourceUrl.startsWith(STORAGE_SOURCE_PREFIX)) {
       return json({
-        source_title, guncellenen_parca: 0, atlanan: rows.length, hata: null,
+        source_title, guncellenen_parca: 0, tam_eslesme: 0, sayfa_silindi: 0, sayfa_yazilamadi: 0,
+        atlanan: rows.length, hata: null,
         not: "storage:// kaynağı değil (elle yüklenmemiş) — atlandı",
       });
     }
     if (!sourceUrl.toLowerCase().endsWith(".pdf")) {
       return json({
-        source_title, guncellenen_parca: 0, atlanan: rows.length, hata: null,
+        source_title, guncellenen_parca: 0, tam_eslesme: 0, sayfa_silindi: 0, sayfa_yazilamadi: 0,
+        atlanan: rows.length, hata: null,
         not: "PDF değil (docx/txt) — sayfa hesabı yapılmaz, atlandı",
       });
     }
@@ -98,36 +107,73 @@ Deno.serve(async (req) => {
       const tc = await page.getTextContent();
       pageTexts.push(tc.items.map((it: any) => ("str" in it ? it.str : "")).join(" "));
     }
-    const pageOffsets = buildPageOffsets(pageTexts);
+    // Tahmin YOK: sayfa yalnızca tam eşleşmeyle yazılır. Arama, boşlukları tekilleştirilmiş
+    // (normalize edilmiş) tam metin üzerinde yapılır — parça arama anahtarına da aynı
+    // normalizasyon uygulanır ki indexOf tutarlı çalışsın.
+    const normalizedPageTexts = pageTexts.map(normalizeWs);
+    const normalizedFullText = normalizedPageTexts.join(" ");
+    const normalizedPageOffsets = buildPageOffsets(normalizedPageTexts);
 
-    // Parçaları chunk_index sırasına göre işle; her parçanın ham metindeki başlangıç konumu
-    // önceki parçaların kümülatif chunk_text uzunluğundan türetilir (zaten dolu olanlar da
-    // sayaca dahil edilir ki sıradaki parçaların ofseti kaymasın).
-    let cumulative = 0;
+    // Parçaları chunk_index sırasına göre işle. Arama, bir önceki BULUNMUŞ parçanın
+    // konumundan ileriye doğru yapılır (searchCursor yalnız başarılı eşleşmede ilerler,
+    // asla geri kaymaz). Eşleşme yoksa: mevcut (muhtemelen yanlış) page değeri varsa
+    // silinir (null); yoksa hiçbir şey yazılmaz — yanlış sayfa asla üretilmez.
+    let searchCursor = 0;
     let updated = 0;
+    let tamEslesme = 0;
+    let sayfaSilindi = 0;
+    let sayfaYazilamadi = 0;
     let skipped = 0;
     const errors: string[] = [];
     for (const row of rows) {
       const existingMeta = (row.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
-      const chunkLen = String(row.chunk_text ?? "").length;
-      if (existingMeta.page != null) {
+      const hadPage = existingMeta.page != null;
+
+      const chunkText = String(row.chunk_text ?? "");
+      const probe = normalizeWs(chunkText.trim().slice(0, 80));
+      let foundPage: number | null = null;
+      if (probe) {
+        const idx = normalizedFullText.indexOf(probe, searchCursor);
+        if (idx !== -1) {
+          searchCursor = idx;
+          foundPage = pageForOffset(normalizedPageOffsets, 1, idx);
+        }
+      }
+
+      if (hadPage && !forceRecalc) {
+        // Zaten sayfası var ve force istenmedi — bugünkü davranış: dokunma. (Arama yine de
+        // yapıldı ki searchCursor sıradaki parçalar için doğru ileri konumda kalsın.)
         skipped++;
-        cumulative += chunkLen;
         continue;
       }
-      const page = pageForOffset(pageOffsets, 1, cumulative);
-      const { error: updErr } = await admin
-        .from("knowledge_base_chunks")
-        .update({ metadata: { ...existingMeta, page } })
-        .eq("id", row.id);
-      if (updErr) errors.push(`${row.id}: ${updErr.message}`);
-      else updated++;
-      cumulative += chunkLen;
+
+      if (foundPage != null) {
+        const { error: updErr } = await admin
+          .from("knowledge_base_chunks")
+          .update({ metadata: { ...existingMeta, page: foundPage } })
+          .eq("id", row.id);
+        if (updErr) errors.push(`${row.id}: ${updErr.message}`);
+        else { updated++; tamEslesme++; }
+      } else if (hadPage) {
+        // Eşleşme yok ve eski (güvenilmez) bir page değeri var — yanlış sayfa görünmesin diye sil.
+        const { error: updErr } = await admin
+          .from("knowledge_base_chunks")
+          .update({ metadata: { ...existingMeta, page: null } })
+          .eq("id", row.id);
+        if (updErr) errors.push(`${row.id}: ${updErr.message}`);
+        else { updated++; sayfaSilindi++; }
+      } else {
+        // Eşleşme yok, zaten page de yoktu — yazacak bir şey yok.
+        sayfaYazilamadi++;
+      }
     }
 
     return json({
       source_title,
       guncellenen_parca: updated,
+      tam_eslesme: tamEslesme,
+      sayfa_silindi: sayfaSilindi,
+      sayfa_yazilamadi: sayfaYazilamadi,
       atlanan: skipped,
       hata: errors.length ? errors.join("; ") : null,
     });
