@@ -773,6 +773,36 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
   const [disputeType, setDisputeType] = useState("");
   const [altUzmanlik, setAltUzmanlik] = useState(ALT_UZMANLIK_YOK);
   const [busy, setBusy] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [aiSuggestedType, setAiSuggestedType] = useState(false);
+  const [aiSuggestedSubtype, setAiSuggestedSubtype] = useState(false);
+
+  // Salt ön-doldurma: başlıktan ana tür + alt uzmanlık önerir, hiçbir DB yazımı yok
+  // (case_id/persist gönderilmez). Menüler öneriyle işaretlenir, arabulucu onaylar/değiştirir.
+  async function suggestFromTitle() {
+    setSuggesting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("classify-dispute", {
+        body: { text: title },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      const kategori = String((data as any)?.kategori ?? "");
+      if (ANA_UYUSMAZLIK_TURLERI.some((c) => c.value === kategori)) {
+        setDisputeType(kategori);
+        setAiSuggestedType(true);
+      }
+      const altUz = String((data as any)?.alt_uzmanlik ?? "");
+      if (altUz !== "yok" && ALT_UZMANLIK_ALANLARI.some((c) => c.value === altUz)) {
+        setAltUzmanlik(altUz);
+        setAiSuggestedSubtype(true);
+      }
+    } catch {
+      toast({ title: "Öneri alınamadı, elle seçebilirsiniz", variant: "destructive" });
+    } finally {
+      setSuggesting(false);
+    }
+  }
 
   async function create() {
     if (!disputeType) {
@@ -808,12 +838,29 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
       <h2 className="text-xl font-semibold">Yeni Başvuru</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="md:col-span-2">
-          <Label>Başvuru Başlığı</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label>Başvuru Başlığı</Label>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={suggestFromTitle}
+              disabled={suggesting || title.trim().length < 10}
+              title={title.trim().length < 10 ? "Önce uyuşmazlığı kısaca yazın" : undefined}
+            >
+              {suggesting
+                ? <><Loader2 className="h-3 w-3 animate-spin mr-1" />Öneriliyor...</>
+                : <><Sparkles className="h-3 w-3 mr-1" />AI Önerisi</>}
+            </Button>
+          </div>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Örn. Kira sözleşmesinden doğan uyuşmazlık" />
         </div>
         <div>
-          <Label>Ana Uyuşmazlık Türü *</Label>
-          <Select value={disputeType || undefined} onValueChange={setDisputeType}>
+          <Label className="flex items-center gap-2">
+            Ana Uyuşmazlık Türü *
+            {aiSuggestedType && <Badge variant="secondary" className="text-[10px]">AI önerisi</Badge>}
+          </Label>
+          <Select value={disputeType || undefined} onValueChange={(v) => { setDisputeType(v); setAiSuggestedType(false); }}>
             <SelectTrigger><SelectValue placeholder="Bir ana tür seçin" /></SelectTrigger>
             <SelectContent>
               {ANA_UYUSMAZLIK_TURLERI.map((c) => (
@@ -823,8 +870,11 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
           </Select>
         </div>
         <div>
-          <Label>Alt Uzmanlık Alanı (isteğe bağlı)</Label>
-          <Select value={altUzmanlik} onValueChange={setAltUzmanlik}>
+          <Label className="flex items-center gap-2">
+            Alt Uzmanlık Alanı (isteğe bağlı)
+            {aiSuggestedSubtype && <Badge variant="secondary" className="text-[10px]">AI önerisi</Badge>}
+          </Label>
+          <Select value={altUzmanlik} onValueChange={(v) => { setAltUzmanlik(v); setAiSuggestedSubtype(false); }}>
             <SelectTrigger><SelectValue placeholder="Yok" /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ALT_UZMANLIK_YOK}>Yok</SelectItem>
