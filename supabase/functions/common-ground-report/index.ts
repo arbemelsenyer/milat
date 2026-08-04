@@ -99,6 +99,42 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Ajan Defteri: agent_worklog(entry_type='rapor_disi') — taraf analizlerinin rapora
+    // almadığı, bilgi boşluğu/temkinli kalınan hususlar. Salt bilgilendirme; bu fonksiyon
+    // orkestratörün son halkası olduğundan bu okuma hiçbir koşulda ana akışı bozmamalı.
+    let worklogBlock = "";
+    try {
+      const { data: worklogRows } = await admin.from("agent_worklog")
+        .select("content, created_at")
+        .eq("case_id", case_id).eq("entry_type", "rapor_disi")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (Array.isArray(worklogRows) && worklogRows.length > 0) {
+        const MAX_WORKLOG_CHARS = 3000;
+        let used = 0;
+        const lines: string[] = [];
+        for (const row of worklogRows as any[]) {
+          const c = row.content ?? {};
+          const husus = String(c.husus ?? "").trim();
+          const kategori = String(c.kategori ?? "").trim();
+          const neden = String(c.neden_rapora_girmedi ?? "").trim();
+          const adim = String(c.onerilen_adim ?? "").trim();
+          if (!husus && !neden && !adim) continue;
+          // created_at DESC ile çekildiği için sırayla eklemek zaten en yeni kayıtları
+          // önceliklendiriyor; bütçe dolunca kalan (daha eski) kayıtlar atlanır.
+          const line = `- [${kategori || "kategori yok"}] ${husus || "(husus belirtilmemiş)"} — Neden: ${neden || "-"} — Önerilen adım: ${adim || "-"}`;
+          if (used + line.length > MAX_WORKLOG_CHARS) break;
+          lines.push(line);
+          used += line.length;
+        }
+        if (lines.length > 0) {
+          worklogBlock = `\n═══ AJAN DEFTERİ — RAPORA GİRMEYEN DEĞERLENDİRMELER (bilgi boşlukları ve önerilen adımlar) ═══\n${lines.join("\n")}\nSentezi bu boşluklardan haberdar olarak yap: belgesiz kalan hususlarda kesin dil kullanma, uygun yerlerde eksik bilgiye ve önerilen adımlara işaret et.\n═══════════════════════════\n`;
+        }
+      }
+    } catch (e: any) {
+      console.error(`[common-ground-report] agent_worklog okuma başarısız (yoksayıldı): ${e?.message ?? String(e)}`);
+    }
+
     const systemPrompt = `Sen kıdemli bir Türk arabuluculuk danışmanısın. Tarafların gizli analizlerini okuyup ortak zemin raporu, arabulucu stratejisi ve iki tarafın risk analizlerini karşılaştıran risk_ozeti üretiyorsun.
 Eğer "GÖRÜŞME NOTLARI ANALİZİ" bloğu verilmişse, bu bloktaki önceden çıkarılmış tespit/pozisyon/strateji bulgularını ortak zemin (common_interests), senaryolar (scenarios) ve arabulucu stratejisi (mediator_strategy) değerlendirmende dikkate al.
 KESİN KURAL: Sabit/uydurma % ASLA verme. Kaynak yoksa "Yeterli veri yok" yaz.
@@ -150,6 +186,7 @@ ${(discAnswers ?? []).map((d) => `[Party ${d.party_id?.slice(0, 8)}] Q: ${d.ques
 ${meetingNotesBlock}
 ${ragBlock}
 ${similarBlock}
+${worklogBlock}
 Yukarıdaki resmi kaynaklardan ve benzer geçmiş davalardan yararlanarak ortak zemin raporu ve iki tarafı karşılaştıran risk_ozeti üret; uydurma % verme.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
