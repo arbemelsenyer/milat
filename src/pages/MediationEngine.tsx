@@ -2038,6 +2038,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [statementDrafts, setStatementDrafts] = useState<Record<string, string>>({});
   const [savingStatement, setSavingStatement] = useState<string | null>(null);
+  const [extractingAll, setExtractingAll] = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoadError(null);
@@ -2120,6 +2121,23 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
     await supabase.storage.from("case-documents").remove([d.file_path]);
     await supabase.from("case_documents").delete().eq("id", d.id);
     loadAll();
+  }
+
+  async function extractAllTexts() {
+    setExtractingAll(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("extract-document-text", {
+        body: { case_id: caseRow.id },
+      });
+      if (error) throw error;
+      const count = Array.isArray((data as any)?.results) ? (data as any).results.length : undefined;
+      toast({ title: count != null ? `${count} belge işlendi` : "Çıkarma tamamlandı" });
+      loadAll();
+    } catch (e: any) {
+      toast({ title: "Metin çıkarma başarısız", description: e?.message ?? "Bilinmeyen hata", variant: "destructive" });
+    } finally {
+      setExtractingAll(false);
+    }
   }
 
   async function saveStatement(partyId: string, text: string) {
@@ -2215,6 +2233,18 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
           <div className="text-right text-xs space-y-1 min-w-[180px]">
             <div className="font-medium">Taraf Analizi: {analysedCount}/{parties.length} taraf analiz edildi</div>
             <Progress value={progressPct} className="h-2" />
+            {isMediator && (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="mt-1"
+                onClick={extractAllTexts}
+                disabled={extractingAll}
+              >
+                {extractingAll ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                {extractingAll ? "İşleniyor..." : "Metinleri Çıkar"}
+              </Button>
+            )}
           </div>
         </div>
         <div className="border-t pt-3">
