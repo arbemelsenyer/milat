@@ -88,3 +88,6 @@ verify_jwt = false
 [functions.analyze-meeting-notes]
 verify_jwt = true
 
+[functions.backfill-knowledge-pages]
+verify_jwt = true
+
