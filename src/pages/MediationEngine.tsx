@@ -3202,13 +3202,14 @@ const STORAGE_SOURCE_PREFIX = "storage://case-documents/";
 // Elle yüklenen kaynaklar storage://case-documents/... sözde-URL'i ile geliyor; bu tarayıcıda
 // açılamaz. CaseDocuments.tsx:88-104'teki desenin aynısı: prefix'i ayıklayıp Supabase Storage'dan
 // authenticated indirip blob URL olarak yeni sekmede açıyoruz.
-async function openStorageSource(sourceUrl: string) {
+async function openStorageSource(sourceUrl: string, page?: number | null) {
   try {
     const path = sourceUrl.replace(STORAGE_SOURCE_PREFIX, "");
     const { data, error } = await supabase.storage.from("case-documents").download(path);
     if (error || !data) throw error ?? new Error("Dosya indirilemedi.");
     const blobUrl = URL.createObjectURL(data);
-    window.open(blobUrl, "_blank", "noopener,noreferrer");
+    const target = Number.isFinite(page) && (page as number) > 0 ? `${blobUrl}#page=${page}` : blobUrl;
+    window.open(target, "_blank", "noopener,noreferrer");
     setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
   } catch (e: any) {
     toast({ title: "Kaynak açılamadı", description: e?.message || "Dosya indirilemedi.", variant: "destructive" });
@@ -3247,7 +3248,7 @@ function SourcesPanel({ sources }: { sources?: any[] }) {
                   {isStorageSource ? (
                     <button
                       type="button"
-                      onClick={() => openStorageSource(s.url)}
+                      onClick={() => openStorageSource(s.url, s.page)}
                       className="text-primary hover:underline cursor-pointer bg-transparent border-0 p-0 font-medium"
                     >
                       {s.title || "Kaynak"}
