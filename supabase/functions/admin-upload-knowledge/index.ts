@@ -1,6 +1,6 @@
 // Admin-only: manuel kaynak yükleme. PDF/DOCX/TXT dosyasını alır, chunk + embed + kaydeder.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { extractText, getDocumentProxy } from "npm:unpdf@0.12.1";
+import { getDocumentProxy } from "npm:unpdf@0.12.1";
 import mammoth from "npm:mammoth@1.8.0";
 
 const corsHeaders = {
@@ -68,6 +68,48 @@ function chunkText(text: string, target = 1800, overlap = 150): string[] {
   return chunks.filter((c) => c.length > 200);
 }
 
+// Sayfa metinlerinin uzunluğunu biriktirerek her chunk'ın PDF'te BAŞLADIĞI sayfayı tahmin
+// eder. chunkText() boşlukları normalize ettiği için chunk'ın ham metindeki konumu kesin
+// bilinmez; chunk'ın ilk ~60 karakteri (boşluklar esnek \s+ ile) regex ile ham metinde
+// aranır. Bulunamazsa (veya regex kurulamazsa) o chunk için null döner — çağıran taraf
+// kendi fallback'ini uygular (processBookWhole: metadata boş; processBookPageSlice: startPage+1).
+function computeChunkPages(
+  rawText: string,
+  pageTexts: string[],
+  firstPageNumber: number,
+  chunks: string[],
+): (number | null)[] {
+  const pageOffsets: number[] = [];
+  let acc = 0;
+  for (const pt of pageTexts) {
+    pageOffsets.push(acc);
+    acc += pt.length + 1; // sayfalar join("\n") ile birleştiriliyor
+  }
+  let searchCursor = 0;
+  return chunks.map((chunk) => {
+    const probe = chunk.trim().slice(0, 60);
+    if (!probe) return null;
+    const pattern = probe.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    try {
+      const re = new RegExp(pattern);
+      const from = Math.max(0, searchCursor - 200);
+      const match = rawText.slice(from).match(re);
+      if (match && match.index !== undefined) {
+        const idx = from + match.index;
+        searchCursor = idx;
+        let pageIdx = 0;
+        for (let i = 0; i < pageOffsets.length; i++) {
+          if (idx >= pageOffsets[i]) pageIdx = i; else break;
+        }
+        return firstPageNumber + pageIdx;
+      }
+    } catch {
+      // geçersiz regex/eşleşme — bu chunk için null dön, fallback çağıran tarafta
+    }
+    return null;
+  });
+}
+
 const EMBEDDING_TIMEOUT_MS = 45_000;
 const EMBED_429_RETRY_DELAYS_MS = [3_000, 8_000, 20_000, 45_000]; // yalnızca 429 için ayrı bekleme politikası
 
@@ -131,19 +173,27 @@ async function embed(texts: string[]): Promise<number[][]> {
   }
 }
 
-async function extractFromFile(bytes: Uint8Array, fileName: string, mime: string): Promise<string> {
+async function extractFromFile(bytes: Uint8Array, fileName: string, mime: string): Promise<{ text: string; pageTexts: string[] | null }> {
   const name = fileName.toLowerCase();
   if (mime === "application/pdf" || name.endsWith(".pdf")) {
-    const pdf = await getDocumentProxy(bytes);
-    const { text } = await extractText(pdf, { mergePages: true });
-    return Array.isArray(text) ? text.join("\n") : text;
+    // mergePages:true yerine sayfa sayfa çıkarılıyor ki chunk'ların hangi sayfaya denk
+    // geldiği (computeChunkPages ile) hesaplanabilsin — build-knowledge-base ile aynı desen.
+    const pdf: any = await getDocumentProxy(bytes);
+    const totalPages: number = pdf.numPages;
+    const pageTexts: string[] = [];
+    for (let p = 1; p <= totalPages; p++) {
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+      pageTexts.push(tc.items.map((it: any) => ("str" in it ? it.str : "")).join(" "));
+    }
+    return { text: pageTexts.join("\n"), pageTexts };
   }
   if (name.endsWith(".docx") || mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
     const result = await mammoth.extractRawText({ buffer: bytes as any });
-    return result.value ?? "";
+    return { text: result.value ?? "", pageTexts: null };
   }
   if (name.endsWith(".txt") || mime.startsWith("text/")) {
-    return new TextDecoder("utf-8").decode(bytes);
+    return { text: new TextDecoder("utf-8").decode(bytes), pageTexts: null };
   }
   throw new Error("Desteklenmeyen dosya formatı. Sadece PDF, DOCX veya TXT yükleyebilirsiniz.");
 }
@@ -206,8 +256,11 @@ Deno.serve(async (req) => {
 
     // Extract text
     let fullText = "";
+    let pageTexts: string[] | null = null;
     try {
-      fullText = await extractFromFile(bytes, file.name, file.type);
+      const extracted = await extractFromFile(bytes, file.name, file.type);
+      fullText = extracted.text;
+      pageTexts = extracted.pageTexts;
     } catch (e: any) {
       return json({ error: `Metin çıkarma başarısız: ${e.message ?? e}` }, 400);
     }
@@ -215,6 +268,17 @@ Deno.serve(async (req) => {
     const chunks = chunkText(fullText);
     if (!chunks.length) return json({ error: "Bu dosya işlenemedi, lütfen başka bir dosya deneyin" }, 400);
     if (chunks.length > 800) return json({ error: `Anormal parça sayısı (${chunks.length}). Daha küçük bir dosya deneyin.` }, 400);
+
+    // Sayfa tahmini: yalnızca PDF'te (pageTexts varsa) hesaplanır; DOCX/TXT'te page hiç yazılmaz.
+    let chunkPages: (number | null)[] = chunks.map(() => null);
+    if (pageTexts) {
+      try {
+        chunkPages = computeChunkPages(fullText, pageTexts, 1, chunks);
+      } catch (e: any) {
+        console.error("Page estimation failed:", e?.message ?? e);
+        chunkPages = chunks.map(() => null);
+      }
+    }
 
     // 1) ÖNCE tüm embedding'leri bellekte üret. Hata olursa hiçbir şey silinmez.
     const cleanTitle = sanitizeUnicode(title);
@@ -257,7 +321,12 @@ Deno.serve(async (req) => {
         chunk_text: c,
         chunk_index: i + j,
         embedding: allVectors[i + j] as any,
-        metadata: { uploaded_by: userId, file_name: sanitizeUnicode(file.name), uploaded_at: new Date().toISOString() },
+        metadata: {
+          uploaded_by: userId,
+          file_name: sanitizeUnicode(file.name),
+          uploaded_at: new Date().toISOString(),
+          ...(chunkPages[i + j] != null ? { page: chunkPages[i + j] } : {}),
+        },
       }));
       const { error } = await admin.from("knowledge_base_chunks").insert(rows);
       if (error) {
