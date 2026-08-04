@@ -3904,6 +3904,49 @@ function CockpitSources({ items, sources }: { items: string[]; sources?: any[] }
   );
 }
 
+const WORKLOG_KATEGORI_LABELS: Record<string, string> = {
+  zayif_dayanak: "Zayıf Dayanak",
+  veri_yetersiz: "Veri Yetersiz",
+  celiskili: "Çelişkili",
+  ek_gorusme_gerekli: "Ek Görüşme Gerekli",
+};
+
+// agent_worklog.entry_type='rapor_disi' satırlarının kokpit görünümü — arabulucuya özel,
+// ajanın değerlendirip nihai rapora almadığı hususları gösterir. content JSON'u
+// party-confidential-analysis'teki rapor_disi_degerlendirmeler şemasıyla birebir eşleşir.
+function CockpitOffReportItem({ item, partyLabel }: { item: any; partyLabel: string | null }) {
+  const husus = safeText(item?.husus);
+  const neden = safeText(item?.neden_rapora_girmedi);
+  const adim = safeText(item?.onerilen_adim);
+  const kategori = String(item?.kategori ?? "");
+  if (!husus && !neden && !adim) return null;
+  return (
+    <li className="py-2.5 space-y-1">
+      <div className="flex items-start justify-between gap-2 flex-wrap">
+        <div className="text-xs font-medium text-sidebar-foreground/90">{husus || "—"}</div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {kategori && (
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sidebar-accent/40 border border-sidebar-border text-sidebar-foreground/70">
+              {WORKLOG_KATEGORI_LABELS[kategori] ?? kategori}
+            </span>
+          )}
+          {partyLabel && (
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sidebar-accent/40 border border-sidebar-border text-sidebar-foreground/70">
+              {partyLabel}
+            </span>
+          )}
+        </div>
+      </div>
+      {neden && <p className="text-xs text-sidebar-foreground/60 leading-snug">{neden}</p>}
+      {adim && (
+        <p className="text-xs text-accent/90 leading-snug flex items-start gap-1">
+          <span className="shrink-0">→</span><span>{adim}</span>
+        </p>
+      )}
+    </li>
+  );
+}
+
 /* ===================== PHASE 4 - MEDIATOR PANEL (READ-ONLY SUMMARY) ===================== */
 
 function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
@@ -3919,6 +3962,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   const [report, setReport] = useState<any>(null);
   const [analyses, setAnalyses] = useState<any[]>([]);
   const [rootCauses, setRootCauses] = useState<Record<string, any>>({});
+  const [worklog, setWorklog] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
@@ -3944,12 +3988,15 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
     setLoading(true);
     setLoadErr(null);
     try {
-      const [r, a, rc] = await Promise.all([
+      const [r, a, rc, wl] = await Promise.all([
         supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("party_analyses").select("party_id, analysis, risk_analizi, case_parties:party_id(first_name, last_name, company_name, party_role)").eq("case_id", caseRow.id),
         // Kök Neden Katmanı: mediator-only, ayrı tablo. Bu sorgu ana yüklemeyi bloklamaz —
         // hata olursa boş kart yerine sessizce boş durum gösterilir.
         supabase.from("party_root_cause_analysis").select("party_id, kok_neden, created_at").eq("case_id", caseRow.id).order("created_at", { ascending: false }),
+        // Rapora Girmeyenler: agent_worklog, aynı "hata olursa sessizce boş" kalıbı —
+        // bu sorgu asla ana kokpit render'ını bozmaz.
+        supabase.from("agent_worklog").select("id, party_id, content, created_at").eq("case_id", caseRow.id).eq("entry_type", "rapor_disi").order("created_at", { ascending: false }),
       ]);
       if (r.error) throw r.error;
       if (a.error) throw a.error;
@@ -3965,12 +4012,19 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
         });
         setRootCauses(rcMap);
       }
+      if (wl.error) {
+        console.error("[Phase4Summary worklog]", wl.error);
+        setWorklog([]);
+      } else {
+        setWorklog(Array.isArray(wl.data) ? wl.data : []);
+      }
     } catch (e: any) {
       console.error("[Phase4Summary] load failed", e);
       setLoadErr(e?.message ?? "Bilinmeyen hata");
       setReport(null);
       setAnalyses([]);
       setRootCauses({});
+      setWorklog([]);
     } finally {
       setLoading(false);
     }
@@ -4076,6 +4130,10 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
       batna: safeText(a.analysis?.party_position?.batna),
     };
   });
+  // Rapora Girmeyenler kartında party_id → taraf adı eşlemesi için — yeni sorgu yok,
+  // mevcut cockpitRows'tan türetilir.
+  const worklogPartyNameById: Record<string, string> = {};
+  cockpitRows.forEach((r) => { if (r.party_id) worklogPartyNameById[r.party_id] = r.name; });
   const cockpitRiskPuani = cockpitRiskOzeti?.genel_risk_puani
     || cockpitRows.find((r) => /yük/i.test(String(r.risk_puani)))?.risk_puani
     || cockpitRows.find((r) => /orta/i.test(String(r.risk_puani)))?.risk_puani
@@ -4216,6 +4274,23 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                         />
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Rapora Girmeyenler — agent_worklog(entry_type='rapor_disi'), Kök Neden ile aynı görünürlük */}
+                {worklog.length > 0 && (
+                  <div className="pt-2 border-t border-sidebar-border/60">
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-1">Rapora Girmeyenler</div>
+                    <p className="text-xs text-sidebar-foreground/50 mb-2">Ajanın değerlendirip rapora almadığı hususlar ve önerilen adımlar</p>
+                    <ul className="divide-y divide-sidebar-border/50">
+                      {worklog.map((w: any) => (
+                        <CockpitOffReportItem
+                          key={w.id}
+                          item={w.content}
+                          partyLabel={w.party_id == null ? "Dosya geneli" : (worklogPartyNameById[w.party_id] ?? null)}
+                        />
+                      ))}
+                    </ul>
                   </div>
                 )}
 
