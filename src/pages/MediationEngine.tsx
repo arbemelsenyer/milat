@@ -3203,13 +3203,25 @@ const STORAGE_SOURCE_PREFIX = "storage://case-documents/";
 // açılamaz. CaseDocuments.tsx:88-104'teki desenin aynısı: prefix'i ayıklayıp Supabase Storage'dan
 // authenticated indirip blob URL olarak yeni sekmede açıyoruz.
 async function openStorageSource(sourceUrl: string, page?: number | null) {
+  const path = sourceUrl.replace(STORAGE_SOURCE_PREFIX, "");
+  const pageSuffix = Number.isFinite(page) && (page as number) > 0 ? `#page=${page}` : "";
   try {
-    const path = sourceUrl.replace(STORAGE_SOURCE_PREFIX, "");
+    // İmzalı URL: gerçek https adresi olduğundan Chrome PDF görüntüleyicisi #page=N ile
+    // sayfaya atlayabiliyor — blob URL'de bu atlamıyordu (canlıda doğrulandı).
+    const { data: signed, error: signErr } = await supabase.storage
+      .from("case-documents")
+      .createSignedUrl(path, 300);
+    if (!signErr && signed?.signedUrl) {
+      window.open(`${signed.signedUrl}${pageSuffix}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+  } catch { /* imzalı URL alınamadı — aşağıdaki blob yedeğine düş */ }
+
+  try {
     const { data, error } = await supabase.storage.from("case-documents").download(path);
     if (error || !data) throw error ?? new Error("Dosya indirilemedi.");
     const blobUrl = URL.createObjectURL(data);
-    const target = Number.isFinite(page) && (page as number) > 0 ? `${blobUrl}#page=${page}` : blobUrl;
-    window.open(target, "_blank", "noopener,noreferrer");
+    window.open(`${blobUrl}${pageSuffix}`, "_blank", "noopener,noreferrer");
     setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
   } catch (e: any) {
     toast({ title: "Kaynak açılamadı", description: e?.message || "Dosya indirilemedi.", variant: "destructive" });
