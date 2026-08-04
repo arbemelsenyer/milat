@@ -36,6 +36,11 @@ const ALLOWED = [
   "kira", "gayrimenkul", "genel",
 ];
 
+// Frontend ALT_UZMANLIK_ALANLARI (MediationEngine.tsx:749-757) ile birebir aynı slug'lar.
+const ALLOWED_SUBTYPES = [
+  "sağlık", "sigorta", "fikri_sınai_haklar", "inşaat", "bankacılık", "spor", "enerji_maden",
+];
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -123,12 +128,17 @@ Verilen uyuşmazlık metnini knowledge_base_chunks tablosundaki kaynaklara ve T�
 SADECE şu kategorilerden birini seç:
 işçi_işveren | ticari | tüketici | sağlık | fikri_mülkiyet | inşaat | sigorta | bankacılık | aile | spor | enerji_maden | kira | gayrimenkul | genel
 
+Ayrıca, ana kategorinin yanında metin belirgin şekilde şu alt uzmanlık alanlarından birine işaret
+ediyorsa onu da belirt: sağlık | sigorta | fikri_sınai_haklar | inşaat | bankacılık | spor | enerji_maden.
+Emin değilsen veya metin bu alanlardan hiçbirine açıkça girmiyorsa "yok" de — tahmin zorlaması yapma.
+
 JSON formatında döndür:
 {
   "kategori": "...",
   "guven_skoru": 0-100,
   "gerekce": "1-2 cümle Türkçe",
-  "ilgili_kanun": ["gerçek kanun adları"]
+  "ilgili_kanun": ["gerçek kanun adları"],
+  "alt_uzmanlik": "sağlık | sigorta | fikri_sınai_haklar | inşaat | bankacılık | spor | enerji_maden | yok"
 }
 
 KURALLAR:
@@ -169,8 +179,10 @@ KURALLAR:
     const ilgili_kanun = Array.isArray(parsed?.ilgili_kanun)
       ? parsed.ilgili_kanun.map((x: any) => String(x)).slice(0, 10)
       : [];
+    let alt_uzmanlik = String(parsed?.alt_uzmanlik ?? "").trim();
+    if (!ALLOWED_SUBTYPES.includes(alt_uzmanlik)) alt_uzmanlik = "yok";
 
-    const result = { kategori, guven_skoru: guven, gerekce, ilgili_kanun };
+    const result = { kategori, guven_skoru: guven, gerekce, ilgili_kanun, alt_uzmanlik };
 
     if (case_id && persist) {
       await admin.from("cases").update({ dispute_type: kategori } as any).eq("id", case_id);
