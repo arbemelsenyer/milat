@@ -14,6 +14,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Loader2, ShieldCheck, Lock, Sparkles, Upload, FileText, Users, Brain, Lightbulb,
   Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X, History, Filter, FileDown, MessageSquare, Bot,
   Wallet, Pencil,
@@ -30,6 +34,17 @@ import { Input } from "@/components/ui/input";
 
 const tabTriggerAccentClass =
   "border-b-2 border-b-transparent transition-colors hover:border-b-accent hover:text-accent data-[state=active]:border-b-accent data-[state=active]:text-accent";
+
+// Taraf belge yüklemesi için denetim eşiği — MediationEngine.tsx:2062-2069'daki
+// arabulucu hattıyla birebir aynı liste.
+const DOC_MAX_SIZE = 10 * 1024 * 1024;
+const DOC_ALLOWED_EXT = ["pdf", "doc", "docx", "txt"];
+const DOC_ALLOWED_MIME = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+];
 
 interface CaseRow {
   id: string; title: string | null; application_no: string | null; uyap_no: string | null;
@@ -94,6 +109,8 @@ export default function CaseRoom() {
   const [editIssueOpen, setEditIssueOpen] = useState(false);
   const [issueDescDraft, setIssueDescDraft] = useState("");
   const [savingIssue, setSavingIssue] = useState(false);
+  const [docBusy, setDocBusy] = useState<string | null>(null);
+  const [deleteDocTarget, setDeleteDocTarget] = useState<DocRow | null>(null);
 
   const myParty = parties.find((p) => p.user_id === user?.id) ?? null;
   const isOwner = !!(caseRow && user && caseRow.user_id === user.id);
@@ -188,12 +205,28 @@ export default function CaseRoom() {
 
   async function uploadDoc(file: File) {
     if (!user || !caseId) return;
-    const path = `${user.id}/${caseId}/${Date.now()}-${file.name}`;
+
+    // Arabulucu hattındaki (MediationEngine.tsx:2124-2133) denetimin aynısı.
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!DOC_ALLOWED_EXT.includes(ext) && !DOC_ALLOWED_MIME.includes(file.type)) {
+      toast({ title: "Geçersiz dosya türü", description: `"${file.name}" yalnızca PDF, Word veya metin dosyası olabilir.`, variant: "destructive" });
+      return;
+    }
+    if (file.size > DOC_MAX_SIZE) {
+      toast({ title: "Dosya çok büyük", description: `"${file.name}" 10MB sınırını aşıyor.`, variant: "destructive" });
+      return;
+    }
+
+    const safeName = file.name.replace(/[^\w.\-]+/g, "_");
+    const path = `${user.id}/${caseId}/${Date.now()}-${safeName}`;
     const { error: upErr } = await supabase.storage.from("case-documents").upload(path, file);
     if (upErr) { toast({ title: "Yükleme hatası", description: upErr.message, variant: "destructive" }); return; }
     const { data: inserted, error: insErr } = await supabase.from("case_documents").insert({
       case_id: caseId, uploaded_by: user.id, file_name: file.name, file_path: path,
       file_size: file.size, mime_type: file.type,
+      // party_id: taraf bilinmiyorsa (myParty henüz yüklenmediyse) bugünkü gibi party_id'siz
+      // devam edilir — yükleme asla engellenmez.
+      ...(myParty?.id ? { party_id: myParty.id } : {}),
     }).select("id").single();
     if (insErr) { toast({ title: "Kayıt hatası", description: insErr.message, variant: "destructive" }); return; }
     // Metin çıkarma: beklemesiz (fire-and-forget) — yüklemeyi bloklamaz, hata sessizce loglanır.
@@ -201,6 +234,47 @@ export default function CaseRoom() {
       .catch((e) => console.error("[extract-document-text] tetiklenemedi", e));
     toast({ title: "Belge yüklendi" });
     await loadAll();
+  }
+
+  // Kendi belgesini indirir. Mevcut SELECT politikası kendi yüklediği dosyaya zaten izin
+  // veriyor — yeni politika gerekmez.
+  async function downloadMyDoc(d: DocRow) {
+    setDocBusy(d.id);
+    try {
+      const { data, error } = await supabase.storage.from("case-documents").download(d.file_path);
+      if (error || !data) throw error ?? new Error("Dosya indirilemedi.");
+      const blobUrl = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = d.file_name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
+    } catch (e: any) {
+      toast({ title: "İndirilemedi", description: e?.message ?? "Bilinmeyen hata", variant: "destructive" });
+    } finally {
+      setDocBusy(null);
+    }
+  }
+
+  // Önce DB satırı silinir (mevcut DELETE politikası yeterli); storage'dan kaldırma
+  // başarısız olsa bile liste güncellenir — kullanıcıya yanlış "silinemedi" gösterilmez.
+  async function deleteMyDoc(d: DocRow) {
+    setDocBusy(d.id);
+    try {
+      const { error } = await supabase.from("case_documents").delete().eq("id", d.id);
+      if (error) throw error;
+      const { error: rmErr } = await supabase.storage.from("case-documents").remove([d.file_path]);
+      if (rmErr) console.warn("[case-documents] storage'dan kaldırılamadı", rmErr.message);
+      toast({ title: "Belge silindi" });
+      await loadAll();
+    } catch (e: any) {
+      toast({ title: "Silinemedi", description: e?.message ?? "Bilinmeyen hata", variant: "destructive" });
+    } finally {
+      setDocBusy(null);
+      setDeleteDocTarget(null);
+    }
   }
 
   async function runMyAnalysis() {
@@ -546,9 +620,42 @@ export default function CaseRoom() {
             </p>
             <input type="file" onChange={(e) => e.target.files?.[0] && uploadDoc(e.target.files[0])} />
             <ul className="text-sm space-y-1 mt-3">
-              {myDocs.map((d) => <li key={d.id}>• {d.file_name}</li>)}
+              {myDocs.map((d) => (
+                <li key={d.id} className="flex items-center gap-2 p-2 border rounded">
+                  <FileText className="h-4 w-4 text-primary shrink-0" />
+                  <span className="flex-1 truncate">{d.file_name}</span>
+                  <Button variant="ghost" size="sm" title="İndir"
+                    onClick={() => downloadMyDoc(d)} disabled={docBusy === d.id}>
+                    {docBusy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileDown className="h-3 w-3" />}
+                  </Button>
+                  <Button variant="ghost" size="sm" title="Sil"
+                    onClick={() => setDeleteDocTarget(d)} disabled={docBusy === d.id}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </li>
+              ))}
               {myDocs.length === 0 && <li className="text-muted-foreground">Henüz belge yok.</li>}
             </ul>
+
+            <AlertDialog open={!!deleteDocTarget} onOpenChange={(o) => { if (!o && !docBusy) setDeleteDocTarget(null); }}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Belge silinsin mi?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    "{deleteDocTarget?.file_name}" kalıcı olarak silinecek. Bu işlem geri alınamaz.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={!!docBusy}>Vazgeç</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={!!docBusy}
+                    onClick={(e) => { e.preventDefault(); if (deleteDocTarget) deleteMyDoc(deleteDocTarget); }}
+                  >
+                    {docBusy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null} Sil
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </Card>
         </TabsContent>
 
