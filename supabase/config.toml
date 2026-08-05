@@ -91,3 +91,6 @@ verify_jwt = true
 [functions.backfill-knowledge-pages]
 verify_jwt = true
 
+
+[functions.knowledge-pdf-proxy]
+verify_jwt = true
