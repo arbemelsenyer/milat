@@ -22,7 +22,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
-import { SourceViewerDialog, type ViewerSource } from "@/components/SourceViewerDialog";
+import { SourceViewerDialog, ADB_SOURCE_PREFIX, type ViewerSource } from "@/components/SourceViewerDialog";
 import { motion, AnimatePresence, animate, useMotionValue, useMotionValueEvent } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -3298,7 +3298,14 @@ function SourcesPanel({ sources }: { sources?: any[] }) {
     <SourceViewerDialog
       source={viewerSource}
       onOpenChange={(o) => { if (!o) setViewerSource(null); }}
-      onOpenExternal={() => { if (viewerSource?.url) openStorageSource(viewerSource.url, viewerSource.page); }}
+      onOpenExternal={() => {
+        const u = viewerSource?.url;
+        if (!u) return;
+        // storage:// → imzalı URL akışı (değişmedi); adb kitapları → bugünkü doğrudan
+        // bağlantı (proxy'siz, #page=N ile).
+        if (u.startsWith(STORAGE_SOURCE_PREFIX)) openStorageSource(u, viewerSource?.page);
+        else window.open(viewerSource?.page ? `${u}#page=${viewerSource.page}` : u, "_blank", "noopener,noreferrer");
+      }}
     />
     <AnaSection icon="📚" title={`Kullanılan Kaynaklar (${list.length})`}>
       <p className="text-[11px] text-muted-foreground mb-2">
@@ -3310,6 +3317,10 @@ function SourcesPanel({ sources }: { sources?: any[] }) {
       <ol className="space-y-2 text-sm list-decimal pl-5">
         {list.map((s: any, i: number) => {
           const isStorageSource = typeof s.url === "string" && s.url.startsWith(STORAGE_SOURCE_PREFIX);
+          // Bakanlık kitapları da uygulama içi görüntüleyicide açılır (belge
+          // knowledge-pdf-proxy üzerinden çekilir). Bu önekle başlamayan diğer https
+          // kaynaklar bugünkü yeni-sekme davranışında kalır.
+          const isViewerSource = isStorageSource || (typeof s.url === "string" && s.url.startsWith(ADB_SOURCE_PREFIX));
           const href = typeof s.url === "string" && s.url.startsWith("https") && s.page
             ? `${s.url}#page=${s.page}`
             : s.url;
@@ -3317,7 +3328,7 @@ function SourcesPanel({ sources }: { sources?: any[] }) {
             <li key={i} className="border rounded p-2 bg-background">
               <div className="flex items-start justify-between gap-2">
                 <div className="font-medium">
-                  {isStorageSource ? (
+                  {isViewerSource ? (
                     <button
                       type="button"
                       onClick={() => setViewerSource({ title: s.title, url: s.url, page: s.page, excerpt: s.excerpt })}

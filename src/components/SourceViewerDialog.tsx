@@ -21,6 +21,10 @@ export type ViewerSource = {
 };
 
 const STORAGE_SOURCE_PREFIX = "storage://case-documents/";
+// Bakanlık kitapları CORS başlığı göndermediği için pdf.js'e doğrudan verilemez;
+// knowledge-pdf-proxy edge function'ı üzerinden çekilir (proxy'de de aynı sabit izin
+// listesi var).
+export const ADB_SOURCE_PREFIX = "https://adb.adalet.gov.tr/";
 
 // DocumentUploader.tsx:14-15 ile AYNI kalıp: pdf.js npm paketi olarak eklenmiyor, CDN'den
 // dinamik import ediliyor (Vite worker kurulumu gerekmiyor). Modül bir kez yüklenip
@@ -47,9 +51,33 @@ function normalizeWs(s: string): string {
   return s.replace(/\s+/g, " ").trim();
 }
 
+type LoadTarget = { url: string; isBlob: boolean; httpHeaders?: Record<string, string> };
+
+// adb kitapları: proxy edge function'ı üzerinden. Anahtar koda gömülmez — oturum
+// token'ı ve apikey istemcideki mevcut supabase oturumundan/ortam değişkeninden alınır.
+async function getProxyTarget(sourceUrl: string): Promise<LoadTarget> {
+  const base = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/+$/, "");
+  const apikey = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "");
+  if (!base) throw new Error("Supabase adresi yapılandırılmamış.");
+
+  const { data } = await supabase.auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error("Oturum bulunamadı.");
+
+  const httpHeaders: Record<string, string> = { Authorization: `Bearer ${token}` };
+  if (apikey) httpHeaders.apikey = apikey;
+
+  return {
+    url: `${base}/functions/v1/knowledge-pdf-proxy?url=${encodeURIComponent(sourceUrl)}`,
+    isBlob: false,
+    httpHeaders,
+  };
+}
+
 // openStorageSource'taki iki yollu mantığın aynısı (imzalı URL → blob yedeği). Oradaki
 // fonksiyona dokunulmadı; bu, görüntüleyicinin kendi kopyası.
-async function getSourceUrl(sourceUrl: string): Promise<{ url: string; isBlob: boolean }> {
+async function getSourceUrl(sourceUrl: string): Promise<LoadTarget> {
+  if (sourceUrl.startsWith(ADB_SOURCE_PREFIX)) return await getProxyTarget(sourceUrl);
   const path = sourceUrl.replace(STORAGE_SOURCE_PREFIX, "");
   try {
     const { data: signed, error: signErr } = await supabase.storage
@@ -195,7 +223,13 @@ export function SourceViewerDialog({
         }
         if (resolved.isBlob) blobUrl = resolved.url;
 
-        pdf = await pdfjs.getDocument(resolved.url).promise;
+        // Range çalışırsa pdf.js kendisi kullanır (proxy Range'i hedefe aynen iletiyor);
+        // çalışmazsa tam indirmeye düşer — ikisi de kabul.
+        pdf = await pdfjs.getDocument({
+          url: resolved.url,
+          httpHeaders: resolved.httpHeaders,
+          withCredentials: false,
+        }).promise;
         if (cancelled) return;
 
         const total: number = pdf.numPages;
@@ -253,7 +287,16 @@ export function SourceViewerDialog({
         setSpans(boxes);
         setHighlighted(hits.size > 0);
       } catch (e: any) {
-        if (!cancelled) setError(e?.message || "Belge açılamadı.");
+        // Proxy hataları (401/403/502) burada UnexpectedResponseError olarak gelir; ekran
+        // hiçbir koşulda boş/kilitli kalmaz, "Yeni sekmede aç" yedeği footer'da durur.
+        if (!cancelled) {
+          const st = Number(e?.status);
+          const msg =
+            st === 401 || st === 403 ? "Belgeye erişim yetkisi doğrulanamadı."
+            : st === 502 ? "Kaynak sunucuya ulaşılamadı."
+            : e?.message || "Belge açılamadı.";
+          setError(msg);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
