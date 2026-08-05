@@ -68,45 +68,55 @@ function chunkText(text: string, target = 1800, overlap = 150): string[] {
   return chunks.filter((c) => c.length > 200);
 }
 
-// Sayfa metinlerinin uzunluğunu biriktirerek her chunk'ın PDF'te BAŞLADIĞI sayfayı tahmin
-// eder. chunkText() boşlukları normalize ettiği için chunk'ın ham metindeki konumu kesin
-// bilinmez; chunk'ın ilk ~60 karakteri (boşluklar esnek \s+ ile) regex ile ham metinde
-// aranır. Bulunamazsa (veya regex kurulamazsa) o chunk için null döner — çağıran taraf
-// kendi fallback'ini uygular (processBookWhole: metadata boş; processBookPageSlice: startPage+1).
+// Ardışık boşlukları teke indirip kırpar — hem chunk arama anahtarına hem tam metne
+// AYNI normalizasyon uygulanır ki indexOf karşılaştırması tutarlı olsun.
+function normalizeWs(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+// pageTexts sayfa sayfa join(" ") ile birleştirildiğinde her sayfanın normalize metindeki
+// başlangıç ofsetini üretir — backfill-knowledge-pages'teki buildPageOffsets ile aynı kalıp.
+function buildPageOffsets(pageTexts: string[]): number[] {
+  const offsets: number[] = [];
+  let acc = 0;
+  for (const pt of pageTexts) {
+    offsets.push(acc);
+    acc += pt.length + 1;
+  }
+  return offsets;
+}
+
+function pageForOffset(pageOffsets: number[], firstPageNumber: number, offset: number): number {
+  let pageIdx = 0;
+  for (let i = 0; i < pageOffsets.length; i++) {
+    if (offset >= pageOffsets[i]) pageIdx = i; else break;
+  }
+  return firstPageNumber + pageIdx;
+}
+
+// Tahmin YOK: sayfa yalnızca tam eşleşmeyle yazılır (backfill-knowledge-pages'teki 7c95322
+// düzeltmesiyle aynı desen). Arama, boşlukları tekilleştirilmiş (normalize edilmiş) tam metin
+// üzerinde yapılır; chunk arama anahtarına da aynı normalizasyon uygulanır ki indexOf tutarlı
+// çalışsın. Arama, bir önceki BULUNMUŞ chunk'ın konumundan ileriye doğru yapılır (searchCursor
+// yalnız başarılı eşleşmede ilerler, asla geri kaymaz). Eşleşme bulunamayan chunk için null
+// döner — çağıran taraf o chunk'a metadata.page YAZMAZ (tahmine geri düşme yok).
 function computeChunkPages(
-  rawText: string,
   pageTexts: string[],
   firstPageNumber: number,
   chunks: string[],
 ): (number | null)[] {
-  const pageOffsets: number[] = [];
-  let acc = 0;
-  for (const pt of pageTexts) {
-    pageOffsets.push(acc);
-    acc += pt.length + 1; // sayfalar join("\n") ile birleştiriliyor
-  }
+  const normalizedPageTexts = pageTexts.map(normalizeWs);
+  const normalizedFullText = normalizedPageTexts.join(" ");
+  const normalizedPageOffsets = buildPageOffsets(normalizedPageTexts);
+
   let searchCursor = 0;
   return chunks.map((chunk) => {
-    const probe = chunk.trim().slice(0, 60);
+    const probe = normalizeWs(chunk.trim().slice(0, 80));
     if (!probe) return null;
-    const pattern = probe.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
-    try {
-      const re = new RegExp(pattern);
-      const from = Math.max(0, searchCursor - 200);
-      const match = rawText.slice(from).match(re);
-      if (match && match.index !== undefined) {
-        const idx = from + match.index;
-        searchCursor = idx;
-        let pageIdx = 0;
-        for (let i = 0; i < pageOffsets.length; i++) {
-          if (idx >= pageOffsets[i]) pageIdx = i; else break;
-        }
-        return firstPageNumber + pageIdx;
-      }
-    } catch {
-      // geçersiz regex/eşleşme — bu chunk için null dön, fallback çağıran tarafta
-    }
-    return null;
+    const idx = normalizedFullText.indexOf(probe, searchCursor);
+    if (idx === -1) return null;
+    searchCursor = idx;
+    return pageForOffset(normalizedPageOffsets, firstPageNumber, idx);
   });
 }
 
@@ -269,13 +279,14 @@ Deno.serve(async (req) => {
     if (!chunks.length) return json({ error: "Bu dosya işlenemedi, lütfen başka bir dosya deneyin" }, 400);
     if (chunks.length > 800) return json({ error: `Anormal parça sayısı (${chunks.length}). Daha küçük bir dosya deneyin.` }, 400);
 
-    // Sayfa tahmini: yalnızca PDF'te (pageTexts varsa) hesaplanır; DOCX/TXT'te page hiç yazılmaz.
+    // Sayfa hesabı: yalnızca PDF'te (pageTexts varsa) yapılır; DOCX/TXT'te page hiç yazılmaz.
+    // Tam eşleşme bulunamayan chunk'lar için page null kalır (tahmin yok).
     let chunkPages: (number | null)[] = chunks.map(() => null);
     if (pageTexts) {
       try {
-        chunkPages = computeChunkPages(fullText, pageTexts, 1, chunks);
+        chunkPages = computeChunkPages(pageTexts, 1, chunks);
       } catch (e: any) {
-        console.error("Page estimation failed:", e?.message ?? e);
+        console.error("Page matching failed:", e?.message ?? e);
         chunkPages = chunks.map(() => null);
       }
     }
