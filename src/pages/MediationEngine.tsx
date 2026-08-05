@@ -22,6 +22,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
+import { SourceViewerDialog, type ViewerSource } from "@/components/SourceViewerDialog";
 import { motion, AnimatePresence, animate, useMotionValue, useMotionValueEvent } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -3280,6 +3281,9 @@ async function openStorageSource(sourceUrl: string, page?: number | null) {
 
 function SourcesPanel({ sources }: { sources?: any[] }) {
   const list = Array.isArray(sources) ? sources : [];
+  // storage:// kaynaklar artık uygulama içi görüntüleyicide açılır; https (Bakanlık
+  // kitapları) kaynaklarda bugünkü yeni-sekme davranışı birebir korunur.
+  const [viewerSource, setViewerSource] = useState<ViewerSource | null>(null);
   if (list.length === 0) {
     return (
       <AnaSection icon="📚" title="Kullanılan Kaynaklar">
@@ -3290,6 +3294,12 @@ function SourcesPanel({ sources }: { sources?: any[] }) {
     );
   }
   return (
+    <>
+    <SourceViewerDialog
+      source={viewerSource}
+      onOpenChange={(o) => { if (!o) setViewerSource(null); }}
+      onOpenExternal={() => { if (viewerSource?.url) openStorageSource(viewerSource.url, viewerSource.page); }}
+    />
     <AnaSection icon="📚" title={`Kullanılan Kaynaklar (${list.length})`}>
       <p className="text-[11px] text-muted-foreground mb-2">
         Bu çıktı, Adalet Bakanlığı Arabuluculuk Daire Başkanlığı resmi yayınlarından alınan aşağıdaki bölümlerden yararlanılarak üretildi.
@@ -3310,7 +3320,7 @@ function SourcesPanel({ sources }: { sources?: any[] }) {
                   {isStorageSource ? (
                     <button
                       type="button"
-                      onClick={() => openStorageSource(s.url, s.page)}
+                      onClick={() => setViewerSource({ title: s.title, url: s.url, page: s.page, excerpt: s.excerpt })}
                       className="text-primary hover:underline cursor-pointer bg-transparent border-0 p-0 font-medium"
                     >
                       {s.title || "Kaynak"}
@@ -3336,6 +3346,7 @@ function SourcesPanel({ sources }: { sources?: any[] }) {
         })}
       </ol>
     </AnaSection>
+    </>
   );
 }
 
