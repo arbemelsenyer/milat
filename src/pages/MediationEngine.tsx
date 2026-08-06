@@ -45,6 +45,7 @@ import { Phase3ErrorBoundary } from "@/components/mediation/Phase3ErrorBoundary"
 import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 import { ProcessTrackerPanel } from "@/components/mediation/ProcessTrackerPanel";
 import { AgentControlPanel } from "@/components/mediation/AgentControlPanel";
+import { CaseQaPanel } from "@/components/mediation/CaseQaPanel";
 
 // Paylaşılan giriş animasyonu deseni — Dashboard.tsx'teki containerVariants/itemVariants ile aynı.
 const containerVariants = {
@@ -322,6 +323,7 @@ export default function MediationEngine() {
   const [trackerOpen, setTrackerOpen] = useState(false);
   const [agentPanelOpen, setAgentPanelOpen] = useState(false);
   const [paymentPanelOpen, setPaymentPanelOpen] = useState(false);
+  const [qaOpen, setQaOpen] = useState(false);
   // Faz tamamlanma daveti — sadece tamamlanmadı→tamamlandı GEÇİŞİNDE toast/parlama tetiklenir.
   // null = henüz hiç hesaplanmadı (dosya ilk açılışı); ilk hesaplamada geçiş sayılmaz.
   const prevPhaseStatusRef = useRef<Record<number, boolean> | null>(null);
@@ -633,6 +635,12 @@ export default function MediationEngine() {
             onClick={() => setAgentPanelOpen(true)}>
             🤖 Ajan Kontrol Paneli
           </Button>
+          {(isMediator || isAdmin) && (
+            <Button variant="ghost" size="sm" className="w-full mb-4 justify-start border-l-2 border-l-transparent bg-transparent text-sidebar-foreground transition-colors hover:border-l-accent hover:text-accent hover:bg-sidebar-accent/40"
+              onClick={() => setQaOpen(true)}>
+              ❓ Dosyaya Soru Sor
+            </Button>
+          )}
           <Button variant="ghost" size="sm" className="w-full mb-4 justify-start border-l-2 border-l-transparent bg-transparent text-sidebar-foreground transition-colors hover:border-l-accent hover:text-accent hover:bg-sidebar-accent/40"
             onClick={() => setPaymentPanelOpen(true)}>
             💰 Ödeme & Muhasebe
@@ -720,6 +728,9 @@ export default function MediationEngine() {
           <AgentControlPanel caseId={activeCase.id} isMediator={isMediator || isAdmin} />
         </DialogContent>
       </Dialog>
+      {(isMediator || isAdmin) && (
+        <CaseQaPanel caseRow={activeCase} open={qaOpen} onOpenChange={setQaOpen} />
+      )}
       <Dialog open={paymentPanelOpen} onOpenChange={setPaymentPanelOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
