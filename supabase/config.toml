@@ -94,3 +94,6 @@ verify_jwt = true
 
 [functions.knowledge-pdf-proxy]
 verify_jwt = true
+
+[functions.case-qa]
+verify_jwt = true
