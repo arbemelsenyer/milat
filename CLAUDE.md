@@ -52,3 +52,9 @@
 - SQL migrasyonları her zaman idempotent yazılır; SQL kurucu tarafından Lovable Cloud > SQL'den çalıştırılır, Supabase Dashboard yok
 - Tek lockfile bun.lock'tur; npm install kullanılmaz, bun install kullanılır
 - Kök nedeni bul; geçici yama yapma
+
+## Oturum Ritüeli (süreklilik kuralı)
+- Oturum BAŞINDA: tasks/todo.md dosyasını oku ve "Nerede kaldık" bölümünden devam et. Kullanıcıya özetle: "Son oturumda X yapılmıştı, sırada Y var."
+- Her görev BİTİMİNDE, "bitti" demeden önce: tasks/todo.md'de tamamlananı [x] işaretle; kalan işleri ve bir sonraki adımı "## Nerede kaldık" başlığı altına 2-3 satırla yaz (tarih ekle).
+- Yeni bir ders/tuzak çıktıysa tasks/lessons.md'ye tek satır ekle.
+- Bu ritüel atlanamaz: todo.md güncellenmeden görev tamamlanmış sayılmaz.
