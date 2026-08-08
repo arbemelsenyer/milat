@@ -256,31 +256,79 @@ ${question}
 
 Yukarıdaki kayıtlara dayanarak cevapla; kayıtlarda karşılığı olmayan hiçbir bilgiyi ekleme.`;
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
-        response_format: { type: "json_object" },
-        temperature: 0.2,
-      }),
-    });
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      console.error("[case-qa] Gateway error:", aiRes.status, errText.slice(0, 300));
-      const userMsg =
-        aiRes.status === 429 ? "Rate limit aşıldı. Lütfen biraz sonra tekrar deneyin." :
-        aiRes.status === 402 ? "AI kredisi tükendi. Workspace ayarlarından kredi ekleyin." :
-        "AI servisi hatası";
-      return new Response(JSON.stringify({ error: userMsg, detail: errText }), {
-        status: aiRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // ── MODEL KAPISI: GEMINI_API_KEY varsa önce doğrudan Google; anahtar yoksa veya
+    // Google çağrısı düşerse MEVCUT Lovable gateway yolu yedek olarak denenir.
+    // Bu noktadan sonrası (JSON parse + sanitizer + şema güvencesi) iki yolda da AYNI.
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    let rawContent: string | null = null;
+    let googleFail: { status: number; userMsg: string } | null = null;
+
+    if (geminiKey) {
+      // Anahtar yalnız env'den okunur; log ve cevap gövdelerinden temizlenir.
+      const redact = (s: string) => s.split(geminiKey).join("***");
+      try {
+        const gRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(geminiKey)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: systemPrompt }] },
+              contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+              generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+            }),
+          },
+        );
+        if (gRes.ok) {
+          const gJson = await gRes.json();
+          const text = gJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (typeof text === "string" && text.trim()) rawContent = text;
+          else console.error("[case-qa] Google boş yanıt döndürdü — gateway'e düşülüyor.");
+        } else {
+          console.error("[case-qa] Google error:", gRes.status, redact(await gRes.text()).slice(0, 300));
+          googleFail = {
+            status: gRes.status,
+            userMsg:
+              gRes.status === 429 ? "Google ücretsiz kota sınırına takıldı, 1 dakika sonra tekrar deneyin." :
+              (gRes.status === 400 || gRes.status === 403) ? "Google API anahtarı sorunu — anahtarı kontrol edin." :
+              "AI servisi hatası",
+          };
+        }
+      } catch (e: any) {
+        console.error(`[case-qa] Google çağrısı başarısız (gateway'e düşülüyor): ${redact(e?.message ?? String(e))}`);
+      }
     }
 
-    const aiJson = await aiRes.json();
+    if (rawContent === null) {
+      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+          response_format: { type: "json_object" },
+          temperature: 0.2,
+        }),
+      });
+      if (!aiRes.ok) {
+        const errText = await aiRes.text();
+        console.error("[case-qa] Gateway error:", aiRes.status, errText.slice(0, 300));
+        // Google birincil kapıydı ve yedek de düştüyse kullanıcıya Google'ın nedenini göster.
+        const userMsg = googleFail?.userMsg ??
+          (aiRes.status === 429 ? "Rate limit aşıldı. Lütfen biraz sonra tekrar deneyin." :
+           aiRes.status === 402 ? "AI kredisi tükendi. Workspace ayarlarından kredi ekleyin." :
+           "AI servisi hatası");
+        return new Response(JSON.stringify({ error: userMsg, detail: errText }), {
+          status: googleFail?.status ?? aiRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const aiJson = await aiRes.json();
+      rawContent = aiJson.choices?.[0]?.message?.content ?? "{}";
+    }
+
     let parsed: any = {};
-    try { parsed = JSON.parse(aiJson.choices?.[0]?.message?.content ?? "{}"); } catch { parsed = {}; }
+    try { parsed = JSON.parse(rawContent ?? "{}"); } catch { parsed = {}; }
 
     // Deterministic citation guard: bağlamda birebir geçmeyen künyeleri temizler.
     parsed = sanitizeCitationHallucinations(parsed, contextBlocks);
