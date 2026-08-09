@@ -256,14 +256,65 @@ ${question}
 
 Yukarıdaki kayıtlara dayanarak cevapla; kayıtlarda karşılığı olmayan hiçbir bilgiyi ekleme.`;
 
-    // ── MODEL KAPISI: GEMINI_API_KEY varsa önce doğrudan Google; anahtar yoksa veya
-    // Google çağrısı düşerse MEVCUT Lovable gateway yolu yedek olarak denenir.
-    // Bu noktadan sonrası (JSON parse + sanitizer + şema güvencesi) iki yolda da AYNI.
+    // ── MODEL KAPISI (üç kademe): (1) OPENAI_API_KEY varsa ÖNCE doğrudan OpenAI —
+    // build-knowledge-base/index.ts gömme hattıyla AYNI secret adı; (2) düşerse
+    // GEMINI_API_KEY ile doğrudan Google model listesi; (3) o da düşerse MEVCUT
+    // Lovable gateway yedeği. Bu noktadan sonrası (JSON parse + sanitizer + şema
+    // güvencesi) üç yolda da AYNI.
+    const openaiKey = Deno.env.get("OPENAI_API_KEY");
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
     let rawContent: string | null = null;
+    let openaiFail: { status: number; shortMsg: string } | null = null;
     let googleFail: { status: number; shortMsg: string } | null = null;
 
-    if (geminiKey) {
+    if (openaiKey) {
+      // Anahtar yalnız env'den okunur; hata gövdelerinden temizlenir, hiçbir yere loglanmaz.
+      const redact = (s: string) => s.split(openaiKey).join("***");
+      const OPENAI_MODEL = "gpt-4o-mini";
+      try {
+        const oRes = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${openaiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: OPENAI_MODEL,
+            messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+            response_format: { type: "json_object" },
+            temperature: 0.2,
+          }),
+        });
+        if (oRes.ok) {
+          const oJson = await oRes.json();
+          const text = oJson?.choices?.[0]?.message?.content;
+          if (typeof text === "string" && text.trim()) {
+            rawContent = text;
+            console.log(`[case-qa] Sağlayıcı: OpenAI — model: ${OPENAI_MODEL}`);
+          } else {
+            console.error(`[case-qa] OpenAI (${OPENAI_MODEL}) boş yanıt döndürdü — Google'a düşülüyor.`);
+            openaiFail = { status: 502, shortMsg: `${OPENAI_MODEL} boş yanıt döndürdü` };
+          }
+        } else {
+          const bodyText = redact(await oRes.text());
+          let shortMsg = bodyText.replace(/\s+/g, " ").trim().slice(0, 120);
+          let code = "";
+          try {
+            const errObj = JSON.parse(bodyText)?.error;
+            shortMsg = String(errObj?.message ?? shortMsg).slice(0, 120);
+            code = String(errObj?.code ?? errObj?.type ?? "");
+          } catch { /* düz metin */ }
+          console.error("[case-qa] OpenAI error:", oRes.status, shortMsg);
+          openaiFail = {
+            status: code === "insufficient_quota" ? 402 : oRes.status,
+            shortMsg: `${OPENAI_MODEL}: ${shortMsg}`,
+          };
+        }
+      } catch (e: any) {
+        const msg = redact(e?.message ?? String(e)).slice(0, 120);
+        console.error(`[case-qa] OpenAI çağrısı başarısız: ${msg}`);
+        openaiFail = { status: 502, shortMsg: `${OPENAI_MODEL}: ${msg}` };
+      }
+    }
+
+    if (rawContent === null && geminiKey) {
       // Anahtar yalnız env'den okunur; log ve cevap gövdelerinden temizlenir.
       const redact = (s: string) => s.split(geminiKey).join("***");
       // Model adları hesaplarda/bölgelerde farklılaşabildiği için sıralı denenir:
@@ -290,7 +341,7 @@ Yukarıdaki kayıtlara dayanarak cevapla; kayıtlarda karşılığı olmayan hi�
             const text = gJson?.candidates?.[0]?.content?.parts?.[0]?.text;
             if (typeof text === "string" && text.trim()) {
               rawContent = text;
-              console.log(`[case-qa] Google modeli çalıştı: ${model}`);
+              console.log(`[case-qa] Sağlayıcı: Google — model: ${model}`);
               break;
             }
             console.error(`[case-qa] Google (${model}) boş yanıt döndürdü — sıradaki model deneniyor.`);
@@ -327,26 +378,33 @@ Yukarıdaki kayıtlara dayanarak cevapla; kayıtlarda karşılığı olmayan hi�
       if (!aiRes.ok) {
         const errText = await aiRes.text();
         console.error("[case-qa] Gateway error:", aiRes.status, errText.slice(0, 300));
-        // Google birincil kapıydı; yedek de düştüyse iki hata tek satırda birleştirilir.
+        // Üç kademe de düştüyse hepsi tek satırda birleştirilir.
         const gatewayMsg =
           aiRes.status === 429 ? "Rate limit aşıldı. Lütfen biraz sonra tekrar deneyin." :
           aiRes.status === 402 ? "AI kredisi tükendi. Workspace ayarlarından kredi ekleyin." :
           "AI servisi hatası";
+        const openaiMsg = openaiFail
+          ? `OpenAI: ${openaiFail.status} ${openaiFail.shortMsg}` +
+            (openaiFail.status === 429 ? " — OpenAI kota/hız sınırı, biraz sonra tekrar deneyin." :
+             openaiFail.status === 401 ? " — OpenAI anahtarı geçersiz." :
+             openaiFail.status === 402 ? " — OpenAI bakiyesi yetersiz." : "")
+          : null;
         const googleMsg = googleFail
           ? `Google: ${googleFail.status} ${googleFail.shortMsg}` +
             (googleFail.status === 429 ? " — ücretsiz kota sınırına takıldı, 1 dakika sonra tekrar deneyin." :
              (googleFail.status === 400 || googleFail.status === 403) ? " — API anahtarını kontrol edin." : "")
           : null;
-        const userMsg = googleMsg
-          ? `${googleMsg} | Gateway: ${aiRes.status} ${gatewayMsg}`
-          : gatewayMsg;
+        const userMsg = [openaiMsg, googleMsg, `Gateway: ${aiRes.status} ${gatewayMsg}`]
+          .filter(Boolean).join(" | ");
         return new Response(JSON.stringify({ error: userMsg, detail: errText }), {
-          status: googleFail?.status ?? aiRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: openaiFail?.status ?? googleFail?.status ?? aiRes.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       const aiJson = await aiRes.json();
       rawContent = aiJson.choices?.[0]?.message?.content ?? "{}";
+      console.log("[case-qa] Sağlayıcı: Lovable gateway — model: google/gemini-2.5-flash");
     }
 
     let parsed: any = {};
