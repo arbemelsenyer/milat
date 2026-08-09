@@ -2122,6 +2122,58 @@ export type Database = {
           },
         ]
       }
+      party_communication_analysis: {
+        Row: {
+          case_id: string
+          created_at: string
+          discovery_questions: Json
+          findings: Json
+          id: string
+          party_id: string
+          updated_at: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          discovery_questions?: Json
+          findings?: Json
+          id?: string
+          party_id: string
+          updated_at?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          discovery_questions?: Json
+          findings?: Json
+          id?: string
+          party_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "party_communication_analysis_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "party_communication_analysis_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_communication_analysis_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       party_consistency_findings: {
         Row: {
           case_id: string
