@@ -3980,6 +3980,55 @@ function CockpitOffReportItem({ item, partyLabel }: { item: any; partyLabel: str
   );
 }
 
+// party_consistency_findings tek bulgusunun kokpit görünümü — arabulucuya özel.
+// CockpitRootCauseCard kalıbından türetildi: gözlem + dayanak + güven rozeti. Fark,
+// dayanağın TEK değil İKİ olması ve yan yana durması (dar ekranda alt alta düşer).
+// guven_seviyesi fonksiyondan "yuksek|orta|dusuk" olarak gelir; rozet için mevcut
+// confidenceBadgeTone'un beklediği Türkçe etikete çevrilir (yeni rozet mantığı YOK).
+const CONSISTENCY_CONFIDENCE_LABELS: Record<string, string> = {
+  yuksek: "Yüksek",
+  orta: "Orta",
+  dusuk: "Düşük",
+};
+
+function CockpitConsistencyItem({ finding, partyLabel }: { finding: any; partyLabel: string | null }) {
+  const gozlem = safeText(finding?.gozlem);
+  const kaynakA = safeText(finding?.dayanak_a?.kaynak);
+  const alintiA = safeText(finding?.dayanak_a?.alinti);
+  const kaynakB = safeText(finding?.dayanak_b?.kaynak);
+  const alintiB = safeText(finding?.dayanak_b?.alinti);
+  if (!gozlem || !alintiA || !alintiB) return null;
+  const confLabel = CONSISTENCY_CONFIDENCE_LABELS[String(finding?.guven_seviyesi ?? "").toLowerCase()] ?? "";
+
+  return (
+    <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 space-y-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-xs font-semibold text-sidebar-foreground/90 leading-snug">{gozlem}</div>
+        {confLabel && (
+          <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${confidenceBadgeTone(confLabel)}`}>
+            {confLabel}
+          </span>
+        )}
+      </div>
+      {partyLabel && (
+        <div className="text-[10px] font-medium px-2 py-0.5 rounded-full inline-block bg-sidebar-accent/40 border border-sidebar-border text-sidebar-foreground/70">
+          {partyLabel}
+        </div>
+      )}
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <div className="rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 p-2.5 space-y-1">
+          <div className="text-[10px] uppercase tracking-wide text-sidebar-foreground/50 truncate">{kaynakA || "Dayanak 1"}</div>
+          <p className="text-[11px] text-sidebar-foreground/75 leading-snug italic">{alintiA}</p>
+        </div>
+        <div className="rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 p-2.5 space-y-1">
+          <div className="text-[10px] uppercase tracking-wide text-sidebar-foreground/50 truncate">{kaynakB || "Dayanak 2"}</div>
+          <p className="text-[11px] text-sidebar-foreground/75 leading-snug italic">{alintiB}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ===================== PHASE 4 - MEDIATOR PANEL (READ-ONLY SUMMARY) ===================== */
 
 function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
@@ -3996,6 +4045,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   const [analyses, setAnalyses] = useState<any[]>([]);
   const [rootCauses, setRootCauses] = useState<Record<string, any>>({});
   const [worklog, setWorklog] = useState<any[]>([]);
+  const [consistency, setConsistency] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
@@ -4021,7 +4071,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
     setLoading(true);
     setLoadErr(null);
     try {
-      const [r, a, rc, wl] = await Promise.all([
+      const [r, a, rc, wl, cf] = await Promise.all([
         supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("party_analyses").select("party_id, analysis, risk_analizi, case_parties:party_id(first_name, last_name, company_name, party_role)").eq("case_id", caseRow.id),
         // Kök Neden Katmanı: mediator-only, ayrı tablo. Bu sorgu ana yüklemeyi bloklamaz —
@@ -4030,6 +4080,9 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
         // Rapora Girmeyenler: agent_worklog, aynı "hata olursa sessizce boş" kalıbı —
         // bu sorgu asla ana kokpit render'ını bozmaz.
         supabase.from("agent_worklog").select("id, party_id, content, created_at").eq("case_id", caseRow.id).eq("entry_type", "rapor_disi").order("created_at", { ascending: false }),
+        // İç Tutarlılık: party_consistency_findings, aynı "hata olursa sessizce boş" kalıbı —
+        // tablo/kayıt yoksa kart hiç görünmez, kokpit render'ı hiçbir koşulda etkilenmez.
+        supabase.from("party_consistency_findings" as any).select("id, party_id, findings, created_at").eq("case_id", caseRow.id).order("created_at", { ascending: false }),
       ]);
       if (r.error) throw r.error;
       if (a.error) throw a.error;
@@ -4051,6 +4104,12 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
       } else {
         setWorklog(Array.isArray(wl.data) ? wl.data : []);
       }
+      if (cf.error) {
+        console.error("[Phase4Summary consistency]", cf.error);
+        setConsistency([]);
+      } else {
+        setConsistency(Array.isArray(cf.data) ? cf.data : []);
+      }
     } catch (e: any) {
       console.error("[Phase4Summary] load failed", e);
       setLoadErr(e?.message ?? "Bilinmeyen hata");
@@ -4058,6 +4117,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
       setAnalyses([]);
       setRootCauses({});
       setWorklog([]);
+      setConsistency([]);
     } finally {
       setLoading(false);
     }
@@ -4167,6 +4227,13 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   // mevcut cockpitRows'tan türetilir.
   const worklogPartyNameById: Record<string, string> = {};
   cockpitRows.forEach((r) => { if (r.party_id) worklogPartyNameById[r.party_id] = r.name; });
+  // İç Tutarlılık kartı: satırlardaki findings dizileri tek listeye düzleştirilir;
+  // taraf adı için yukarıdaki mevcut eşleme kullanılır, yeni sorgu yok.
+  const consistencyItems = consistency.flatMap((row: any) =>
+    (Array.isArray(row?.findings) ? row.findings : []).map((finding: any) => ({
+      rowId: row.id, party_id: row.party_id, finding,
+    }))
+  );
   const cockpitRiskPuani = cockpitRiskOzeti?.genel_risk_puani
     || cockpitRows.find((r) => /yük/i.test(String(r.risk_puani)))?.risk_puani
     || cockpitRows.find((r) => /orta/i.test(String(r.risk_puani)))?.risk_puani
@@ -4324,6 +4391,26 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                         />
                       ))}
                     </ul>
+                  </div>
+                )}
+
+                {/* İç Tutarlılık — party_consistency_findings, Rapora Girmeyenler ile aynı görünürlük.
+                    Kayıt yoksa (veya sorgu düştüyse) bu bölüm hiç render edilmez. */}
+                {consistencyItems.length > 0 && (
+                  <div className="pt-2 border-t border-sidebar-border/60">
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-1">İç Tutarlılık</div>
+                    <p className="text-xs text-sidebar-foreground/50 mb-2">
+                      Tarafın kendi beyanı ile kendi belgeleri arasındaki uyumsuzluklar — yorum arabulucuya aittir
+                    </p>
+                    <div className="grid gap-3">
+                      {consistencyItems.map((it, i) => (
+                        <CockpitConsistencyItem
+                          key={`${it.rowId}-${i}`}
+                          finding={it.finding}
+                          partyLabel={it.party_id ? (worklogPartyNameById[it.party_id] ?? null) : null}
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
 
