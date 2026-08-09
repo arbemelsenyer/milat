@@ -15,6 +15,7 @@ const PER_DOC_CHAR_BUDGET = 6_000;
 const TOTAL_CHAR_BUDGET = 24_000;
 const MAX_STATEMENT_CHARS = 12_000;
 const MAX_DISCOVERY_CHARS = 4_000;
+const MAX_ISSUE_CHARS = 3_000;
 
 // "Bilirkişi raporu:" etiketi bu fonksiyondan değil, party_analyses.document_findings
 // içeriğinden geliyor (party-confidential-analysis oradaki kaynağı böyle etiketliyor).
@@ -68,7 +69,7 @@ Deno.serve(async (req) => {
     // ── YETKİ: party-consistency-check ile aynı — taraf-izinli gevşetme YOK,
     // bu çıktı MEDIATOR_ONLY: yalnız atanmış arabulucu, dosya sahibi veya admin.
     const { data: caseRow } = await admin.from("cases")
-      .select("id, user_id, assigned_mediator_id, dispute_type, dispute_subtype, title")
+      .select("id, user_id, assigned_mediator_id, dispute_type, dispute_subtype, title, issue_description")
       .eq("id", case_id).maybeSingle();
     if (!caseRow) {
       return new Response(JSON.stringify({ error: "Case not found" }), {
@@ -176,35 +177,51 @@ Deno.serve(async (req) => {
       String(p.company_name ?? "").trim(),
     ]).filter((n: string) => n.length >= 3);
 
+    // 5) Uyuşmazlık başlıkları — "kacinilan_konu" izinin karşılaştırma listesi.
+    // Kaynak: cases.issue_description + BU tarafın kendi belgelerinin adları.
+    // Karşı tarafın beyanı bu listeye GİRMEZ (iz atfı karışmasın).
+    const issueText = clip(String((caseRow as any).issue_description ?? "").trim(), MAX_ISSUE_CHARS);
+    const docTitles = (docs as any[]).map((d) => String(d.file_name ?? "").trim()).filter(Boolean);
+    const topicsBlock = (issueText || docTitles.length > 0)
+      ? `\n═══ DOSYANIN UYUŞMAZLIK BAŞLIKLARI (karşılaştırma listesi — bu tarafın metni DEĞİL) ═══\n` +
+        `${issueText ? `Uyuşmazlık konusu: ${issueText}\n` : ""}` +
+        `${docTitles.length > 0 ? `Bu tarafın belge başlıkları:\n${docTitles.map((t) => `- ${t}`).join("\n")}\n` : ""}` +
+        `═══════════════════════════\n`
+      : "";
+
     // Prompt'a giden TÜM bağlam metni tek noktada süzülür.
     const contextBlocks = relabelBilirkisi(
-      [statementBlock, docsBlock, discoveryBlock].filter(Boolean).join("")
+      [statementBlock, docsBlock, discoveryBlock, topicsBlock].filter(Boolean).join("")
     );
 
     const systemPrompt = `Sen bir arabuluculuk dosyasında İLETİŞİM İZİ ANALİZİ yapan asistansın.
 Tarafın NE söylediğine değil NASIL konuştuğuna bak: neyi atlıyor, neyi tekrar ediyor, nerede dili sertleşiyor, hangi alana hiç değinmiyor, talebi ile anlatısı nerede ayrışıyor.
-Her iz için: iz_tipi, gozlem (nötr, tek cümle), dayanak {kaynak, alinti}, guven_seviyesi ("yuksek"|"orta"|"dusuk").
-iz_tipi şu BEŞTEN biri olmalı, başka değer YAZMA: "kacinilan_konu" | "tekrar_eden_tema" | "sertlesme_noktasi" | "hic_deginilmeyen_alan" | "talep_anlati_farki".
+BEŞ HANE KURALI: findings dizisi serbest değildir — şu BEŞ iz_tipi'nin HER BİRİ için TAM BİR kayıt döndür (toplam 5 öğe, sırayla): "kacinilan_konu", "tekrar_eden_tema", "sertlesme_noktasi", "hic_deginilmeyen_alan", "talep_anlati_farki". Bir tipten ikinci bir kayıt YAZMA, tip atlama.
+Her kayıt için: iz_tipi, var_mi (true/false), gozlem (nötr, tek cümle), dayanak {kaynak, alinti}, guven_seviyesi ("yuksek"|"orta"|"dusuk"), yok_gerekcesi.
+var_mi=true ise gozlem ve dayanak.alinti ZORUNLU, yok_gerekcesi boş kalır. var_mi=false ise yok_gerekcesi tek cümleyle ZORUNLU (ör. "beyanda sertleşme gösteren bir ifade yok"), gozlem ve dayanak boş kalır. Zorlama yapma: bir tip için gerçek bir iz yoksa var_mi=false demek DOĞRU cevaptır.
 kaynak alanı, kaydın GERÇEK türünü gösteren şu etiketlerden biri olmalı ve AYNEN böyle yazılmalı: "Taraf beyanı" | "Belge: <dosya adı>" | "İhtiyaç tespiti". Başka tür adı uydurmak YASAKTIR.
 KİMİN İZİ (çok önemli): İzler YALNIZ bu tarafın kendi ifadelerinden çıkarılır. Gözlem cümlesi bu tarafın davranışını anlatmalı ("bu taraf şu konuya hiç değinmiyor"), karşı tarafın davranışını DEĞİL. Karşı tarafın tutumunu anlatan iz ÜRETME (ör. "karşı taraf teklifi kabul etmiyor" bir iz değildir). Bu tarafın metninde karşı taraftan söz edilse bile iz, bu tarafın kendi anlatımı hakkında olmalıdır.
 dayanak.alinti ZORUNLUDUR ve verilen kaynaklarda BİREBİR geçen kısa bir alıntı olmalı (en fazla 200 karakter) — kendi cümleni alıntı diye yazma, özetleme.
 TEŞHİS DİLİ YASAK — kişilik yorumu ("savunmacı", "agresif"), niyet atfı, "yalan söylüyor" türü hüküm cümlesi kurma. Yalnız gözlem + birebir alıntı yaz. Örnek doğru gözlem: "Ödeme konusu üç ayrı yerde soruluyor, üçünde de cevap başka konuya kaydırılıyor."
-Dayanağı gösterilemeyen iz ÜRETME; hiç iz yoksa boş dizi döndür — bu başarısızlık değildir.
-"hic_deginilmeyen_alan" izinde bile dayanak zorunludur: hangi metnin o alana girmeden geçtiğini gösteren birebir alıntı ver.
+Dayanağı gösterilemeyen iz için var_mi=false yaz — bu başarısızlık değildir.
+"hic_deginilmeyen_alan" izinde de dayanak zorunludur: hangi metnin o alana girmeden geçtiğini gösteren birebir alıntı ver.
+"kacinilan_konu": "DOSYANIN UYUŞMAZLIK BAŞLIKLARI" bloğunda geçen ama tarafın KENDİ beyanında hiç geçmeyen başlıktır. Dayanak alıntısı beyandan alınamıyorsa dayanak.kaynak alanına "Uyuşmazlık başlığı" yaz ve dayanak.alinti alanına konu başlığını + "beyanda karşılığı yok" notunu yaz (ör. "Marka lisans bedeli — beyanda karşılığı yok").
+"talep_anlati_farki": bu tipte ayrıca talep_ne (taraf ne talep ediyor) ve anlati_agirlik_merkezi (anlatının ağırlık merkezi ne) alanlarını da doldur (ör. talep_ne: "840.000 TL alacak", anlati_agirlik_merkezi: "marka itibarı ve emsal endişesi"). İkisi de dolu VE birbirinden farklıysa var_mi=true; aynı şeyi söylüyorlarsa veya biri boşsa var_mi=false.
 discovery_questions: arabulucunun sıradaki EN FAZLA 3 keşif sorusu. Her soru bir boşluğa bağlı olmalı ve hangi_boslugu_kapatir alanında bu boşluk açıkça yazılmalı; boşluğu yazamıyorsan o soruyu ÜRETME. Sorular kısa, açık uçlu ve arabulucunun ağzından olmalı.
 Türkçe yaz.
 Çıktı YALNIZCA şu JSON: {
-  "findings": [{"iz_tipi":"", "gozlem":"", "dayanak":{"kaynak":"","alinti":""}, "guven_seviyesi":"yuksek|orta|dusuk"}],
+  "findings": [{"iz_tipi":"", "var_mi":true, "gozlem":"", "dayanak":{"kaynak":"","alinti":""}, "guven_seviyesi":"yuksek|orta|dusuk", "yok_gerekcesi":"", "talep_ne":"", "anlati_agirlik_merkezi":""}],
   "discovery_questions": [{"soru":"", "hangi_boslugu_kapatir":""}]
-}`;
+}
+findings dizisi TAM 5 öğe içermeli; talep_ne ve anlati_agirlik_merkezi yalnız "talep_anlati_farki" kaydında doldurulur, diğerlerinde boş bırakılır.`;
 
     const userPrompt = `TARAF: ${partyName} (rol: ${party.party_role ?? "?"}, tür: ${party.party_type ?? "-"})
 UYUŞMAZLIK: ${caseRow.dispute_type ?? "-"} / ${caseRow.dispute_subtype ?? "-"}
 
 BU TARAFIN KAYITLARI:
 ${contextBlocks || "(bu taraf için okunabilir beyan, belge veya not metni yok)"}
-Yukarıdaki kayıtlar bu tarafa (ve arabulucunun bu dosyadaki kendi notlarına) aittir. Karşı tarafla karşılaştırma yapma.
-Bu kayıtlardaki iletişim izlerini çıkar ve arabulucuya sıradaki en fazla 3 keşif sorusunu ver; uygun iz yoksa findings dizisini boş bırak.`;
+Yukarıdaki kayıtlar bu tarafa aittir (uyuşmazlık başlıkları bloğu yalnız karşılaştırma listesidir). Karşı tarafla karşılaştırma yapma.
+Beş iz tipinin her biri için ayrı ayrı değerlendir ve TAM 5 kayıt döndür; iz bulunmayan tipe var_mi=false + yok_gerekcesi yaz. Ayrıca arabulucuya sıradaki en fazla 3 keşif sorusunu ver.`;
 
     // ── MODEL KAPISI (üç kademe): (1) OPENAI_API_KEY varsa ÖNCE doğrudan OpenAI;
     // (2) düşerse GEMINI_API_KEY ile doğrudan Google model listesi; (3) o da düşerse
@@ -367,27 +384,66 @@ Bu kayıtlardaki iletişim izlerini çıkar ve arabulucuya sıradaki en fazla 3 
     ];
     const ALLOWED_CONF = ["yuksek", "orta", "dusuk"];
     const rawFindings = Array.isArray(parsed?.findings) ? parsed.findings : [];
-    const findings = rawFindings
+    const normalized = rawFindings
       .map((f: any) => {
         const iz = String(f?.iz_tipi ?? "").trim().toLowerCase();
         const conf = String(f?.guven_seviyesi ?? "").toLowerCase();
         return {
           iz_tipi: ALLOWED_IZ.includes(iz) ? iz : "",
+          var_mi: f?.var_mi === true,
           gozlem: String(f?.gozlem ?? "").trim(),
           dayanak: {
             kaynak: String(f?.dayanak?.kaynak ?? "").slice(0, 200),
             alinti: String(f?.dayanak?.alinti ?? "").trim().slice(0, 400),
           },
           guven_seviyesi: ALLOWED_CONF.includes(conf) ? conf : "dusuk",
+          yok_gerekcesi: String(f?.yok_gerekcesi ?? "").trim().slice(0, 400),
+          talep_ne: String(f?.talep_ne ?? "").trim().slice(0, 300),
+          anlati_agirlik_merkezi: String(f?.anlati_agirlik_merkezi ?? "").trim().slice(0, 300),
         };
       })
-      .filter((f: any) => f.iz_tipi && f.gozlem && f.dayanak.alinti.length >= MIN_ALINTI_CHARS)
+      .filter((f: any) => f.iz_tipi);
+
+    // TİP BAŞINA EN FAZLA BİR KAYIT: aynı iz_tipi tekrar gelirse ilki tutulur.
+    const seenTypes = new Set<string>();
+    const perType = normalized.filter((f: any) => {
+      if (seenTypes.has(f.iz_tipi)) return false;
+      seenTypes.add(f.iz_tipi);
+      return true;
+    });
+
+    const norm = (s: string) => s.toLocaleLowerCase("tr").replace(/\s+/g, " ").trim();
+    // var_mi=true kaydın geçerlilik şartları — model "var" dese bile burada doğrulanır.
+    const isValidPresent = (f: any): boolean => {
+      if (!f.var_mi) return false;
+      if (!f.gozlem || f.dayanak.alinti.length < MIN_ALINTI_CHARS) return false;
       // Karşı tarafın davranışını anlatan iz ELENİR: gozlem metninde bu dosyadaki
       // DİĞER taraflardan birinin adı geçiyorsa bu iz bu tarafa ait değildir.
-      .filter((f: any) => {
-        const g = f.gozlem.toLocaleLowerCase("tr");
-        return !otherPartyNames.some((n: string) => g.includes(n.toLocaleLowerCase("tr")));
-      });
+      const g = norm(f.gozlem);
+      if (otherPartyNames.some((n: string) => g.includes(norm(n)))) return false;
+      // talep_anlati_farki: iki alan da dolu VE birbirinden farklı olmalı.
+      if (f.iz_tipi === "talep_anlati_farki") {
+        if (!f.talep_ne || !f.anlati_agirlik_merkezi) return false;
+        if (norm(f.talep_ne) === norm(f.anlati_agirlik_merkezi)) return false;
+      }
+      return true;
+    };
+
+    // Tabloya YALNIZ var_mi=true olan (ve doğrulamayı geçen) kayıtlar findings olarak
+    // yazılır — kart şeması değişmez. var_mi=false olanlar cevapta bilgi olarak durur.
+    const findings = perType.filter(isValidPresent).map((f: any) => ({
+      iz_tipi: f.iz_tipi,
+      gozlem: f.gozlem,
+      dayanak: f.dayanak,
+      guven_seviyesi: f.guven_seviyesi,
+      ...(f.iz_tipi === "talep_anlati_farki"
+        ? { talep_ne: f.talep_ne, anlati_agirlik_merkezi: f.anlati_agirlik_merkezi }
+        : {}),
+    }));
+    const bulunmayan_izler = perType.filter((f: any) => !isValidPresent(f)).map((f: any) => ({
+      iz_tipi: f.iz_tipi,
+      yok_gerekcesi: f.yok_gerekcesi || "Bu tip için doğrulanabilir bir iz bulunamadı.",
+    }));
 
     // Her soru bir boşluğa bağlı olmalı: boşluğu yazılmayan soru elenir, en fazla 3 tutulur.
     const rawQuestions = Array.isArray(parsed?.discovery_questions) ? parsed.discovery_questions : [];
@@ -399,11 +455,9 @@ Bu kayıtlardaki iletişim izlerini çıkar ve arabulucuya sıradaki en fazla 3 
       .filter((q: any) => q.soru && q.hangi_boslugu_kapatir)
       .slice(0, 3);
 
-    const droppedFindings = rawFindings.length - findings.length;
     const droppedQuestions = rawQuestions.length - discovery_questions.length;
     console.log(
-      `[party-communication-analysis] case=${case_id} party=${party_id} bağlam=${contextBlocks.length} krk | iz=${findings.length} | soru=${discovery_questions.length}` +
-      (droppedFindings > 0 ? ` | dayanaksız/karşı tarafa ait ${droppedFindings} iz elendi` : "") +
+      `[party-communication-analysis] case=${case_id} party=${party_id} bağlam=${contextBlocks.length} krk | hane=${perType.length}/5 | iz=${findings.length} | yok=${bulunmayan_izler.length} | soru=${discovery_questions.length}` +
       (droppedQuestions > 0 ? ` | boşluğu yazılmayan ${droppedQuestions} soru elendi` : "")
     );
 
@@ -422,7 +476,7 @@ Bu kayıtlardaki iletişim izlerini çıkar ve arabulucuya sıradaki en fazla 3 
       console.error(`[party-communication-analysis] party_communication_analysis yazımı başarısız: ${e?.message ?? String(e)}`);
     }
 
-    return new Response(JSON.stringify({ findings, discovery_questions, persisted }), {
+    return new Response(JSON.stringify({ findings, bulunmayan_izler, discovery_questions, persisted }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
