@@ -51,7 +51,7 @@ function normalizeWs(s: string): string {
   return s.replace(/\s+/g, " ").trim();
 }
 
-type LoadTarget = { url: string; isBlob: boolean; httpHeaders?: Record<string, string>; ranged?: boolean };
+type LoadTarget = { url: string; isBlob: boolean; httpHeaders?: Record<string, string> };
 
 // adb kitapları: proxy edge function'ı üzerinden. Anahtar koda gömülmez — oturum
 // token'ı ve apikey istemcideki mevcut supabase oturumundan/ortam değişkeninden alınır.
@@ -83,9 +83,7 @@ async function getSourceUrl(sourceUrl: string): Promise<LoadTarget> {
     const { data: signed, error: signErr } = await supabase.storage
       .from("case-documents")
       .createSignedUrl(path, 300);
-    // ranged: imzalı storage URL'i Range isteklerini destekliyor — pdf.js yalnız
-    // gereken sayfa dilimlerini çeker (tüm PDF'i indirmez).
-    if (!signErr && signed?.signedUrl) return { url: signed.signedUrl, isBlob: false, ranged: true };
+    if (!signErr && signed?.signedUrl) return { url: signed.signedUrl, isBlob: false };
   } catch { /* imzalı URL alınamadı — blob yedeğine düş */ }
 
   const { data, error } = await supabase.storage.from("case-documents").download(path);
@@ -124,39 +122,6 @@ async function fetchPassageText(s: ViewerSource): Promise<string | null> {
   return excerpt.length >= 40 ? excerpt : null;
 }
 
-// Chunk metni çoğu zaman sayfa üst bilgisiyle başlıyor ("1.08.2026 12:06",
-// "Mevzuat Bilgi Sistemi"). Bu ön ek arama anahtarı olarak kullanılırsa vurgu
-// pasajın kendisine değil sayfa başlığına düşüyor — bu yüzden baştan atılır.
-function stripHeaderNoise(s: string): string {
-  const patterns = [
-    /^\d{1,2}[./]\d{1,2}[./]\d{2,4}(?:\s+\d{1,2}[:.]\d{2}(?::\d{2})?)?\s*/,
-    /^Mevzuat\s+Bilgi\s+Sistemi\s*/i,
-    /^[-–—|·:]+\s*/,
-  ];
-  let out = s.trim();
-  let prev = "";
-  while (out !== prev) {
-    prev = out;
-    for (const re of patterns) out = out.replace(re, "").trim();
-  }
-  return out;
-}
-
-// Arama anahtarı: temizlik sonrası metnin ilk ANLAMLI 80 karakteri (en az 5 kelime).
-// Cümle yeterince anlamlı değilse bir sonraki cümleden denenir; hiçbiri uymuyorsa
-// boş döner ve çağıran taraf boyama yapmaz.
-function pickProbe(cleaned: string): string {
-  const starts: number[] = [0];
-  const re = /[.!?:]\s+/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(cleaned))) starts.push(m.index + m[0].length);
-  for (const start of starts) {
-    const candidate = cleaned.slice(start, start + 80).trim();
-    if (candidate.split(/\s+/).filter(Boolean).length >= 5) return candidate;
-  }
-  return "";
-}
-
 type SpanBox = { left: number; top: number; width: number; height: number; text: string; hit: boolean };
 
 // Sayfanın text layer öğelerini birleşik normalize metne çevirip pasajı arar.
@@ -166,9 +131,7 @@ function matchPassage(
   passage: string,
 ): Set<number> {
   const empty = new Set<number>();
-  // Aranan metin, sayfa üst bilgisi ayıklandıktan sonraki hâlidir; temizlenen kısım
-  // yalnızca baştan atıldığı için kalan metin hâlâ chunk'ın birebir bir parçasıdır.
-  const target = stripHeaderNoise(normalizeWs(passage));
+  const target = normalizeWs(passage);
   if (target.length < 40) return empty;
 
   // Öğeleri normalize edip " " ile birleştir — backfill'deki join(" ") + normalizeWs ile
@@ -189,24 +152,15 @@ function matchPassage(
   let matchEnd = matchStart >= 0 ? matchStart + target.length : -1;
 
   if (matchStart < 0) {
-    // Pasaj sayfa sınırını aşıyor olabilir: anlamlı 80 karakterlik prob ile başlangıcı
-    // bul, sonra birebir uyuşan en uzun ön eki al. Uyuşmayan ilk karakterde dururuz —
-    // tahmin yok. Prob anlamlı bir cümle parçası değilse hiç boyama yapılmaz.
-    const probe = pickProbe(target);
-    if (probe.length < 20) return empty;
+    // Pasaj sayfa sınırını aşıyor olabilir: 80 karakterlik prob ile başlangıcı bul, sonra
+    // birebir uyuşan en uzun ön eki al. Uyuşmayan ilk karakterde dururuz — tahmin yok.
+    const probe = target.slice(0, 80);
     const first = joined.indexOf(probe);
     if (first < 0) return empty;
     // Aynı prob sayfada birden fazla yerde geçiyorsa hangisi olduğu bilinemez — boyama.
     if (joined.indexOf(probe, first + 1) !== -1) return empty;
-    // Prob, target'ın başından değil ilk anlamlı cümlesinden başlayabilir; uzatma
-    // karşılaştırması bu yüzden target içindeki prob konumundan yürütülür.
-    const probeOffset = Math.max(0, target.indexOf(probe));
     let k = 0;
-    while (
-      probeOffset + k < target.length &&
-      first + k < joined.length &&
-      joined[first + k] === target[probeOffset + k]
-    ) k++;
+    while (k < target.length && first + k < joined.length && joined[first + k] === target[k]) k++;
     if (k < 40) return empty;
     matchStart = first;
     matchEnd = first + k;
@@ -271,17 +225,10 @@ export function SourceViewerDialog({
 
         // Range çalışırsa pdf.js kendisi kullanır (proxy Range'i hedefe aynen iletiyor);
         // çalışmazsa tam indirmeye düşer — ikisi de kabul.
-        // ranged=true (imzalı storage URL'i): aralıklı indirme açıkça istenir —
-        // disableAutoFetch ile PDF'in tamamı ardıl olarak çekilmez, yalnız açılan
-        // sayfanın dilimleri indirilir. Kitap/proxy yolunda bu ayarlar canlıda
-        // doğrulanmadığı için mevcut davranış AYNEN bırakıldı.
         pdf = await pdfjs.getDocument({
           url: resolved.url,
           httpHeaders: resolved.httpHeaders,
           withCredentials: false,
-          ...(resolved.ranged
-            ? { disableAutoFetch: true, disableStream: false, rangeChunkSize: 65536 }
-            : {}),
         }).promise;
         if (cancelled) return;
 
