@@ -261,41 +261,55 @@ Yukarıdaki kayıtlara dayanarak cevapla; kayıtlarda karşılığı olmayan hi�
     // Bu noktadan sonrası (JSON parse + sanitizer + şema güvencesi) iki yolda da AYNI.
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
     let rawContent: string | null = null;
-    let googleFail: { status: number; userMsg: string } | null = null;
+    let googleFail: { status: number; shortMsg: string } | null = null;
 
     if (geminiKey) {
       // Anahtar yalnız env'den okunur; log ve cevap gövdelerinden temizlenir.
       const redact = (s: string) => s.split(geminiKey).join("***");
-      try {
-        const gRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(geminiKey)}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              systemInstruction: { parts: [{ text: systemPrompt }] },
-              contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-              generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
-            }),
-          },
-        );
-        if (gRes.ok) {
-          const gJson = await gRes.json();
-          const text = gJson?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (typeof text === "string" && text.trim()) rawContent = text;
-          else console.error("[case-qa] Google boş yanıt döndürdü — gateway'e düşülüyor.");
-        } else {
-          console.error("[case-qa] Google error:", gRes.status, redact(await gRes.text()).slice(0, 300));
-          googleFail = {
-            status: gRes.status,
-            userMsg:
-              gRes.status === 429 ? "Google ücretsiz kota sınırına takıldı, 1 dakika sonra tekrar deneyin." :
-              (gRes.status === 400 || gRes.status === 403) ? "Google API anahtarı sorunu — anahtarı kontrol edin." :
-              "AI servisi hatası",
-          };
+      // Model adları hesaplarda/bölgelerde farklılaşabildiği için sıralı denenir:
+      // 404 (model yok) veya 400 (istek/model reddi) alınırsa sıradaki denenir,
+      // ilk başarılı cevapta durulur. Diğer kodlarda (429/403/5xx) denemeye devam
+      // etmenin anlamı yok — doğrudan gateway yedeğine düşülür.
+      const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-1.5-flash"];
+      for (const model of GEMINI_MODELS) {
+        try {
+          const gRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiKey)}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+                generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+              }),
+            },
+          );
+          if (gRes.ok) {
+            const gJson = await gRes.json();
+            const text = gJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (typeof text === "string" && text.trim()) {
+              rawContent = text;
+              console.log(`[case-qa] Google modeli çalıştı: ${model}`);
+              break;
+            }
+            console.error(`[case-qa] Google (${model}) boş yanıt döndürdü — sıradaki model deneniyor.`);
+            googleFail = { status: 502, shortMsg: `${model} boş yanıt döndürdü` };
+            continue;
+          }
+          const bodyText = redact(await gRes.text());
+          let shortMsg = bodyText.replace(/\s+/g, " ").trim().slice(0, 120);
+          try { shortMsg = String(JSON.parse(bodyText)?.error?.message ?? shortMsg).slice(0, 120); } catch { /* düz metin */ }
+          console.error(`[case-qa] Google (${model}) error:`, gRes.status, shortMsg);
+          googleFail = { status: gRes.status, shortMsg: `${model}: ${shortMsg}` };
+          if (gRes.status === 404 || gRes.status === 400) continue;
+          break;
+        } catch (e: any) {
+          const msg = redact(e?.message ?? String(e)).slice(0, 120);
+          console.error(`[case-qa] Google (${model}) çağrısı başarısız: ${msg}`);
+          googleFail = { status: 502, shortMsg: `${model}: ${msg}` };
+          break;
         }
-      } catch (e: any) {
-        console.error(`[case-qa] Google çağrısı başarısız (gateway'e düşülüyor): ${redact(e?.message ?? String(e))}`);
       }
     }
 
@@ -313,11 +327,19 @@ Yukarıdaki kayıtlara dayanarak cevapla; kayıtlarda karşılığı olmayan hi�
       if (!aiRes.ok) {
         const errText = await aiRes.text();
         console.error("[case-qa] Gateway error:", aiRes.status, errText.slice(0, 300));
-        // Google birincil kapıydı ve yedek de düştüyse kullanıcıya Google'ın nedenini göster.
-        const userMsg = googleFail?.userMsg ??
-          (aiRes.status === 429 ? "Rate limit aşıldı. Lütfen biraz sonra tekrar deneyin." :
-           aiRes.status === 402 ? "AI kredisi tükendi. Workspace ayarlarından kredi ekleyin." :
-           "AI servisi hatası");
+        // Google birincil kapıydı; yedek de düştüyse iki hata tek satırda birleştirilir.
+        const gatewayMsg =
+          aiRes.status === 429 ? "Rate limit aşıldı. Lütfen biraz sonra tekrar deneyin." :
+          aiRes.status === 402 ? "AI kredisi tükendi. Workspace ayarlarından kredi ekleyin." :
+          "AI servisi hatası";
+        const googleMsg = googleFail
+          ? `Google: ${googleFail.status} ${googleFail.shortMsg}` +
+            (googleFail.status === 429 ? " — ücretsiz kota sınırına takıldı, 1 dakika sonra tekrar deneyin." :
+             (googleFail.status === 400 || googleFail.status === 403) ? " — API anahtarını kontrol edin." : "")
+          : null;
+        const userMsg = googleMsg
+          ? `${googleMsg} | Gateway: ${aiRes.status} ${gatewayMsg}`
+          : gatewayMsg;
         return new Response(JSON.stringify({ error: userMsg, detail: errText }), {
           status: googleFail?.status ?? aiRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
