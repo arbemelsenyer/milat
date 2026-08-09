@@ -165,7 +165,8 @@ Deno.serve(async (req) => {
 
     const systemPrompt = `Sen bir arabuluculuk dosyasında İÇ TUTARLILIK DENETİMİ yapan asistansın.
 Yalnızca AYNI tarafın kendi beyanı ile kendi belgeleri arasındaki, ya da beyanın kendi içindeki uyumsuzlukları bul.
-Her bulgu için: gozlem (nötr, tek cümle), dayanak_a {kaynak, alinti}, dayanak_b {kaynak, alinti}, guven_seviyesi ("yuksek"|"orta"|"dusuk").
+Her bulgu için: gozlem (nötr, tek cümle), a_deger, b_deger, dayanak_a {kaynak, alinti}, dayanak_b {kaynak, alinti}, guven_seviyesi ("yuksek"|"orta"|"dusuk").
+a_deger ve b_deger ZORUNLUDUR: çelişkinin iki ucundaki SOMUT değeri yazarlar — tarih, tutar, kişi veya olay ifadesi (ör. a_deger: "Haziran 2025 temerrüt", b_deger: "Mayıs 2025'te 180.000 TL ödeme"). Bu iki alanı somut değerlerle dolduramıyorsan o bulguyu ÜRETME. a_deger dayanak_a'dan, b_deger dayanak_b'den gelmelidir.
 kaynak alanı, kaydın GERÇEK türünü gösteren şu üç etiketten biri olmalı ve AYNEN böyle yazılmalı: "Taraf beyanı" | "Belge: <dosya adı>" | "Analiz bulgusu". Bu üçü dışında tür adı (ör. "Bilirkişi raporu", "Tanık ifadesi") uydurmak YASAKTIR; belge etiketinde dosya adını verilen bloktaki haliyle yaz. Bloklarda "Bilirkişi raporu: <ad>" benzeri bir ifadeye rastlarsan bunu kaynak alanına "Belge: <ad>" olarak yaz — dosyaya bilirkişi raporu deme.
 alinti alanları, verilen kaynaklarda BİREBİR geçen kısa alıntı olmalı (en fazla 200 karakter) — kendi cümleni alıntı diye yazma.
 YASAK: kişilik teşhisi, niyet atfı, "yalan söylüyor" türü hüküm cümlesi — yalnız iki dayanağı yan yana koy.
@@ -174,7 +175,7 @@ KESİN KURAL (iki değer şartı): Bir bulgu ancak iki dayanak AYNI OLGU hakkın
 SOMUTLUK: gozlem alanı çelişkinin İKİ UCUNU da açıkça yazmalı — hangi kaynakta ne, diğerinde ne (tarih/tutar/kişi/olay belirtilerek). Örnek biçim: "İhtarnamede temerrüt Haziran 2025 deniyor, ihtara cevapta Mayıs 2025 ödemesi gösteriliyor." İki ucu somut yazamıyorsan o bulguyu ÜRETME. "Örtüşmemektedir", "tutarsızlık göze çarpıyor" gibi muğlak, ucu belirtilmeyen cümleler KABUL EDİLMEZ.
 Uyumsuzluk yoksa boş dizi döndür, ZORLAMA. Dayanağı gösterilemeyen bulgu üretme. Türkçe yaz.
 Çıktı YALNIZCA şu JSON: {
-  "findings": [{"gozlem":"", "dayanak_a":{"kaynak":"","alinti":""}, "dayanak_b":{"kaynak":"","alinti":""}, "guven_seviyesi":"yuksek|orta|dusuk"}]
+  "findings": [{"gozlem":"", "a_deger":"", "b_deger":"", "dayanak_a":{"kaynak":"","alinti":""}, "dayanak_b":{"kaynak":"","alinti":""}, "guven_seviyesi":"yuksek|orta|dusuk"}]
 }`;
 
     const userPrompt = `TARAF: ${partyName} (rol: ${party.party_role ?? "?"}, tür: ${party.party_type ?? "-"})
@@ -331,20 +332,23 @@ Yalnızca bu kayıtlar arasındaki uyumsuzlukları, her biri için iki dayanağ�
       console.log("[party-consistency-check] Sağlayıcı: Lovable gateway — model: google/gemini-2.5-flash");
     }
 
+    // Etiket temizliği TEK NOKTADAN: model cevabının tamamı parse edilmeden önce
+    // süzülür, böylece hangi alanda geçtiğine bakmaya gerek kalmaz.
     let parsed: any = {};
-    try { parsed = JSON.parse(rawContent ?? "{}"); } catch { parsed = {}; }
+    try { parsed = JSON.parse(relabelBilirkisi(rawContent ?? "{}")); } catch { parsed = {}; }
 
     // Deterministic citation guard: bağlamda birebir geçmeyen künyeleri temizler.
     parsed = sanitizeCitationHallucinations(parsed, contextBlocks);
 
     // Şema güvencesi: iki dayanağı da alıntısıyla gösteremeyen bulgu ELENİR —
     // "dayanağı gösterilemeyen bulgu üretme" kuralının kod tarafındaki karşılığı.
-    // (b) Son savunma hattı: model kuralı yok sayarsa bile tabloya yazılan kaynak
-    // etiketi gerçek türüne çevrilmiş olur.
+    // Buna ek olarak çelişkinin iki ucundaki somut değer (a_deger/b_deger) yazılamamışsa
+    // bulgu yine ELENİR: prompt kuralının yapısal karşılığı, model onu yok sayamaz.
     const normSide = (s: any) => ({
-      kaynak: relabelBilirkisi(String(s?.kaynak ?? "")).slice(0, 200),
+      kaynak: String(s?.kaynak ?? "").slice(0, 200),
       alinti: String(s?.alinti ?? "").slice(0, 400),
     });
+    const MIN_DEGER_CHARS = 10;
     const ALLOWED_CONF = ["yuksek", "orta", "dusuk"];
     const rawFindings = Array.isArray(parsed?.findings) ? parsed.findings : [];
     const findings = rawFindings
@@ -352,12 +356,17 @@ Yalnızca bu kayıtlar arasındaki uyumsuzlukları, her biri için iki dayanağ�
         const conf = String(f?.guven_seviyesi ?? "").toLowerCase();
         return {
           gozlem: String(f?.gozlem ?? "").trim(),
+          a_deger: String(f?.a_deger ?? "").trim().slice(0, 300),
+          b_deger: String(f?.b_deger ?? "").trim().slice(0, 300),
           dayanak_a: normSide(f?.dayanak_a),
           dayanak_b: normSide(f?.dayanak_b),
           guven_seviyesi: ALLOWED_CONF.includes(conf) ? conf : "dusuk",
         };
       })
-      .filter((f: any) => f.gozlem && f.dayanak_a.alinti && f.dayanak_b.alinti);
+      .filter((f: any) =>
+        f.gozlem && f.dayanak_a.alinti && f.dayanak_b.alinti
+        && f.a_deger.length >= MIN_DEGER_CHARS && f.b_deger.length >= MIN_DEGER_CHARS
+      );
     const droppedCount = rawFindings.length - findings.length;
 
     console.log(
