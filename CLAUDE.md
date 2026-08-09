@@ -1,7 +1,26 @@
 # CLAUDE.md — MediPact Çalışma Düzeni
 
-## Her Oturumda Okuma Sırası
-1. constitution.md → 2. medipact-komut.md → 3. mimari.md → 4. tasks/todo.md ve tasks/lessons.md
+## Oturum okuma sırası (bağlayıcı)
+
+1. `constitution.md` — tam oku. Kısadır; değişmez ilkeler.
+2. `mimari/00-INDEX.md` — tam oku. Bölüm haritasıdır.
+3. Yalnızca işine karşılık gelen `mimari/` bölüm dosyası.
+4. `tasks/todo.md` ve `tasks/lessons.md` — tam oku.
+5. `medipact-komut.md` — yalnızca ürünün niyeti tartışılıyorsa.
+6. `tasks/yol-haritasi.md` — yalnızca sıra/öncelik sorusu varsa.
+
+Çelişki hâlinde üst sıradaki kazanır:
+constitution > komut > mimari > tasks.
+
+## Okuma sınırı (token disiplini)
+
+- Kök dizindeki `mimari.md` bütün metni taşır ve tek doğruluk
+  kaynağıdır, ama OKUNMAZ. Okuma daima `mimari/` üzerinden yapılır.
+- `mimari/` klasörünün tamamını okuma. İndeksten ilgili bölümü seç.
+- Kod ararken dosyanın tamamını okuma: önce grep ile ilgili yeri
+  bul, sonra yalnız o aralığı aç.
+- İndekste yazmayan bir dosyayı açacaksan, hangisini neden açtığını
+  tek satırla yaz.
 
 ## İş Akışı
 
