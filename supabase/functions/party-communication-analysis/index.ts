@@ -1,8 +1,8 @@
 // İletişim İzi Analizi — MEDIATOR_ONLY.
 // Tarafın NE söylediğinden değil NASIL konuştuğundan asıl ihtiyacını çıkarır ve
-// arabulucuya sıradaki en fazla 3 keşif sorusunu verir. Karşı tarafın hiçbir verisi
-// prompt'a GİRMEZ (dosya geneli toplantı notları hariç — onlar arabulucunun kendi
-// kaydı). Yalnız party_communication_analysis tablosuna yazar; RAG / worklog YOK.
+// arabulucuya sıradaki en fazla 3 keşif sorusunu verir. Bağlama YALNIZCA bu tarafın
+// kendi ifadeleri girer (beyan + kendi belgeleri + kendi soru/cevapları); karşı tarafın
+// hiçbir metni girmez. Yalnız party_communication_analysis tablosuna yazar; RAG/worklog YOK.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
@@ -13,9 +13,7 @@ const corsHeaders = {
 // Belge içerik bütçesi — party-consistency-check/index.ts kalıbının aynısı.
 const PER_DOC_CHAR_BUDGET = 6_000;
 const TOTAL_CHAR_BUDGET = 24_000;
-const MAX_DOC_FINDINGS_CHARS = 4_000;
 const MAX_STATEMENT_CHARS = 12_000;
-const MAX_NOTES_CHARS = 4_000;
 const MAX_DISCOVERY_CHARS = 4_000;
 
 // "Bilirkişi raporu:" etiketi bu fonksiyondan değil, party_analyses.document_findings
@@ -98,7 +96,7 @@ Deno.serve(async (req) => {
       ? `${party.first_name ?? ""} ${party.last_name ?? ""}`.trim()
       : (party.company_name ?? "Taraf");
 
-    // ── BAĞLAM: YALNIZCA bu tarafın kendi verisi (+ arabulucunun kendi toplantı notları).
+    // ── BAĞLAM: YALNIZCA bu tarafın kendi ifadeleri.
 
     // 1) Tarafın kendi beyanı
     const statementText = clip(String(party.statement ?? "").trim(), MAX_STATEMENT_CHARS);
@@ -141,24 +139,14 @@ Deno.serve(async (req) => {
       ? `\n═══ KAYNAK: BU TARAFIN KENDİ BELGELERİ ═══${docExcerpts}${docBudgetNote}\n═══════════════════════════\n`
       : (docs.length > 0 ? `\n═══ KAYNAK: BU TARAFIN KENDİ BELGELERİ ═══\n(okunabilir belge metni yok)${docBudgetNote}\n═══════════════════════════\n` : "");
 
-    // 3) Tarafın kendi party_analyses.analysis metinleri (varsa)
-    const { data: analysisRow } = await admin.from("party_analyses")
-      .select("analysis").eq("case_id", case_id).eq("party_id", party_id).maybeSingle();
-    const analysisObj = (analysisRow as any)?.analysis ?? null;
-    const analysisParts: string[] = [];
-    if (Array.isArray(analysisObj?.document_findings) && analysisObj.document_findings.length > 0) {
-      analysisParts.push(
-        `Belge bulguları:\n${analysisObj.document_findings.map((f: any) => `- ${typeof f === "string" ? f : JSON.stringify(f)}`).join("\n")}`
-      );
-    }
-    if (analysisObj?.party_position && typeof analysisObj.party_position === "object") {
-      analysisParts.push(`Pozisyon/ihtiyaç: ${JSON.stringify(analysisObj.party_position)}`);
-    }
-    const analysisBlock = analysisParts.length > 0
-      ? `\n═══ KAYNAK: Analiz bulgusu (bu tarafın kendi analizinden) ═══\n${clip(analysisParts.join("\n\n"), MAX_DOC_FINDINGS_CHARS)}\n═══════════════════════════\n`
-      : "";
+    // NOT (bağlam daraltması): party_analyses metinleri bağlamdan ÇIKARILDI — üçüncü
+    // şahıs dilinde yazıldıkları için model kimin konuştuğunu karıştırıyor ve karşı
+    // tarafın davranışını bu tarafın izi sanıyordu. Aynı nedenle case_notes (dosya
+    // geneli, iki tarafı birden anlatıyor) da çıkarıldı. Bağlamda artık YALNIZCA bu
+    // tarafın kendi ifadeleri var: kendi beyanı, kendi belgeleri, kendi soru/cevapları.
 
-    // 4) Bu tarafa ait ihtiyaç tespiti soru/cevapları (varsa)
+    // 3) Bu tarafa ait ihtiyaç tespiti soru/cevapları (varsa) — party_id ile sınırlı,
+    // yani cevaplar bu tarafın kendi sözleri.
     const { data: discRows } = await admin.from("case_discovery_questions")
       .select("id, question_text, answer_text, detected_need, question_order")
       .eq("case_id", case_id).eq("party_id", party_id)
@@ -178,37 +166,27 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 5) Dosyanın toplantı notları (arabulucunun kendi kaydı) — varsa dahil, yoksa atla.
-    const { data: noteRows } = await admin.from("case_notes")
-      .select("id, content, phase, created_at")
-      .eq("case_id", case_id).order("created_at", { ascending: false }).limit(30);
-    let notesBlock = "";
-    if ((noteRows ?? []).length > 0) {
-      let used = 0;
-      const parts: string[] = [];
-      for (const n of (noteRows ?? []) as any[]) {
-        const text = String(n.content ?? "").trim();
-        if (!text) continue;
-        const line = `(aşama: ${n.phase ?? "-"}, tarih: ${String(n.created_at ?? "").slice(0, 10)})\n${text}`;
-        if (used + line.length > MAX_NOTES_CHARS) break;
-        parts.push(line);
-        used += line.length;
-      }
-      if (parts.length > 0) {
-        notesBlock = `\n═══ KAYNAK: Toplantı notu (arabulucunun kaydı) ═══\n${parts.join("\n\n")}\n═══════════════════════════\n`;
-      }
-    }
+    // 4) Aynı dosyadaki DİĞER tarafların adları — bağlama girmezler, yalnızca cevap
+    // geldikten sonra "karşı tarafın davranışını anlatan iz" elemesi için kullanılır.
+    const { data: otherParties } = await admin.from("case_parties")
+      .select("id, party_type, first_name, last_name, company_name")
+      .eq("case_id", case_id).neq("id", party_id);
+    const otherPartyNames = (otherParties ?? []).flatMap((p: any) => [
+      `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim(),
+      String(p.company_name ?? "").trim(),
+    ]).filter((n: string) => n.length >= 3);
 
     // Prompt'a giden TÜM bağlam metni tek noktada süzülür.
     const contextBlocks = relabelBilirkisi(
-      [statementBlock, docsBlock, analysisBlock, discoveryBlock, notesBlock].filter(Boolean).join("")
+      [statementBlock, docsBlock, discoveryBlock].filter(Boolean).join("")
     );
 
     const systemPrompt = `Sen bir arabuluculuk dosyasında İLETİŞİM İZİ ANALİZİ yapan asistansın.
 Tarafın NE söylediğine değil NASIL konuştuğuna bak: neyi atlıyor, neyi tekrar ediyor, nerede dili sertleşiyor, hangi alana hiç değinmiyor, talebi ile anlatısı nerede ayrışıyor.
 Her iz için: iz_tipi, gozlem (nötr, tek cümle), dayanak {kaynak, alinti}, guven_seviyesi ("yuksek"|"orta"|"dusuk").
 iz_tipi şu BEŞTEN biri olmalı, başka değer YAZMA: "kacinilan_konu" | "tekrar_eden_tema" | "sertlesme_noktasi" | "hic_deginilmeyen_alan" | "talep_anlati_farki".
-kaynak alanı, kaydın GERÇEK türünü gösteren şu etiketlerden biri olmalı ve AYNEN böyle yazılmalı: "Taraf beyanı" | "Belge: <dosya adı>" | "Analiz bulgusu" | "İhtiyaç tespiti" | "Toplantı notu". Başka tür adı uydurmak YASAKTIR.
+kaynak alanı, kaydın GERÇEK türünü gösteren şu etiketlerden biri olmalı ve AYNEN böyle yazılmalı: "Taraf beyanı" | "Belge: <dosya adı>" | "İhtiyaç tespiti". Başka tür adı uydurmak YASAKTIR.
+KİMİN İZİ (çok önemli): İzler YALNIZ bu tarafın kendi ifadelerinden çıkarılır. Gözlem cümlesi bu tarafın davranışını anlatmalı ("bu taraf şu konuya hiç değinmiyor"), karşı tarafın davranışını DEĞİL. Karşı tarafın tutumunu anlatan iz ÜRETME (ör. "karşı taraf teklifi kabul etmiyor" bir iz değildir). Bu tarafın metninde karşı taraftan söz edilse bile iz, bu tarafın kendi anlatımı hakkında olmalıdır.
 dayanak.alinti ZORUNLUDUR ve verilen kaynaklarda BİREBİR geçen kısa bir alıntı olmalı (en fazla 200 karakter) — kendi cümleni alıntı diye yazma, özetleme.
 TEŞHİS DİLİ YASAK — kişilik yorumu ("savunmacı", "agresif"), niyet atfı, "yalan söylüyor" türü hüküm cümlesi kurma. Yalnız gözlem + birebir alıntı yaz. Örnek doğru gözlem: "Ödeme konusu üç ayrı yerde soruluyor, üçünde de cevap başka konuya kaydırılıyor."
 Dayanağı gösterilemeyen iz ÜRETME; hiç iz yoksa boş dizi döndür — bu başarısızlık değildir.
@@ -403,7 +381,13 @@ Bu kayıtlardaki iletişim izlerini çıkar ve arabulucuya sıradaki en fazla 3 
           guven_seviyesi: ALLOWED_CONF.includes(conf) ? conf : "dusuk",
         };
       })
-      .filter((f: any) => f.iz_tipi && f.gozlem && f.dayanak.alinti.length >= MIN_ALINTI_CHARS);
+      .filter((f: any) => f.iz_tipi && f.gozlem && f.dayanak.alinti.length >= MIN_ALINTI_CHARS)
+      // Karşı tarafın davranışını anlatan iz ELENİR: gozlem metninde bu dosyadaki
+      // DİĞER taraflardan birinin adı geçiyorsa bu iz bu tarafa ait değildir.
+      .filter((f: any) => {
+        const g = f.gozlem.toLocaleLowerCase("tr");
+        return !otherPartyNames.some((n: string) => g.includes(n.toLocaleLowerCase("tr")));
+      });
 
     // Her soru bir boşluğa bağlı olmalı: boşluğu yazılmayan soru elenir, en fazla 3 tutulur.
     const rawQuestions = Array.isArray(parsed?.discovery_questions) ? parsed.discovery_questions : [];
@@ -419,7 +403,7 @@ Bu kayıtlardaki iletişim izlerini çıkar ve arabulucuya sıradaki en fazla 3 
     const droppedQuestions = rawQuestions.length - discovery_questions.length;
     console.log(
       `[party-communication-analysis] case=${case_id} party=${party_id} bağlam=${contextBlocks.length} krk | iz=${findings.length} | soru=${discovery_questions.length}` +
-      (droppedFindings > 0 ? ` | dayanaksız ${droppedFindings} iz elendi` : "") +
+      (droppedFindings > 0 ? ` | dayanaksız/karşı tarafa ait ${droppedFindings} iz elendi` : "") +
       (droppedQuestions > 0 ? ` | boşluğu yazılmayan ${droppedQuestions} soru elendi` : "")
     );
 
