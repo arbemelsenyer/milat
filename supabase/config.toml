@@ -97,3 +97,6 @@ verify_jwt = true
 
 [functions.case-qa]
 verify_jwt = true
+
+[functions.party-consistency-check]
+verify_jwt = true
