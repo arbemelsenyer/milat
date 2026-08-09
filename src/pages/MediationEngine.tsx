@@ -2095,6 +2095,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
   const [openId, setOpenId] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [analysing, setAnalysing] = useState<string | null>(null);
+  const [consistencyChecking, setConsistencyChecking] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<{ partyId: string; msg: string } | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -2234,6 +2235,41 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
       setAnalysisError({ partyId, msg });
       toast({ title: "Analiz hatası", description: msg, variant: "destructive" });
     } finally { setAnalysing(null); }
+  }
+
+  // İç Tutarlılık Denetimi — party-consistency-check. runAnalysis'ten tamamen ayrı
+  // akış: kendi state'i var, analysisError'a dokunmaz, loadAll() çağırmaz (sonuç
+  // Aşama 4 kokpitinde okunur). Fonksiyonun döndürdüğü Türkçe mesaj olduğu gibi gösterilir.
+  async function runConsistencyCheck(partyId: string) {
+    setConsistencyChecking(partyId);
+    try {
+      const { data, error } = await supabase.functions.invoke("party-consistency-check", {
+        body: { case_id: caseRow.id, party_id: partyId },
+      });
+      // Edge function 4xx/5xx döndürdüğünde Türkçe mesaj gövdede gelir; gövdeyi
+      // hem data'dan hem de hata context'inden okumayı dene — jenerik mesaja düşme.
+      let errMsg: string | null = (data as any)?.error ?? null;
+      if (!errMsg && error) {
+        try {
+          const ctxBody = await (error as any)?.context?.json?.();
+          errMsg = ctxBody?.error ?? null;
+        } catch { /* gövde okunamadı */ }
+        errMsg = errMsg ?? error.message;
+      }
+      if (errMsg) throw new Error(errMsg);
+      const findings = Array.isArray((data as any)?.findings) ? (data as any).findings : [];
+      toast(
+        findings.length > 0
+          ? { title: `İç tutarlılık denetimi tamamlandı — ${findings.length} bulgu`, description: "Sonuç Aşama 4 kokpitinde" }
+          : { title: "Uyumsuzluk bulunmadı" }
+      );
+    } catch (e: any) {
+      toast({
+        title: "İç tutarlılık denetimi hatası",
+        description: e?.message || "AI servisine ulaşılamadı.",
+        variant: "destructive",
+      });
+    } finally { setConsistencyChecking(null); }
   }
 
   const analysedCount = analyses.length;
@@ -2455,6 +2491,11 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
                     <Button size="sm" onClick={() => runAnalysis(p.id)} disabled={analysing === p.id}>
                       {analysing === p.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
                       {a ? "Yeniden Analiz Et" : "Analiz Başlat"}
+                    </Button>
+                    {/* İç Tutarlılık Denetimi — ayrı fonksiyon, sonuç yalnız Aşama 4 kokpitinde görünür */}
+                    <Button size="sm" variant="outline" onClick={() => runConsistencyCheck(p.id)} disabled={consistencyChecking === p.id}>
+                      {consistencyChecking === p.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <ShieldCheck className="h-4 w-4 mr-1" />}
+                      {consistencyChecking === p.id ? "Denetleniyor..." : "İç Tutarlılık Denetimi"}
                     </Button>
                     {analysisError?.partyId === p.id && (
                       <Button size="sm" variant="outline" onClick={() => runAnalysis(p.id)}>
