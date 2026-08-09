@@ -1,0 +1,555 @@
+// İletişim İzi Analizi — MEDIATOR_ONLY.
+// Tarafın NE söylediğinden değil NASIL konuştuğundan asıl ihtiyacını çıkarır ve
+// arabulucuya sıradaki en fazla 3 keşif sorusunu verir. Karşı tarafın hiçbir verisi
+// prompt'a GİRMEZ (dosya geneli toplantı notları hariç — onlar arabulucunun kendi
+// kaydı). Yalnız party_communication_analysis tablosuna yazar; RAG / worklog YOK.
+import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+// Belge içerik bütçesi — party-consistency-check/index.ts kalıbının aynısı.
+const PER_DOC_CHAR_BUDGET = 6_000;
+const TOTAL_CHAR_BUDGET = 24_000;
+const MAX_DOC_FINDINGS_CHARS = 4_000;
+const MAX_STATEMENT_CHARS = 12_000;
+const MAX_NOTES_CHARS = 4_000;
+const MAX_DISCOVERY_CHARS = 4_000;
+
+// "Bilirkişi raporu:" etiketi bu fonksiyondan değil, party_analyses.document_findings
+// içeriğinden geliyor (party-confidential-analysis oradaki kaynağı böyle etiketliyor).
+// case_documents'ta belge türü kolonu YOK; bu yüzden ifade hem prompt'a giren bağlamda
+// hem de model cevabında gerçek türüne çevrilir.
+function relabelBilirkisi(s: string): string {
+  return s.replace(/Bilirkişi\s*raporu\s*:/gi, "Belge:");
+}
+
+function clip(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  return `${text.slice(0, limit)}\n…(bu kayıt karakter bütçesi nedeniyle kırpıldı)`;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const apiKey = Deno.env.get("LOVABLE_API_KEY")!;
+
+    const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Invalid session" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userId = userData.user.id;
+
+    const body = await req.json();
+    const case_id: string | undefined = body?.case_id;
+    const party_id: string | undefined = body?.party_id;
+    if (!case_id || !party_id) {
+      return new Response(JSON.stringify({ error: "case_id and party_id required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const admin = createClient(supabaseUrl, serviceKey);
+
+    // ── YETKİ: party-consistency-check ile aynı — taraf-izinli gevşetme YOK,
+    // bu çıktı MEDIATOR_ONLY: yalnız atanmış arabulucu, dosya sahibi veya admin.
+    const { data: caseRow } = await admin.from("cases")
+      .select("id, user_id, assigned_mediator_id, dispute_type, dispute_subtype, title")
+      .eq("id", case_id).maybeSingle();
+    if (!caseRow) {
+      return new Response(JSON.stringify({ error: "Case not found" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: party } = await admin.from("case_parties")
+      .select("id, user_id, case_id, party_role, party_type, first_name, last_name, company_name, statement")
+      .eq("id", party_id).eq("case_id", case_id).maybeSingle();
+    if (!party) {
+      return new Response(JSON.stringify({ error: "Party not found" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: roleRow } = await admin.from("user_roles")
+      .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+    const allowed = !!roleRow || caseRow.user_id === userId || caseRow.assigned_mediator_id === userId;
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const partyName = party.party_type === "individual"
+      ? `${party.first_name ?? ""} ${party.last_name ?? ""}`.trim()
+      : (party.company_name ?? "Taraf");
+
+    // ── BAĞLAM: YALNIZCA bu tarafın kendi verisi (+ arabulucunun kendi toplantı notları).
+
+    // 1) Tarafın kendi beyanı
+    const statementText = clip(String(party.statement ?? "").trim(), MAX_STATEMENT_CHARS);
+    const statementBlock = statementText
+      ? `\n═══ KAYNAK: Taraf beyanı — ${partyName} (kendi anlatımı) ═══\n${statementText}\n═══════════════════════════\n`
+      : "";
+
+    // 2) Tarafın kendi belgeleri — party_id eşleşmesi; party_id boşsa uploaded_by
+    // fallback + 6.000/24.000 karakter bütçesi (party-consistency-check kalıbı).
+    const { data: allDocs } = await admin.from("case_documents")
+      .select("id, file_name, file_path, mime_type, extracted_text, extraction_status, party_id, uploaded_by")
+      .eq("case_id", case_id);
+    const docs = (allDocs ?? []).filter((d: any) =>
+      d.party_id === party_id || (!d.party_id && party.user_id && d.uploaded_by === party.user_id)
+    );
+
+    let docExcerpts = "";
+    let totalUsed = 0;
+    let fullCount = 0, truncatedCount = 0, notIncludedCount = 0;
+    for (const d of docs as any[]) {
+      if (totalUsed >= TOTAL_CHAR_BUDGET) { notIncludedCount++; continue; }
+      let text = String(d.extracted_text ?? "").trim();
+      if (!text && ((d.mime_type ?? "").startsWith("text/") || String(d.file_name).toLowerCase().endsWith(".txt"))) {
+        try {
+          const { data: blob, error: dlErr } = await admin.storage.from("case-documents").download(d.file_path);
+          if (!dlErr && blob) text = (await blob.text()).trim();
+        } catch { /* okunamadı, dahil edilemeyen olarak sayılacak */ }
+      }
+      if (!text) { notIncludedCount++; continue; }
+      const perDocLimit = Math.min(PER_DOC_CHAR_BUDGET, TOTAL_CHAR_BUDGET - totalUsed);
+      const slice = text.slice(0, perDocLimit);
+      docExcerpts += `\n--- Belge: ${d.file_name} ---\n${slice}\n`;
+      totalUsed += slice.length;
+      if (slice.length < text.length) truncatedCount++; else fullCount++;
+    }
+    const docBudgetNote = docs.length > 0
+      ? `\nNOT (belge içerik bütçesi): ${docs.length} belgeden ${fullCount} tam, ${truncatedCount} kırpılarak, ${notIncludedCount} dahil edilemeden işlendi. Dahil edilemeyen belgeler hakkında iz üretme.`
+      : "";
+    const docsBlock = docExcerpts
+      ? `\n═══ KAYNAK: BU TARAFIN KENDİ BELGELERİ ═══${docExcerpts}${docBudgetNote}\n═══════════════════════════\n`
+      : (docs.length > 0 ? `\n═══ KAYNAK: BU TARAFIN KENDİ BELGELERİ ═══\n(okunabilir belge metni yok)${docBudgetNote}\n═══════════════════════════\n` : "");
+
+    // 3) Tarafın kendi party_analyses.analysis metinleri (varsa)
+    const { data: analysisRow } = await admin.from("party_analyses")
+      .select("analysis").eq("case_id", case_id).eq("party_id", party_id).maybeSingle();
+    const analysisObj = (analysisRow as any)?.analysis ?? null;
+    const analysisParts: string[] = [];
+    if (Array.isArray(analysisObj?.document_findings) && analysisObj.document_findings.length > 0) {
+      analysisParts.push(
+        `Belge bulguları:\n${analysisObj.document_findings.map((f: any) => `- ${typeof f === "string" ? f : JSON.stringify(f)}`).join("\n")}`
+      );
+    }
+    if (analysisObj?.party_position && typeof analysisObj.party_position === "object") {
+      analysisParts.push(`Pozisyon/ihtiyaç: ${JSON.stringify(analysisObj.party_position)}`);
+    }
+    const analysisBlock = analysisParts.length > 0
+      ? `\n═══ KAYNAK: Analiz bulgusu (bu tarafın kendi analizinden) ═══\n${clip(analysisParts.join("\n\n"), MAX_DOC_FINDINGS_CHARS)}\n═══════════════════════════\n`
+      : "";
+
+    // 4) Bu tarafa ait ihtiyaç tespiti soru/cevapları (varsa)
+    const { data: discRows } = await admin.from("case_discovery_questions")
+      .select("id, question_text, answer_text, detected_need, question_order")
+      .eq("case_id", case_id).eq("party_id", party_id)
+      .order("question_order", { ascending: true });
+    let discoveryBlock = "";
+    if ((discRows ?? []).length > 0) {
+      let used = 0;
+      const lines: string[] = [];
+      for (const d of (discRows ?? []) as any[]) {
+        const line = `S: ${d.question_text}\nC: ${d.answer_text ?? "(cevap yok)"}\nTespit edilen ihtiyaç: ${d.detected_need ?? "-"}`;
+        if (used + line.length > MAX_DISCOVERY_CHARS) break;
+        lines.push(line);
+        used += line.length;
+      }
+      if (lines.length > 0) {
+        discoveryBlock = `\n═══ KAYNAK: İhtiyaç tespiti (bu tarafın soru/cevapları) ═══\n${lines.join("\n\n")}\n═══════════════════════════\n`;
+      }
+    }
+
+    // 5) Dosyanın toplantı notları (arabulucunun kendi kaydı) — varsa dahil, yoksa atla.
+    const { data: noteRows } = await admin.from("case_notes")
+      .select("id, content, phase, created_at")
+      .eq("case_id", case_id).order("created_at", { ascending: false }).limit(30);
+    let notesBlock = "";
+    if ((noteRows ?? []).length > 0) {
+      let used = 0;
+      const parts: string[] = [];
+      for (const n of (noteRows ?? []) as any[]) {
+        const text = String(n.content ?? "").trim();
+        if (!text) continue;
+        const line = `(aşama: ${n.phase ?? "-"}, tarih: ${String(n.created_at ?? "").slice(0, 10)})\n${text}`;
+        if (used + line.length > MAX_NOTES_CHARS) break;
+        parts.push(line);
+        used += line.length;
+      }
+      if (parts.length > 0) {
+        notesBlock = `\n═══ KAYNAK: Toplantı notu (arabulucunun kaydı) ═══\n${parts.join("\n\n")}\n═══════════════════════════\n`;
+      }
+    }
+
+    // Prompt'a giden TÜM bağlam metni tek noktada süzülür.
+    const contextBlocks = relabelBilirkisi(
+      [statementBlock, docsBlock, analysisBlock, discoveryBlock, notesBlock].filter(Boolean).join("")
+    );
+
+    const systemPrompt = `Sen bir arabuluculuk dosyasında İLETİŞİM İZİ ANALİZİ yapan asistansın.
+Tarafın NE söylediğine değil NASIL konuştuğuna bak: neyi atlıyor, neyi tekrar ediyor, nerede dili sertleşiyor, hangi alana hiç değinmiyor, talebi ile anlatısı nerede ayrışıyor.
+Her iz için: iz_tipi, gozlem (nötr, tek cümle), dayanak {kaynak, alinti}, guven_seviyesi ("yuksek"|"orta"|"dusuk").
+iz_tipi şu BEŞTEN biri olmalı, başka değer YAZMA: "kacinilan_konu" | "tekrar_eden_tema" | "sertlesme_noktasi" | "hic_deginilmeyen_alan" | "talep_anlati_farki".
+kaynak alanı, kaydın GERÇEK türünü gösteren şu etiketlerden biri olmalı ve AYNEN böyle yazılmalı: "Taraf beyanı" | "Belge: <dosya adı>" | "Analiz bulgusu" | "İhtiyaç tespiti" | "Toplantı notu". Başka tür adı uydurmak YASAKTIR.
+dayanak.alinti ZORUNLUDUR ve verilen kaynaklarda BİREBİR geçen kısa bir alıntı olmalı (en fazla 200 karakter) — kendi cümleni alıntı diye yazma, özetleme.
+TEŞHİS DİLİ YASAK — kişilik yorumu ("savunmacı", "agresif"), niyet atfı, "yalan söylüyor" türü hüküm cümlesi kurma. Yalnız gözlem + birebir alıntı yaz. Örnek doğru gözlem: "Ödeme konusu üç ayrı yerde soruluyor, üçünde de cevap başka konuya kaydırılıyor."
+Dayanağı gösterilemeyen iz ÜRETME; hiç iz yoksa boş dizi döndür — bu başarısızlık değildir.
+"hic_deginilmeyen_alan" izinde bile dayanak zorunludur: hangi metnin o alana girmeden geçtiğini gösteren birebir alıntı ver.
+discovery_questions: arabulucunun sıradaki EN FAZLA 3 keşif sorusu. Her soru bir boşluğa bağlı olmalı ve hangi_boslugu_kapatir alanında bu boşluk açıkça yazılmalı; boşluğu yazamıyorsan o soruyu ÜRETME. Sorular kısa, açık uçlu ve arabulucunun ağzından olmalı.
+Türkçe yaz.
+Çıktı YALNIZCA şu JSON: {
+  "findings": [{"iz_tipi":"", "gozlem":"", "dayanak":{"kaynak":"","alinti":""}, "guven_seviyesi":"yuksek|orta|dusuk"}],
+  "discovery_questions": [{"soru":"", "hangi_boslugu_kapatir":""}]
+}`;
+
+    const userPrompt = `TARAF: ${partyName} (rol: ${party.party_role ?? "?"}, tür: ${party.party_type ?? "-"})
+UYUŞMAZLIK: ${caseRow.dispute_type ?? "-"} / ${caseRow.dispute_subtype ?? "-"}
+
+BU TARAFIN KAYITLARI:
+${contextBlocks || "(bu taraf için okunabilir beyan, belge veya not metni yok)"}
+Yukarıdaki kayıtlar bu tarafa (ve arabulucunun bu dosyadaki kendi notlarına) aittir. Karşı tarafla karşılaştırma yapma.
+Bu kayıtlardaki iletişim izlerini çıkar ve arabulucuya sıradaki en fazla 3 keşif sorusunu ver; uygun iz yoksa findings dizisini boş bırak.`;
+
+    // ── MODEL KAPISI (üç kademe): (1) OPENAI_API_KEY varsa ÖNCE doğrudan OpenAI;
+    // (2) düşerse GEMINI_API_KEY ile doğrudan Google model listesi; (3) o da düşerse
+    // Lovable gateway yedeği. party-consistency-check kalıbının aynısı.
+    const openaiKey = Deno.env.get("OPENAI_API_KEY");
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    let rawContent: string | null = null;
+    let openaiFail: { status: number; shortMsg: string } | null = null;
+    let googleFail: { status: number; shortMsg: string } | null = null;
+
+    if (openaiKey) {
+      // Anahtar yalnız env'den okunur; hata gövdelerinden temizlenir, hiçbir yere loglanmaz.
+      const redact = (s: string) => s.split(openaiKey).join("***");
+      const OPENAI_MODEL = "gpt-4o-mini";
+      try {
+        const oRes = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${openaiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: OPENAI_MODEL,
+            messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+            response_format: { type: "json_object" },
+            temperature: 0.2,
+          }),
+        });
+        if (oRes.ok) {
+          const oJson = await oRes.json();
+          const text = oJson?.choices?.[0]?.message?.content;
+          if (typeof text === "string" && text.trim()) {
+            rawContent = text;
+            console.log(`[party-communication-analysis] Sağlayıcı: OpenAI — model: ${OPENAI_MODEL}`);
+          } else {
+            console.error(`[party-communication-analysis] OpenAI (${OPENAI_MODEL}) boş yanıt döndürdü — Google'a düşülüyor.`);
+            openaiFail = { status: 502, shortMsg: `${OPENAI_MODEL} boş yanıt döndürdü` };
+          }
+        } else {
+          const bodyText = redact(await oRes.text());
+          let shortMsg = bodyText.replace(/\s+/g, " ").trim().slice(0, 120);
+          let code = "";
+          try {
+            const errObj = JSON.parse(bodyText)?.error;
+            shortMsg = String(errObj?.message ?? shortMsg).slice(0, 120);
+            code = String(errObj?.code ?? errObj?.type ?? "");
+          } catch { /* düz metin */ }
+          console.error("[party-communication-analysis] OpenAI error:", oRes.status, shortMsg);
+          openaiFail = {
+            status: code === "insufficient_quota" ? 402 : oRes.status,
+            shortMsg: `${OPENAI_MODEL}: ${shortMsg}`,
+          };
+        }
+      } catch (e: any) {
+        const msg = redact(e?.message ?? String(e)).slice(0, 120);
+        console.error(`[party-communication-analysis] OpenAI çağrısı başarısız: ${msg}`);
+        openaiFail = { status: 502, shortMsg: `${OPENAI_MODEL}: ${msg}` };
+      }
+    }
+
+    if (rawContent === null && geminiKey) {
+      const redact = (s: string) => s.split(geminiKey).join("***");
+      // Model adları hesaplarda/bölgelerde farklılaşabildiği için sıralı denenir:
+      // 404/400 alınırsa sıradaki denenir, ilk başarılı cevapta durulur.
+      const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-1.5-flash"];
+      for (const model of GEMINI_MODELS) {
+        try {
+          const gRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiKey)}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+                generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+              }),
+            },
+          );
+          if (gRes.ok) {
+            const gJson = await gRes.json();
+            const text = gJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (typeof text === "string" && text.trim()) {
+              rawContent = text;
+              console.log(`[party-communication-analysis] Sağlayıcı: Google — model: ${model}`);
+              break;
+            }
+            console.error(`[party-communication-analysis] Google (${model}) boş yanıt döndürdü — sıradaki model deneniyor.`);
+            googleFail = { status: 502, shortMsg: `${model} boş yanıt döndürdü` };
+            continue;
+          }
+          const bodyText = redact(await gRes.text());
+          let shortMsg = bodyText.replace(/\s+/g, " ").trim().slice(0, 120);
+          try { shortMsg = String(JSON.parse(bodyText)?.error?.message ?? shortMsg).slice(0, 120); } catch { /* düz metin */ }
+          console.error(`[party-communication-analysis] Google (${model}) error:`, gRes.status, shortMsg);
+          googleFail = { status: gRes.status, shortMsg: `${model}: ${shortMsg}` };
+          if (gRes.status === 404 || gRes.status === 400) continue;
+          break;
+        } catch (e: any) {
+          const msg = redact(e?.message ?? String(e)).slice(0, 120);
+          console.error(`[party-communication-analysis] Google (${model}) çağrısı başarısız: ${msg}`);
+          googleFail = { status: 502, shortMsg: `${model}: ${msg}` };
+          break;
+        }
+      }
+    }
+
+    if (rawContent === null) {
+      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+          response_format: { type: "json_object" },
+          temperature: 0.2,
+        }),
+      });
+      if (!aiRes.ok) {
+        const errText = await aiRes.text();
+        console.error("[party-communication-analysis] Gateway error:", aiRes.status, errText.slice(0, 300));
+        // Üç kademe de düştüyse hepsi tek satırda birleştirilir.
+        const gatewayMsg =
+          aiRes.status === 429 ? "Rate limit aşıldı. Lütfen biraz sonra tekrar deneyin." :
+          aiRes.status === 402 ? "AI kredisi tükendi. Workspace ayarlarından kredi ekleyin." :
+          "AI servisi hatası";
+        const openaiMsg = openaiFail
+          ? `OpenAI: ${openaiFail.status} ${openaiFail.shortMsg}` +
+            (openaiFail.status === 429 ? " — OpenAI kota/hız sınırı, biraz sonra tekrar deneyin." :
+             openaiFail.status === 401 ? " — OpenAI anahtarı geçersiz." :
+             openaiFail.status === 402 ? " — OpenAI bakiyesi yetersiz." : "")
+          : null;
+        const googleMsg = googleFail
+          ? `Google: ${googleFail.status} ${googleFail.shortMsg}` +
+            (googleFail.status === 429 ? " — ücretsiz kota sınırına takıldı, 1 dakika sonra tekrar deneyin." :
+             (googleFail.status === 400 || googleFail.status === 403) ? " — API anahtarını kontrol edin." : "")
+          : null;
+        const userMsg = [openaiMsg, googleMsg, `Gateway: ${aiRes.status} ${gatewayMsg}`]
+          .filter(Boolean).join(" | ");
+        return new Response(JSON.stringify({ error: userMsg, detail: errText }), {
+          status: openaiFail?.status ?? googleFail?.status ?? aiRes.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const aiJson = await aiRes.json();
+      rawContent = aiJson?.choices?.[0]?.message?.content ?? "{}";
+      console.log("[party-communication-analysis] Sağlayıcı: Lovable gateway — model: google/gemini-2.5-flash");
+    }
+
+    // Etiket temizliği TEK NOKTADAN: model cevabının tamamı parse edilmeden önce süzülür.
+    let parsed: any = {};
+    try { parsed = JSON.parse(relabelBilirkisi(rawContent ?? "{}")); } catch { parsed = {}; }
+
+    // Deterministic citation guard: bağlamda birebir geçmeyen künyeleri temizler.
+    parsed = sanitizeCitationHallucinations(parsed, contextBlocks);
+
+    // Yapısal kalite kuralı (iç tutarlılıkta kanıtlandı): dayanağı gösterilemeyen iz
+    // ELENİR — alinti boş veya 15 karakterden kısaysa o finding listeden atılır.
+    const MIN_ALINTI_CHARS = 15;
+    const ALLOWED_IZ = [
+      "kacinilan_konu", "tekrar_eden_tema", "sertlesme_noktasi",
+      "hic_deginilmeyen_alan", "talep_anlati_farki",
+    ];
+    const ALLOWED_CONF = ["yuksek", "orta", "dusuk"];
+    const rawFindings = Array.isArray(parsed?.findings) ? parsed.findings : [];
+    const findings = rawFindings
+      .map((f: any) => {
+        const iz = String(f?.iz_tipi ?? "").trim().toLowerCase();
+        const conf = String(f?.guven_seviyesi ?? "").toLowerCase();
+        return {
+          iz_tipi: ALLOWED_IZ.includes(iz) ? iz : "",
+          gozlem: String(f?.gozlem ?? "").trim(),
+          dayanak: {
+            kaynak: String(f?.dayanak?.kaynak ?? "").slice(0, 200),
+            alinti: String(f?.dayanak?.alinti ?? "").trim().slice(0, 400),
+          },
+          guven_seviyesi: ALLOWED_CONF.includes(conf) ? conf : "dusuk",
+        };
+      })
+      .filter((f: any) => f.iz_tipi && f.gozlem && f.dayanak.alinti.length >= MIN_ALINTI_CHARS);
+
+    // Her soru bir boşluğa bağlı olmalı: boşluğu yazılmayan soru elenir, en fazla 3 tutulur.
+    const rawQuestions = Array.isArray(parsed?.discovery_questions) ? parsed.discovery_questions : [];
+    const discovery_questions = rawQuestions
+      .map((q: any) => ({
+        soru: String(q?.soru ?? "").trim().slice(0, 500),
+        hangi_boslugu_kapatir: String(q?.hangi_boslugu_kapatir ?? "").trim().slice(0, 500),
+      }))
+      .filter((q: any) => q.soru && q.hangi_boslugu_kapatir)
+      .slice(0, 3);
+
+    const droppedFindings = rawFindings.length - findings.length;
+    const droppedQuestions = rawQuestions.length - discovery_questions.length;
+    console.log(
+      `[party-communication-analysis] case=${case_id} party=${party_id} bağlam=${contextBlocks.length} krk | iz=${findings.length} | soru=${discovery_questions.length}` +
+      (droppedFindings > 0 ? ` | dayanaksız ${droppedFindings} iz elendi` : "") +
+      (droppedQuestions > 0 ? ` | boşluğu yazılmayan ${droppedQuestions} soru elendi` : "")
+    );
+
+    // Yazma best-effort: bu satır yazılamazsa bile cevap döner, ana akış durmaz.
+    // Başka hiçbir tabloya yazılmaz.
+    let persisted = true;
+    try {
+      const { error: upsertErr } = await admin.from("party_communication_analysis")
+        .upsert(
+          { case_id, party_id, findings, discovery_questions, updated_at: new Date().toISOString() },
+          { onConflict: "case_id,party_id" },
+        );
+      if (upsertErr) throw upsertErr;
+    } catch (e: any) {
+      persisted = false;
+      console.error(`[party-communication-analysis] party_communication_analysis yazımı başarısız: ${e?.message ?? String(e)}`);
+    }
+
+    return new Response(JSON.stringify({ findings, discovery_questions, persisted }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e: any) {
+    console.error("[party-communication-analysis] Function error:", e);
+    return new Response(JSON.stringify({ error: e?.message ?? String(e) }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Deterministic citation guard (no extra AI call, no schema change). Copied
+// verbatim from party-consistency-check/index.ts — this repo has no _shared/
+// module between edge functions, so each function stays self-contained.
+// ─────────────────────────────────────────────────────────────────────────
+
+// Matches "2016/10292 E.", "E. 2017/3257", "K. 2018/7889", "2010/8939 K.",
+// placeholder-digit variants like "2020/XXXX E." (number/E-or-K token pairs in
+// either order), AND bare "YYYY/NNN+" case numbers with no E./K. label at all
+// (min 3-digit docket segment so tarife/madde references like "2026/17" don't
+// match). A bare match whose second segment is exactly 4 digits and within ±1
+// of the first (e.g. "2024/2025") is a year range, not a citation — excluded
+// via isYearRangeFalsePositive below, not in the regex itself.
+const CITATION_PATTERN = /\b(\d{4}\/[0-9X]{1,7}\s*(?:E|K)\.?)\b|\b((?:E|K)\.?\s*\d{4}\/[0-9X]{1,7})\b|\b(\d{4})\/([0-9X]{3,7})\b/gi;
+
+function isYearRangeFalsePositive(yearStr: string, secondStr: string): boolean {
+  if (!/^\d{4}$/.test(secondStr)) return false;
+  const y1 = Number(yearStr), y2 = Number(secondStr);
+  return Math.abs(y2 - y1) === 1;
+}
+
+function extractCitations(text: string): string[] {
+  const out: string[] = [];
+  const re = new RegExp(CITATION_PATTERN);
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m[3] !== undefined) {
+      if (isYearRangeFalsePositive(m[3], m[4])) continue;
+      out.push(`${m[3]}/${m[4]}`);
+    } else {
+      out.push((m[1] ?? m[2] ?? m[0]).trim());
+    }
+  }
+  return out;
+}
+
+function normalizeForCompare(s: string): string {
+  return s.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function citationInContext(citation: string, context: string): boolean {
+  return normalizeForCompare(context).includes(normalizeForCompare(citation));
+}
+
+// Replaces any citation not verbatim in `context` with a generic phrase,
+// then tidies the double-space/empty-parenthesis artifacts that leaves behind.
+function scrubCitationsInString(text: string, context: string): { text: string; removed: number } {
+  let removed = 0;
+  const re = new RegExp(CITATION_PATTERN);
+  const scrubbed = text.replace(re, (match: string, g1: string, g2: string, g3: string, g4: string) => {
+    if (g3 !== undefined && isYearRangeFalsePositive(g3, g4)) return match;
+    if (citationInContext(match, context)) return match;
+    removed++;
+    return "yerleşik içtihadı";
+  });
+  const cleaned = scrubbed
+    .replace(/\(\s*\)/g, "")
+    .replace(/ {2,}/g, " ")
+    .trim();
+  return { text: cleaned, removed };
+}
+
+function sanitizeStringsDeep(value: any, context: string, stats: { removed: number }): any {
+  if (typeof value === "string") {
+    const { text, removed } = scrubCitationsInString(value, context);
+    stats.removed += removed;
+    return text;
+  }
+  if (Array.isArray(value)) return value.map((v) => sanitizeStringsDeep(v, context, stats));
+  if (value && typeof value === "object") {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(value)) out[k] = sanitizeStringsDeep(v, context, stats);
+    return out;
+  }
+  return value;
+}
+
+// legal_framework.precedents gets the stricter treatment: an item whose `decision`
+// cites an E./K. number not present in context is dropped entirely. This function's
+// own output schema has no precedents field, so this block is a no-op here — kept
+// for parity with the sibling functions so all stay identical, copy-paste-able.
+function sanitizeCitationHallucinations(parsed: any, context: string): any {
+  const stats = { removed: 0, precedentsDropped: 0 };
+
+  if (Array.isArray(parsed?.legal_framework?.precedents)) {
+    const before = parsed.legal_framework.precedents.length;
+    parsed.legal_framework.precedents = parsed.legal_framework.precedents.filter((p: any) => {
+      const citations = extractCitations(String(p?.decision ?? ""));
+      if (citations.length === 0) return true;
+      return citations.every((c) => citationInContext(c, context));
+    });
+    stats.precedentsDropped = before - parsed.legal_framework.precedents.length;
+  }
+
+  const sanitized = sanitizeStringsDeep(parsed, context, stats);
+
+  if (stats.removed > 0 || stats.precedentsDropped > 0) {
+    console.log(
+      `[party-communication-analysis] citation guard: ${stats.removed} inline künye temizlendi, ${stats.precedentsDropped} precedent kaydı bağlamda doğrulanamadığı için silindi`
+    );
+  }
+
+  return sanitized;
+}
