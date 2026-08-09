@@ -2096,6 +2096,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
   const [uploading, setUploading] = useState<string | null>(null);
   const [analysing, setAnalysing] = useState<string | null>(null);
   const [consistencyChecking, setConsistencyChecking] = useState<string | null>(null);
+  const [communicationRunning, setCommunicationRunning] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<{ partyId: string; msg: string } | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -2270,6 +2271,42 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
         variant: "destructive",
       });
     } finally { setConsistencyChecking(null); }
+  }
+
+  // İletişim Analizi — party-communication-analysis. İç Tutarlılık düğmesiyle aynı
+  // kalıp: kendi state'i, analysisError'a dokunmaz, sonuç Aşama 4 kokpitinde okunur.
+  async function runCommunicationAnalysis(partyId: string) {
+    setCommunicationRunning(partyId);
+    try {
+      const { data, error } = await supabase.functions.invoke("party-communication-analysis", {
+        body: { case_id: caseRow.id, party_id: partyId },
+      });
+      let errMsg: string | null = (data as any)?.error ?? null;
+      if (!errMsg && error) {
+        try {
+          const ctxBody = await (error as any)?.context?.json?.();
+          errMsg = ctxBody?.error ?? null;
+        } catch { /* gövde okunamadı */ }
+        errMsg = errMsg ?? error.message;
+      }
+      if (errMsg) throw new Error(errMsg);
+      const findings = Array.isArray((data as any)?.findings) ? (data as any).findings : [];
+      const questions = Array.isArray((data as any)?.discovery_questions) ? (data as any).discovery_questions : [];
+      toast(
+        findings.length > 0 || questions.length > 0
+          ? {
+              title: `İletişim analizi tamamlandı — ${findings.length} iz, ${questions.length} soru`,
+              description: "Sonuç Aşama 4 kokpitinde",
+            }
+          : { title: "İletişim izi bulunmadı" }
+      );
+    } catch (e: any) {
+      toast({
+        title: "İletişim analizi hatası",
+        description: e?.message || "AI servisine ulaşılamadı.",
+        variant: "destructive",
+      });
+    } finally { setCommunicationRunning(null); }
   }
 
   const analysedCount = analyses.length;
@@ -2496,6 +2533,11 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
                     <Button size="sm" variant="outline" onClick={() => runConsistencyCheck(p.id)} disabled={consistencyChecking === p.id}>
                       {consistencyChecking === p.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <ShieldCheck className="h-4 w-4 mr-1" />}
                       {consistencyChecking === p.id ? "Denetleniyor..." : "İç Tutarlılık Denetimi"}
+                    </Button>
+                    {/* İletişim Analizi — ayrı fonksiyon, sonuç yalnız Aşama 4 kokpitinde görünür */}
+                    <Button size="sm" variant="outline" onClick={() => runCommunicationAnalysis(p.id)} disabled={communicationRunning === p.id}>
+                      {communicationRunning === p.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <MessageSquare className="h-4 w-4 mr-1" />}
+                      {communicationRunning === p.id ? "Analiz ediliyor..." : "İletişim Analizi"}
                     </Button>
                     {analysisError?.partyId === p.id && (
                       <Button size="sm" variant="outline" onClick={() => runAnalysis(p.id)}>
@@ -4070,6 +4112,56 @@ function CockpitConsistencyItem({ finding, partyLabel }: { finding: any; partyLa
   );
 }
 
+// party_communication_analysis tek izinin kokpit görünümü — CockpitConsistencyItem
+// kalıbından türetildi. Fark: iki dayanak değil TEK dayanak var, onun yerine iz tipini
+// gösteren bir rozet eklendi. Bilinmeyen slug olduğu gibi gösterilir (uydurma etiket yok).
+const COMMUNICATION_IZ_LABELS: Record<string, string> = {
+  kacinilan_konu: "Kaçınılan konu",
+  tekrar_eden_tema: "Tekrar eden tema",
+  sertlesme_noktasi: "Sertleşme noktası",
+  hic_deginilmeyen_alan: "Hiç değinilmeyen alan",
+  talep_anlati_farki: "Talep–anlatı farkı",
+};
+
+function CockpitCommunicationItem({ finding, partyLabel }: { finding: any; partyLabel: string | null }) {
+  const gozlem = safeText(finding?.gozlem);
+  const kaynak = safeText(finding?.dayanak?.kaynak);
+  const alinti = safeText(finding?.dayanak?.alinti);
+  if (!gozlem || !alinti) return null;
+  const izSlug = String(finding?.iz_tipi ?? "").trim();
+  const izLabel = COMMUNICATION_IZ_LABELS[izSlug] ?? izSlug;
+  const confLabel = CONSISTENCY_CONFIDENCE_LABELS[String(finding?.guven_seviyesi ?? "").toLowerCase()] ?? "";
+
+  return (
+    <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 space-y-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {izLabel && (
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sidebar-accent/40 border border-sidebar-border text-sidebar-foreground/70">
+              {izLabel}
+            </span>
+          )}
+          {partyLabel && (
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sidebar-accent/40 border border-sidebar-border text-sidebar-foreground/70">
+              {partyLabel}
+            </span>
+          )}
+        </div>
+        {confLabel && (
+          <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${confidenceBadgeTone(confLabel)}`}>
+            {confLabel}
+          </span>
+        )}
+      </div>
+      <div className="text-xs font-semibold text-sidebar-foreground/90 leading-snug">{gozlem}</div>
+      <div className="rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 p-2.5 space-y-1">
+        <div className="text-[10px] uppercase tracking-wide text-sidebar-foreground/50 truncate">{kaynak || "Dayanak"}</div>
+        <p className="text-[11px] text-sidebar-foreground/75 leading-snug italic">{alinti}</p>
+      </div>
+    </div>
+  );
+}
+
 /* ===================== PHASE 4 - MEDIATOR PANEL (READ-ONLY SUMMARY) ===================== */
 
 function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
@@ -4087,6 +4179,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   const [rootCauses, setRootCauses] = useState<Record<string, any>>({});
   const [worklog, setWorklog] = useState<any[]>([]);
   const [consistency, setConsistency] = useState<any[]>([]);
+  const [communication, setCommunication] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
@@ -4112,7 +4205,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
     setLoading(true);
     setLoadErr(null);
     try {
-      const [r, a, rc, wl, cf] = await Promise.all([
+      const [r, a, rc, wl, cf, ca] = await Promise.all([
         supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("party_analyses").select("party_id, analysis, risk_analizi, case_parties:party_id(first_name, last_name, company_name, party_role)").eq("case_id", caseRow.id),
         // Kök Neden Katmanı: mediator-only, ayrı tablo. Bu sorgu ana yüklemeyi bloklamaz —
@@ -4124,6 +4217,9 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
         // İç Tutarlılık: party_consistency_findings, aynı "hata olursa sessizce boş" kalıbı —
         // tablo/kayıt yoksa kart hiç görünmez, kokpit render'ı hiçbir koşulda etkilenmez.
         supabase.from("party_consistency_findings" as any).select("id, party_id, findings, created_at").eq("case_id", caseRow.id).order("created_at", { ascending: false }),
+        // İletişim ve Asıl İhtiyaç: party_communication_analysis, aynı "hata olursa
+        // sessizce boş" kalıbı — kayıt yoksa kart hiç görünmez.
+        supabase.from("party_communication_analysis" as any).select("id, party_id, findings, discovery_questions, created_at").eq("case_id", caseRow.id).order("created_at", { ascending: false }),
       ]);
       if (r.error) throw r.error;
       if (a.error) throw a.error;
@@ -4151,6 +4247,12 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
       } else {
         setConsistency(Array.isArray(cf.data) ? cf.data : []);
       }
+      if (ca.error) {
+        console.error("[Phase4Summary communication]", ca.error);
+        setCommunication([]);
+      } else {
+        setCommunication(Array.isArray(ca.data) ? ca.data : []);
+      }
     } catch (e: any) {
       console.error("[Phase4Summary] load failed", e);
       setLoadErr(e?.message ?? "Bilinmeyen hata");
@@ -4159,6 +4261,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
       setRootCauses({});
       setWorklog([]);
       setConsistency([]);
+      setCommunication([]);
     } finally {
       setLoading(false);
     }
@@ -4273,6 +4376,17 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
   const consistencyItems = consistency.flatMap((row: any) =>
     (Array.isArray(row?.findings) ? row.findings : []).map((finding: any) => ({
       rowId: row.id, party_id: row.party_id, finding,
+    }))
+  );
+  // İletişim ve Asıl İhtiyaç kartı: izler ve sıradaki sorular aynı satırlardan düzleştirilir.
+  const communicationItems = communication.flatMap((row: any) =>
+    (Array.isArray(row?.findings) ? row.findings : []).map((finding: any) => ({
+      rowId: row.id, party_id: row.party_id, finding,
+    }))
+  );
+  const communicationQuestions = communication.flatMap((row: any) =>
+    (Array.isArray(row?.discovery_questions) ? row.discovery_questions : []).map((q: any) => ({
+      rowId: row.id, party_id: row.party_id, q,
     }))
   );
   const cockpitRiskPuani = cockpitRiskOzeti?.genel_risk_puani
@@ -4452,6 +4566,50 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                         />
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* İletişim ve Asıl İhtiyaç — party_communication_analysis, İç Tutarlılık ile aynı
+                    görünürlük. Kayıt yoksa (veya sorgu düştüyse) bu bölüm hiç render edilmez. */}
+                {(communicationItems.length > 0 || communicationQuestions.length > 0) && (
+                  <div className="pt-2 border-t border-sidebar-border/60">
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-1">İletişim ve Asıl İhtiyaç</div>
+                    <p className="text-xs text-sidebar-foreground/50 mb-2">
+                      Tarafın nasıl konuştuğundan çıkan izler — yorum arabulucuya aittir
+                    </p>
+                    {communicationItems.length > 0 && (
+                      <div className="grid gap-3">
+                        {communicationItems.map((it, i) => (
+                          <CockpitCommunicationItem
+                            key={`${it.rowId}-${i}`}
+                            finding={it.finding}
+                            partyLabel={it.party_id ? (worklogPartyNameById[it.party_id] ?? null) : null}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {communicationQuestions.length > 0 && (
+                      <div className="mt-3 rounded-xl border border-sidebar-border/60 bg-sidebar-accent/20 p-4">
+                        <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-2">Sıradaki 3 Soru</div>
+                        <ol className="space-y-2 list-decimal list-inside">
+                          {communicationQuestions.map((it, i) => {
+                            const soru = safeText(it.q?.soru);
+                            const bosluk = safeText(it.q?.hangi_boslugu_kapatir);
+                            if (!soru) return null;
+                            return (
+                              <li key={`${it.rowId}-q${i}`} className="text-xs text-sidebar-foreground/85 leading-snug">
+                                {soru}
+                                {bosluk && (
+                                  <div className="mt-0.5 ml-4 text-[11px] text-sidebar-foreground/55 leading-snug">
+                                    Kapattığı boşluk: {bosluk}
+                                  </div>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ol>
+                      </div>
+                    )}
                   </div>
                 )}
 
