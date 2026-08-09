@@ -93,8 +93,11 @@ Deno.serve(async (req) => {
 
     // 1) Tarafın kendi beyanı
     const statementText = clip(String(party.statement ?? "").trim(), MAX_STATEMENT_CHARS);
+    // Kaynak etiketleri kaydın GERÇEK türüne göre sabittir ve modelin dayanak.kaynak
+    // alanına birebir yazması istenen değerlerdir: "Taraf beyanı" | "Belge: <file_name>"
+    // | "Analiz bulgusu". Uydurma tür adı (ör. "Bilirkişi raporu") yasaktır.
     const statementBlock = statementText
-      ? `\n═══ KAYNAK: TARAF BEYANI (${partyName} — kendi anlatımı) ═══\n${statementText}\n═══════════════════════════\n`
+      ? `\n═══ KAYNAK: Taraf beyanı — ${partyName} (kendi anlatımı) ═══\n${statementText}\n═══════════════════════════\n`
       : "";
 
     // 2) Tarafın kendi belgeleri — party-confidential-analysis'teki eşleşme kalıbı
@@ -137,7 +140,7 @@ Deno.serve(async (req) => {
       .select("analysis").eq("case_id", case_id).eq("party_id", party_id).maybeSingle();
     const findingsArr = (analysisRow as any)?.analysis?.document_findings;
     const docFindingsBlock = Array.isArray(findingsArr) && findingsArr.length > 0
-      ? `\n═══ KAYNAK: BELGE BULGULARI (bu tarafın kendi analizinden) ═══\n${clip(
+      ? `\n═══ KAYNAK: Analiz bulgusu (bu tarafın kendi analizinden) ═══\n${clip(
           findingsArr.map((f: any) => `- ${typeof f === "string" ? f : JSON.stringify(f)}`).join("\n"),
           MAX_DOC_FINDINGS_CHARS,
         )}\n═══════════════════════════\n`
@@ -148,9 +151,10 @@ Deno.serve(async (req) => {
     const systemPrompt = `Sen bir arabuluculuk dosyasında İÇ TUTARLILIK DENETİMİ yapan asistansın.
 Yalnızca AYNI tarafın kendi beyanı ile kendi belgeleri arasındaki, ya da beyanın kendi içindeki uyumsuzlukları bul.
 Her bulgu için: gozlem (nötr, tek cümle), dayanak_a {kaynak, alinti}, dayanak_b {kaynak, alinti}, guven_seviyesi ("yuksek"|"orta"|"dusuk").
-kaynak alanı, uyumsuzluğun geldiği yeri açıkça göstermeli (ör. "Taraf beyanı" veya "Belge: bordro.pdf").
+kaynak alanı, kaydın GERÇEK türünü gösteren şu üç etiketten biri olmalı ve AYNEN böyle yazılmalı: "Taraf beyanı" | "Belge: <dosya adı>" | "Analiz bulgusu". Bu üçü dışında tür adı (ör. "Bilirkişi raporu", "Tanık ifadesi") uydurmak YASAKTIR; belge etiketinde dosya adını verilen bloktaki haliyle yaz.
 alinti alanları, verilen kaynaklarda BİREBİR geçen kısa alıntı olmalı (en fazla 200 karakter) — kendi cümleni alıntı diye yazma.
 YASAK: kişilik teşhisi, niyet atfı, "yalan söylüyor" türü hüküm cümlesi — yalnız iki dayanağı yan yana koy.
+EŞİK (çok önemli): Bir bulgu ancak İKİ DAYANAK BİRBİRİYLE GERÇEKTEN ÇELİŞİYORSA üretilir: aynı olguya dair farklı tarih/tutar/kişi/olay bilgisi ya da birinin açıkça yalanladığı bir beyan. Konu benzerliği, ton farkı, eksik bilgi veya "destekleyici" iki alıntı ÇELİŞKİ DEĞİLDİR — bunları üretme. Emin değilsen bulguyu atla; boş dizi döndürmek yanlış bulgu üretmekten iyidir. Her bulguda çelişkinin NE OLDUĞUNU gozlem alanında tek cümlede açıkça yaz (ör. "ihtarnamede Haziran 2025, cevapta Mayıs 2025 deniyor").
 Uyumsuzluk yoksa boş dizi döndür, ZORLAMA. Dayanağı gösterilemeyen bulgu üretme. Türkçe yaz.
 Çıktı YALNIZCA şu JSON: {
   "findings": [{"gozlem":"", "dayanak_a":{"kaynak":"","alinti":""}, "dayanak_b":{"kaynak":"","alinti":""}, "guven_seviyesi":"yuksek|orta|dusuk"}]
