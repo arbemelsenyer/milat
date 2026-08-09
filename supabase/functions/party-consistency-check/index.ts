@@ -16,6 +16,14 @@ const TOTAL_CHAR_BUDGET = 24_000;
 const MAX_DOC_FINDINGS_CHARS = 4_000;
 const MAX_STATEMENT_CHARS = 12_000;
 
+// "Bilirkişi raporu:" etiketi bu fonksiyondan değil, party_analyses.document_findings
+// içeriğinden geliyor (party-confidential-analysis oradaki kaynağı böyle etiketliyor).
+// case_documents'ta belge türü kolonu YOK; bu yüzden ifade hem prompt'a giren bağlamda
+// hem de model cevabındaki kaynak alanlarında gerçek türüne çevrilir.
+function relabelBilirkisi(s: string): string {
+  return s.replace(/Bilirkişi\s*raporu\s*:/gi, "Belge:");
+}
+
 function clip(text: string, limit: number): string {
   if (text.length <= limit) return text;
   return `${text.slice(0, limit)}\n…(bu kayıt karakter bütçesi nedeniyle kırpıldı)`;
@@ -143,15 +151,17 @@ Deno.serve(async (req) => {
     // yazılan document_findings içeriğinden geliyor (party-confidential-analysis oradaki
     // kaynağı böyle etiketliyor). case_documents'ta belge türü kolonu YOK — bu yüzden
     // bloğa girmeden önce etiket gerçek türüne, yani "Belge: <ad>"a çevrilir.
-    const relabelDocSource = (s: string) => s.replace(/bilirkişi\s+raporu\s*:\s*/gi, "Belge: ");
     const docFindingsBlock = Array.isArray(findingsArr) && findingsArr.length > 0
       ? `\n═══ KAYNAK: Analiz bulgusu (bu tarafın kendi analizinden) ═══\n${clip(
-          findingsArr.map((f: any) => `- ${relabelDocSource(typeof f === "string" ? f : JSON.stringify(f))}`).join("\n"),
+          findingsArr.map((f: any) => `- ${typeof f === "string" ? f : JSON.stringify(f)}`).join("\n"),
           MAX_DOC_FINDINGS_CHARS,
         )}\n═══════════════════════════\n`
       : "";
 
-    const contextBlocks = [statementBlock, docsBlock, docFindingsBlock].filter(Boolean).join("");
+    // (a) Prompt'a giden TÜM bağlam metni tek noktada süzülür: model bu ifadeyi hiç görmesin.
+    const contextBlocks = relabelBilirkisi(
+      [statementBlock, docsBlock, docFindingsBlock].filter(Boolean).join("")
+    );
 
     const systemPrompt = `Sen bir arabuluculuk dosyasında İÇ TUTARLILIK DENETİMİ yapan asistansın.
 Yalnızca AYNI tarafın kendi beyanı ile kendi belgeleri arasındaki, ya da beyanın kendi içindeki uyumsuzlukları bul.
@@ -160,6 +170,7 @@ kaynak alanı, kaydın GERÇEK türünü gösteren şu üç etiketten biri olmal
 alinti alanları, verilen kaynaklarda BİREBİR geçen kısa alıntı olmalı (en fazla 200 karakter) — kendi cümleni alıntı diye yazma.
 YASAK: kişilik teşhisi, niyet atfı, "yalan söylüyor" türü hüküm cümlesi — yalnız iki dayanağı yan yana koy.
 EŞİK (çok önemli): Bir bulgu ancak İKİ DAYANAK BİRBİRİYLE GERÇEKTEN ÇELİŞİYORSA üretilir: aynı olguya dair farklı tarih/tutar/kişi/olay bilgisi ya da birinin açıkça yalanladığı bir beyan. Konu benzerliği, ton farkı, eksik bilgi veya "destekleyici" iki alıntı ÇELİŞKİ DEĞİLDİR — bunları üretme. Emin değilsen bulguyu atla; boş dizi döndürmek yanlış bulgu üretmekten iyidir. Her bulguda çelişkinin NE OLDUĞUNU gozlem alanında tek cümlede açıkça yaz (ör. "ihtarnamede Haziran 2025, cevapta Mayıs 2025 deniyor").
+KESİN KURAL (iki değer şartı): Bir bulgu ancak iki dayanak AYNI OLGU hakkında BİRBİRİNİ TUTMAYAN iki değer içeriyorsa üretilir (farklı tarih, farklı tutar, farklı kişi, ya da biri "oldu" diğeri "olmadı" diyorsa). gozlem cümlesi bu iki değeri de içermek ZORUNDA — "A kaynağında X, B kaynağında Y" biçiminde. Tek bir kaynağın beyanını tekrar eden, iki alıntısı da aynı yöne bakan veya "örtüşmüyor/farklılık var" deyip iki değeri yazmayan bulgu ÜRETME. Hiç uygun bulgu yoksa boş dizi döndür — bu başarısızlık değildir.
 SOMUTLUK: gozlem alanı çelişkinin İKİ UCUNU da açıkça yazmalı — hangi kaynakta ne, diğerinde ne (tarih/tutar/kişi/olay belirtilerek). Örnek biçim: "İhtarnamede temerrüt Haziran 2025 deniyor, ihtara cevapta Mayıs 2025 ödemesi gösteriliyor." İki ucu somut yazamıyorsan o bulguyu ÜRETME. "Örtüşmemektedir", "tutarsızlık göze çarpıyor" gibi muğlak, ucu belirtilmeyen cümleler KABUL EDİLMEZ.
 Uyumsuzluk yoksa boş dizi döndür, ZORLAMA. Dayanağı gösterilemeyen bulgu üretme. Türkçe yaz.
 Çıktı YALNIZCA şu JSON: {
@@ -328,8 +339,10 @@ Yalnızca bu kayıtlar arasındaki uyumsuzlukları, her biri için iki dayanağ�
 
     // Şema güvencesi: iki dayanağı da alıntısıyla gösteremeyen bulgu ELENİR —
     // "dayanağı gösterilemeyen bulgu üretme" kuralının kod tarafındaki karşılığı.
+    // (b) Son savunma hattı: model kuralı yok sayarsa bile tabloya yazılan kaynak
+    // etiketi gerçek türüne çevrilmiş olur.
     const normSide = (s: any) => ({
-      kaynak: String(s?.kaynak ?? "").slice(0, 200),
+      kaynak: relabelBilirkisi(String(s?.kaynak ?? "")).slice(0, 200),
       alinti: String(s?.alinti ?? "").slice(0, 400),
     });
     const ALLOWED_CONF = ["yuksek", "orta", "dusuk"];
