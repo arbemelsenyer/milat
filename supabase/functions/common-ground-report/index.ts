@@ -135,6 +135,62 @@ Deno.serve(async (req) => {
       console.error(`[common-ground-report] agent_worklog okuma başarısız (yoksayıldı): ${e?.message ?? String(e)}`);
     }
 
+    // Rapor öncesi defter tartımı — dürüstlük bandı (mimari §5.2i). Yukarıdaki prompt
+    // okumasından AYRI ve ondan bağımsız: aynı dosyanın rapor_disi kayıtlarını daha geniş
+    // bir pencereyle sayar. Salt hesap — prompt'a, sentez akışına ve mevcut çıktı alanlarına
+    // dokunmaz. Okuma başarısız olursa bant üretilmez (goster=false) ve ana analiz sürer.
+    let durustlukBandi: {
+      goster: boolean;
+      toplam_rapor_disi: number;
+      veri_yetersiz_sayisi: number;
+      kategori_dagilimi: Record<string, number>;
+      hususlar: Array<{ husus: string; onerilen_adim: string }>;
+      metin: string;
+    } = {
+      goster: false, toplam_rapor_disi: 0, veri_yetersiz_sayisi: 0,
+      kategori_dagilimi: {}, hususlar: [], metin: "",
+    };
+    try {
+      const { data: tartimRows } = await admin.from("agent_worklog")
+        .select("content")
+        .eq("case_id", case_id).eq("entry_type", "rapor_disi")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (Array.isArray(tartimRows)) {
+        const dagilim: Record<string, number> = {};
+        const hususlar: Array<{ husus: string; onerilen_adim: string }> = [];
+        let veriYetersiz = 0;
+        for (const row of tartimRows as any[]) {
+          const c = row.content ?? {};
+          // Beklenmedik/boş kategori değeri hata değildir; sabit listeye zorlanmadan olduğu gibi sayılır.
+          const kategori = String(c.kategori ?? "").trim() || "kategori yok";
+          dagilim[kategori] = (dagilim[kategori] ?? 0) + 1;
+          if (kategori === "veri_yetersiz") {
+            veriYetersiz += 1;
+            // Husus metni ajanın yazdığı hâliyle taşınır — yeniden yazılmaz, yorumlanmaz.
+            if (hususlar.length < 5) {
+              hususlar.push({
+                husus: String(c.husus ?? "").trim(),
+                onerilen_adim: String(c.onerilen_adim ?? "").trim(),
+              });
+            }
+          }
+        }
+        durustlukBandi = {
+          goster: veriYetersiz >= 2,
+          toplam_rapor_disi: tartimRows.length,
+          veri_yetersiz_sayisi: veriYetersiz,
+          kategori_dagilimi: dagilim,
+          hususlar,
+          metin: veriYetersiz >= 2
+            ? `Bu analiz ${veriYetersiz} belgesiz hususa dayanıyor. Masaya oturmadan önce aşağıdaki eksikleri kapatmanız önerilir.`
+            : "",
+        };
+      }
+    } catch (e: any) {
+      console.error(`[common-ground-report] dürüstlük bandı tartımı başarısız (yoksayıldı): ${e?.message ?? String(e)}`);
+    }
+
     const systemPrompt = `Sen kıdemli bir Türk arabuluculuk danışmanısın. Tarafların gizli analizlerini okuyup ortak zemin raporu, arabulucu stratejisi ve iki tarafın risk analizlerini karşılaştıran risk_ozeti üretiyorsun.
 Eğer "GÖRÜŞME NOTLARI ANALİZİ" bloğu verilmişse, bu bloktaki önceden çıkarılmış tespit/pozisyon/strateji bulgularını ortak zemin (common_interests), senaryolar (scenarios) ve arabulucu stratejisi (mediator_strategy) değerlendirmende dikkate al.
 KESİN KURAL: Sabit/uydurma % ASLA verme. Kaynak yoksa "Yeterli veri yok" yaz.
@@ -214,6 +270,7 @@ Yukarıdaki resmi kaynaklardan ve benzer geçmiş davalardan yararlanarak ortak 
 
     parsed.sources = ragSources;
     parsed.rag_debug = { category: ragCategory, count: ragSources.length, threshold: 0.25 };
+    parsed.durustluk_bandi = durustlukBandi;
 
     const { data: inserted, error: upErr } = await admin.from("common_ground_reports").upsert({
       case_id, report: parsed, strategy: parsed.mediator_strategy ?? {},
