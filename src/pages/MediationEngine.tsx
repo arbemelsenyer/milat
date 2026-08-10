@@ -2729,6 +2729,27 @@ function CommonGroundZeminSection({ data }: { data: any }) {
   if (!data) return null;
   return (
     <div className="space-y-2">
+      {/* Dürüstlük bandı (mimari §5.2i) — sunucuda hesaplanır, burada yalnız gösterilir.
+          Alanı taşımayan eski raporlarda goster undefined kalır ve kart hiç çizilmez. */}
+      {data.durustluk_bandi?.goster === true && (
+        <div className="border rounded-lg p-4 bg-amber-50 border-amber-200 text-xs text-amber-800 space-y-2">
+          <div className="font-semibold">⚠️ Dayanak Uyarısı</div>
+          <p>{data.durustluk_bandi.metin}</p>
+          {Array.isArray(data.durustluk_bandi.hususlar) && data.durustluk_bandi.hususlar.length > 0 && (
+            <ul className="space-y-1.5">
+              {data.durustluk_bandi.hususlar.map((h: any, i: number) => (
+                <li key={i} className="rounded-md border border-amber-400/50 bg-amber-50/60 px-2.5 py-1.5">
+                  <div>{h?.husus}</div>
+                  {h?.onerilen_adim && <div className="text-[11px] text-amber-700 mt-0.5">{h.onerilen_adim}</div>}
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="text-[11px] text-amber-700">
+            Bu uyarı yalnız size görünür; taraflara hiçbir ekranda açılmaz. {data.durustluk_bandi.toplam_rapor_disi} rapor dışı kayıttan üretildi.
+          </div>
+        </div>
+      )}
       {data.common_interests?.length > 0 && (
         <AnaSection icon="🤝" title="Ortak Çıkarlar">
           <ul className="space-y-1.5 text-sm">
@@ -3528,6 +3549,17 @@ function buildReportHtml(opts: { caseTitle?: string; caseId: string; report: any
           ${x.excerpt ? `<blockquote>"${esc(cleanExcerpt(x.excerpt))}"</blockquote>` : ""}
         </li>`).join("")}</ol>`
     : `<p class="muted">İlgili resmi kaynak bulunamadı.</p>`;
+
+  // Dürüstlük bandı (mimari §5.2i) — ekrandaki kartla aynı içerik, mevcut .card/.muted
+  // stilleriyle düz metin. Alan yoksa veya goster false ise hiçbir şey eklenmez.
+  const band = r.durustluk_bandi;
+  const bandHtml = band?.goster === true ? `
+<div class="card">
+<h4>⚠️ Dayanak Uyarısı</h4>
+<p>${esc(band.metin || "")}</p>
+${Array.isArray(band.hususlar) && band.hususlar.length ? `<ul>${band.hususlar.map((h: any) => `<li>${esc(h?.husus || "")}${h?.onerilen_adim ? `<br/><span class="muted">${esc(h.onerilen_adim)}</span>` : ""}</li>`).join("")}</ul>` : ""}
+<p class="muted">Bu uyarı yalnız size görünür; taraflara hiçbir ekranda açılmaz. ${esc(String(band.toplam_rapor_disi ?? 0))} rapor dışı kayıttan üretildi.</p>
+</div>` : "";
   return `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>Ortak Zemin Raporu — ${esc(caseTitle || caseId)}</title>
 <style>
 body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;max-width:820px;margin:24px auto;padding:0 24px;color:#1f2937;line-height:1.55}
@@ -3544,6 +3576,7 @@ ul,ol{padding-left:20px}
 </style></head><body>
 <div class="confidential">GİZLİ — Yalnızca Arabulucu İçindir (6325 s.K. m.4/m.33)</div>
 <h1>Ortak Zemin Raporu</h1>
+${bandHtml}
 <div class="meta"><b>Başvuru:</b> ${esc(caseTitle || "—")} &nbsp;•&nbsp; <b>ID:</b> ${esc(caseId)} &nbsp;•&nbsp; <b>Oluşturulma:</b> ${generatedAt.toLocaleString("tr-TR")}</div>
 
 <h2>Taraf Analizleri</h2>${partyAnalysesHtml || `<p class="muted">Taraf analizi bulunamadı.</p>`}
