@@ -8,10 +8,13 @@ import pypdf
 
 SUPABASE_URL = "https://oijdnfibboiinogdmlcj.supabase.co"
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '') 
+# service_role akışında apikey de Authorization da SUPABASE_KEY'dir (varsayılan).
+# Admin JWT akışında (run_scraper_local.py) apikey=anon, Authorization=Bearer <access_token> olarak ayrılır.
+SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY', '') or SUPABASE_KEY
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
 headers_sb = {
-    'apikey': SUPABASE_KEY,
+    'apikey': SUPABASE_ANON_KEY,
     'Authorization': f'Bearer {SUPABASE_KEY}',
     'Content-Type': 'application/json'
 }
