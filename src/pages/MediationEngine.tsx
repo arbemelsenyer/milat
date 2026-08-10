@@ -4501,21 +4501,10 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
       <h2 className="text-2xl font-bold text-primary">Aşama 4 — Arabulucu Paneli</h2>
       <p className="text-sm text-muted-foreground">Aşama 3'te üretilen taraf analizlerinin özeti ve Ortak Zemin Raporu üretimi.</p>
 
-      {/* Kokpit dört katman halinde okunur: (1) durum şeridi, (2) masaya otururken,
-          (3) dayanak katmanı, (4) detaylar (varsayılan kapalı). Kartların içeriği ve
-          veri kaynakları değişmedi — yalnız sıraları ve sarmalayıcıları değişti. */}
+      {/* Sekme çubuğu en üstte; Genel Bakış sekmesi kokpitin üç katmanını
+          (durum şeridi, masaya otururken, dayanak katmanı) ve kokpit kutusunu taşır.
+          Kartların içeriği ve veri kaynakları değişmedi — yalnız yerleri değişti. */}
       <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
-
-        {/* ── 1. DURUM ŞERİDİ — dört rakam, hepsi mevcut state'ten; yeni sorgu yok ── */}
-        <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {statusStripItems.map((m, i) => (
-            <div key={i} className="rounded-lg border bg-muted/30 px-3 py-2 min-w-0">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">{m.label}</div>
-              <div className="text-sm font-semibold truncate">{m.value}</div>
-              {m.sub && <div className="text-[11px] text-muted-foreground truncate">{m.sub}</div>}
-            </div>
-          ))}
-        </motion.div>
 
         {/* Karşılaştırmalı risk_ozeti otomatik-üretim efekti sessizce çalışmaya devam eder;
             görünümü aşağıdaki kokpit panelleri devralır, mükerrer kart göstermez. */}
@@ -4528,121 +4517,6 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
               caseId={caseRow.id}
             />
           </div>
-        )}
-
-        {analyses.length === 0 && (
-          <motion.div variants={itemVariants} className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground italic text-center">
-            Kokpit, Aşama 3'te en az bir taraf analizi tamamlandığında dolmaya başlar.
-          </motion.div>
-        )}
-
-        {/* ── 2. MASAYA OTURURKEN — kök neden + sıradaki sorular ── */}
-        {hasTableLayer && (
-          <motion.div variants={itemVariants} className={cockpitLayerBoxClass}>
-            <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Masaya otururken</div>
-
-            {/* Kök Neden Analizi — arabulucuya özel stratejik içgörü, party_root_cause_analysis'ten */}
-            {cockpitRows.length > 0 && (
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-2">Kök Neden Analizi</div>
-                <div className={`grid gap-4 ${cockpitRows.length > 1 ? "sm:grid-cols-2" : ""}`}>
-                  {cockpitRows.map((r, i) => (
-                    <CockpitRootCauseCard
-                      key={i}
-                      name={r.name}
-                      rootCause={r.party_id ? rootCauses[r.party_id] : undefined}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Sıradaki 3 Soru — party_communication_analysis.discovery_questions */}
-            {communicationQuestions.length > 0 && (
-              <div className="rounded-xl border border-sidebar-border/60 bg-sidebar-accent/20 p-4">
-                <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-2">Sıradaki 3 Soru</div>
-                <ol className="space-y-2 list-decimal list-inside">
-                  {communicationQuestions.map((it, i) => {
-                    const soru = safeText(it.q?.soru);
-                    const bosluk = safeText(it.q?.hangi_boslugu_kapatir);
-                    if (!soru) return null;
-                    return (
-                      <li key={`${it.rowId}-q${i}`} className="text-xs text-sidebar-foreground/85 leading-snug">
-                        {soru}
-                        {bosluk && (
-                          <div className="mt-0.5 ml-4 text-[11px] text-sidebar-foreground/55 leading-snug">
-                            Kapattığı boşluk: {bosluk}
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ol>
-              </div>
-            )}
-          </motion.div>
-        )}
-
-        {/* ── 3. DAYANAK KATMANI — iç tutarlılık, rapora girmeyenler, iletişim izleri ── */}
-        {hasEvidenceLayer && (
-          <motion.div variants={itemVariants} className={cockpitLayerBoxClass}>
-            <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Dayanak katmanı</div>
-
-            {/* İç Tutarlılık — party_consistency_findings */}
-            {consistencyItems.length > 0 && (
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-1">İç Tutarlılık</div>
-                <p className="text-xs text-sidebar-foreground/50 mb-2">
-                  Tarafın kendi beyanı ile kendi belgeleri arasındaki uyumsuzluklar — yorum arabulucuya aittir
-                </p>
-                <div className="grid gap-3">
-                  {consistencyItems.map((it, i) => (
-                    <CockpitConsistencyItem
-                      key={`${it.rowId}-${i}`}
-                      finding={it.finding}
-                      partyLabel={it.party_id ? (worklogPartyNameById[it.party_id] ?? null) : null}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Rapora Girmeyenler — agent_worklog(entry_type='rapor_disi') */}
-            {worklog.length > 0 && (
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-1">Rapora Girmeyenler</div>
-                <p className="text-xs text-sidebar-foreground/50 mb-2">Ajanın değerlendirip rapora almadığı hususlar ve önerilen adımlar</p>
-                <ul className="divide-y divide-sidebar-border/50">
-                  {worklog.map((w: any) => (
-                    <CockpitOffReportItem
-                      key={w.id}
-                      item={w.content}
-                      partyLabel={w.party_id == null ? "Dosya geneli" : (worklogPartyNameById[w.party_id] ?? null)}
-                    />
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* İletişim ve Asıl İhtiyaç — iz listesi (sorular 2. katmanda) */}
-            {communicationItems.length > 0 && (
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-1">İletişim ve Asıl İhtiyaç</div>
-                <p className="text-xs text-sidebar-foreground/50 mb-2">
-                  Tarafın nasıl konuştuğundan çıkan izler — yorum arabulucuya aittir
-                </p>
-                <div className="grid gap-3">
-                  {communicationItems.map((it, i) => (
-                    <CockpitCommunicationItem
-                      key={`${it.rowId}-${i}`}
-                      finding={it.finding}
-                      partyLabel={it.party_id ? (worklogPartyNameById[it.party_id] ?? null) : null}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </motion.div>
         )}
 
         {/* ── 4. ESKİ SEKMELER — kokpitin geri kalanı ve eski sekmelerin tamamı
@@ -4658,6 +4532,132 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
             </TabsList>
 
             <TabsContent value="genel-bakis" className="space-y-6">
+
+              {analyses.length === 0 && (
+                <motion.div variants={itemVariants} className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground italic text-center">
+                  Kokpit, Aşama 3'te en az bir taraf analizi tamamlandığında dolmaya başlar.
+                </motion.div>
+              )}
+
+              {/* ── 1. DURUM ŞERİDİ — dört rakam, hepsi mevcut state'ten; yeni sorgu yok ── */}
+              <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {statusStripItems.map((m, i) => (
+                  <div key={i} className="rounded-lg border bg-muted/30 px-3 py-2 min-w-0">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">{m.label}</div>
+                    <div className="text-sm font-semibold truncate">{m.value}</div>
+                    {m.sub && <div className="text-[11px] text-muted-foreground truncate">{m.sub}</div>}
+                  </div>
+                ))}
+              </motion.div>
+
+              {/* ── 2. MASAYA OTURURKEN — kök neden + sıradaki sorular ── */}
+              {hasTableLayer && (
+                <motion.div variants={itemVariants} className={cockpitLayerBoxClass}>
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Masaya otururken</div>
+
+                  {/* Kök Neden Analizi — arabulucuya özel stratejik içgörü, party_root_cause_analysis'ten */}
+                  {cockpitRows.length > 0 && (
+                    <div>
+                      <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-2">Kök Neden Analizi</div>
+                      <div className={`grid gap-4 ${cockpitRows.length > 1 ? "sm:grid-cols-2" : ""}`}>
+                        {cockpitRows.map((r, i) => (
+                          <CockpitRootCauseCard
+                            key={i}
+                            name={r.name}
+                            rootCause={r.party_id ? rootCauses[r.party_id] : undefined}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sıradaki 3 Soru — party_communication_analysis.discovery_questions */}
+                  {communicationQuestions.length > 0 && (
+                    <div className="rounded-xl border border-sidebar-border/60 bg-sidebar-accent/20 p-4">
+                      <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-2">Sıradaki 3 Soru</div>
+                      <ol className="space-y-2 list-decimal list-inside">
+                        {communicationQuestions.map((it, i) => {
+                          const soru = safeText(it.q?.soru);
+                          const bosluk = safeText(it.q?.hangi_boslugu_kapatir);
+                          if (!soru) return null;
+                          return (
+                            <li key={`${it.rowId}-q${i}`} className="text-xs text-sidebar-foreground/85 leading-snug">
+                              {soru}
+                              {bosluk && (
+                                <div className="mt-0.5 ml-4 text-[11px] text-sidebar-foreground/55 leading-snug">
+                                  Kapattığı boşluk: {bosluk}
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {/* ── 3. DAYANAK KATMANI — iç tutarlılık, rapora girmeyenler, iletişim izleri ── */}
+              {hasEvidenceLayer && (
+                <motion.div variants={itemVariants} className={cockpitLayerBoxClass}>
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Dayanak katmanı</div>
+
+                  {/* İç Tutarlılık — party_consistency_findings */}
+                  {consistencyItems.length > 0 && (
+                    <div>
+                      <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-1">İç Tutarlılık</div>
+                      <p className="text-xs text-sidebar-foreground/50 mb-2">
+                        Tarafın kendi beyanı ile kendi belgeleri arasındaki uyumsuzluklar — yorum arabulucuya aittir
+                      </p>
+                      <div className="grid gap-3">
+                        {consistencyItems.map((it, i) => (
+                          <CockpitConsistencyItem
+                            key={`${it.rowId}-${i}`}
+                            finding={it.finding}
+                            partyLabel={it.party_id ? (worklogPartyNameById[it.party_id] ?? null) : null}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rapora Girmeyenler — agent_worklog(entry_type='rapor_disi') */}
+                  {worklog.length > 0 && (
+                    <div>
+                      <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-1">Rapora Girmeyenler</div>
+                      <p className="text-xs text-sidebar-foreground/50 mb-2">Ajanın değerlendirip rapora almadığı hususlar ve önerilen adımlar</p>
+                      <ul className="divide-y divide-sidebar-border/50">
+                        {worklog.map((w: any) => (
+                          <CockpitOffReportItem
+                            key={w.id}
+                            item={w.content}
+                            partyLabel={w.party_id == null ? "Dosya geneli" : (worklogPartyNameById[w.party_id] ?? null)}
+                          />
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* İletişim ve Asıl İhtiyaç — iz listesi (sorular 2. katmanda) */}
+                  {communicationItems.length > 0 && (
+                    <div>
+                      <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-1">İletişim ve Asıl İhtiyaç</div>
+                      <p className="text-xs text-sidebar-foreground/50 mb-2">
+                        Tarafın nasıl konuştuğundan çıkan izler — yorum arabulucuya aittir
+                      </p>
+                      <div className="grid gap-3">
+                        {communicationItems.map((it, i) => (
+                          <CockpitCommunicationItem
+                            key={`${it.rowId}-${i}`}
+                            finding={it.finding}
+                            partyLabel={it.party_id ? (worklogPartyNameById[it.party_id] ?? null) : null}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
 
               {report && analyses.length > 0 && (
                 <div className="flex justify-end gap-2">
