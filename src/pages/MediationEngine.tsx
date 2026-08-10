@@ -4648,9 +4648,9 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
         {/* ── 4. DETAYLAR — varsayılan kapalı; kokpitin geri kalanı ve eski sekmelerin
             tamamı burada, hiçbir bölüm silinmeden ── */}
         <motion.div variants={itemVariants}>
-          <details className="rounded-2xl border border-border bg-muted/20">
+          <details open className="rounded-2xl border border-border bg-muted/20">
             <summary className="cursor-pointer select-none px-4 py-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">
-              Detaylar
+              Ortak Zemin · Strateji · Kör Teklif
             </summary>
             <div className="px-4 pb-4 space-y-6">
 
