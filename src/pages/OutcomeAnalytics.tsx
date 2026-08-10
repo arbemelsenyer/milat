@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, BarChart3, Loader2 } from "lucide-react";
+import { formatDisputeType } from "@/lib/disputeLabels";
 
 // Bilinen {grup}_{belge_tipi} kalıplarını okunur Türkçe ada çevirir — aynısı
 // src/components/mediation/ProcessTrackerPanel.tsx'te de var; bu sayfa o
@@ -284,8 +285,7 @@ export default function OutcomeAnalytics() {
                           {r.case_id ? r.case_id.slice(0, 8) : "—"}
                         </td>
                         <td className="py-2 pr-4">
-                          {r.dispute_type ?? "—"}
-                          {r.dispute_subtype ? ` / ${r.dispute_subtype}` : ""}
+                          {formatDisputeType(r.dispute_type, r.dispute_subtype)}
                         </td>
                         <td className="py-2 pr-4">{outcomeLabel(r.outcome)}</td>
                         <td className="py-2 pr-4">{r.sure_gun != null ? `${r.sure_gun} gün` : "—"}</td>

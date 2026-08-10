@@ -69,7 +69,7 @@ export const DISPUTE_SUBTYPE_LABELS: Record<string, string> = {
   "inşaat": "İnşaat",
   "bankacılık": "Bankacılık",
   "spor": "Spor",
-  "enerji_maden": "Enerji-Maden",
+  "enerji_maden": "Enerji & Maden",
 };
 
 // Ana tür + (varsa) alt uzmanlık alanını "AnaTür — AltUzmanlık" biçiminde birleştirir;

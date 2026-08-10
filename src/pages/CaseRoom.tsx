@@ -30,6 +30,7 @@ import { StepTimeline } from "@/components/mediation/StepTimeline";
 import { AgentControlPanel } from "@/components/mediation/AgentControlPanel";
 import { downloadOfficialPdf } from "@/lib/pdfTemplates";
 import { downloadPaymentInfoPdf } from "@/lib/invoice-pdf";
+import { formatDisputeType } from "@/lib/disputeLabels";
 import { Input } from "@/components/ui/input";
 
 const tabTriggerAccentClass =
@@ -380,7 +381,7 @@ export default function CaseRoom() {
               </div>
               <h1 className="text-2xl font-bold text-primary">{caseRow.title}</h1>
               <div className="text-sm text-muted-foreground mt-1">
-                {caseRow.dispute_type} · Aşama {caseRow.current_phase ?? 1}/8 · Tur {caseRow.round_number ?? 1}
+                {formatDisputeType(caseRow.dispute_type, caseRow.dispute_subtype)} · Aşama {caseRow.current_phase ?? 1}/8 · Tur {caseRow.round_number ?? 1}
               </div>
             </div>
             <div className="flex gap-2">
