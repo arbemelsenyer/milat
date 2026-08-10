@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Pencil } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { formatDisputeType } from "@/lib/disputeLabels";
 
 // case_process_tracker isn't in the generated Supabase types yet.
 const trackerTable = () => (supabase as any).from("case_process_tracker");
@@ -96,56 +97,6 @@ function humanizeTemplateType(type: string): string {
   if (!belgeLabel) return type;
   return `${TEMPLATE_GROUP_LABELS[groupKey]} ${belgeLabel}`;
 }
-
-// Uyuşmazlık türü / alt uzmanlık etiketleri — diğer ekranlarla birebir aynı
-// metni üretmek için burada yerel olarak tanımlı (dosyalar arası import yok).
-const DISPUTE_TYPE_LABELS: Record<string, string> = {
-  isci_isveren: "İşçi-İşveren",
-  ticari: "Ticari",
-  tuketici: "Tüketici",
-  kira: "Kira",
-  ortaklik: "Ortaklığın Giderilmesi",
-  fikri_mulkiyet: "Fikri Mülkiyet",
-  saglik: "Sağlık / Malpraktis",
-  sigorta: "Sigorta",
-  aile: "Aile",
-  diger: "Diğer",
-  commercial: "Ticari",
-  ip: "Fikri Mülkiyet",
-  healthcare: "Sağlık / Malpraktis",
-  health: "Sağlık / Malpraktis",
-  other: "Diğer",
-};
-
-const DISPUTE_SUBTYPE_LABELS: Record<string, string> = {
-  fikri_sinai_haklar: "Fikri-Sınai Haklar",
-  "fikri_sınai_haklar": "Fikri-Sınai Haklar",
-  marka: "Marka",
-  patent: "Patent",
-  telif: "Telif Hakkı",
-  ticari_sir: "Ticari Sır",
-  alacak: "Alacak",
-  sozlesme: "Sözleşme",
-  cek_senet: "Çek-Senet",
-  haksiz_rekabet: "Haksız Rekabet",
-  kidem_ihbar: "Kıdem-İhbar Tazminatı",
-  ise_iade: "İşe İade",
-  fazla_mesai: "Fazla Mesai",
-  is_kazasi: "İş Kazası",
-  ayipli_mal: "Ayıplı Mal",
-  ayipli_hizmet: "Ayıplı Hizmet",
-  abonelik: "Abonelik",
-  kira_bedeli: "Kira Bedeli",
-  tahliye: "Tahliye",
-  depozito: "Depozito",
-  malpraktis: "Malpraktis",
-  police: "Poliçe",
-  hasar: "Hasar",
-  tazminat: "Tazminat",
-  nafaka: "Nafaka",
-  mal_paylasimi: "Mal Paylaşımı",
-  diger: "Diğer",
-};
 
 function fmtDate(d?: string | null): string {
   if (!d) return "—";
@@ -311,13 +262,10 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
   const claimants = useMemo(() => parties.filter((p) => p.party_role === "applicant" || p.role === "applicant" || p.role === "claimant"), [parties]);
   const respondents = useMemo(() => parties.filter((p) => p.party_role === "respondent" || p.role === "respondent"), [parties]);
 
-  const arbKonusu = useMemo(() => {
-    if (!caseData?.dispute_type) return "—";
-    const main = DISPUTE_TYPE_LABELS[caseData.dispute_type] ?? caseData.dispute_type;
-    if (!caseData.dispute_subtype) return main;
-    const sub = DISPUTE_SUBTYPE_LABELS[caseData.dispute_subtype] ?? caseData.dispute_subtype;
-    return `${main} — ${sub}`;
-  }, [caseData]);
+  const arbKonusu = useMemo(
+    () => formatDisputeType(caseData?.dispute_type, caseData?.dispute_subtype),
+    [caseData],
+  );
 
   const sonGunTarihi = caseData?.deadline_extended ?? caseData?.deadline_total ?? null;
 

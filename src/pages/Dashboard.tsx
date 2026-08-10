@@ -48,6 +48,7 @@ import { AppNavbar } from "@/components/AppNavbar";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDisputeType } from "@/lib/disputeLabels";
 
 const TOTAL_PHASES = 8;
 
@@ -57,6 +58,7 @@ interface CaseRow {
   title: string | null;
   category: string | null;
   dispute_type: string | null;
+  dispute_subtype: string | null;
   your_name: string | null;
   other_party_name: string | null;
   assigned_mediator_id: string | null;
@@ -316,7 +318,7 @@ export default function Dashboard() {
       supabase
         .from("cases")
         .select(
-          "id,status,title,category,dispute_type,your_name,other_party_name,assigned_mediator_id,current_phase,ai_summary,deadline_total,deadline_extended,created_at,updated_at",
+          "id,status,title,category,dispute_type,dispute_subtype,your_name,other_party_name,assigned_mediator_id,current_phase,ai_summary,deadline_total,deadline_extended,created_at,updated_at",
         )
         .order("updated_at", { ascending: false }),
       supabase
@@ -766,7 +768,7 @@ export default function Dashboard() {
                         </span>
                       ) : (
                         <Badge variant="outline" className="text-[10px] border-sidebar-foreground/20 text-sidebar-foreground/55">
-                          {c.category || c.dispute_type || "—"}
+                          {c.category || formatDisputeType(c.dispute_type, c.dispute_subtype)}
                         </Badge>
                       )}
                     </div>

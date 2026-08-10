@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDisputeType } from "@/lib/disputeLabels";
 
 interface CaseRow {
   id: string;
@@ -18,6 +19,7 @@ interface CaseRow {
   title: string | null;
   application_no: string | null;
   dispute_type: string | null;
+  dispute_subtype: string | null;
   your_name: string | null;
   other_party_name: string | null;
   outcome: string | null;
@@ -60,7 +62,7 @@ export default function Cases() {
     (async () => {
       const { data } = await supabase
         .from("cases")
-        .select("id,status,title,application_no,dispute_type,your_name,other_party_name,outcome,deadline_total,created_at,updated_at")
+        .select("id,status,title,application_no,dispute_type,dispute_subtype,your_name,other_party_name,outcome,deadline_total,created_at,updated_at")
         .order("updated_at", { ascending: false });
       setCases((data as CaseRow[]) ?? []);
       setLoading(false);
@@ -131,7 +133,7 @@ export default function Cases() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-xs text-muted-foreground">{c.application_no ?? "—"}</span>
                         <Badge variant="secondary">Aşama {phase}/8</Badge>
-                        {c.dispute_type && <Badge variant="outline">{c.dispute_type}</Badge>}
+                        {c.dispute_type && <Badge variant="outline">{formatDisputeType(c.dispute_type, c.dispute_subtype)}</Badge>}
                       </div>
                       <h3 className="font-medium mt-1 truncate">
                         {c.title || `${c.your_name ?? "Taraf 1"} vs ${c.other_party_name ?? "Taraf 2"}`}

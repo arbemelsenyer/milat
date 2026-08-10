@@ -11,12 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDisputeType } from "@/lib/disputeLabels";
 
 interface Row {
   id: string;
   title: string | null;
   application_no: string | null;
   dispute_type: string | null;
+  dispute_subtype: string | null;
   your_name: string | null;
   other_party_name: string | null;
   outcome: string | null;
@@ -42,7 +44,7 @@ export default function Archive() {
     (async () => {
       const { data } = await supabase
         .from("cases")
-        .select("id,title,application_no,dispute_type,your_name,other_party_name,outcome,status,updated_at")
+        .select("id,title,application_no,dispute_type,dispute_subtype,your_name,other_party_name,outcome,status,updated_at")
         .order("updated_at", { ascending: false });
       const closed = (data as Row[] ?? []).filter(
         (r) => CLOSED_STATUSES.includes(r.status) || ["anlasma", "anlasamama"].includes(r.outcome ?? "")
@@ -95,7 +97,7 @@ export default function Archive() {
             <SelectTrigger><SelectValue placeholder="Tür" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tüm türler</SelectItem>
-              {types.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              {types.map((t) => <SelectItem key={t} value={t}>{formatDisputeType(t)}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -117,7 +119,7 @@ export default function Archive() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono text-xs text-muted-foreground">{r.application_no ?? "—"}</span>
-                      {r.dispute_type && <Badge variant="outline">{r.dispute_type}</Badge>}
+                      {r.dispute_type && <Badge variant="outline">{formatDisputeType(r.dispute_type, r.dispute_subtype)}</Badge>}
                       <Badge variant={r.outcome === "anlasma" ? "default" : "secondary"}>
                         {r.outcome === "anlasma" ? "Anlaşma" : r.outcome === "anlasamama" ? "Anlaşamama" : "Kapandı"}
                       </Badge>
