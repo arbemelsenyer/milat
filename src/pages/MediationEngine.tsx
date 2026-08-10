@@ -4645,14 +4645,19 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
           </motion.div>
         )}
 
-        {/* ── 4. DETAYLAR — varsayılan kapalı; kokpitin geri kalanı ve eski sekmelerin
-            tamamı burada, hiçbir bölüm silinmeden ── */}
+        {/* ── 4. ESKİ SEKMELER — kokpitin geri kalanı ve eski sekmelerin tamamı
+            burada; hiçbir bölüm silinmeden, tıklanabilir sekmelere dağıtılmış ── */}
         <motion.div variants={itemVariants}>
-          <details open className="rounded-2xl border border-border bg-muted/20">
-            <summary className="cursor-pointer select-none px-4 py-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">
-              Ortak Zemin · Strateji · Kör Teklif
-            </summary>
-            <div className="px-4 pb-4 space-y-6">
+          <Tabs defaultValue="genel-bakis" className="space-y-4">
+            <TabsList className="flex-wrap h-auto">
+              <TabsTrigger value="genel-bakis" className={tabTriggerAccentClass}><LayoutDashboard className="h-4 w-4 mr-1" />Genel Bakış</TabsTrigger>
+              <TabsTrigger value="taraf-analizleri" className={tabTriggerAccentClass}><Users className="h-4 w-4 mr-1" />Taraf Analizleri</TabsTrigger>
+              <TabsTrigger value="ortak-zemin" className={tabTriggerAccentClass}><Lightbulb className="h-4 w-4 mr-1" />Ortak Zemin</TabsTrigger>
+              <TabsTrigger value="strateji" className={tabTriggerAccentClass}><Target className="h-4 w-4 mr-1" />Strateji</TabsTrigger>
+              <TabsTrigger value="kor-teklif" className={tabTriggerAccentClass}><EyeOff className="h-4 w-4 mr-1" />Kör Teklif</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="genel-bakis" className="space-y-6">
 
               {report && analyses.length > 0 && (
                 <div className="flex justify-end gap-2">
@@ -4764,6 +4769,9 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                 </div>
               )}
 
+            </TabsContent>
+
+            <TabsContent value="taraf-analizleri" className="space-y-6">
               {/* Taraf Analizleri (eski sekme) */}
               {analyses.length > 0 && (
                 <div>
@@ -4784,6 +4792,9 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                 </div>
               )}
 
+            </TabsContent>
+
+            <TabsContent value="ortak-zemin" className="space-y-6">
               {/* Ortak Zemin Raporu (eski sekme) */}
               <div>
                 <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
@@ -4824,6 +4835,9 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                 )}
               </div>
 
+            </TabsContent>
+
+            <TabsContent value="strateji" className="space-y-6">
               {/* Strateji (eski sekme) */}
               <div>
                 <h3 className="font-semibold mb-2">Strateji</h3>
@@ -4834,13 +4848,16 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                 )}
               </div>
 
+            </TabsContent>
+
+            <TabsContent value="kor-teklif" className="space-y-6">
               {/* Kör Teklif (eski sekme) */}
               <div>
                 <h3 className="font-semibold mb-2">Kör Teklif</h3>
                 <BlindBidMediatorPanel caseId={caseRow.id} />
               </div>
-            </div>
-          </details>
+            </TabsContent>
+          </Tabs>
         </motion.div>
 
         <motion.div variants={itemVariants} className="border rounded-md px-3 py-2 bg-muted/30 flex items-center gap-2 flex-wrap">
