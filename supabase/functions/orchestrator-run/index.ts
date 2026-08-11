@@ -9,7 +9,9 @@
 // (belge üretimi mediator kontrolünde) — bu zincire dahil edilmedi.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
-declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
+// Takılı koşu eşiği: bu süreden eski, hâlâ "running" görünen orchestrator satırı
+// yarıda kalmış bir koşudur; yeni koşu başlarken kapatılır.
+const STALE_RUNNING_MS = 30 * 60 * 1000;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,11 +24,12 @@ type Admin = ReturnType<typeof createClient>;
 async function upsertOrchestratorState(admin: Admin, case_id: string, patch: Record<string, unknown>) {
   const { data: existing } = await admin.from("agent_states")
     .select("id").eq("case_id", case_id).eq("agent_type", "orchestrator").is("party_id", null).maybeSingle();
-  if (existing?.id) {
-    await admin.from("agent_states").update(patch).eq("id", existing.id);
-  } else {
-    await admin.from("agent_states").insert({ case_id, agent_type: "orchestrator", party_id: null, ...patch });
-  }
+  // supabase-js DB hatasını FIRLATMAZ, {error} olarak döndürür — kontrol edilmezse
+  // yazım sessizce düşer ve satır eski durumunda ("running") asılı kalır.
+  const { error } = existing?.id
+    ? await admin.from("agent_states").update(patch).eq("id", existing.id)
+    : await admin.from("agent_states").insert({ case_id, agent_type: "orchestrator", party_id: null, ...patch });
+  if (error) throw error;
 }
 
 // Bir adımı ATLARKEN, o adımın KENDİ agent_states satırını (mevcut function'ların yazdığı
@@ -60,6 +63,12 @@ Deno.serve(async (req) => {
 
   let admin: Admin | null = null;
   let case_id: string | undefined;
+  // chainStarted: orchestrator satırı açıldı mı (yetki/doğrulama dönüşlerinde satır
+  // hiç yazılmadığı için finally'nin dokunmaması gerekir).
+  // terminalWritten: completed/failed yazımı yapıldı mı — finally yalnız yazılmadıysa
+  // devreye girer ve fail()'in özel mesajının üzerine yazmaz.
+  let chainStarted = false;
+  let terminalWritten = false;
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -97,7 +106,7 @@ Deno.serve(async (req) => {
     // zinciri burada durdur (multi-agent-negotiation'daki throw deseniyle aynı sertlikte).
     const fail = async (agent_type: string, party_id: string | null, message: string) => {
       const errorSummary = message.slice(0, 300);
-      await Promise.allSettled([
+      const settled = await Promise.allSettled([
         upsertOrchestratorState(finalAdmin, finalCaseId, {
           status: "failed",
           error_message: `${agent_type} adımında durdu: ${errorSummary}`,
@@ -120,14 +129,46 @@ Deno.serve(async (req) => {
             })
           : Promise.resolve(),
       ]);
+      // Terminal durum burada yazıldıysa finally üzerine yazmasın. Yazım düştüyse
+      // bayrak açılmaz ve finally satırı yine de terminal duruma getirir.
+      terminalWritten = settled[0].status === "fulfilled";
       return new Response(JSON.stringify({ error: `${agent_type} failed`, detail: errorSummary, steps }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     };
 
-    await upsertOrchestratorState(admin, case_id, {
-      status: "running", error_message: null, last_output: { current_step: "classify_dispute" },
-    });
+    // Ara ilerleme yazımları BEST-EFFORT: geçici bir agent_states hatası zinciri
+    // durdurmasın. Terminal durum yazımı (completed/failed) ise strict — doğrulanır.
+    const progress = async (current_step: string) => {
+      try {
+        await upsertOrchestratorState(finalAdmin, finalCaseId, {
+          status: "running", error_message: null, last_output: { current_step },
+        });
+      } catch (e: any) {
+        console.error(`[orchestrator-run] ilerleme yazımı başarısız (${current_step}): ${e?.message ?? String(e)}`);
+      }
+    };
+
+    // Takılı koşu temizliği: 30 dakikadan eski, hâlâ "running" duran orchestrator satırı
+    // yarıda kalmış bir koşudur (canlıda görüldü: ortak zemin bitti, terminal durum
+    // yazılmadı, panel sonsuza kadar döndü). Yeni koşuyu engellemesin diye kapatılır.
+    // Kendi satırımızı yazmadan ÖNCE çalışır. Best-effort: hatası zinciri durdurmaz.
+    try {
+      const { data: stale } = await admin.from("agent_states")
+        .select("id, status, updated_at").eq("case_id", case_id)
+        .eq("agent_type", "orchestrator").is("party_id", null).maybeSingle();
+      if (stale?.status === "running" && Date.now() - new Date(stale.updated_at as string).getTime() > STALE_RUNNING_MS) {
+        await admin.from("agent_states")
+          .update({ status: "failed", error_message: "önceki koşu yarıda kaldı" })
+          .eq("id", stale.id);
+        console.log(`[orchestrator-run] takılı kalmış önceki koşu kapatıldı: case=${case_id}`);
+      }
+    } catch (e: any) {
+      console.error(`[orchestrator-run] takılı koşu temizliği başarısız: ${e?.message ?? String(e)}`);
+    }
+
+    chainStarted = true;
+    await progress("classify_dispute");
 
     // ---- 1) classify-dispute ----
     const classifyText = (caseRow.issue_description || caseRow.title || "").trim();
@@ -142,9 +183,7 @@ Deno.serve(async (req) => {
       steps.push({ step: "classify_dispute", status: "completed", detail: disputeType ?? undefined });
     }
 
-    await upsertOrchestratorState(admin, case_id, {
-      status: "running", error_message: null, last_output: { current_step: "deadline_detect" },
-    });
+    await progress("deadline_detect");
 
     // ---- 2) detect-legal-deadlines ----
     if (!disputeType) {
@@ -158,9 +197,7 @@ Deno.serve(async (req) => {
       steps.push({ step: "deadline_detect", status: "completed" });
     }
 
-    await upsertOrchestratorState(admin, case_id, {
-      status: "running", error_message: null, last_output: { current_step: "party_analysis" },
-    });
+    await progress("party_analysis");
 
     // ---- 3) party-confidential-analysis (her taraf) ----
     const { data: parties } = await admin.from("case_parties").select("id").eq("case_id", case_id);
@@ -190,9 +227,7 @@ Deno.serve(async (req) => {
         steps.push({ step: be.step, status: "skipped", detail: "taraf yok" });
         continue;
       }
-      await upsertOrchestratorState(admin, case_id, {
-        status: "running", error_message: null, last_output: { current_step: be.step },
-      });
+      await progress(be.step);
       const failures: string[] = [];
       for (const p of parties) {
         try {
@@ -214,34 +249,50 @@ Deno.serve(async (req) => {
       }
     }
 
-    await upsertOrchestratorState(admin, case_id, {
-      status: "running", error_message: null, last_output: { current_step: "common_ground" },
-    });
+    await progress("common_ground");
 
     // ---- 4) common-ground-report ----
     const r = await callFn(supabaseUrl, authHeader, anonKey, "common-ground-report", { case_id });
     if (!r.ok) return await fail("common_ground", null, r.json?.error ?? `HTTP ${r.status}`);
     steps.push({ step: "common_ground", status: "completed" });
 
-    EdgeRuntime.waitUntil(
-      upsertOrchestratorState(finalAdmin, finalCaseId, {
-        status: "completed", error_message: null, last_output: { steps },
-      }).catch(() => {})
-    );
+    // "completed" yazımı artık AWAIT ediliyor. Eskiden EdgeRuntime.waitUntil ile
+    // gönderiliyordu; cevap dönerken izolat sonlandığında bu yazım kayboluyordu —
+    // canlıda ortak zemin bittiği hâlde satır "running" kaldı (11.08 09:56 koşusu).
+    await upsertOrchestratorState(finalAdmin, finalCaseId, {
+      status: "completed", error_message: null, last_output: { steps },
+    });
+    terminalWritten = true;
 
     return new Response(JSON.stringify({ success: true, steps }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
     if (admin && case_id) {
-      const finalAdmin = admin, finalCaseId = case_id;
       const errorSummary = String(e?.message ?? "unknown error").slice(0, 300);
-      EdgeRuntime.waitUntil(
-        upsertOrchestratorState(finalAdmin, finalCaseId, { status: "failed", error_message: errorSummary }).catch(() => {})
-      );
+      try {
+        await upsertOrchestratorState(admin, case_id, { status: "failed", error_message: errorSummary });
+        terminalWritten = true;
+      } catch (stateErr: any) {
+        console.error(`[orchestrator-run] hata durumu yazılamadı: ${stateErr?.message ?? String(stateErr)}`);
+      }
     }
     return new Response(JSON.stringify({ error: String(e?.message ?? e) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+  } finally {
+    // MUTLAK GARANTİ: zincir hangi yoldan çıkarsa çıksın orchestrator satırı terminal
+    // duruma gelir. Yukarıdaki yollardan biri zaten yazdıysa (terminalWritten) burası
+    // dokunmaz; hiçbiri yazamadıysa satır "running" olarak asılı kalmasın diye kapatılır.
+    if (chainStarted && !terminalWritten && admin && case_id) {
+      try {
+        await upsertOrchestratorState(admin, case_id, {
+          status: "failed",
+          error_message: "koşu terminal durum yazılmadan sonlandı",
+        });
+      } catch (e: any) {
+        console.error(`[orchestrator-run] finally terminal durum yazımı başarısız: ${e?.message ?? String(e)}`);
+      }
+    }
   }
 });

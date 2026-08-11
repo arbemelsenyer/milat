@@ -11,8 +11,14 @@ const corsHeaders = {
 };
 
 // Ajan Kontrol Paneli ilerleme satırı — party-confidential-analysis'teki agent_states
-// yazımının aynısı. Yalnız durum yazılır, analiz içeriği ASLA buraya girmez; buradaki
-// hata ana akışı durdurmaz (her çağrı kendi try-catch'i içinde).
+// yazımının aynısı (aynı kolonlar, aynı case_id+agent_type+party_id anahtarı). Yalnız
+// durum yazılır, analiz içeriği ASLA buraya girmez; buradaki hata ana akışı durdurmaz.
+//
+// DURUM DEĞERLERİ: agent_states.status bir CHECK kısıtıyla sınırlı —
+// ('pending','running','completed','failed','flagged'). 'error' kabul EDİLMİYOR, bu
+// yüzden hata yolunda 'failed' yazılır (kısıtın izin verdiği hata değeri budur).
+// agent_type için de CHECK kısıtı var; 'party_consistency' değerinin kısıta eklenmiş
+// olması ŞART — eklenmezse insert reddedilir ve panelde hiç satır görünmez.
 const AGENT_TYPE = "party_consistency";
 
 async function upsertConsistencyState(
@@ -23,11 +29,12 @@ async function upsertConsistencyState(
 ) {
   const { data: existing } = await admin.from("agent_states")
     .select("id").eq("case_id", case_id).eq("agent_type", AGENT_TYPE).eq("party_id", party_id).maybeSingle();
-  if (existing?.id) {
-    await admin.from("agent_states").update(patch).eq("id", existing.id);
-  } else {
-    await admin.from("agent_states").insert({ case_id, agent_type: AGENT_TYPE, party_id, ...patch });
-  }
+  // supabase-js DB hatasını FIRLATMAZ, {error} olarak döndürür — kontrol edilmezse
+  // CHECK kısıtı ihlali sessizce yutulur ve satır hiç oluşmaz. Bu yüzden açıkça atılır.
+  const { error } = existing?.id
+    ? await admin.from("agent_states").update(patch).eq("id", existing.id)
+    : await admin.from("agent_states").insert({ case_id, agent_type: AGENT_TYPE, party_id, ...patch });
+  if (error) throw error;
 }
 
 // Belge içerik bütçesi — party-confidential-analysis/index.ts kalıbının aynısı.
@@ -58,8 +65,13 @@ Deno.serve(async (req) => {
   let statePartyId: string | null = null;
   const writeState = async (patch: Record<string, unknown>) => {
     if (!stateAdmin || !stateCaseId || !statePartyId) return;
-    try { await upsertConsistencyState(stateAdmin, stateCaseId, statePartyId, patch); }
-    catch { /* ilerleme satırı kritik değil */ }
+    try {
+      await upsertConsistencyState(stateAdmin, stateCaseId, statePartyId, patch);
+    } catch (e: any) {
+      // Best-effort: ana akış DURMAZ. Ama sessiz de kalmaz — kısıt ihlali gibi kalıcı
+      // hatalar (agent_type/status CHECK) ancak logda görülerek fark edilebiliyor.
+      console.error(`[party-consistency-check] agent_states yazımı başarısız: ${e?.message ?? String(e)}`);
+    }
   };
   const step = (current_step: string) =>
     writeState({ status: "running", error_message: null, last_output: { current_step } });
