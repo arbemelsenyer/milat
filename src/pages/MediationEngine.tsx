@@ -319,7 +319,7 @@ export default function MediationEngine() {
   const [phase3Complete, setPhase3Complete] = useState(false);
   // Faz 4 kokpitinin bildirdiği bölüm listesi (sol menüdeki alt katman) ve
   // menüden gelen "şu bölümü aç" isteği. Faz 4 dışında liste boş kalır.
-  const [cockpitSections, setCockpitSections] = useState<{ id: string; label: string }[]>([]);
+  const [cockpitSections, setCockpitSections] = useState<{ id: string; label: string; kind: "layer" | "section"; hint?: string }[]>([]);
   const [cockpitJump, setCockpitJump] = useState<{ id: string; nonce: number } | null>(null);
   const [phaseStatus, setPhaseStatus] = useState<Record<number, boolean>>({});
   const [deleteTarget, setDeleteTarget] = useState<CaseRow | null>(null);
@@ -703,10 +703,15 @@ export default function MediationEngine() {
                   <div className="mt-1 mb-1 space-y-0.5">
                     {cockpitSections.map((sec) => (
                       <button
-                        key={sec.id}
+                        key={`${sec.kind}-${sec.id}`}
                         type="button"
+                        title={sec.hint}
                         onClick={() => setCockpitJump({ id: sec.id, nonce: Date.now() })}
-                        className="w-full text-left pl-11 pr-3 py-1 rounded-md text-xs text-sidebar-foreground/70 transition-colors hover:text-accent hover:bg-sidebar-accent/40"
+                        className={
+                          sec.kind === "layer"
+                            ? "w-full text-left pl-8 pr-3 pt-2 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/45 transition-colors hover:text-accent"
+                            : "w-full text-left pl-11 pr-3 py-1 rounded-md text-xs text-sidebar-foreground/70 transition-colors hover:text-accent hover:bg-sidebar-accent/40"
+                        }
                       >
                         {sec.label}
                       </button>
@@ -957,7 +962,7 @@ function NextPhaseButton({ phase, onAdvance }: { phase: number; onAdvance: (n: n
 function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance, onCockpitSections, cockpitJump }: {
   phase: number; caseRow: CaseRow; reload: () => void; isMediator: boolean; userId: string;
   onAdvance: (n: number) => void;
-  onCockpitSections?: (sections: { id: string; label: string }[]) => void;
+  onCockpitSections?: (sections: { id: string; label: string; kind: "layer" | "section"; hint?: string }[]) => void;
   cockpitJump?: { id: string; nonce: number } | null;
 }) {
   async function bumpPhase(next: number) {
@@ -3751,7 +3756,7 @@ th{background:#f0fdfa;color:#0f766e}
 
 <h2>Uzlaşma Alanı (ZOPA)</h2>${zopaHtml}
 
-<h2>Taraf Karşılaştırması</h2>${comparisonHtml}
+<h2>Güçlü ve Zayıf Yanlar</h2>${comparisonHtml}
 
 <h2>Çözüm Senaryoları</h2>${scenariosHtml}
 
@@ -3865,9 +3870,9 @@ function printSectionsPdf(opts: {
 // sağda kısa özet + ok; içerik tıklanınca açılır. Kutu içinde kutu olmaması için
 // Card yerine ince üst ayraç kullanılır — Faz 3'teki etkileşimin aynısı.
 function CockpitCollapsible({
-  id, title, summary, open, onToggle, onPdf, children,
+  id, title, summary, hint, open, onToggle, onPdf, children,
 }: {
-  id: string; title: string; summary?: string; open: boolean; onToggle: () => void;
+  id: string; title: string; summary?: string; hint?: string; open: boolean; onToggle: () => void;
   // Yalnız çıktısı olan bölümlerde dolu gelir; boşsa PDF düğmesi hiç çizilmez.
   onPdf?: () => void;
   children: React.ReactNode;
@@ -3878,6 +3883,7 @@ function CockpitCollapsible({
         <button
           type="button"
           onClick={onToggle}
+          title={hint}
           className="flex-1 min-w-0 flex items-center justify-between gap-3 py-3 hover:bg-accent/30 transition text-left"
         >
           <span className="text-sm font-medium truncate">{title}</span>
@@ -4141,7 +4147,7 @@ function CockpitOfficialComparisonTable({ items }: { items: any[] }) {
   if (items.length === 0) return null;
   return (
     <div className="space-y-3">
-      <div className="text-sm font-semibold text-primary">Resmi taraf karşılaştırması</div>
+      <div className="text-sm font-semibold text-primary">Güçlü ve zayıf yanlar</div>
       <div className="grid sm:grid-cols-2 gap-4">
         {items.map((t: any, i: number) => (
           <div key={i} className="space-y-1">
@@ -4332,7 +4338,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   caseRow: CaseRow;
   // Sol menüdeki alt katmanı besler: hangi bölümlerin verisi var. Yeni sorgu yok —
   // liste, bu bileşenin zaten okuduğu state'ten türetilir.
-  onSectionsChange?: (sections: { id: string; label: string }[]) => void;
+  onSectionsChange?: (sections: { id: string; label: string; kind: "layer" | "section"; hint?: string }[]) => void;
   // Sol menüden gelen "şu bölümü aç ve oraya kay" isteği; nonce her tıklamada artar.
   jump?: { id: string; nonce: number } | null;
 }) {
@@ -4620,8 +4626,30 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   // hiç girmez — başlığı da görünmez.
   type CockpitSectionDef = {
     id: string; layer: string; title: string; summary?: string; body: React.ReactNode;
+    // Başlığa ve sol menü satırına bağlanan tek cümlelik ipucu (title/tooltip).
+    hint?: string;
     // PDF alanı yalnız çıktısı olan bölümlerde dolar — düğme de yalnız o zaman çıkar.
     pdf?: { confidential: boolean; html: () => string };
+  };
+  // Bölüm ipuçları tek yerde: hem sağdaki başlıkta hem sol menüde aynı metin görünür.
+  const SECTION_HINTS: Record<string, string> = {
+    "kokpit-kok-neden": "Tarafların görünen talebinin altındaki asıl mesele",
+    "kokpit-siradaki-sorular": "Bir sonraki oturumda sorulacak sorular",
+    "kokpit-ic-tutarlilik": "Tarafın kendi beyanı ile kendi belgesi arasındaki uyumsuzluk",
+    "kokpit-rapora-girmeyenler": "Ajanın değerlendirip rapora almadığı hususlar ve nedenleri",
+    "kokpit-iletisim": "Tarafın nasıl konuştuğundan çıkan izler",
+    "kokpit-uzlasma-zopa": "Anlaşma olasılığı ve olası anlaşma aralığı",
+    "kokpit-taraf-karsilastirma": "Dava yoluna gidilirse ne olur",
+    "kokpit-resmi-karsilastirma": "Her tarafın elindeki güçlü ve zayıf noktalar",
+    "kokpit-senaryolar": "Masaya konabilecek olası çözüm biçimleri",
+    "kokpit-kritik-faktorler": "Sonucu belirleyecek ana etkenler",
+    "kokpit-kirmizi-cizgiler": "Tarafların taviz vermeyeceğini belirttiği noktalar",
+    "kokpit-uzlasma-engelleri": "Müzakereyi tıkayabilecek konular",
+    "kokpit-arabulucu-onerisi": "Sistemin önerdiği yaklaşım",
+    "kokpit-kaynaklar": "Analizde kullanılan mevzuat ve kitap parçaları",
+    "kokpit-taraf-analizleri": "Her taraf için ayrıntılı analiz metni",
+    "kokpit-ortak-zemin": "İki tarafın kesişim alanı ve strateji",
+    "kokpit-kor-teklif": "Taraflar birbirini görmeden kabul aralığı girer",
   };
   const sectionDefs: CockpitSectionDef[] = [];
 
@@ -4804,7 +4832,8 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
 
   if (cockpitRows.length > 0) {
     sectionDefs.push({
-      id: "kokpit-taraf-karsilastirma", layer: LAYER_COCKPIT, title: "Taraf karşılaştırması",
+      // id DEĞİŞMEDİ (scrollIntoView bağlantıları kırılmasın); yalnız görünen ad.
+      id: "kokpit-taraf-karsilastirma", layer: LAYER_COCKPIT, title: "Risk ve mahkeme değerlendirmesi",
       summary: `${cockpitRows.length} taraf`,
       body: (
         <div className={`grid gap-6 ${cockpitRows.length > 1 ? "sm:grid-cols-2" : ""}`}>
@@ -4867,7 +4896,8 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
 
   if (cockpitTarafKarsilastirma.length > 0) {
     sectionDefs.push({
-      id: "kokpit-resmi-karsilastirma", layer: LAYER_COCKPIT, title: "Resmi taraf karşılaştırması",
+      // id DEĞİŞMEDİ (scrollIntoView bağlantıları kırılmasın); yalnız görünen ad.
+      id: "kokpit-resmi-karsilastirma", layer: LAYER_COCKPIT, title: "Güçlü ve zayıf yanlar",
       summary: `${cockpitTarafKarsilastirma.length} taraf`,
       body: <CockpitOfficialComparisonTable items={cockpitTarafKarsilastirma} />,
     });
@@ -5010,15 +5040,32 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   });
 
   const layerOrder = [LAYER_TABLE, LAYER_EVIDENCE, LAYER_COCKPIT, LAYER_REPORTS];
+  // Katman başlığının kendi çıpası (sol menüden katman adına tıklanınca oraya kayılır)
+  // ve başlığın altındaki tek satır açıklama; aynı açıklama menüde tooltip olur.
+  const LAYER_META: Record<string, { id: string; hint: string }> = {
+    [LAYER_TABLE]: { id: "kokpit-katman-masa", hint: "Oturuma girmeden bilmen gerekenler" },
+    [LAYER_EVIDENCE]: { id: "kokpit-katman-dayanak", hint: "Bulgular ve hangi belgeye dayandıkları" },
+    [LAYER_COCKPIT]: { id: "kokpit-katman-kokpit", hint: "Sayılarla durum: tahmin, senaryolar, engeller" },
+    [LAYER_REPORTS]: { id: "kokpit-katman-rapor", hint: "Tam metinler ve dışa aktarma" },
+  };
   // Çıktısı olan bölümler — hem tekil PDF düğmesi hem birleşik rapor seçim listesi buradan.
   const pdfSections = sectionDefs.filter((x) => !!x.pdf);
 
   // Sol menüye bölüm listesini bildir. Liste her renderda yeniden kurulduğu için
   // yalnız id+başlık dizisi değiştiğinde gönderilir (imza karşılaştırması).
-  const sectionSignature = sectionDefs.map((s) => `${s.id}|${s.title}`).join(",");
+  // Sol menüye giden liste iki kademeli: katman başlığı + o katmanın bölümleri,
+  // sağdaki sırayla birebir. Görünen bölümü olmayan katman listeye hiç girmez.
+  const menuEntries: { id: string; label: string; kind: "layer" | "section"; hint?: string }[] = [];
+  layerOrder.forEach((layer) => {
+    const items = sectionDefs.filter((x) => x.layer === layer);
+    if (items.length === 0) return;
+    menuEntries.push({ id: LAYER_META[layer].id, label: layer, kind: "layer", hint: LAYER_META[layer].hint });
+    items.forEach((x) => menuEntries.push({ id: x.id, label: x.title, kind: "section", hint: SECTION_HINTS[x.id] }));
+  });
+  const sectionSignature = menuEntries.map((x) => `${x.kind}:${x.id}|${x.label}`).join(",");
   const sectionsReady = !loading && !loadErr;
   useEffect(() => {
-    onSectionsChange?.(sectionsReady ? sectionDefs.map((s) => ({ id: s.id, label: s.title })) : []);
+    onSectionsChange?.(sectionsReady ? menuEntries : []);
     return () => onSectionsChange?.([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectionSignature, sectionsReady, onSectionsChange]);
@@ -5026,7 +5073,10 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   // Sol menüden gelen istek: bölümü aç, sonra oraya yumuşak kaydır.
   useEffect(() => {
     if (!jump?.id) return;
-    setOpenSections((prev) => (prev.has(jump.id) ? prev : new Set(prev).add(jump.id)));
+    // Katman çıpasında açılacak bir bölüm yok — yalnız oraya kaydırılır.
+    if (!jump.id.startsWith("kokpit-katman-")) {
+      setOpenSections((prev) => (prev.has(jump.id) ? prev : new Set(prev).add(jump.id)));
+    }
     const t = setTimeout(() => {
       document.getElementById(jump.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 60);
@@ -5132,9 +5182,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
           const items = sectionDefs.filter((s) => s.layer === layer);
           if (items.length === 0) return null;
           return (
-            <motion.div key={layer} variants={itemVariants} className={cockpitLayerBoxClass}>
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-lg font-semibold">{layer}</div>
+            <motion.div key={layer} id={LAYER_META[layer].id} variants={itemVariants} className={`${cockpitLayerBoxClass} scroll-mt-24`}>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-lg font-semibold">{layer}</div>
+                  <p className="text-sm text-muted-foreground">{LAYER_META[layer].hint}</p>
+                </div>
                 {layer === LAYER_REPORTS && pdfSections.length > 0 && (
                   <Button size="sm" variant="outline" onClick={() => {
                     setPickedSections(new Set(pdfSections.map((x) => x.id)));
@@ -5151,6 +5204,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
                     id={s.id}
                     title={s.title}
                     summary={s.summary}
+                    hint={SECTION_HINTS[s.id]}
                     open={openSections.has(s.id)}
                     onToggle={() => toggleSection(s.id)}
                     onPdf={s.pdf ? () => printSectionsPdf({
