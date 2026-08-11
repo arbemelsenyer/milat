@@ -1532,8 +1532,8 @@ function DisputeClassifierCard({
   const [result, setResult] = useState<{ kategori: string; guven_skoru: number; gerekce: string; ilgili_kanun: string[] } | null>(null);
   const [manual, setManual] = useState<string>(caseRow.dispute_type ?? "");
   // Alt uzmanlık alanı ayrı bir kolon (cases.dispute_subtype) ve ayrı bir menü.
-  // classify-dispute alt_uzmanlik döndürüyor ama YALNIZ dispute_type'ı yazıyor;
-  // alt uzmanlığın kaydı bu yüzden burada, ana türle aynı update kalıbıyla yapılır.
+  // AI önerisinin kaydını classify-dispute yapar; buradaki yazma yolu YALNIZ elle
+  // seçim içindir (manuel her zaman kazanır, bu yol silinirse seçim kaydedilmez).
   const [altUzmanlik, setAltUzmanlik] = useState<string>(caseRow.dispute_subtype || ALT_UZMANLIK_YOK);
   const [aiSuggestedSubtype, setAiSuggestedSubtype] = useState(false);
   const [savingManual, setSavingManual] = useState(false);
@@ -1551,14 +1551,14 @@ function DisputeClassifierCard({
       if ((data as any)?.error) throw new Error((data as any).error);
       setResult(data as any);
       setManual((data as any).kategori);
-      // AI'ın alt uzmanlık önerisi geçerliyse menüye ön-doldurulur ve rozetlenir;
-      // edge function bu kolonu yazmadığı için kayıt burada yapılır.
+      // AI'ın alt uzmanlık önerisi geçerliyse menüye ön-doldurulur ve rozetlenir.
+      // Kaydı classify-dispute persist:true akışında sunucu yazıyor (89f5c7e) —
+      // burada yalnız ekran durumu güncellenir, mükerrer yazma yapılmaz.
       const altUz = String((data as any)?.alt_uzmanlik ?? "");
       const validAlt = altUz !== ALT_UZMANLIK_YOK && ALT_UZMANLIK_ALANLARI.some((c) => c.value === altUz);
       if (validAlt) {
         setAltUzmanlik(altUz);
         setAiSuggestedSubtype(true);
-        await supabase.from("cases").update({ dispute_subtype: altUz } as any).eq("id", caseRow.id);
       }
       toast({
         title: "Tür tespiti tamamlandı",
