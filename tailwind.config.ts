@@ -25,9 +25,9 @@ export default {
         "3xl": ["34px", { lineHeight: "1.2" }],
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        heading: ["Space Grotesk", "system-ui", "sans-serif"],
-        display: ["Space Grotesk", "system-ui", "sans-serif"],
+        sans: ["Instrument Serif", "Inter", "Georgia", "serif"],
+        heading: ["Instrument Serif", "Inter", "Georgia", "serif"],
+        display: ["Instrument Serif", "Inter", "Georgia", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",
