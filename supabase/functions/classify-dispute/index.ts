@@ -185,7 +185,11 @@ KURALLAR:
     const result = { kategori, guven_skoru: guven, gerekce, ilgili_kanun, alt_uzmanlik };
 
     if (case_id && persist) {
-      await admin.from("cases").update({ dispute_type: kategori } as any).eq("id", case_id);
+      // Alt uzmanlık yalnız geçerli bir slug geldiğinde yazılır; "yok" veya geçersiz
+      // değer mevcut kaydı EZMEZ (kullanıcının elle seçtiği alt uzmanlık korunur).
+      const patch: Record<string, unknown> = { dispute_type: kategori };
+      if (alt_uzmanlik !== "yok") patch.dispute_subtype = alt_uzmanlik;
+      await admin.from("cases").update(patch as any).eq("id", case_id);
     }
 
     // Activity log: mark completed. Fire via waitUntil so it can't delay the response,
