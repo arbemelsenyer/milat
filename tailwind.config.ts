@@ -17,12 +17,12 @@ export default {
       // açık. Bileşenlerdeki text-* sınıfları değişmeden yeni ölçeği alır.
       fontSize: {
         xs: ["13px", { lineHeight: "1.5" }],
-        sm: ["15px", { lineHeight: "1.6" }],
-        base: ["16.5px", { lineHeight: "1.7" }],
-        lg: ["18px", { lineHeight: "1.6" }],
-        xl: ["20px", { lineHeight: "1.5" }],
-        "2xl": ["24px", { lineHeight: "1.4" }],
-        "3xl": ["30px", { lineHeight: "1.3" }],
+        sm: ["16px", { lineHeight: "1.6" }],
+        base: ["17px", { lineHeight: "1.7" }],
+        lg: ["20px", { lineHeight: "1.5" }],
+        xl: ["23px", { lineHeight: "1.4" }],
+        "2xl": ["28px", { lineHeight: "1.3" }],
+        "3xl": ["34px", { lineHeight: "1.2" }],
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],

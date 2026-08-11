@@ -46,7 +46,7 @@
     --input: 222 16% 88%;
     --ring: 222 47% 20%;
 
-    --radius: 0.625rem;
+    --radius: 1.125rem;
 
     --gradient-primary: linear-gradient(135deg, hsl(222 47% 20%), hsl(222 55% 38%));
     --gradient-accent: linear-gradient(135deg, hsl(43 65% 52%), hsl(43 70% 62%));
