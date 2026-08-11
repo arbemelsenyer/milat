@@ -3794,6 +3794,67 @@ function downloadCockpitBriefing(opts: {
   }
 }
 
+// ── Faz 4 bölüm PDF'i ────────────────────────────────────────────────────
+// Motor DEĞİŞMEDİ: kokpit brifingiyle birebir aynı akış — HTML string kurulur,
+// yeni sekmede açılır, window.print() ile PDF'e verilir. Türkçe karakterler aynı
+// yolla korunur (<meta charset="UTF-8"> + sistem fontu); yeni kütüphane yok.
+const pdfEsc = (v: any) => String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" } as any)[c]);
+const pdfList = (arr?: string[]) =>
+  arr && arr.length ? `<ul>${arr.map((x) => `<li>${pdfEsc(x)}</li>`).join("")}</ul>` : `<p class="muted">Yeterli veri yok</p>`;
+
+// Gizli bölümlerin HER SAYFASINA basılan alt bilgi. position:fixed olduğu için
+// yazdırmada her sayfada tekrarlanır — tarayıcıların standart davranışı.
+const PDF_CONFIDENTIAL_NOTE = "Arabulucuya özeldir — taraflarla paylaşılamaz";
+
+function buildSectionsPdfHtml(opts: {
+  caseTitle?: string; caseId: string; generatedAt: Date;
+  docTitle: string; confidential: boolean;
+  sections: { title: string; html: string }[];
+}): string {
+  const { caseTitle, caseId, generatedAt, docTitle, confidential, sections } = opts;
+  const dateLabel = generatedAt.toLocaleString("tr-TR");
+  return `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>${pdfEsc(docTitle)} — ${pdfEsc(caseTitle || caseId)}</title>
+<style>
+body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;max-width:780px;margin:20px auto;padding:0 20px;color:#1f2937;line-height:1.45;font-size:13px}
+h1{color:#0f766e;border-bottom:2px solid #0f766e;padding-bottom:5px;font-size:20px;margin-bottom:4px}
+h2{color:#0f766e;margin:16px 0 6px;border-bottom:1px solid #e5e7eb;padding-bottom:3px;font-size:14px}
+h4{margin:4px 0;font-size:13px}
+.muted{color:#6b7280;font-size:12px}
+.card{border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px;margin:6px 0;background:#f9fafb}
+ul,ol{padding-left:18px;margin:4px 0}
+table{width:100%;border-collapse:collapse;margin:6px 0;font-size:12px}
+th,td{border:1px solid #e5e7eb;padding:4px 6px;text-align:left;vertical-align:top}
+th{background:#f0fdfa;color:#0f766e}
+.meta{color:#6b7280;font-size:11px;margin-bottom:12px}
+.confidential{background:#fef2f2;border:2px solid #dc2626;color:#991b1b;font-weight:600;text-align:center;padding:6px 10px;border-radius:6px;margin-bottom:12px;font-size:12px}
+.quote{color:#374151;font-style:italic}
+.pagenote{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10px;color:#991b1b;border-top:1px solid #fecaca;background:#fff;padding:4px 0}
+@media print{body{margin:0;font-size:12px}.card{break-inside:avoid}h2{break-after:avoid}${confidential ? "body{padding-bottom:30px}" : ""}}
+</style></head><body>
+${confidential ? `<div class="confidential">GİZLİ — Yalnızca Arabulucu İçindir (6325 s.K. m.4/m.33)</div>` : ""}
+<h1>${pdfEsc(docTitle)}</h1>
+<div class="meta"><b>Başvuru:</b> ${pdfEsc(caseTitle || "—")} &nbsp;•&nbsp; <b>ID:</b> ${pdfEsc(caseId)} &nbsp;•&nbsp; <b>Oluşturulma:</b> ${dateLabel}</div>
+${sections.map((s) => `<h2>${pdfEsc(s.title)}</h2>${s.html}`).join("")}
+<div class="meta" style="margin-top:20px;text-align:center">MediPact AI tarafından oluşturuldu • ${dateLabel}</div>
+${confidential ? `<div class="pagenote">${pdfEsc(PDF_CONFIDENTIAL_NOTE)}</div>` : ""}
+</body></html>`;
+}
+
+function printSectionsPdf(opts: {
+  caseTitle?: string; caseId: string; docTitle: string; confidential: boolean;
+  sections: { title: string; html: string }[];
+}) {
+  const html = buildSectionsPdfHtml({ ...opts, generatedAt: new Date() });
+  const w = window.open("", "_blank");
+  if (!w) {
+    toast({ title: "PDF açılamadı", description: "Tarayıcı açılır pencereyi engelledi.", variant: "destructive" });
+    return;
+  }
+  w.document.write(html);
+  w.document.close();
+  w.onload = () => w.print();
+}
+
 /* ===================== PHASE 4 KOKPİT — Genel Bakış sekmesi bileşenleri ===================== */
 // Görsel dil Faz 3'teki P3Section kalıbıyla aynı: zemin beyaz, bölümler ince ayraçla
 // ayrılır, kutu içinde kutu yoktur. Renk YALNIZ durum rozetlerinde (risk seviyesi, güven
@@ -3804,23 +3865,39 @@ function downloadCockpitBriefing(opts: {
 // sağda kısa özet + ok; içerik tıklanınca açılır. Kutu içinde kutu olmaması için
 // Card yerine ince üst ayraç kullanılır — Faz 3'teki etkileşimin aynısı.
 function CockpitCollapsible({
-  id, title, summary, open, onToggle, children,
+  id, title, summary, open, onToggle, onPdf, children,
 }: {
-  id: string; title: string; summary?: string; open: boolean; onToggle: () => void; children: React.ReactNode;
+  id: string; title: string; summary?: string; open: boolean; onToggle: () => void;
+  // Yalnız çıktısı olan bölümlerde dolu gelir; boşsa PDF düğmesi hiç çizilmez.
+  onPdf?: () => void;
+  children: React.ReactNode;
 }) {
   return (
     <div id={id} className="border-t scroll-mt-24">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center justify-between gap-3 py-3 hover:bg-accent/30 transition text-left"
-      >
-        <span className="text-sm font-medium truncate">{title}</span>
-        <span className="flex items-center gap-2 shrink-0">
-          {summary && <span className="text-sm text-muted-foreground">{summary}</span>}
-          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </span>
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex-1 min-w-0 flex items-center justify-between gap-3 py-3 hover:bg-accent/30 transition text-left"
+        >
+          <span className="text-sm font-medium truncate">{title}</span>
+          <span className="flex items-center gap-2 shrink-0">
+            {summary && <span className="text-sm text-muted-foreground">{summary}</span>}
+            {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </span>
+        </button>
+        {onPdf && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-xs shrink-0"
+            onClick={onPdf}
+            title={`${title} — PDF`}
+          >
+            PDF
+          </Button>
+        )}
+      </div>
       {open && <div className="pb-4">{children}</div>}
     </div>
   );
@@ -4290,6 +4367,10 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   const [reportStatus, setReportStatus] = useState<string | null>(null);
   const [reportAttempt, setReportAttempt] = useState(0);
   const [openScenario, setOpenScenario] = useState<{ letter: string; scenario: any; recommended: boolean } | null>(null);
+  // "Rapor oluştur" seçim penceresi. Hook kuralı (a26bdd7): tüm useState'ler erken
+  // return'lerden ÖNCE, koşulsuz ve sabit sırada.
+  const [reportPickerOpen, setReportPickerOpen] = useState(false);
+  const [pickedSections, setPickedSections] = useState<Set<string>>(new Set());
 
   const fetchReport = useCallback(async () => {
     const { data, error } = await supabase
@@ -4537,7 +4618,11 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   // Her bölüm: sabit id (sol menüden derin bağlantı için), tek satırlık başlık,
   // veriden türetilen kısa özet ve bugünkü içeriği. Verisi olmayan bölüm listeye
   // hiç girmez — başlığı da görünmez.
-  type CockpitSectionDef = { id: string; layer: string; title: string; summary?: string; body: React.ReactNode };
+  type CockpitSectionDef = {
+    id: string; layer: string; title: string; summary?: string; body: React.ReactNode;
+    // PDF alanı yalnız çıktısı olan bölümlerde dolar — düğme de yalnız o zaman çıkar.
+    pdf?: { confidential: boolean; html: () => string };
+  };
   const sectionDefs: CockpitSectionDef[] = [];
 
   const LAYER_TABLE = "Masaya otururken";
@@ -4549,6 +4634,14 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     sectionDefs.push({
       id: "kokpit-kok-neden", layer: LAYER_TABLE, title: "Kök neden",
       summary: `${cockpitRows.length} kart`,
+      pdf: { confidential: true, html: () => cockpitRows.map((r) => {
+        const rc = r.party_id ? rootCauses[r.party_id] : undefined;
+        return `<div class="card"><h4>${pdfEsc(r.name)}${rc?.guven_seviyesi ? ` — güven: ${pdfEsc(rc.guven_seviyesi)}` : ""}</h4>`
+          + `<p><b>Görünen talep:</b> ${pdfEsc(safeText(rc?.gorunen_talep) || "—")}</p>`
+          + `<p><b>Asıl mesele:</b> ${pdfEsc(safeText(rc?.asil_mesele) || "—")}</p>`
+          + (safeText(rc?.dayanak) ? `<p class="muted"><b>Dayanak:</b> ${pdfEsc(safeText(rc?.dayanak))}</p>` : "")
+          + `</div>`;
+      }).join("") },
       body: (
         <div className={`grid gap-6 ${cockpitRows.length > 1 ? "sm:grid-cols-2" : ""}`}>
           {cockpitRows.map((r, i) => (
@@ -4562,6 +4655,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   if (communicationQuestions.length > 0) {
     sectionDefs.push({
       id: "kokpit-siradaki-sorular", layer: LAYER_TABLE, title: "Sıradaki 3 soru",
+      pdf: { confidential: true, html: () => `<ol>${communicationQuestions.map((it) => {
+        const soru = safeText(it.q?.soru);
+        const bosluk = safeText(it.q?.hangi_boslugu_kapatir);
+        if (!soru) return "";
+        return `<li>${pdfEsc(soru)}${bosluk ? `<div class="muted">Kapattığı boşluk: ${pdfEsc(bosluk)}</div>` : ""}</li>`;
+      }).join("")}</ol>` },
       body: (
         <ol className="space-y-2 list-decimal list-inside">
           {communicationQuestions.map((it, i) => {
@@ -4586,6 +4685,16 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     sectionDefs.push({
       id: "kokpit-ic-tutarlilik", layer: LAYER_EVIDENCE, title: "İç tutarlılık",
       summary: `${consistencyItems.length} bulgu`,
+      pdf: { confidential: true, html: () => consistencyItems.map((it) => {
+        const f = it.finding ?? {};
+        const taraf = it.party_id ? (worklogPartyNameById[it.party_id] ?? "") : "";
+        const conf = CONSISTENCY_CONFIDENCE_LABELS[String(f?.guven_seviyesi ?? "").toLowerCase()] ?? "";
+        return `<div class="card"><h4>${pdfEsc(safeText(f?.gozlem))}</h4>`
+          + `<p class="muted">${taraf ? `${pdfEsc(taraf)} • ` : ""}Güven: ${pdfEsc(conf || "—")}</p>`
+          + `<p><b>${pdfEsc(safeText(f?.dayanak_a?.kaynak) || "Dayanak 1")}:</b> <span class="quote">${pdfEsc(safeText(f?.dayanak_a?.alinti))}</span></p>`
+          + `<p><b>${pdfEsc(safeText(f?.dayanak_b?.kaynak) || "Dayanak 2")}:</b> <span class="quote">${pdfEsc(safeText(f?.dayanak_b?.alinti))}</span></p>`
+          + `</div>`;
+      }).join("") },
       body: (
         <>
           <p className="text-sm text-muted-foreground mb-2">
@@ -4609,6 +4718,16 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     sectionDefs.push({
       id: "kokpit-rapora-girmeyenler", layer: LAYER_EVIDENCE, title: "Rapora girmeyenler",
       summary: `${worklog.length} kayıt`,
+      pdf: { confidential: true, html: () => worklog.map((w: any) => {
+        const c = w?.content ?? {};
+        const taraf = w.party_id == null ? "Dosya geneli" : (worklogPartyNameById[w.party_id] ?? "");
+        const kategori = String(c?.kategori ?? "");
+        return `<div class="card"><h4>${pdfEsc(safeText(c?.husus) || "—")}</h4>`
+          + `<p class="muted">${pdfEsc(taraf)}${kategori ? ` • ${pdfEsc(WORKLOG_KATEGORI_LABELS[kategori] ?? kategori)}` : ""}</p>`
+          + (safeText(c?.neden_rapora_girmedi) ? `<p>${pdfEsc(safeText(c?.neden_rapora_girmedi))}</p>` : "")
+          + (safeText(c?.onerilen_adim) ? `<p><b>Önerilen adım:</b> ${pdfEsc(safeText(c?.onerilen_adim))}</p>` : "")
+          + `</div>`;
+      }).join("") },
       body: (
         <>
           <p className="text-sm text-muted-foreground mb-2">Ajanın değerlendirip rapora almadığı hususlar ve önerilen adımlar</p>
@@ -4633,6 +4752,18 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     sectionDefs.push({
       id: "kokpit-iletisim", layer: LAYER_EVIDENCE, title: "İletişim ve asıl ihtiyaç",
       summary: communicationItems.length > 0 ? `${communicationItems.length} iz` : "incelendi — bulgu yok",
+      pdf: { confidential: true, html: () => communicationItems.length === 0
+        ? `<p class="muted">Analiz çalıştı ancak doğrulanabilir bir iz bulunamadı.</p>`
+        : communicationItems.map((it) => {
+            const f = it.finding ?? {};
+            const taraf = it.party_id ? (worklogPartyNameById[it.party_id] ?? "") : "";
+            const izSlug = String(f?.iz_tipi ?? "").trim();
+            const conf = CONSISTENCY_CONFIDENCE_LABELS[String(f?.guven_seviyesi ?? "").toLowerCase()] ?? "";
+            return `<div class="card"><h4>${pdfEsc(safeText(f?.gozlem))}</h4>`
+              + `<p class="muted">${pdfEsc(COMMUNICATION_IZ_LABELS[izSlug] ?? izSlug)}${taraf ? ` • ${pdfEsc(taraf)}` : ""} • Güven: ${pdfEsc(conf || "—")}</p>`
+              + `<p><b>${pdfEsc(safeText(f?.dayanak?.kaynak) || "Dayanak")}:</b> <span class="quote">${pdfEsc(safeText(f?.dayanak?.alinti))}</span></p>`
+              + `</div>`;
+          }).join("") },
       body: (
         <>
           <p className="text-sm text-muted-foreground mb-2">
@@ -4761,6 +4892,11 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     sectionDefs.push({
       id: "kokpit-kaynaklar", layer: LAYER_COCKPIT, title: "Kaynaklar",
       summary: `${cockpitKaynakListesi.length}`,
+      // Taraflarla paylaşılabilir: gizlilik ibaresi BASILMAZ.
+      pdf: { confidential: false, html: () => `<ol>${cockpitKaynakListesi.map((name) => {
+        const src = matchSource(name, cockpitReportData?.sources);
+        return `<li>${pdfEsc(name)}${src?.url ? ` — ${pdfEsc(src.url)}` : ""}</li>`;
+      }).join("")}</ol>` },
       body: <CockpitSources items={cockpitKaynakListesi} sources={cockpitReportData?.sources} />,
     });
   }
@@ -4769,6 +4905,14 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     sectionDefs.push({
       id: "kokpit-taraf-analizleri", layer: LAYER_REPORTS, title: "Taraf analizleri",
       summary: `${analyses.length} taraf`,
+      pdf: { confidential: true, html: () => analyses.map((a: any, i: number) => {
+        const cp = a.case_parties || {};
+        const name = cp.company_name || `${cp.first_name ?? ""} ${cp.last_name ?? ""}`.trim() || `Taraf ${i + 1}`;
+        return `<div class="card"><h4>${pdfEsc(name)} (${pdfEsc(roleLabel(cp.party_role))})</h4>`
+          + (a.analysis?.dispute_area ? `<p><b>Uyuşmazlık türü:</b> ${pdfEsc(a.analysis.dispute_area)}</p>` : "")
+          + (a.analysis?.party_position?.batna ? `<p><b>BATNA:</b> ${pdfEsc(a.analysis.party_position.batna)}</p>` : "")
+          + `</div>`;
+      }).join("") },
       body: (
         <div className="divide-y">
           {analyses.map((a: any, i) => {
@@ -4791,6 +4935,20 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   sectionDefs.push({
     id: "kokpit-ortak-zemin", layer: LAYER_REPORTS, title: "Ortak zemin raporu",
     summary: report ? undefined : "üretilmedi",
+    // Taraflarla paylaşılabilir belge: gizlilik ibaresi BASILMAZ.
+    pdf: report?.report ? { confidential: false, html: () => {
+      const d: any = report.report ?? {};
+      const parts = [
+        safeList(d?.common_interests).length ? `<h4>Ortak çıkarlar</h4>${pdfList(safeList(d?.common_interests))}` : "",
+        d?.zopa ? `<h4>Uzlaşma alanı (ZOPA)</h4><p><b>Alt:</b> ${pdfEsc(d.zopa.lower_bound || "—")} • <b>Üst:</b> ${pdfEsc(d.zopa.upper_bound || "—")}</p><p>${pdfEsc(d.zopa.description || "")}</p>` : "",
+        Array.isArray(d?.scenarios) && d.scenarios.length
+          ? `<h4>Çözüm senaryoları</h4>` + d.scenarios.map((sc: any, i: number) =>
+              `<div class="card"><h4>${String.fromCharCode(65 + i)}) ${pdfEsc(sc?.label || "Senaryo")}</h4><p>${pdfEsc(sc?.summary || "")}</p>`
+              + (sc?.tradeoffs?.length ? pdfList(sc.tradeoffs) : "") + `</div>`).join("")
+          : "",
+      ].filter(Boolean);
+      return parts.length ? parts.join("") : `<p class="muted">Yeterli veri yok</p>`;
+    } } : undefined,
     body: (
       <div>
         <div className="flex items-center justify-end mb-2 gap-2 flex-wrap">
@@ -4832,6 +4990,16 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   if (report?.report) {
     sectionDefs.push({
       id: "kokpit-strateji", layer: LAYER_REPORTS, title: "Strateji",
+      pdf: { confidential: true, html: () => {
+        const d: any = report?.report ?? {};
+        const parts = [
+          safeList(d?.mediator_strategy?.opening).length ? `<h4>Açılış</h4>${pdfList(safeList(d?.mediator_strategy?.opening))}` : "",
+          safeList(d?.mediator_strategy?.caucus_focus).length ? `<h4>Özel oturum odağı</h4>${pdfList(safeList(d?.mediator_strategy?.caucus_focus))}` : "",
+          safeList(d?.mediator_strategy?.leverage_points).length ? `<h4>Kaldıraç noktaları</h4>${pdfList(safeList(d?.mediator_strategy?.leverage_points))}` : "",
+          safeList(d?.red_lines).length ? `<h4>Kırmızı çizgiler</h4>${pdfList(safeList(d?.red_lines))}` : "",
+        ].filter(Boolean);
+        return parts.length ? parts.join("") : `<p class="muted">Yeterli veri yok</p>`;
+      } },
       body: <CommonGroundStrategySection data={report.report} strategy={report.strategy} />,
     });
   }
@@ -4842,6 +5010,8 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   });
 
   const layerOrder = [LAYER_TABLE, LAYER_EVIDENCE, LAYER_COCKPIT, LAYER_REPORTS];
+  // Çıktısı olan bölümler — hem tekil PDF düğmesi hem birleşik rapor seçim listesi buradan.
+  const pdfSections = sectionDefs.filter((x) => !!x.pdf);
 
   // Sol menüye bölüm listesini bildir. Liste her renderda yeniden kurulduğu için
   // yalnız id+başlık dizisi değiştiğinde gönderilir (imza karşılaştırması).
@@ -4963,7 +5133,17 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
           if (items.length === 0) return null;
           return (
             <motion.div key={layer} variants={itemVariants} className={cockpitLayerBoxClass}>
-              <div className="text-lg font-semibold">{layer}</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-lg font-semibold">{layer}</div>
+                {layer === LAYER_REPORTS && pdfSections.length > 0 && (
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setPickedSections(new Set(pdfSections.map((x) => x.id)));
+                    setReportPickerOpen(true);
+                  }}>
+                    Rapor oluştur
+                  </Button>
+                )}
+              </div>
               <div>
                 {items.map((s) => (
                   <CockpitCollapsible
@@ -4973,6 +5153,11 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
                     summary={s.summary}
                     open={openSections.has(s.id)}
                     onToggle={() => toggleSection(s.id)}
+                    onPdf={s.pdf ? () => printSectionsPdf({
+                      caseTitle: caseRow.title, caseId: caseRow.id,
+                      docTitle: s.title, confidential: s.pdf!.confidential,
+                      sections: [{ title: s.title, html: s.pdf!.html() }],
+                    }) : undefined}
                   >
                     {s.body}
                   </CockpitCollapsible>
@@ -4994,6 +5179,61 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
         </motion.div>
       </motion.div>
     </Card>
+    <Dialog open={reportPickerOpen} onOpenChange={setReportPickerOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold">Rapor oluştur</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">Seçilen bölümler tek PDF'te birleştirilir.</p>
+          <div className="divide-y">
+            {pdfSections.map((x) => (
+              <label key={x.id} className="flex items-center gap-2 py-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={pickedSections.has(x.id)}
+                  onChange={() => setPickedSections((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(x.id)) next.delete(x.id); else next.add(x.id);
+                    return next;
+                  })}
+                />
+                <span className="flex-1">{x.title}</span>
+                {x.pdf!.confidential && <span className="text-xs text-muted-foreground">arabulucuya özel</span>}
+              </label>
+            ))}
+          </div>
+          {/* Seçimde tek bir gizli bölüm varsa ibare TÜM belgeye basılır — karışık
+              belgede sayfa sayfa ayırmak güvenli değil. */}
+          {pdfSections.some((x) => pickedSections.has(x.id) && x.pdf!.confidential) && (
+            <p className="text-sm text-destructive">
+              Seçimde arabulucuya özel bölüm var — belgenin her sayfasına "{PDF_CONFIDENTIAL_NOTE}" ibaresi basılacak.
+            </p>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button size="sm" variant="outline" onClick={() => setReportPickerOpen(false)}>Vazgeç</Button>
+            <Button
+              size="sm"
+              disabled={pickedSections.size === 0}
+              onClick={() => {
+                const chosen = pdfSections.filter((x) => pickedSections.has(x.id));
+                if (chosen.length === 0) return;
+                printSectionsPdf({
+                  caseTitle: caseRow.title, caseId: caseRow.id,
+                  docTitle: "Arabulucu Raporu",
+                  confidential: chosen.some((x) => x.pdf!.confidential),
+                  sections: chosen.map((x) => ({ title: x.title, html: x.pdf!.html() })),
+                });
+                setReportPickerOpen(false);
+              }}
+            >
+              PDF oluştur
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
     <Dialog open={!!openScenario} onOpenChange={(o) => !o && setOpenScenario(null)}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
