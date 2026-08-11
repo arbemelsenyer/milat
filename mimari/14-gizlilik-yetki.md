@@ -29,3 +29,9 @@ işaretlenebilmesi; iki trigger yeniden yazıldı (durum sunucu tarafında türe
 kimliğini ekleyebilir); ikinci kat canlı test bekliyor (gerçek taraf hesabı gerektirir). (c) Daraltılacak —
 multi-agent-negotiation'ın agent_states.last_output alanına yazdığı ham çıktı taraflarca okunabilir
 durumda.
+
+[v0.36 EKLEME — AJAN DURUM GÖRÜNÜRLÜĞÜ (05–11.08)] can_view_agent_state fonksiyonunda
+party_consistency ve party_communication ajan tipleri common_ground dalına alındı: bu iki ajanın
+durum kaydını yalnız görevli arabulucu ve yönetici görür. Karşı taraf denetimin/analizin
+YAPILDIĞINI dahi göremez — varlığın kendisi de gizli veridir (yalnız içerik değil). Taraf SELECT
+politikası bilerek yazılmamıştır.

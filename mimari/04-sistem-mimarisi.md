@@ -43,3 +43,9 @@ prompt cümlesi ekleyerek kovalanmaz: üç tur denendi, her turda başka bir nit
 (2) bu alanı geçemeyen bulguyu sunucu tarafında elemek. Yeni analiz ajanları bu kalıpla yazılır.
 
 
+
+[v0.36 EKLEME — MODEL ÇAĞRILARINDA OPENAI-ÖNCE HATTI (karar 05–11.08)] Ajanların model çağrıları
+önce doğrudan OpenAI hattından yapılır (OPENAI_API_KEY, varsayılan model gpt-4o-mini); gateway
+yedeğe alınmıştır ve yalnız doğrudan hat kullanılamadığında devreye girer. Deploy ve Publish
+tarafında değişiklik yok: edge fonksiyonlarının deploy'u ve uygulamanın yayınlanması YALNIZ
+Lovable üzerinden yapılır — komut satırından deploy denemesi 403 ile reddedilir.

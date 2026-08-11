@@ -34,3 +34,14 @@ sınırı, §11 teşhis dili yasağı).
 üretmez — rapor hukuken delildir. AI soruyu ve çerçeveyi hazırlar; raporu sistemde tanımlı gerçek
 bilirkişi yazar (uzman havuzu modeli). Bilirkişi bunu kendi hesabıyla yapar; rol, erişim ve yüzey modeli
 §12.6'dadır.
+
+[v0.36 EKLEME — AJAN ENVANTERİ SATIRLARI (05–11.08)]
+· party_consistency (party-consistency-check) — gizlilik sınıfı MEDIATOR_ONLY, ● CANLI.
+  Orkestratör zincirine dahildir; her koşumda taraf başına çalışır, bulgular
+  party_consistency_findings tablosuna yazılır.
+· party_communication (party-communication-analysis) — gizlilik sınıfı MEDIATOR_ONLY, ● CANLI.
+  Orkestratör zincirine dahildir ancak KOŞULLU koşar: dosyada görüşme notu veya oturum özeti
+  yoksa ajan çalıştırılmaz, zincire "atlandı" kaydı düşer (bkz. §5 v0.36 eklemesi). Atlama bir
+  hata değildir; zinciri durdurmaz.
+Her iki ajan da ajan sözleşmesinin kalıbına uyar: sabit JSON çıktı şeması, zorunlu dayanak alanı,
+sunucu tarafı eleme, "yeterli veri yok" davranışı ve denetim kaydı.

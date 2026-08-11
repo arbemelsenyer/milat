@@ -342,3 +342,34 @@ kendi sayacını görür; kurucu toplulaştırılmış anonim görünümü gör�
 anlatısının tek dürüst kaynağı budur (R5). Ham gerçek dosya modele asla girmez; eski dosyalar yalnız
 anonimleştirilerek örnek kural kütüphanesine Uzun vade: biriken anonim veri > alana özgü model
 imkânı (sıra: ürün > kullanıcı > veri (oo > model)
+
+[v0.36 EKLEME — YETENEK DURUM GÜNCELLEMESİ (05–11.08)]
+· İç Tutarlılık Denetimi ● CANLI — tablo party_consistency_findings; kalite disiplini çıktı
+  şemasındaki ZORUNLU a_deger / b_deger alanları ve sunucu tarafı elemeyle sağlanır (değer alanı
+  boş veya anlamsız kısalıkta olan bulgu sunucuda elenir).
+· İletişim ve Asıl İhtiyaç analizi + keşif sorusu üreteci ● CANLI — tablo
+  party_communication_analysis; beş iz (kaçınılan konu · tekrar eden tema · sertleşme noktası ·
+  hiç değinilmeyen alan · talep ile anlatı farkı) + en fazla 3 keşif sorusu.
+  KOŞULLU ÇALIŞMA (karar 05–11.08): bu ajan orkestratör zincirinde YALNIZ dosyada görüşme notu
+  veya oturum özeti varsa koşar. Yazılı beyan tek başına kaçınma/sertleşme izini taşımadığından,
+  girdi yoksa ajan çalıştırılmaz ve zincire "atlandı" kaydı düşülür — üretilmeyen analiz sessizce
+  atlanmaz, atlandığı görünür kalır (constitution m.2).
+· Dosyaya Soru Sor (Çalışma Kanalı V1, §8.1) ● CANLI.
+· Rapor öncesi defter tartımı — Dürüstlük Bandı (§5.2i) ○ YAPIMDA.
+· Elenen bulguların iz kaydı (entry_type = 'elenen') ○ PLANLI.
+
+[v0.36 EKLEME — KÖR TEKLİF v2: KOŞULLU ARALIK / BRAKETLEME (karar 05–11.08, planlı)]
+Taraf, koşullu teklifini sisteme girer ("karşı taraf şu bandın altına inerse ben de şuraya
+inerim"). Karşı tarafa bu taahhüt gösterilmez; yalnız bant sorusu sorulur ("şu aralığı
+düşünür müsünüz?"). Karşı taraf reddederse taahhüt otomatik düşer ve karşı taraf, tarafın
+inmeye razı olduğunu HİÇBİR yüzeyden öğrenemez — ret hâlinde bilgi sızmaz. Her adım (teklifin
+girilmesi, bandın sorulması, kabul/ret, taahhüdün düşmesi) denetim izine yazılır. Teklif
+Yakınlık Göstergesi ile birlikte çalışır: yakınlık seyri yalnız arabulucuya görünür.
+
+[v0.36 KALICI ŞART — FAZ 3 TÜR TESPİTİ İKİ MENÜDÜR (değişmez)]
+Faz 3 uyuşmazlık tür tespitinde ANA TÜR ve ALT UZMANLIK olmak üzere İKİ menü zorunludur. Alt
+uzmanlık menüsü üç kez sehven silinip geri konmuştur; bir daha kaldırılamaz — düzen değişikliği,
+sadeleştirme veya refaktör gerekçesiyle de kaldırılamaz. Alt uzmanlığın kaydı classify-dispute
+edge fonksiyonunda SUNUCU TARAFINDA yazılır (persist:true akışında, geçerli slug gelmezse mevcut
+değer ezilmez); kullanıcının menüden yaptığı ELLE seçimin yazımı istemcide korunur — manuel her
+zaman kazanır (§10.6).

@@ -1,5 +1,5 @@
 # MediPact Mimari — İNDEKS
-Sürüm: v0.35 · 9 Ağustos 2026
+Sürüm: v0.36 · 11 Ağustos 2026
 
 Bu klasör, mimari.md'nin bölümlere ayrılmış hâlidir. Bölünmemiş tam
 metin 99-ARSIV-mimari-tam.md olarak bu klasörde durur ve tek doğruluk

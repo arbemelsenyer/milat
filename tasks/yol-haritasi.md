@@ -250,3 +250,39 @@ aday listesi + paket fiyatları. (Davet e-postası kalemi KAPALIDIR — Güncell
    tablosunun doğrulanması · aydınlatma metni ve oturum kaydı rıza ibaresi · belge saklamada 5 yıl
    mı 10 yıl mı kararı · pilot aday listesi · paket fiyatları ve kota rakamları · evrak tespit
    ajanı için beklenen-belge listeleri.
+
+[r6 EKLEME] 5–11 AĞUSTOS YAPILANLAR (tek paragraf)
+Derin analiz katmanının iki ajanı canlıya alındı: İç Tutarlılık Denetimi
+(party_consistency_findings; kalite, prompt cilasıyla değil çıktı şemasındaki zorunlu
+a_deger/b_deger alanları ve sunucu tarafı elemeyle sağlandı) ve İletişim ve Asıl İhtiyaç analizi
++ keşif sorusu üreteci (party_communication_analysis; beş iz, en fazla üç soru). İletişim ajanı
+orkestratör zincirinde koşullu çalışacak biçimde bağlandı — görüşme notu/oturum özeti yoksa
+koşmaz, "atlandı" kaydı düşer. Dosyaya Soru Sor (Çalışma Kanalı V1) canlıya alındı. Gizlilik
+tarafında can_view_agent_state'te iki yeni ajan tipi common_ground dalına alındı; karşı taraf
+denetimin varlığını dahi göremiyor. Arayüzde Faz 4 dört katmanlı katlanır düzene geçti (Masaya
+otururken · Dayanak katmanı · Kokpit · Rapor ve belgeler), sol menüye iki kademeli gruplama,
+bölüm bazlı PDF ve "Rapor oluştur" seçim penceresi eklendi, rapor çıktısında uzlaşma tahmini
+(paylaşılabilir) ile ZOPA (arabulucuya özel) ayrıldı; ardından Faz 3 de aynı katmanlı-katlanır
+düzene geçirildi (Dosya özeti · Taraflar · Belgeler ve araçlar). Faz 3 tür tespitindeki alt
+uzmanlık menüsü kalıcı şart olarak yazıldı (üç kez silinmişti); alt uzmanlığın kaydı
+classify-dispute içinde sunucu tarafına taşındı, elle seçim istemcide korundu. Operasyon
+tarafında model çağrıları OpenAI-önce hattına alındı (OPENAI_API_KEY, gpt-4o-mini; gateway
+yedekte); deploy ve Publish'in yalnız Lovable üzerinden yapılabildiği (CLI 403) kayda geçti.
+Kör Teklif v2'ye "Koşullu Aralık — Braketleme" kalemi eklendi (planlı).
+
+AÇIK KALEMLER (11.08 itibarıyla):
+1. Rapor öncesi defter tartımı + Dürüstlük Bandı — ○ YAPIMDA (ekran değişikliği; kurucu onayı).
+2. Elenen bulguların iz kaydı (entry_type = 'elenen') — ○ planlı.
+3. Kör Teklif v2 — Koşullu Aralık/Braketleme — ○ planlı.
+4. İç tutarlılık a_deger/b_deger alanlarının kokpit kartında gösterilmesi — kırıntı.
+5. İletişim analizinde "talep ↔ anlatı farkı" izi — pilotta görüşme notlarıyla yeniden ölçülecek.
+6. Taraf gizli belge kanalının gerçek taraf hesabıyla görsel testi.
+7. Evrak tespit ajanı — kurucudan beklenen-belge listeleri gelince başlar (park).
+8. Kırıntılar: dosya soru-cevap panelinde hata mesajının ekrana düşmemesi · künye temizleyicinin
+   marka tescil numarasını yanlış yakalaması · alt uzmanlık rozetlerinin diğer ekranlara
+   yansıması · menü klavye erişilebilirliği · dosya açılış formu rota kararlılığı · sayfa sapması
+   kapanışının kalan turu.
+9. KURUCUDAN BEKLEYENLER (değişmedi): 2 örnek tutanak + bilgilendirme belgesi · süre/istisna
+   tablosunun doğrulanması · aydınlatma metni ve oturum kaydı rıza ibaresi · belge saklamada
+   5 yıl mı 10 yıl mı kararı · pilot aday listesi · paket fiyatları ve kota rakamları · evrak
+   tespit ajanı için beklenen-belge listeleri.
