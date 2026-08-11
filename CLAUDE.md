@@ -14,13 +14,26 @@ constitution > komut > mimari > tasks.
 
 ## Okuma sınırı (token disiplini)
 
-- Kök dizindeki `mimari.md` bütün metni taşır ve tek doğruluk
-  kaynağıdır, ama OKUNMAZ. Okuma daima `mimari/` üzerinden yapılır.
+- `mimari/99-ARSIV-mimari-tam.md` bütün metni taşır ve tek doğruluk
+  kaynağıdır, ama OKUNMAZ. Okuma daima `mimari/` bölüm dosyaları
+  üzerinden yapılır. (Kökteki `mimari.md` bu arşive taşındı.)
 - `mimari/` klasörünün tamamını okuma. İndeksten ilgili bölümü seç.
 - Kod ararken dosyanın tamamını okuma: önce grep ile ilgili yeri
   bul, sonra yalnız o aralığı aç.
 - İndekste yazmayan bir dosyayı açacaksan, hangisini neden açtığını
   tek satırla yaz.
+
+## Belge güncelleme kuralı (bağlayıcı)
+
+Ürün davranışını, ekranı, ajan mantığını veya veri modelini değiştiren
+her iş bittiğinde, AYNI COMMIT içinde:
+
+1. İlgili `mimari/` bölüm dosyasına durum satırını güncelle veya ekle
+   (○ planlı → ● canlı).
+2. `tasks/yol-haritasi.md` dosyasına tek satır kayıt düş.
+
+Mevcut metni yeniden yazma — yalnız ekle veya işaretle. Kodun
+değişmediği işlerde (yalnız keşif, inceleme, rapor) bu adım atlanır.
 
 ## İş Akışı
 

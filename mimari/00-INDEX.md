@@ -1,9 +1,9 @@
 # MediPact Mimari — İNDEKS
 Sürüm: v0.35 · 9 Ağustos 2026
 
-Bu klasör, kök dizindeki mimari.md'nin bölümlere ayrılmış hâlidir.
-mimari.md bütün hâliyle yerinde durur ve tek doğruluk kaynağıdır;
-buradaki dosyalar aynı metnin parçalarıdır.
+Bu klasör, mimari.md'nin bölümlere ayrılmış hâlidir. Bölünmemiş tam
+metin 99-ARSIV-mimari-tam.md olarak bu klasörde durur ve tek doğruluk
+kaynağıdır; diğer dosyalar aynı metnin parçalarıdır. Arşiv OKUNMAZ.
 
 ## OKUMA KURALI
 Mimarinin tamamını okuma. Önce bu indeksi oku, işine karşılık gelen
@@ -87,6 +87,10 @@ Yasak listesi.
 
 17-riskler-acik-kararlar.md (36)
 Açık kararlar (K) ve riskler (R).
+
+99-ARSIV-mimari-tam.md (1137)
+Bölünmemiş tam metin — tek doğruluk kaynağı.
+Aç: ASLA. Yalnız bir bölüm dosyasında eksik metinden şüphelenilirse.
 
 ## NOT
 05 ve 12 numaralı bölümler hâlâ büyük. Bunların içinde de arama
