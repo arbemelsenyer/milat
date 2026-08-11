@@ -119,7 +119,7 @@
 
 @layer base {
   * { @apply border-border; }
-  body { @apply bg-background text-foreground antialiased; }
+  body { @apply bg-background text-foreground antialiased; line-height: 1.65; }
   html { scroll-behavior: smooth; }
   h1, h2, h3, h4 { @apply font-heading; }
 }
