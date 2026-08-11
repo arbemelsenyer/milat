@@ -2357,33 +2357,33 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
       />
       <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
       <motion.div variants={itemVariants}>
-      <Card className="p-6 space-y-3">
+      <Card className="p-6 space-y-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h2 className="text-2xl font-bold text-primary">Aşama 3 — Taraf Analizi</h2>
+            <h2 className="text-lg font-semibold">Aşama 3 — Taraf analizi</h2>
             <p className="text-sm text-muted-foreground mt-1">
               Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. Analizler tamamlandığında Ortak Zemin Raporu, Aşama 4 — Arabulucu Paneli'nde üretilir.
             </p>
           </div>
-          <div className="text-right text-xs space-y-1 min-w-[180px]">
-            <div className="font-medium">Taraf Analizi: {analysedCount}/{parties.length} taraf analiz edildi</div>
-            <Progress value={progressPct} className="h-2" />
+          <div className="text-right text-sm space-y-1 min-w-[180px]">
+            <div className="text-muted-foreground">{analysedCount}/{parties.length} taraf analiz edildi</div>
+            <Progress value={progressPct} className="h-1.5" />
             {isMediator && (
               <Button
                 size="sm"
-                variant="secondary"
-                className="mt-1"
+                variant="outline"
+                className="mt-2"
                 onClick={extractAllTexts}
                 disabled={extractingAll}
               >
-                {extractingAll ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                {extractingAll ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                 {extractingAll ? "İşleniyor..." : "Metinleri Çıkar"}
               </Button>
             )}
           </div>
         </div>
-        <div className="border-t pt-3">
-          <Label className="text-xs text-muted-foreground">Uyuşmazlık Konusu</Label>
+        <div className="border-t pt-4">
+          <Label className="text-sm text-muted-foreground">Uyuşmazlık konusu</Label>
           <p className="text-sm mt-1 whitespace-pre-wrap">
             {caseRow.issue_description || <span className="text-muted-foreground italic">Girilmemiş.</span>}
           </p>
@@ -2411,25 +2411,31 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
           const open = openId === p.id;
           const an = a?.analysis ?? {};
           const analysisStale = !!a && a.issue_description_snapshot != null && a.issue_description_snapshot !== caseRow.issue_description;
+          const riskLabelRaw = (an.risk_analizi ?? (a as any)?.risk_analizi)?.risk_puani;
           return (
             <motion.div variants={itemVariants} key={p.id}>
             <Card className="overflow-hidden">
               <button
                 type="button"
                 onClick={() => setOpenId(open ? null : p.id)}
-                className="w-full flex items-center justify-between p-4 hover:bg-accent/30 transition"
+                className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-accent/30 transition text-left"
               >
-                <div className="text-left">
-                  <div className="font-semibold">{partyDisplay(p)}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {roleLabel(p.party_role)} · {p.party_type === "corporate" ? "Kurumsal" : "Bireysel"} · {partyDocs.length} belge
-                  </div>
+                <div className="flex items-baseline gap-2 min-w-0 text-sm">
+                  <span className="font-semibold truncate">{partyDisplay(p)}</span>
+                  <span className="text-muted-foreground truncate">
+                    · {roleLabel(p.party_role)} · {partyDocs.length} belge
+                  </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  {a && <Badge variant="secondary">Analiz hazır</Badge>}
+                <div className="flex items-center gap-2 shrink-0">
+                  {riskLabelRaw && (
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${riskBadgeTone(riskLabelRaw)}`}>
+                      {safeText(riskLabelRaw)} risk
+                    </span>
+                  )}
+                  {a && !riskLabelRaw && <Badge variant="secondary">Analiz hazır</Badge>}
                   {analysisStale && (
                     <Badge className="bg-amber-500 text-white gap-1">
-                      <AlertTriangle className="h-3 w-3" /> Uyuşmazlık konusu değişti
+                      <AlertTriangle className="h-3 w-3" /> Konu değişti
                     </Badge>
                   )}
                   {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -2437,9 +2443,9 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
               </button>
 
               {open && (
-                <div className="border-t p-4 space-y-4">
+                <div className="border-t px-4 py-4 space-y-5">
                   {/* Step indicator */}
-                  <div className="flex items-center gap-2 text-xs">
+                  <div className="flex items-center gap-3 text-sm">
                     <StepDot done={partyDocs.length > 0} label="1. Belge yüklendi" />
                     <span className="text-muted-foreground">→</span>
                     <StepDot done={!!a} active={analysing === p.id} label="2. AI analiz edildi" />
@@ -2455,8 +2461,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
                   </div>
 
                   {/* Party statement */}
-                  <div>
-                    <div className="text-sm font-medium mb-2">Taraf Beyanı / Anlatımı</div>
+                  <div className="border-t pt-4">
+                    <div className="text-sm font-medium mb-2">Taraf beyanı</div>
                     <Textarea
                       rows={4}
                       placeholder="Tarafın uyuşmazlığa ilişkin kendi anlatımı, talepleri, pozisyonu..."
@@ -2477,11 +2483,11 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
                   </div>
 
                   {/* Per-party docs */}
-                  <div>
+                  <div className="border-t pt-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-sm font-medium">Belgeler</div>
-                      <label className="text-xs cursor-pointer text-primary hover:underline flex items-center gap-1">
-                        {uploading === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                      <label className="text-sm cursor-pointer text-primary hover:underline flex items-center gap-1">
+                        {uploading === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                         Belge Yükle
                         <input type="file" multiple className="hidden"
                           accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
@@ -2489,16 +2495,16 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
                       </label>
                     </div>
                     {partyDocs.length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic">Bu taraf için belge yok.</p>
+                      <p className="text-sm text-muted-foreground italic">Bu taraf için belge yok.</p>
                     ) : (
-                      <ul className="space-y-1">
+                      <ul className="divide-y">
                         {partyDocs.map((d) => (
                           <motion.li
                             key={d.id}
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.25 }}
-                            className="flex items-center gap-2 text-sm p-2 border rounded"
+                            className="flex items-center gap-2 text-sm py-1.5"
                           >
                             <FileText className="h-4 w-4 text-primary" />
                             <span className="flex-1 truncate">{d.file_name}</span>
@@ -2508,24 +2514,24 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
                       </ul>
                     )}
                     {partyDocs.some((d) => !(d.mime_type ?? "").startsWith("text/") && !d.file_name?.toLowerCase().endsWith(".txt")) && (
-                      <p className="text-[11px] text-amber-600 mt-1 flex items-start gap-1">
-                        <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                      <p className="text-sm text-muted-foreground mt-2 flex items-start gap-1.5">
+                        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                         Uyarı: PDF/Word belgelerin içeriği tam okunamayabilir. Daha doğru analiz için kritik metinleri .txt olarak da yükleyebilirsiniz.
                       </p>
                     )}
                   </div>
 
-
+                  <div className="border-t pt-4 space-y-3">
                   {analysisStale && (
-                    <p className="text-[11px] text-amber-600 flex items-start gap-1">
-                      <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                    <p className="text-sm text-muted-foreground flex items-start gap-1.5">
+                      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                       Uyuşmazlık konusu bu analizden sonra değişti — Analizi yeniden çalıştırın.
                     </p>
                   )}
 
                   {/* Analysis trigger */}
-                  <div className="flex gap-2 flex-wrap">
-                    <Button size="sm" onClick={() => runAnalysis(p.id)} disabled={analysing === p.id}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button size="sm" variant="outline" onClick={() => runAnalysis(p.id)} disabled={analysing === p.id}>
                       {analysing === p.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
                       {a ? "Yeniden Analiz Et" : "Analiz Başlat"}
                     </Button>
@@ -2546,32 +2552,32 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
                     )}
                   </div>
                   {analysisError?.partyId === p.id && (
-                    <div className="text-xs text-destructive flex items-center gap-1">
-                      <AlertTriangle className="h-3 w-3" /> {analysisError.msg}
+                    <div className="text-sm text-destructive flex items-center gap-1.5">
+                      <AlertTriangle className="h-4 w-4" /> {analysisError.msg}
                     </div>
                   )}
 
                   {!a && analysing !== p.id && !analysisError && (
-                    <div className="text-xs text-muted-foreground italic flex items-start gap-1 p-2 border border-dashed rounded">
-                      <Circle className="h-3 w-3 mt-0.5" />
+                    <div className="text-sm text-muted-foreground flex items-start gap-1.5">
+                      <Circle className="h-4 w-4 mt-0.5 shrink-0" />
                       Analiz henüz yapılmadı. {partyDocs.length === 0 ? "Önce belge yükleyin, ardından" : ""} “Analiz Başlat” butonuna basın.
                     </div>
                   )}
                   {analysing === p.id && (
-                    <div className="text-xs text-muted-foreground flex items-center gap-2 p-2 border rounded bg-muted/30">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Analiz yapılıyor, lütfen bekleyin…
+                    <div className="text-sm text-muted-foreground flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Analiz yapılıyor, lütfen bekleyin…
                     </div>
                   )}
-
+                  </div>
 
                   {/* Analysis result */}
                   {a && !(isMediator || p.user_id === userId) && (
-                    <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded">
+                    <div className="border-t pt-4 text-sm text-muted-foreground italic">
                       Bu bölüm yalnızca arabulucu tarafından görüntülenebilir.
                     </div>
                   )}
                   {a && (isMediator || p.user_id === userId) && (
-                    <div className="space-y-2">
+                    <div className="border-t pt-4 space-y-4">
                       <RiskAnalysisCard
                         risk={an.risk_analizi ?? (a as any).risk_analizi}
                         sources={an.sources}
@@ -2580,22 +2586,21 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
                       />
 
                       {an.dispute_area && (
-                        <AnaSection icon="🔍" title="Uyuşmazlık Türü">
-
+                        <P3Section title="Uyuşmazlık türü">
                           <p className="text-sm">{safeText(an.dispute_area)}</p>
-                        </AnaSection>
+                        </P3Section>
                       )}
                       {an.legal_framework && (
-                        <AnaSection icon="⚖️" title="Hukuki Çerçeve">
+                        <P3Section title="Hukuki çerçeve">
                           {safeList(an.legal_framework.statutes).length > 0 && (
                             <div className="text-sm">
-                              <div className="font-medium">Mevzuat:</div>
+                              <div className="font-medium">Mevzuat</div>
                               <ul className="list-disc pl-5">{safeList(an.legal_framework.statutes).map((s, i) => <li key={i}>{s}</li>)}</ul>
                             </div>
                           )}
                           {Array.isArray(an.legal_framework.precedents) && an.legal_framework.precedents.length > 0 && (
                             <div className="text-sm mt-2">
-                              <div className="font-medium">Emsal Kararlar:</div>
+                              <div className="font-medium">Emsal kararlar</div>
                               <ul className="list-disc pl-5">
                                 {an.legal_framework.precedents.map((pr: any, i: number) => (
                                   <li key={i}><b>{safeText(pr?.court)}:</b> {safeText(pr?.decision)} <span className="text-muted-foreground">— {safeText(pr?.relevance)}</span></li>
@@ -2603,28 +2608,28 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
                               </ul>
                             </div>
                           )}
-                        </AnaSection>
+                        </P3Section>
                       )}
                       {safeList(an.document_findings).length > 0 && (
-                        <AnaSection icon="📄" title="Belge Bulguları">
+                        <P3Section title="Belge bulguları">
                           <ul className="list-disc pl-5 text-sm">{safeList(an.document_findings).map((f, i) => <li key={i}>{f}</li>)}</ul>
-                        </AnaSection>
+                        </P3Section>
                       )}
                       {an.party_position && (
-                        <AnaSection icon="👤" title="Taraf Analizi">
-                          <PosBlock label="Güçlü Yanlar" items={safeList(an.party_position.strengths)} />
-                          <PosBlock label="Zayıf Yanlar" items={safeList(an.party_position.weaknesses)} />
+                        <P3Section title="Taraf analizi">
+                          <PosBlock label="Güçlü yanlar" items={safeList(an.party_position.strengths)} />
+                          <PosBlock label="Zayıf yanlar" items={safeList(an.party_position.weaknesses)} />
                           <PosBlock label="İhtiyaçlar" items={safeList(an.party_position.interests)} />
                           {an.party_position.batna && <div className="text-sm mt-1"><b>BATNA:</b> {safeText(an.party_position.batna)}</div>}
                           {an.party_position.watna && <div className="text-sm"><b>WATNA:</b> {safeText(an.party_position.watna)}</div>}
-                        </AnaSection>
+                        </P3Section>
                       )}
                       {Array.isArray(an.discovery_questions) && an.discovery_questions.length > 0 && (
-                        <AnaSection icon="❓" title="İhtiyaç Soruları">
+                        <P3Section title="İhtiyaç soruları">
                           <ol className="list-decimal pl-5 text-sm space-y-1">
                             {an.discovery_questions.map((q: any, i: number) => <li key={i}>{safeText(q?.question ?? q)}</li>)}
                           </ol>
-                        </AnaSection>
+                        </P3Section>
                       )}
                       <SourcesPanel sources={an.sources} />
                     </div>
@@ -2646,10 +2651,22 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
 
 function StepDot({ done, active, label }: { done: boolean; active?: boolean; label: string }) {
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${done ? "bg-emerald-50 border-emerald-300 text-emerald-700" : active ? "bg-amber-50 border-amber-300 text-amber-700" : "bg-muted/40 border-border text-muted-foreground"}`}>
-      {done ? <CheckCircle2 className="h-3 w-3" /> : active ? <Loader2 className="h-3 w-3 animate-spin" /> : <Circle className="h-3 w-3" />}
+    <span className={`inline-flex items-center gap-1.5 ${done || active ? "text-foreground" : "text-muted-foreground"}`}>
+      {done ? <CheckCircle2 className="h-4 w-4" /> : active ? <Loader2 className="h-4 w-4 animate-spin" /> : <Circle className="h-4 w-4" />}
       {label}
     </span>
+  );
+}
+
+// Faz 3 analiz çıktısı için düz bölüm: kutu/arka plan yok, yalnız ince ayraç + boşluk.
+// AnaSection'a dokunulmadı — o bileşen Faz 4 tarafından da kullanılıyor.
+function P3Section({ title, children }: { title: string; children: React.ReactNode }) {
+  if (isBlankNode(children)) return null;
+  return (
+    <div className="border-t pt-3">
+      <div className="font-medium text-sm mb-1">{title}</div>
+      {children}
+    </div>
   );
 }
 
@@ -3157,7 +3174,6 @@ function RiskAnalysisCard({
   risk, sources, onRefresh, refreshing,
 }: { risk?: any; sources?: any[]; onRefresh?: () => void; refreshing?: boolean }) {
   if (!risk || typeof risk !== "object") return null;
-  const tone = riskContainerTone(risk.risk_puani);
   const badgeTone = riskBadgeTone(risk.risk_puani);
   const missingAny =
     isMissing(risk.uzlasma_orani) || isMissing(risk.mahkeme_riski) || isMissing(risk.tahmini_sure_tasarrufu_ay);
@@ -3168,9 +3184,9 @@ function RiskAnalysisCard({
     (Array.isArray(sources) ? sources : []).map((s: any) => String(s?.title ?? "").trim()).filter(Boolean)
   ));
   return (
-    <div className={`border rounded-lg p-4 space-y-3 ${tone}`}>
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="font-semibold text-sm">📊 Risk Analizi & Anlaşma Oranı</div>
+        <div className="font-medium text-sm">Risk analizi ve anlaşma oranı</div>
         <div className="flex items-center gap-2">
           {risk.risk_puani && (
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badgeTone}`}>{risk.risk_puani} Risk</span>
@@ -3224,19 +3240,19 @@ function RiskAnalysisCard({
       )}
       {safeList(risk.kritik_faktorler).length > 0 && (
         <div>
-          <div className="text-xs font-medium mb-1">Kritik Faktörler</div>
+          <div className="text-sm font-medium mb-1">Kritik faktörler</div>
           <ul className="list-disc pl-5 text-sm">{safeList(risk.kritik_faktorler).map((s, i) => <li key={i}>{s}</li>)}</ul>
         </div>
       )}
       {safeList(risk.uzlasma_engelleri).length > 0 && (
         <div>
-          <div className="text-xs font-medium mb-1">Uzlaşma Engelleri</div>
+          <div className="text-sm font-medium mb-1">Uzlaşma engelleri</div>
           <ul className="list-disc pl-5 text-sm">{safeList(risk.uzlasma_engelleri).map((s, i) => <li key={i}>{s}</li>)}</ul>
         </div>
       )}
       {kaynakNames.length > 0 && (
-        <div className="text-xs">
-          <div className="font-medium mb-1">Kullanılan Kaynaklar</div>
+        <div className="text-sm">
+          <div className="font-medium mb-1">Kullanılan kaynaklar</div>
           <div className="flex flex-wrap gap-1">
             {kaynakNames.map((name, i) => (
               <SourceChip key={i} name={name} source={matchSource(name, sources)} />
