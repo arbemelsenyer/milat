@@ -1524,13 +1524,18 @@ function catLabel(v?: string | null) {
 }
 
 function DisputeClassifierCard({
-  caseRow, initialText, autoRun = false,
-}: { caseRow: CaseRow; initialText: string; autoRun?: boolean }) {
+  caseRow, initialText, autoRun = false, bare = false,
+}: { caseRow: CaseRow; initialText: string; autoRun?: boolean; bare?: boolean }) {
   const [text, setText] = useState(initialText || caseRow.title || "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ kategori: string; guven_skoru: number; gerekce: string; ilgili_kanun: string[] } | null>(null);
   const [manual, setManual] = useState<string>(caseRow.dispute_type ?? "");
+  // Alt uzmanlık alanı ayrı bir kolon (cases.dispute_subtype) ve ayrı bir menü.
+  // classify-dispute alt_uzmanlik döndürüyor ama YALNIZ dispute_type'ı yazıyor;
+  // alt uzmanlığın kaydı bu yüzden burada, ana türle aynı update kalıbıyla yapılır.
+  const [altUzmanlik, setAltUzmanlik] = useState<string>(caseRow.dispute_subtype || ALT_UZMANLIK_YOK);
+  const [aiSuggestedSubtype, setAiSuggestedSubtype] = useState(false);
   const [savingManual, setSavingManual] = useState(false);
   const ranRef = useRef(false);
 
@@ -1546,7 +1551,19 @@ function DisputeClassifierCard({
       if ((data as any)?.error) throw new Error((data as any).error);
       setResult(data as any);
       setManual((data as any).kategori);
-      toast({ title: "Tür tespiti tamamlandı", description: `${catLabel((data as any).kategori)} · %${(data as any).guven_skoru}` });
+      // AI'ın alt uzmanlık önerisi geçerliyse menüye ön-doldurulur ve rozetlenir;
+      // edge function bu kolonu yazmadığı için kayıt burada yapılır.
+      const altUz = String((data as any)?.alt_uzmanlik ?? "");
+      const validAlt = altUz !== ALT_UZMANLIK_YOK && ALT_UZMANLIK_ALANLARI.some((c) => c.value === altUz);
+      if (validAlt) {
+        setAltUzmanlik(altUz);
+        setAiSuggestedSubtype(true);
+        await supabase.from("cases").update({ dispute_subtype: altUz } as any).eq("id", caseRow.id);
+      }
+      toast({
+        title: "Tür tespiti tamamlandı",
+        description: `${anaAltLabel((data as any).kategori, validAlt ? altUz : null)} · %${(data as any).guven_skoru}`,
+      });
     } catch (e: any) {
       const raw = e?.message ?? "";
       setError(trErr(raw) || "Uyuşmazlık türü tespit edilemedi. Lütfen tekrar deneyin.");
@@ -1570,7 +1587,23 @@ function DisputeClassifierCard({
       const { error } = await supabase.from("cases").update({ dispute_type: value } as any).eq("id", caseRow.id);
       if (error) throw error;
       setManual(value);
-      toast({ title: "Alan güncellendi", description: catLabel(value) });
+      toast({ title: "Ana tür güncellendi", description: catLabel(value) });
+    } catch (e: any) {
+      toast({ title: "Güncellenemedi", description: trErr(e?.message ?? ""), variant: "destructive" });
+    } finally { setSavingManual(false); }
+  }
+
+  // Elle seçim: AI önerisi rozeti kalkar, kayıt ana türle aynı kalıpla yazılır.
+  async function saveAltUzmanlik(value: string) {
+    setSavingManual(true);
+    setAiSuggestedSubtype(false);
+    try {
+      const { error } = await supabase.from("cases")
+        .update({ dispute_subtype: value !== ALT_UZMANLIK_YOK ? value : null } as any)
+        .eq("id", caseRow.id);
+      if (error) throw error;
+      setAltUzmanlik(value);
+      toast({ title: "Alt uzmanlık güncellendi", description: altUzmanlikLabel(value) ?? "Yok" });
     } catch (e: any) {
       toast({ title: "Güncellenemedi", description: trErr(e?.message ?? ""), variant: "destructive" });
     } finally { setSavingManual(false); }
@@ -1578,19 +1611,27 @@ function DisputeClassifierCard({
 
   const lowConfidence = result && result.guven_skoru < 60;
   const currentCat = manual || caseRow.dispute_type || result?.kategori || "";
+  // Ana tür listesi ANA_UYUSMAZLIK_TURLERI'dir; eski kayıtlarda bu listede olmayan
+  // bir değer duruyorsa (ör. "fikri_mülkiyet") kaybolmasın diye listeye eklenir.
+  const anaOptions = ANA_UYUSMAZLIK_TURLERI.some((c) => c.value === currentCat) || !currentCat
+    ? ANA_UYUSMAZLIK_TURLERI
+    : [...ANA_UYUSMAZLIK_TURLERI, { value: currentCat, label: catLabel(currentCat) }];
 
-  return (
-    <Card className="p-6 space-y-3">
+  const inner = (
+    <>
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" /> AI Uyuşmazlık Türü Tespiti
-        </h3>
-        <Button size="sm" onClick={() => runClassify(text)} disabled={busy}>
-          {busy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Analiz…</> : <><RefreshCw className="h-4 w-4 mr-1" /> {result ? "Yeniden Sınıflandır" : "Sınıflandır"}</>}
+        {bare
+          ? <div className="text-sm font-semibold text-primary">Uyuşmazlık tür tespiti</div>
+          : <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" /> AI Uyuşmazlık Türü Tespiti
+            </h3>}
+        <Button size="sm" variant="outline" onClick={() => runClassify(text)} disabled={busy}>
+          {busy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Analiz…</> : <><Sparkles className="h-4 w-4 mr-1" /> {result ? "AI önerisini yenile" : "AI önerisi"}</>}
         </Button>
       </div>
+
       <div>
-        <Label className="text-xs">Uyuşmazlık metni (başlık + kısa açıklama)</Label>
+        <Label className="text-sm text-muted-foreground">Uyuşmazlık metni (başlık + kısa açıklama)</Label>
         <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -1600,64 +1641,81 @@ function DisputeClassifierCard({
       </div>
 
       {error && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-2">
-          <div className="text-xs text-destructive flex items-start gap-1">
-            <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+        <div className="space-y-2">
+          <p className="text-sm text-destructive flex items-start gap-1.5">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
             <span>{error}</span>
-          </div>
+          </p>
           <Button size="sm" variant="outline" onClick={() => runClassify(text)} disabled={busy}>
             {busy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Deneniyor…</> : <><RefreshCw className="h-4 w-4 mr-1" /> Tekrar Dene</>}
           </Button>
         </div>
       )}
 
+      {/* İKİ MENÜ: ana tür (zorunlu) + alt uzmanlık (isteğe bağlı). Föy künyesi
+          bu ikisinden "Ticari — Fikri-Sınai Haklar" biçiminde üretilir. */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <Label className="text-sm text-muted-foreground">Ana uyuşmazlık türü</Label>
+          <Select value={manual || undefined} onValueChange={saveManual} disabled={savingManual}>
+            <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Seçin…" /></SelectTrigger>
+            <SelectContent>
+              {anaOptions.map((c) => (
+                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-sm text-muted-foreground flex items-center gap-2">
+            Alt uzmanlık alanı
+            {aiSuggestedSubtype && <Badge variant="secondary" className="text-[10px]">AI önerisi</Badge>}
+          </Label>
+          <Select value={altUzmanlik} onValueChange={saveAltUzmanlik} disabled={savingManual}>
+            <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Yok" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALT_UZMANLIK_YOK}>Yok</SelectItem>
+              {ALT_UZMANLIK_ALANLARI.map((c) => (
+                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       {(result || caseRow.dispute_type) && (
-        <div className="border rounded-md p-3 space-y-2 bg-muted/30">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="text-sm">
-              <div>📋 <b>Tespit Edilen Alan:</b> {catLabel(currentCat)}</div>
-              {result && (
-                <>
-                  <div className="text-xs text-muted-foreground">Güven: %{result.guven_skoru}</div>
-                  {result.gerekce && <div className="text-xs mt-1"><span className="text-muted-foreground">Gerekçe:</span> {result.gerekce}</div>}
-                  {result.ilgili_kanun?.length > 0 && (
-                    <div className="text-xs mt-1">
-                      <span className="text-muted-foreground">Dayanak:</span> {result.ilgili_kanun.join(", ")}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-            <div className="min-w-[200px]">
-              <Label className="text-[11px] text-muted-foreground">Değiştir</Label>
-              <Select value={manual || undefined} onValueChange={saveManual} disabled={savingManual}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Manuel seç…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DISPUTE_CATEGORIES.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="text-sm space-y-1">
+          <div>
+            <span className="text-muted-foreground">Tespit edilen alan: </span>
+            {anaAltLabel(currentCat, altUzmanlik !== ALT_UZMANLIK_YOK ? altUzmanlik : null)}
           </div>
+          {result && (
+            <>
+              <div className="text-muted-foreground">Güven: %{result.guven_skoru}</div>
+              {result.gerekce && <div><span className="text-muted-foreground">Gerekçe: </span>{result.gerekce}</div>}
+              {result.ilgili_kanun?.length > 0 && (
+                <div><span className="text-muted-foreground">Dayanak: </span>{result.ilgili_kanun.join(", ")}</div>
+              )}
+            </>
+          )}
           {lowConfidence && (
-            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 flex items-start gap-1">
-              <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
-              AI bu konuyu %{result!.guven_skoru} güvenle sınıflandırdı. Lütfen doğru alanı manuel seçin.
-            </div>
+            <p className="text-sm text-destructive">
+              AI bu konuyu %{result!.guven_skoru} güvenle sınıflandırdı — doğru alanı elle seçin.
+            </p>
           )}
         </div>
       )}
 
       {!result && !caseRow.dispute_type && !busy && (
-        <p className="text-xs text-muted-foreground italic">
-          Metni yazıp "Sınıflandır" butonuna basın; AI, Türk hukuku ve bilgi tabanı kaynaklarına göre alanı tespit edecek.
+        <p className="text-sm text-muted-foreground italic">
+          Metni yazıp "AI önerisi" düğmesine basın; AI, Türk hukuku ve bilgi tabanı kaynaklarına göre alanı tespit edecek.
         </p>
       )}
-    </Card>
+    </>
   );
+
+  // bare: Faz 3'te kendi kartı yok — kapsayan kartın içinde bölüm olarak durur.
+  return bare ? <div className="space-y-3">{inner}</div> : <Card className="p-6 space-y-3">{inner}</Card>;
 }
 
 /* ===================== PHASE 2 - PARTIES ===================== */
@@ -2416,17 +2474,18 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
             )}
           </div>
         </div>
+        {/* Büyük başlık: uyuşmazlık konusu; hemen altında serbest metin. */}
         <div className="border-t pt-4">
-          <Label className="text-sm text-muted-foreground">Uyuşmazlık konusu</Label>
+          <div className="text-lg font-semibold">Uyuşmazlık konusu</div>
           <p className="text-sm mt-1 whitespace-pre-wrap">
             {caseRow.issue_description || <span className="text-muted-foreground italic">Girilmemiş.</span>}
           </p>
         </div>
+        {/* Küçük başlık: tür tespiti — iki menü ve AI önerisi düğmesi kartın içinde. */}
+        <div className="border-t pt-4">
+          <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} bare />
+        </div>
       </Card>
-      </motion.div>
-
-      <motion.div variants={itemVariants}>
-        <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} />
       </motion.div>
 
       {parties.length === 0 && (
@@ -2438,7 +2497,13 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
         </motion.div>
       )}
 
-      <div className="space-y-3">
+      {/* Taraf kartları ayrı bölüm; Faz 4'teki katlanır satır kalıbının aynısı —
+          tek satır özet (ad · rol · belge sayısı · risk rozeti), tıklayınca detay. */}
+      {parties.length > 0 && (
+        <motion.div variants={itemVariants}>
+        <Card className="p-6 space-y-2">
+          <div className="text-lg font-semibold">Taraflar</div>
+          <div>
         {parties.map((p) => {
           const partyDocs = docs.filter((d) => d.party_id === p.id);
           const a = analyses.find((x) => x.party_id === p.id);
@@ -2447,15 +2512,14 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
           const analysisStale = !!a && a.issue_description_snapshot != null && a.issue_description_snapshot !== caseRow.issue_description;
           const riskLabelRaw = (an.risk_analizi ?? (a as any)?.risk_analizi)?.risk_puani;
           return (
-            <motion.div variants={itemVariants} key={p.id}>
-            <Card className="overflow-hidden">
+            <div key={p.id} className="border-t">
               <button
                 type="button"
                 onClick={() => setOpenId(open ? null : p.id)}
-                className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-accent/30 transition text-left"
+                className="w-full flex items-center justify-between gap-3 py-3 hover:bg-accent/30 transition text-left"
               >
                 <div className="flex items-baseline gap-2 min-w-0 text-sm">
-                  <span className="font-semibold truncate">{partyDisplay(p)}</span>
+                  <span className="font-medium truncate">{partyDisplay(p)}</span>
                   <span className="text-muted-foreground truncate">
                     · {roleLabel(p.party_role)} · {partyDocs.length} belge
                   </span>
@@ -2477,7 +2541,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
               </button>
 
               {open && (
-                <div className="border-t px-4 py-4 space-y-5">
+                <div className="pb-4 space-y-5">
                   {/* Step indicator */}
                   <div className="flex items-center gap-3 text-sm">
                     <StepDot done={partyDocs.length > 0} label="1. Belge yüklendi" />
@@ -2670,11 +2734,13 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
                   )}
                 </div>
               )}
-            </Card>
-            </motion.div>
+            </div>
           );
         })}
-      </div>
+          </div>
+        </Card>
+        </motion.div>
+      )}
 
       </motion.div>
       </>
