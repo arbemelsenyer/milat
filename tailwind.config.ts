@@ -25,9 +25,9 @@ export default {
         "3xl": ["34px", { lineHeight: "1.2" }],
       },
       fontFamily: {
-        sans: ["Instrument Serif", "Inter", "Georgia", "serif"],
-        heading: ["Instrument Serif", "Inter", "Georgia", "serif"],
-        display: ["Instrument Serif", "Inter", "Georgia", "serif"],
+        sans: ["Newsreader", "Inter", "Georgia", "serif"],
+        heading: ["Newsreader", "Inter", "Georgia", "serif"],
+        display: ["Newsreader", "Inter", "Georgia", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",

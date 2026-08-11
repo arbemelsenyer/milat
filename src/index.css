@@ -1,6 +1,6 @@
-/* Instrument Serif — hem başlık hem gövde ailesi. Tek ağırlık (400) normal +
-   italik; latin-ext alt kümesi dahil. Inter yedek zincirde kalır. */
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&subset=latin,latin-ext&display=swap');
+/* Newsreader — hem başlık hem gövde ailesi. Ağırlıklar 400/500/600/700,
+   normal + italik; latin-ext alt kümesi dahil. Inter yedek zincirde kalır. */
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&subset=latin,latin-ext&display=swap');
 
 @tailwind base;
 @tailwind components;
