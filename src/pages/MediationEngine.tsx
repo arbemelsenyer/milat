@@ -5055,19 +5055,19 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   const LAYER_META: Record<string, { id: string; hint: string }> = {
     [LAYER_TABLE]: {
       id: "kokpit-katman-masa",
-      hint: "İlk oturuma girmeden bilinmesi gerekenler: tarafların görünen taleplerinin altındaki asıl mesele ve bu turda sorulacak keşif soruları. Müzakerenin açılışını bu maddeler belirler.",
+      hint: "Bu katman, ilk oturuma girmeden önce bilmeniz gerekenleri toplar: tarafların görünen taleplerinin altındaki asıl meseleyi gösterir ve bu turda sormanız gereken keşif sorularını verir.",
     },
     [LAYER_EVIDENCE]: {
       id: "kokpit-katman-dayanak",
-      hint: "Bulguların hangi belgeye ve hangi beyana dayandığı. Tarafın kendi anlatımıyla kendi belgesi arasındaki uyumsuzluklar, rapora alınmayan hususlar ve tarafın iletişiminden çıkan izler dayanaklarıyla birlikte burada.",
+      hint: "Bu katman, her bulgunun hangi belgeye ve hangi beyana dayandığını gösterir; tarafın kendi anlatımıyla kendi belgesi arasındaki uyumsuzlukları, rapora alınmayan hususları ve iletişiminden çıkan izleri dayanaklarıyla birlikte sunar.",
     },
     [LAYER_COCKPIT]: {
       id: "kokpit-katman-kokpit",
-      hint: "Dosyanın sayısal görünümü: anlaşma ihtimali ve olası anlaşma aralığı, tarafların güçlü ve zayıf yanları, çözüm senaryoları, kırmızı çizgiler ve müzakereyi tıkayabilecek başlıklar.",
+      hint: "Bu katman, dosyanın sayısal görünümünü verir: anlaşma ihtimalini ve olası anlaşma aralığını hesaplar, tarafların güçlü ve zayıf yanlarını, çözüm senaryolarını ve müzakereyi tıkayabilecek başlıkları bir arada gösterir.",
     },
     [LAYER_REPORTS]: {
       id: "kokpit-katman-rapor",
-      hint: "Analizlerin tam metinleri ve dışa aktarma: taraf analizleri, ortak zemin raporu, strateji ve Kör Teklif yüzeyi ile bölüm bazlı PDF çıktıları.",
+      hint: "Bu katman, analizlerin tam metinlerini barındırır ve dışa aktarmayı sağlar: taraf analizleri, ortak zemin raporu, strateji ve Kör Teklif yüzeyi ile bölüm bazlı PDF çıktıları buradadır.",
     },
   };
   // Sol menüden bir bölüme atlanınca önce kapsayan katmanın açılması gerekir.
@@ -5228,7 +5228,11 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
                       ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
                       : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                   </div>
-                  <p className="text-sm text-muted-foreground mt-0.5 max-w-3xl">{LAYER_META[layer].hint}</p>
+                  {/* Açıklama: başlıktan bir kademe küçük, italik ve ince — görsel
+                      hiyerarşi başlık > açıklama kalsın, uzun metin sarabilsin. */}
+                  <p className="text-xs font-light italic text-muted-foreground mt-1 max-w-3xl leading-relaxed">
+                    {LAYER_META[layer].hint}
+                  </p>
                 </button>
                 {layer === LAYER_REPORTS && pdfSections.length > 0 && (
                   <Button size="sm" variant="outline" className="shrink-0" onClick={() => {
