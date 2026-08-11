@@ -4831,6 +4831,18 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     sectionDefs.push({
       id: "kokpit-uzlasma-zopa", layer: LAYER_COCKPIT, title: "Uzlaşma tahmini ve ZOPA",
       summary: heroUzlasmaPct !== null ? `%${heroUzlasmaPct}` : undefined,
+      // Kokpit çıktıları arabulucu masasının kendi görünümü — kokpit brifingi de
+      // "GİZLİ — Yalnızca Arabulucu İçindir" bandıyla çıkıyor, aynı kural izlenir.
+      pdf: { confidential: true, html: () => {
+        const z = cockpitReportData?.zopa;
+        return `<p><b>Genel uzlaşma tahmini:</b> ${heroUzlasmaPct !== null ? `%${heroUzlasmaPct}` : "Yeterli veri yok"}`
+          + `${cockpitRiskPuani ? ` &nbsp;•&nbsp; <b>Risk:</b> ${pdfEsc(cockpitRiskPuani)}` : ""}</p>`
+          + (cockpitRiskOzeti?.genel_uzlasma_orani_kaynak ? `<p class="muted">${pdfEsc(cockpitRiskOzeti.genel_uzlasma_orani_kaynak)}</p>` : "")
+          + (z && (z.lower_bound || z.upper_bound || z.description)
+              ? `<p><b>Alt sınır:</b> ${pdfEsc(z.lower_bound || "—")} &nbsp;•&nbsp; <b>Üst sınır:</b> ${pdfEsc(z.upper_bound || "—")}</p>`
+                + `<p>${pdfEsc(z.description || "")}</p>`
+              : `<p class="muted">ZOPA için yeterli veri yok</p>`);
+      } },
       body: (
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(240px,340px)_1fr] gap-4 items-stretch">
           <CockpitGauge pct={heroUzlasmaPct} riskLabel={cockpitRiskPuani} sourceHint={cockpitRiskOzeti?.genel_uzlasma_orani_kaynak} />
@@ -4845,6 +4857,11 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
       // id DEĞİŞMEDİ (scrollIntoView bağlantıları kırılmasın); yalnız görünen ad.
       id: "kokpit-taraf-karsilastirma", layer: LAYER_COCKPIT, title: "Risk ve mahkeme değerlendirmesi",
       summary: `${cockpitRows.length} taraf`,
+      pdf: { confidential: true, html: () =>
+        `<table><thead><tr><th>Taraf</th><th>Risk</th><th>Anlaşma oranı</th><th>Mahkeme riski</th><th>BATNA</th></tr></thead><tbody>`
+        + cockpitRows.map((r) => `<tr><td>${pdfEsc(r.name)}</td><td>${pdfEsc(r.risk_puani || "—")}</td>`
+            + `<td>${pdfEsc(r.uzlasma_label)}</td><td>${pdfEsc(r.mahkeme_label)}</td><td>${pdfEsc(r.batna || "—")}</td></tr>`).join("")
+        + `</tbody></table>` },
       body: (
         <div className={`grid gap-6 ${cockpitRows.length > 1 ? "sm:grid-cols-2" : ""}`}>
           {cockpitRows.map((r, i) => (
@@ -4868,6 +4885,11 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     sectionDefs.push({
       id: "kokpit-senaryolar", layer: LAYER_COCKPIT, title: "Çözüm senaryoları",
       summary: `${cockpitScenarios.length} senaryo`,
+      pdf: { confidential: true, html: () => cockpitScenarios.map((sc: any, i: number) =>
+        `<div class="card"><h4>${String.fromCharCode(65 + i)}) ${pdfEsc(sc?.label || "Senaryo")}</h4>`
+        + `<p>${pdfEsc(sc?.summary || "")}</p>`
+        + (sc?.tradeoffs?.length ? `<p class="muted"><b>Ödünler:</b></p>${pdfList(sc.tradeoffs)}` : "")
+        + `</div>`).join("") },
       body: (
         <div className="grid sm:grid-cols-3 gap-3">
           {cockpitScenarios.map((sc: any, i: number) => {
@@ -4892,6 +4914,9 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     sectionDefs.push({
       id: "kokpit-kritik-faktorler", layer: LAYER_COCKPIT, title: "Kritik faktörler",
       summary: `${cockpitCriticalFactors.length}`,
+      pdf: { confidential: true, html: () => pdfList(
+        cockpitCriticalFactors.map((f) => f.sources.length > 1 ? `${f.text} (${f.sources.join(", ")})` : f.text)
+      ) },
       body: <CockpitBadgeFlow items={cockpitCriticalFactors} />,
     });
   }
@@ -4900,6 +4925,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     sectionDefs.push({
       id: "kokpit-kirmizi-cizgiler", layer: LAYER_COCKPIT, title: "Kırmızı çizgiler",
       summary: `${cockpitRedLines.length}`,
+      pdf: { confidential: true, html: () => pdfList(cockpitRedLines) },
       body: <CockpitRedLines items={cockpitRedLines} />,
     });
   }
@@ -4909,6 +4935,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
       // id DEĞİŞMEDİ (scrollIntoView bağlantıları kırılmasın); yalnız görünen ad.
       id: "kokpit-resmi-karsilastirma", layer: LAYER_COCKPIT, title: "Güçlü ve zayıf yanlar",
       summary: `${cockpitTarafKarsilastirma.length} taraf`,
+      pdf: { confidential: true, html: () =>
+        `<table><thead><tr><th>Taraf</th><th>Risk</th><th>Güçlü yan</th><th>Zayıf yan</th></tr></thead><tbody>`
+        + cockpitTarafKarsilastirma.map((t: any, i: number) =>
+            `<tr><td>${pdfEsc(safeText(t?.taraf) || `Taraf ${i + 1}`)}</td><td>${pdfEsc(t?.risk_puani || "—")}</td>`
+            + `<td>${pdfEsc(t?.guclu_yon || "—")}</td><td>${pdfEsc(t?.zayif_yon || "—")}</td></tr>`).join("")
+        + `</tbody></table>` },
       body: <CockpitOfficialComparisonTable items={cockpitTarafKarsilastirma} />,
     });
   }
@@ -4917,6 +4949,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     sectionDefs.push({
       id: "kokpit-uzlasma-engelleri", layer: LAYER_COCKPIT, title: "Uzlaşma engelleri",
       summary: `${cockpitObstacleList.length}`,
+      pdf: { confidential: true, html: () => pdfList(cockpitObstacleList) },
       body: <CockpitObstacles items={cockpitObstacleList} />,
     });
   }
@@ -4924,6 +4957,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   if (cockpitMediatorOneri) {
     sectionDefs.push({
       id: "kokpit-arabulucu-onerisi", layer: LAYER_COCKPIT, title: "Arabulucu önerisi",
+      pdf: { confidential: true, html: () => `<p>${pdfEsc(cockpitMediatorOneri)}</p>` },
       body: <CockpitMediatorRecommendation text={cockpitMediatorOneri} />,
     });
   }
@@ -5284,26 +5318,51 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">Rapor oluştur</DialogTitle>
         </DialogHeader>
-        <div className="space-y-2">
+        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
           <p className="text-sm text-muted-foreground">Seçilen bölümler tek PDF'te birleştirilir.</p>
-          <div className="divide-y">
-            {pdfSections.map((x) => (
-              <label key={x.id} className="flex items-center gap-2 py-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={pickedSections.has(x.id)}
-                  onChange={() => setPickedSections((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(x.id)) next.delete(x.id); else next.add(x.id);
-                    return next;
-                  })}
-                />
-                <span className="flex-1">{x.title}</span>
-                {x.pdf!.confidential && <span className="text-xs text-muted-foreground">arabulucuya özel</span>}
-              </label>
-            ))}
-          </div>
+          {/* Liste ekrandaki katman sırasıyla gruplanır; her grubun başında
+              "tümünü seç" kutusu vardır. Verisi olmayan bölüm zaten listede yok. */}
+          {layerOrder.map((layer) => {
+            const group = pdfSections.filter((x) => x.layer === layer);
+            if (group.length === 0) return null;
+            const allPicked = group.every((x) => pickedSections.has(x.id));
+            return (
+              <div key={layer}>
+                <label className="flex items-center gap-2 py-2 border-t text-sm font-medium cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={allPicked}
+                    onChange={() => setPickedSections((prev) => {
+                      const next = new Set(prev);
+                      group.forEach((x) => { if (allPicked) next.delete(x.id); else next.add(x.id); });
+                      return next;
+                    })}
+                  />
+                  <span className="flex-1">{layer}</span>
+                  <span className="text-xs font-normal text-muted-foreground">tümünü seç</span>
+                </label>
+                <div className="pl-6">
+                  {group.map((x) => (
+                    <label key={x.id} className="flex items-center gap-2 py-1.5 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        checked={pickedSections.has(x.id)}
+                        onChange={() => setPickedSections((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(x.id)) next.delete(x.id); else next.add(x.id);
+                          return next;
+                        })}
+                      />
+                      <span className="flex-1">{x.title}</span>
+                      {x.pdf!.confidential && <span className="text-xs text-muted-foreground">arabulucuya özel</span>}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
           {/* Seçimde tek bir gizli bölüm varsa ibare TÜM belgeye basılır — karışık
               belgede sayfa sayfa ayırmak güvenli değil. */}
           {pdfSections.some((x) => pickedSections.has(x.id) && x.pdf!.confidential) && (
