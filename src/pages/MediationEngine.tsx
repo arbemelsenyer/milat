@@ -697,6 +697,23 @@ export default function MediationEngine() {
                     </span>
                   )}
                 </button>
+                {/* Faz 3'teyken bu satırın altında Faz 3 katmanları; Faz 4'teki
+                    girintili alt satır kalıbının aynısı. Faz 3 dışında render edilmez. */}
+                {p.id === 3 && active && (
+                  <div className="mt-1 mb-1 space-y-0.5">
+                    {FAZ3_LAYERS.map((l) => (
+                      <button
+                        key={l.id}
+                        type="button"
+                        title={l.hint}
+                        onClick={() => setCockpitJump({ id: l.id, nonce: Date.now() })}
+                        className="w-full text-left pl-8 pr-3 pt-2 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/45 transition-colors hover:text-accent"
+                      >
+                        {l.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {/* Faz 4'teyken bu satırın altında kokpit bölümleri; yalnız verisi
                     olanlar listelenir. Diğer fazlarda hiç render edilmez. */}
                 {p.id === 4 && active && cockpitSections.length > 0 && (
@@ -974,7 +991,7 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance, 
   switch (phase) {
     case 1: return <><Phase1Summary caseRow={caseRow} reload={reload} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 2: return <><Phase2Parties caseRow={caseRow} isMediator={isMediator} userId={userId} onDone={() => { bumpPhase(3); onAdvance(3); }} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
-    case 3: return <><Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} /></Phase3ErrorBoundary><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 3: return <><Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} jump={cockpitJump} /></Phase3ErrorBoundary><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 4: return <>
       {isMediator
         ? <Phase4Summary caseRow={caseRow} onSectionsChange={onCockpitSections} jump={cockpitJump} />
@@ -2178,9 +2195,56 @@ function roleLabel(r?: string) {
   return r === "applicant" ? "Başvurucu" : r === "respondent" ? "Karşı Taraf" : "Üçüncü Taraf";
 }
 
-function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
+// Faz 3 katmanları: Faz 4'teki kalıbın aynısı — sabit id (sol menüden derin bağlantı),
+// katlanır başlık, altında tek satır açıklama. Liste statik: üç katman her zaman vardır.
+const FAZ3_LAYERS = [
+  {
+    id: "faz3-katman-ozet",
+    label: "Dosya özeti",
+    hint: "Bu katman, uyuşmazlığın konusunu ve tür tespitini içerir; metni ve tespiti buradan görüp düzeltebilirsiniz.",
+  },
+  {
+    id: "faz3-katman-taraflar",
+    label: "Taraflar",
+    hint: "Bu katman, her tarafın bilgilerini, belgelerini ve analiz sonuçlarını barındırır.",
+  },
+  {
+    id: "faz3-katman-belgeler",
+    label: "Belgeler ve araçlar",
+    hint: "Bu katman, dosyadaki belgelerin metne çevrilmesi gibi hazırlık işlemlerini içerir.",
+  },
+];
+// Bölüm → kapsayan katman: sol menüden bölüme atlanınca önce katman açılır.
+const FAZ3_SECTION_LAYER: Record<string, string> = {
+  "faz3-uyusmazlik-konusu": "faz3-katman-ozet",
+  "faz3-tur-tespiti": "faz3-katman-ozet",
+};
+
+function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
   caseRow: CaseRow; userId: string; isMediator: boolean; reload: () => void;
+  // Sol menüden gelen "şu katmanı aç ve oraya kay" isteği; nonce her tıklamada artar.
+  jump?: { id: string; nonce: number } | null;
 }) {
+  // Varsayılan: Dosya özeti ve Taraflar açık, Belgeler ve araçlar kapalı.
+  const [openLayers, setOpenLayers] = useState<Set<string>>(
+    () => new Set(["faz3-katman-ozet", "faz3-katman-taraflar"]),
+  );
+  // Dosya özeti içinde yalnız tür tespiti açık gelir; uzun metin kapalı durur.
+  const [openSections, setOpenSections] = useState<Set<string>>(() => new Set(["faz3-tur-tespiti"]));
+  const toggleLayer = useCallback((id: string) => {
+    setOpenLayers((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+  const toggleSection = useCallback((id: string) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
   const [parties, setParties] = useState<any[]>([]);
   const [docs, setDocs] = useState<any[]>([]);
   const [analyses, setAnalyses] = useState<any[]>([]);
@@ -2220,6 +2284,23 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
   }, [caseRow.id]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Sol menüden gelen istek: katmanı (gerekirse bölümü de) aç, sonra oraya kaydır.
+  // Faz 4 ile aynı kalıp; yalnız "faz3-" ile başlayan istekler işlenir.
+  useEffect(() => {
+    if (!jump?.id || !jump.id.startsWith("faz3-")) return;
+    if (jump.id.startsWith("faz3-katman-")) {
+      setOpenLayers((prev) => (prev.has(jump.id) ? prev : new Set(prev).add(jump.id)));
+    } else {
+      const layerId = FAZ3_SECTION_LAYER[jump.id];
+      if (layerId) setOpenLayers((prev) => (prev.has(layerId) ? prev : new Set(prev).add(layerId)));
+      setOpenSections((prev) => (prev.has(jump.id) ? prev : new Set(prev).add(jump.id)));
+    }
+    const t = setTimeout(() => {
+      document.getElementById(jump.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+    return () => clearTimeout(t);
+  }, [jump?.id, jump?.nonce]);
 
   async function handleUpload(partyId: string, e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -2403,8 +2484,6 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
 
   const analysedCount = analyses.length;
 
-  const progressPct = parties.length ? Math.round((analysedCount / parties.length) * 100) : 0;
-
   const riskLevels = analyses
     .map((a: any) => normalizeRiskLevel(a.risk_analizi?.risk_puani))
     .filter((l): l is "low" | "medium" | "high" => l !== "unknown");
@@ -2415,6 +2494,20 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
     dominantRisk = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0] as "low" | "medium" | "high";
   }
   const dominantRiskLabel = dominantRisk ? { low: "Düşük", medium: "Orta", high: "Yüksek" }[dominantRisk] : null;
+
+  // ── Katman düzeni için türetilenler: hepsi mevcut state'ten okunur, yeni sorgu yok.
+  // Katman kutusu ve durum şeridi Faz 4 ile birebir aynı kalıp.
+  const layerBoxClass = "rounded-lg border bg-card p-6 space-y-4";
+  const statusStripItems: { label: string; value: string }[] = [
+    { label: "Taraf Analizi", value: parties.length ? `${analysedCount} / ${parties.length}` : "—" },
+    { label: "Ortalama Risk Puanı", value: dominantRiskLabel ?? "Yeterli veri yok" },
+    { label: "Belge", value: `${docs.length}` },
+  ];
+  const layerCounts: Record<string, string> = {
+    "faz3-katman-ozet": "2 bölüm",
+    "faz3-katman-taraflar": `${parties.length} taraf`,
+    "faz3-katman-belgeler": `${docs.length} belge`,
+  };
 
   return (
     <div className="space-y-4">
@@ -2447,63 +2540,66 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
           { label: "Ortalama Risk Puanı", value: dominantRiskLabel, tone: dominantRisk ?? undefined },
         ]}
       />
-      <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
-      <motion.div variants={itemVariants}>
       <Card className="p-6 space-y-4">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h2 className="text-lg font-semibold">Aşama 3 — Taraf analizi</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. Analizler tamamlandığında Ortak Zemin Raporu, Aşama 4 — Arabulucu Paneli'nde üretilir.
-            </p>
-          </div>
-          <div className="text-right text-sm space-y-1 min-w-[180px]">
-            <div className="text-muted-foreground">{analysedCount}/{parties.length} taraf analiz edildi</div>
-            <Progress value={progressPct} className="h-1.5" />
-            {isMediator && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="mt-2"
-                onClick={extractAllTexts}
-                disabled={extractingAll}
-              >
-                {extractingAll ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                {extractingAll ? "İşleniyor..." : "Metinleri Çıkar"}
-              </Button>
-            )}
-          </div>
-        </div>
-        {/* Büyük başlık: uyuşmazlık konusu; hemen altında serbest metin. */}
-        <div className="border-t pt-4">
-          <div className="text-lg font-semibold">Uyuşmazlık konusu</div>
-          <p className="text-sm mt-1 whitespace-pre-wrap">
-            {caseRow.issue_description || <span className="text-muted-foreground italic">Girilmemiş.</span>}
-          </p>
-        </div>
-        {/* Küçük başlık: tür tespiti — iki menü ve AI önerisi düğmesi kartın içinde. */}
-        <div className="border-t pt-4">
-          <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} bare />
-        </div>
-      </Card>
-      </motion.div>
+        <h2 className="text-lg font-semibold">Aşama 3 — Taraf analizi</h2>
+        <p className="text-sm text-muted-foreground">
+          Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. Analizler tamamlandığında Ortak Zemin Raporu, Aşama 4 — Arabulucu Paneli'nde üretilir.
+        </p>
 
-      {parties.length === 0 && (
-        <motion.div variants={itemVariants}>
-        <Card className="p-6 space-y-2">
-          <div className="font-semibold">Taraflar bulunamadı</div>
-          <p className="text-sm text-muted-foreground">Bu başvuruya henüz taraf eklenmemiş. Aşama 2 — Taraf Bilgileri ekranından en az iki taraf ekleyin, ardından bu adımda belge yükleyip analiz başlatabilirsiniz.</p>
-        </Card>
+      <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+
+        {/* ── 1. DURUM ŞERİDİ — ekranda sabit duran tek bölüm; katlanmaz ── */}
+        <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {statusStripItems.map((m, i) => (
+            <div key={i} className="min-w-0">
+              <div className="text-sm text-muted-foreground truncate">{m.label}</div>
+              <div className="text-sm font-semibold truncate">{m.value}</div>
+            </div>
+          ))}
         </motion.div>
-      )}
 
-      {/* Taraf kartları ayrı bölüm; Faz 4'teki katlanır satır kalıbının aynısı —
-          tek satır özet (ad · rol · belge sayısı · risk rozeti), tıklayınca detay. */}
-      {parties.length > 0 && (
-        <motion.div variants={itemVariants}>
-        <Card className="p-6 space-y-2">
-          <div className="text-lg font-semibold">Taraflar</div>
-          <div>
+        {/* ── 2. KATMAN — Dosya özeti ── */}
+        <Phase3Layer
+          layer={FAZ3_LAYERS[0]}
+          count={layerCounts["faz3-katman-ozet"]}
+          boxClass={layerBoxClass}
+          open={openLayers.has("faz3-katman-ozet")}
+          onToggle={() => toggleLayer("faz3-katman-ozet")}
+        >
+          <CockpitCollapsible
+            id="faz3-uyusmazlik-konusu"
+            title="Uyuşmazlık konusu"
+            open={openSections.has("faz3-uyusmazlik-konusu")}
+            onToggle={() => toggleSection("faz3-uyusmazlik-konusu")}
+          >
+            <p className="text-sm whitespace-pre-wrap">
+              {caseRow.issue_description || <span className="text-muted-foreground italic">Girilmemiş.</span>}
+            </p>
+          </CockpitCollapsible>
+          <CockpitCollapsible
+            id="faz3-tur-tespiti"
+            title="Uyuşmazlık tür tespiti"
+            open={openSections.has("faz3-tur-tespiti")}
+            onToggle={() => toggleSection("faz3-tur-tespiti")}
+          >
+            {/* Ana tür + alt uzmanlık menüleri ve AI önerisi düğmesi — bileşen aynen korunur. */}
+            <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} bare />
+          </CockpitCollapsible>
+        </Phase3Layer>
+
+        {/* ── 3. KATMAN — Taraflar ── */}
+        <Phase3Layer
+          layer={FAZ3_LAYERS[1]}
+          count={layerCounts["faz3-katman-taraflar"]}
+          boxClass={layerBoxClass}
+          open={openLayers.has("faz3-katman-taraflar")}
+          onToggle={() => toggleLayer("faz3-katman-taraflar")}
+        >
+          {parties.length === 0 && (
+            <p className="text-sm text-muted-foreground border-t pt-3">
+              Bu başvuruya henüz taraf eklenmemiş. Aşama 2 — Taraf Bilgileri ekranından en az iki taraf ekleyin, ardından bu adımda belge yükleyip analiz başlatabilirsiniz.
+            </p>
+          )}
         {parties.map((p) => {
           const partyDocs = docs.filter((d) => d.party_id === p.id);
           const a = analyses.find((x) => x.party_id === p.id);
@@ -2737,15 +2833,59 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload }: {
             </div>
           );
         })}
+        </Phase3Layer>
+
+        {/* ── 4. KATMAN — Belgeler ve araçlar ── */}
+        <Phase3Layer
+          layer={FAZ3_LAYERS[2]}
+          count={layerCounts["faz3-katman-belgeler"]}
+          boxClass={layerBoxClass}
+          open={openLayers.has("faz3-katman-belgeler")}
+          onToggle={() => toggleLayer("faz3-katman-belgeler")}
+        >
+          <div className="border-t pt-3 flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-sm text-muted-foreground">
+              Dosyada {docs.length} belge var. “Metinleri Çıkar”, yüklenen PDF/Word belgelerin
+              içeriğini analiz edilebilir metne çevirir.
+            </div>
+            {isMediator && (
+              <Button size="sm" variant="outline" onClick={extractAllTexts} disabled={extractingAll}>
+                {extractingAll ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                {extractingAll ? "İşleniyor..." : "Metinleri Çıkar"}
+              </Button>
+            )}
           </div>
-        </Card>
-        </motion.div>
-      )}
+        </Phase3Layer>
 
       </motion.div>
+      </Card>
       </>
       )}
     </div>
+  );
+}
+
+// Faz 3 katman kutusu — Faz 4'teki katman başlığının birebir aynısı: ana başlık +
+// sağında sayaç + chevron, altında italik/ince açıklama; içerik katman açıkken görünür.
+function Phase3Layer({ layer, count, boxClass, open, onToggle, children }: {
+  layer: { id: string; label: string; hint: string };
+  count: string; boxClass: string; open: boolean; onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <motion.div variants={itemVariants} id={layer.id} className={`${boxClass} scroll-mt-24`}>
+      <button type="button" onClick={onToggle} className="w-full min-w-0 text-left">
+        <div className="flex items-center gap-2">
+          <div className="text-lg font-semibold">{layer.label}</div>
+          <span className="text-sm text-muted-foreground">{count}</span>
+          {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        </div>
+        <p className="text-xs font-light italic text-muted-foreground mt-1 max-w-3xl leading-relaxed">
+          {layer.hint}
+        </p>
+      </button>
+      <div className={open ? "" : "hidden"}>{children}</div>
+    </motion.div>
   );
 }
 
