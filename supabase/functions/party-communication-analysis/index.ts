@@ -10,6 +10,26 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Ajan Kontrol Paneli ilerleme satırı — party-confidential-analysis'teki agent_states
+// yazımının aynısı. Yalnız durum yazılır, analiz içeriği ASLA buraya girmez; buradaki
+// hata ana akışı durdurmaz (her çağrı kendi try-catch'i içinde).
+const AGENT_TYPE = "party_communication";
+
+async function upsertCommunicationState(
+  admin: ReturnType<typeof createClient>,
+  case_id: string,
+  party_id: string,
+  patch: Record<string, unknown>,
+) {
+  const { data: existing } = await admin.from("agent_states")
+    .select("id").eq("case_id", case_id).eq("agent_type", AGENT_TYPE).eq("party_id", party_id).maybeSingle();
+  if (existing?.id) {
+    await admin.from("agent_states").update(patch).eq("id", existing.id);
+  } else {
+    await admin.from("agent_states").insert({ case_id, agent_type: AGENT_TYPE, party_id, ...patch });
+  }
+}
+
 // Belge içerik bütçesi — party-consistency-check/index.ts kalıbının aynısı.
 const PER_DOC_CHAR_BUDGET = 6_000;
 const TOTAL_CHAR_BUDGET = 24_000;
@@ -32,6 +52,18 @@ function clip(text: string, limit: number): string {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // Hata yolunda da "hata" yazabilmek için dış kapsamda tutulur.
+  let stateAdmin: ReturnType<typeof createClient> | null = null;
+  let stateCaseId: string | null = null;
+  let statePartyId: string | null = null;
+  const writeState = async (patch: Record<string, unknown>) => {
+    if (!stateAdmin || !stateCaseId || !statePartyId) return;
+    try { await upsertCommunicationState(stateAdmin, stateCaseId, statePartyId, patch); }
+    catch { /* ilerleme satırı kritik değil */ }
+  };
+  const step = (current_step: string) =>
+    writeState({ status: "running", error_message: null, last_output: { current_step } });
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -96,6 +128,10 @@ Deno.serve(async (req) => {
     const partyName = party.party_type === "individual"
       ? `${party.first_name ?? ""} ${party.last_name ?? ""}`.trim()
       : (party.company_name ?? "Taraf");
+
+    // İlerleme satırı yetki kapısından SONRA açılır: yetkisiz çağrı panelde iz bırakmaz.
+    stateAdmin = admin; stateCaseId = case_id; statePartyId = party_id;
+    await step(`${partyName || "Taraf"} — bağlam toplanıyor`);
 
     // ── BAĞLAM: YALNIZCA bu tarafın kendi ifadeleri.
 
@@ -222,6 +258,8 @@ BU TARAFIN KAYITLARI:
 ${contextBlocks || "(bu taraf için okunabilir beyan, belge veya not metni yok)"}
 Yukarıdaki kayıtlar bu tarafa aittir (uyuşmazlık başlıkları bloğu yalnız karşılaştırma listesidir). Karşı tarafla karşılaştırma yapma.
 Beş iz tipinin her biri için ayrı ayrı değerlendir ve TAM 5 kayıt döndür; iz bulunmayan tipe var_mi=false + yok_gerekcesi yaz. Ayrıca arabulucuya sıradaki en fazla 3 keşif sorusunu ver.`;
+
+    await step("izler inceleniyor (kaçınılan konu · tekrar eden tema · sertleşme noktası · hiç değinilmeyen alan · talep–anlatı farkı)");
 
     // ── MODEL KAPISI (üç kademe): (1) OPENAI_API_KEY varsa ÖNCE doğrudan OpenAI;
     // (2) düşerse GEMINI_API_KEY ile doğrudan Google model listesi; (3) o da düşerse
@@ -358,6 +396,7 @@ Beş iz tipinin her biri için ayrı ayrı değerlendir ve TAM 5 kayıt döndür
           : null;
         const userMsg = [openaiMsg, googleMsg, `Gateway: ${aiRes.status} ${gatewayMsg}`]
           .filter(Boolean).join(" | ");
+        await writeState({ status: "failed", error_message: userMsg.slice(0, 300) });
         return new Response(JSON.stringify({ error: userMsg, detail: errText }), {
           status: openaiFail?.status ?? googleFail?.status ?? aiRes.status,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -367,6 +406,8 @@ Beş iz tipinin her biri için ayrı ayrı değerlendir ve TAM 5 kayıt döndür
       rawContent = aiJson?.choices?.[0]?.message?.content ?? "{}";
       console.log("[party-communication-analysis] Sağlayıcı: Lovable gateway — model: google/gemini-2.5-flash");
     }
+
+    await step("bulgular eleniyor");
 
     // Etiket temizliği TEK NOKTADAN: model cevabının tamamı parse edilmeden önce süzülür.
     let parsed: any = {};
@@ -429,21 +470,36 @@ Beş iz tipinin her biri için ayrı ayrı değerlendir ve TAM 5 kayıt döndür
       return true;
     };
 
-    // Tabloya YALNIZ var_mi=true olan (ve doğrulamayı geçen) kayıtlar findings olarak
-    // yazılır — kart şeması değişmez. var_mi=false olanlar cevapta bilgi olarak durur.
-    const findings = perType.filter(isValidPresent).map((f: any) => ({
-      iz_tipi: f.iz_tipi,
-      gozlem: f.gozlem,
-      dayanak: f.dayanak,
-      guven_seviyesi: f.guven_seviyesi,
-      ...(f.iz_tipi === "talep_anlati_farki"
-        ? { talep_ne: f.talep_ne, anlati_agirlik_merkezi: f.anlati_agirlik_merkezi }
-        : {}),
-    }));
-    const bulunmayan_izler = perType.filter((f: any) => !isValidPresent(f)).map((f: any) => ({
-      iz_tipi: f.iz_tipi,
-      yok_gerekcesi: f.yok_gerekcesi || "Bu tip için doğrulanabilir bir iz bulunamadı.",
-    }));
+    // Tabloya BEŞ hanenin TAMAMI yazılır: doğrulamayı geçen izler var_mi=true, geçmeyenler
+    // var_mi=false + yok_gerekcesi ile. Böylece "İncelendi — bulgu yok" hali de kalıcı olur
+    // ve ekranda incelenmemiş tipten ayırt edilebilir. Tablo yapısı aynı (findings jsonb).
+    const persistedFindings = perType.map((f: any) =>
+      isValidPresent(f)
+        ? {
+            iz_tipi: f.iz_tipi,
+            var_mi: true,
+            gozlem: f.gozlem,
+            dayanak: f.dayanak,
+            guven_seviyesi: f.guven_seviyesi,
+            ...(f.iz_tipi === "talep_anlati_farki"
+              ? { talep_ne: f.talep_ne, anlati_agirlik_merkezi: f.anlati_agirlik_merkezi }
+              : {}),
+          }
+        : {
+            iz_tipi: f.iz_tipi,
+            var_mi: false,
+            yok_gerekcesi: f.yok_gerekcesi || "Bu tip için doğrulanabilir bir iz bulunamadı.",
+          }
+    );
+    // Cevabın şekli DEĞİŞMEDİ: `findings` yine yalnız var_mi=true izleri taşır (elle
+    // çalıştırma düğmesinin "N iz" toast sayımı bunu okuyor), `bulunmayan_izler` yine
+    // ayrı döner. Beş hanenin tamamı yalnızca tabloya yazılır.
+    const findings = persistedFindings.filter((f: any) => f.var_mi);
+    const bulunmayan_izler = persistedFindings
+      .filter((f: any) => !f.var_mi)
+      .map((f: any) => ({ iz_tipi: f.iz_tipi, yok_gerekcesi: f.yok_gerekcesi }));
+
+    await step("keşif soruları üretiliyor");
 
     // Her soru bir boşluğa bağlı olmalı: boşluğu yazılmayan soru elenir, en fazla 3 tutulur.
     const rawQuestions = Array.isArray(parsed?.discovery_questions) ? parsed.discovery_questions : [];
@@ -461,13 +517,15 @@ Beş iz tipinin her biri için ayrı ayrı değerlendir ve TAM 5 kayıt döndür
       (droppedQuestions > 0 ? ` | boşluğu yazılmayan ${droppedQuestions} soru elendi` : "")
     );
 
+    await step("kayıt");
+
     // Yazma best-effort: bu satır yazılamazsa bile cevap döner, ana akış durmaz.
     // Başka hiçbir tabloya yazılmaz.
     let persisted = true;
     try {
       const { error: upsertErr } = await admin.from("party_communication_analysis")
         .upsert(
-          { case_id, party_id, findings, discovery_questions, updated_at: new Date().toISOString() },
+          { case_id, party_id, findings: persistedFindings, discovery_questions, updated_at: new Date().toISOString() },
           { onConflict: "case_id,party_id" },
         );
       if (upsertErr) throw upsertErr;
@@ -476,11 +534,18 @@ Beş iz tipinin her biri için ayrı ayrı değerlendir ve TAM 5 kayıt döndür
       console.error(`[party-communication-analysis] party_communication_analysis yazımı başarısız: ${e?.message ?? String(e)}`);
     }
 
+    await writeState(
+      persisted
+        ? { status: "completed", error_message: null }
+        : { status: "failed", error_message: "party_communication_analysis yazılamadı" }
+    );
+
     return new Response(JSON.stringify({ findings, bulunmayan_izler, discovery_questions, persisted }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
     console.error("[party-communication-analysis] Function error:", e);
+    await writeState({ status: "failed", error_message: String(e?.message ?? e).slice(0, 300) });
     return new Response(JSON.stringify({ error: e?.message ?? String(e) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

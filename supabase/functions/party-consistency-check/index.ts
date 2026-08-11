@@ -10,6 +10,26 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Ajan Kontrol Paneli ilerleme satırı — party-confidential-analysis'teki agent_states
+// yazımının aynısı. Yalnız durum yazılır, analiz içeriği ASLA buraya girmez; buradaki
+// hata ana akışı durdurmaz (her çağrı kendi try-catch'i içinde).
+const AGENT_TYPE = "party_consistency";
+
+async function upsertConsistencyState(
+  admin: ReturnType<typeof createClient>,
+  case_id: string,
+  party_id: string,
+  patch: Record<string, unknown>,
+) {
+  const { data: existing } = await admin.from("agent_states")
+    .select("id").eq("case_id", case_id).eq("agent_type", AGENT_TYPE).eq("party_id", party_id).maybeSingle();
+  if (existing?.id) {
+    await admin.from("agent_states").update(patch).eq("id", existing.id);
+  } else {
+    await admin.from("agent_states").insert({ case_id, agent_type: AGENT_TYPE, party_id, ...patch });
+  }
+}
+
 // Belge içerik bütçesi — party-confidential-analysis/index.ts kalıbının aynısı.
 const PER_DOC_CHAR_BUDGET = 6_000;
 const TOTAL_CHAR_BUDGET = 24_000;
@@ -31,6 +51,18 @@ function clip(text: string, limit: number): string {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // Hata yolunda da "hata" yazabilmek için dış kapsamda tutulur.
+  let stateAdmin: ReturnType<typeof createClient> | null = null;
+  let stateCaseId: string | null = null;
+  let statePartyId: string | null = null;
+  const writeState = async (patch: Record<string, unknown>) => {
+    if (!stateAdmin || !stateCaseId || !statePartyId) return;
+    try { await upsertConsistencyState(stateAdmin, stateCaseId, statePartyId, patch); }
+    catch { /* ilerleme satırı kritik değil */ }
+  };
+  const step = (current_step: string) =>
+    writeState({ status: "running", error_message: null, last_output: { current_step } });
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -96,6 +128,10 @@ Deno.serve(async (req) => {
     const partyName = party.party_type === "individual"
       ? `${party.first_name ?? ""} ${party.last_name ?? ""}`.trim()
       : (party.company_name ?? "Taraf");
+
+    // İlerleme satırı yetki kapısından SONRA açılır: yetkisiz çağrı panelde iz bırakmaz.
+    stateAdmin = admin; stateCaseId = case_id; statePartyId = party_id;
+    await step(`${partyName || "Taraf"} — beyan ve belgeler karşılaştırılıyor`);
 
     // ── BAĞLAM: YALNIZCA bu tarafın kendi verisi. Karşı tarafın hiçbir kaydı okunmaz.
 
@@ -322,6 +358,7 @@ Yalnızca bu kayıtlar arasındaki uyumsuzlukları, her biri için iki dayanağ�
           : null;
         const userMsg = [openaiMsg, googleMsg, `Gateway: ${aiRes.status} ${gatewayMsg}`]
           .filter(Boolean).join(" | ");
+        await writeState({ status: "failed", error_message: userMsg.slice(0, 300) });
         return new Response(JSON.stringify({ error: userMsg, detail: errText }), {
           status: openaiFail?.status ?? googleFail?.status ?? aiRes.status,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -331,6 +368,8 @@ Yalnızca bu kayıtlar arasındaki uyumsuzlukları, her biri için iki dayanağ�
       rawContent = aiJson?.choices?.[0]?.message?.content ?? "{}";
       console.log("[party-consistency-check] Sağlayıcı: Lovable gateway — model: google/gemini-2.5-flash");
     }
+
+    await step("çelişki adayları eleniyor");
 
     // Etiket temizliği TEK NOKTADAN: model cevabının tamamı parse edilmeden önce
     // süzülür, böylece hangi alanda geçtiğine bakmaya gerek kalmaz.
@@ -374,6 +413,8 @@ Yalnızca bu kayıtlar arasındaki uyumsuzlukları, her biri için iki dayanağ�
       (droppedCount > 0 ? ` | dayanaksız ${droppedCount} bulgu elendi` : "")
     );
 
+    await step("kayıt");
+
     // Yazma best-effort: bu satır yazılamazsa bile cevap döner, ana akış durmaz.
     // Başka hiçbir tabloya yazılmaz.
     let persisted = true;
@@ -389,11 +430,18 @@ Yalnızca bu kayıtlar arasındaki uyumsuzlukları, her biri için iki dayanağ�
       console.error(`[party-consistency-check] party_consistency_findings yazımı başarısız: ${e?.message ?? String(e)}`);
     }
 
+    await writeState(
+      persisted
+        ? { status: "completed", error_message: null }
+        : { status: "failed", error_message: "party_consistency_findings yazılamadı" }
+    );
+
     return new Response(JSON.stringify({ findings, persisted }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
     console.error("[party-consistency-check] Function error:", e);
+    await writeState({ status: "failed", error_message: String(e?.message ?? e).slice(0, 300) });
     return new Response(JSON.stringify({ error: e?.message ?? String(e) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

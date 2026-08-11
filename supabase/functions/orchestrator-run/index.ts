@@ -1,5 +1,7 @@
 // Orchestrator v1 (Causa Prima) — Parça 1: analiz zinciri motoru.
-// classify-dispute → detect-legal-deadlines → party-confidential-analysis (her taraf) → common-ground-report.
+// classify-dispute → detect-legal-deadlines → party-confidential-analysis (her taraf) →
+// party-consistency-check (her taraf, best-effort) → party-communication-analysis (her taraf,
+// best-effort) → common-ground-report.
 // Mevcut function'ların hiçbirinin kodu değişmedi — her adım kendi HTTP arayüzünden,
 // çağıranın Authorization header'ı aynen ileri iletilerek (aynı kullanıcı kimliğiyle) tetikleniyor;
 // multi-agent-negotiation'ın agent:"all" sıralı-zincir deseniyle birebir aynı mantık.
@@ -171,6 +173,45 @@ Deno.serve(async (req) => {
         if (!r.ok) return await fail("party_analysis", p.id, r.json?.error ?? `HTTP ${r.status}`);
       }
       steps.push({ step: "party_analysis", status: "completed", detail: `${parties.length} taraf` });
+    }
+
+    // ---- 3b) İç Tutarlılık Denetimi + 3c) İletişim İzi Analizi (her taraf, sırayla) ----
+    // BEST-EFFORT (bilinçli): bu iki adım zinciri DURDURMAZ. Hata alan taraf uyarı olarak
+    // steps[] özetine yazılır, döngü sıradaki tarafla devam eder ve ortak zemin adımı her
+    // hâlükârda çalışır. Adımın kendi agent_states satırını ilgili function kendisi yazıyor;
+    // burada üzerine yazılmaz. Mevcut adımların sırası ve davranışı değişmedi.
+    const bestEffortSteps: Array<{ step: string; fn: string }> = [
+      { step: "party_consistency", fn: "party-consistency-check" },
+      { step: "party_communication", fn: "party-communication-analysis" },
+    ];
+    for (const be of bestEffortSteps) {
+      if (!parties || parties.length === 0) {
+        await flagSkippedStep(admin, case_id, be.step, null, "case_parties boş — analiz edilecek taraf yok");
+        steps.push({ step: be.step, status: "skipped", detail: "taraf yok" });
+        continue;
+      }
+      await upsertOrchestratorState(admin, case_id, {
+        status: "running", error_message: null, last_output: { current_step: be.step },
+      });
+      const failures: string[] = [];
+      for (const p of parties) {
+        try {
+          const res = await callFn(supabaseUrl, authHeader, anonKey, be.fn, { case_id, party_id: p.id });
+          if (!res.ok) failures.push(`${p.id}: ${res.json?.error ?? `HTTP ${res.status}`}`);
+        } catch (e: any) {
+          failures.push(`${p.id}: ${String(e?.message ?? e)}`);
+        }
+      }
+      if (failures.length > 0) {
+        console.error(`[orchestrator-run] ${be.step} best-effort hata:`, failures.join(" | ").slice(0, 500));
+        steps.push({
+          step: be.step,
+          status: "failed",
+          detail: `${failures.length}/${parties.length} taraf hata verdi — zincir devam etti`,
+        });
+      } else {
+        steps.push({ step: be.step, status: "completed", detail: `${parties.length} taraf` });
+      }
     }
 
     await upsertOrchestratorState(admin, case_id, {
