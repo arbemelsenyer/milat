@@ -317,6 +317,10 @@ export default function MediationEngine() {
   const [showNew, setShowNew] = useState(false);
   const [activeCase, setActiveCase] = useState<CaseRow | null>(null);
   const [phase3Complete, setPhase3Complete] = useState(false);
+  // Faz 4 kokpitinin bildirdiği bölüm listesi (sol menüdeki alt katman) ve
+  // menüden gelen "şu bölümü aç" isteği. Faz 4 dışında liste boş kalır.
+  const [cockpitSections, setCockpitSections] = useState<{ id: string; label: string }[]>([]);
+  const [cockpitJump, setCockpitJump] = useState<{ id: string; nonce: number } | null>(null);
   const [phaseStatus, setPhaseStatus] = useState<Record<number, boolean>>({});
   const [deleteTarget, setDeleteTarget] = useState<CaseRow | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -657,7 +661,8 @@ export default function MediationEngine() {
               const locked = p.id >= 4 && !phase3Complete;
               const isNext = !locked && !active && p.id === nextActionablePhase;
               return (
-                <button key={p.id} onClick={() => { if (!locked) setPhase(p.id); else toast({ title: "Aşama kilitli", description: "Önce Aşama 3'te en az bir taraf analizini tamamlayın." }); }}
+                <div key={p.id}>
+                <button onClick={() => { if (!locked) setPhase(p.id); else toast({ title: "Aşama kilitli", description: "Önce Aşama 3'te en az bir taraf analizini tamamlayın." }); }}
                   className={`relative w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors border-l-2
                     ${active ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-accent" : "border-l-transparent hover:border-l-accent hover:text-accent hover:bg-sidebar-accent/40"}
                     ${locked ? "opacity-50 cursor-not-allowed" : ""}
@@ -692,9 +697,29 @@ export default function MediationEngine() {
                     </span>
                   )}
                 </button>
+                {/* Faz 4'teyken bu satırın altında kokpit bölümleri; yalnız verisi
+                    olanlar listelenir. Diğer fazlarda hiç render edilmez. */}
+                {p.id === 4 && active && cockpitSections.length > 0 && (
+                  <div className="mt-1 mb-1 space-y-0.5">
+                    {cockpitSections.map((sec) => (
+                      <button
+                        key={sec.id}
+                        type="button"
+                        onClick={() => setCockpitJump({ id: sec.id, nonce: Date.now() })}
+                        className="w-full text-left pl-11 pr-3 py-1 rounded-md text-xs text-sidebar-foreground/70 transition-colors hover:text-accent hover:bg-sidebar-accent/40"
+                      >
+                        {sec.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                </div>
               );
             })}
           </nav>
+          {/* Faz 4'teyken kokpit bölümleri: "4. Arabulucu Paneli" satırının altında
+              girintili alt satırlar. Yalnız verisi olan bölümler listelenir; başka
+              fazlarda hiç render edilmez, menünün mevcut yapısı değişmez. */}
         </aside>
         <main className="flex-1 p-6 max-w-5xl mx-auto w-full">
           <AnimatePresence mode="wait">
@@ -712,6 +737,8 @@ export default function MediationEngine() {
                 isMediator={isMediator || isAdmin}
                 userId={user!.id}
                 onAdvance={(next) => setPhase(next)}
+                onCockpitSections={setCockpitSections}
+                cockpitJump={cockpitJump}
               />
             </motion.div>
           </AnimatePresence>
@@ -927,9 +954,11 @@ function NextPhaseButton({ phase, onAdvance }: { phase: number; onAdvance: (n: n
   );
 }
 
-function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }: {
+function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance, onCockpitSections, cockpitJump }: {
   phase: number; caseRow: CaseRow; reload: () => void; isMediator: boolean; userId: string;
   onAdvance: (n: number) => void;
+  onCockpitSections?: (sections: { id: string; label: string }[]) => void;
+  cockpitJump?: { id: string; nonce: number } | null;
 }) {
   async function bumpPhase(next: number) {
     if ((caseRow.current_phase ?? 1) < next) {
@@ -943,7 +972,7 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance }
     case 3: return <><Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} /></Phase3ErrorBoundary><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 4: return <>
       {isMediator
-        ? <Phase4Summary caseRow={caseRow} />
+        ? <Phase4Summary caseRow={caseRow} onSectionsChange={onCockpitSections} jump={cockpitJump} />
         : <BlindBidPartyForm caseId={caseRow.id} userId={userId} />}
       <NextPhaseButton phase={phase} onAdvance={onAdvance} />
     </>;
@@ -3771,14 +3800,28 @@ function downloadCockpitBriefing(opts: {
 // seviyesi) kullanılır; lacivert (primary) yalnız başlık ve düğmelerde, gövde metni siyah,
 // açıklamalar gri. Veri kaynakları ve prop'lar değişmedi — yalnız sunum.
 
-// Kokpit bölümü: başlık + ince üst ayraç. Faz 3'teki P3Section'ın kokpit karşılığı.
-function CockpitSection({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
-  if (isBlankNode(children)) return null;
+// Faz 3'teki taraf kartı katlanma kalıbının kokpit karşılığı: tek satır başlık +
+// sağda kısa özet + ok; içerik tıklanınca açılır. Kutu içinde kutu olmaması için
+// Card yerine ince üst ayraç kullanılır — Faz 3'teki etkileşimin aynısı.
+function CockpitCollapsible({
+  id, title, summary, open, onToggle, children,
+}: {
+  id: string; title: string; summary?: string; open: boolean; onToggle: () => void; children: React.ReactNode;
+}) {
   return (
-    <div className="border-t pt-4">
-      <div className="text-sm font-semibold text-primary">{title}</div>
-      {hint && <p className="text-sm text-muted-foreground mt-0.5">{hint}</p>}
-      <div className="mt-2">{children}</div>
+    <div id={id} className="border-t scroll-mt-24">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between gap-3 py-3 hover:bg-accent/30 transition text-left"
+      >
+        <span className="text-sm font-medium truncate">{title}</span>
+        <span className="flex items-center gap-2 shrink-0">
+          {summary && <span className="text-sm text-muted-foreground">{summary}</span>}
+          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </span>
+      </button>
+      {open && <div className="pb-4">{children}</div>}
     </div>
   );
 }
@@ -4208,7 +4251,23 @@ function CockpitCommunicationItem({ finding, partyLabel }: { finding: any; party
 
 /* ===================== PHASE 4 - MEDIATOR PANEL (READ-ONLY SUMMARY) ===================== */
 
-function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
+function Phase4Summary({ caseRow, onSectionsChange, jump }: {
+  caseRow: CaseRow;
+  // Sol menüdeki alt katmanı besler: hangi bölümlerin verisi var. Yeni sorgu yok —
+  // liste, bu bileşenin zaten okuduğu state'ten türetilir.
+  onSectionsChange?: (sections: { id: string; label: string }[]) => void;
+  // Sol menüden gelen "şu bölümü aç ve oraya kay" isteği; nonce her tıklamada artar.
+  jump?: { id: string; nonce: number } | null;
+}) {
+  // Tüm bölümler varsayılan KAPALI; yalnız durum şeridi her zaman görünür.
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  const toggleSection = useCallback((id: string) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
   const [uyap, setUyap] = useState(caseRow.uyap_no || "");
   const [savingUyap, setSavingUyap] = useState(false);
   async function saveUyap() {
@@ -4484,9 +4543,335 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
     { label: "Risk Puanı", value: safeText(cockpitRiskPuani) || "Yeterli veri yok" },
     { label: "Uzlaşma Tahmini", value: heroUzlasmaPct !== null ? `%${heroUzlasmaPct}` : "Yeterli veri yok" },
   ];
-  // Boş katman = görünmeyen katman (başlığıyla birlikte).
-  const hasTableLayer = cockpitRows.length > 0 || communicationQuestions.length > 0;
-  const hasEvidenceLayer = consistencyItems.length > 0 || worklog.length > 0 || communicationItems.length > 0;
+
+  // ── Katlanır bölüm listesi ──────────────────────────────────────────────
+  // Her bölüm: sabit id (sol menüden derin bağlantı için), tek satırlık başlık,
+  // veriden türetilen kısa özet ve bugünkü içeriği. Verisi olmayan bölüm listeye
+  // hiç girmez — başlığı da görünmez.
+  type CockpitSectionDef = { id: string; layer: string; title: string; summary?: string; body: React.ReactNode };
+  const sectionDefs: CockpitSectionDef[] = [];
+
+  const LAYER_TABLE = "Masaya otururken";
+  const LAYER_EVIDENCE = "Dayanak katmanı";
+  const LAYER_COCKPIT = "Kokpit";
+  const LAYER_REPORTS = "Rapor ve belgeler";
+
+  if (cockpitRows.length > 0) {
+    sectionDefs.push({
+      id: "kokpit-kok-neden", layer: LAYER_TABLE, title: "Kök neden",
+      summary: `${cockpitRows.length} kart`,
+      body: (
+        <div className={`grid gap-6 ${cockpitRows.length > 1 ? "sm:grid-cols-2" : ""}`}>
+          {cockpitRows.map((r, i) => (
+            <CockpitRootCauseCard key={i} name={r.name} rootCause={r.party_id ? rootCauses[r.party_id] : undefined} />
+          ))}
+        </div>
+      ),
+    });
+  }
+
+  if (communicationQuestions.length > 0) {
+    sectionDefs.push({
+      id: "kokpit-siradaki-sorular", layer: LAYER_TABLE, title: "Sıradaki 3 soru",
+      body: (
+        <ol className="space-y-2 list-decimal list-inside">
+          {communicationQuestions.map((it, i) => {
+            const soru = safeText(it.q?.soru);
+            const bosluk = safeText(it.q?.hangi_boslugu_kapatir);
+            if (!soru) return null;
+            return (
+              <li key={`${it.rowId}-q${i}`} className="text-sm leading-snug">
+                {soru}
+                {bosluk && (
+                  <div className="mt-0.5 ml-4 text-sm text-muted-foreground leading-snug">Kapattığı boşluk: {bosluk}</div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      ),
+    });
+  }
+
+  if (consistencyItems.length > 0) {
+    sectionDefs.push({
+      id: "kokpit-ic-tutarlilik", layer: LAYER_EVIDENCE, title: "İç tutarlılık",
+      summary: `${consistencyItems.length} bulgu`,
+      body: (
+        <>
+          <p className="text-sm text-muted-foreground mb-2">
+            Tarafın kendi beyanı ile kendi belgeleri arasındaki uyumsuzluklar — yorum arabulucuya aittir
+          </p>
+          <div className="divide-y">
+            {consistencyItems.map((it, i) => (
+              <CockpitConsistencyItem
+                key={`${it.rowId}-${i}`}
+                finding={it.finding}
+                partyLabel={it.party_id ? (worklogPartyNameById[it.party_id] ?? null) : null}
+              />
+            ))}
+          </div>
+        </>
+      ),
+    });
+  }
+
+  if (worklog.length > 0) {
+    sectionDefs.push({
+      id: "kokpit-rapora-girmeyenler", layer: LAYER_EVIDENCE, title: "Rapora girmeyenler",
+      summary: `${worklog.length} kayıt`,
+      body: (
+        <>
+          <p className="text-sm text-muted-foreground mb-2">Ajanın değerlendirip rapora almadığı hususlar ve önerilen adımlar</p>
+          <ul className="divide-y">
+            {worklog.map((w: any) => (
+              <CockpitOffReportItem
+                key={w.id}
+                item={w.content}
+                partyLabel={w.party_id == null ? "Dosya geneli" : (worklogPartyNameById[w.party_id] ?? null)}
+              />
+            ))}
+          </ul>
+        </>
+      ),
+    });
+  }
+
+  // İletişim izleri: kayıt hiç yoksa bölüm görünmez (analiz atlanmış/çalışmamış demektir).
+  // Kayıt var ama doğrulanmış iz yoksa bölüm "incelendi, bulgu yok" özetiyle durur —
+  // incelenmemiş olmakla bulgu çıkmamış olmak aynı şey değil.
+  if (communicationItems.length > 0 || communication.length > 0) {
+    sectionDefs.push({
+      id: "kokpit-iletisim", layer: LAYER_EVIDENCE, title: "İletişim ve asıl ihtiyaç",
+      summary: communicationItems.length > 0 ? `${communicationItems.length} iz` : "incelendi — bulgu yok",
+      body: (
+        <>
+          <p className="text-sm text-muted-foreground mb-2">
+            Tarafın nasıl konuştuğundan çıkan izler — yorum arabulucuya aittir
+          </p>
+          {communicationItems.length > 0 ? (
+            <div className="divide-y">
+              {communicationItems.map((it, i) => (
+                <CockpitCommunicationItem
+                  key={`${it.rowId}-${i}`}
+                  finding={it.finding}
+                  partyLabel={it.party_id ? (worklogPartyNameById[it.party_id] ?? null) : null}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground italic">
+              Analiz çalıştı ancak doğrulanabilir bir iz bulunamadı.
+            </p>
+          )}
+        </>
+      ),
+    });
+  }
+
+  if (analyses.length > 0) {
+    sectionDefs.push({
+      id: "kokpit-uzlasma-zopa", layer: LAYER_COCKPIT, title: "Uzlaşma tahmini ve ZOPA",
+      summary: heroUzlasmaPct !== null ? `%${heroUzlasmaPct}` : undefined,
+      body: (
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(240px,340px)_1fr] gap-4 items-stretch">
+          <CockpitGauge pct={heroUzlasmaPct} riskLabel={cockpitRiskPuani} sourceHint={cockpitRiskOzeti?.genel_uzlasma_orani_kaynak} />
+          <CockpitZopaBand zopa={cockpitReportData?.zopa} lowerName={cockpitRows[1]?.name} upperName={cockpitRows[0]?.name} />
+        </div>
+      ),
+    });
+  }
+
+  if (cockpitRows.length > 0) {
+    sectionDefs.push({
+      id: "kokpit-taraf-karsilastirma", layer: LAYER_COCKPIT, title: "Taraf karşılaştırması",
+      summary: `${cockpitRows.length} taraf`,
+      body: (
+        <div className={`grid gap-6 ${cockpitRows.length > 1 ? "sm:grid-cols-2" : ""}`}>
+          {cockpitRows.map((r, i) => (
+            <CockpitPartyColumn
+              key={i}
+              name={r.name}
+              riskPuani={r.risk_puani}
+              uzlasmaPct={r.uzlasma_pct}
+              uzlasmaLabel={r.uzlasma_label}
+              mahkemePct={r.mahkeme_pct}
+              mahkemeLabel={r.mahkeme_label}
+              batna={r.batna}
+            />
+          ))}
+        </div>
+      ),
+    });
+  }
+
+  if (cockpitScenarios.length > 0) {
+    sectionDefs.push({
+      id: "kokpit-senaryolar", layer: LAYER_COCKPIT, title: "Çözüm senaryoları",
+      summary: `${cockpitScenarios.length} senaryo`,
+      body: (
+        <div className="grid sm:grid-cols-3 gap-3">
+          {cockpitScenarios.map((sc: any, i: number) => {
+            const letter = String.fromCharCode(65 + i);
+            const recommended = sc === cockpitStrongestScenario || /⭐/.test(`${sc?.label ?? ""} ${sc?.summary ?? ""}`);
+            return (
+              <CockpitScenarioCard
+                key={i}
+                letter={letter}
+                scenario={sc}
+                recommended={recommended}
+                onClick={() => setOpenScenario({ letter, scenario: sc, recommended })}
+              />
+            );
+          })}
+        </div>
+      ),
+    });
+  }
+
+  if (cockpitCriticalFactors.length > 0) {
+    sectionDefs.push({
+      id: "kokpit-kritik-faktorler", layer: LAYER_COCKPIT, title: "Kritik faktörler",
+      summary: `${cockpitCriticalFactors.length}`,
+      body: <CockpitBadgeFlow items={cockpitCriticalFactors} />,
+    });
+  }
+
+  if (cockpitRedLines.length > 0) {
+    sectionDefs.push({
+      id: "kokpit-kirmizi-cizgiler", layer: LAYER_COCKPIT, title: "Kırmızı çizgiler",
+      summary: `${cockpitRedLines.length}`,
+      body: <CockpitRedLines items={cockpitRedLines} />,
+    });
+  }
+
+  if (cockpitTarafKarsilastirma.length > 0) {
+    sectionDefs.push({
+      id: "kokpit-resmi-karsilastirma", layer: LAYER_COCKPIT, title: "Resmi taraf karşılaştırması",
+      summary: `${cockpitTarafKarsilastirma.length} taraf`,
+      body: <CockpitOfficialComparisonTable items={cockpitTarafKarsilastirma} />,
+    });
+  }
+
+  if (cockpitObstacleList.length > 0) {
+    sectionDefs.push({
+      id: "kokpit-uzlasma-engelleri", layer: LAYER_COCKPIT, title: "Uzlaşma engelleri",
+      summary: `${cockpitObstacleList.length}`,
+      body: <CockpitObstacles items={cockpitObstacleList} />,
+    });
+  }
+
+  if (cockpitMediatorOneri) {
+    sectionDefs.push({
+      id: "kokpit-arabulucu-onerisi", layer: LAYER_COCKPIT, title: "Arabulucu önerisi",
+      body: <CockpitMediatorRecommendation text={cockpitMediatorOneri} />,
+    });
+  }
+
+  if (cockpitKaynakListesi.length > 0) {
+    sectionDefs.push({
+      id: "kokpit-kaynaklar", layer: LAYER_COCKPIT, title: "Kaynaklar",
+      summary: `${cockpitKaynakListesi.length}`,
+      body: <CockpitSources items={cockpitKaynakListesi} sources={cockpitReportData?.sources} />,
+    });
+  }
+
+  if (analyses.length > 0) {
+    sectionDefs.push({
+      id: "kokpit-taraf-analizleri", layer: LAYER_REPORTS, title: "Taraf analizleri",
+      summary: `${analyses.length} taraf`,
+      body: (
+        <div className="divide-y">
+          {analyses.map((a: any, i) => {
+            const cp = a.case_parties || {};
+            const name = cp.company_name || `${cp.first_name ?? ""} ${cp.last_name ?? ""}`.trim() || "Taraf";
+            return (
+              <div key={i} className="py-2.5 text-sm">
+                <div className="font-medium">{name} <span className="text-muted-foreground">({roleLabel(cp.party_role)})</span></div>
+                {a.analysis?.dispute_area && <div><span className="text-muted-foreground">Uyuşmazlık türü: </span>{a.analysis.dispute_area}</div>}
+                {a.analysis?.party_position?.batna && <div><span className="text-muted-foreground">BATNA: </span>{a.analysis.party_position.batna}</div>}
+              </div>
+            );
+          })}
+        </div>
+      ),
+    });
+  }
+
+  // Ortak zemin raporu her zaman görünür: rapor yoksa da üretim düğmesi burada duruyor.
+  sectionDefs.push({
+    id: "kokpit-ortak-zemin", layer: LAYER_REPORTS, title: "Ortak zemin raporu",
+    summary: report ? undefined : "üretilmedi",
+    body: (
+      <div>
+        <div className="flex items-center justify-end mb-2 gap-2 flex-wrap">
+          {report && (
+            <>
+              <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, analyses, mode: "print" })}>PDF</Button>
+              <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, analyses, mode: "html" })}>İndir</Button>
+            </>
+          )}
+          <Button size="sm" onClick={generateReport} disabled={!canReport || reportBusy}>
+            {reportBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {reportStatus ?? "Rapor hazırlanıyor…"}</> : <><Sparkles className="h-4 w-4 mr-1" /> {report ? "Yeniden Üret" : "Rapor Üret"}</>}
+          </Button>
+        </div>
+        {reportBusy && reportAttempt > 1 && (
+          <div className="text-sm text-muted-foreground flex items-center gap-2 mb-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Geçici bir hata oluştu, otomatik olarak tekrar deneniyor ({reportAttempt}/3)…
+          </div>
+        )}
+        {reportError && (
+          <div className="text-sm text-destructive flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-4 w-4" /> {reportError}
+            <Button size="sm" variant="outline" onClick={generateReport}><RefreshCw className="h-4 w-4 mr-1" />Tekrar Dene</Button>
+          </div>
+        )}
+        {report ? (
+          <CommonGroundZeminSection data={report.report} />
+        ) : canReport ? (
+          <p className="text-sm text-muted-foreground italic">Henüz rapor üretilmedi. "Rapor Üret" butonuna basın.</p>
+        ) : (
+          <p className="text-sm text-destructive">
+            Rapor üretmeden önce Aşama 3'te en az bir taraf analizini tamamlayın.
+          </p>
+        )}
+      </div>
+    ),
+  });
+
+  if (report?.report) {
+    sectionDefs.push({
+      id: "kokpit-strateji", layer: LAYER_REPORTS, title: "Strateji",
+      body: <CommonGroundStrategySection data={report.report} strategy={report.strategy} />,
+    });
+  }
+
+  sectionDefs.push({
+    id: "kokpit-kor-teklif", layer: LAYER_REPORTS, title: "Kör teklif",
+    body: <BlindBidMediatorPanel caseId={caseRow.id} />,
+  });
+
+  const layerOrder = [LAYER_TABLE, LAYER_EVIDENCE, LAYER_COCKPIT, LAYER_REPORTS];
+
+  // Sol menüye bölüm listesini bildir. Liste her renderda yeniden kurulduğu için
+  // yalnız id+başlık dizisi değiştiğinde gönderilir (imza karşılaştırması).
+  const sectionSignature = sectionDefs.map((s) => `${s.id}|${s.title}`).join(",");
+  useEffect(() => {
+    onSectionsChange?.(sectionDefs.map((s) => ({ id: s.id, label: s.title })));
+    return () => onSectionsChange?.([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sectionSignature, onSectionsChange]);
+
+  // Sol menüden gelen istek: bölümü aç, sonra oraya yumuşak kaydır.
+  useEffect(() => {
+    if (!jump?.id) return;
+    setOpenSections((prev) => (prev.has(jump.id) ? prev : new Set(prev).add(jump.id)));
+    const t = setTimeout(() => {
+      document.getElementById(jump.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+    return () => clearTimeout(t);
+  }, [jump?.id, jump?.nonce]);
 
   return (
     <div className="space-y-4">
@@ -4514,9 +4899,6 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
       <h2 className="text-lg font-semibold">Aşama 4 — Arabulucu paneli</h2>
       <p className="text-sm text-muted-foreground">Aşama 3'te üretilen taraf analizlerinin özeti ve Ortak Zemin Raporu üretimi.</p>
 
-      {/* Sekme çubuğu en üstte; Genel Bakış sekmesi kokpitin üç katmanını
-          (durum şeridi, masaya otururken, dayanak katmanı) ve kokpit kutusunu taşır.
-          Kartların içeriği ve veri kaynakları değişmedi — yalnız yerleri değişti. */}
       <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
 
         {/* Karşılaştırmalı risk_ozeti otomatik-üretim efekti sessizce çalışmaya devam eder;
@@ -4532,341 +4914,67 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
           </div>
         )}
 
-        {/* ── 4. ESKİ SEKMELER — kokpitin geri kalanı ve eski sekmelerin tamamı
-            burada; hiçbir bölüm silinmeden, tıklanabilir sekmelere dağıtılmış ── */}
-        <motion.div variants={itemVariants}>
-          <Tabs defaultValue="genel-bakis" className="space-y-4">
-            <TabsList className="flex-wrap h-auto">
-              <TabsTrigger value="genel-bakis" className={tabTriggerAccentClass}><LayoutDashboard className="h-4 w-4 mr-1" />Genel Bakış</TabsTrigger>
-              <TabsTrigger value="taraf-analizleri" className={tabTriggerAccentClass}><Users className="h-4 w-4 mr-1" />Taraf Analizleri</TabsTrigger>
-              <TabsTrigger value="ortak-zemin" className={tabTriggerAccentClass}><Lightbulb className="h-4 w-4 mr-1" />Ortak Zemin</TabsTrigger>
-              <TabsTrigger value="strateji" className={tabTriggerAccentClass}><Target className="h-4 w-4 mr-1" />Strateji</TabsTrigger>
-              <TabsTrigger value="kor-teklif" className={tabTriggerAccentClass}><EyeOff className="h-4 w-4 mr-1" />Kör Teklif</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="genel-bakis" className="space-y-6">
-
-              {analyses.length === 0 && (
-                <motion.div variants={itemVariants} className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground italic text-center">
-                  Kokpit, Aşama 3'te en az bir taraf analizi tamamlandığında dolmaya başlar.
-                </motion.div>
-              )}
-
-              {/* ── 1. DURUM ŞERİDİ — dört rakam, hepsi mevcut state'ten; yeni sorgu yok ── */}
-              <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {statusStripItems.map((m, i) => (
-                  <div key={i} className="min-w-0">
-                    <div className="text-sm text-muted-foreground truncate">{m.label}</div>
-                    <div className="text-sm font-semibold truncate">{m.value}</div>
-                    {m.sub && <div className="text-sm text-muted-foreground truncate">{m.sub}</div>}
-                  </div>
-                ))}
-              </motion.div>
-
-              {/* ── 2. MASAYA OTURURKEN — kök neden + sıradaki sorular ── */}
-              {hasTableLayer && (
-                <motion.div variants={itemVariants} className={cockpitLayerBoxClass}>
-                  <div className="text-lg font-semibold">Masaya otururken</div>
-
-                  {/* Kök Neden Analizi — arabulucuya özel stratejik içgörü, party_root_cause_analysis'ten */}
-                  {cockpitRows.length > 0 && (
-                    <CockpitSection title="Kök neden analizi">
-                      <div className={`grid gap-6 ${cockpitRows.length > 1 ? "sm:grid-cols-2" : ""}`}>
-                        {cockpitRows.map((r, i) => (
-                          <CockpitRootCauseCard
-                            key={i}
-                            name={r.name}
-                            rootCause={r.party_id ? rootCauses[r.party_id] : undefined}
-                          />
-                        ))}
-                      </div>
-                    </CockpitSection>
-                  )}
-
-                  {/* Sıradaki 3 Soru — party_communication_analysis.discovery_questions */}
-                  {communicationQuestions.length > 0 && (
-                    <CockpitSection title="Sıradaki 3 soru">
-                      <ol className="space-y-2 list-decimal list-inside">
-                        {communicationQuestions.map((it, i) => {
-                          const soru = safeText(it.q?.soru);
-                          const bosluk = safeText(it.q?.hangi_boslugu_kapatir);
-                          if (!soru) return null;
-                          return (
-                            <li key={`${it.rowId}-q${i}`} className="text-sm leading-snug">
-                              {soru}
-                              {bosluk && (
-                                <div className="mt-0.5 ml-4 text-sm text-muted-foreground leading-snug">
-                                  Kapattığı boşluk: {bosluk}
-                                </div>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ol>
-                    </CockpitSection>
-                  )}
-                </motion.div>
-              )}
-
-              {/* ── 3. DAYANAK KATMANI — iç tutarlılık, rapora girmeyenler, iletişim izleri ── */}
-              {hasEvidenceLayer && (
-                <motion.div variants={itemVariants} className={cockpitLayerBoxClass}>
-                  <div className="text-lg font-semibold">Dayanak katmanı</div>
-
-                  {/* İç Tutarlılık — party_consistency_findings */}
-                  {consistencyItems.length > 0 && (
-                    <CockpitSection
-                      title="İç tutarlılık"
-                      hint="Tarafın kendi beyanı ile kendi belgeleri arasındaki uyumsuzluklar — yorum arabulucuya aittir"
-                    >
-                      <div className="divide-y">
-                        {consistencyItems.map((it, i) => (
-                          <CockpitConsistencyItem
-                            key={`${it.rowId}-${i}`}
-                            finding={it.finding}
-                            partyLabel={it.party_id ? (worklogPartyNameById[it.party_id] ?? null) : null}
-                          />
-                        ))}
-                      </div>
-                    </CockpitSection>
-                  )}
-
-                  {/* Rapora Girmeyenler — agent_worklog(entry_type='rapor_disi') */}
-                  {worklog.length > 0 && (
-                    <CockpitSection
-                      title="Rapora girmeyenler"
-                      hint="Ajanın değerlendirip rapora almadığı hususlar ve önerilen adımlar"
-                    >
-                      <ul className="divide-y">
-                        {worklog.map((w: any) => (
-                          <CockpitOffReportItem
-                            key={w.id}
-                            item={w.content}
-                            partyLabel={w.party_id == null ? "Dosya geneli" : (worklogPartyNameById[w.party_id] ?? null)}
-                          />
-                        ))}
-                      </ul>
-                    </CockpitSection>
-                  )}
-
-                  {/* İletişim ve Asıl İhtiyaç — iz listesi (sorular 2. katmanda) */}
-                  {communicationItems.length > 0 && (
-                    <CockpitSection
-                      title="İletişim ve asıl ihtiyaç"
-                      hint="Tarafın nasıl konuştuğundan çıkan izler — yorum arabulucuya aittir"
-                    >
-                      <div className="divide-y">
-                        {communicationItems.map((it, i) => (
-                          <CockpitCommunicationItem
-                            key={`${it.rowId}-${i}`}
-                            finding={it.finding}
-                            partyLabel={it.party_id ? (worklogPartyNameById[it.party_id] ?? null) : null}
-                          />
-                        ))}
-                      </div>
-                    </CockpitSection>
-                  )}
-                </motion.div>
-              )}
-
-              {report && analyses.length > 0 && (
-                <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="outline" onClick={() => downloadCockpitBriefing({
-                    caseTitle: caseRow.title, caseId: caseRow.id, mode: "print",
-                    uzlasmaPct: heroUzlasmaPct, uzlasmaKaynak: cockpitRiskOzeti?.genel_uzlasma_orani_kaynak, riskPuani: cockpitRiskPuani,
-                    zopa: cockpitReportData?.zopa, tarafKarsilastirma: cockpitTarafKarsilastirma, scenarios: cockpitScenarios,
-                    criticalFactors: cockpitCriticalFactors.map((f) => f.sources.length > 1 ? `${f.text} (${f.sources.join(", ")})` : f.text), redLines: cockpitRedLines, obstacles: cockpitObstacleList,
-                    mediatorOneri: cockpitMediatorOneri, kaynakListesi: cockpitKaynakListesi, sources: cockpitReportData?.sources,
-                  })}>PDF</Button>
-                  <Button size="sm" variant="outline" onClick={() => downloadCockpitBriefing({
-                    caseTitle: caseRow.title, caseId: caseRow.id, mode: "html",
-                    uzlasmaPct: heroUzlasmaPct, uzlasmaKaynak: cockpitRiskOzeti?.genel_uzlasma_orani_kaynak, riskPuani: cockpitRiskPuani,
-                    zopa: cockpitReportData?.zopa, tarafKarsilastirma: cockpitTarafKarsilastirma, scenarios: cockpitScenarios,
-                    criticalFactors: cockpitCriticalFactors.map((f) => f.sources.length > 1 ? `${f.text} (${f.sources.join(", ")})` : f.text), redLines: cockpitRedLines, obstacles: cockpitObstacleList,
-                    mediatorOneri: cockpitMediatorOneri, kaynakListesi: cockpitKaynakListesi, sources: cockpitReportData?.sources,
-                  })}>Kaydet (HTML)</Button>
-                </div>
-              )}
-
-              {analyses.length > 0 && (
-                <div className={cockpitLayerBoxClass}>
-                  {/* Üst şerit: Uzlaşma Tahmini gauge'ı + ZOPA bandı */}
-                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(240px,340px)_1fr] gap-4 items-stretch">
-                    <CockpitGauge pct={heroUzlasmaPct} riskLabel={cockpitRiskPuani} sourceHint={cockpitRiskOzeti?.genel_uzlasma_orani_kaynak} />
-                    <CockpitZopaBand
-                      zopa={cockpitReportData?.zopa}
-                      lowerName={cockpitRows[1]?.name}
-                      upperName={cockpitRows[0]?.name}
-                    />
-                  </div>
-
-                  {/* Taraf karşılaştırma sütunları */}
-                  {cockpitRows.length > 0 && (
-                    <div className={`grid gap-6 border-t pt-4 ${cockpitRows.length > 1 ? "sm:grid-cols-2" : ""}`}>
-                      {cockpitRows.map((r, i) => (
-                        <CockpitPartyColumn
-                          key={i}
-                          name={r.name}
-                          riskPuani={r.risk_puani}
-                          uzlasmaPct={r.uzlasma_pct}
-                          uzlasmaLabel={r.uzlasma_label}
-                          mahkemePct={r.mahkeme_pct}
-                          mahkemeLabel={r.mahkeme_label}
-                          batna={r.batna}
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Senaryo kartları */}
-                  {cockpitScenarios.length > 0 && (
-                    <CockpitSection title="Çözüm senaryoları">
-                      <div className="grid sm:grid-cols-3 gap-3">
-                        {cockpitScenarios.map((sc: any, i: number) => {
-                          const letter = String.fromCharCode(65 + i);
-                          const recommended = sc === cockpitStrongestScenario || /⭐/.test(`${sc?.label ?? ""} ${sc?.summary ?? ""}`);
-                          return (
-                            <CockpitScenarioCard
-                              key={i}
-                              letter={letter}
-                              scenario={sc}
-                              recommended={recommended}
-                              onClick={() => setOpenScenario({ letter, scenario: sc, recommended })}
-                            />
-                          );
-                        })}
-                      </div>
-                    </CockpitSection>
-                  )}
-
-                  {/* Alt şerit: Kritik Faktörler rozet akışı + Kırmızı Çizgiler */}
-                  <div className="grid sm:grid-cols-2 gap-6 border-t pt-4">
-                    <div>
-                      <div className="text-sm font-semibold text-primary mb-2">Kritik faktörler</div>
-                      <CockpitBadgeFlow items={cockpitCriticalFactors} />
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-primary mb-2">Kırmızı çizgiler</div>
-                      <CockpitRedLines items={cockpitRedLines} />
-                    </div>
-                  </div>
-
-                  {/* Resmi risk_ozeti — AI'ın ürettiği taraf karşılaştırması + uzlaşma engelleri */}
-                  {(cockpitTarafKarsilastirma.length > 0 || cockpitObstacleList.length > 0) && (
-                    <div className="grid sm:grid-cols-2 gap-6 border-t pt-4 items-start">
-                      <CockpitOfficialComparisonTable items={cockpitTarafKarsilastirma} />
-                      <div>
-                        <div className="text-sm font-semibold text-primary mb-2">Uzlaşma engelleri</div>
-                        <CockpitObstacles items={cockpitObstacleList} />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Arabulucu önerisi — kokpitin sonuç cümlesi */}
-                  {cockpitMediatorOneri && (
-                    <div className="border-t pt-4">
-                      <CockpitMediatorRecommendation text={cockpitMediatorOneri} />
-                    </div>
-                  )}
-
-                  {/* Kaynaklar — en altta küçük */}
-                  {cockpitKaynakListesi.length > 0 && (
-                    <div className="border-t pt-4">
-                      <CockpitSources items={cockpitKaynakListesi} sources={cockpitReportData?.sources} />
-                    </div>
-                  )}
-                </div>
-              )}
-
-            </TabsContent>
-
-            <TabsContent value="taraf-analizleri" className="space-y-6">
-              {/* Taraf Analizleri (eski sekme) */}
-              {analyses.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-primary mb-2">Taraf analizleri ({analyses.length})</h3>
-                  <div className="divide-y">
-                    {analyses.map((a: any, i) => {
-                      const cp = a.case_parties || {};
-                      const name = cp.company_name || `${cp.first_name ?? ""} ${cp.last_name ?? ""}`.trim() || "Taraf";
-                      return (
-                        <div key={i} className="py-2.5 text-sm">
-                          <div className="font-medium">{name} <span className="text-muted-foreground">({roleLabel(cp.party_role)})</span></div>
-                          {a.analysis?.dispute_area && <div><span className="text-muted-foreground">Uyuşmazlık türü: </span>{a.analysis.dispute_area}</div>}
-                          {a.analysis?.party_position?.batna && <div><span className="text-muted-foreground">BATNA: </span>{a.analysis.party_position.batna}</div>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-            </TabsContent>
-
-            <TabsContent value="ortak-zemin" className="space-y-6">
-              {/* Ortak Zemin Raporu (eski sekme) */}
-              <div>
-                <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-                  <h3 className="text-sm font-semibold text-primary">Ortak zemin raporu</h3>
-                  <div className="flex gap-2 flex-wrap">
-                    {report && (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, analyses, mode: "print" })}>PDF</Button>
-                        <Button size="sm" variant="outline" onClick={() => downloadReport({ caseTitle: caseRow.title, caseId: caseRow.id, report: report.report, strategy: report.strategy, analyses, mode: "html" })}>İndir</Button>
-                      </>
-                    )}
-                    <Button size="sm" onClick={generateReport} disabled={!canReport || reportBusy}>
-                      {reportBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {reportStatus ?? "Rapor hazırlanıyor…"}</> : <><Sparkles className="h-4 w-4 mr-1" /> {report ? "Yeniden Üret" : "Rapor Üret"}</>}
-                    </Button>
-                  </div>
-                </div>
-                {reportBusy && reportAttempt > 1 && (
-                  <div className="text-sm text-muted-foreground flex items-center gap-2 mb-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Geçici bir hata oluştu, otomatik olarak tekrar deneniyor ({reportAttempt}/3)…
-                  </div>
-                )}
-                {reportError && (
-                  <div className="text-sm text-destructive flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-4 w-4" /> {reportError}
-                    <Button size="sm" variant="outline" onClick={generateReport}><RefreshCw className="h-4 w-4 mr-1" />Tekrar Dene</Button>
-                  </div>
-                )}
-                {report ? (
-                  <CommonGroundZeminSection data={report.report} />
-                ) : canReport ? (
-                  <p className="text-sm text-muted-foreground italic">Henüz rapor üretilmedi. "Rapor Üret" butonuna basın.</p>
-                ) : (
-                  <p className="text-sm text-destructive">
-                    Rapor üretmeden önce Aşama 3'te en az bir taraf analizini tamamlayın.
-                  </p>
-                )}
-              </div>
-
-            </TabsContent>
-
-            <TabsContent value="strateji" className="space-y-6">
-              {/* Strateji (eski sekme) */}
-              <div>
-                <h3 className="text-sm font-semibold text-primary mb-2">Strateji</h3>
-                {report?.report ? (
-                  <CommonGroundStrategySection data={report.report} strategy={report.strategy} />
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">Strateji, Ortak Zemin Raporu üretildikten sonra burada görünecek.</p>
-                )}
-              </div>
-
-            </TabsContent>
-
-            <TabsContent value="kor-teklif" className="space-y-6">
-              {/* Kör Teklif (eski sekme) */}
-              <div>
-                <h3 className="text-sm font-semibold text-primary mb-2">Kör teklif</h3>
-                <BlindBidMediatorPanel caseId={caseRow.id} />
-              </div>
-            </TabsContent>
-          </Tabs>
+        {/* ── 1. DURUM ŞERİDİ — ekranda sabit duran tek bölüm; katlanmaz ── */}
+        <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {statusStripItems.map((m, i) => (
+            <div key={i} className="min-w-0">
+              <div className="text-sm text-muted-foreground truncate">{m.label}</div>
+              <div className="text-sm font-semibold truncate">{m.value}</div>
+              {m.sub && <div className="text-sm text-muted-foreground truncate">{m.sub}</div>}
+            </div>
+          ))}
         </motion.div>
+
+        {analyses.length === 0 && (
+          <motion.div variants={itemVariants} className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground italic text-center">
+            Kokpit, Aşama 3'te en az bir taraf analizi tamamlandığında dolmaya başlar.
+          </motion.div>
+        )}
+
+        {/* Kokpit brifingi — bölüm değil, eylem satırı; katlanmaz. */}
+        {report && analyses.length > 0 && (
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => downloadCockpitBriefing({
+              caseTitle: caseRow.title, caseId: caseRow.id, mode: "print",
+              uzlasmaPct: heroUzlasmaPct, uzlasmaKaynak: cockpitRiskOzeti?.genel_uzlasma_orani_kaynak, riskPuani: cockpitRiskPuani,
+              zopa: cockpitReportData?.zopa, tarafKarsilastirma: cockpitTarafKarsilastirma, scenarios: cockpitScenarios,
+              criticalFactors: cockpitCriticalFactors.map((f) => f.sources.length > 1 ? `${f.text} (${f.sources.join(", ")})` : f.text), redLines: cockpitRedLines, obstacles: cockpitObstacleList,
+              mediatorOneri: cockpitMediatorOneri, kaynakListesi: cockpitKaynakListesi, sources: cockpitReportData?.sources,
+            })}>PDF</Button>
+            <Button size="sm" variant="outline" onClick={() => downloadCockpitBriefing({
+              caseTitle: caseRow.title, caseId: caseRow.id, mode: "html",
+              uzlasmaPct: heroUzlasmaPct, uzlasmaKaynak: cockpitRiskOzeti?.genel_uzlasma_orani_kaynak, riskPuani: cockpitRiskPuani,
+              zopa: cockpitReportData?.zopa, tarafKarsilastirma: cockpitTarafKarsilastirma, scenarios: cockpitScenarios,
+              criticalFactors: cockpitCriticalFactors.map((f) => f.sources.length > 1 ? `${f.text} (${f.sources.join(", ")})` : f.text), redLines: cockpitRedLines, obstacles: cockpitObstacleList,
+              mediatorOneri: cockpitMediatorOneri, kaynakListesi: cockpitKaynakListesi, sources: cockpitReportData?.sources,
+            })}>Kaydet (HTML)</Button>
+          </div>
+        )}
+
+        {/* ── 2-5. KATMANLAR — her katman sade başlık + katlanır satırlar ── */}
+        {layerOrder.map((layer) => {
+          const items = sectionDefs.filter((s) => s.layer === layer);
+          if (items.length === 0) return null;
+          return (
+            <motion.div key={layer} variants={itemVariants} className={cockpitLayerBoxClass}>
+              <div className="text-lg font-semibold">{layer}</div>
+              <div>
+                {items.map((s) => (
+                  <CockpitCollapsible
+                    key={s.id}
+                    id={s.id}
+                    title={s.title}
+                    summary={s.summary}
+                    open={openSections.has(s.id)}
+                    onToggle={() => toggleSection(s.id)}
+                  >
+                    {s.body}
+                  </CockpitCollapsible>
+                ))}
+              </div>
+            </motion.div>
+          );
+        })}
 
         <motion.div variants={itemVariants} className="border-t pt-4 flex items-center gap-2 flex-wrap">
           <Label className="text-sm text-muted-foreground shrink-0">UYAP kayıt no</Label>
