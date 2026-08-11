@@ -47,6 +47,45 @@ async function flagSkippedStep(admin: Admin, case_id: string, agent_type: string
   }
 }
 
+// Belirli bir adımın KENDİ agent_states satırını yazar — ilgili function'ların
+// kullandığı anahtarın aynısı (case_id + agent_type + party_id). flagSkippedStep'ten
+// farkı: durumu ve last_output'u çağıran belirler.
+async function upsertStepState(
+  admin: Admin, case_id: string, agent_type: string, party_id: string | null, patch: Record<string, unknown>,
+) {
+  let query = admin.from("agent_states").select("id").eq("case_id", case_id).eq("agent_type", agent_type);
+  query = party_id ? query.eq("party_id", party_id) : query.is("party_id", null);
+  const { data: existing } = await query.maybeSingle();
+  const { error } = existing?.id
+    ? await admin.from("agent_states").update(patch).eq("id", existing.id)
+    : await admin.from("agent_states").insert({ case_id, agent_type, party_id, ...patch });
+  if (error) throw error;
+}
+
+// İletişim analizinin ön koşulu: dosyada görüşme malzemesi var mı?
+// Kaynak (1) case_notes, phase=7 — MeetingNotesPanel/analyze-meeting-notes akışının
+// görüşme notlarını yazdığı yer; (2) case_sessions.notes — oturum özeti alanı.
+// En az bir kayıt varsa VAR sayılır.
+// Sorgu hata verirse VAR kabul edilir: geçici bir okuma hatası yüzünden analiz sessizce
+// atlanmasın — gereksiz çalıştırmak, sessizce atlamaktan daha az zararlı.
+async function hasMeetingMaterial(admin: Admin, case_id: string): Promise<boolean> {
+  try {
+    const [notesRes, sessionsRes] = await Promise.all([
+      admin.from("case_notes").select("id", { count: "exact", head: true }).eq("case_id", case_id).eq("phase", 7),
+      admin.from("case_sessions").select("id").eq("case_id", case_id).not("notes", "is", null).neq("notes", "").limit(1),
+    ]);
+    if (notesRes.error || sessionsRes.error) {
+      console.error("[orchestrator-run] görüşme malzemesi kontrolü hata verdi — analiz çalıştırılacak:",
+        notesRes.error?.message ?? sessionsRes.error?.message);
+      return true;
+    }
+    return (notesRes.count ?? 0) > 0 || (sessionsRes.data ?? []).length > 0;
+  } catch (e: any) {
+    console.error(`[orchestrator-run] görüşme malzemesi kontrolü başarısız — analiz çalıştırılacak: ${e?.message ?? String(e)}`);
+    return true;
+  }
+}
+
 async function callFn(supabaseUrl: string, authHeader: string, anonKey: string, name: string, body: unknown) {
   const res = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
     method: "POST",
@@ -227,6 +266,27 @@ Deno.serve(async (req) => {
         steps.push({ step: be.step, status: "skipped", detail: "taraf yok" });
         continue;
       }
+
+      // İletişim analizi KOŞULLU: dosyada görüşme malzemesi yoksa hiçbir taraf için
+      // çağrılmaz. Zincirden çıkarılmadı — atlandığı, her tarafın kendi satırında
+      // gerekçesiyle görünür. İç tutarlılık denetimi bu koşuldan etkilenmez.
+      if (be.step === "party_communication" && !(await hasMeetingMaterial(admin, case_id))) {
+        for (const p of parties) {
+          try {
+            await upsertStepState(admin, case_id, be.step, p.id, {
+              status: "completed",
+              error_message: null,
+              last_output: { current_step: "atlandı — görüşme notu yok" },
+            });
+          } catch (e: any) {
+            console.error(`[orchestrator-run] ${be.step} atlandı satırı yazılamadı: ${e?.message ?? String(e)}`);
+          }
+        }
+        console.log(`[orchestrator-run] ${be.step} atlandı: görüşme notu yok (case=${case_id})`);
+        steps.push({ step: be.step, status: "skipped", detail: "görüşme notu yok" });
+        continue;
+      }
+
       await progress(be.step);
       const failures: string[] = [];
       for (const p of parties) {
