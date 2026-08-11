@@ -3870,13 +3870,16 @@ function printSectionsPdf(opts: {
 // sağda kısa özet + ok; içerik tıklanınca açılır. Kutu içinde kutu olmaması için
 // Card yerine ince üst ayraç kullanılır — Faz 3'teki etkileşimin aynısı.
 function CockpitCollapsible({
-  id, title, summary, hint, open, onToggle, onPdf, children,
+  id, title, summary, hint, open, onToggle, pdfActions, children,
 }: {
   id: string; title: string; summary?: string; hint?: string; open: boolean; onToggle: () => void;
   // Yalnız çıktısı olan bölümlerde dolu gelir; boşsa PDF düğmesi hiç çizilmez.
-  onPdf?: () => void;
+  // Bir bölüm rapor tarafında birden çok kaleme ayrılmışsa her kalem kendi düğmesini alır.
+  pdfActions?: { label: string; run: () => void }[];
   children: React.ReactNode;
 }) {
+  const actions = pdfActions ?? [];
+  const single = actions.length === 1;
   return (
     <div id={id} className="border-t scroll-mt-24">
       <div className="flex items-center gap-2">
@@ -3892,17 +3895,18 @@ function CockpitCollapsible({
             {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </span>
         </button>
-        {onPdf && (
+        {actions.map((a) => (
           <Button
+            key={a.label}
             size="sm"
             variant="outline"
             className="h-7 px-2 text-xs shrink-0"
-            onClick={onPdf}
-            title={`${title} — PDF`}
+            onClick={a.run}
+            title={`${a.label} — PDF`}
           >
-            PDF
+            {single ? "PDF" : `${a.label} PDF`}
           </Button>
-        )}
+        ))}
       </div>
       {open && <div className="pb-4">{children}</div>}
     </div>
@@ -4639,7 +4643,10 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     // Başlığa ve sol menü satırına bağlanan tek cümlelik ipucu (title/tooltip).
     hint?: string;
     // PDF alanı yalnız çıktısı olan bölümlerde dolar — düğme de yalnız o zaman çıkar.
+    // Varsayılan: bölüm = tek PDF kalemi. `pdfs` verilirse bölüm, rapor/PDF tarafında
+    // birden çok kaleme AYRILIR; ekrandaki bölüm tek parça görünmeye devam eder.
     pdf?: { confidential: boolean; html: () => string };
+    pdfs?: { id: string; title: string; confidential: boolean; html: () => string }[];
   };
   // Bölüm ipuçları tek yerde: hem sağdaki başlıkta hem sol menüde aynı metin görünür.
   const SECTION_HINTS: Record<string, string> = {
@@ -4831,18 +4838,28 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     sectionDefs.push({
       id: "kokpit-uzlasma-zopa", layer: LAYER_COCKPIT, title: "Uzlaşma tahmini ve ZOPA",
       summary: heroUzlasmaPct !== null ? `%${heroUzlasmaPct}` : undefined,
-      // Kokpit çıktıları arabulucu masasının kendi görünümü — kokpit brifingi de
-      // "GİZLİ — Yalnızca Arabulucu İçindir" bandıyla çıkıyor, aynı kural izlenir.
-      pdf: { confidential: true, html: () => {
-        const z = cockpitReportData?.zopa;
-        return `<p><b>Genel uzlaşma tahmini:</b> ${heroUzlasmaPct !== null ? `%${heroUzlasmaPct}` : "Yeterli veri yok"}`
-          + `${cockpitRiskPuani ? ` &nbsp;•&nbsp; <b>Risk:</b> ${pdfEsc(cockpitRiskPuani)}` : ""}</p>`
-          + (cockpitRiskOzeti?.genel_uzlasma_orani_kaynak ? `<p class="muted">${pdfEsc(cockpitRiskOzeti.genel_uzlasma_orani_kaynak)}</p>` : "")
-          + (z && (z.lower_bound || z.upper_bound || z.description)
+      // Rapor tarafında İKİYE ayrılır: uzlaşma tahmini taraflarla paylaşılabilir,
+      // ZOPA (kabul aralığı) arabulucuya özeldir. Ekranda tek bölüm görünmeye devam eder.
+      pdfs: [
+        {
+          id: "kokpit-uzlasma-tahmini", title: "Uzlaşma tahmini", confidential: false,
+          html: () => `<p><b>Genel uzlaşma tahmini:</b> ${heroUzlasmaPct !== null ? `%${heroUzlasmaPct}` : "Yeterli veri yok"}`
+            + `${cockpitRiskPuani ? ` &nbsp;•&nbsp; <b>Risk:</b> ${pdfEsc(cockpitRiskPuani)}` : ""}</p>`
+            + (cockpitRiskOzeti?.genel_uzlasma_orani_kaynak
+                ? `<p><b>Nasıl türetildi:</b> ${pdfEsc(cockpitRiskOzeti.genel_uzlasma_orani_kaynak)}</p>`
+                : `<p class="muted">Türetim açıklaması bulunmuyor.</p>`),
+        },
+        {
+          id: "kokpit-zopa", title: "ZOPA (olası anlaşma aralığı)", confidential: true,
+          html: () => {
+            const z = cockpitReportData?.zopa;
+            return z && (z.lower_bound || z.upper_bound || z.description)
               ? `<p><b>Alt sınır:</b> ${pdfEsc(z.lower_bound || "—")} &nbsp;•&nbsp; <b>Üst sınır:</b> ${pdfEsc(z.upper_bound || "—")}</p>`
-                + `<p>${pdfEsc(z.description || "")}</p>`
-              : `<p class="muted">ZOPA için yeterli veri yok</p>`);
-      } },
+                + `<p><b>Dayanağı:</b> ${pdfEsc(z.description || "Belirtilmemiş")}</p>`
+              : `<p class="muted">ZOPA için yeterli veri yok</p>`;
+          },
+        },
+      ],
       body: (
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(240px,340px)_1fr] gap-4 items-stretch">
           <CockpitGauge pct={heroUzlasmaPct} riskLabel={cockpitRiskPuani} sourceHint={cockpitRiskOzeti?.genel_uzlasma_orani_kaynak} />
@@ -5107,8 +5124,14 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   // Sol menüden bir bölüme atlanınca önce kapsayan katmanın açılması gerekir.
   const layerIdBySectionId: Record<string, string> = {};
   sectionDefs.forEach((x) => { layerIdBySectionId[x.id] = LAYER_META[x.layer].id; });
-  // Çıktısı olan bölümler — hem tekil PDF düğmesi hem birleşik rapor seçim listesi buradan.
-  const pdfSections = sectionDefs.filter((x) => !!x.pdf);
+  // Çıktı kalemleri — hem tekil PDF düğmesi hem birleşik rapor seçim listesi buradan.
+  // Bir bölüm `pdfs` ile birden çok kaleme ayrılabilir (bkz. uzlaşma tahmini / ZOPA).
+  const pdfSections = sectionDefs.flatMap((x) => {
+    const common = { layer: x.layer, sectionId: x.id };
+    if (x.pdfs) return x.pdfs.map((pd) => ({ ...pd, ...common }));
+    if (x.pdf) return [{ id: x.id, title: x.title, confidential: x.pdf.confidential, html: x.pdf.html, ...common }];
+    return [];
+  });
 
   // Sol menüye bölüm listesini bildir. Liste her renderda yeniden kurulduğu için
   // yalnız id+başlık dizisi değiştiğinde gönderilir (imza karşılaştırması).
@@ -5287,11 +5310,14 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
                     hint={SECTION_HINTS[s.id]}
                     open={openSections.has(s.id)}
                     onToggle={() => toggleSection(s.id)}
-                    onPdf={s.pdf ? () => printSectionsPdf({
-                      caseTitle: caseRow.title, caseId: caseRow.id,
-                      docTitle: s.title, confidential: s.pdf!.confidential,
-                      sections: [{ title: s.title, html: s.pdf!.html() }],
-                    }) : undefined}
+                    pdfActions={pdfSections.filter((x) => x.sectionId === s.id).map((x) => ({
+                      label: x.title,
+                      run: () => printSectionsPdf({
+                        caseTitle: caseRow.title, caseId: caseRow.id,
+                        docTitle: x.title, confidential: x.confidential,
+                        sections: [{ title: x.title, html: x.html() }],
+                      }),
+                    }))}
                   >
                     {s.body}
                   </CockpitCollapsible>
@@ -5356,7 +5382,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
                         })}
                       />
                       <span className="flex-1">{x.title}</span>
-                      {x.pdf!.confidential && <span className="text-xs text-muted-foreground">arabulucuya özel</span>}
+                      {x.confidential && <span className="text-xs text-muted-foreground">arabulucuya özel</span>}
                     </label>
                   ))}
                 </div>
@@ -5365,7 +5391,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
           })}
           {/* Seçimde tek bir gizli bölüm varsa ibare TÜM belgeye basılır — karışık
               belgede sayfa sayfa ayırmak güvenli değil. */}
-          {pdfSections.some((x) => pickedSections.has(x.id) && x.pdf!.confidential) && (
+          {pdfSections.some((x) => pickedSections.has(x.id) && x.confidential) && (
             <p className="text-sm text-destructive">
               Seçimde arabulucuya özel bölüm var — belgenin her sayfasına "{PDF_CONFIDENTIAL_NOTE}" ibaresi basılacak.
             </p>
@@ -5381,8 +5407,8 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
                 printSectionsPdf({
                   caseTitle: caseRow.title, caseId: caseRow.id,
                   docTitle: "Arabulucu Raporu",
-                  confidential: chosen.some((x) => x.pdf!.confidential),
-                  sections: chosen.map((x) => ({ title: x.title, html: x.pdf!.html() })),
+                  confidential: chosen.some((x) => x.confidential),
+                  sections: chosen.map((x) => ({ title: x.title, html: x.html() })),
                 });
                 setReportPickerOpen(false);
               }}
