@@ -4418,22 +4418,11 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   const analysedCount = analyses.length;
   const canReport = analysedCount >= 1;
 
-  if (loading) return (
-    <Card className="p-6 flex items-center gap-2 text-sm text-muted-foreground">
-      <Loader2 className="h-4 w-4 animate-spin" /> Risk verileri ve taraf analizleri yükleniyor…
-    </Card>
-  );
-
-  if (loadErr) return (
-    <Card className="p-6 space-y-3">
-      <div className="flex items-center gap-2 text-destructive font-semibold text-sm">
-        <AlertTriangle className="h-4 w-4" /> Risk & analiz verileri yüklenemedi
-      </div>
-      <p className="text-xs text-muted-foreground break-words">{trErr(loadErr)}</p>
-      <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-3 w-3 mr-1" /> Tekrar Dene</Button>
-    </Card>
-  );
-
+  // NOT (React hata #310 — canlıda beyaz ekran): yükleme/hata erken return'leri
+  // BİLEREK aşağıya, TÜM hook çağrılarından sonraya alındı. Buradayken, kendilerinden
+  // sonra tanımlanan iki useEffect ilk render'da hiç çalışmıyor, veri gelince
+  // çalışıyordu; hook sayısı render'dan render'a değiştiği için React çöküyordu.
+  // Bu bloğa hook'tan önce hiçbir return eklenmemeli.
   const heroUzlasmaPct = (() => {
     const fromReport = parsePercent(report?.risk_ozeti?.genel_uzlasma_orani);
     if (fromReport !== null) return fromReport;
@@ -4857,11 +4846,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   // Sol menüye bölüm listesini bildir. Liste her renderda yeniden kurulduğu için
   // yalnız id+başlık dizisi değiştiğinde gönderilir (imza karşılaştırması).
   const sectionSignature = sectionDefs.map((s) => `${s.id}|${s.title}`).join(",");
+  const sectionsReady = !loading && !loadErr;
   useEffect(() => {
-    onSectionsChange?.(sectionDefs.map((s) => ({ id: s.id, label: s.title })));
+    onSectionsChange?.(sectionsReady ? sectionDefs.map((s) => ({ id: s.id, label: s.title })) : []);
     return () => onSectionsChange?.([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sectionSignature, onSectionsChange]);
+  }, [sectionSignature, sectionsReady, onSectionsChange]);
 
   // Sol menüden gelen istek: bölümü aç, sonra oraya yumuşak kaydır.
   useEffect(() => {
@@ -4872,6 +4862,22 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     }, 60);
     return () => clearTimeout(t);
   }, [jump?.id, jump?.nonce]);
+
+  if (loading) return (
+    <Card className="p-6 flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" /> Risk verileri ve taraf analizleri yükleniyor…
+    </Card>
+  );
+
+  if (loadErr) return (
+    <Card className="p-6 space-y-3">
+      <div className="flex items-center gap-2 text-destructive font-semibold text-sm">
+        <AlertTriangle className="h-4 w-4" /> Risk & analiz verileri yüklenemedi
+      </div>
+      <p className="text-xs text-muted-foreground break-words">{trErr(loadErr)}</p>
+      <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-3 w-3 mr-1" /> Tekrar Dene</Button>
+    </Card>
+  );
 
   return (
     <div className="space-y-4">
