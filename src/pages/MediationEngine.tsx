@@ -3766,18 +3766,44 @@ function downloadCockpitBriefing(opts: {
 }
 
 /* ===================== PHASE 4 KOKPİT — Genel Bakış sekmesi bileşenleri ===================== */
-// Dashboard'daki hero istatistik kartı (koyu bg-sidebar, CountUp altın rakamlar) deseninin
-// Faz 4 "Genel Bakış" sekmesi için komuta-merkezi yerleşimine uyarlanmış hali. Sadece görsel
-// sunum — veri kaynakları mevcut report.report / analyses alanlarıyla birebir aynı.
-const COCKPIT_TONE_BG: Record<"low" | "medium" | "high" | "unknown", string> = {
-  low: "bg-emerald-400", medium: "bg-amber-400", high: "bg-red-400", unknown: "bg-accent",
-};
-const COCKPIT_TONE_TEXT: Record<"low" | "medium" | "high" | "unknown", string> = {
-  low: "text-emerald-400", medium: "text-amber-400", high: "text-red-400", unknown: "text-accent",
-};
+// Görsel dil Faz 3'teki P3Section kalıbıyla aynı: zemin beyaz, bölümler ince ayraçla
+// ayrılır, kutu içinde kutu yoktur. Renk YALNIZ durum rozetlerinde (risk seviyesi, güven
+// seviyesi) kullanılır; lacivert (primary) yalnız başlık ve düğmelerde, gövde metni siyah,
+// açıklamalar gri. Veri kaynakları ve prop'lar değişmedi — yalnız sunum.
+
+// Kokpit bölümü: başlık + ince üst ayraç. Faz 3'teki P3Section'ın kokpit karşılığı.
+function CockpitSection({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  if (isBlankNode(children)) return null;
+  return (
+    <div className="border-t pt-4">
+      <div className="text-sm font-semibold text-primary">{title}</div>
+      {hint && <p className="text-sm text-muted-foreground mt-0.5">{hint}</p>}
+      <div className="mt-2">{children}</div>
+    </div>
+  );
+}
+
+// Kart içi en fazla üç satır kuralının karşılığı: uzun dayanak/gerekçe metinleri
+// silinmez, bu açılımın altına alınır. CockpitRootCauseCard'daki "Açıkla/Gizle"
+// düğmesinin aynısı, tek yerde toplanmış hali.
+function CockpitDisclosure({ label = "Açıkla", children }: { label?: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  if (isBlankNode(children)) return null;
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-sm font-medium text-primary hover:underline"
+      >
+        {open ? "Gizle" : label}
+      </button>
+      {open && <div className="mt-1.5 space-y-1.5">{children}</div>}
+    </div>
+  );
+}
 
 function CockpitGauge({ pct, riskLabel, sourceHint }: { pct: number | null; riskLabel?: string; sourceHint?: string }) {
-  const tone = normalizeRiskLevel(riskLabel);
   const empty = pct === null;
   const clamped = empty ? 0 : Math.min(100, Math.max(0, pct));
   const r = 80;
@@ -3785,27 +3811,27 @@ function CockpitGauge({ pct, riskLabel, sourceHint }: { pct: number | null; risk
   const dashOffset = circumference * (1 - clamped / 100);
   return (
     <div className="flex flex-col items-center justify-center h-full">
-      <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-1">Uzlaşma Tahmini</div>
+      <div className="text-sm font-semibold text-primary mb-1">Uzlaşma tahmini</div>
       <div className="relative w-full max-w-[220px]">
         <svg viewBox="0 0 200 100" className="w-full">
-          <path d="M20,90 A80,80 0 0 1 180,90" fill="none" stroke="currentColor" strokeWidth="14" strokeLinecap="round" className="text-sidebar-accent/60" />
+          <path d="M20,90 A80,80 0 0 1 180,90" fill="none" stroke="currentColor" strokeWidth="14" strokeLinecap="round" className="text-muted" />
           <path
             d="M20,90 A80,80 0 0 1 180,90" fill="none" stroke="currentColor" strokeWidth="14" strokeLinecap="round"
             strokeDasharray={circumference} strokeDashoffset={dashOffset}
-            className={empty ? "text-sidebar-foreground/15" : COCKPIT_TONE_TEXT[tone]}
+            className={empty ? "text-muted" : "text-primary"}
             style={{ transition: "stroke-dashoffset 1s ease-out" }}
           />
         </svg>
         <div className="absolute inset-x-0 bottom-0 flex justify-center">
-          <div className={`font-display font-bold tabular-nums leading-none ${empty ? "text-3xl text-sidebar-foreground/30" : `text-5xl ${COCKPIT_TONE_TEXT[tone]}`}`}>
+          <div className={`font-display font-bold tabular-nums leading-none ${empty ? "text-3xl text-muted-foreground" : "text-5xl text-foreground"}`}>
             {empty ? "—" : <PhaseHeroCountUp value={clamped} suffix="%" />}
           </div>
         </div>
       </div>
       {riskLabel && !empty && (
-        <span className={`mt-2 text-[11px] font-medium px-2 py-0.5 rounded-full ${riskBadgeTone(riskLabel)}`}>{riskLabel} Risk</span>
+        <span className={`mt-2 text-xs font-medium px-2 py-0.5 rounded-full ${riskBadgeTone(riskLabel)}`}>{riskLabel} risk</span>
       )}
-      {sourceHint && <div className="text-[11px] text-sidebar-foreground/45 mt-1.5 italic text-center max-w-[220px]">{sourceHint}</div>}
+      {sourceHint && <div className="text-sm text-muted-foreground mt-1.5 text-center max-w-[220px]">{sourceHint}</div>}
     </div>
   );
 }
@@ -3814,42 +3840,42 @@ function CockpitZopaBand({ zopa, lowerName, upperName }: { zopa: any; lowerName?
   const hasData = zopa && (zopa.lower_bound || zopa.upper_bound || zopa.description);
   if (!hasData) {
     return (
-      <div className="rounded-xl border border-dashed border-sidebar-border/70 bg-sidebar-accent/20 p-5 flex flex-col items-center justify-center text-center h-full min-h-[140px]">
-        <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-2">Uzlaşma Alanı (ZOPA)</div>
-        <p className="text-sm text-sidebar-foreground/50 italic">ZOPA için rapor üretin</p>
+      <div className="flex flex-col items-center justify-center text-center h-full min-h-[140px]">
+        <div className="text-sm font-semibold text-primary mb-1">Uzlaşma alanı (ZOPA)</div>
+        <p className="text-sm text-muted-foreground italic">ZOPA için rapor üretin</p>
       </div>
     );
   }
   return (
-    <div className="rounded-xl border border-sidebar-border bg-sidebar-accent/20 p-5 space-y-3 h-full">
-      <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Uzlaşma Alanı (ZOPA)</div>
+    <div className="space-y-3 h-full">
+      <div className="text-sm font-semibold text-primary">Uzlaşma alanı (ZOPA)</div>
       <div className="flex items-center gap-3">
         <div className="shrink-0">
-          <div className="text-[10px] text-sidebar-foreground/50 uppercase tracking-wide">{lowerName ? `${lowerName} alt teklifi` : "Alt teklif"}</div>
-          <div className="font-display text-lg font-bold text-sidebar-foreground">{zopa.lower_bound || "?"}</div>
+          <div className="text-sm text-muted-foreground">{lowerName ? `${lowerName} alt teklifi` : "Alt teklif"}</div>
+          <div className="font-display text-lg font-bold">{zopa.lower_bound || "?"}</div>
         </div>
-        <div className="flex-1 h-3 rounded-full bg-sidebar-border/60 relative overflow-hidden">
-          <div className="absolute inset-y-0 left-[15%] right-[15%] rounded-full bg-accent/80" />
+        <div className="flex-1 h-3 rounded-full bg-muted relative overflow-hidden">
+          <div className="absolute inset-y-0 left-[15%] right-[15%] rounded-full bg-primary/70" />
         </div>
         <div className="shrink-0 text-right">
-          <div className="text-[10px] text-sidebar-foreground/50 uppercase tracking-wide">{upperName ? `${upperName} üst talebi` : "Üst talep"}</div>
-          <div className="font-display text-lg font-bold text-sidebar-foreground">{zopa.upper_bound || "?"}</div>
+          <div className="text-sm text-muted-foreground">{upperName ? `${upperName} üst talebi` : "Üst talep"}</div>
+          <div className="font-display text-lg font-bold">{zopa.upper_bound || "?"}</div>
         </div>
       </div>
-      {zopa.description && <p className="text-xs text-sidebar-foreground/60 leading-snug">{zopa.description}</p>}
+      {zopa.description && <p className="text-sm text-muted-foreground leading-snug">{zopa.description}</p>}
     </div>
   );
 }
 
-function CockpitMiniBar({ label, pct, valueLabel, tone }: { label: string; pct: number | null; valueLabel: string; tone: "low" | "medium" | "high" | "unknown" }) {
+function CockpitMiniBar({ label, pct, valueLabel }: { label: string; pct: number | null; valueLabel: string }) {
   return (
     <div className="space-y-1">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[11px] text-sidebar-foreground/50">{label}</span>
-        <span className="text-xs font-semibold text-sidebar-foreground">{valueLabel}</span>
+        <span className="text-sm text-muted-foreground">{label}</span>
+        <span className="text-sm font-medium">{valueLabel}</span>
       </div>
-      <div className="h-1.5 rounded-full bg-sidebar-border/60 overflow-hidden">
-        <div className={`h-full rounded-full ${COCKPIT_TONE_BG[tone]}`} style={{ width: pct !== null ? `${Math.min(100, Math.max(0, pct))}%` : "0%" }} />
+      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+        <div className="h-full rounded-full bg-primary" style={{ width: pct !== null ? `${Math.min(100, Math.max(0, pct))}%` : "0%" }} />
       </div>
     </div>
   );
@@ -3861,18 +3887,17 @@ function CockpitPartyColumn({
   name: string; riskPuani?: string; uzlasmaPct: number | null; uzlasmaLabel: string;
   mahkemePct: number | null; mahkemeLabel: string; batna: string;
 }) {
-  const tone = normalizeRiskLevel(riskPuani);
   return (
-    <div className="rounded-xl border border-sidebar-border bg-sidebar-accent/25 p-4 space-y-3">
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <div className="font-display font-semibold text-sidebar-foreground truncate">{name}</div>
-        <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${riskBadgeTone(riskPuani)}`}>{riskPuani || "—"}</span>
+        <div className="text-sm font-semibold truncate">{name}</div>
+        <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${riskBadgeTone(riskPuani)}`}>{riskPuani || "—"}</span>
       </div>
-      <CockpitMiniBar label="Anlaşma Oranı" pct={uzlasmaPct} valueLabel={uzlasmaLabel} tone={tone} />
-      <CockpitMiniBar label="Mahkeme Riski" pct={mahkemePct} valueLabel={mahkemeLabel} tone={tone} />
+      <CockpitMiniBar label="Anlaşma oranı" pct={uzlasmaPct} valueLabel={uzlasmaLabel} />
+      <CockpitMiniBar label="Mahkeme riski" pct={mahkemePct} valueLabel={mahkemeLabel} />
       <div>
-        <div className="text-[11px] text-sidebar-foreground/50 uppercase tracking-wide mb-0.5">BATNA Gücü</div>
-        <div className="text-xs text-sidebar-foreground/80 leading-snug line-clamp-2">{batna || "—"}</div>
+        <div className="text-sm text-muted-foreground">BATNA gücü</div>
+        <div className="text-sm leading-snug line-clamp-2">{batna || "—"}</div>
       </div>
     </div>
   );
@@ -3889,6 +3914,10 @@ function confidenceBadgeTone(raw?: string): string {
   }
 }
 
+// Rozet olmayan, yalnız etiketleyen küçük çipler (taraf adı, iz tipi, kategori) —
+// bunlar durum bildirmediği için renksiz kalır.
+const cockpitTagClass = "text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground";
+
 // Faz 4 kokpiti, mediator-only: party_root_cause_analysis satırı hiç yoksa veya kok_neden
 // boş {} ise nazik boş durum gösterir — uydurma metin YOK.
 function CockpitRootCauseCard({
@@ -3897,7 +3926,6 @@ function CockpitRootCauseCard({
   name: string;
   rootCause?: { gorunen_talep?: string; asil_mesele?: string; dayanak?: string; guven_seviyesi?: string } | null;
 }) {
-  const [showBasis, setShowBasis] = useState(false);
   const asilMesele = safeText(rootCause?.asil_mesele);
   const gorunenTalep = safeText(rootCause?.gorunen_talep);
   const dayanak = safeText(rootCause?.dayanak);
@@ -3905,46 +3933,34 @@ function CockpitRootCauseCard({
   const hasData = !!(asilMesele || gorunenTalep) && !isInsufficient;
 
   return (
-    <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 space-y-2.5">
+    <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50">Kök Neden Analizi</span>
+        <span className="text-sm font-medium truncate">{name}</span>
         {rootCause?.guven_seviyesi && (
-          <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${confidenceBadgeTone(rootCause.guven_seviyesi)}`}>
+          <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${confidenceBadgeTone(rootCause.guven_seviyesi)}`}>
             {rootCause.guven_seviyesi}
           </span>
         )}
       </div>
-      <div className="text-xs font-medium text-sidebar-foreground/70 truncate">{name}</div>
 
       {!hasData && !isInsufficient ? (
-        <p className="text-xs text-sidebar-foreground/50 italic">
+        <p className="text-sm text-muted-foreground italic">
           Kök neden analizi henüz üretilmedi — taraf analizi çalıştırıldığında oluşur.
         </p>
       ) : isInsufficient ? (
-        <p className="text-xs text-sidebar-foreground/50 italic">Yeterli veri yok.</p>
+        <p className="text-sm text-muted-foreground italic">Yeterli veri yok.</p>
       ) : (
-        <div className="space-y-1.5">
-          <div className="text-xs text-sidebar-foreground/80 leading-snug">
-            <span className="text-sidebar-foreground/50">Görünen talep: </span>{gorunenTalep || "—"}
+        <div className="space-y-1">
+          <div className="text-sm leading-snug">
+            <span className="text-muted-foreground">Görünen talep: </span>{gorunenTalep || "—"}
           </div>
-          <div className="text-xs text-sidebar-foreground/80 leading-snug">
-            <span className="text-sidebar-foreground/50">Asıl mesele: </span>{asilMesele || "—"}
+          <div className="text-sm leading-snug">
+            <span className="text-muted-foreground">Asıl mesele: </span>{asilMesele || "—"}
           </div>
           {dayanak && (
-            <div>
-              <button
-                type="button"
-                onClick={() => setShowBasis((v) => !v)}
-                className="text-[11px] font-medium text-accent hover:underline"
-              >
-                {showBasis ? "Gizle" : "Açıkla"}
-              </button>
-              {showBasis && (
-                <p className="mt-1 text-[11px] text-sidebar-foreground/60 leading-snug italic">
-                  Dayanak: {dayanak}
-                </p>
-              )}
-            </div>
+            <CockpitDisclosure>
+              <p className="text-sm text-muted-foreground leading-snug">Dayanak: {dayanak}</p>
+            </CockpitDisclosure>
           )}
         </div>
       )}
@@ -3957,27 +3973,26 @@ function CockpitScenarioCard({ letter, scenario, recommended, onClick }: { lette
     <button
       type="button"
       onClick={onClick}
-      className={`group relative w-full text-left rounded-xl border p-3 space-y-1.5 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${recommended ? "border-accent/60 bg-accent/10 hover:border-accent" : "border-sidebar-border bg-sidebar-accent/20 hover:border-accent/40"}`}
+      className="group w-full text-left rounded-md border p-3 space-y-1.5 cursor-pointer transition-colors hover:border-primary/40 hover:bg-accent/20"
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-display font-bold text-accent">{letter}</span>
-        {recommended && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-sidebar-background">⭐ Önerilen</span>}
+        <span className="text-sm font-semibold text-primary">{letter}</span>
+        {recommended && <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground">Önerilen</span>}
       </div>
-      <div className="text-sm font-medium text-sidebar-foreground line-clamp-1">{scenario.label || "Senaryo"}</div>
-      <p className="text-xs text-sidebar-foreground/60 line-clamp-2">{scenario.summary}</p>
-      <div className="text-[10px] font-medium text-accent opacity-0 group-hover:opacity-100 transition-opacity text-right">Detay →</div>
+      <div className="text-sm font-medium line-clamp-1">{scenario.label || "Senaryo"}</div>
+      <p className="text-sm text-muted-foreground line-clamp-2">{scenario.summary}</p>
     </button>
   );
 }
 
 function CockpitBadgeFlow({ items }: { items: { text: string; sources: string[] }[] }) {
-  if (items.length === 0) return <p className="text-xs text-sidebar-foreground/40 italic">Henüz belirlenmedi</p>;
+  if (items.length === 0) return <p className="text-sm text-muted-foreground italic">Henüz belirlenmedi</p>;
   return (
     <div className="flex flex-wrap gap-1.5">
       {items.map((f, i) => (
         <span
           key={i}
-          className="text-[11px] px-2 py-1 rounded-full bg-sidebar-accent/40 border border-sidebar-border text-sidebar-foreground/80"
+          className={cockpitTagClass}
           title={f.sources.length > 1 ? `Vurgulayan taraflar: ${f.sources.join(", ")}` : f.sources[0]}
         >
           {f.text}
@@ -3988,38 +4003,44 @@ function CockpitBadgeFlow({ items }: { items: { text: string; sources: string[] 
   );
 }
 
+// Kırmızı çizgiler kritik uyarıdır: kutu değil, tek satır kırmızı metin.
 function CockpitRedLines({ items }: { items: string[] }) {
-  if (items.length === 0) return <p className="text-xs text-sidebar-foreground/40 italic">Henüz belirlenmedi</p>;
+  if (items.length === 0) return <p className="text-sm text-muted-foreground italic">Henüz belirlenmedi</p>;
   return (
     <ul className="space-y-1">
       {items.map((r, i) => (
-        <li key={i} className="flex items-start gap-1.5 text-xs text-sidebar-foreground/80">
-          <ShieldCheck className="h-3 w-3 mt-0.5 shrink-0 text-red-400" />
-          <span>{r}</span>
-        </li>
+        <li key={i} className="text-sm text-destructive leading-snug">{r}</li>
       ))}
     </ul>
   );
 }
 
 // risk_ozeti'nin AI tarafından üretilmiş resmi taraf karşılaştırma tablosu — CockpitPartyColumn'daki
-// tarafın kendi risk_analizi'nden anlık hesaplanan verilerle karışmasın diye ayrı, koyu tema kart.
+// tarafın kendi risk_analizi'nden anlık hesaplanan verilerle karışmasın diye ayrı bölüm.
 function CockpitOfficialComparisonTable({ items }: { items: any[] }) {
   if (items.length === 0) return null;
   return (
-    <div className="rounded-xl border border-sidebar-border bg-sidebar-accent/20 p-4 space-y-3">
-      <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Resmi Taraf Karşılaştırması</div>
-      <div className="grid sm:grid-cols-2 gap-3">
+    <div className="space-y-3">
+      <div className="text-sm font-semibold text-primary">Resmi taraf karşılaştırması</div>
+      <div className="grid sm:grid-cols-2 gap-4">
         {items.map((t: any, i: number) => (
-          <div key={i} className="rounded-lg border border-sidebar-border/70 bg-sidebar-accent/25 p-3 space-y-1.5">
+          <div key={i} className="space-y-1">
             <div className="flex items-center justify-between gap-2">
-              <span className="font-display font-semibold text-sm text-sidebar-foreground truncate">{safeText(t?.taraf) || `Taraf ${i + 1}`}</span>
+              <span className="text-sm font-medium truncate">{safeText(t?.taraf) || `Taraf ${i + 1}`}</span>
               {t?.risk_puani && (
-                <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${riskBadgeTone(t.risk_puani)}`}>{t.risk_puani}</span>
+                <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${riskBadgeTone(t.risk_puani)}`}>{t.risk_puani}</span>
               )}
             </div>
-            {t?.guclu_yon && <div className="text-xs text-emerald-400/90 flex items-start gap-1.5"><span className="shrink-0">✓</span><span>{t.guclu_yon}</span></div>}
-            {t?.zayif_yon && <div className="text-xs text-red-400/90 flex items-start gap-1.5"><span className="shrink-0">✗</span><span>{t.zayif_yon}</span></div>}
+            {t?.guclu_yon && (
+              <div className="text-sm leading-snug">
+                <span className="text-muted-foreground">Güçlü yan: </span>{t.guclu_yon}
+              </div>
+            )}
+            {t?.zayif_yon && (
+              <div className="text-sm leading-snug">
+                <span className="text-muted-foreground">Zayıf yan: </span>{t.zayif_yon}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -4028,29 +4049,23 @@ function CockpitOfficialComparisonTable({ items }: { items: any[] }) {
 }
 
 function CockpitObstacles({ items }: { items: string[] }) {
-  if (items.length === 0) return <p className="text-xs text-sidebar-foreground/40 italic">Henüz belirlenmedi</p>;
+  if (items.length === 0) return <p className="text-sm text-muted-foreground italic">Henüz belirlenmedi</p>;
   return (
-    <ul className="space-y-1.5">
+    <ul className="divide-y">
       {items.map((o, i) => (
-        <li key={i} className="flex items-start gap-1.5 text-xs text-sidebar-foreground/80 rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-1.5">
-          <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0 text-amber-400" />
-          <span>{o}</span>
-        </li>
+        <li key={i} className="text-sm leading-snug py-1.5">{o}</li>
       ))}
     </ul>
   );
 }
 
-// Kokpitin "sonuç cümlesi" — altın çerçeveli vurgu kartı.
+// Kokpitin "sonuç cümlesi".
 function CockpitMediatorRecommendation({ text }: { text?: string }) {
   if (!text) return null;
   return (
-    <div className="rounded-xl border border-accent/50 bg-accent/10 p-4 flex items-start gap-3">
-      <Target className="h-4 w-4 mt-0.5 shrink-0 text-accent" />
-      <div>
-        <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-1">Arabulucu Önerisi</div>
-        <p className="text-sm text-sidebar-foreground/90 italic leading-relaxed">{text}</p>
-      </div>
+    <div>
+      <div className="text-sm font-semibold text-primary mb-1">Arabulucu önerisi</div>
+      <p className="text-sm leading-relaxed">{text}</p>
     </div>
   );
 }
@@ -4059,7 +4074,7 @@ function CockpitSources({ items, sources }: { items: string[]; sources?: any[] }
   if (items.length === 0) return null;
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/40 font-semibold mb-1.5">Kaynaklar</div>
+      <div className="text-sm font-semibold text-primary mb-1.5">Kaynaklar</div>
       <div className="flex flex-wrap gap-1.5">
         {items.map((name, i) => (
           <SourceChip key={i} name={name} source={matchSource(name, sources)} />
@@ -4079,6 +4094,7 @@ const WORKLOG_KATEGORI_LABELS: Record<string, string> = {
 // agent_worklog.entry_type='rapor_disi' satırlarının kokpit görünümü — arabulucuya özel,
 // ajanın değerlendirip nihai rapora almadığı hususları gösterir. content JSON'u
 // party-confidential-analysis'teki rapor_disi_degerlendirmeler şemasıyla birebir eşleşir.
+// Gerekçe ve önerilen adım "Açıkla" altına alındı: kart üç satırı aşmasın (metin silinmedi).
 function CockpitOffReportItem({ item, partyLabel }: { item: any; partyLabel: string | null }) {
   const husus = safeText(item?.husus);
   const neden = safeText(item?.neden_rapora_girmedi);
@@ -4088,33 +4104,23 @@ function CockpitOffReportItem({ item, partyLabel }: { item: any; partyLabel: str
   return (
     <li className="py-2.5 space-y-1">
       <div className="flex items-start justify-between gap-2 flex-wrap">
-        <div className="text-xs font-medium text-sidebar-foreground/90">{husus || "—"}</div>
+        <div className="text-sm font-medium">{husus || "—"}</div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {kategori && (
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sidebar-accent/40 border border-sidebar-border text-sidebar-foreground/70">
-              {WORKLOG_KATEGORI_LABELS[kategori] ?? kategori}
-            </span>
-          )}
-          {partyLabel && (
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sidebar-accent/40 border border-sidebar-border text-sidebar-foreground/70">
-              {partyLabel}
-            </span>
-          )}
+          {kategori && <span className={cockpitTagClass}>{WORKLOG_KATEGORI_LABELS[kategori] ?? kategori}</span>}
+          {partyLabel && <span className={cockpitTagClass}>{partyLabel}</span>}
         </div>
       </div>
-      {neden && <p className="text-xs text-sidebar-foreground/60 leading-snug">{neden}</p>}
-      {adim && (
-        <p className="text-xs text-accent/90 leading-snug flex items-start gap-1">
-          <span className="shrink-0">→</span><span>{adim}</span>
-        </p>
+      {(neden || adim) && (
+        <CockpitDisclosure>
+          {neden && <p className="text-sm text-muted-foreground leading-snug">{neden}</p>}
+          {adim && <p className="text-sm leading-snug">Önerilen adım: {adim}</p>}
+        </CockpitDisclosure>
       )}
     </li>
   );
 }
 
 // party_consistency_findings tek bulgusunun kokpit görünümü — arabulucuya özel.
-// CockpitRootCauseCard kalıbından türetildi: gözlem + dayanak + güven rozeti. Fark,
-// dayanağın TEK değil İKİ olması ve yan yana durması (dar ekranda alt alta düşer).
 // guven_seviyesi fonksiyondan "yuksek|orta|dusuk" olarak gelir; rozet için mevcut
 // confidenceBadgeTone'un beklediği Türkçe etikete çevrilir (yeni rozet mantığı YOK).
 const CONSISTENCY_CONFIDENCE_LABELS: Record<string, string> = {
@@ -4133,37 +4139,32 @@ function CockpitConsistencyItem({ finding, partyLabel }: { finding: any; partyLa
   const confLabel = CONSISTENCY_CONFIDENCE_LABELS[String(finding?.guven_seviyesi ?? "").toLowerCase()] ?? "";
 
   return (
-    <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 space-y-2.5">
+    <div className="py-2.5 space-y-1.5">
       <div className="flex items-start justify-between gap-2">
-        <div className="text-xs font-semibold text-sidebar-foreground/90 leading-snug">{gozlem}</div>
+        <div className="text-sm font-medium leading-snug">{gozlem}</div>
         {confLabel && (
-          <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${confidenceBadgeTone(confLabel)}`}>
+          <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${confidenceBadgeTone(confLabel)}`}>
             {confLabel}
           </span>
         )}
       </div>
-      {partyLabel && (
-        <div className="text-[10px] font-medium px-2 py-0.5 rounded-full inline-block bg-sidebar-accent/40 border border-sidebar-border text-sidebar-foreground/70">
-          {partyLabel}
+      {partyLabel && <span className={`${cockpitTagClass} inline-block`}>{partyLabel}</span>}
+      {/* İki dayanak alıntısı "Açıkla" altında — kart üç satırı aşmasın (metin silinmedi). */}
+      <CockpitDisclosure label="Dayanakları göster">
+        <div className="text-sm">
+          <span className="text-muted-foreground">{kaynakA || "Dayanak 1"}: </span>{alintiA}
         </div>
-      )}
-      <div className="grid gap-2.5 sm:grid-cols-2">
-        <div className="rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 p-2.5 space-y-1">
-          <div className="text-[10px] uppercase tracking-wide text-sidebar-foreground/50 truncate">{kaynakA || "Dayanak 1"}</div>
-          <p className="text-[11px] text-sidebar-foreground/75 leading-snug italic">{alintiA}</p>
+        <div className="text-sm">
+          <span className="text-muted-foreground">{kaynakB || "Dayanak 2"}: </span>{alintiB}
         </div>
-        <div className="rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 p-2.5 space-y-1">
-          <div className="text-[10px] uppercase tracking-wide text-sidebar-foreground/50 truncate">{kaynakB || "Dayanak 2"}</div>
-          <p className="text-[11px] text-sidebar-foreground/75 leading-snug italic">{alintiB}</p>
-        </div>
-      </div>
+      </CockpitDisclosure>
     </div>
   );
 }
 
 // party_communication_analysis tek izinin kokpit görünümü — CockpitConsistencyItem
 // kalıbından türetildi. Fark: iki dayanak değil TEK dayanak var, onun yerine iz tipini
-// gösteren bir rozet eklendi. Bilinmeyen slug olduğu gibi gösterilir (uydurma etiket yok).
+// gösteren bir etiket eklendi. Bilinmeyen slug olduğu gibi gösterilir (uydurma etiket yok).
 const COMMUNICATION_IZ_LABELS: Record<string, string> = {
   kacinilan_konu: "Kaçınılan konu",
   tekrar_eden_tema: "Tekrar eden tema",
@@ -4182,31 +4183,25 @@ function CockpitCommunicationItem({ finding, partyLabel }: { finding: any; party
   const confLabel = CONSISTENCY_CONFIDENCE_LABELS[String(finding?.guven_seviyesi ?? "").toLowerCase()] ?? "";
 
   return (
-    <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 space-y-2.5">
+    <div className="py-2.5 space-y-1.5">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {izLabel && (
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sidebar-accent/40 border border-sidebar-border text-sidebar-foreground/70">
-              {izLabel}
-            </span>
-          )}
-          {partyLabel && (
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sidebar-accent/40 border border-sidebar-border text-sidebar-foreground/70">
-              {partyLabel}
-            </span>
-          )}
+          {izLabel && <span className={cockpitTagClass}>{izLabel}</span>}
+          {partyLabel && <span className={cockpitTagClass}>{partyLabel}</span>}
         </div>
         {confLabel && (
-          <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${confidenceBadgeTone(confLabel)}`}>
+          <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${confidenceBadgeTone(confLabel)}`}>
             {confLabel}
           </span>
         )}
       </div>
-      <div className="text-xs font-semibold text-sidebar-foreground/90 leading-snug">{gozlem}</div>
-      <div className="rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 p-2.5 space-y-1">
-        <div className="text-[10px] uppercase tracking-wide text-sidebar-foreground/50 truncate">{kaynak || "Dayanak"}</div>
-        <p className="text-[11px] text-sidebar-foreground/75 leading-snug italic">{alinti}</p>
-      </div>
+      <div className="text-sm font-medium leading-snug">{gozlem}</div>
+      {/* Dayanak alıntısı "Açıkla" altında — kart üç satırı aşmasın (metin silinmedi). */}
+      <CockpitDisclosure label="Dayanağı göster">
+        <div className="text-sm">
+          <span className="text-muted-foreground">{kaynak || "Dayanak"}: </span>{alinti}
+        </div>
+      </CockpitDisclosure>
     </div>
   );
 }
@@ -4466,7 +4461,9 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
 
   // ── Katman düzeni için türetilenler: hepsi yukarıdaki mevcut state'ten okunur,
   // yeni sorgu yok. Kartların içeriği değişmez; yalnız hangi katmanda durdukları.
-  const cockpitLayerBoxClass = "rounded-2xl border border-sidebar-border bg-sidebar text-sidebar-foreground p-6 shadow-elegant space-y-6";
+  // Katman kutusu: koyu lacivert zemin yerine beyaz kart + ince çerçeve. Katman içindeki
+  // bölümler CockpitSection'ın üst ayracıyla ayrılır; kutu içinde kutu yok.
+  const cockpitLayerBoxClass = "rounded-lg border bg-card p-6 space-y-4";
   // Aktif süre sonu: CountdownBadge'in kullandığı kuralın aynısı (uzatma kullanıldıysa uzatılmış tarih).
   const activeDeadline = caseRow.extension_used && caseRow.deadline_extended ? caseRow.deadline_extended : caseRow.deadline_total;
   const deadlineDaysLeft = activeDeadline
@@ -4514,7 +4511,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
         }
       />
     <Card className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-primary">Aşama 4 — Arabulucu Paneli</h2>
+      <h2 className="text-lg font-semibold">Aşama 4 — Arabulucu paneli</h2>
       <p className="text-sm text-muted-foreground">Aşama 3'te üretilen taraf analizlerinin özeti ve Ortak Zemin Raporu üretimi.</p>
 
       {/* Sekme çubuğu en üstte; Genel Bakış sekmesi kokpitin üç katmanını
@@ -4550,18 +4547,18 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
             <TabsContent value="genel-bakis" className="space-y-6">
 
               {analyses.length === 0 && (
-                <motion.div variants={itemVariants} className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground italic text-center">
+                <motion.div variants={itemVariants} className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground italic text-center">
                   Kokpit, Aşama 3'te en az bir taraf analizi tamamlandığında dolmaya başlar.
                 </motion.div>
               )}
 
               {/* ── 1. DURUM ŞERİDİ — dört rakam, hepsi mevcut state'ten; yeni sorgu yok ── */}
-              <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {statusStripItems.map((m, i) => (
-                  <div key={i} className="rounded-lg border bg-muted/30 px-3 py-2 min-w-0">
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">{m.label}</div>
+                  <div key={i} className="min-w-0">
+                    <div className="text-sm text-muted-foreground truncate">{m.label}</div>
                     <div className="text-sm font-semibold truncate">{m.value}</div>
-                    {m.sub && <div className="text-[11px] text-muted-foreground truncate">{m.sub}</div>}
+                    {m.sub && <div className="text-sm text-muted-foreground truncate">{m.sub}</div>}
                   </div>
                 ))}
               </motion.div>
@@ -4569,13 +4566,12 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
               {/* ── 2. MASAYA OTURURKEN — kök neden + sıradaki sorular ── */}
               {hasTableLayer && (
                 <motion.div variants={itemVariants} className={cockpitLayerBoxClass}>
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Masaya otururken</div>
+                  <div className="text-lg font-semibold">Masaya otururken</div>
 
                   {/* Kök Neden Analizi — arabulucuya özel stratejik içgörü, party_root_cause_analysis'ten */}
                   {cockpitRows.length > 0 && (
-                    <div>
-                      <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-2">Kök Neden Analizi</div>
-                      <div className={`grid gap-4 ${cockpitRows.length > 1 ? "sm:grid-cols-2" : ""}`}>
+                    <CockpitSection title="Kök neden analizi">
+                      <div className={`grid gap-6 ${cockpitRows.length > 1 ? "sm:grid-cols-2" : ""}`}>
                         {cockpitRows.map((r, i) => (
                           <CockpitRootCauseCard
                             key={i}
@@ -4584,23 +4580,22 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                           />
                         ))}
                       </div>
-                    </div>
+                    </CockpitSection>
                   )}
 
                   {/* Sıradaki 3 Soru — party_communication_analysis.discovery_questions */}
                   {communicationQuestions.length > 0 && (
-                    <div className="rounded-xl border border-sidebar-border/60 bg-sidebar-accent/20 p-4">
-                      <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-2">Sıradaki 3 Soru</div>
+                    <CockpitSection title="Sıradaki 3 soru">
                       <ol className="space-y-2 list-decimal list-inside">
                         {communicationQuestions.map((it, i) => {
                           const soru = safeText(it.q?.soru);
                           const bosluk = safeText(it.q?.hangi_boslugu_kapatir);
                           if (!soru) return null;
                           return (
-                            <li key={`${it.rowId}-q${i}`} className="text-xs text-sidebar-foreground/85 leading-snug">
+                            <li key={`${it.rowId}-q${i}`} className="text-sm leading-snug">
                               {soru}
                               {bosluk && (
-                                <div className="mt-0.5 ml-4 text-[11px] text-sidebar-foreground/55 leading-snug">
+                                <div className="mt-0.5 ml-4 text-sm text-muted-foreground leading-snug">
                                   Kapattığı boşluk: {bosluk}
                                 </div>
                               )}
@@ -4608,7 +4603,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                           );
                         })}
                       </ol>
-                    </div>
+                    </CockpitSection>
                   )}
                 </motion.div>
               )}
@@ -4616,16 +4611,15 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
               {/* ── 3. DAYANAK KATMANI — iç tutarlılık, rapora girmeyenler, iletişim izleri ── */}
               {hasEvidenceLayer && (
                 <motion.div variants={itemVariants} className={cockpitLayerBoxClass}>
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Dayanak katmanı</div>
+                  <div className="text-lg font-semibold">Dayanak katmanı</div>
 
                   {/* İç Tutarlılık — party_consistency_findings */}
                   {consistencyItems.length > 0 && (
-                    <div>
-                      <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-1">İç Tutarlılık</div>
-                      <p className="text-xs text-sidebar-foreground/50 mb-2">
-                        Tarafın kendi beyanı ile kendi belgeleri arasındaki uyumsuzluklar — yorum arabulucuya aittir
-                      </p>
-                      <div className="grid gap-3">
+                    <CockpitSection
+                      title="İç tutarlılık"
+                      hint="Tarafın kendi beyanı ile kendi belgeleri arasındaki uyumsuzluklar — yorum arabulucuya aittir"
+                    >
+                      <div className="divide-y">
                         {consistencyItems.map((it, i) => (
                           <CockpitConsistencyItem
                             key={`${it.rowId}-${i}`}
@@ -4634,15 +4628,16 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                           />
                         ))}
                       </div>
-                    </div>
+                    </CockpitSection>
                   )}
 
                   {/* Rapora Girmeyenler — agent_worklog(entry_type='rapor_disi') */}
                   {worklog.length > 0 && (
-                    <div>
-                      <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-1">Rapora Girmeyenler</div>
-                      <p className="text-xs text-sidebar-foreground/50 mb-2">Ajanın değerlendirip rapora almadığı hususlar ve önerilen adımlar</p>
-                      <ul className="divide-y divide-sidebar-border/50">
+                    <CockpitSection
+                      title="Rapora girmeyenler"
+                      hint="Ajanın değerlendirip rapora almadığı hususlar ve önerilen adımlar"
+                    >
+                      <ul className="divide-y">
                         {worklog.map((w: any) => (
                           <CockpitOffReportItem
                             key={w.id}
@@ -4651,17 +4646,16 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                           />
                         ))}
                       </ul>
-                    </div>
+                    </CockpitSection>
                   )}
 
                   {/* İletişim ve Asıl İhtiyaç — iz listesi (sorular 2. katmanda) */}
                   {communicationItems.length > 0 && (
-                    <div>
-                      <div className="text-[11px] uppercase tracking-wide text-sidebar-foreground/50 mb-1">İletişim ve Asıl İhtiyaç</div>
-                      <p className="text-xs text-sidebar-foreground/50 mb-2">
-                        Tarafın nasıl konuştuğundan çıkan izler — yorum arabulucuya aittir
-                      </p>
-                      <div className="grid gap-3">
+                    <CockpitSection
+                      title="İletişim ve asıl ihtiyaç"
+                      hint="Tarafın nasıl konuştuğundan çıkan izler — yorum arabulucuya aittir"
+                    >
+                      <div className="divide-y">
                         {communicationItems.map((it, i) => (
                           <CockpitCommunicationItem
                             key={`${it.rowId}-${i}`}
@@ -4670,7 +4664,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                           />
                         ))}
                       </div>
-                    </div>
+                    </CockpitSection>
                   )}
                 </motion.div>
               )}
@@ -4708,7 +4702,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
 
                   {/* Taraf karşılaştırma sütunları */}
                   {cockpitRows.length > 0 && (
-                    <div className={`grid gap-4 ${cockpitRows.length > 1 ? "sm:grid-cols-2" : ""}`}>
+                    <div className={`grid gap-6 border-t pt-4 ${cockpitRows.length > 1 ? "sm:grid-cols-2" : ""}`}>
                       {cockpitRows.map((r, i) => (
                         <CockpitPartyColumn
                           key={i}
@@ -4726,8 +4720,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
 
                   {/* Senaryo kartları */}
                   {cockpitScenarios.length > 0 && (
-                    <div>
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-2">Çözüm Senaryoları</div>
+                    <CockpitSection title="Çözüm senaryoları">
                       <div className="grid sm:grid-cols-3 gap-3">
                         {cockpitScenarios.map((sc: any, i: number) => {
                           const letter = String.fromCharCode(65 + i);
@@ -4743,27 +4736,27 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                           );
                         })}
                       </div>
-                    </div>
+                    </CockpitSection>
                   )}
 
                   {/* Alt şerit: Kritik Faktörler rozet akışı + Kırmızı Çizgiler */}
-                  <div className="grid sm:grid-cols-2 gap-4 pt-2 border-t border-sidebar-border/60">
+                  <div className="grid sm:grid-cols-2 gap-6 border-t pt-4">
                     <div>
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-2">Kritik Faktörler</div>
+                      <div className="text-sm font-semibold text-primary mb-2">Kritik faktörler</div>
                       <CockpitBadgeFlow items={cockpitCriticalFactors} />
                     </div>
                     <div>
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-2">Kırmızı Çizgiler</div>
+                      <div className="text-sm font-semibold text-primary mb-2">Kırmızı çizgiler</div>
                       <CockpitRedLines items={cockpitRedLines} />
                     </div>
                   </div>
 
                   {/* Resmi risk_ozeti — AI'ın ürettiği taraf karşılaştırması + uzlaşma engelleri */}
                   {(cockpitTarafKarsilastirma.length > 0 || cockpitObstacleList.length > 0) && (
-                    <div className="grid sm:grid-cols-2 gap-4 pt-2 border-t border-sidebar-border/60 items-start">
+                    <div className="grid sm:grid-cols-2 gap-6 border-t pt-4 items-start">
                       <CockpitOfficialComparisonTable items={cockpitTarafKarsilastirma} />
                       <div>
-                        <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-2">Uzlaşma Engelleri</div>
+                        <div className="text-sm font-semibold text-primary mb-2">Uzlaşma engelleri</div>
                         <CockpitObstacles items={cockpitObstacleList} />
                       </div>
                     </div>
@@ -4771,14 +4764,14 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
 
                   {/* Arabulucu önerisi — kokpitin sonuç cümlesi */}
                   {cockpitMediatorOneri && (
-                    <div className="pt-2 border-t border-sidebar-border/60">
+                    <div className="border-t pt-4">
                       <CockpitMediatorRecommendation text={cockpitMediatorOneri} />
                     </div>
                   )}
 
                   {/* Kaynaklar — en altta küçük */}
                   {cockpitKaynakListesi.length > 0 && (
-                    <div className="pt-2 border-t border-sidebar-border/60">
+                    <div className="border-t pt-4">
                       <CockpitSources items={cockpitKaynakListesi} sources={cockpitReportData?.sources} />
                     </div>
                   )}
@@ -4791,16 +4784,16 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
               {/* Taraf Analizleri (eski sekme) */}
               {analyses.length > 0 && (
                 <div>
-                  <h3 className="font-semibold mb-2">Taraf Analizleri ({analyses.length})</h3>
-                  <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-primary mb-2">Taraf analizleri ({analyses.length})</h3>
+                  <div className="divide-y">
                     {analyses.map((a: any, i) => {
                       const cp = a.case_parties || {};
                       const name = cp.company_name || `${cp.first_name ?? ""} ${cp.last_name ?? ""}`.trim() || "Taraf";
                       return (
-                        <div key={i} className="border rounded p-3 text-sm bg-background">
-                          <div className="font-medium">{name} <span className="text-xs text-muted-foreground">({roleLabel(cp.party_role)})</span></div>
-                          {a.analysis?.dispute_area && <div className="text-xs">📋 {a.analysis.dispute_area}</div>}
-                          {a.analysis?.party_position?.batna && <div className="text-xs">BATNA: {a.analysis.party_position.batna}</div>}
+                        <div key={i} className="py-2.5 text-sm">
+                          <div className="font-medium">{name} <span className="text-muted-foreground">({roleLabel(cp.party_role)})</span></div>
+                          {a.analysis?.dispute_area && <div><span className="text-muted-foreground">Uyuşmazlık türü: </span>{a.analysis.dispute_area}</div>}
+                          {a.analysis?.party_position?.batna && <div><span className="text-muted-foreground">BATNA: </span>{a.analysis.party_position.batna}</div>}
                         </div>
                       );
                     })}
@@ -4814,7 +4807,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
               {/* Ortak Zemin Raporu (eski sekme) */}
               <div>
                 <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-                  <h3 className="font-semibold">Ortak Zemin Raporu</h3>
+                  <h3 className="text-sm font-semibold text-primary">Ortak zemin raporu</h3>
                   <div className="flex gap-2 flex-wrap">
                     {report && (
                       <>
@@ -4828,15 +4821,15 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                   </div>
                 </div>
                 {reportBusy && reportAttempt > 1 && (
-                  <div className="text-xs text-muted-foreground flex items-center gap-2 mb-2">
-                    <Loader2 className="h-3 w-3 animate-spin" />
+                  <div className="text-sm text-muted-foreground flex items-center gap-2 mb-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     Geçici bir hata oluştu, otomatik olarak tekrar deneniyor ({reportAttempt}/3)…
                   </div>
                 )}
                 {reportError && (
-                  <div className="text-xs text-destructive flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-3 w-3" /> {reportError}
-                    <Button size="sm" variant="outline" onClick={generateReport}><RefreshCw className="h-3 w-3 mr-1" />Tekrar Dene</Button>
+                  <div className="text-sm text-destructive flex items-center gap-2 mb-2">
+                    <AlertTriangle className="h-4 w-4" /> {reportError}
+                    <Button size="sm" variant="outline" onClick={generateReport}><RefreshCw className="h-4 w-4 mr-1" />Tekrar Dene</Button>
                   </div>
                 )}
                 {report ? (
@@ -4844,10 +4837,9 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
                 ) : canReport ? (
                   <p className="text-sm text-muted-foreground italic">Henüz rapor üretilmedi. "Rapor Üret" butonuna basın.</p>
                 ) : (
-                  <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 flex items-start gap-2">
-                    <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
-                    <span>Rapor üretmeden önce Aşama 3'te en az bir taraf analizini tamamlayın.</span>
-                  </div>
+                  <p className="text-sm text-destructive">
+                    Rapor üretmeden önce Aşama 3'te en az bir taraf analizini tamamlayın.
+                  </p>
                 )}
               </div>
 
@@ -4856,7 +4848,7 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
             <TabsContent value="strateji" className="space-y-6">
               {/* Strateji (eski sekme) */}
               <div>
-                <h3 className="font-semibold mb-2">Strateji</h3>
+                <h3 className="text-sm font-semibold text-primary mb-2">Strateji</h3>
                 {report?.report ? (
                   <CommonGroundStrategySection data={report.report} strategy={report.strategy} />
                 ) : (
@@ -4869,15 +4861,15 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
             <TabsContent value="kor-teklif" className="space-y-6">
               {/* Kör Teklif (eski sekme) */}
               <div>
-                <h3 className="font-semibold mb-2">Kör Teklif</h3>
+                <h3 className="text-sm font-semibold text-primary mb-2">Kör teklif</h3>
                 <BlindBidMediatorPanel caseId={caseRow.id} />
               </div>
             </TabsContent>
           </Tabs>
         </motion.div>
 
-        <motion.div variants={itemVariants} className="border rounded-md px-3 py-2 bg-muted/30 flex items-center gap-2 flex-wrap">
-          <Label className="text-xs text-muted-foreground shrink-0">UYAP Kayıt No</Label>
+        <motion.div variants={itemVariants} className="border-t pt-4 flex items-center gap-2 flex-wrap">
+          <Label className="text-sm text-muted-foreground shrink-0">UYAP kayıt no</Label>
           <Input
             value={uyap} onChange={(e) => setUyap(e.target.value)} placeholder="Örn. 2026/12345"
             className="font-mono h-8 text-sm max-w-[200px]"
@@ -4889,27 +4881,24 @@ function Phase4Summary({ caseRow }: { caseRow: CaseRow }) {
       </motion.div>
     </Card>
     <Dialog open={!!openScenario} onOpenChange={(o) => !o && setOpenScenario(null)}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto bg-sidebar text-sidebar-foreground border-sidebar-border">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-display font-bold text-accent">{openScenario?.letter}</span>
+            <span className="text-sm font-semibold text-primary">{openScenario?.letter}</span>
             {openScenario?.recommended && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-sidebar-background">⭐ Önerilen</span>
+              <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground">Önerilen</span>
             )}
           </div>
-          <DialogTitle className="heading-gold-underline">{safeText(openScenario?.scenario?.label) || "Senaryo"}</DialogTitle>
+          <DialogTitle className="text-lg font-semibold">{safeText(openScenario?.scenario?.label) || "Senaryo"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 text-sm">
-          <p className="leading-relaxed text-sidebar-foreground/90">{safeText(openScenario?.scenario?.summary) || "—"}</p>
+        <div className="space-y-4 text-sm">
+          <p className="leading-relaxed">{safeText(openScenario?.scenario?.summary) || "—"}</p>
           {safeList(openScenario?.scenario?.tradeoffs).length > 0 && (
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-1.5">Taraf Ödünleri & Riskleri</div>
-              <ul className="space-y-1.5">
+            <div className="border-t pt-4">
+              <div className="text-sm font-semibold text-primary mb-1.5">Taraf ödünleri ve riskleri</div>
+              <ul className="divide-y">
                 {safeList(openScenario?.scenario?.tradeoffs).map((t, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sidebar-foreground/80">
-                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-400" />
-                    <span>{t}</span>
-                  </li>
+                  <li key={i} className="py-1.5 leading-snug">{t}</li>
                 ))}
               </ul>
             </div>
