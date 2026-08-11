@@ -4344,6 +4344,16 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
 }) {
   // Tüm bölümler varsayılan KAPALI; yalnız durum şeridi her zaman görünür.
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  // Katmanlar da varsayılan KAPALI: ekran açıldığında durum şeridi + dört katman
+  // başlığı görünür, bölüm listeleri katman açılınca gelir.
+  const [openLayers, setOpenLayers] = useState<Set<string>>(new Set());
+  const toggleLayer = useCallback((id: string) => {
+    setOpenLayers((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
   const toggleSection = useCallback((id: string) => {
     setOpenSections((prev) => {
       const next = new Set(prev);
@@ -4633,23 +4643,23 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   };
   // Bölüm ipuçları tek yerde: hem sağdaki başlıkta hem sol menüde aynı metin görünür.
   const SECTION_HINTS: Record<string, string> = {
-    "kokpit-kok-neden": "Tarafların görünen talebinin altındaki asıl mesele",
-    "kokpit-siradaki-sorular": "Bir sonraki oturumda sorulacak sorular",
-    "kokpit-ic-tutarlilik": "Tarafın kendi beyanı ile kendi belgesi arasındaki uyumsuzluk",
-    "kokpit-rapora-girmeyenler": "Ajanın değerlendirip rapora almadığı hususlar ve nedenleri",
-    "kokpit-iletisim": "Tarafın nasıl konuştuğundan çıkan izler",
-    "kokpit-uzlasma-zopa": "Anlaşma olasılığı ve olası anlaşma aralığı",
-    "kokpit-taraf-karsilastirma": "Dava yoluna gidilirse ne olur",
-    "kokpit-resmi-karsilastirma": "Her tarafın elindeki güçlü ve zayıf noktalar",
-    "kokpit-senaryolar": "Masaya konabilecek olası çözüm biçimleri",
-    "kokpit-kritik-faktorler": "Sonucu belirleyecek ana etkenler",
-    "kokpit-kirmizi-cizgiler": "Tarafların taviz vermeyeceğini belirttiği noktalar",
-    "kokpit-uzlasma-engelleri": "Müzakereyi tıkayabilecek konular",
-    "kokpit-arabulucu-onerisi": "Sistemin önerdiği yaklaşım",
-    "kokpit-kaynaklar": "Analizde kullanılan mevzuat ve kitap parçaları",
-    "kokpit-taraf-analizleri": "Her taraf için ayrıntılı analiz metni",
-    "kokpit-ortak-zemin": "İki tarafın kesişim alanı ve strateji",
-    "kokpit-kor-teklif": "Taraflar birbirini görmeden kabul aralığı girer",
+    "kokpit-kok-neden": "Tarafın görünen talebinin altındaki asıl mesele; dayanağı ve güven düzeyiyle birlikte, yalnız arabulucuya.",
+    "kokpit-siradaki-sorular": "Bir sonraki oturumda sorulduğunda dosyadaki bilgi boşluğunu kapatacak sorular.",
+    "kokpit-ic-tutarlilik": "Tarafın kendi beyanı ile kendi belgesi arasındaki uyumsuzluklar; iki dayanak yan yana gösterilir, hüküm kurulmaz.",
+    "kokpit-rapora-girmeyenler": "Ajanın değerlendirip rapora almadığı hususlar; neden alınmadığı ve önerilen adımla birlikte.",
+    "kokpit-iletisim": "Tarafın nasıl konuştuğundan çıkan izler: kaçınılan konu, tekrar eden tema, sertleşme noktası, hiç değinilmeyen alan, talep ile anlatı farkı.",
+    "kokpit-uzlasma-zopa": "Anlaşma olasılığı ve tarafların kabul aralıklarının kesiştiği olası anlaşma bandı.",
+    "kokpit-taraf-karsilastirma": "Dava yoluna gidilmesi hâlinde tarafları bekleyen risk ve ispat yükü değerlendirmesi.",
+    "kokpit-resmi-karsilastirma": "Her tarafın elindeki güçlü dayanaklar ve açık kalan noktalar.",
+    "kokpit-senaryolar": "Masaya konabilecek somut çözüm biçimleri ve her birinin dayanağı.",
+    "kokpit-kritik-faktorler": "Sonucu belirleyeceği değerlendirilen ana etkenler.",
+    "kokpit-kirmizi-cizgiler": "Tarafların taviz vermeyeceğini belirttiği noktalar.",
+    "kokpit-uzlasma-engelleri": "Müzakereyi tıkayabilecek konu başlıkları; oturum öncesi bilinmesi gerekenler.",
+    "kokpit-arabulucu-onerisi": "Sistemin önerdiği yaklaşım; bağlayıcı değildir, karar arabulucunundur.",
+    "kokpit-kaynaklar": "Analizde kullanılan mevzuat ve uzmanlık kitabı parçaları; tıklanınca ilgili sayfada açılır.",
+    "kokpit-taraf-analizleri": "Her taraf için güçlü/zayıf yan, risk, belge bulguları ve keşif sorularını içeren tam analiz metni.",
+    "kokpit-ortak-zemin": "İki tarafın kesişim alanı, uzlaşma tahmini ve strateji önerileri.",
+    "kokpit-kor-teklif": "Taraflar birbirini görmeden kabul aralığı girer; yalnız örtüşme arabulucuya gösterilir.",
   };
   const sectionDefs: CockpitSectionDef[] = [];
 
@@ -5043,11 +5053,26 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   // Katman başlığının kendi çıpası (sol menüden katman adına tıklanınca oraya kayılır)
   // ve başlığın altındaki tek satır açıklama; aynı açıklama menüde tooltip olur.
   const LAYER_META: Record<string, { id: string; hint: string }> = {
-    [LAYER_TABLE]: { id: "kokpit-katman-masa", hint: "Oturuma girmeden bilmen gerekenler" },
-    [LAYER_EVIDENCE]: { id: "kokpit-katman-dayanak", hint: "Bulgular ve hangi belgeye dayandıkları" },
-    [LAYER_COCKPIT]: { id: "kokpit-katman-kokpit", hint: "Sayılarla durum: tahmin, senaryolar, engeller" },
-    [LAYER_REPORTS]: { id: "kokpit-katman-rapor", hint: "Tam metinler ve dışa aktarma" },
+    [LAYER_TABLE]: {
+      id: "kokpit-katman-masa",
+      hint: "İlk oturuma girmeden bilinmesi gerekenler: tarafların görünen taleplerinin altındaki asıl mesele ve bu turda sorulacak keşif soruları. Müzakerenin açılışını bu maddeler belirler.",
+    },
+    [LAYER_EVIDENCE]: {
+      id: "kokpit-katman-dayanak",
+      hint: "Bulguların hangi belgeye ve hangi beyana dayandığı. Tarafın kendi anlatımıyla kendi belgesi arasındaki uyumsuzluklar, rapora alınmayan hususlar ve tarafın iletişiminden çıkan izler dayanaklarıyla birlikte burada.",
+    },
+    [LAYER_COCKPIT]: {
+      id: "kokpit-katman-kokpit",
+      hint: "Dosyanın sayısal görünümü: anlaşma ihtimali ve olası anlaşma aralığı, tarafların güçlü ve zayıf yanları, çözüm senaryoları, kırmızı çizgiler ve müzakereyi tıkayabilecek başlıklar.",
+    },
+    [LAYER_REPORTS]: {
+      id: "kokpit-katman-rapor",
+      hint: "Analizlerin tam metinleri ve dışa aktarma: taraf analizleri, ortak zemin raporu, strateji ve Kör Teklif yüzeyi ile bölüm bazlı PDF çıktıları.",
+    },
   };
+  // Sol menüden bir bölüme atlanınca önce kapsayan katmanın açılması gerekir.
+  const layerIdBySectionId: Record<string, string> = {};
+  sectionDefs.forEach((x) => { layerIdBySectionId[x.id] = LAYER_META[x.layer].id; });
   // Çıktısı olan bölümler — hem tekil PDF düğmesi hem birleşik rapor seçim listesi buradan.
   const pdfSections = sectionDefs.filter((x) => !!x.pdf);
 
@@ -5073,8 +5098,13 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   // Sol menüden gelen istek: bölümü aç, sonra oraya yumuşak kaydır.
   useEffect(() => {
     if (!jump?.id) return;
-    // Katman çıpasında açılacak bir bölüm yok — yalnız oraya kaydırılır.
-    if (!jump.id.startsWith("kokpit-katman-")) {
+    if (jump.id.startsWith("kokpit-katman-")) {
+      // Katman başlığına tıklandı: katmanı aç ve oraya kaydır.
+      setOpenLayers((prev) => (prev.has(jump.id) ? prev : new Set(prev).add(jump.id)));
+    } else {
+      // Bölüme tıklandı: önce kapsayan katman, sonra bölüm açılır.
+      const layerId = layerIdBySectionId[jump.id];
+      if (layerId) setOpenLayers((prev) => (prev.has(layerId) ? prev : new Set(prev).add(layerId)));
       setOpenSections((prev) => (prev.has(jump.id) ? prev : new Set(prev).add(jump.id)));
     }
     const t = setTimeout(() => {
@@ -5184,12 +5214,24 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
           return (
             <motion.div key={layer} id={LAYER_META[layer].id} variants={itemVariants} className={`${cockpitLayerBoxClass} scroll-mt-24`}>
               <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="text-lg font-semibold">{layer}</div>
-                  <p className="text-sm text-muted-foreground">{LAYER_META[layer].hint}</p>
-                </div>
+                {/* Katman başlığı da katlanır: varsayılan kapalı, tıklayınca bölüm
+                    listesi açılır. Ana başlık görünümü bölüm satırlarından ayrı kalır. */}
+                <button
+                  type="button"
+                  onClick={() => toggleLayer(LAYER_META[layer].id)}
+                  className="flex-1 min-w-0 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="text-lg font-semibold">{layer}</div>
+                    <span className="text-sm text-muted-foreground">{items.length} bölüm</span>
+                    {openLayers.has(LAYER_META[layer].id)
+                      ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                      : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-0.5 max-w-3xl">{LAYER_META[layer].hint}</p>
+                </button>
                 {layer === LAYER_REPORTS && pdfSections.length > 0 && (
-                  <Button size="sm" variant="outline" onClick={() => {
+                  <Button size="sm" variant="outline" className="shrink-0" onClick={() => {
                     setPickedSections(new Set(pdfSections.map((x) => x.id)));
                     setReportPickerOpen(true);
                   }}>
@@ -5197,7 +5239,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
                   </Button>
                 )}
               </div>
-              <div>
+              <div className={openLayers.has(LAYER_META[layer].id) ? "" : "hidden"}>
                 {items.map((s) => (
                   <CockpitCollapsible
                     key={s.id}
