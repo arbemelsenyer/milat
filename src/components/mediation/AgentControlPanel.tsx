@@ -163,16 +163,37 @@ function isToday(iso: string): boolean {
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
 }
 
-// agent_states.last_output.current_step'i satır altında gösterilecek metne çevirir.
-// Orkestratör slug yazıyor ("common_ground") — o zaten ORCHESTRATOR_STEPS'te etiketli,
-// oradaki etiket kullanılır. Taraf ajanları düz Türkçe cümle yazıyor; ilk adım
+// agent_states'te current_step diye bir KOLON YOK — değer last_output JSONB'sinin
+// "current_step" anahtarında duruyor. Sürücü satırı bazen düz string olarak da
+// döndürebildiği için önce parse denenir; okunamayan/beklenmeyen şekilde gelen kayıt
+// boş string döndürür ve satır hiç render edilmez.
+function readCurrentStep(last_output: AgentStateRow["last_output"]): string {
+  let source: unknown = last_output;
+  if (typeof source === "string") {
+    try { source = JSON.parse(source); } catch { return ""; }
+  }
+  if (!source || typeof source !== "object") return "";
+  const value = (source as { current_step?: unknown }).current_step;
+  return typeof value === "string" ? value.trim() : "";
+}
+
+// Adım slug'larının okunur karşılıkları. ORCHESTRATOR_STEPS'te zaten etiketi olanlar
+// oradan alınır (tek kaynak); zincire sonradan eklenen best-effort adımlar burada.
+const EXTRA_STEP_LABELS: Record<string, string> = {
+  party_consistency: "İç tutarlılık denetimi",
+  party_communication: "İletişim analizi",
+};
+
+// current_step'i satır altında gösterilecek metne çevirir. Orkestratör slug yazıyor
+// ("common_ground"); taraf ajanları düz Türkçe cümle yazıyor ve ilk adım
 // "<taraf adı> — ..." biçiminde geldiği için taraf adı iki kez yazılmasın diye ayıklanır.
-// current_step yoksa boş string döner ve satır hiç render edilmez.
+// Bilinmeyen değer olduğu gibi basılır.
 function currentStepLabel(row: AgentStateRow, partyName?: string): string {
-  const raw = String(row.last_output?.current_step ?? "").trim();
+  const raw = readCurrentStep(row.last_output);
   if (!raw) return "";
   const known = ORCHESTRATOR_STEPS.find((s) => s.key === raw);
   if (known) return known.label;
+  if (EXTRA_STEP_LABELS[raw]) return EXTRA_STEP_LABELS[raw];
   if (partyName && raw.startsWith(partyName)) {
     return raw.slice(partyName.length).replace(/^\s*[—–-]\s*/, "").trim();
   }
