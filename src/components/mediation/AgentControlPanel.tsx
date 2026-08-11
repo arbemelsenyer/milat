@@ -122,7 +122,7 @@ function OrchestratorProgress({ row }: { row: AgentStateRow }) {
   );
 }
 
-const AGENT_TYPE_META: Record<string, { label: string; icon: any; color: string }> = {
+const AGENT_TYPE_META: Record<string, { label: string; icon: any; color: string; description?: string }> = {
   party_analysis: { label: "Taraf Analizi", icon: Users, color: "text-blue-600" },
   common_ground: { label: "Ortak Zemin Sentezi", icon: Lightbulb, color: "text-amber-600" },
   classify_dispute: { label: "Uyuşmazlık Sınıflandırma", icon: Scale, color: "text-indigo-600" },
@@ -130,6 +130,16 @@ const AGENT_TYPE_META: Record<string, { label: string; icon: any; color: string 
   document_analysis: { label: "Belge Analizi", icon: FileSearch, color: "text-cyan-600" },
   agreement_generation: { label: "Belge Üretimi", icon: FileSignature, color: "text-emerald-600" },
   meeting_notes: { label: "Görüşme Notu Analizi", icon: MessageSquare, color: "text-purple-600" },
+  // İkon/renk eşleşmeleri mevcut kayıtlardan alındı (validator ve meeting_notes) — yeni
+  // renk/ikon eklenmedi. Bilinmeyen slug'lar için Brain + text-muted-foreground yedeği aynen duruyor.
+  party_consistency: {
+    label: "İç Tutarlılık Denetimi", icon: ShieldCheck, color: "text-amber-600",
+    description: "Tarafın beyanı ile kendi belgeleri arasındaki uyumsuzlukları arar",
+  },
+  party_communication: {
+    label: "İletişim ve Asıl İhtiyaç", icon: MessageSquare, color: "text-purple-600",
+    description: "Tarafın nasıl konuştuğundan izler çıkarır, keşif soruları üretir",
+  },
   party_a: { label: "Taraf A Ajanı", icon: Users, color: "text-blue-600" },
   party_b: { label: "Taraf B Ajanı", icon: Users, color: "text-purple-600" },
   mediator: { label: "Arabulucu Ajan", icon: Scale, color: "text-emerald-600" },
