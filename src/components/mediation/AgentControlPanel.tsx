@@ -163,6 +163,22 @@ function isToday(iso: string): boolean {
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
 }
 
+// agent_states.last_output.current_step'i satır altında gösterilecek metne çevirir.
+// Orkestratör slug yazıyor ("common_ground") — o zaten ORCHESTRATOR_STEPS'te etiketli,
+// oradaki etiket kullanılır. Taraf ajanları düz Türkçe cümle yazıyor; ilk adım
+// "<taraf adı> — ..." biçiminde geldiği için taraf adı iki kez yazılmasın diye ayıklanır.
+// current_step yoksa boş string döner ve satır hiç render edilmez.
+function currentStepLabel(row: AgentStateRow, partyName?: string): string {
+  const raw = String(row.last_output?.current_step ?? "").trim();
+  if (!raw) return "";
+  const known = ORCHESTRATOR_STEPS.find((s) => s.key === raw);
+  if (known) return known.label;
+  if (partyName && raw.startsWith(partyName)) {
+    return raw.slice(partyName.length).replace(/^\s*[—–-]\s*/, "").trim();
+  }
+  return raw;
+}
+
 function StatusIndicator({ row }: { row: AgentStateRow }) {
   if (row.status === "running") {
     return (
@@ -462,6 +478,10 @@ export function AgentControlPanel({ caseId, isMediator }: { caseId: string; isMe
                   const meta = AGENT_TYPE_META[row.agent_type] ?? { label: row.agent_type, icon: Brain, color: "text-muted-foreground" };
                   const Icon = meta.icon;
                   const partyName = row.party_id ? partyNames[row.party_id] : undefined;
+                  // Alt adım YALNIZ çalışırken görünür; tamamlandı/hata durumunda satır
+                  // yeniden taraf adına döner ve durumu sağdaki mevcut rozet anlatır.
+                  const subStep = row.status === "running" ? currentStepLabel(row, partyName) : "";
+                  const subLine = [partyName, subStep].filter(Boolean).join(" — ");
                   return (
                     <motion.div
                       key={row.id}
@@ -476,8 +496,8 @@ export function AgentControlPanel({ caseId, isMediator }: { caseId: string; isMe
                           <Icon className={`h-4 w-4 ${meta.color}`} />
                         </span>
                         <div className="min-w-0">
-                          <div className="text-sm font-medium truncate">{meta.label}</div>
-                          {partyName && <div className="text-xs text-muted-foreground truncate">{partyName}</div>}
+                          <div className="text-sm font-medium truncate" title={meta.description}>{meta.label}</div>
+                          {subLine && <div className="text-xs text-muted-foreground truncate">{subLine}</div>}
                         </div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
