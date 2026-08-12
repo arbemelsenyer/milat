@@ -40,6 +40,13 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026
+Faz 4 sol menü düzeni bitti: "Şimdi ne yapmalısın" bölüm başlığı biçiminde ve listenin
+1. sırasında; numaralandırma (1., 2.1 …) liste sırasından hesaplanıyor. Faz 4 girişinde
+üstten açılma ve yönlendirme satırının karta kaydırması düzeltildi (window.scrollTo
+"instant" + yükleme sonrası tek doğrulama; atlamada hesaplanmış konuma kaydırma).
+Sırada: canlıda doğrulama, ardından "Elenen bulguların iz kaydı" (yol haritası madde 2).
+
 ## Nerede kaldık — 12.08.2026
 Dürüstlük bandı (yol haritası madde 1) kod tarafında tamam: bant hesabı, ekran kartı ve
 husus satırındaki Açıkla katlanır alanı main dalında. Sırada: Lovable'dan

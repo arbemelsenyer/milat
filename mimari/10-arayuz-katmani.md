@@ -13,6 +13,10 @@ iki yazı boyu, renk yalnız rozetlerde, emoji yok, ince gri ayraçlar.
   ilgili katman/bölüm açılır ve oraya kaydırılır. Bölüm bazlı PDF düğmeleri ve katman başlığında
   "Rapor oluştur" seçim penceresi. Rapor çıktısında "Uzlaşma tahmini" paylaşılabilir kalem,
   "ZOPA" arabulucuya özel kalem olarak AYRI durur.
+  ● 13.08: Sol menüde "Şimdi ne yapmalısın" bölüm başlığı biçiminde (1. sırada);
+    başlıklar 1..n, alt maddeler bağlı olduğu başlığın numarasını alır (2.1, 2.2 …).
+    Numaralar liste sırasından hesaplanır, yalnız sol menüdedir; sayfadaki başlıklar
+    numarasızdır. Büyük harf Türkçe kuralına göre (ŞİMDİ NE YAPMALISIN).
 · Faz 3 — Taraf Analizi: aynı düzene geçti — üç katman: Dosya özeti (uyuşmazlık konusu metni
   varsayılan kapalı · uyuşmazlık tür tespiti varsayılan açık) · Taraflar (kartlar tek satır özet,
   tıklayınca detay ve analiz düğmeleri) · Belgeler ve araçlar (metin çıkarma). Sol menüde

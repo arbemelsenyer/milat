@@ -4605,9 +4605,31 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   // cockpitJump) yeniden oynatmaz, böylece giriş her zaman en üstten olur.
   // Kullanıcı kendi kaydırdıktan sonra hiçbir yerde zorla yukarı çekilmez.
   const mountedAtRef = useRef<number>(Date.now());
+  // Kullanıcının kendi kaydırma hareketi: bu işaret konduktan sonra sayfa hiçbir
+  // yerde kendiliğinden yukarı çekilmez.
+  const userScrolledRef = useRef(false);
+  const topAppliedRef = useRef(false);
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0 });
+    const mark = () => { userScrolledRef.current = true; };
+    window.addEventListener("wheel", mark, { passive: true });
+    window.addEventListener("touchmove", mark, { passive: true });
+    window.addEventListener("keydown", mark);
+    return () => {
+      window.removeEventListener("wheel", mark);
+      window.removeEventListener("touchmove", mark);
+      window.removeEventListener("keydown", mark);
+    };
   }, []);
+  // index.css'te html{scroll-behavior:smooth} var; davranış açıkça verilmezse bu çağrı
+  // YUMUŞAK kaydırma olarak kuyruğa girer ve montaj anındaki kısa sayfada (yükleme
+  // kartı) sonuçsuz kalır. "instant" ile konum anında yazılır.
+  const scrollPageTop = useCallback(() => {
+    if (userScrolledRef.current) return;
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+  }, []);
+  useEffect(() => {
+    scrollPageTop();
+  }, [scrollPageTop]);
   const [uyap, setUyap] = useState(caseRow.uyap_no || "");
   const [savingUyap, setSavingUyap] = useState(false);
   async function saveUyap() {
@@ -5461,11 +5483,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   // Sol menüye giden liste iki kademeli: katman başlığı + o katmanın bölümleri,
   // sağdaki sırayla birebir. Görünen bölümü olmayan katman listeye hiç girmez.
   const menuEntries: { id: string; label: string; kind: "layer" | "section"; hint?: string }[] = [];
-  // "Şimdi ne yapmalısın" listenin EN BAŞINDA, katmanlardan önce durur. Katmana bağlı
-  // değildir; layerIdBySectionId'ye girmediği için katman eşleşmesi etkilenmez.
-  // Kart çizilmiyorsa (madde yok) bu satır da listeye hiç girmez.
+  // "Şimdi ne yapmalısın" listenin EN BAŞINDA, katmanlardan önce durur ve diğerleri
+  // gibi BÖLÜM BAŞLIĞI biçiminde görünür (kind: "layer"). Kendi katmanı olmadığı,
+  // layerIdBySectionId'ye girmediği için katman eşleşmesi etkilenmez; çapa kimliği
+  // değişmedi. Kart çizilmiyorsa (madde yok) bu satır da listeye hiç girmez.
   if (yonlendirmeListesi.length > 0) {
-    menuEntries.push({ id: YONLENDIRME_ID, label: "Şimdi ne yapmalısın", kind: "section" });
+    menuEntries.push({ id: YONLENDIRME_ID, label: "Şimdi ne yapmalısın", kind: "layer" });
   }
   layerOrder.forEach((layer) => {
     const items = sectionDefs.filter((x) => x.layer === layer);
@@ -5473,10 +5496,28 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     menuEntries.push({ id: LAYER_META[layer].id, label: layer, kind: "layer", hint: LAYER_META[layer].hint });
     items.forEach((x) => menuEntries.push({ id: x.id, label: x.title, kind: "section", hint: SECTION_HINTS[x.id] }));
   });
-  const sectionSignature = menuEntries.map((x) => `${x.kind}:${x.id}|${x.label}`).join(",");
+  // Sol menüdeki numaralandırma — YALNIZ menüde; sayfadaki kart/katman başlıkları
+  // olduğu gibi kalır. Numaralar listedeki sıradan hesaplanır: bölüm başlıkları
+  // 1..n, alt maddeler bağlı olduğu bölümün numarasını alır (2.1, 2.2 …). Bölüm
+  // eklenip çıkarıldığında numaralar kendiliğinden kayar.
+  // Büyük harfe çevirme Türkçe kuralına göre yapılır (i → İ, ı → I); CSS'in
+  // uppercase'i "Şimdi"yi "ŞIMDI" yapardı.
+  const trUpper = (s: string) => s.replace(/i/g, "İ").replace(/ı/g, "I").toUpperCase();
+  let layerNo = 0;
+  let subNo = 0;
+  const numberedEntries = menuEntries.map((e) => {
+    if (e.kind === "layer") {
+      layerNo += 1;
+      subNo = 0;
+      return { ...e, label: `${layerNo}. ${trUpper(e.label)}` };
+    }
+    subNo += 1;
+    return { ...e, label: layerNo > 0 ? `${layerNo}.${subNo} ${e.label}` : e.label };
+  });
+  const sectionSignature = numberedEntries.map((x) => `${x.kind}:${x.id}|${x.label}`).join(",");
   const sectionsReady = !loading && !loadErr;
   useEffect(() => {
-    onSectionsChange?.(sectionsReady ? menuEntries : []);
+    onSectionsChange?.(sectionsReady ? numberedEntries : []);
     return () => onSectionsChange?.([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectionSignature, sectionsReady, onSectionsChange]);
@@ -5496,11 +5537,47 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
       if (layerId) setOpenLayers((prev) => (prev.has(layerId) ? prev : new Set(prev).add(layerId)));
       setOpenSections((prev) => (prev.has(jump.id) ? prev : new Set(prev).add(jump.id)));
     }
-    const t = setTimeout(() => {
-      document.getElementById(jump.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 60);
-    return () => clearTimeout(t);
+    // Kaydırma: tek atışlık scrollIntoView, düzen henüz oturmamışsa veya tarayıcı
+    // kaydırma konumunu geri yüklüyorsa sonuçsuz kalabiliyordu ("Şimdi ne yapmalısın"
+    // satırında görülen durum: satır seçiliyor ama sayfa kaymıyor). Hedef konum sayı
+    // olarak hesaplanır, düzen oturduktan sonra uygulanır ve bir kez daha doğrulanır.
+    // Kullanıcı bu arada kendi kaydırırsa bırakılır.
+    let abort = false;
+    const stop = () => { abort = true; };
+    window.addEventListener("wheel", stop, { passive: true });
+    window.addEventListener("touchmove", stop, { passive: true });
+    const jumpTo = () => {
+      if (abort) return;
+      const el = document.getElementById(jump.id);
+      if (!el) return;
+      // 96px = kartlardaki scroll-mt-24 karşılığı (üstteki şerit için pay).
+      const top = Math.max(0, window.scrollY + el.getBoundingClientRect().top - 96);
+      window.scrollTo({ top, left: 0, behavior: "smooth" });
+    };
+    const raf = requestAnimationFrame(() => requestAnimationFrame(jumpTo));
+    const t = window.setTimeout(jumpTo, 350);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t);
+      window.removeEventListener("wheel", stop);
+      window.removeEventListener("touchmove", stop);
+    };
   }, [jump?.id, jump?.nonce]);
+
+  // Faz 4 montajında sayfa üstten açılır; ancak kokpit kartları yüklendikten sonra
+  // sayfanın yüksekliği değiştiği için tarayıcı eski kaydırma konumunu geri
+  // yükleyebiliyor ve ekran ortadan açılıyordu. Yükleme bitince üst konum bir kez
+  // daha, anında uygulanır. Kullanıcı kendi kaydırdıysa veya sol menüden bir bölüme
+  // atlandıysa hiç dokunulmaz.
+  useEffect(() => {
+    if (loading || topAppliedRef.current) return;
+    if (jump && jump.nonce > mountedAtRef.current) return;
+    topAppliedRef.current = true;
+    scrollPageTop();
+    const raf = requestAnimationFrame(scrollPageTop);
+    const t = window.setTimeout(scrollPageTop, 150);
+    return () => { cancelAnimationFrame(raf); clearTimeout(t); };
+  }, [loading, jump?.nonce, scrollPageTop]);
 
   if (loading) return (
     <Card className="p-6 flex items-center gap-2 text-sm text-muted-foreground">

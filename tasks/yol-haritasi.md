@@ -290,3 +290,7 @@ AÇIK KALEMLER (11.08 itibarıyla):
    tablosunun doğrulanması · aydınlatma metni ve oturum kaydı rıza ibaresi · belge saklamada
    5 yıl mı 10 yıl mı kararı · pilot aday listesi · paket fiyatları ve kota rakamları · evrak
    tespit ajanı için beklenen-belge listeleri.
+
+13.08: Faz 4 sol menüsü — "Şimdi ne yapmalısın" bölüm başlığı oldu, başlık/alt madde
+numaralandırması liste sırasından hesaplanıyor (1., 2.1 …). Faz 4 girişinde üstten açılma
+(instant + yükleme sonrası tek doğrulama) ve yönlendirme satırının karta kaydırması düzeltildi.
