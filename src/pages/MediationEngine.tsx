@@ -2983,6 +2983,9 @@ function PosBlock({ label, items }: { label: string; items?: string[] }) {
 }
 // Faz 4 sekmeli yerleşiminde "Ortak Zemin" sekmesi için — Ortak Çıkarlar + ZOPA + Çözüm Senaryoları.
 function CommonGroundZeminSection({ data }: { data: any }) {
+  // Dürüstlük bandındaki açık husus — tek state, aynı anda tek satır açık kalır.
+  // Koşulsuz ve erken return'ün ÜSTÜNDE (React #310).
+  const [acikBantHususu, setAcikBantHususu] = useState<number | null>(null);
   if (!data) return null;
   return (
     <div className="space-y-2">
@@ -2994,12 +2997,36 @@ function CommonGroundZeminSection({ data }: { data: any }) {
           <p>{data.durustluk_bandi.metin}</p>
           {Array.isArray(data.durustluk_bandi.hususlar) && data.durustluk_bandi.hususlar.length > 0 && (
             <ul className="space-y-1.5">
-              {data.durustluk_bandi.hususlar.map((h: any, i: number) => (
-                <li key={i} className="rounded-md border border-amber-400/50 bg-amber-50/60 px-2.5 py-1.5">
-                  <div>{h?.husus}</div>
-                  {h?.onerilen_adim && <div className="text-[11px] text-amber-700 mt-0.5">{h.onerilen_adim}</div>}
-                </li>
-              ))}
+              {data.durustluk_bandi.hususlar.map((h: any, i: number) => {
+                // Gerekçe ve önerilen adım "Açıkla" altına alındı (kokpit kartındaki kalıp).
+                // Yalnız bantta gelen alanlar okunur; boş alan hiç çizilmez.
+                const neden = typeof h?.neden_rapora_girmedi === "string" ? h.neden_rapora_girmedi.trim() : "";
+                const adim = typeof h?.onerilen_adim === "string" ? h.onerilen_adim.trim() : "";
+                const acilabilir = !!(neden || adim);
+                const acik = acikBantHususu === i;
+                return (
+                  <li key={i} className="rounded-md border border-amber-400/50 bg-amber-50/60 px-2.5 py-1.5">
+                    {acilabilir ? (
+                      <button
+                        type="button"
+                        onClick={() => setAcikBantHususu(acik ? null : i)}
+                        className="w-full flex items-start justify-between gap-2 text-left"
+                      >
+                        <span>{h?.husus}</span>
+                        <span className="shrink-0 font-medium text-amber-900 hover:underline">{acik ? "Gizle" : "Açıkla"}</span>
+                      </button>
+                    ) : (
+                      <div>{h?.husus}</div>
+                    )}
+                    {acilabilir && acik && (
+                      <div className="mt-1.5 space-y-1">
+                        {neden && <div className="text-[11px] text-amber-700">{neden}</div>}
+                        {adim && <div className="text-[11px] text-amber-700">Önerilen adım: {adim}</div>}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
           <div className="text-[11px] text-amber-700">
