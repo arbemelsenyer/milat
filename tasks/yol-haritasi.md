@@ -297,3 +297,6 @@ numaralandırması liste sırasından hesaplanıyor (1., 2.1 …). Faz 4 girişi
 
 13.08: Faz 3 sol menüsüne bölüm dizini eklendi (Faz 4'le aynı biçim ve tek numaralandırma
 kopyası); sol paneldeki Faz 3/Faz 4 alt satır çizimi tek bloğa indirildi.
+
+13.08: Faz 3 ve Faz 4 ana katman başlıkları sayfada da BÜYÜK HARF oldu (Türkçe İ ile
+doğrudan yazılı); alt bölüm başlıkları ve süreç adımları değişmedi.

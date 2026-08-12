@@ -20,6 +20,8 @@ iki yazı boyu, renk yalnız rozetlerde, emoji yok, ince gri ayraçlar.
   ● 13.08: Faz 3 sol menüsüne aynı bölüm dizini geldi (1. DOSYA ÖZETİ · 1.1 Uyuşmazlık
     konusu · 1.2 Uyuşmazlık tür tespiti · 2. TARAFLAR · 3. BELGELER VE ARAÇLAR);
     numaralandırma ve çizim Faz 4 ile tek kopyadır (numberMenuEntries).
+  ● 13.08: Ana katman başlıkları hem sol dizinde hem sayfada BÜYÜK HARF (Türkçe İ ile,
+    doğrudan yazılı); alt bölüm başlıkları küçük harf kaldı.
 · Faz 3 — Taraf Analizi: aynı düzene geçti — üç katman: Dosya özeti (uyuşmazlık konusu metni
   varsayılan kapalı · uyuşmazlık tür tespiti varsayılan açık) · Taraflar (kartlar tek satır özet,
   tıklayınca detay ve analiz düğmeleri) · Belgeler ve araçlar (metin çıkarma). Sol menüde

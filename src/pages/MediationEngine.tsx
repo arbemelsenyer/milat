@@ -2185,19 +2185,21 @@ function roleLabel(r?: string) {
 // Faz 3 katmanları: Faz 4'teki kalıbın aynısı — sabit id (sol menüden derin bağlantı),
 // katlanır başlık, altında tek satır açıklama. Liste statik: üç katman her zaman vardır.
 const FAZ3_LAYERS = [
+  // Katman başlıkları hem sayfada hem sol dizinde BÜYÜK HARF; Türkçe büyük harf
+  // (İ noktalı) doğrudan yazılır, otomatik dönüştürmeye bırakılmaz.
   {
     id: "faz3-katman-ozet",
-    label: "Dosya özeti",
+    label: "DOSYA ÖZETİ",
     hint: "Bu katman, uyuşmazlığın konusunu ve tür tespitini içerir; metni ve tespiti buradan görüp düzeltebilirsiniz.",
   },
   {
     id: "faz3-katman-taraflar",
-    label: "Taraflar",
+    label: "TARAFLAR",
     hint: "Bu katman, her tarafın bilgilerini, belgelerini ve analiz sonuçlarını barındırır.",
   },
   {
     id: "faz3-katman-belgeler",
-    label: "Belgeler ve araçlar",
+    label: "BELGELER VE ARAÇLAR",
     hint: "Bu katman, dosyadaki belgelerin metne çevrilmesi gibi hazırlık işlemlerini içerir.",
   },
 ];
@@ -5034,10 +5036,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   };
   const sectionDefs: CockpitSectionDef[] = [];
 
-  const LAYER_TABLE = "Masaya otururken";
-  const LAYER_EVIDENCE = "Dayanak katmanı";
-  const LAYER_COCKPIT = "Kokpit";
-  const LAYER_REPORTS = "Rapor ve belgeler";
+  // Katman başlıkları hem sayfada hem sol dizinde BÜYÜK HARF; Türkçe büyük harf
+  // (İ noktalı: KOKPİT) doğrudan yazılır, otomatik dönüştürmeye bırakılmaz.
+  const LAYER_TABLE = "MASAYA OTURURKEN";
+  const LAYER_EVIDENCE = "DAYANAK KATMANI";
+  const LAYER_COCKPIT = "KOKPİT";
+  const LAYER_REPORTS = "RAPOR VE BELGELER";
 
   if (cockpitRows.length > 0) {
     sectionDefs.push({
@@ -5507,7 +5511,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   // layerIdBySectionId'ye girmediği için katman eşleşmesi etkilenmez; çapa kimliği
   // değişmedi. Kart çizilmiyorsa (madde yok) bu satır da listeye hiç girmez.
   if (yonlendirmeListesi.length > 0) {
-    menuEntries.push({ id: YONLENDIRME_ID, label: "Şimdi ne yapmalısın", kind: "layer" });
+    menuEntries.push({ id: YONLENDIRME_ID, label: "ŞİMDİ NE YAPMALISIN", kind: "layer" });
   }
   layerOrder.forEach((layer) => {
     const items = sectionDefs.filter((x) => x.layer === layer);
@@ -5655,7 +5659,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
         {/* ── "Şimdi ne yapmalısın" — kural tabanlı yönlendirme; madde yoksa hiç çizilmez ── */}
         {yonlendirmeListesi.length > 0 && (
           <motion.div variants={itemVariants} id={YONLENDIRME_ID} className={`${cockpitLayerBoxClass} scroll-mt-24`}>
-            <div className="text-lg font-semibold">Şimdi ne yapmalısın</div>
+            <div className="text-lg font-semibold">ŞİMDİ NE YAPMALISIN</div>
             <ul className="divide-y">
               {yonlendirmeListesi.map((m, i) => {
                 const acik = acikYonlendirme === i;
