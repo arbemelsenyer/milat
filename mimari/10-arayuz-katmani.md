@@ -17,6 +17,9 @@ iki yazı boyu, renk yalnız rozetlerde, emoji yok, ince gri ayraçlar.
     başlıklar 1..n, alt maddeler bağlı olduğu başlığın numarasını alır (2.1, 2.2 …).
     Numaralar liste sırasından hesaplanır, yalnız sol menüdedir; sayfadaki başlıklar
     numarasızdır. Büyük harf Türkçe kuralına göre (ŞİMDİ NE YAPMALISIN).
+  ● 13.08: Faz 3 sol menüsüne aynı bölüm dizini geldi (1. DOSYA ÖZETİ · 1.1 Uyuşmazlık
+    konusu · 1.2 Uyuşmazlık tür tespiti · 2. TARAFLAR · 3. BELGELER VE ARAÇLAR);
+    numaralandırma ve çizim Faz 4 ile tek kopyadır (numberMenuEntries).
 · Faz 3 — Taraf Analizi: aynı düzene geçti — üç katman: Dosya özeti (uyuşmazlık konusu metni
   varsayılan kapalı · uyuşmazlık tür tespiti varsayılan açık) · Taraflar (kartlar tek satır özet,
   tıklayınca detay ve analiz düğmeleri) · Belgeler ve araçlar (metin çıkarma). Sol menüde

@@ -660,6 +660,9 @@ export default function MediationEngine() {
               const Icon = p.icon;
               const locked = p.id >= 4 && !phase3Complete;
               const isNext = !locked && !active && p.id === nextActionablePhase;
+              // Aktif fazın sol bölüm dizini — Faz 3 statik listeden, Faz 4
+              // kokpitin bildirdiği listeden; ikisi de aynı biçimle çizilir.
+              const sideSections = !active ? [] : p.id === 3 ? FAZ3_MENU_ENTRIES : p.id === 4 ? cockpitSections : [];
               return (
                 <div key={p.id}>
                 <button onClick={() => { if (!locked) setPhase(p.id); else toast({ title: "Aşama kilitli", description: "Önce Aşama 3'te en az bir taraf analizini tamamlayın." }); }}
@@ -697,28 +700,12 @@ export default function MediationEngine() {
                     </span>
                   )}
                 </button>
-                {/* Faz 3'teyken bu satırın altında Faz 3 katmanları; Faz 4'teki
-                    girintili alt satır kalıbının aynısı. Faz 3 dışında render edilmez. */}
-                {p.id === 3 && active && (
+                {/* Aktif fazın bölüm dizini (Faz 3: statik katman+bölüm listesi,
+                    Faz 4: kokpitin bildirdiği liste) — tek çizim, aynı biçim.
+                    Diğer fazlarda hiç render edilmez. */}
+                {sideSections.length > 0 && (
                   <div className="mt-1 mb-1 space-y-0.5">
-                    {FAZ3_LAYERS.map((l) => (
-                      <button
-                        key={l.id}
-                        type="button"
-                        title={l.hint}
-                        onClick={() => setCockpitJump({ id: l.id, nonce: Date.now() })}
-                        className="w-full text-left pl-8 pr-3 pt-2 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/45 transition-colors hover:text-accent"
-                      >
-                        {l.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {/* Faz 4'teyken bu satırın altında kokpit bölümleri; yalnız verisi
-                    olanlar listelenir. Diğer fazlarda hiç render edilmez. */}
-                {p.id === 4 && active && cockpitSections.length > 0 && (
-                  <div className="mt-1 mb-1 space-y-0.5">
-                    {cockpitSections.map((sec) => (
+                    {sideSections.map((sec) => (
                       <button
                         key={`${sec.kind}-${sec.id}`}
                         type="button"
@@ -2219,6 +2206,38 @@ const FAZ3_SECTION_LAYER: Record<string, string> = {
   "faz3-uyusmazlik-konusu": "faz3-katman-ozet",
   "faz3-tur-tespiti": "faz3-katman-ozet",
 };
+
+// ── Sol menü numaralandırması — Faz 3 ve Faz 4 ORTAK (tek kopya) ──────────────
+// Bölüm başlıkları 1..n, alt maddeler bağlı olduğu başlığın numarasını alır
+// (2.1, 2.2 …). Numaralar listedeki sıradan hesaplanır; bölüm eklenip
+// çıkarıldığında kendiliğinden kayar. Yalnız sol menüde kullanılır; sayfadaki
+// başlıklar numarasız ve küçük harf kalır. Büyük harfe çevirme Türkçe kuralına
+// göre yapılır (i → İ, ı → I); CSS'in uppercase'i "Şimdi"yi "ŞIMDI" yapardı.
+const trUpper = (s: string) => s.replace(/i/g, "İ").replace(/ı/g, "I").toUpperCase();
+function numberMenuEntries<T extends { kind: "layer" | "section"; label: string }>(entries: T[]): T[] {
+  let layerNo = 0;
+  let subNo = 0;
+  return entries.map((e) => {
+    if (e.kind === "layer") {
+      layerNo += 1;
+      subNo = 0;
+      return { ...e, label: `${layerNo}. ${trUpper(e.label)}` };
+    }
+    subNo += 1;
+    return { ...e, label: layerNo > 0 ? `${layerNo}.${subNo} ${e.label}` : e.label };
+  });
+}
+
+// Faz 3 sol dizini: katmanlar + çıpası olan bölümler, ekrandaki sırayla.
+// Liste statiktir (Faz 3 katmanları her zaman vardır), numarası bir kez hesaplanır.
+const FAZ3_MENU_ENTRIES: { id: string; label: string; kind: "layer" | "section"; hint?: string }[] =
+  numberMenuEntries([
+    { id: FAZ3_LAYERS[0].id, label: FAZ3_LAYERS[0].label, kind: "layer", hint: FAZ3_LAYERS[0].hint },
+    { id: "faz3-uyusmazlik-konusu", label: "Uyuşmazlık konusu", kind: "section" },
+    { id: "faz3-tur-tespiti", label: "Uyuşmazlık tür tespiti", kind: "section" },
+    { id: FAZ3_LAYERS[1].id, label: FAZ3_LAYERS[1].label, kind: "layer", hint: FAZ3_LAYERS[1].hint },
+    { id: FAZ3_LAYERS[2].id, label: FAZ3_LAYERS[2].label, kind: "layer", hint: FAZ3_LAYERS[2].hint },
+  ]);
 
 function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
   caseRow: CaseRow; userId: string; isMediator: boolean; reload: () => void;
@@ -5497,23 +5516,9 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     items.forEach((x) => menuEntries.push({ id: x.id, label: x.title, kind: "section", hint: SECTION_HINTS[x.id] }));
   });
   // Sol menüdeki numaralandırma — YALNIZ menüde; sayfadaki kart/katman başlıkları
-  // olduğu gibi kalır. Numaralar listedeki sıradan hesaplanır: bölüm başlıkları
-  // 1..n, alt maddeler bağlı olduğu bölümün numarasını alır (2.1, 2.2 …). Bölüm
-  // eklenip çıkarıldığında numaralar kendiliğinden kayar.
-  // Büyük harfe çevirme Türkçe kuralına göre yapılır (i → İ, ı → I); CSS'in
-  // uppercase'i "Şimdi"yi "ŞIMDI" yapardı.
-  const trUpper = (s: string) => s.replace(/i/g, "İ").replace(/ı/g, "I").toUpperCase();
-  let layerNo = 0;
-  let subNo = 0;
-  const numberedEntries = menuEntries.map((e) => {
-    if (e.kind === "layer") {
-      layerNo += 1;
-      subNo = 0;
-      return { ...e, label: `${layerNo}. ${trUpper(e.label)}` };
-    }
-    subNo += 1;
-    return { ...e, label: layerNo > 0 ? `${layerNo}.${subNo} ${e.label}` : e.label };
-  });
+  // olduğu gibi kalır. Kural ve Türkçe büyük harf tek kopyadır: numberMenuEntries
+  // (Faz 3 dizini de aynı yardımcıyı kullanır).
+  const numberedEntries = numberMenuEntries(menuEntries);
   const sectionSignature = numberedEntries.map((x) => `${x.kind}:${x.id}|${x.label}`).join(",");
   const sectionsReady = !loading && !loadErr;
   useEffect(() => {

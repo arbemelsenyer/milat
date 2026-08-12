@@ -294,3 +294,6 @@ AÇIK KALEMLER (11.08 itibarıyla):
 13.08: Faz 4 sol menüsü — "Şimdi ne yapmalısın" bölüm başlığı oldu, başlık/alt madde
 numaralandırması liste sırasından hesaplanıyor (1., 2.1 …). Faz 4 girişinde üstten açılma
 (instant + yükleme sonrası tek doğrulama) ve yönlendirme satırının karta kaydırması düzeltildi.
+
+13.08: Faz 3 sol menüsüne bölüm dizini eklendi (Faz 4'le aynı biçim ve tek numaralandırma
+kopyası); sol paneldeki Faz 3/Faz 4 alt satır çizimi tek bloğa indirildi.
