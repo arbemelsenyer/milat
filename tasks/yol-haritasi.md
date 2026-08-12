@@ -270,6 +270,10 @@ tarafında model çağrıları OpenAI-önce hattına alındı (OPENAI_API_KEY, g
 yedekte); deploy ve Publish'in yalnız Lovable üzerinden yapılabildiği (CLI 403) kayda geçti.
 Kör Teklif v2'ye "Koşullu Aralık — Braketleme" kalemi eklendi (planlı).
 
+12.08: Dürüstlük bandı husus satırlarına "Açıkla" katlanır alanı eklendi (aynı anda tek satır
+açık; gerekçe ve önerilen adım altta). common-ground-report tartımı hususlara
+neden_rapora_girmedi alanını da taşıyor. Canlı test ve edge fonksiyon redeploy'u bekliyor.
+
 AÇIK KALEMLER (11.08 itibarıyla):
 1. Rapor öncesi defter tartımı + Dürüstlük Bandı — ○ YAPIMDA (ekran değişikliği; kurucu onayı).
 2. Elenen bulguların iz kaydı (entry_type = 'elenen') — ○ planlı.

@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
       toplam_rapor_disi: number;
       veri_yetersiz_sayisi: number;
       kategori_dagilimi: Record<string, number>;
-      hususlar: Array<{ husus: string; onerilen_adim: string }>;
+      hususlar: Array<{ husus: string; neden_rapora_girmedi: string; onerilen_adim: string }>;
       metin: string;
     } = {
       goster: false, toplam_rapor_disi: 0, veri_yetersiz_sayisi: 0,
@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
         .limit(200);
       if (Array.isArray(tartimRows)) {
         const dagilim: Record<string, number> = {};
-        const hususlar: Array<{ husus: string; onerilen_adim: string }> = [];
+        const hususlar: Array<{ husus: string; neden_rapora_girmedi: string; onerilen_adim: string }> = [];
         let veriYetersiz = 0;
         for (const row of tartimRows as any[]) {
           const c = row.content ?? {};
@@ -171,6 +171,8 @@ Deno.serve(async (req) => {
             if (hususlar.length < 5) {
               hususlar.push({
                 husus: String(c.husus ?? "").trim(),
+                // Gerekçe de banda taşınır (defterde zaten var); yoksa boş kalır, üretilmez.
+                neden_rapora_girmedi: String(c.neden_rapora_girmedi ?? "").trim(),
                 onerilen_adim: String(c.onerilen_adim ?? "").trim(),
               });
             }

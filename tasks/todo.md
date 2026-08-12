@@ -30,7 +30,18 @@ Kırıntılar:
 Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
 
 ## Devam Eden
-- [ ] (henüz boş — yeni iş planı buraya yazılacak)
+- [ ] Dürüstlük bandı canlı testi (Lovable redeploy sonrası: bant çıkıyor mu,
+      Açıkla açılıp kapanıyor mu, gerekçe metni görünüyor mu)
 
 ## İnceleme Notları
 (Her biten işin kısa sonucu buraya)
+- 12.08 Dürüstlük bandı "Açıkla": MediationEngine.tsx'te husus satırı tıklanabilir
+  yapıldı (tek state, aynı anda tek satır açık); common-ground-report tartımı
+  hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
+  metni, AI çıktı şeması ve PDF çıktısı değişmedi.
+
+## Nerede kaldık — 12.08.2026
+Dürüstlük bandı (yol haritası madde 1) kod tarafında tamam: bant hesabı, ekran kartı ve
+husus satırındaki Açıkla katlanır alanı main dalında. Sırada: Lovable'dan
+common-ground-report redeploy + canlı test, ardından "Elenen bulguların iz kaydı"
+(entry_type='elenen', yol haritası madde 2).

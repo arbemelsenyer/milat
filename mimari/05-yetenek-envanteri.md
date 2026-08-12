@@ -356,6 +356,9 @@ imkânı (sıra: ürün > kullanıcı > veri (oo > model)
   atlanmaz, atlandığı görünür kalır (constitution m.2).
 · Dosyaya Soru Sor (Çalışma Kanalı V1, §8.1) ● CANLI.
 · Rapor öncesi defter tartımı — Dürüstlük Bandı (§5.2i) ○ YAPIMDA.
+  12.08: bant hesabı + ekran kartı kodda; husus satırına "Açıkla" eklendi (gerekçe +
+  önerilen adım katlanır, aynı anda tek satır açık). Gerekçe alanı (neden_rapora_girmedi)
+  banda taşındı. Canlı test ve edge fonksiyon redeploy'u bekliyor.
 · Elenen bulguların iz kaydı (entry_type = 'elenen') ○ PLANLI.
 
 [v0.36 EKLEME — KÖR TEKLİF v2: KOŞULLU ARALIK / BRAKETLEME (karar 05–11.08, planlı)]
