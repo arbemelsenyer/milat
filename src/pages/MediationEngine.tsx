@@ -4600,6 +4600,14 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
       return next;
     });
   }, []);
+  // Faz 4'e girişte sayfa üstten açılsın. Montaj anı bir kez damgalanır; aşağıdaki
+  // atlama efekti bu damgadan ESKİ bir isteği (önceki Faz 4 ziyaretinden taşınan
+  // cockpitJump) yeniden oynatmaz, böylece giriş her zaman en üstten olur.
+  // Kullanıcı kendi kaydırdıktan sonra hiçbir yerde zorla yukarı çekilmez.
+  const mountedAtRef = useRef<number>(Date.now());
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0 });
+  }, []);
   const [uyap, setUyap] = useState(caseRow.uyap_no || "");
   const [savingUyap, setSavingUyap] = useState(false);
   async function saveUyap() {
@@ -4946,6 +4954,8 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     }
   }
   const yonlendirmeListesi = yonlendirmeMaddeleri.slice(0, 3);
+  // Sol menüdeki satırın ve karttaki çapa kimliğinin tek kaynağı.
+  const YONLENDIRME_ID = "kokpit-simdi-ne-yapmalisin";
 
   // ── Katlanır bölüm listesi ──────────────────────────────────────────────
   // Her bölüm: sabit id (sol menüden derin bağlantı için), tek satırlık başlık,
@@ -5451,6 +5461,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   // Sol menüye giden liste iki kademeli: katman başlığı + o katmanın bölümleri,
   // sağdaki sırayla birebir. Görünen bölümü olmayan katman listeye hiç girmez.
   const menuEntries: { id: string; label: string; kind: "layer" | "section"; hint?: string }[] = [];
+  // "Şimdi ne yapmalısın" listenin EN BAŞINDA, katmanlardan önce durur. Katmana bağlı
+  // değildir; layerIdBySectionId'ye girmediği için katman eşleşmesi etkilenmez.
+  // Kart çizilmiyorsa (madde yok) bu satır da listeye hiç girmez.
+  if (yonlendirmeListesi.length > 0) {
+    menuEntries.push({ id: YONLENDIRME_ID, label: "Şimdi ne yapmalısın", kind: "section" });
+  }
   layerOrder.forEach((layer) => {
     const items = sectionDefs.filter((x) => x.layer === layer);
     if (items.length === 0) return;
@@ -5468,6 +5484,9 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   // Sol menüden gelen istek: bölümü aç, sonra oraya yumuşak kaydır.
   useEffect(() => {
     if (!jump?.id) return;
+    // Montajdan ÖNCE üretilmiş istek: Faz 4'ten çıkılıp geri girildiğinde eski atlama
+    // tekrar oynatılmasın (sayfa alta düşme sebebi). Yeni tıklamaların nonce'ı büyüktür.
+    if (jump.nonce <= mountedAtRef.current) return;
     if (jump.id.startsWith("kokpit-katman-")) {
       // Katman başlığına tıklandı: katmanı aç ve oraya kaydır.
       setOpenLayers((prev) => (prev.has(jump.id) ? prev : new Set(prev).add(jump.id)));
@@ -5553,7 +5572,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
 
         {/* ── "Şimdi ne yapmalısın" — kural tabanlı yönlendirme; madde yoksa hiç çizilmez ── */}
         {yonlendirmeListesi.length > 0 && (
-          <motion.div variants={itemVariants} className={cockpitLayerBoxClass}>
+          <motion.div variants={itemVariants} id={YONLENDIRME_ID} className={`${cockpitLayerBoxClass} scroll-mt-24`}>
             <div className="text-lg font-semibold">Şimdi ne yapmalısın</div>
             <ul className="divide-y">
               {yonlendirmeListesi.map((m, i) => {
