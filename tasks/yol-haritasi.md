@@ -300,3 +300,6 @@ kopyası); sol paneldeki Faz 3/Faz 4 alt satır çizimi tek bloğa indirildi.
 
 13.08: Faz 3 ve Faz 4 ana katman başlıkları sayfada da BÜYÜK HARF oldu (Türkçe İ ile
 doğrudan yazılı); alt bölüm başlıkları ve süreç adımları değişmedi.
+
+13.08: Kelime birliği — görünen her yerde "Aşama"; üst şeritle tekrarlanan sayfa içi
+aşama başlıkları kaldırıldı; Aşama 4 durum şeridi "Sıradaki aşama: N" oldu.

@@ -1037,7 +1037,7 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance }: {
   return (
     <div className="space-y-4">
       <PhaseHero
-        label="Faz 5 — Oturumlar"
+        label="AŞAMA 5 — OTURUMLAR"
         metrics={[
           { label: "Sıradaki Oturum", value: nextSession?.scheduled_at ? formatPhaseCountdown(nextSession.scheduled_at) : null },
           { label: "Planlanan Oturum", value: plannedSessions.length },
@@ -1115,7 +1115,7 @@ function Phase1Summary({ caseRow, reload }: { caseRow: CaseRow; reload: () => vo
   return (
     <div className="space-y-4">
       <PhaseHero
-        label="Faz 1 — Başvuru"
+        label="AŞAMA 1 — BAŞVURU"
         metrics={[
           { label: "Uyuşmazlık Türü", value: classified ? anaAltLabel(caseRow.dispute_type, caseRow.dispute_subtype) : null },
           { label: "Sınıflandırma Durumu", value: classified ? "Tamamlandı" : "Bekliyor", tone: classified ? "low" : "medium" },
@@ -1124,7 +1124,7 @@ function Phase1Summary({ caseRow, reload }: { caseRow: CaseRow; reload: () => vo
       <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
       <motion.div variants={itemVariants}>
         <Card className="p-6 space-y-3">
-          <h2 className="text-2xl font-bold text-primary">Aşama 1 — Başvuru Özeti</h2>
+          {/* Aşama başlığı üst şeritte (PhaseHero); burada tekrarlanmaz. */}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div><span className="text-muted-foreground">Sistem No:</span> <b className="font-mono">{caseRow.application_no}</b></div>
             <div><span className="text-muted-foreground">Başlık:</span> {caseRow.title}</div>
@@ -1905,7 +1905,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
   return (
     <div className="space-y-4">
       <PhaseHero
-        label="Faz 2 — Taraflar"
+        label="AŞAMA 2 — TARAFLAR"
         metrics={[
           { label: "Kayıtlı Taraf", value: parties.length },
           { label: "Davet Durumu", value: inviteSummary, tone: acceptedCount && acceptedCount === withEmail.length ? "low" : undefined },
@@ -1914,8 +1914,8 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
     <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
       <motion.div variants={itemVariants}>
       <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-primary">Aşama 2 — Taraflar</h2>
+        {/* Aşama başlığı üst şeritte (PhaseHero); burada tekrarlanmaz. */}
+        <div className="flex items-center justify-end mb-4">
           <Button onClick={() => setDraft(emptyParty(parties.length === 0 ? "applicant" : "respondent"))}>
             <Plus className="h-4 w-4 mr-1" /> Taraf Ekle
           </Button>
@@ -2555,14 +2555,14 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
       ) : (
       <>
       <PhaseHero
-        label="Faz 3 — Taraf Analizi"
+        label="AŞAMA 3 — TARAF ANALİZİ"
         metrics={[
           { label: "Taraf Analizi", value: parties.length ? analysedCount : null, suffix: parties.length ? ` / ${parties.length}` : "" },
           { label: "Ortalama Risk Puanı", value: dominantRiskLabel, tone: dominantRisk ?? undefined },
         ]}
       />
       <Card className="p-6 space-y-4">
-        <h2 className="text-lg font-semibold">Aşama 3 — Taraf analizi</h2>
+        {/* Aşama başlığı üst şeritte (PhaseHero); burada tekrarlanmaz. */}
         <p className="text-sm text-muted-foreground">
           Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. Analizler tamamlandığında Ortak Zemin Raporu, Aşama 4 — Arabulucu Paneli'nde üretilir.
         </p>
@@ -4929,8 +4929,8 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     : null;
   const statusStripItems: { label: string; value: string; sub?: string | null }[] = [
     {
-      label: "Aşama",
-      value: caseRow.current_phase != null ? `Faz ${caseRow.current_phase}` : "—",
+      label: "Sıradaki aşama",
+      value: caseRow.current_phase != null ? String(caseRow.current_phase) : "—",
     },
     {
       label: "Son Tarih",
@@ -5607,7 +5607,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   return (
     <div className="space-y-4">
       <PhaseHero
-        label="Faz 4 — Arabulucu Paneli"
+        label="AŞAMA 4 — ARABULUCU PANELİ"
         metrics={[
           { label: "Uzlaşma Tahmini", value: heroUzlasmaPct, suffix: "%" },
         ]}
@@ -5627,7 +5627,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
         }
       />
     <Card className="p-6 space-y-4">
-      <h2 className="text-lg font-semibold">Aşama 4 — Arabulucu paneli</h2>
+      {/* Aşama başlığı üst şeritte (PhaseHero); burada tekrarlanmaz. */}
       <p className="text-sm text-muted-foreground">Aşama 3'te üretilen taraf analizlerinin özeti ve Ortak Zemin Raporu üretimi.</p>
 
       <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
@@ -6178,7 +6178,7 @@ function Phase8Negotiation({ caseRow, userId, onDone }: { caseRow: CaseRow; user
   return (
     <div className="space-y-4">
       <PhaseHero
-        label="Faz 7 — Görüşme Notları"
+        label="AŞAMA 7 — GÖRÜŞME NOTLARI"
         metrics={[
           { label: "Görüşme Notu", value: notesMeta.count },
           { label: "Son Not", value: notesMeta.lastAt ? formatPhaseRelative(notesMeta.lastAt) : null },
@@ -6186,7 +6186,7 @@ function Phase8Negotiation({ caseRow, userId, onDone }: { caseRow: CaseRow; user
       />
     <motion.div variants={containerVariants} initial="hidden" animate="show">
     <Card className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-primary">Aşama 7 — Görüşme Notları</h2>
+      {/* Aşama başlığı üst şeritte (PhaseHero); burada tekrarlanmaz. */}
       <motion.div variants={itemVariants}>
         <MeetingNotesPanel caseId={caseRow.id} caseSummary={caseRow.title ?? ""} />
       </motion.div>
@@ -7354,7 +7354,7 @@ function Phase9Closing({ caseRow, reload }: { caseRow: CaseRow; reload: () => vo
   return (
     <div className="space-y-4">
       <PhaseHero
-        label="Faz 8 — Belgeler & Kapanış"
+        label="AŞAMA 8 — BELGELER & KAPANIŞ"
         metrics={[
           { label: "Üretilen Belge", value: docCount },
           { label: "Kapanış Durumu", value: closingLabel, tone: closingTone },
@@ -7362,7 +7362,7 @@ function Phase9Closing({ caseRow, reload }: { caseRow: CaseRow; reload: () => vo
       />
     <motion.div variants={containerVariants} initial="hidden" animate="show">
     <Card className="p-6 space-y-6">
-      <h2 className="text-2xl font-bold text-primary">Aşama 8 — Belgeler & Kapanış</h2>
+      {/* Aşama başlığı üst şeritte (PhaseHero); burada tekrarlanmaz. */}
 
       <Tabs defaultValue="belgeler">
         <TabsList className="flex-wrap h-auto">
@@ -7508,7 +7508,7 @@ function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
   return (
     <div className="space-y-4">
       <PhaseHero
-        label="Faz 6 — Bilirkişi"
+        label="AŞAMA 6 — BİLİRKİŞİ (OPSİYONEL)"
         metrics={[
           {
             label: "Bilirkişi Durumu",
@@ -7524,7 +7524,7 @@ function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
       />
     <motion.div variants={containerVariants} initial="hidden" animate="show">
     <Card className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-primary">Aşama 6 — Bilirkişi (Opsiyonel)</h2>
+      {/* Aşama başlığı üst şeritte (PhaseHero); burada tekrarlanmaz. */}
       <p className="text-sm text-muted-foreground">Uyuşmazlık türü: {caseRow.dispute_type}</p>
 
       {loading ? (

@@ -22,6 +22,9 @@ iki yazı boyu, renk yalnız rozetlerde, emoji yok, ince gri ayraçlar.
     numaralandırma ve çizim Faz 4 ile tek kopyadır (numberMenuEntries).
   ● 13.08: Ana katman başlıkları hem sol dizinde hem sayfada BÜYÜK HARF (Türkçe İ ile,
     doğrudan yazılı); alt bölüm başlıkları küçük harf kaldı.
+  ● 13.08: Kelime birliği — kullanıcıya görünen her yerde "Aşama" (üst şeritler
+    "AŞAMA N — …"); üst şeritle tekrarlanan sayfa içi aşama başlıkları kaldırıldı
+    (açıklama cümleleri kaldı); Aşama 4 durum şeridinde "Sıradaki aşama: N".
 · Faz 3 — Taraf Analizi: aynı düzene geçti — üç katman: Dosya özeti (uyuşmazlık konusu metni
   varsayılan kapalı · uyuşmazlık tür tespiti varsayılan açık) · Taraflar (kartlar tek satır özet,
   tıklayınca detay ve analiz düğmeleri) · Belgeler ve araçlar (metin çıkarma). Sol menüde
