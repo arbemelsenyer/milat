@@ -4615,6 +4615,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   const [worklog, setWorklog] = useState<any[]>([]);
   const [consistency, setConsistency] = useState<any[]>([]);
   const [communication, setCommunication] = useState<any[]>([]);
+  // "Şimdi ne yapmalısın" kartı için iki sayım — yalnız adet, içerik okunmaz.
+  // null = sayılamadı; bilinmeyen sayıdan madde üretilmez.
+  const [partyCount, setPartyCount] = useState<number | null>(null);
+  const [docCount, setDocCount] = useState<number | null>(null);
+  // Açık yönlendirme maddesi — tek state, aynı anda tek madde açık kalır.
+  const [acikYonlendirme, setAcikYonlendirme] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
@@ -4644,7 +4650,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     setLoading(true);
     setLoadErr(null);
     try {
-      const [r, a, rc, wl, cf, ca] = await Promise.all([
+      const [r, a, rc, wl, cf, ca, pc, dc] = await Promise.all([
         supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("party_analyses").select("party_id, analysis, risk_analizi, case_parties:party_id(first_name, last_name, company_name, party_role)").eq("case_id", caseRow.id),
         // Kök Neden Katmanı: mediator-only, ayrı tablo. Bu sorgu ana yüklemeyi bloklamaz —
@@ -4659,6 +4665,9 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
         // İletişim ve Asıl İhtiyaç: party_communication_analysis, aynı "hata olursa
         // sessizce boş" kalıbı — kayıt yoksa kart hiç görünmez.
         supabase.from("party_communication_analysis" as any).select("id, party_id, findings, discovery_questions, created_at").eq("case_id", caseRow.id).order("created_at", { ascending: false }),
+        // "Şimdi ne yapmalısın" kartının iki sayımı — head:true, satır içeriği çekilmez.
+        supabase.from("case_parties").select("id", { count: "exact", head: true }).eq("case_id", caseRow.id),
+        supabase.from("case_documents").select("id", { count: "exact", head: true }).eq("case_id", caseRow.id),
       ]);
       if (r.error) throw r.error;
       if (a.error) throw a.error;
@@ -4692,6 +4701,18 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
       } else {
         setCommunication(Array.isArray(ca.data) ? ca.data : []);
       }
+      if (pc.error) {
+        console.error("[Phase4Summary partyCount]", pc.error);
+        setPartyCount(null);
+      } else {
+        setPartyCount(pc.count ?? null);
+      }
+      if (dc.error) {
+        console.error("[Phase4Summary docCount]", dc.error);
+        setDocCount(null);
+      } else {
+        setDocCount(dc.count ?? null);
+      }
     } catch (e: any) {
       console.error("[Phase4Summary] load failed", e);
       setLoadErr(e?.message ?? "Bilinmeyen hata");
@@ -4701,6 +4722,8 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
       setWorklog([]);
       setConsistency([]);
       setCommunication([]);
+      setPartyCount(null);
+      setDocCount(null);
     } finally {
       setLoading(false);
     }
@@ -4868,6 +4891,61 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
     { label: "Risk Puanı", value: safeText(cockpitRiskPuani) || "Yeterli veri yok" },
     { label: "Uzlaşma Tahmini", value: heroUzlasmaPct !== null ? `%${heroUzlasmaPct}` : "Yeterli veri yok" },
   ];
+
+  // ── "Şimdi ne yapmalısın" (V1) ────────────────────────────────────────────
+  // Kural tabanlı, yapay zekâ çağrısı yok. Maddeler yukarıdaki mevcut state'ten
+  // türetilir; dayanak satırları yalnız o veriyi gösterir, yeni metin üretilmez.
+  // Öncelik: 1) akış tıkanıklığı 2) süre baskısı 3) çelişki. En fazla üç madde.
+  const yonlendirmeMaddeleri: { baslik: string; dayanak: string[] }[] = [];
+  if (analyses.length === 0) {
+    yonlendirmeMaddeleri.push({
+      baslik: "Analiz henüz koşmadı — başlat",
+      dayanak: ["Tamamlanmış taraf analizi: 0 (Aşama 3'te en az bir analiz gerekir)"],
+    });
+  }
+  if (partyCount !== null && partyCount < 2) {
+    yonlendirmeMaddeleri.push({
+      baslik: "Taraf bilgisi eksik",
+      dayanak: [`Kayıtlı taraf: ${partyCount} (en az 2 gerekir)`],
+    });
+  }
+  if (docCount === 0) {
+    yonlendirmeMaddeleri.push({
+      baslik: "Hiç belge yüklenmemiş",
+      dayanak: ["Yüklü belge: 0"],
+    });
+  }
+  if (deadlineDaysLeft !== null && yonlendirmeMaddeleri.length < 3) {
+    const sonTarihMetni = `Son tarih: ${new Date(activeDeadline as string).toLocaleDateString("tr-TR")}`;
+    if (deadlineDaysLeft < 0) {
+      yonlendirmeMaddeleri.push({ baslik: "Süre doldu", dayanak: [sonTarihMetni] });
+    } else if (deadlineDaysLeft < 7) {
+      yonlendirmeMaddeleri.push({
+        baslik: `Süre ${deadlineDaysLeft} gün kaldı — oturumu planla`,
+        dayanak: [sonTarihMetni],
+      });
+    }
+  }
+  if (yonlendirmeMaddeleri.length < 3 && consistencyItems.length > 0) {
+    // guven_seviyesi 'yuksek' olanlar öne alınır; sıralama dışında hiçbir eleme yok.
+    const celiskiSirali = [...consistencyItems].sort((x: any, y: any) => {
+      const xy = String(x?.finding?.guven_seviyesi ?? "") === "yuksek" ? 0 : 1;
+      const yy = String(y?.finding?.guven_seviyesi ?? "") === "yuksek" ? 0 : 1;
+      return xy - yy;
+    });
+    for (const item of celiskiSirali) {
+      if (yonlendirmeMaddeleri.length >= 3) break;
+      const tarafAdi = item.party_id ? (worklogPartyNameById[item.party_id] ?? "Taraf") : "Taraf";
+      const gozlem = safeText(item?.finding?.gozlem);
+      const aDeger = safeText(item?.finding?.a_deger);
+      const bDeger = safeText(item?.finding?.b_deger);
+      yonlendirmeMaddeleri.push({
+        baslik: `${tarafAdi} beyanında çelişki var — ilk oturumda sor`,
+        dayanak: [gozlem, aDeger && bDeger ? `${aDeger} ↔ ${bDeger}` : ""].filter(Boolean),
+      });
+    }
+  }
+  const yonlendirmeListesi = yonlendirmeMaddeleri.slice(0, 3);
 
   // ── Katlanır bölüm listesi ──────────────────────────────────────────────
   // Her bölüm: sabit id (sol menüden derin bağlantı için), tek satırlık başlık,
@@ -5472,6 +5550,37 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
             </div>
           ))}
         </motion.div>
+
+        {/* ── "Şimdi ne yapmalısın" — kural tabanlı yönlendirme; madde yoksa hiç çizilmez ── */}
+        {yonlendirmeListesi.length > 0 && (
+          <motion.div variants={itemVariants} className={cockpitLayerBoxClass}>
+            <div className="text-lg font-semibold">Şimdi ne yapmalısın</div>
+            <ul className="divide-y">
+              {yonlendirmeListesi.map((m, i) => {
+                const acik = acikYonlendirme === i;
+                return (
+                  <li key={i} className="py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setAcikYonlendirme(acik ? null : i)}
+                      className="w-full flex items-start justify-between gap-2 text-left"
+                    >
+                      <span className="text-sm font-medium">{m.baslik}</span>
+                      <span className="shrink-0 text-sm font-medium text-primary hover:underline">{acik ? "Gizle" : "Açıkla"}</span>
+                    </button>
+                    {acik && m.dayanak.length > 0 && (
+                      <div className="mt-1.5 space-y-1">
+                        {m.dayanak.map((d, j) => (
+                          <p key={j} className="text-sm text-muted-foreground leading-snug">{d}</p>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </motion.div>
+        )}
 
         {analyses.length === 0 && (
           <motion.div variants={itemVariants} className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground italic text-center">
