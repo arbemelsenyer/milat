@@ -3020,8 +3020,10 @@ function CommonGroundZeminSection({ data }: { data: any }) {
                     )}
                     {acilabilir && acik && (
                       <div className="mt-1.5 space-y-1">
-                        {neden && <div className="text-[11px] text-amber-700">Neden rapora girmedi: {neden}</div>}
-                        {adim && <div className="text-[11px] text-amber-700">Önerilen adım: {adim}</div>}
+                        {/* Etiketler ana metin rengiyle (koyu lacivert-siyah) ve yarı kalın;
+                            kart zemini her temada amber kaldığından token yerine sabit değer. */}
+                        {neden && <div className="text-[11px] text-amber-700"><span className="font-medium text-[hsl(222_47%_14%)]">Neden rapora girmedi:</span> {neden}</div>}
+                        {adim && <div className="text-[11px] text-amber-700"><span className="font-medium text-[hsl(222_47%_14%)]">Önerilen adım:</span> {adim}</div>}
                       </div>
                     )}
                   </li>
