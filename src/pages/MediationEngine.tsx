@@ -3020,7 +3020,7 @@ function CommonGroundZeminSection({ data }: { data: any }) {
                     )}
                     {acilabilir && acik && (
                       <div className="mt-1.5 space-y-1">
-                        {neden && <div className="text-[11px] text-amber-700">{neden}</div>}
+                        {neden && <div className="text-[11px] text-amber-700">Neden rapora girmedi: {neden}</div>}
                         {adim && <div className="text-[11px] text-amber-700">Önerilen adım: {adim}</div>}
                       </div>
                     )}
