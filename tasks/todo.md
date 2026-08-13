@@ -40,6 +40,14 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (45)
+"Görüşme bağlantınız" e-postasının imzası randevu-teklif'teki davet yazısıyla aynı bloğa
+çevrildi: "Saygılarımızla," + "Arb. <arabulucunun ad soyadı>" (ad zaten Arb. ile
+başlıyorsa tekrarlanmıyor) ve altta küçük "Bu ileti MediPact AI aracılığıyla
+gönderilmiştir." notu. Ad profiles'ta bulunamazsa yalnız "Saygılarımızla," yazılıyor —
+"MediPact AI" imzası artık kullanılmıyor ve durum koşum özetindeki hata listesine
+düşüyor. Diğer davranışlar değişmedi. tsc temiz. REDEPLOY GEREKLİ: ajan-nobetci.
+
 ## Nerede kaldık — 13.08.2026 (44)
 ajan-nobetci teklif–oturum eşleştirmesi düzeltildi: cevaplanmış tekliflerin seçenekleri düz
 listeye açılıp GÜN ve SAATİN İKİSİ BİRDEN tutan seçenek aranıyor (oturum saati TR'ye

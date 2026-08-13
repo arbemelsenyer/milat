@@ -363,8 +363,11 @@ async function videoBaglantiEpostasi(
   const { data: profil } = arabulucuId
     ? await admin.from("profiles").select("full_name").eq("user_id", arabulucuId).maybeSingle()
     : { data: null };
+  // İmza bloğu randevu-teklif'teki davet e-postasıyla aynı: "Saygılarımızla," +
+  // "Arb. <ad soyad>". Ad bulunamazsa yalnız "Saygılarımızla," yazılır.
   const adSoyad = String((profil as any)?.full_name ?? "").trim();
-  const imza = adSoyad ? (/^arb\.?\s/i.test(adSoyad) ? adSoyad : `Arb. ${adSoyad}`) : "MediPact AI";
+  const imza = adSoyad ? (/^arb\.?\s/i.test(adSoyad) ? adSoyad : `Arb. ${adSoyad}`) : "";
+  if (!adSoyad) hatalar.push("arabulucu adı bulunamadı, imza adsız gönderildi");
 
   const esc = (t: string) => String(t).replace(/</g, "&lt;");
   const tarih = trTarihMetni(gun);
@@ -384,7 +387,7 @@ async function videoBaglantiEpostasi(
       ${kunye.length ? `<p>${kunye.join("<br>")}</p>` : ""}
       <p><strong>Görüşme:</strong> ${esc(tarih)} · ${esc(saat)}</p>
       <p>Görüşme bağlantınız:<br><a href="${link}">${esc(link)}</a></p>
-      <p>Saygılarımızla,<br>${esc(imza)}</p>
+      <p>Saygılarımızla,${imza ? `<br>${esc(imza)}` : ""}</p>
       <p style="font-size:12px;color:#666">Bu ileti MediPact AI aracılığıyla gönderilmiştir.</p>
     </body></html>`;
     try {
