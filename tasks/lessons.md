@@ -27,3 +27,7 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   (cases.user_id) ve takvim sahibi (mediator_availability.user_id) farklı
   kullanıcılar olabiliyor. Kimlik daima isteği yapan JWT'den alınır.
   (13.08, randevu-teklif — 1f9856f'teki ilk düzeltme de yanlış kaynağa bakıyordu)
+- PostgREST gömülü ilişkiyle (tablo:fk(alan)) filtrelemeye güvenme: ilişki
+  boş/hatalı dönerse sorgu sessizce işlevsiz kalır. Önce kimlikleri ayrı
+  sorguyla al, sonra .in(...) ile filtrele; error'ı da mutlaka oku.
+  (13.08, randevu-teklif dolu saat dışlama)

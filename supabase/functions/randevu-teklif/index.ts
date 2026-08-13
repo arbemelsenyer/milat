@@ -64,18 +64,50 @@ async function saatleriSec(admin: any, mediatorId: string, party: any): Promise<
     .limit(200);
   if (slotErr) return { secenekler: [], hata: "musaitlik_yok", tanili: { sebep: slotErr.message } };
 
-  // Aynı kullanıcının bekleyen tekliflerinde kullanılan saatler tekrar önerilmez
-  // (kendi dosyaları: assigned_mediator_id veya user_id kendisi olanlar).
-  const { data: pending } = await admin.from("randevu_teklifleri")
-    .select("secenekler, cases:case_id(assigned_mediator_id, user_id)")
-    .eq("durum", "beklemede")
-    .limit(500);
+  // Dolu saatler: arabulucunun TÜM dosyalarındaki bekleyen teklifler ve planlanmış
+  // oturumlar. Dosya kimlikleri önce tek sorguyla alınır — gömülü ilişki (cases:case_id)
+  // üzerinden filtrelemek sessizce boş dönebiliyordu.
   const dolu = new Set<string>();
-  for (const row of (pending ?? []) as any[]) {
-    const kendi = row?.cases?.assigned_mediator_id === mediatorId || row?.cases?.user_id === mediatorId;
-    if (!kendi) continue;
-    for (const s of Array.isArray(row?.secenekler) ? row.secenekler : []) {
-      dolu.add(`${String(s?.gun ?? "").slice(0, 10)}|${String(s?.saat ?? "").slice(0, 5)}`);
+  const doluAnahtar = (gun: string, saat: string) => `${String(gun).slice(0, 10)}|${String(saat).slice(0, 5)}`;
+
+  const { data: kendiDosyalar, error: caseErr } = await admin.from("cases")
+    .select("id, assigned_mediator_id, user_id")
+    .or(`assigned_mediator_id.eq.${mediatorId},user_id.eq.${mediatorId}`)
+    .limit(1000);
+  const caseIds = ((kendiDosyalar ?? []) as any[])
+    .filter((c) => takvimSahibi(c) === mediatorId)
+    .map((c) => String(c.id));
+
+  let pendingErr: string | null = caseErr?.message ?? null;
+  let sessionErr: string | null = null;
+
+  if (caseIds.length) {
+    const { data: pending, error: pErr } = await admin.from("randevu_teklifleri")
+      .select("secenekler")
+      .in("case_id", caseIds)
+      .eq("durum", "beklemede")
+      .limit(500);
+    if (pErr) pendingErr = pErr.message;
+    for (const row of (pending ?? []) as any[]) {
+      for (const s of Array.isArray(row?.secenekler) ? row.secenekler : []) {
+        dolu.add(doluAnahtar(String(s?.gun ?? ""), String(s?.saat ?? "")));
+      }
+    }
+
+    // Planlanmış oturumlar: scheduled_at UTC saklanır, TR gün+saatine çevrilir.
+    const { data: sessions, error: sErr } = await admin.from("case_sessions")
+      .select("scheduled_at, status")
+      .in("case_id", caseIds)
+      .eq("status", "scheduled")
+      .limit(1000);
+    if (sErr) sessionErr = sErr.message;
+    for (const s of (sessions ?? []) as any[]) {
+      if (!s?.scheduled_at) continue;
+      const d = new Date(s.scheduled_at);
+      if (Number.isNaN(d.getTime())) continue;
+      const gun = d.toLocaleDateString("en-CA", { timeZone: TZ });
+      const saat = d.toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+      dolu.add(doluAnahtar(gun, saat));
     }
   }
 
@@ -84,14 +116,17 @@ async function saatleriSec(admin: any, mediatorId: string, party: any): Promise<
     const gun = String(r.gun).slice(0, 10);
     const saat = String(r.baslangic).slice(0, 5);
     if (gun === bugun && saat <= simdi) continue;       // bugünün geçmiş saatleri
-    if (dolu.has(`${gun}|${saat}`)) continue;
+    if (dolu.has(doluAnahtar(gun, saat))) continue;     // bekleyen teklif veya planlı oturum
     bos.push({ gun, saat });
   }
   if (bos.length === 0) {
     return {
       secenekler: [],
       hata: "musaitlik_yok",
-      tanili: { mediator_id: mediatorId, bugun, satir: (slots ?? []).length, dolu: dolu.size },
+      tanili: {
+        mediator_id: mediatorId, bugun, satir: (slots ?? []).length, dolu: dolu.size,
+        dosya: caseIds.length, teklif_hatasi: pendingErr, oturum_hatasi: sessionErr,
+      },
     };
   }
 

@@ -40,6 +40,16 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (20)
+randevu-teklif dolu saat dışlama düzeltildi: arabulucunun dosya kimlikleri önce cases'ten
+alınıyor, sonra (a) o dosyalardaki durum='beklemede' tekliflerin seçenekleri ve
+(b) status='scheduled' case_sessions saatleri (scheduled_at UTC → TR gün+saat) dışlanıyor;
+karşılaştırma gun|HH:MM anahtarıyla normalize. Bekleyen dışlaması çalışmıyordu çünkü sorgu
+gömülü cases:case_id ilişkisi üzerinden filtreliyordu ve o ilişki boş/hatalı dönünce
+(hata da yutuluyordu) hiçbir saat dolu sayılmıyordu. Geçmiş saat kuralı, bireysel/kurumsal
+kuralı, yanıt şeması ve secenekler alan koruması değişmedi. tsc temiz.
+REDEPLOY GEREKLİ: randevu-teklif Lovable'dan yeniden deploy edilmeli.
+
 ## Nerede kaldık — 13.08.2026 (19)
 randevu-teklif/normalizeSecenekler artık ek alanları düşürmüyor: girdi olduğu gibi taşınıyor,
 yalnız gun/saat normalize ediliyor (gun/saat doğrulaması ve 1-3 sınırı aynı). Böylece
