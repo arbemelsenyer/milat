@@ -40,6 +40,12 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (19)
+randevu-teklif/normalizeSecenekler artık ek alanları düşürmüyor: girdi olduğu gibi taşınıyor,
+yalnız gun/saat normalize ediliyor (gun/saat doğrulaması ve 1-3 sınırı aynı). Böylece
+oturum_tipi ve adres secenekler jsonb'sine yazılıyor — (18)'deki kırıntı kapandı. tsc temiz.
+REDEPLOY GEREKLİ: randevu-teklif Lovable'dan yeniden deploy edilmeli.
+
 ## Nerede kaldık — 13.08.2026 (18)
 Randevu kartına oturum tipi eklendi (MediationEngine.tsx): "Online görüşme" (varsayılan) /
 "Yüz yüze görüşme" + adres kutusu, adres boşsa "Adres girilmedi" uyarısı. Seçim, teklif

@@ -11,7 +11,8 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-type Secenek = { gun: string; saat: string };
+// gun/saat zorunlu; oturum_tipi, adres gibi ek alanlar olduğu gibi taşınır.
+type Secenek = { gun: string; saat: string; [alan: string]: unknown };
 
 const GUN_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SAAT_RE = /^\d{2}:\d{2}$/;
@@ -29,10 +30,12 @@ function normalizeSecenekler(raw: unknown): Secenek[] | null {
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > 3) return null;
   const out: Secenek[] = [];
   for (const s of raw) {
+    if (!s || typeof s !== "object" || Array.isArray(s)) return null;
     const gun = String((s as any)?.gun ?? "").slice(0, 10);
     const saat = String((s as any)?.saat ?? "").slice(0, 5);
     if (!GUN_RE.test(gun) || !SAAT_RE.test(saat)) return null;
-    out.push({ gun, saat });
+    // Girdideki ek alanlar (oturum_tipi, adres vb.) korunur; yalnız gun/saat düzeltilir.
+    out.push({ ...(s as Record<string, unknown>), gun, saat });
   }
   return out;
 }
