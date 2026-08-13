@@ -591,6 +591,7 @@ export type Database = {
           contact_info: string | null
           created_at: string
           email: string | null
+          email_confirmed_at: string | null
           first_name: string | null
           full_name: string | null
           gsm: string | null
@@ -622,6 +623,7 @@ export type Database = {
           contact_info?: string | null
           created_at?: string
           email?: string | null
+          email_confirmed_at?: string | null
           first_name?: string | null
           full_name?: string | null
           gsm?: string | null
@@ -653,6 +655,7 @@ export type Database = {
           contact_info?: string | null
           created_at?: string
           email?: string | null
+          email_confirmed_at?: string | null
           first_name?: string | null
           full_name?: string | null
           gsm?: string | null
@@ -1495,37 +1498,28 @@ export type Database = {
       }
       mediator_availability: {
         Row: {
+          baslangic: string
+          bitis: string
           created_at: string
-          day_of_week: number
-          end_time: string
+          gun: string
           id: string
-          is_recurring: boolean
-          mediator_id: string
-          specific_date: string | null
-          start_time: string
-          updated_at: string
+          user_id: string
         }
         Insert: {
+          baslangic: string
+          bitis: string
           created_at?: string
-          day_of_week: number
-          end_time: string
+          gun: string
           id?: string
-          is_recurring?: boolean
-          mediator_id: string
-          specific_date?: string | null
-          start_time: string
-          updated_at?: string
+          user_id: string
         }
         Update: {
+          baslangic?: string
+          bitis?: string
           created_at?: string
-          day_of_week?: number
-          end_time?: string
+          gun?: string
           id?: string
-          is_recurring?: boolean
-          mediator_id?: string
-          specific_date?: string | null
-          start_time?: string
-          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -2402,6 +2396,42 @@ export type Database = {
           user_id?: string
           vergi_dairesi?: string | null
           vkn_tckn?: string | null
+        }
+        Relationships: []
+      }
+      randevu_teklifleri: {
+        Row: {
+          case_id: string
+          cevap_zamani: string | null
+          created_at: string
+          durum: string
+          id: string
+          party_id: string
+          secenekler: Json
+          secilen: string | null
+          token: string
+        }
+        Insert: {
+          case_id: string
+          cevap_zamani?: string | null
+          created_at?: string
+          durum?: string
+          id?: string
+          party_id: string
+          secenekler: Json
+          secilen?: string | null
+          token?: string
+        }
+        Update: {
+          case_id?: string
+          cevap_zamani?: string | null
+          created_at?: string
+          durum?: string
+          id?: string
+          party_id?: string
+          secenekler?: Json
+          secilen?: string | null
+          token?: string
         }
         Relationships: []
       }
