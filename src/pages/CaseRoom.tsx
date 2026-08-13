@@ -34,6 +34,16 @@ import { formatDisputeType } from "@/lib/disputeLabels";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 
+// YZ kullanım beyanı — metin ve sürümü tek yerde; sürüm değişirse onay yeniden istenir.
+const YZ_BEYAN_SURUMU = "v1";
+const YZ_BEYAN_METNI = `Bu arabuluculuk sürecinde, arabulucunuza destek olması amacıyla MediPact AI yapay zekâ araçları kullanılmaktadır. Bu araçlar; başvuru bilgilerinin düzenlenmesi, belgelerin özetlenmesi ve analizi, görüşme saatlerinin planlanması, size sorulacak bilgi sorularının hazırlanması ve belge taslaklarının oluşturulmasında görev yapar.
+
+Bilmeniz gerekenler:
+1. Paylaştığınız bilgiler yalnız sizin sürecinizde kullanılır; belgeleriniz ve beyanlarınız açık rızanız olmadan karşı tarafa gösterilmez.
+2. Yapay zekâ çıktıları öneri niteliğindedir; süreçle ilgili kararlar arabulucunuz ve taraflarca verilir.
+3. Bu araçlar hukuki danışmanlık vermez; hukuki değerlendirmeleriniz için vekilinizle görüşünüz.
+4. Kullanılan araçlar hakkında bilgi isteme ve kullanımına itiraz etme hakkınız vardır; itirazınız çözülmezse ilgili araç dosyanızda kullanılmaz.`;
+
 const tabTriggerAccentClass =
   "border-b-2 border-b-transparent transition-colors hover:border-b-accent hover:text-accent data-[state=active]:border-b-accent data-[state=active]:text-accent";
 
@@ -113,11 +123,53 @@ export default function CaseRoom() {
   const [savingIssue, setSavingIssue] = useState(false);
   const [docBusy, setDocBusy] = useState<string | null>(null);
   const [deleteDocTarget, setDeleteDocTarget] = useState<DocRow | null>(null);
+  // YZ kullanım beyanı: taraf onaylamadan dosya içeriği açılmaz.
+  const [yzDurum, setYzDurum] = useState<"yukleniyor" | "gerekli" | "tamam">("yukleniyor");
+  const [yzBusy, setYzBusy] = useState(false);
+  const [yzHata, setYzHata] = useState<string | null>(null);
 
   const myParty = parties.find((p) => p.user_id === user?.id) ?? null;
   const isOwner = !!(caseRow && user && caseRow.user_id === user.id);
   const isMediator = !!(caseRow && user && caseRow.assigned_mediator_id === user.id);
   const isParty = !!myParty;
+
+  // Onay kaydı yalnız tarafın kendi party_id'siyle aranır; arabulucu/admin ekranında
+  // kart hiç çıkmaz (kapı yalnız taraf girişinde işler).
+  useEffect(() => {
+    if (isMediator || isAdmin) { setYzDurum("tamam"); return; }
+    if (!myParty?.id) { setYzDurum("yukleniyor"); return; }
+    let aktif = true;
+    (async () => {
+      const { data, error } = await (supabase.from("yz_beyan_onaylari" as any) as any)
+        .select("id")
+        .eq("party_id", myParty.id)
+        .eq("metin_surumu", YZ_BEYAN_SURUMU)
+        .limit(1);
+      if (!aktif) return;
+      if (error) {
+        setYzHata(`Beyan durumu okunamadı: ${error.message}`);
+        setYzDurum("gerekli");
+        return;
+      }
+      setYzHata(null);
+      setYzDurum(Array.isArray(data) && data.length > 0 ? "tamam" : "gerekli");
+    })();
+    return () => { aktif = false; };
+  }, [myParty?.id, isMediator, isAdmin]);
+
+  async function yzBeyaniOnayla() {
+    if (!myParty?.id || !caseRow?.id || yzBusy) return;
+    setYzBusy(true);
+    setYzHata(null);
+    const { error } = await (supabase.from("yz_beyan_onaylari" as any) as any).insert({
+      party_id: myParty.id,
+      case_id: caseRow.id,
+      metin_surumu: YZ_BEYAN_SURUMU,
+    });
+    if (error) setYzHata(`Kaydedilemedi: ${error.message}`);   // kart kapanmaz
+    else setYzDurum("tamam");
+    setYzBusy(false);
+  }
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/auth");
@@ -429,16 +481,40 @@ export default function CaseRoom() {
           </DialogContent>
         </Dialog>
 
-        <ProcessOverview
-          currentPhase={caseRow.current_phase ?? 1}
-          parties={parties}
-          analyses={analyses}
-          discovery={discovery}
-          docs={docs}
-          commonGround={commonGround}
-        />
+        {!isMediator && !isAdmin && isParty && yzDurum !== "tamam" ? (
+          <Card className="p-6 space-y-4">
+            <h2 className="text-lg font-semibold">Yapay Zekâ Kullanım Bilgilendirmesi</h2>
+            {yzDurum === "yukleniyor" ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <>
+                <p className="text-sm whitespace-pre-line leading-relaxed">{YZ_BEYAN_METNI}</p>
+                {yzHata && (
+                  <div className="text-sm rounded border border-destructive/40 bg-destructive/10 text-destructive p-3">
+                    {yzHata}
+                  </div>
+                )}
+                <Button onClick={yzBeyaniOnayla} disabled={yzBusy}>
+                  {yzBusy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                  Okudum, bilgilendirildim
+                </Button>
+              </>
+            )}
+          </Card>
+        ) : (
+          <>
+            <ProcessOverview
+              currentPhase={caseRow.current_phase ?? 1}
+              parties={parties}
+              analyses={analyses}
+              discovery={discovery}
+              docs={docs}
+              commonGround={commonGround}
+            />
 
-        {isMediator ? <MediatorView /> : <PartyView />}
+            {isMediator ? <MediatorView /> : <PartyView />}
+          </>
+        )}
       </main>
     </div>
   );

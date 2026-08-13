@@ -375,3 +375,5 @@ oturuma bağlanıyor, davet yazısı gidiyor.
 
 13.08: Kritik faktör mükerrerliği giderildi · Aşama geçişindeki boş sayfa düzeltildi
 (AnimatePresence bekletmesi kaldırıldı) · Ödeme defteri Düzenle/Sil zaten mevcuttu.
+
+13.08: Taraf ekranına YZ kullanım beyanı kapısı (yz_beyan_onaylari, metin sürümü v1).

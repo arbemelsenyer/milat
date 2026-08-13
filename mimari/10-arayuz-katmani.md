@@ -88,3 +88,8 @@ arabulucunun kendi girdiği kayıttır.
   Aşama 4'e geçişteki boş sayfa bu yüzden oluşuyordu). Kokpit brifingindeki "Kritik
   Faktörler" birleştirmesi güçlendirildi: aynı maddenin farklı ifadeleri ve genişletilmiş
   hâlleri tek satıra iner, kaynak etiketleri korunur.
+● 13.08: Taraf dosyaya ilk girişinde "Yapay Zekâ Kullanım Bilgilendirmesi" kartı çıkar;
+  onaylanmadan dosya içeriği açılmaz. Onay yz_beyan_onaylari'na (party_id, case_id,
+  metin_surumu) yazılır ve bir daha sorulmaz; metin sürümü değişirse onay yeniden istenir.
+  Kart yalnız taraf girişinde görünür, arabulucu/admin ekranlarında çıkmaz. Kayıt hatası
+  ekranda gösterilir, kart kapanmaz.

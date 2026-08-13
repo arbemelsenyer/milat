@@ -40,6 +40,15 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (36)
+YZ Kullanım Beyanı kapısı eklendi (CaseRoom.tsx): taraf dosyaya girdiğinde
+yz_beyan_onaylari'nda kendi party_id'siyle metin_surumu='v1' kaydı yoksa dosya içeriği
+yerine tam genişlikte bilgilendirme kartı çıkıyor (metin ve sürüm tek sabitte:
+YZ_BEYAN_METNI / YZ_BEYAN_SURUMU). "Okudum, bilgilendirildim" kayıt atıyor, kart kapanıyor
+ve bir daha çıkmıyor; kayıt/okuma hatasında hata kartta görünüyor ve kart kapanmıyor.
+Arabulucu/admin ekranlarında kart hiç çıkmıyor, mevcut hiçbir bölüm kaldırılmadı.
+tsc + build temiz.
+
 ## Nerede kaldık — 13.08.2026 (35)
 Üç iş tek commit (MediationEngine.tsx):
 A) Kritik Faktörler mükerrer maddesi: factorSimilarity'ye normalize edilmiş tam eşitlik ve
