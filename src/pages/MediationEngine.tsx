@@ -1144,7 +1144,66 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
 
   const BOS_SAAT_MESAJI = "Takviminizde uygun boş saat bulunamadı — Takvim > Müsaitlik bölümünden saat ekleyin.";
 
+  // Bu dosyaya ait randevu tekliflerinin durum listesi (yeniden eskiye).
+  const [teklifler, setTeklifler] = useState<any[]>([]);
+  const [teklifYukleniyor, setTeklifYukleniyor] = useState(true);
+  const [teklifHata, setTeklifHata] = useState<string | null>(null);
+
+  const teklifleriYukle = useCallback(async () => {
+    setTeklifYukleniyor(true);
+    const { data, error } = await supabase
+      .from("randevu_teklifleri")
+      .select("id, party_id, secenekler, durum, secilen, cevap_zamani, created_at, token")
+      .eq("case_id", caseRow.id)
+      .order("created_at", { ascending: false });
+    if (error) {
+      // Hata yutulmaz: RLS'te arabulucu için SELECT politikası yoksa da burada görünür.
+      setTeklifHata(error.message);
+      setTeklifler([]);
+    } else {
+      setTeklifHata(null);
+      setTeklifler(data ?? []);
+    }
+    setTeklifYukleniyor(false);
+  }, [caseRow.id]);
+
+  useEffect(() => { void teklifleriYukle(); }, [teklifleriYukle]);
+
   const party = parties.find((p) => p.id === partyId) ?? null;
+
+  function tarafAdi(pid: string): string {
+    const p = parties.find((x) => x.id === pid);
+    return p ? partyDisplay(p) : "Taraf";
+  }
+
+  function gunSaatMetni(s: any): string {
+    const gun = String(s?.gun ?? "").slice(0, 10);
+    const saat = String(s?.saat ?? "").slice(0, 5);
+    if (!gun) return saat || "—";
+    return `${new Date(`${gun}T00:00:00`).toLocaleDateString("tr-TR")} ${saat}`;
+  }
+
+  function durumMetni(t: any): string {
+    if (t?.durum === "iptal") return "İptal edildi";
+    if (t?.durum !== "cevaplandi") return "Bekliyor";
+    const secilen = String(t?.secilen ?? "");
+    if (secilen === "uygun") return "Cevaplandı — Uygun";
+    if (secilen === "uymuyor") return "Cevaplandı — Uymuyor";
+    if (secilen) {
+      const [gun, saat] = secilen.split(" ");
+      return `Cevaplandı — ${gunSaatMetni({ gun, saat })} saatini seçti`;
+    }
+    return "Cevaplandı";
+  }
+
+  async function metniKopyala(t: string) {
+    try {
+      await navigator.clipboard.writeText(t);
+      toast({ title: "Link kopyalandı" });
+    } catch {
+      toast({ title: "Kopyalanamadı", description: "Linki elle seçip kopyalayın.", variant: "destructive" });
+    }
+  }
 
   function reset() {
     setOnerilen(null);
@@ -1253,6 +1312,7 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
       setEditing(false);
       setMesaj({ tip: "bilgi", metin: "Randevu teklifi oluşturuldu — linki tarafa iletin." });
       toast({ title: "Randevu teklifi oluşturuldu" });
+      void teklifleriYukle();
     } catch (e: any) {
       setMesaj({ tip: "hata", metin: trErr(e?.message ?? "") || "Teklif oluşturulamadı." });
     } finally {
@@ -1384,6 +1444,59 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
           </Button>
         </div>
       )}
+
+      <div className="border-t pt-3 space-y-2">
+        <div className="text-sm font-medium">Bu dosyadaki randevu teklifleri</div>
+
+        {teklifHata && (
+          <div className="text-sm rounded border border-destructive/40 bg-destructive/10 text-destructive p-3">
+            Teklif listesi okunamadı: {teklifHata}
+          </div>
+        )}
+
+        {teklifYukleniyor ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : teklifler.length === 0 ? (
+          !teklifHata && <p className="text-sm text-muted-foreground">Henüz randevu teklifi oluşturulmadı.</p>
+        ) : (
+          <div className="space-y-2">
+            {teklifler.map((t) => {
+              const secenekler = Array.isArray(t.secenekler) ? t.secenekler : [];
+              const teklifLinki = `${window.location.origin}/randevu/${t.token}`;
+              return (
+                <div key={t.id} className="border rounded p-3 space-y-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-medium">{tarafAdi(t.party_id)}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(t.created_at).toLocaleString("tr-TR")}
+                    </span>
+                  </div>
+                  <div className="text-sm">
+                    {secenekler.length
+                      ? secenekler.map((s: any) => gunSaatMetni(s)).join(" · ")
+                      : "Saat bilgisi yok"}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {durumMetni(t)}
+                    {t.cevap_zamani && ` (${new Date(t.cevap_zamani).toLocaleString("tr-TR")})`}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Input
+                      readOnly
+                      value={teklifLinki}
+                      className="text-xs flex-1 min-w-[220px] h-8"
+                      onFocus={(e) => e.currentTarget.select()}
+                    />
+                    <Button size="sm" variant="outline" onClick={() => metniKopyala(teklifLinki)}>
+                      <Copy className="h-3 w-3 mr-1" /> Kopyala
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
