@@ -348,3 +348,6 @@ düğmesi; mevcut Aşama 5 randevu akışını tetikliyor, kopyasını yazmıyor
 
 13.08: Kokpit kartından tarafa keşif sorusu gönderme — mevcut case_discovery_questions
 kanalı kullanıldı (yeni tablo/sütun yok, e-posta yok); gönderilen soru tekrar önerilmiyor.
+
+13.08: Dosya künyesine "Otomatik akış" anahtarı (cases.otomatik_akis) — yalnız değer
+saklanıyor, nöbetçi fonksiyon sonraki taş.

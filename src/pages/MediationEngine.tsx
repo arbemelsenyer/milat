@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -228,6 +229,8 @@ type CaseRow = {
   title: string | null;
   application_no: string | null;
   uyap_no: string | null;
+  // Nöbetçi fonksiyon gelene kadar yalnız saklanan anahtar (cases.otomatik_akis).
+  otomatik_akis?: boolean | null;
   dispute_type: string | null;
   dispute_subtype?: string | null;
   status: string | null;
@@ -469,7 +472,7 @@ export default function MediationEngine() {
     setLoading(true);
     const { data, error } = await supabase
       .from("cases")
-      .select("id, user_id, title, application_no, uyap_no, dispute_type, dispute_subtype, status, current_phase, application_date, assigned_mediator_id, issue_description, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta")
+      .select("id, user_id, title, application_no, uyap_no, dispute_type, dispute_subtype, status, current_phase, application_date, assigned_mediator_id, issue_description, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta, otomatik_akis")
       .order("created_at", { ascending: false });
     if (error) toast({ title: "Yükleme hatası", description: trErr(error.message), variant: "destructive" });
     else setCases((data ?? []) as CaseRow[]);
@@ -479,7 +482,7 @@ export default function MediationEngine() {
   async function loadCase(id: string) {
     const { data, error } = await supabase
       .from("cases")
-      .select("id, user_id, title, application_no, uyap_no, dispute_type, dispute_subtype, status, current_phase, application_date, assigned_mediator_id, issue_description, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta")
+      .select("id, user_id, title, application_no, uyap_no, dispute_type, dispute_subtype, status, current_phase, application_date, assigned_mediator_id, issue_description, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta, otomatik_akis")
       .eq("id", id).maybeSingle();
     if (error) { toast({ title: "Başvuru yüklenemedi", description: trErr(error.message), variant: "destructive" }); return; }
     setActiveCase(data as CaseRow);
@@ -504,6 +507,34 @@ export default function MediationEngine() {
       return;
     }
     setPhase(id);
+  }
+
+  // Otomatik akış anahtarı (cases.otomatik_akis). Şimdilik yalnız değeri saklar;
+  // nöbetçi fonksiyon gelince işlevlenecek. Hook'lar koşullu return'lerin ÜSTÜNDE.
+  const [otomatikAkis, setOtomatikAkis] = useState(false);
+  const [otomatikBusy, setOtomatikBusy] = useState(false);
+  const [otomatikHata, setOtomatikHata] = useState<string | null>(null);
+  useEffect(() => {
+    setOtomatikAkis(!!activeCase?.otomatik_akis);
+    setOtomatikHata(null);
+  }, [activeCase?.id, activeCase?.otomatik_akis]);
+
+  async function toggleOtomatikAkis(next: boolean) {
+    if (!activeCase || otomatikBusy) return;
+    const onceki = otomatikAkis;
+    setOtomatikBusy(true);
+    setOtomatikHata(null);
+    setOtomatikAkis(next);
+    const { error } = await supabase.from("cases")
+      .update({ otomatik_akis: next } as any)
+      .eq("id", activeCase.id);
+    if (error) {
+      setOtomatikAkis(onceki);                       // hata sessiz kalmaz
+      setOtomatikHata(`Kaydedilemedi: ${trErr(error.message)}`);
+    } else {
+      setActiveCase((prev) => (prev ? { ...prev, otomatik_akis: next } : prev));
+    }
+    setOtomatikBusy(false);
   }
 
   // NOT: Bu hook, aşağıdaki koşullu return'lerden (loading / !caseId / !activeCase) ÖNCE
@@ -639,6 +670,28 @@ export default function MediationEngine() {
             <div className="text-xs uppercase opacity-70">Başvuru No</div>
             <div className="font-mono text-sm">{activeCase.application_no || "—"}</div>
             <div className="text-xs mt-2 opacity-80 line-clamp-2">{activeCase.title}</div>
+            {(isMediator || isAdmin) && (
+              <div className="mt-3 border-t border-sidebar-foreground/10 pt-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium">Otomatik akış</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] opacity-70">{otomatikAkis ? "Açık" : "Kapalı"}</span>
+                    <Switch
+                      checked={otomatikAkis}
+                      disabled={otomatikBusy}
+                      onCheckedChange={(v) => toggleOtomatikAkis(!!v)}
+                      aria-label="Otomatik akış"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] opacity-70 mt-1 leading-snug">
+                  Açıkken ajan sıradaki adımları kendisi yürütür; her adımı kayda yazar.
+                </p>
+                {otomatikHata && (
+                  <p className="text-[11px] text-destructive mt-1 leading-snug">{otomatikHata}</p>
+                )}
+              </div>
+            )}
           </div>
           <div className="border-t border-sidebar-foreground/10 pt-3 mb-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Dosya Araçları

@@ -40,6 +40,13 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (26)
+Sol paneldeki dosya künyesine "Otomatik akış" anahtarı eklendi (MediationEngine.tsx):
+cases.otomatik_akis okunuyor/yazılıyor, Açık/Kapalı durumu ve tek cümlelik açıklama
+görünüyor, yalnız arabulucu/admin görüyor. Kayıt hatasında anahtar eski değerine dönüyor
+ve hata satırı ekranda kalıyor. Anahtar şimdilik yalnız değeri saklıyor — nöbetçi
+fonksiyon gelince işlevlenecek. Başka davranış değişmedi. tsc + build temiz.
+
 ## Nerede kaldık — 13.08.2026 (25)
 "Şimdi ne yapmalısın" kartına keşif sorusu kolu eklendi (MediationEngine.tsx): ajanın
 ürettiği sıradaki sorulardan (party_communication_analysis.discovery_questions) tarafa

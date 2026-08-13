@@ -73,3 +73,8 @@ arabulucunun kendi girdiği kayıttır.
   kendi kanalına (case_discovery_questions, party_id) yazar; taraf kendi ekranındaki
   İhtiyaç Tespiti bölümünde görür. E-posta gönderilmez, karşı taraf göremez. Gönderilen
   soru bir daha madde olmaz; kartta "✓ Gönderildi" satırı görünür.
+● 13.08: Sol paneldeki dosya künyesinde "Otomatik akış" anahtarı (cases.otomatik_akis) —
+  Açık/Kapalı durumu ve "Açıkken ajan sıradaki adımları kendisi yürütür; her adımı kayda
+  yazar." açıklaması. Yalnız arabulucu/admin görür ve değiştirir; taraf yüzeylerinde yok.
+  Kayıt hatası ekranda gösterilir. Anahtar şimdilik yalnız değeri saklar; nöbetçi fonksiyon
+  gelene kadar hiçbir davranışı tetiklemez.
