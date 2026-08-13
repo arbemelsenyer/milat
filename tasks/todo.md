@@ -40,6 +40,15 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (43)
+ajan-nobetci ReferenceError'ları giderildi: TZ değişkeni bu dosyada hiç tanımlı değildi —
+yerine sabit TR_OFFSET_MS (3 saat) ve trGunSaat()/trTarihMetni() yardımcıları tanımlandı;
+teklif–oturum saat karşılaştırması ve e-posta tarih metni bunları kullanıyor. Aynı hatta
+takvimSahibi() de tanımsızdı (randevu-teklif'te kalmış), e-posta yolunda patlıyordu —
+bu dosyaya da eklendi. Dosya tanımlayıcı taramasıyla başka çözülmemiş ad kalmadığı
+doğrulandı. Diğer davranışlar değişmedi. tsc temiz.
+REDEPLOY GEREKLİ: ajan-nobetci.
+
 ## Nerede kaldık — 13.08.2026 (42)
 ajan-nobetci video hattı düzeltildi: teklif–oturum eşleştirmesi artık scheduled_at'i
 Türkiye saatine çevirip karşılaştırıyor (2026-08-18T07:00Z → 18.08 10:00) ve karar tersine

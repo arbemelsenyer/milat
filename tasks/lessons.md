@@ -31,3 +31,7 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   boş/hatalı dönerse sorgu sessizce işlevsiz kalır. Önce kimlikleri ayrı
   sorguyla al, sonra .in(...) ile filtrele; error'ı da mutlaka oku.
   (13.08, randevu-teklif dolu saat dışlama)
+- Edge fonksiyonlarda tsc kapsam DIŞIDIR (tsconfig yalnız src'yi tarar): tanımsız
+  değişken ancak canlıda ReferenceError olarak çıkar. Bir fonksiyondan diğerine
+  kod taşırken yardımcıların (TZ, takvimSahibi gibi) hedef dosyada tanımlı
+  olduğu ayrıca doğrulanır. (13.08, ajan-nobetci)

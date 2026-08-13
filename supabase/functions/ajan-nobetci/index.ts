@@ -16,6 +16,37 @@ const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 
 const SURE_ESIGI_GUN = 3;
 
+// Türkiye saati sabit UTC+3 (yaz saati uygulaması yok). Saat dilimi adı yerine sabit
+// kayma kullanılır — teklif kayıtlarındaki gun/saat de Türkiye saatidir.
+const TR_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+// UTC ISO değerini Türkiye saatine çevirip "YYYY-MM-DD" ve "HH:MM" döndürür.
+function trGunSaat(iso: string): { gun: string; saat: string } {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { gun: "", saat: "" };
+  const tr = new Date(d.getTime() + TR_OFFSET_MS);
+  const gun = tr.toISOString().slice(0, 10);
+  const saat = tr.toISOString().slice(11, 16);
+  return { gun, saat };
+}
+
+// Dosyanın arabulucusu: assigned_mediator_id doluysa o, boşsa cases.user_id.
+// (randevu-teklif'teki aynı adlı yardımcının bu dosyadaki karşılığı — burada da
+// tanımlı olmadığı için e-posta hattı ReferenceError veriyordu.)
+function takvimSahibi(caseRow: any): string {
+  return caseRow?.assigned_mediator_id ?? caseRow?.user_id ?? "";
+}
+
+// Türkçe uzun tarih metni ("18 Ağustos 2026 Salı") — TR gün değerinden üretilir.
+const TR_AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+const TR_GUNLER = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
+function trTarihMetni(gun: string): string {
+  const [y, m, g] = String(gun).split("-").map((x) => Number(x));
+  if (!y || !m || !g) return gun;
+  const d = new Date(Date.UTC(y, m - 1, g));
+  return `${g} ${TR_AYLAR[m - 1]} ${y} ${TR_GUNLER[d.getUTCDay()]}`;
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
@@ -242,10 +273,8 @@ async function videoBaglantilariniHazirla(admin: any, dosya: any): Promise<Video
   }
 
   for (const oturum of adaylar) {
-    // TR gün/saat: scheduled_at UTC'den Europe/Istanbul'a çevrilir.
-    const d = new Date(oturum.scheduled_at);
-    const gun = d.toLocaleDateString("en-CA", { timeZone: TZ });
-    const saat = d.toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+    // TR gün/saat: scheduled_at UTC'dir, sabit UTC+3 kaymasıyla çevrilir.
+    const { gun, saat } = trGunSaat(String(oturum.scheduled_at));
     try {
       if (tipEslemesi.get(`${gun}|${saat}`) === "yuz_yuze") {
         ozet.atlanan_yuz_yuze++;
@@ -330,8 +359,7 @@ async function videoBaglantiEpostasi(
   const imza = adSoyad ? (/^arb\.?\s/i.test(adSoyad) ? adSoyad : `Arb. ${adSoyad}`) : "MediPact AI";
 
   const esc = (t: string) => String(t).replace(/</g, "&lt;");
-  const tarih = new Date(`${gun}T${saat}:00+03:00`)
-    .toLocaleDateString("tr-TR", { timeZone: TZ, day: "numeric", month: "long", year: "numeric", weekday: "long" });
+  const tarih = trTarihMetni(gun);
   const kunye: string[] = [];
   if (dosya?.application_no) kunye.push(`<strong>Dosya No:</strong> ${esc(String(dosya.application_no))}`);
   if (dosya?.title) kunye.push(`<strong>Uyuşmazlık konusu:</strong> ${esc(String(dosya.title))}`);
