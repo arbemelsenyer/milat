@@ -514,6 +514,7 @@ export default function MediationEngine() {
   const [otomatikAkis, setOtomatikAkis] = useState(false);
   const [otomatikBusy, setOtomatikBusy] = useState(false);
   const [otomatikHata, setOtomatikHata] = useState<string | null>(null);
+  // Gösterim yalnız aktif dosyanın kendi değerinden gelir; dosya değişince sıfırlanır.
   useEffect(() => {
     setOtomatikAkis(!!activeCase?.otomatik_akis);
     setOtomatikHata(null);
@@ -521,18 +522,26 @@ export default function MediationEngine() {
 
   async function toggleOtomatikAkis(next: boolean) {
     if (!activeCase || otomatikBusy) return;
+    const hedefId = activeCase.id;                   // yazım yalnız bu dosyaya
     const onceki = otomatikAkis;
     setOtomatikBusy(true);
     setOtomatikHata(null);
     setOtomatikAkis(next);
-    const { error } = await supabase.from("cases")
+    // Etkilenen satırlar geri okunur: tek satır ve tam da bu dosya olmalı.
+    // Başka bir dosya etkilenirse anahtar eski hâline döner ve hata görünür kalır.
+    const { data, error } = await supabase.from("cases")
       .update({ otomatik_akis: next } as any)
-      .eq("id", activeCase.id);
+      .eq("id", hedefId)
+      .select("id, otomatik_akis");
+    const satirlar = Array.isArray(data) ? data : [];
     if (error) {
       setOtomatikAkis(onceki);                       // hata sessiz kalmaz
       setOtomatikHata(`Kaydedilemedi: ${trErr(error.message)}`);
+    } else if (satirlar.length !== 1 || (satirlar[0] as any)?.id !== hedefId) {
+      setOtomatikAkis(onceki);
+      setOtomatikHata(`Kaydedilemedi: beklenen tek dosya yerine ${satirlar.length} kayıt etkilendi.`);
     } else {
-      setActiveCase((prev) => (prev ? { ...prev, otomatik_akis: next } : prev));
+      setActiveCase((prev) => (prev && prev.id === hedefId ? { ...prev, otomatik_akis: next } : prev));
     }
     setOtomatikBusy(false);
   }

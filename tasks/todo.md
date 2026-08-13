@@ -40,6 +40,15 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (29)
+Otomatik akış anahtarı: update zaten .eq("id", activeCase.id) ile tek dosyayı hedefliyordu;
+kodda başka yazıcı yok (grep). Bu yüzden 3 dosyanın true olmasının sebebini koddan
+DOĞRULAYAMADIM — bilmiyorum; veritabanı tarafında (tetikleyici/politika/sütun varsayılanı)
+kontrol edilmeli. Yapılan: update artık .select() ile etkilenen satırları geri okuyor;
+tek satır değilse veya id tutmuyorsa anahtar eski değerine dönüyor ve "beklenen tek dosya
+yerine N kayıt etkilendi" hatası ekranda kalıyor. Okuma zaten yalnız aktif dosyanın
+değerinden geliyor (yorumla sabitlendi). tsc + build temiz.
+
 ## Nerede kaldık — 13.08.2026 (28)
 Nöbetçi yazıldı: supabase/functions/ajan-nobetci (verify_jwt=false, config.toml'a eklendi).
 Her koşuda otomatik_akis=true dosyaları tarıyor; panodaki durum='bekliyor' soru_gonder
