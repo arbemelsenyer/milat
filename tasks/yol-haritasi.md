@@ -351,3 +351,6 @@ kanalı kullanıldı (yeni tablo/sütun yok, e-posta yok); gönderilen soru tekr
 
 13.08: Dosya künyesine "Otomatik akış" anahtarı (cases.otomatik_akis) — yalnız değer
 saklanıyor, nöbetçi fonksiyon sonraki taş.
+
+13.08: Taraf analizi, otomatik akış açık dosyalarda ajan_gorevleri panosuna "soru_gonder"
+görevi bırakıyor (mükerrer yazmıyor). Nöbetçi/yürütücü sonraki taş.

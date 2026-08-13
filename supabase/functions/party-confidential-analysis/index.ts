@@ -358,6 +358,41 @@ Bu tarafın perspektifinden detaylı analiz üret. Yukarıdaki bloklarda somut b
       }
     }
 
+    // Görev panosu (ajan_gorevleri): yalnız dosyanın otomatik akışı AÇIKSA ve bu koşumda
+    // keşif sorusu üretildiyse, bu taraf için tek bir "soru_gonder" görevi bırakılır.
+    // Aynı dosya+taraf için bekleyen görev varsa ikincisi yazılmaz. Best-effort: bu yazım
+    // başarısız olsa bile analiz sonucu ve response etkilenmez.
+    try {
+      const uretilenSoru = Array.isArray(parsed.discovery_questions) ? parsed.discovery_questions.length : 0;
+      if (uretilenSoru > 0) {
+        const { data: akisRow } = await admin.from("cases")
+          .select("otomatik_akis").eq("id", case_id).maybeSingle();
+        if ((akisRow as any)?.otomatik_akis === true) {
+          const { data: bekleyen } = await admin.from("ajan_gorevleri")
+            .select("id")
+            .eq("case_id", case_id)
+            .eq("hedef_party_id", party_id)
+            .eq("gorev_tipi", "soru_gonder")
+            .eq("durum", "bekliyor")
+            .limit(1);
+          if (!bekleyen || bekleyen.length === 0) {
+            const { error: gorevErr } = await admin.from("ajan_gorevleri").insert({
+              case_id,
+              gorev_tipi: "soru_gonder",
+              hedef_party_id: party_id,
+              durum: "bekliyor",
+              gerekce: "Analiz yeni keşif soruları üretti",
+            });
+            if (gorevErr) {
+              console.error(`[party-confidential-analysis] ajan_gorevleri yazımı başarısız: ${gorevErr.message}`);
+            }
+          }
+        }
+      }
+    } catch (e: any) {
+      console.error(`[party-confidential-analysis] görev panosu yazımı başarısız: ${e?.message ?? String(e)}`);
+    }
+
     // Activity log: mark completed. Fire via waitUntil so it can't delay the response,
     // and so it still finishes even though the response is about to be sent.
     if (admin && case_id && party_id) {

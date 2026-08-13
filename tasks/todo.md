@@ -40,6 +40,15 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (27)
+party-confidential-analysis artık görev panosuna kayıt bırakıyor: koşumda keşif sorusu
+üretildiyse ve cases.otomatik_akis TRUE ise ajan_gorevleri'ne o taraf için tek satır
+(gorev_tipi='soru_gonder', durum='bekliyor', gerekce='Analiz yeni keşif soruları üretti');
+aynı dosya+taraf için bekleyen görev varsa ikinci satır yazılmıyor. otomatik_akis kapalıysa
+hiçbir şey yazılmıyor. Yazım service role ile ve best-effort — hata analizi düşürmüyor,
+loga yazılıyor. Analizin kendisi, çıktısı ve şeması değişmedi. tsc temiz.
+REDEPLOY GEREKLİ: party-confidential-analysis Lovable'dan yeniden deploy edilmeli.
+
 ## Nerede kaldık — 13.08.2026 (26)
 Sol paneldeki dosya künyesine "Otomatik akış" anahtarı eklendi (MediationEngine.tsx):
 cases.otomatik_akis okunuyor/yazılıyor, Açık/Kapalı durumu ve tek cümlelik açıklama

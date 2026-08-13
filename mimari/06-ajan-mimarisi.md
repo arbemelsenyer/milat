@@ -71,3 +71,8 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
   ve karşı taraf ADLARI, arabulucu adı) ve aynı içeriğin PDF eki eklendi. Künye dışında
   hiçbir analiz, gizli kanal içeriği veya tutar e-postaya girmez. PDF Türkçe karakterli
   gömülü fontla üretilir; font/PDF üretilemezse ek konulmaz, yazı eksiz gider.
+● 13.08: Görev panosu (ajan_gorevleri) ilk yazıcı — party_confidential_analysis. Koşumda
+  keşif sorusu üretildiyse ve dosyanın otomatik akışı açıksa (cases.otomatik_akis) ilgili
+  taraf için tek "soru_gonder" görevi 'bekliyor' durumunda yazılır; aynı dosya+taraf için
+  bekleyen görev varsa ikincisi yazılmaz. Otomatik akış kapalıyken pano hiç yazılmaz.
+  Yazım best-effort: hata analizi düşürmez, yalnız loga geçer.
