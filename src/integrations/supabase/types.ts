@@ -2678,6 +2678,52 @@ export type Database = {
         }
         Relationships: []
       }
+      yz_beyan_onaylari: {
+        Row: {
+          case_id: string
+          id: string
+          metin_surumu: string
+          onay_zamani: string
+          party_id: string
+        }
+        Insert: {
+          case_id: string
+          id?: string
+          metin_surumu?: string
+          onay_zamani?: string
+          party_id: string
+        }
+        Update: {
+          case_id?: string
+          id?: string
+          metin_surumu?: string
+          onay_zamani?: string
+          party_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yz_beyan_onaylari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "yz_beyan_onaylari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yz_beyan_onaylari_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       case_outcome_analytics: {
