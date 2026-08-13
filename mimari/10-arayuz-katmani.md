@@ -68,3 +68,8 @@ arabulucunun kendi girdiği kayıttır.
   "Randevu ayarla" eylem düğmesi var; düğme Aşama 5'teki mevcut randevu akışını tetikler
   (tek taraflı dosyada taraf otomatik seçilir ve saat önerisi istenir, çok taraflıda
   kullanıcı Aşama 5'teki bölümde tarafı kendisi seçer). Diğer maddelerde düğme çıkmaz.
+● 13.08: "ŞİMDİ NE YAPMALISIN" kartına keşif sorusu kolu — tarafa iletilmemiş sıradaki
+  soru madde olarak çıkar (taraf adı + önizleme), [Soruyu gönder] soruyu yalnız o tarafın
+  kendi kanalına (case_discovery_questions, party_id) yazar; taraf kendi ekranındaki
+  İhtiyaç Tespiti bölümünde görür. E-posta gönderilmez, karşı taraf göremez. Gönderilen
+  soru bir daha madde olmaz; kartta "✓ Gönderildi" satırı görünür.

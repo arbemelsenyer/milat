@@ -40,6 +40,16 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (25)
+"Şimdi ne yapmalısın" kartına keşif sorusu kolu eklendi (MediationEngine.tsx): ajanın
+ürettiği sıradaki sorulardan (party_communication_analysis.discovery_questions) tarafa
+HENÜZ iletilmemiş ilk soru madde olarak çıkıyor (taraf adı + kısa önizleme) ve
+[Soruyu gönder] düğmesi soruyu case_discovery_questions'a o tarafın party_id'siyle
+yazıyor — taraf CaseRoom > İhtiyaç Tespiti sekmesinde kendi sorularını zaten buradan
+okuyor, yeni tablo/sütun ve e-posta yok. Gönderim sonrası liste yenileniyor, aynı soru
+tekrar madde olmuyor ve kartta "✓ Gönderildi" satırı çıkıyor. Randevu düğmesi ve diğer
+maddeler değişmedi. CaseRoom'a dokunulmadı. tsc + build temiz.
+
 ## Nerede kaldık — 13.08.2026 (24)
 Kokpitteki "Randevu ayarla" düğmesi aşama geçişini artık sol menüyle TEK kopya üzerinden
 yapıyor: menü satırının tıklama davranışı gotoPhase(id) fonksiyonuna alındı (kilit kontrolü

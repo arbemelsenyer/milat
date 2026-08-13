@@ -345,3 +345,6 @@ düğmesi; mevcut Aşama 5 randevu akışını tetikliyor, kopyasını yazmıyor
 
 13.08: Kokpitteki "Randevu ayarla" düğmesi aşama geçişini sol menüyle aynı tek yoldan
 (gotoPhase) yapıyor; randevu tetiği ref'e alındı.
+
+13.08: Kokpit kartından tarafa keşif sorusu gönderme — mevcut case_discovery_questions
+kanalı kullanıldı (yeni tablo/sütun yok, e-posta yok); gönderilen soru tekrar önerilmiyor.

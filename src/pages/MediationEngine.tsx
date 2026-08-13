@@ -5510,6 +5510,10 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
   // null = sayılamadı; bilinmeyen sayıdan madde üretilmez.
   const [partyCount, setPartyCount] = useState<number | null>(null);
   const [docCount, setDocCount] = useState<number | null>(null);
+  // Tarafa iletilmiş keşif soruları + gönderim durumu ("Şimdi ne yapmalısın" kolu).
+  const [discoveryRows, setDiscoveryRows] = useState<any[]>([]);
+  const [soruGonderiliyor, setSoruGonderiliyor] = useState(false);
+  const [sonGonderilenSoru, setSonGonderilenSoru] = useState<string | null>(null);
   // Açık yönlendirme maddesi — tek state, aynı anda tek madde açık kalır.
   const [acikYonlendirme, setAcikYonlendirme] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -5541,7 +5545,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     setLoading(true);
     setLoadErr(null);
     try {
-      const [r, a, rc, wl, cf, ca, pc, dc] = await Promise.all([
+      const [r, a, rc, wl, cf, ca, pc, dc, dq] = await Promise.all([
         supabase.from("common_ground_reports").select("*").eq("case_id", caseRow.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("party_analyses").select("party_id, analysis, risk_analizi, case_parties:party_id(first_name, last_name, company_name, party_role)").eq("case_id", caseRow.id),
         // Kök Neden Katmanı: mediator-only, ayrı tablo. Bu sorgu ana yüklemeyi bloklamaz —
@@ -5559,6 +5563,9 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
         // "Şimdi ne yapmalısın" kartının iki sayımı — head:true, satır içeriği çekilmez.
         supabase.from("case_parties").select("id", { count: "exact", head: true }).eq("case_id", caseRow.id),
         supabase.from("case_documents").select("id", { count: "exact", head: true }).eq("case_id", caseRow.id),
+        // Tarafa iletilmiş keşif soruları — tarafın CaseRoom'daki "İhtiyaç Tespiti"
+        // sekmesinde okuduğu mevcut yol. Hata olursa kart sessizce çıkmaz.
+        supabase.from("case_discovery_questions").select("id, party_id, question_text, question_order, answer_text").eq("case_id", caseRow.id),
       ]);
       if (r.error) throw r.error;
       if (a.error) throw a.error;
@@ -5604,6 +5611,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
       } else {
         setDocCount(dc.count ?? null);
       }
+      if (dq.error) {
+        console.error("[Phase4Summary discoveryQuestions]", dq.error);
+        setDiscoveryRows([]);
+      } else {
+        setDiscoveryRows(Array.isArray(dq.data) ? dq.data : []);
+      }
     } catch (e: any) {
       console.error("[Phase4Summary] load failed", e);
       setLoadErr(e?.message ?? "Bilinmeyen hata");
@@ -5615,6 +5628,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
       setCommunication([]);
       setPartyCount(null);
       setDocCount(null);
+      setDiscoveryRows([]);
     } finally {
       setLoading(false);
     }
@@ -5787,8 +5801,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
   // Kural tabanlı, yapay zekâ çağrısı yok. Maddeler yukarıdaki mevcut state'ten
   // türetilir; dayanak satırları yalnız o veriyi gösterir, yeni metin üretilmez.
   // Öncelik: 1) akış tıkanıklığı 2) süre baskısı 3) çelişki. En fazla üç madde.
-  // eylem: yalnız oturum planlamayı öneren maddede dolar (düğme o maddede çıkar).
-  const yonlendirmeMaddeleri: { baslik: string; dayanak: string[]; eylem?: "randevu" }[] = [];
+  // eylem: yalnız eylem düğmesi olan maddelerde dolar (randevu veya keşif sorusu).
+  const yonlendirmeMaddeleri: {
+    baslik: string; dayanak: string[];
+    eylem?: "randevu" | "kesif";
+    soru?: { partyId: string; soru: string };
+  }[] = [];
   if (analyses.length === 0) {
     yonlendirmeMaddeleri.push({
       baslik: "Analiz henüz koşmadı — başlat",
@@ -5819,6 +5837,33 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
       });
     }
   }
+  // Tarafa iletilmemiş keşif sorusu: ajanın ürettiği "sıradaki sorular" içinde,
+  // case_discovery_questions'a henüz düşmemiş ilk soru. Hepsi iletilmişse madde çıkmaz.
+  const iletilmemisSoru = (() => {
+    const iletilmis = new Set(
+      discoveryRows.map((r: any) => `${r.party_id}|${String(r.question_text ?? "").trim()}`)
+    );
+    for (const it of communicationQuestions) {
+      const soru = safeText((it as any).q?.soru);
+      const pid = (it as any).party_id as string | null;
+      if (!soru || !pid) continue;
+      if (iletilmis.has(`${pid}|${soru.trim()}`)) continue;
+      return { partyId: pid, soru };
+    }
+    return null;
+  })();
+  if (yonlendirmeMaddeleri.length < 3 && iletilmemisSoru) {
+    const tarafAdi = worklogPartyNameById[iletilmemisSoru.partyId] ?? "Taraf";
+    const onizleme = iletilmemisSoru.soru.length > 90
+      ? `${iletilmemisSoru.soru.slice(0, 90)}…`
+      : iletilmemisSoru.soru;
+    yonlendirmeMaddeleri.push({
+      baslik: `${tarafAdi} tarafına keşif sorusu sor`,
+      dayanak: [onizleme],
+      eylem: "kesif",
+      soru: iletilmemisSoru,
+    });
+  }
   if (yonlendirmeMaddeleri.length < 3 && consistencyItems.length > 0) {
     // guven_seviyesi 'yuksek' olanlar öne alınır; sıralama dışında hiçbir eleme yok.
     const celiskiSirali = [...consistencyItems].sort((x: any, y: any) => {
@@ -5839,6 +5884,34 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     }
   }
   const yonlendirmeListesi = yonlendirmeMaddeleri.slice(0, 3);
+
+  // Soruyu tarafa ilet: yeni kanal yok — soru, tarafın CaseRoom'da zaten okuduğu
+  // case_discovery_questions tablosuna KENDİ party_id'siyle yazılır. E-posta gidilmez,
+  // karşı taraf bu satırı hiçbir yüzeyden göremez.
+  async function keSifSorusunuGonder(hedef: { partyId: string; soru: string }) {
+    if (soruGonderiliyor) return;
+    setSoruGonderiliyor(true);
+    try {
+      const mevcut = discoveryRows
+        .filter((r: any) => r.party_id === hedef.partyId)
+        .map((r: any) => Number(r.question_order ?? 0));
+      const siradaki = (mevcut.length ? Math.max(...mevcut) : 0) + 1;
+      const { error } = await supabase.from("case_discovery_questions").insert({
+        case_id: caseRow.id,
+        party_id: hedef.partyId,
+        question_text: hedef.soru,
+        question_order: siradaki,
+      } as any);
+      if (error) throw error;
+      setSonGonderilenSoru(hedef.soru);
+      toast({ title: "Soru tarafa iletildi", description: "Taraf, kendi ekranındaki İhtiyaç Tespiti bölümünde görecek." });
+      await load();   // iletilenler yenilenir; aynı soru bir daha madde olarak çıkmaz
+    } catch (e: any) {
+      toast({ title: "Soru iletilemedi", description: trErr(e?.message ?? ""), variant: "destructive" });
+    } finally {
+      setSoruGonderiliyor(false);
+    }
+  }
   // Sol menüdeki satırın ve karttaki çapa kimliğinin tek kaynağı.
   const YONLENDIRME_ID = "kokpit-simdi-ne-yapmalisin";
 
@@ -6522,6 +6595,20 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
                         </Button>
                       </div>
                     )}
+                    {m.eylem === "kesif" && m.soru && (
+                      <div className="mt-2">
+                        <Button
+                          size="sm"
+                          disabled={soruGonderiliyor}
+                          onClick={() => keSifSorusunuGonder(m.soru!)}
+                        >
+                          {soruGonderiliyor
+                            ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            : <MessageSquare className="h-4 w-4 mr-1" />}
+                          Soruyu gönder
+                        </Button>
+                      </div>
+                    )}
                     {acik && m.dayanak.length > 0 && (
                       <div className="mt-1.5 space-y-1">
                         {m.dayanak.map((d, j) => (
@@ -6533,6 +6620,11 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
                 );
               })}
             </ul>
+            {sonGonderilenSoru && (
+              <p className="text-sm text-muted-foreground">
+                ✓ Gönderildi: {sonGonderilenSoru.length > 90 ? `${sonGonderilenSoru.slice(0, 90)}…` : sonGonderilenSoru}
+              </p>
+            )}
           </motion.div>
         )}
 
