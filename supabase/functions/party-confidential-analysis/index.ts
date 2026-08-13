@@ -40,6 +40,11 @@ Deno.serve(async (req) => {
   let party_id: string | undefined;
 
   try {
+    // İç çağrı kapısı (create-video-room / randevu-teklif ile aynı desen):
+    // x-cron-secret CRON_SECRET ile eşleşirse çağıran sistemin kendisidir,
+    // kullanıcı JWT'si aranmaz. Boş/yanlış secret'ta mevcut JWT yolu aynen işler.
+    const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
+    const isCron = !!CRON_SECRET && req.headers.get("x-cron-secret") === CRON_SECRET;
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -57,12 +62,13 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData.user) {
+    if (!isCron && (userErr || !userData.user)) {
       return new Response(JSON.stringify({ error: "Invalid session" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const userId = userData.user.id;
+    // İç çağrıda kullanıcı yok; kayıtlarda user_id yerine dosyanın arabulucusu kullanılır.
+    const userId = userData?.user?.id ?? "";
 
     const body = await req.json();
     case_id = body.case_id;
@@ -94,7 +100,7 @@ Deno.serve(async (req) => {
     }
     const { data: roleRow } = await admin.from("user_roles")
       .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
-    const isPrivileged = !!roleRow || caseRow.user_id === userId || caseRow.assigned_mediator_id === userId;
+    const isPrivileged = isCron || !!roleRow || caseRow.user_id === userId || caseRow.assigned_mediator_id === userId;
     if (!isPrivileged && party.user_id !== userId) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },

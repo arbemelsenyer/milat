@@ -401,3 +401,6 @@ ekranına elle URL ile giriş kapatıldı.
 
 13.08: Dosya açan tüm bağlantılar (liste kartları, davet sonrası yönlendirme, bildirim
 linkleri dahil) /cases/:id tek kapısından geçiyor; kapı query parametrelerini koruyor.
+
+14.08: Otomatik akış açık dosyalarda analiz zinciri nöbetçi tarafından başlatılıyor
+(analiz_baslat görevi + orchestrator-run iç kapısı).

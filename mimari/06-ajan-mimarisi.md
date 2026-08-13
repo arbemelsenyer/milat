@@ -131,3 +131,9 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
   atlanır, diğer her durumda (işaret yok, teklif yok, seçenek boş) oturum çevrim içi
   sayılır ve bağlantı üretilir. Koşum özeti incelenen oturum, atlanan yüz yüze sayısı ve
   atlama sebeplerini döndürür; oda üretimi ve e-posta hataları sessiz geçmez.
+● 14.08: Otomatik akışta analiz kendiliğinden başlar — nöbetçi, otomatik_akis açık ve
+  analiz sonucu olmayan (ama başvuru metni ya da belgesi bulunan) dosyalar için panoya
+  'analiz_baslat' görevi açar ve aynı turda orchestrator-run'ı iç kapıdan tetikler.
+  Analiz sonucu varsa, bekleyen görev varsa veya orkestratör koşuyorsa görev atlanır.
+  İç kapı (x-cron-secret) orchestrator-run'a ve zincirin altı adımına eklendi; kullanıcı
+  JWT yolu ve yetki kontrolleri değişmedi.

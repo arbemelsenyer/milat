@@ -48,6 +48,11 @@ Deno.serve(async (req) => {
   let case_id: string | undefined;
 
   try {
+    // İç çağrı kapısı (create-video-room / randevu-teklif ile aynı desen):
+    // x-cron-secret CRON_SECRET ile eşleşirse çağıran sistemin kendisidir,
+    // kullanıcı JWT'si aranmaz. Boş/yanlış secret'ta mevcut JWT yolu aynen işler.
+    const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
+    const isCron = !!CRON_SECRET && req.headers.get("x-cron-secret") === CRON_SECRET;
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -64,7 +69,7 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData.user) {
+    if (!isCron && (userErr || !userData.user)) {
       return new Response(JSON.stringify({ error: "Invalid session" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

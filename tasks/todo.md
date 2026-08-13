@@ -40,6 +40,27 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 14.08.2026 (49)
+Otomatik akış açık dosyalarda analiz kendiliğinden başlıyor:
+- "Tüm Analizi Başlat" düğmesinin çağırdığı fonksiyon: orchestrator-run.
+- ajan-nobetci'ye 'analiz_baslat' görev tipi eklendi: otomatik_akis açık + dosyada
+  party_analyses kaydı yok + girdi var (issue_description veya en az bir case_documents
+  satırı) ise pano görevi AÇILIYOR ve aynı turda işleniyor. İşleme, orchestrator-run'ı
+  x-cron-secret iç kapısından çağırıyor. Tekrar koruması: bekleyen aynı görev varsa,
+  analiz sonucu oluşmuşsa veya orkestratör 'running' ise atlanıyor.
+- İç kapı zinciri: orchestrator-run'a create-video-room desenli kapı eklendi ve alt
+  çağrılara x-cron-secret iletiliyor; zincirdeki altı fonksiyona (classify-dispute,
+  detect-legal-deadlines, party-confidential-analysis, party-consistency-check,
+  party-communication-analysis, common-ground-report) aynı kapı eklendi — hepsi kullanıcı
+  JWT'si isteyip 401 döndüğü için zincir aksi hâlde koşamıyordu. Kullanıcı JWT yolu ve
+  yetki kontrolleri aynen duruyor; iç çağrıda party_analyses.user_id için kullanıcı yoksa
+  tarafın kendi user_id'si kullanılıyor.
+- Koşum özetine analiz_baslatildi, analiz_gorevi_acildi sayaçları ve atlanan görevlerin
+  sebepleri eklendi. Randevu ve video hatları değişmedi. tsc temiz.
+REDEPLOY GEREKLİ: ajan-nobetci, orchestrator-run, classify-dispute,
+detect-legal-deadlines, party-confidential-analysis, party-consistency-check,
+party-communication-analysis, common-ground-report.
+
 ## Nerede kaldık — 13.08.2026 (48)
 Dosya açan tüm yollar tek kapıya (/cases/:id) alındı: Archive kartı, Auth davet sonrası
 yönlendirme, MediatorDashboard "Tam Görünüm", AgentControlPanel'in iki düğmesi, ekran

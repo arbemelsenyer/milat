@@ -86,10 +86,19 @@ async function hasMeetingMaterial(admin: Admin, case_id: string): Promise<boolea
   }
 }
 
-async function callFn(supabaseUrl: string, authHeader: string, anonKey: string, name: string, body: unknown) {
+async function callFn(
+  supabaseUrl: string, authHeader: string, anonKey: string, name: string, body: unknown,
+  cronSecret?: string,
+) {
   const res = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
     method: "POST",
-    headers: { Authorization: authHeader, apikey: anonKey, "Content-Type": "application/json" },
+    headers: {
+      Authorization: authHeader,
+      apikey: anonKey,
+      "Content-Type": "application/json",
+      // İç çağrı zinciri: alt fonksiyonlar da aynı kapıdan geçer (kullanıcı JWT'si yok).
+      ...(cronSecret ? { "x-cron-secret": cronSecret } : {}),
+    },
     body: JSON.stringify(body),
   });
   let json: any = null;
@@ -110,6 +119,10 @@ Deno.serve(async (req) => {
   let terminalWritten = false;
 
   try {
+    // İç çağrı kapısı (create-video-room / randevu-teklif ile aynı desen): x-cron-secret
+    // CRON_SECRET ile eşleşirse kullanıcı JWT'si aranmaz. Kullanıcı yolu aynen kalır.
+    const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
+    const isCron = !!CRON_SECRET && req.headers.get("x-cron-secret") === CRON_SECRET;
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
 
@@ -119,7 +132,7 @@ Deno.serve(async (req) => {
 
     const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
     const { data: userData } = await userClient.auth.getUser();
-    if (!userData?.user) return new Response(JSON.stringify({ error: "Invalid session" }), { status: 401, headers: corsHeaders });
+    if (!isCron && !userData?.user) return new Response(JSON.stringify({ error: "Invalid session" }), { status: 401, headers: corsHeaders });
 
     const body = await req.json();
     case_id = body.case_id;
@@ -134,8 +147,8 @@ Deno.serve(async (req) => {
 
     // Aynı yetki kapısı common-ground-report ile birebir: sadece arabulucu/dosya sahibi/admin.
     const { data: roleRow } = await admin.from("user_roles")
-      .select("role").eq("user_id", userData.user.id).eq("role", "admin").maybeSingle();
-    const allowed = caseRow.assigned_mediator_id === userData.user.id || caseRow.user_id === userData.user.id || !!roleRow;
+      .select("role").eq("user_id", userData?.user?.id ?? "").eq("role", "admin").maybeSingle();
+    const allowed = isCron || caseRow.assigned_mediator_id === userData?.user?.id || caseRow.user_id === userData?.user?.id || !!roleRow;
     if (!allowed) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
 
     const finalAdmin = admin, finalCaseId = case_id;
@@ -216,7 +229,7 @@ Deno.serve(async (req) => {
       await flagSkippedStep(admin, case_id, "classify_dispute", null, "uyuşmazlık metni yok/çok kısa (issue_description ve title boş)");
       steps.push({ step: "classify_dispute", status: "skipped", detail: "metin yok" });
     } else {
-      const r = await callFn(supabaseUrl, authHeader, anonKey, "classify-dispute", { case_id, text: classifyText, persist: true });
+      const r = await callFn(supabaseUrl, authHeader, anonKey, "classify-dispute", { case_id, text: classifyText, persist: true }, isCron ? CRON_SECRET : undefined);
       if (!r.ok) return await fail("classify_dispute", null, r.json?.error ?? `HTTP ${r.status}`);
       disputeType = r.json?.kategori ?? disputeType;
       steps.push({ step: "classify_dispute", status: "completed", detail: disputeType ?? undefined });
@@ -231,7 +244,7 @@ Deno.serve(async (req) => {
     } else {
       const r = await callFn(supabaseUrl, authHeader, anonKey, "detect-legal-deadlines", {
         case_id, dispute_type: disputeType, dispute_text: classifyText, persist: true,
-      });
+      }, isCron ? CRON_SECRET : undefined);
       if (!r.ok) return await fail("deadline_detect", null, r.json?.error ?? `HTTP ${r.status}`);
       steps.push({ step: "deadline_detect", status: "completed" });
     }
@@ -245,7 +258,7 @@ Deno.serve(async (req) => {
       steps.push({ step: "party_analysis", status: "skipped", detail: "taraf yok" });
     } else {
       for (const p of parties) {
-        const r = await callFn(supabaseUrl, authHeader, anonKey, "party-confidential-analysis", { case_id, party_id: p.id });
+        const r = await callFn(supabaseUrl, authHeader, anonKey, "party-confidential-analysis", { case_id, party_id: p.id }, isCron ? CRON_SECRET : undefined);
         if (!r.ok) return await fail("party_analysis", p.id, r.json?.error ?? `HTTP ${r.status}`);
       }
       steps.push({ step: "party_analysis", status: "completed", detail: `${parties.length} taraf` });
@@ -291,7 +304,7 @@ Deno.serve(async (req) => {
       const failures: string[] = [];
       for (const p of parties) {
         try {
-          const res = await callFn(supabaseUrl, authHeader, anonKey, be.fn, { case_id, party_id: p.id });
+          const res = await callFn(supabaseUrl, authHeader, anonKey, be.fn, { case_id, party_id: p.id }, isCron ? CRON_SECRET : undefined);
           if (!res.ok) failures.push(`${p.id}: ${res.json?.error ?? `HTTP ${res.status}`}`);
         } catch (e: any) {
           failures.push(`${p.id}: ${String(e?.message ?? e)}`);
@@ -312,7 +325,7 @@ Deno.serve(async (req) => {
     await progress("common_ground");
 
     // ---- 4) common-ground-report ----
-    const r = await callFn(supabaseUrl, authHeader, anonKey, "common-ground-report", { case_id });
+    const r = await callFn(supabaseUrl, authHeader, anonKey, "common-ground-report", { case_id }, isCron ? CRON_SECRET : undefined);
     if (!r.ok) return await fail("common_ground", null, r.json?.error ?? `HTTP ${r.status}`);
     steps.push({ step: "common_ground", status: "completed" });
 

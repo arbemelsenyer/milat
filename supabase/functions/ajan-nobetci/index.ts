@@ -178,6 +178,72 @@ async function randevuTeklifiYurut(admin: any, caseId: string): Promise<{ durum:
   }
 }
 
+// analiz_baslat görevi: "Tüm Analizi Başlat" düğmesinin çağırdığı orchestrator-run,
+// iç kapıdan (x-cron-secret) tetiklenir. Analiz sonucu oluşmuşsa veya orkestratör
+// zaten koşuyorsa görev atlanır.
+async function analizBaslat(admin: any, caseId: string): Promise<{ durum: string; sonuc: string }> {
+  const { data: analizler, error: aErr } = await admin.from("party_analyses")
+    .select("id").eq("case_id", caseId).limit(1);
+  if (aErr) return { durum: "bekliyor", sonuc: `Analizler okunamadı: ${aErr.message}` };
+  if (analizler && analizler.length > 0) return { durum: "atlandi", sonuc: "Dosyada analiz sonucu zaten var" };
+
+  const { data: kosan } = await admin.from("agent_states")
+    .select("id").eq("case_id", caseId).eq("agent_type", "orchestrator").eq("status", "running").limit(1);
+  if (kosan && kosan.length > 0) return { durum: "atlandi", sonuc: "Orkestratör şu an koşuyor" };
+
+  if (!CRON_SECRET) return { durum: "bekliyor", sonuc: "CRON_SECRET tanımlı değil, iç çağrı yapılamadı" };
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/orchestrator-run`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-cron-secret": CRON_SECRET,
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+      },
+      body: JSON.stringify({ case_id: caseId }),
+    });
+    const govde = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { durum: "bekliyor", sonuc: `Analiz başlatılamadı (HTTP ${res.status}): ${String((govde as any)?.error ?? "").slice(0, 200)}` };
+    }
+    if ((govde as any)?.error) {
+      return { durum: "bekliyor", sonuc: `Analiz başlatılamadı: ${String((govde as any).error).slice(0, 200)}` };
+    }
+    return { durum: "yapildi", sonuc: "analiz zinciri başlatıldı" };
+  } catch (e: any) {
+    return { durum: "bekliyor", sonuc: `İç çağrı başarısız: ${e?.message ?? String(e)}` };
+  }
+}
+
+// Analiz için yeterli girdi var mı: başvuru metni veya yüklenmiş belge.
+// Analiz sonucu yoksa ve girdi varsa panoya 'analiz_baslat' görevi açılır (mükerrer yazmaz).
+async function analizGoreviAc(admin: any, dosya: any): Promise<{ acildi: boolean; sebep?: string }> {
+  const { data: analizler } = await admin.from("party_analyses")
+    .select("id").eq("case_id", dosya.id).limit(1);
+  if (analizler && analizler.length > 0) return { acildi: false, sebep: "analiz sonucu zaten var" };
+
+  const basvuruMetni = String(dosya?.issue_description ?? "").trim();
+  const { data: belgeler } = await admin.from("case_documents")
+    .select("id").eq("case_id", dosya.id).limit(1);
+  const girdiVar = !!basvuruMetni || (Array.isArray(belgeler) && belgeler.length > 0);
+  if (!girdiVar) return { acildi: false, sebep: "analiz için girdi yok (başvuru metni ve belge yok)" };
+
+  const { data: mevcut } = await admin.from("ajan_gorevleri")
+    .select("id").eq("case_id", dosya.id).eq("gorev_tipi", "analiz_baslat").eq("durum", "bekliyor").limit(1);
+  if (mevcut && mevcut.length > 0) return { acildi: false, sebep: "bekleyen analiz_baslat görevi zaten var" };
+
+  const { error } = await admin.from("ajan_gorevleri").insert({
+    case_id: dosya.id,
+    gorev_tipi: "analiz_baslat",
+    durum: "bekliyor",
+    gerekce: "Otomatik akış açık, dosyada analiz yok",
+  });
+  if (error) return { acildi: false, sebep: `görev yazılamadı: ${error.message}` };
+  return { acildi: true };
+}
+
 // Zaman kontrolü: süre bitimine SURE_ESIGI_GUN veya daha az kaldıysa, gelecekte planlı
 // oturum ve bekleyen randevu teklifi yoksa panoya randevu_teklifi görevi bırakılır.
 async function zamanKontrolu(admin: any, dosya: any): Promise<boolean> {
@@ -463,7 +529,7 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const { data: dosyalar, error: cErr } = await admin.from("cases")
-      .select("id, deadline_total, deadline_extended, extension_used, assigned_mediator_id, user_id, application_no, title")
+      .select("id, deadline_total, deadline_extended, extension_used, assigned_mediator_id, user_id, application_no, title, issue_description")
       .eq("otomatik_akis", true)
       .limit(500);
     if (cErr) return json({ error: cErr.message }, 500);
@@ -477,12 +543,19 @@ Deno.serve(async (req) => {
     let atlananYuzYuze = 0;
     const atlamaSebepleri: string[] = [];
     let imzaAdi = "";
+    let analizBaslatildi = 0;
+    let yeniAnalizGorevi = 0;
     const hatalar: string[] = [];
 
     for (const dosya of (dosyalar ?? []) as any[]) {
       // Bir dosyadaki hata diğer dosyaları durdurmaz.
       let buDosyaYapilan = 0;
       try {
+        // Analiz görevi görev listesi okunmadan ÖNCE açılır ki aynı turda işlensin.
+        const analizGorev = await analizGoreviAc(admin, dosya);
+        if (analizGorev.acildi) yeniAnalizGorevi++;
+        else if (analizGorev.sebep) atlamaSebepleri.push(`${dosya.id}: analiz görevi açılmadı — ${analizGorev.sebep}`);
+
         const { data: gorevler, error: gErr } = await admin.from("ajan_gorevleri")
           .select("id, gorev_tipi, hedef_party_id, durum")
           .eq("case_id", dosya.id)
@@ -492,7 +565,7 @@ Deno.serve(async (req) => {
 
         for (const gorev of (gorevler ?? []) as any[]) {
           // Tanınmayan görev tipine dokunulmaz: 'bekliyor' kalır.
-          if (gorev.gorev_tipi !== "soru_gonder" && gorev.gorev_tipi !== "randevu_teklifi") continue;
+          if (gorev.gorev_tipi !== "soru_gonder" && gorev.gorev_tipi !== "randevu_teklifi" && gorev.gorev_tipi !== "analiz_baslat") continue;
           if (gorev.gorev_tipi === "soru_gonder" && !gorev.hedef_party_id) {
             await admin.from("ajan_gorevleri")
               .update({ durum: "atlandi", sonuc: "Hedef taraf yok" }).eq("id", gorev.id);
@@ -501,7 +574,9 @@ Deno.serve(async (req) => {
           }
           const { durum, sonuc } = gorev.gorev_tipi === "randevu_teklifi"
             ? await randevuTeklifiYurut(admin, dosya.id)
-            : await soruGonder(admin, dosya.id, gorev.hedef_party_id);
+            : gorev.gorev_tipi === "analiz_baslat"
+              ? await analizBaslat(admin, dosya.id)
+              : await soruGonder(admin, dosya.id, gorev.hedef_party_id);
           if (durum !== "bekliyor") {
             await admin.from("ajan_gorevleri").update({ durum, sonuc }).eq("id", gorev.id);
           } else {
@@ -510,8 +585,14 @@ Deno.serve(async (req) => {
             hatalar.push(`${dosya.id}: ${sonuc}`);
             console.error(`[ajan-nobetci] görev yürütülemedi (${gorev.id}): ${sonuc}`);
           }
-          if (durum === "yapildi") { yapilanGorev++; buDosyaYapilan++; }
-          if (durum === "atlandi") atlananGorev++;
+          if (durum === "yapildi") {
+            yapilanGorev++; buDosyaYapilan++;
+            if (gorev.gorev_tipi === "analiz_baslat") analizBaslatildi++;
+          }
+          if (durum === "atlandi") {
+            atlananGorev++;
+            atlamaSebepleri.push(`${gorev.id} (${gorev.gorev_tipi}): ${sonuc}`);
+          }
         }
 
         if (await zamanKontrolu(admin, dosya)) yeniRandevuGorevi++;
@@ -558,6 +639,8 @@ Deno.serve(async (req) => {
       video_baglantisi_hazirlandi: hazirlananVideo,
       incelenen_oturum: incelenenOturum,
       atlanan_yuz_yuze: atlananYuzYuze,
+      analiz_baslatildi: analizBaslatildi,
+      analiz_gorevi_acildi: yeniAnalizGorevi,
       atlama_sebepleri: atlamaSebepleri,
       imza_adi: imzaAdi,
       hata: hatalar,
