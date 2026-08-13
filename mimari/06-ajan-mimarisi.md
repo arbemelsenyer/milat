@@ -76,3 +76,12 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
   taraf için tek "soru_gonder" görevi 'bekliyor' durumunda yazılır; aynı dosya+taraf için
   bekleyen görev varsa ikincisi yazılmaz. Otomatik akış kapalıyken pano hiç yazılmaz.
   Yazım best-effort: hata analizi düşürmez, yalnız loga geçer.
+● 13.08: ajan-nobetci (edge function, verify_jwt=false) — otomatik akışı açık dosyalarda
+  sıradaki adımı yürüten nöbetçi. Panodaki (ajan_gorevleri) bekleyen soru_gonder görevini
+  kokpitteki [Soruyu gönder] ile aynı yazımla yürütür (case_discovery_questions, tarafın
+  kendi party_id'si); zaten gönderilmişse görevi atlar. Tanımadığı görev tipine dokunmaz.
+  Zaman kontrolü: yasal sürenin bitimine 3 gün veya az kaldıysa, gelecekte planlı oturum
+  ve bekleyen randevu teklifi yoksa panoya randevu_teklifi görevi bırakır (yalnız kayıt).
+  Her koşumda dosya başına agent_states'e 'nobetci' satırı yazar; bir dosyadaki hata
+  diğerlerini durdurmaz, görevin sonuc alanına ve loga geçer. Güvenlik: x-cron-secret
+  veya admin JWT, ikisi de yoksa 401.

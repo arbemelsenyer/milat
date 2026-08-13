@@ -40,6 +40,18 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (28)
+Nöbetçi yazıldı: supabase/functions/ajan-nobetci (verify_jwt=false, config.toml'a eklendi).
+Her koşuda otomatik_akis=true dosyaları tarıyor; panodaki durum='bekliyor' soru_gonder
+görevlerini kokpitteki [Soruyu gönder] ile AYNI yazımla yürütüyor (case_discovery_questions,
+tarafın party_id'si) → yapildi/'soru tarafın kanalına yazıldı'; zaten gönderilmişse
+atlandi. Tanımadığı görev tipine dokunmuyor. Zaman kontrolü: son tarihe ≤3 gün, gelecekte
+scheduled oturum yok ve beklemede teklif yoksa panoya randevu_teklifi görevi bırakıyor
+(mükerrer yazmıyor). Her dosya için agent_states'e agent_type='nobetci' satırı düşüyor;
+bir dosyadaki hata diğerlerini durdurmuyor, sonuc alanına ve loga yazılıyor. Güvenlik
+check-new-tariff deseni (x-cron-secret veya admin JWT, yoksa 401). tsc temiz.
+REDEPLOY GEREKLİ: ajan-nobetci Lovable'dan deploy edilmeli; cron/tetikleme henüz yok.
+
 ## Nerede kaldık — 13.08.2026 (27)
 party-confidential-analysis artık görev panosuna kayıt bırakıyor: koşumda keşif sorusu
 üretildiyse ve cases.otomatik_akis TRUE ise ajan_gorevleri'ne o taraf için tek satır

@@ -106,3 +106,6 @@ verify_jwt = true
 
 [functions.randevu-teklif]
 verify_jwt = false
+
+[functions.ajan-nobetci]
+verify_jwt = false

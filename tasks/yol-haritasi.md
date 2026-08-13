@@ -354,3 +354,6 @@ saklanıyor, nöbetçi fonksiyon sonraki taş.
 
 13.08: Taraf analizi, otomatik akış açık dosyalarda ajan_gorevleri panosuna "soru_gonder"
 görevi bırakıyor (mükerrer yazmıyor). Nöbetçi/yürütücü sonraki taş.
+
+13.08: Ajan nöbetçisi (ajan-nobetci) yazıldı — pano işleme (soru_gonder) ve zaman
+kontrolü (randevu_teklifi görevi açma). Tetikleyici/cron sonraki taş.
