@@ -185,11 +185,21 @@ KURALLAR:
     const result = { kategori, guven_skoru: guven, gerekce, ilgili_kanun, alt_uzmanlik };
 
     if (case_id && persist) {
+      // Ana tür yalnız kayıtta boşsa yazılır; dolu bir dispute_type EZİLMEZ
+      // (kullanıcının elle seçtiği ana tür korunur). AI'ın bulduğu tür yanıtta
+      // yine döner, ekran onu öneri olarak gösterebilir.
+      const { data: current } = await admin
+        .from("cases").select("dispute_type").eq("id", case_id).maybeSingle();
+      const mevcutTur = String((current as any)?.dispute_type ?? "").trim();
+
       // Alt uzmanlık yalnız geçerli bir slug geldiğinde yazılır; "yok" veya geçersiz
       // değer mevcut kaydı EZMEZ (kullanıcının elle seçtiği alt uzmanlık korunur).
-      const patch: Record<string, unknown> = { dispute_type: kategori };
+      const patch: Record<string, unknown> = {};
+      if (!mevcutTur) patch.dispute_type = kategori;
       if (alt_uzmanlik !== "yok") patch.dispute_subtype = alt_uzmanlik;
-      await admin.from("cases").update(patch as any).eq("id", case_id);
+      if (Object.keys(patch).length > 0) {
+        await admin.from("cases").update(patch as any).eq("id", case_id);
+      }
     }
 
     // Activity log: mark completed. Fire via waitUntil so it can't delay the response,
