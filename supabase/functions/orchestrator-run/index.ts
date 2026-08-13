@@ -164,7 +164,7 @@ Deno.serve(async (req) => {
               p_title: "Orkestratör Zinciri Durdu",
               p_message: `"${caseRow.title ?? finalCaseId}" dosyasında ${agent_type} adımı hata verdi: ${errorSummary}`,
               p_type: "orchestrator_failed",
-              p_link: `/case-room/${finalCaseId}`,
+              p_link: `/cases/${finalCaseId}`,
             })
           : Promise.resolve(),
       ]);

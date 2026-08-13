@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { Loader2, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
  */
 export default function CaseRedirect() {
   const { id } = useParams<{ id: string }>();
+  const [params] = useSearchParams();
   const { user, isLoading: authLoading, isAdmin } = useAuth();
   const [hedef, setHedef] = useState<"taraf" | "arabulucu" | "yok" | null>(null);
 
@@ -40,7 +41,12 @@ export default function CaseRedirect() {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   }
   if (hedef === "taraf") return <Navigate to={`/case-room/${id}`} replace />;
-  if (hedef === "arabulucu") return <Navigate to={`/legal-reasoning?caseId=${id}`} replace />;
+  if (hedef === "arabulucu") {
+    // Gelen ek parametreler (ör. ?phase=4) korunur — kapı davranışı değiştirmez.
+    const p = new URLSearchParams(params);
+    p.set("caseId", id);
+    return <Navigate to={`/legal-reasoning?${p.toString()}`} replace />;
+  }
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-muted-foreground">
       <Lock className="h-10 w-10" />

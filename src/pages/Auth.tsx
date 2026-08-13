@@ -141,7 +141,7 @@ export default function AuthPage() {
               toast({ variant: 'destructive', title: 'Davet kabul edilemedi', description: error.message });
               navigate(homePath);
             } else if ((data as any)?.case_id) {
-              navigate(`/case-room/${(data as any).case_id}`);
+              navigate(`/cases/${(data as any).case_id}`);
             } else {
               navigate(homePath);
             }

@@ -425,10 +425,10 @@ export function AgentControlPanel({ caseId, isMediator }: { caseId: string; isMe
               )}
             </dl>
             <div className="flex flex-wrap gap-2 pt-1">
-              <Button size="sm" variant="outline" onClick={() => navigate(`/legal-reasoning?caseId=${caseId}&phase=4`)}>
+              <Button size="sm" variant="outline" onClick={() => navigate(`/cases/${caseId}?phase=4`)}>
                 Açıkla
               </Button>
-              <Button size="sm" variant="outline" onClick={() => navigate(`/case/${caseId}`)}>
+              <Button size="sm" variant="outline" onClick={() => navigate(`/cases/${caseId}`)}>
                 Düzelt
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setSummaryDismissed(true)}>

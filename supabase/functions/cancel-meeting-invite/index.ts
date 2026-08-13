@@ -186,7 +186,7 @@ serve(async (req) => {
             p_title: "Toplantı İptal Edildi",
             p_message: `${typeLabel} — ${dateStr} ${timeStr} iptal edildi.`,
             p_type: "warning",
-            p_link: `/case-room/${session.case_id}`,
+            p_link: `/cases/${session.case_id}`,
           });
         }
       } catch (e: any) {

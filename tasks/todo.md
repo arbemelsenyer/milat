@@ -40,6 +40,17 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (48)
+Dosya açan tüm yollar tek kapıya (/cases/:id) alındı: Archive kartı, Auth davet sonrası
+yönlendirme, MediatorDashboard "Tam Görünüm", AgentControlPanel'in iki düğmesi, ekran
+tarafındaki bildirim linkleri (SessionScheduler, CaseRoom×2) ve edge fonksiyonlarındaki
+bildirim linkleri (send-meeting-invite, cancel-meeting-invite, orchestrator-run).
+Kapı artık gelen query parametrelerini koruyor (ör. ?phase=4 → /legal-reasoning'e taşınıyor).
+Doğrudan /case-room/ yalnız iki yerde kaldı ve kalması gerekiyor: kapının kendi taraf
+yönlendirmesi ve MediationEngine'deki sayfa koruması. tsc + build temiz.
+REDEPLOY GEREKLİ: send-meeting-invite, cancel-meeting-invite, orchestrator-run
+(yalnız bildirim link metni değişti).
+
 ## Nerede kaldık — 13.08.2026 (47)
 Dosya yönlendirmesi rol duyarlı oldu: /cases/:id (CaseRedirect) artık tek kapı —
 case_parties.user_id eşleşen kullanıcı TARAF sayılıp /case-room/:id'ye, dosya sahibi /

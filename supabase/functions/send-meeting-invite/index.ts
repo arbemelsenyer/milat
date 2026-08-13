@@ -218,7 +218,7 @@ serve(async (req) => {
             p_title: "Toplantı Daveti Gönderildi",
             p_message: `${typeLabel} — ${dateStr} ${timeStr}`,
             p_type: "info",
-            p_link: `/case-room/${session.case_id}`,
+            p_link: `/cases/${session.case_id}`,
           });
         }
       } catch (e: any) {

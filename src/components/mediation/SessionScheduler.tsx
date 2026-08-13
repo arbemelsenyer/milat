@@ -324,7 +324,7 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
       recipients.map((uid) =>
         supabase.rpc("create_notification", {
           p_user_id: uid, p_title: "Yeni Toplantı Daveti", p_message: msg,
-          p_type: "info", p_link: `/case-room/${caseId}`,
+          p_type: "info", p_link: `/cases/${caseId}`,
         })
       )
     );

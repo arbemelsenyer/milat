@@ -398,3 +398,6 @@ kuralı düzeltildi, koşum özetine teşhis alanları eklendi.
 
 13.08: Dosya yönlendirmesi rol duyarlı — taraf CaseRoom'a, arabulucu 8 aşamaya; arabulucu
 ekranına elle URL ile giriş kapatıldı.
+
+13.08: Dosya açan tüm bağlantılar (liste kartları, davet sonrası yönlendirme, bildirim
+linkleri dahil) /cases/:id tek kapısından geçiyor; kapı query parametrelerini koruyor.

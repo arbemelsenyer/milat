@@ -1467,7 +1467,7 @@ function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string;
             p_title: title,
             p_message: message,
             p_type: "info",
-            p_link: `/case-room/${caseId}`,
+            p_link: `/cases/${caseId}`,
           })
         )
     );
@@ -1634,7 +1634,7 @@ function PartyExpertApproval({ caseId, partyId }: { caseId: string; partyId: str
           p_title: "Bilirkişi Onay Güncellemesi",
           p_message: msg,
           p_type: nextStatus === "rejected" ? "warning" : "info",
-          p_link: `/case-room/${caseId}`,
+          p_link: `/cases/${caseId}`,
         })
       )
     );

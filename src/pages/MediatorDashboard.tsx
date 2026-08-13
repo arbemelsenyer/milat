@@ -284,7 +284,7 @@ export default function MediatorDashboard() {
                           </p>
                         </div>
                         <Button asChild size="sm" variant="outline">
-                          <Link to={`/case/${current.id}`}>{language === "tr" ? "Tam Görünüm" : "Full view"}</Link>
+                          <Link to={`/cases/${current.id}`}>{language === "tr" ? "Tam Görünüm" : "Full view"}</Link>
                         </Button>
                       </div>
                     </CardHeader>
