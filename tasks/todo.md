@@ -40,6 +40,14 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (23)
+Kokpit "Şimdi ne yapmalısın" kartında oturum planlama maddesine (Süre X gün kaldı —
+oturumu planla) "Randevu ayarla" düğmesi eklendi (MediationEngine.tsx). Düğme kök
+state'teki randevuTetik'i kurup Aşama 5'e geçiriyor; orada mevcut RandevuTeklifKarti'na
+kaydırılıyor, tek taraflı dosyada taraf otomatik seçilip mevcut saat önerisi akışı
+başlıyor, çok taraflıda seçim kullanıcıda. Randevu akışının kopyası yazılmadı; diğer
+maddeler ve Açıkla davranışı aynı. tsc + build temiz.
+
 ## Nerede kaldık — 13.08.2026 (22)
 Davet e-postasına dosya künyesi (dosya no, uyuşmazlık konusu, başvuran + karşı taraf adları,
 arabulucu adı — cases/case_parties/profiles) ve aynı içeriğin PDF eki eklendi

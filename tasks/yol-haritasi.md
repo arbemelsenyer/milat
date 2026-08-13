@@ -339,3 +339,6 @@ Kopyala · WhatsApp'ta aç). E-posta gönderimi yok — sonraki taş.
 
 13.08: Davet e-postasına dosya künyesi ve davet yazısı PDF eki (Türkçe fontla; font
 gömülemezse ek konulmaz). Gönderici ve gönderim yolu değişmedi.
+
+13.08: Kokpit "Şimdi ne yapmalısın" — oturum planlama maddesine "Randevu ayarla" eylem
+düğmesi; mevcut Aşama 5 randevu akışını tetikliyor, kopyasını yazmıyor.

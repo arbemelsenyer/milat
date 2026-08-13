@@ -321,6 +321,8 @@ export default function MediationEngine() {
   // menüden gelen "şu bölümü aç" isteği. Faz 4 dışında liste boş kalır.
   const [cockpitSections, setCockpitSections] = useState<{ id: string; label: string; kind: "layer" | "section"; hint?: string }[]>([]);
   const [cockpitJump, setCockpitJump] = useState<{ id: string; nonce: number } | null>(null);
+  // Kokpitteki "Randevu ayarla" düğmesinden Aşama 5'teki mevcut randevu akışına tetik.
+  const [randevuTetik, setRandevuTetik] = useState<{ nonce: number } | null>(null);
   const [phaseStatus, setPhaseStatus] = useState<Record<number, boolean>>({});
   const [deleteTarget, setDeleteTarget] = useState<CaseRow | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -748,6 +750,8 @@ export default function MediationEngine() {
                 onAdvance={(next) => setPhase(next)}
                 onCockpitSections={setCockpitSections}
                 cockpitJump={cockpitJump}
+                randevuTetik={randevuTetik}
+                onRandevuAyarla={() => { setRandevuTetik({ nonce: Date.now() }); setPhase(5); }}
               />
             </motion.div>
           </AnimatePresence>
@@ -1097,11 +1101,13 @@ function NextPhaseButton({ phase, onAdvance }: { phase: number; onAdvance: (n: n
   );
 }
 
-function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance, onCockpitSections, cockpitJump }: {
+function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance, onCockpitSections, cockpitJump, randevuTetik, onRandevuAyarla }: {
   phase: number; caseRow: CaseRow; reload: () => void; isMediator: boolean; userId: string;
   onAdvance: (n: number) => void;
   onCockpitSections?: (sections: { id: string; label: string; kind: "layer" | "section"; hint?: string }[]) => void;
   cockpitJump?: { id: string; nonce: number } | null;
+  randevuTetik?: { nonce: number } | null;
+  onRandevuAyarla?: () => void;
 }) {
   async function bumpPhase(next: number) {
     if ((caseRow.current_phase ?? 1) < next) {
@@ -1115,11 +1121,11 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance, 
     case 3: return <><Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} jump={cockpitJump} /></Phase3ErrorBoundary><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 4: return <>
       {isMediator
-        ? <Phase4Summary caseRow={caseRow} onSectionsChange={onCockpitSections} jump={cockpitJump} />
+        ? <Phase4Summary caseRow={caseRow} onSectionsChange={onCockpitSections} jump={cockpitJump} onRandevuAyarla={onRandevuAyarla} />
         : <BlindBidPartyForm caseId={caseRow.id} userId={userId} />}
       <NextPhaseButton phase={phase} onAdvance={onAdvance} />
     </>;
-    case 5: return <><Phase5Sessions caseRow={caseRow} bumpPhase={bumpPhase} onAdvance={onAdvance} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 5: return <><Phase5Sessions caseRow={caseRow} bumpPhase={bumpPhase} onAdvance={onAdvance} randevuTetik={randevuTetik} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 6: return <><Phase7Expert caseRow={caseRow} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 7: return <><Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(8); onAdvance(8); }} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 8: return <Phase9Closing caseRow={caseRow} reload={reload} />;
@@ -1128,10 +1134,15 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance, 
 }
 
 /* ===================== RANDEVU TEKLİFİ (Aşama 5) ===================== */
+// Kokpitteki eylem düğmesinin kaydırma hedefi.
+const RANDEVU_KART_ID = "faz5-randevu-ayarla";
+
 // Saatleri randevu-teklif fonksiyonu seçer (bireysel → 1, kurumsal → 3 farklı gün);
 // bu ekran yalnız seçilenleri gösterir. Elle saat seçme ekranı yoktur — tek istisna
 // "Düzenle"dir. Teklif satırı da fonksiyonda service role ile yazılır.
-function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: any[] }) {
+function RandevuTeklifKarti({ caseRow, parties, tetik }: {
+  caseRow: CaseRow; parties: any[]; tetik?: { nonce: number } | null;
+}) {
   const [partyId, setPartyId] = useState<string>("");
   const [onerilen, setOnerilen] = useState<{ gun: string; saat: string }[] | null>(null);
   const [asking, setAsking] = useState(false);
@@ -1171,6 +1182,23 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
   }, [caseRow.id]);
 
   useEffect(() => { void teklifleriYukle(); }, [teklifleriYukle]);
+
+  // Kokpitteki "Randevu ayarla" düğmesinden gelen tetik: karta kaydırır, dosyada tek
+  // taraf varsa onu seçip mevcut saat önerisi akışını başlatır. Taraf listesi geç
+  // yüklenebildiği için tetik, taraflar gelene kadar bekletilir (nonce bir kez işlenir).
+  const islenenTetikRef = useRef<number | null>(null);
+  useEffect(() => {
+    const nonce = tetik?.nonce ?? null;
+    if (nonce === null || islenenTetikRef.current === nonce) return;
+    if (parties.length === 0) return;                   // taraflar henüz yüklenmedi
+    islenenTetikRef.current = nonce;
+    document.getElementById(RANDEVU_KART_ID)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (parties.length === 1) {
+      const tek = parties[0].id;
+      setPartyId(tek);
+      void askAgent(tek);
+    }
+  }, [tetik?.nonce, parties.length]);
 
   const party = parties.find((p) => p.id === partyId) ?? null;
 
@@ -1251,13 +1279,14 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
     return data ?? null;
   }
 
-  async function askAgent() {
-    if (!partyId || asking) return;
+  async function askAgent(hedefPartyId?: string) {
+    const pid = hedefPartyId ?? partyId;
+    if (!pid || asking) return;
     reset();
     setAsking(true);
     try {
       const { data, error } = await supabase.functions.invoke("randevu-teklif", {
-        body: { action: "oner", case_id: caseRow.id, party_id: partyId },
+        body: { action: "oner", case_id: caseRow.id, party_id: pid },
       });
       if (error) {
         setMesaj({ tip: "hata", metin: await hataMetni(error) });
@@ -1366,7 +1395,7 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
   }
 
   return (
-    <Card className="p-6 space-y-3">
+    <Card id={RANDEVU_KART_ID} className="p-6 space-y-3 scroll-mt-24">
       <div>
         <h3 className="text-lg font-semibold">Randevu ayarla</h3>
         <p className="text-sm text-muted-foreground">
@@ -1387,7 +1416,7 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={askAgent} disabled={asking || !partyId}>
+        <Button onClick={() => askAgent()} disabled={asking || !partyId}>
           {asking ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CalIcon className="h-4 w-4 mr-1" />}
           {asking ? "Hazırlanıyor…" : "Randevu ayarla"}
         </Button>
@@ -1547,8 +1576,9 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
 
 // SessionScheduler needs case_parties for invite selection/presence — not lifted into
 // MediationEngine state elsewhere, so fetch it here the same way Phase2Parties does.
-function Phase5Sessions({ caseRow, bumpPhase, onAdvance }: {
+function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik }: {
   caseRow: CaseRow; bumpPhase: (n: number) => Promise<void>; onAdvance: (n: number) => void;
+  randevuTetik?: { nonce: number } | null;
 }) {
   const [parties, setParties] = useState<any[]>([]);
   const [sessions, setSessions] = useState<{ scheduled_at: string | null; status: string }[]>([]);
@@ -1610,7 +1640,7 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance }: {
         </Card>
       </motion.div>
       <motion.div variants={itemVariants}>
-        <RandevuTeklifKarti caseRow={caseRow} parties={parties} />
+        <RandevuTeklifKarti caseRow={caseRow} parties={parties} tetik={randevuTetik} />
       </motion.div>
       <motion.div variants={itemVariants}>
         <SessionScheduler
@@ -5389,8 +5419,11 @@ function CockpitCommunicationItem({ finding, partyLabel }: { finding: any; party
 
 /* ===================== PHASE 4 - MEDIATOR PANEL (READ-ONLY SUMMARY) ===================== */
 
-function Phase4Summary({ caseRow, onSectionsChange, jump }: {
+function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
   caseRow: CaseRow;
+  // "Şimdi ne yapmalısın"daki oturum planlama maddesinin eylem düğmesi; Aşama 5'teki
+  // mevcut randevu akışını tetikler, kopyasını yazmaz.
+  onRandevuAyarla?: () => void;
   // Sol menüdeki alt katmanı besler: hangi bölümlerin verisi var. Yeni sorgu yok —
   // liste, bu bileşenin zaten okuduğu state'ten türetilir.
   onSectionsChange?: (sections: { id: string; label: string; kind: "layer" | "section"; hint?: string }[]) => void;
@@ -5742,7 +5775,8 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
   // Kural tabanlı, yapay zekâ çağrısı yok. Maddeler yukarıdaki mevcut state'ten
   // türetilir; dayanak satırları yalnız o veriyi gösterir, yeni metin üretilmez.
   // Öncelik: 1) akış tıkanıklığı 2) süre baskısı 3) çelişki. En fazla üç madde.
-  const yonlendirmeMaddeleri: { baslik: string; dayanak: string[] }[] = [];
+  // eylem: yalnız oturum planlamayı öneren maddede dolar (düğme o maddede çıkar).
+  const yonlendirmeMaddeleri: { baslik: string; dayanak: string[]; eylem?: "randevu" }[] = [];
   if (analyses.length === 0) {
     yonlendirmeMaddeleri.push({
       baslik: "Analiz henüz koşmadı — başlat",
@@ -5769,6 +5803,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
       yonlendirmeMaddeleri.push({
         baslik: `Süre ${deadlineDaysLeft} gün kaldı — oturumu planla`,
         dayanak: [sonTarihMetni],
+        eylem: "randevu",
       });
     }
   }
@@ -6468,6 +6503,13 @@ function Phase4Summary({ caseRow, onSectionsChange, jump }: {
                       <span className="text-sm font-medium">{m.baslik}</span>
                       <span className="shrink-0 text-sm font-medium text-primary hover:underline">{acik ? "Gizle" : "Açıkla"}</span>
                     </button>
+                    {m.eylem === "randevu" && onRandevuAyarla && (
+                      <div className="mt-2">
+                        <Button size="sm" onClick={onRandevuAyarla}>
+                          <CalIcon className="h-4 w-4 mr-1" /> Randevu ayarla
+                        </Button>
+                      </div>
+                    )}
                     {acik && m.dayanak.length > 0 && (
                       <div className="mt-1.5 space-y-1">
                         {m.dayanak.map((d, j) => (

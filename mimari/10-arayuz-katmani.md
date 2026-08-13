@@ -64,3 +64,7 @@ arabulucunun kendi girdiği kayıttır.
   "Randevu ayarla" kartı: taraf seçilir, sistemin seçtiği saatler kart olarak gösterilir,
   [Oluştur ve linki al] ile link üretilir ([Kopyala] · [WhatsApp'ta aç]); [Düzenle] saatleri
   değiştirmenin tek yoludur, ayrı manuel saat seçme ekranı yoktur.
+● 13.08: Kokpitteki "ŞİMDİ NE YAPMALISIN" kartında oturum planlamayı öneren maddede
+  "Randevu ayarla" eylem düğmesi var; düğme Aşama 5'teki mevcut randevu akışını tetikler
+  (tek taraflı dosyada taraf otomatik seçilir ve saat önerisi istenir, çok taraflıda
+  kullanıcı Aşama 5'teki bölümde tarafı kendisi seçer). Diğer maddelerde düğme çıkmaz.
