@@ -67,3 +67,7 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
   boşsa cases.user_id); JWT yalnız kimlik ve yetki kontrolü içindir. "Uygun" cevabında
   saat bağlanır: case_sessions'a ön görüşme (preliminary) / scheduled kaydı açılır,
   katılımcı teklifin tarafıdır. Oturum yazımı hata verse de tarafın cevabı kaybolmaz.
+● 13.08: randevu-teklif davet yazısı — künye (dosya no, uyuşmazlık konusu başlığı, başvuran
+  ve karşı taraf ADLARI, arabulucu adı) ve aynı içeriğin PDF eki eklendi. Künye dışında
+  hiçbir analiz, gizli kanal içeriği veya tutar e-postaya girmez. PDF Türkçe karakterli
+  gömülü fontla üretilir; font/PDF üretilemezse ek konulmaz, yazı eksiz gider.

@@ -336,3 +336,6 @@ ajan ve bildirim yok — sonraki taş.
 kurumsal 3 farklı gün; bekleyen tekliflerdeki saatler dışlanır), girişsiz /randevu/:token
 cevap sayfası ve Aşama 5'teki "Randevu ayarla" kartı (Oluştur ve linki al · Düzenle ·
 Kopyala · WhatsApp'ta aç). E-posta gönderimi yok — sonraki taş.
+
+13.08: Davet e-postasına dosya künyesi ve davet yazısı PDF eki (Türkçe fontla; font
+gömülemezse ek konulmaz). Gönderici ve gönderim yolu değişmedi.

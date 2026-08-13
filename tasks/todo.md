@@ -40,6 +40,17 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (22)
+Davet e-postasına dosya künyesi (dosya no, uyuşmazlık konusu, başvuran + karşı taraf adları,
+arabulucu adı — cases/case_parties/profiles) ve aynı içeriğin PDF eki eklendi
+(jsPDF npm:jspdf@4.2.1 + uzaktan Roboto TTF, VFS'e gömülü; Resend base64 attachments).
+Font indirilemez veya PDF üretilemezse EK KONULMAZ, e-posta künyeli metin hâliyle gider
+(bozuk karakterli PDF yok). Künye dışında analiz/gizli kanal/tutar içeriği yazıya girmez.
+Deno ortamında çalıştırılıp doğrulanamadı (yerelde deno yok); aynı kod yolu Node'da
+denendi: font 200, 84KB PDF üretildi. tsc temiz.
+REDEPLOY GEREKLİ: randevu-teklif Lovable'dan yeniden deploy edilmeli; ilk canlı denemede
+ekin geldiği ve Türkçe karakterlerin doğru göründüğü kontrol edilmeli.
+
 ## Nerede kaldık — 13.08.2026 (21)
 randevu-teklif "cevapla": Uygun cevabından sonra oturum kaydı açılıyor VE tarafa oturum
 davet e-postası gidiyor — mevcut yol (Resend HTTP API + RESEND_API_KEY, gönderici

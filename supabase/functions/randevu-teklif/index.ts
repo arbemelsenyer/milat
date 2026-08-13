@@ -145,9 +145,64 @@ async function saatleriSec(admin: any, mediatorId: string, party: any): Promise<
   return { secenekler: secilen };
 }
 
+function tarafAdiMetni(p: any): string {
+  return p?.party_type === "individual"
+    ? `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim()
+    : String(p?.company_name ?? "").trim();
+}
+
+// Davet yazısının PDF'i. Türkçe karakter için client tarafındaki kanıtlanmış desen
+// kullanılır: jsPDF + uzaktan yüklenen Roboto TTF, VFS'e gömülü. Font gömülemezse
+// PDF ÜRETİLMEZ (bozuk karakterli ek gönderilmez) ve e-posta eksiz gider.
+async function davetPdfBase64(satirlar: { baslik: string; govde: string[] }): Promise<string | null> {
+  try {
+    const { jsPDF } = await import("npm:jspdf@4.2.1");
+    const res = await fetch("https://cdn.jsdelivr.net/gh/googlefonts/roboto@main/src/hinted/Roboto-Regular.ttf");
+    if (!res.ok) {
+      console.error("[randevu-teklif] PDF eki atlandı: font indirilemedi", res.status);
+      return null;
+    }
+    const buf = new Uint8Array(await res.arrayBuffer());
+    let bin = "";
+    const CH = 0x8000;
+    for (let i = 0; i < buf.length; i += CH) bin += String.fromCharCode(...buf.subarray(i, i + CH));
+    const fontB64 = btoa(bin);
+
+    const doc = new (jsPDF as any)({ unit: "pt", format: "a4" });
+    doc.addFileToVFS("Roboto-Regular.ttf", fontB64);
+    doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
+    doc.setFont("Roboto", "normal");
+
+    const margin = 56;
+    let y = 72;
+    doc.setFontSize(14);
+    doc.text(satirlar.baslik, margin, y);
+    y += 28;
+    doc.setFontSize(11);
+    for (const satir of satirlar.govde) {
+      const parcalar: string[] = doc.splitTextToSize(satir, 595 - margin * 2);
+      for (const p of parcalar) {
+        if (y > 780) { doc.addPage(); y = 72; }
+        doc.text(p, margin, y);
+        y += 16;
+      }
+      y += 4;
+    }
+
+    const out = new Uint8Array(doc.output("arraybuffer"));
+    let pdfBin = "";
+    for (let i = 0; i < out.length; i += CH) pdfBin += String.fromCharCode(...out.subarray(i, i + CH));
+    return btoa(pdfBin);
+  } catch (e) {
+    console.error("[randevu-teklif] PDF eki üretilemedi", (e as any)?.message ?? e);
+    return null;
+  }
+}
+
 // Oturum davet yazısı: taraf davet/toplantı e-postalarıyla AYNI yol — Resend HTTP API
 // ve RESEND_API_KEY (send-party-invite / send-meeting-invite ile aynı gönderici).
-// Gizlilik: yazı yalnız o tarafın kendi oturum bilgisini taşır, karşı taraf geçmez.
+// Gizlilik: yazı yalnız künye (dosya no, konu başlığı, taraf adları, arabulucu adı) ve
+// o tarafın kendi oturum bilgisini taşır; analiz, gizli kanal ve tutar içeriği girmez.
 async function oturumDavetiGonder(
   admin: any,
   opts: { party: any; slot: Secenek; secenekler: any[]; caseId: string },
@@ -186,16 +241,59 @@ async function oturumDavetiGonder(
     ? (adres ? `Görüşme adresi: ${adres.replace(/</g, "&lt;")}` : "Görüşme adresi arabulucunuz tarafından iletilecektir.")
     : "Görüşme çevrim içi yapılacaktır; katılım bağlantısı görüşme öncesi iletilecektir.";
 
+  // Dosya künyesi: yalnız numara, konu başlığı, taraf ADLARI ve arabulucu adı.
+  // Analiz, gizli kanal içeriği ve tutar bu yazıya giremez.
+  const { data: dosya } = await admin.from("cases")
+    .select("application_no, title, assigned_mediator_id, user_id").eq("id", caseId).maybeSingle();
+  const { data: taraflar } = await admin.from("case_parties")
+    .select("party_role, party_type, first_name, last_name, company_name").eq("case_id", caseId);
+  const arabulucuId = takvimSahibi(dosya);
+  const { data: profil } = arabulucuId
+    ? await admin.from("profiles").select("full_name").eq("user_id", arabulucuId).maybeSingle()
+    : { data: null };
+
+  const basvuran = ((taraflar ?? []) as any[]).filter((p) => p.party_role === "applicant").map(tarafAdiMetni).filter(Boolean);
+  const karsiTaraf = ((taraflar ?? []) as any[]).filter((p) => p.party_role === "respondent").map(tarafAdiMetni).filter(Boolean);
+  const kunye: { etiket: string; deger: string }[] = [];
+  if (dosya?.application_no) kunye.push({ etiket: "Dosya No", deger: String(dosya.application_no) });
+  if (dosya?.title) kunye.push({ etiket: "Uyuşmazlık konusu", deger: String(dosya.title) });
+  if (basvuran.length) kunye.push({ etiket: "Başvuran", deger: basvuran.join(", ") });
+  if (karsiTaraf.length) kunye.push({ etiket: "Karşı taraf", deger: karsiTaraf.join(", ") });
+  if (profil?.full_name) kunye.push({ etiket: "Arabulucu", deger: String(profil.full_name) });
+
+  const esc = (t: string) => String(t).replace(/</g, "&lt;");
+  const kunyeHtml = kunye.length
+    ? `<p>${kunye.map((k) => `<strong>${esc(k.etiket)}:</strong> ${esc(k.deger)}`).join("<br>")}</p>`
+    : "";
+
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
   <body style="font-family:Arial,sans-serif;line-height:1.6;color:#222">
-    <p>Sayın ${displayName.replace(/</g, "&lt;")},</p>
+    <p>Sayın ${esc(displayName)},</p>
     <p>Onayınızla aşağıdaki görüşme planlanmıştır.</p>
+    ${kunyeHtml}
     <p><strong>Görüşme türü:</strong> Ön Görüşme<br>
        <strong>Tarih:</strong> ${dateStr}<br>
        <strong>Saat:</strong> ${timeStr}</p>
     <p>${yerSatiri}</p>
     <p>Saygılarımızla,<br>MediPact AI</p>
   </body></html>`;
+
+  const pdfB64 = await davetPdfBase64({
+    baslik: "GÖRÜŞME DAVETİ",
+    govde: [
+      `Sayın ${displayName},`,
+      "Onayınızla aşağıdaki görüşme planlanmıştır.",
+      ...kunye.map((k) => `${k.etiket}: ${k.deger}`),
+      "Görüşme türü: Ön Görüşme",
+      `Tarih: ${dateStr}`,
+      `Saat: ${timeStr}`,
+      yuzYuze
+        ? (adres ? `Görüşme adresi: ${adres}` : "Görüşme adresi arabulucunuz tarafından iletilecektir.")
+        : "Görüşme çevrim içi yapılacaktır; katılım bağlantısı görüşme öncesi iletilecektir.",
+      "Saygılarımızla,",
+      "MediPact AI",
+    ],
+  });
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -206,6 +304,8 @@ async function oturumDavetiGonder(
         to: [email],
         subject: "Görüşme daveti — Ön Görüşme",
         html,
+        // PDF yalnız Türkçe fontla üretilebildiyse eklenir.
+        ...(pdfB64 ? { attachments: [{ filename: "gorusme-daveti.pdf", content: pdfB64 }] } : {}),
       }),
     });
     if (!res.ok) {
@@ -219,9 +319,7 @@ async function oturumDavetiGonder(
 
   // Arabulucuya yalnız olay başlığı düşer; taraf verisi bildirime yazılmaz.
   try {
-    const { data: c } = await admin.from("cases")
-      .select("assigned_mediator_id, user_id").eq("id", caseId).maybeSingle();
-    const mediatorId = takvimSahibi(c);
+    const mediatorId = arabulucuId;
     if (mediatorId) {
       await admin.rpc("create_notification", {
         p_user_id: mediatorId,
