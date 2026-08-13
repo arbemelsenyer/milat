@@ -53,3 +53,13 @@ gelirse sayaç sıfırlanır (arka arkaya yüklemede tek koşum). Sayaç dolunca
 "Tüm Analizi Başlat" düğmesiyle aynı çağrıyla tetiklenir — yalnız iki şart sağlanırsa:
 case_parties >= 2 ve agent_states'te koşan bir orkestratör satırı yok. Şartlar sağlanmazsa
 sessizce beklenir, hata gösterilmez. Elle başlatma düğmesi aynen durur.
+
+[EKLEME — RANDEVU TEKLİFİ (13.08)] ● CANLI. randevu-teklif (edge function, verify_jwt=false):
+dört eylem — "oner" ve "olustur" arabulucu JWT'si ve dosya yetkisi ister, "getir" ve "cevapla"
+yalnız token ile çalışır. Saatleri sistem seçer: arabulucunun mediator_availability'deki
+gelecek aralıkları okunur, bekleyen tekliflerde kullanılan saatler dışlanır; bireysel tarafa
+en yakın TEK saat, kurumsal tarafa en yakın 3 FARKLI günden birer saat önerilir. Uygun saat
+yoksa "musaitlik_yok" döner. Teklif satırı randevu_teklifleri tablosuna service role ile
+yazılır. Kör veri: "getir" yalnız seçenekleri, taraf adını ve dosya başlığını döner; token'ı
+bilmeyen istek hiçbir veri alamaz. Cevap tek seferliktir — durum 'beklemede' değilse ikinci
+cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda yoktur.

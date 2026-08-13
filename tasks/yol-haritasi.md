@@ -331,3 +331,8 @@ Gönder / Düzenle / Şimdi değil kartı. Adres değişirse e-posta onay paneli
 (ay ızgarası, gün paneli, aralık ekle/sil, sonraki N güne kopyalama, geçmiş gün kapalı).
 Kayıtlar mediator_availability tablosuna yazılıyor; migration yazılmadı. Randevu bağlama,
 ajan ve bildirim yok — sonraki taş.
+
+13.08: Randevu teklifi — randevu-teklif edge fonksiyonu (saatleri sistem seçer: bireysel 1,
+kurumsal 3 farklı gün; bekleyen tekliflerdeki saatler dışlanır), girişsiz /randevu/:token
+cevap sayfası ve Aşama 5'teki "Randevu ayarla" kartı (Oluştur ve linki al · Düzenle ·
+Kopyala · WhatsApp'ta aç). E-posta gönderimi yok — sonraki taş.

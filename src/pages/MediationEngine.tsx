@@ -1127,6 +1127,198 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance, 
   }
 }
 
+/* ===================== RANDEVU TEKLİFİ (Aşama 5) ===================== */
+// Saatleri randevu-teklif fonksiyonu seçer (bireysel → 1, kurumsal → 3 farklı gün);
+// bu ekran yalnız seçilenleri gösterir. Elle saat seçme ekranı yoktur — tek istisna
+// "Düzenle"dir. Teklif satırı da fonksiyonda service role ile yazılır.
+function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: any[] }) {
+  const [partyId, setPartyId] = useState<string>("");
+  const [onerilen, setOnerilen] = useState<{ gun: string; saat: string }[] | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [link, setLink] = useState<string | null>(null);
+
+  const party = parties.find((p) => p.id === partyId) ?? null;
+
+  function reset() {
+    setOnerilen(null);
+    setEditing(false);
+    setLink(null);
+  }
+
+  async function askAgent() {
+    if (!partyId) return;
+    setAsking(true);
+    reset();
+    try {
+      const { data, error } = await supabase.functions.invoke("randevu-teklif", {
+        body: { action: "oner", case_id: caseRow.id, party_id: partyId },
+      });
+      if (error) throw error;
+      const err = (data as any)?.error;
+      if (err === "musaitlik_yok") {
+        toast({
+          title: "Uygun boş saat yok",
+          description: "Takvim sayfasındaki Müsaitlik sekmesinden gelecek tarihli aralık ekleyin.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (err) throw new Error(err);
+      const list = Array.isArray((data as any)?.secenekler) ? (data as any).secenekler : [];
+      if (!list.length) {
+        toast({ title: "Uygun boş saat yok", variant: "destructive" });
+        return;
+      }
+      setOnerilen(list.map((s: any) => ({ gun: String(s.gun).slice(0, 10), saat: String(s.saat).slice(0, 5) })));
+    } catch (e: any) {
+      toast({ title: "Saat önerisi alınamadı", description: trErr(e?.message ?? ""), variant: "destructive" });
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  async function createOffer() {
+    if (!partyId || !onerilen?.length) return;
+    setCreating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("randevu-teklif", {
+        body: {
+          action: "olustur",
+          case_id: caseRow.id,
+          party_id: partyId,
+          secenekler: onerilen,
+          app_url: window.location.origin,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setLink(String((data as any)?.link ?? ""));
+      setEditing(false);
+      toast({ title: "Randevu teklifi oluşturuldu" });
+    } catch (e: any) {
+      toast({ title: "Teklif oluşturulamadı", description: trErr(e?.message ?? ""), variant: "destructive" });
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  function whatsappMessage(): string {
+    const ad = party ? partyDisplay(party) : "Sayın taraf";
+    const no = caseRow.application_no ? `${caseRow.application_no} numaralı ` : "";
+    return `${ad}, ${no}arabuluculuk dosyasında toplantı saati öneriyoruz. Uygun saati seçmek için: ${link ?? ""}`;
+  }
+
+  function openWhatsapp() {
+    if (!link) return;
+    const phone = party ? getPartyPhone(party) : null;
+    const text = encodeURIComponent(whatsappMessage());
+    const url = phone
+      ? `https://wa.me/${normalizePhoneForWhatsapp(phone)}?text=${text}`
+      : `https://wa.me/?text=${text}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  async function copyLink() {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast({ title: "Link kopyalandı" });
+    } catch {
+      toast({ title: "Kopyalanamadı", description: "Linki elle seçip kopyalayın.", variant: "destructive" });
+    }
+  }
+
+  return (
+    <Card className="p-6 space-y-3">
+      <div>
+        <h3 className="text-lg font-semibold">Randevu ayarla</h3>
+        <p className="text-sm text-muted-foreground">
+          Saatleri sistem seçer: bireysel tarafa en yakın tek saat, kurumsal tarafa üç farklı günden birer saat.
+          Taraf girişsiz bir sayfadan tek dokunuşla cevaplar.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-[220px]">
+          <Label className="text-xs">Taraf</Label>
+          <Select value={partyId || undefined} onValueChange={(v) => { setPartyId(v); reset(); }}>
+            <SelectTrigger><SelectValue placeholder="Taraf seçin" /></SelectTrigger>
+            <SelectContent>
+              {parties.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{partyDisplay(p)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button onClick={askAgent} disabled={asking || !partyId}>
+          {asking ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CalIcon className="h-4 w-4 mr-1" />}
+          Randevu ayarla
+        </Button>
+      </div>
+
+      {onerilen && !link && (
+        <div className="space-y-2">
+          <Label className="text-xs">Önerilen saatler</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {onerilen.map((s, i) => (
+              <div key={i} className="border rounded p-3">
+                {editing ? (
+                  <div className="space-y-1">
+                    <Input
+                      type="date"
+                      className="h-8 text-xs"
+                      value={s.gun}
+                      onChange={(e) => setOnerilen((prev) =>
+                        (prev ?? []).map((x, j) => (j === i ? { ...x, gun: e.target.value } : x)))}
+                    />
+                    <Input
+                      type="time"
+                      className="h-8 text-xs"
+                      value={s.saat}
+                      onChange={(e) => setOnerilen((prev) =>
+                        (prev ?? []).map((x, j) => (j === i ? { ...x, saat: e.target.value } : x)))}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-sm font-medium">
+                      {s.gun ? new Date(`${s.gun}T00:00:00`).toLocaleDateString("tr-TR") : "—"}
+                    </div>
+                    <div className="text-sm text-muted-foreground">{s.saat}</div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={createOffer} disabled={creating}>
+              {creating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+              Oluştur ve linki al
+            </Button>
+            <Button variant="outline" onClick={() => setEditing((o) => !o)} disabled={creating}>
+              <Pencil className="h-4 w-4 mr-1" /> {editing ? "Düzenlemeyi bitir" : "Düzenle"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {link && (
+        <div className="flex items-center gap-2 flex-wrap bg-muted/40 rounded p-2">
+          <Input readOnly value={link} className="text-xs flex-1 min-w-[220px] h-8" onFocus={(e) => e.currentTarget.select()} />
+          <Button size="sm" variant="outline" onClick={copyLink}>
+            <Copy className="h-3 w-3 mr-1" /> Kopyala
+          </Button>
+          <Button size="sm" variant="outline" onClick={openWhatsapp}>
+            <MessageSquare className="h-3 w-3 mr-1" /> WhatsApp'ta aç
+          </Button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // SessionScheduler needs case_parties for invite selection/presence — not lifted into
 // MediationEngine state elsewhere, so fetch it here the same way Phase2Parties does.
 function Phase5Sessions({ caseRow, bumpPhase, onAdvance }: {
@@ -1190,6 +1382,9 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance }: {
             </Button>
           </div>
         </Card>
+      </motion.div>
+      <motion.div variants={itemVariants}>
+        <RandevuTeklifKarti caseRow={caseRow} parties={parties} />
       </motion.div>
       <motion.div variants={itemVariants}>
         <SessionScheduler

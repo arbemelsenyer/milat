@@ -103,3 +103,6 @@ verify_jwt = true
 
 [functions.party-communication-analysis]
 verify_jwt = true
+
+[functions.randevu-teklif]
+verify_jwt = false

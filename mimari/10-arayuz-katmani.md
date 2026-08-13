@@ -57,3 +57,10 @@ arabulucunun kendi girdiği kayıttır.
   kullanıcı). Tek kolaylık aracı vardır: günün aralıklarını sonraki N güne kopyalama
   (aynı aralık iki kez yazılmaz). Geçmiş güne aralık eklenemez. Bu ekran yalnız kayıt içindir —
   randevu bağlama, ajan entegrasyonu ve bildirim yoktur.
+● 13.08: Girişsiz randevu cevap sayfası (/randevu/:token) — menü, giriş ve başka bağlantı yok;
+  tek seçenekte "Toplantınız … için planlandı" + [Uygun]/[Uymuyor], çok seçenekte "Uygun saate
+  dokunun" + saat düğmeleri + küçük "Hiçbiri uymuyor". Cevap sonrası yalnız "Teşekkürler,
+  kaydedildi."; geçersiz veya cevaplanmış token "Bu bağlantının süresi dolmuş." Aşama 5'te
+  "Randevu ayarla" kartı: taraf seçilir, sistemin seçtiği saatler kart olarak gösterilir,
+  [Oluştur ve linki al] ile link üretilir ([Kopyala] · [WhatsApp'ta aç]); [Düzenle] saatleri
+  değiştirmenin tek yoludur, ayrı manuel saat seçme ekranı yoktur.

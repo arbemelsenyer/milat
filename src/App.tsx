@@ -29,6 +29,7 @@ import Cases from "./pages/Cases";
 import Archive from "./pages/Archive";
 import CalendarPage from "./pages/CalendarPage";
 import CaseRedirect from "./pages/CaseRedirect";
+import RandevuCevap from "./pages/RandevuCevap";
 import AppLayout from "./components/AppLayout";
 import { HelmetProvider } from "react-helmet-async";
 
@@ -56,6 +57,8 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            {/* Girişsiz randevu cevap sayfası — AppLayout dışında, guard yok. */}
+            <Route path="/randevu/:token" element={<RandevuCevap />} />
 
             {/* App shell with left sidebar */}
             <Route element={<AppLayout />}>
