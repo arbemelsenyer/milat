@@ -40,6 +40,16 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (41)
+Taraf sohbet asistanı kutusu eklendi (CaseRoom.tsx, DosyaAsistani): "Dosya Asistanım" kartı
+taraf görünümünde sekmelerin altında; mesaj listesi, tek satır giriş, Gönder düğmesi ve
+Enter ile gönderim, "yazıyor…" göstergesi, düğme pasifleşmesi, kırmızı tek satır hata
+(yutma yok), altında gri not. Geçmiş yalnız bileşen state'inde, tablo eklenmedi.
+Çağrı kullanıcının kendi JWT'siyle taraf-asistan'a gidiyor; gövdede case_id ile birlikte
+hem soru hem mesaj hem son 10 mesajlık gecmis gönderiliyor (fonksiyon "mesaj" alanını
+okuyor, "soru" uyum için duruyor). Arabulucu görünümünde kart yok, mevcut bölümler
+yerinden oynamadı. tsc + build temiz.
+
 ## Nerede kaldık — 13.08.2026 (40)
 Ajan tekliflerinde oturum tipi ve video bağlantısı zinciri kapandı:
 1) ajan-nobetci randevu_teklifi görevinde önce "oner" (iç kapıdan) çağırıp saatleri alıyor,

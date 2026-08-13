@@ -680,6 +680,7 @@ export default function CaseRoom() {
   // =================== PARTY VIEW ===================
   function PartyView() {
     return (
+      <>
       <Tabs defaultValue="analysis">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="documents" className={tabTriggerAccentClass}><Upload className="h-4 w-4 mr-1" />Belgelerim</TabsTrigger>
@@ -848,8 +849,113 @@ export default function CaseRoom() {
           <AgentControlPanel caseId={caseId!} isMediator={false} />
         </TabsContent>
       </Tabs>
+      {/* Taraf sohbet asistanı — yalnız taraf görünümünde, mevcut kartların altında. */}
+      <DosyaAsistani caseId={caseId!} />
+      </>
     );
   }
+}
+
+/* ===================== DOSYA ASİSTANIM (yalnız taraf görünümü) ===================== */
+// Sohbet geçmişi yalnız bileşen state'inde durur; hiçbir tabloya yazılmaz.
+// Çağrı kullanıcının kendi JWT'siyle taraf-asistan fonksiyonuna gider.
+type AsistanMesaji = { role: "user" | "assistant"; content: string };
+
+function DosyaAsistani({ caseId }: { caseId: string }) {
+  const [mesajlar, setMesajlar] = useState<AsistanMesaji[]>([]);
+  const [girdi, setGirdi] = useState("");
+  const [bekliyor, setBekliyor] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+
+  async function gonder() {
+    const soru = girdi.trim();
+    if (!soru || bekliyor) return;
+    const gecmis = mesajlar.slice(-10);
+    setMesajlar((prev) => [...prev, { role: "user", content: soru }]);
+    setGirdi("");
+    setHata(null);
+    setBekliyor(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("taraf-asistan", {
+        body: { case_id: caseId, soru, mesaj: soru, gecmis },
+      });
+      if (error) {
+        let msg = error.message || "Asistan yanıt veremedi.";
+        try {
+          const ctx = (error as any).context;
+          if (ctx && typeof ctx.text === "function") {
+            const raw = await (typeof ctx.clone === "function" ? ctx.clone() : ctx).text();
+            const parsed = JSON.parse(raw);
+            if (parsed?.error) msg = String(parsed.error);
+          }
+        } catch { /* gövde okunamadı */ }
+        setHata(msg);
+        return;
+      }
+      const cevap = String((data as any)?.cevap ?? "").trim();
+      if ((data as any)?.error) { setHata(String((data as any).error)); return; }
+      if (!cevap) { setHata("Asistan boş yanıt döndürdü."); return; }
+      setMesajlar((prev) => [...prev, { role: "assistant", content: cevap }]);
+    } catch (e: any) {
+      setHata(e?.message ?? "Asistana ulaşılamadı.");
+    } finally {
+      setBekliyor(false);
+    }
+  }
+
+  return (
+    <Card className="p-5 space-y-3 mt-4">
+      <h3 className="font-semibold">Dosya Asistanım</h3>
+
+      <div className="space-y-2 max-h-80 overflow-y-auto">
+        {mesajlar.length === 0 && !bekliyor && (
+          <p className="text-sm text-muted-foreground">
+            Sürecinizle ilgili merak ettiğinizi yazabilirsiniz.
+          </p>
+        )}
+        {mesajlar.map((m, i) => (
+          <div
+            key={i}
+            className={
+              m.role === "user"
+                ? "text-sm rounded-lg bg-muted px-3 py-2 ml-auto max-w-[85%] w-fit whitespace-pre-line"
+                : "text-sm rounded-lg border px-3 py-2 mr-auto max-w-[85%] w-fit whitespace-pre-line"
+            }
+          >
+            {m.content}
+          </div>
+        ))}
+        {bekliyor && (
+          <div className="text-sm text-muted-foreground flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" /> yazıyor…
+          </div>
+        )}
+      </div>
+
+      {hata && (
+        <p className="text-sm text-destructive">{hata}</p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          className="flex-1 min-w-[200px]"
+          value={girdi}
+          disabled={bekliyor}
+          placeholder="Sorunuzu yazın…"
+          onChange={(e) => setGirdi(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void gonder(); } }}
+        />
+        <Button onClick={() => void gonder()} disabled={bekliyor || !girdi.trim()}>
+          {bekliyor ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+          Gönder
+        </Button>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Bu asistan yalnız senin dosyandaki bilgileri görür ve hukuki tavsiye vermez.
+      </p>
+    </Card>
+  );
 }
 
 function CommonGroundView({ report }: { report: any }) {

@@ -95,3 +95,8 @@ arabulucunun kendi girdiği kayıttır.
   ekranda gösterilir, kart kapanmaz.
 ● 13.08: Aşama 5 üst şeridindeki "Planlanan Oturum" sayacı yalnız GELECEKTEKİ planlı
   (scheduled) oturumları sayar; taslak ve geçmiş kayıtlar sayaca girmez.
+● 13.08: Taraf görünümünde "Dosya Asistanım" sohbet kartı — taraf kendi sürecini sorar,
+  yanıt taraf-asistan fonksiyonundan gelir (kendi JWT'siyle). Geçmiş yalnız ekranda tutulur,
+  veritabanına yazılmaz. Bekleme "yazıyor…" ile, hata kırmızı tek satırla gösterilir.
+  Kartın altında "yalnız senin dosyandaki bilgileri görür ve hukuki tavsiye vermez" notu
+  durur. Arabulucu görünümünde bu kart yoktur.

@@ -390,3 +390,5 @@ model kapısıyla. Ekran parçası sonraki taş.
 
 13.08: Ajan teklifleri online işaretleniyor; onay anında video bağlantısı üretilip davet
 yazısına giriyor.
+
+13.08: Taraf ekranına "Dosya Asistanım" sohbet kutusu (taraf-asistan motoruna bağlı).
