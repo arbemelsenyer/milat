@@ -40,6 +40,16 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (42)
+ajan-nobetci video hattı düzeltildi: teklif–oturum eşleştirmesi artık scheduled_at'i
+Türkiye saatine çevirip karşılaştırıyor (2026-08-18T07:00Z → 18.08 10:00) ve karar tersine
+çevrildi — yalnız eşleşen seçenekte oturum_tipi AÇIKÇA "yuz_yuze" ise atlanıyor; teklif
+bulunamazsa, seçenekler boşsa veya işaret yoksa oturum online sayılıp bağlantı üretiliyor.
+Yanıta teşhis alanları eklendi: incelenen_oturum, atlanan_yuz_yuze, atlama_sebepleri[];
+create-video-room ve e-posta hataları artık sessiz geçmiyor, hata dizisine yazılıyor
+(videoBaglantiEpostasi hata listesi döndürüyor). Diğer davranışlar değişmedi. tsc temiz.
+REDEPLOY GEREKLİ: ajan-nobetci (ve daha önce deploy edilmediyse create-video-room).
+
 ## Nerede kaldık — 13.08.2026 (41)
 Taraf sohbet asistanı kutusu eklendi (CaseRoom.tsx, DosyaAsistani): "Dosya Asistanım" kartı
 taraf görünümünde sekmelerin altında; mesaj listesi, tek satır giriş, Gönder düğmesi ve

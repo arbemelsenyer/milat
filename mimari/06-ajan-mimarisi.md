@@ -126,3 +126,8 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
   "Görüşme bağlantısı" satırı olarak girer. Yüz yüze görüşmede link üretilmez. Nöbetçinin
   video hattı yalnız açıkça yüz yüze işaretli saatleri atlar; işaretsiz eski oturumlar
   çevrim içi sayılır.
+● 13.08: Nöbetçinin video hattında karar kuralı — oturumun saati Türkiye saatine çevrilip
+  cevaplanmış teklif seçenekleriyle eşleştirilir; yalnız açıkça "yuz_yuze" işaretli saat
+  atlanır, diğer her durumda (işaret yok, teklif yok, seçenek boş) oturum çevrim içi
+  sayılır ve bağlantı üretilir. Koşum özeti incelenen oturum, atlanan yüz yüze sayısı ve
+  atlama sebeplerini döndürür; oda üretimi ve e-posta hataları sessiz geçmez.

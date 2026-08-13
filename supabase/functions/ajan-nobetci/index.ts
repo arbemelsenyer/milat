@@ -200,7 +200,16 @@ async function zamanKontrolu(admin: any, dosya: any): Promise<boolean> {
 // seçilmediği için e-posta bir kez gönderilir. Yüz yüze olduğu teklif kaydından belli
 // olan oturumlar atlanır; belli değilse oturum çevrim içi kabul edilir (video düğmesi
 // zaten her oturumda var).
-async function videoBaglantilariniHazirla(admin: any, dosya: any): Promise<number> {
+type VideoOzet = {
+  hazirlanan: number;
+  incelenen: number;
+  atlanan_yuz_yuze: number;
+  atlama_sebepleri: string[];
+  hatalar: string[];
+};
+
+async function videoBaglantilariniHazirla(admin: any, dosya: any): Promise<VideoOzet> {
+  const ozet: VideoOzet = { hazirlanan: 0, incelenen: 0, atlanan_yuz_yuze: 0, atlama_sebepleri: [], hatalar: [] };
   const simdi = new Date().toISOString();
   const { data: oturumlar, error: sErr } = await admin.from("case_sessions")
     .select("id, scheduled_at, status, video_link, participants")
@@ -209,37 +218,46 @@ async function videoBaglantilariniHazirla(admin: any, dosya: any): Promise<numbe
     .gt("scheduled_at", simdi)
     .limit(50);
   if (sErr) {
+    ozet.hatalar.push(`${dosya.id}: oturumlar okunamadı — ${sErr.message}`);
     console.error(`[ajan-nobetci] oturumlar okunamadı (${dosya.id}): ${sErr.message}`);
-    return 0;
+    return ozet;
   }
   const adaylar = ((oturumlar ?? []) as any[]).filter((s) => !String(s.video_link ?? "").trim());
-  if (adaylar.length === 0) return 0;
+  ozet.incelenen = adaylar.length;
+  if (adaylar.length === 0) return ozet;
 
-  // Cevaplanmış tekliflerdeki saat → oturum tipi eşlemesi. Yalnız açıkça "yuz_yuze"
-  // işaretli saatler dışlanır; işaret yoksa (eski kayıtlar dahil) oturum çevrim içi
-  // sayılır ve bağlantı üretilir.
-  const yuzYuzeSaatler = new Set<string>();
+  // Cevaplanmış tekliflerdeki saat → oturum tipi eşlemesi. Teklifteki gun/saat Türkiye
+  // saatidir; oturumun scheduled_at değeri UTC'dir, bu yüzden karşılaştırma TR'ye
+  // çevrilerek yapılır. Yalnız AÇIKÇA "yuz_yuze" işaretli saat atlanır; işaret yoksa,
+  // teklif bulunamazsa veya seçenekler boşsa oturum çevrim içi sayılır.
+  const tipEslemesi = new Map<string, string>();
   const { data: teklifler } = await admin.from("randevu_teklifleri")
     .select("secenekler, durum").eq("case_id", dosya.id).eq("durum", "cevaplandi").limit(50);
   for (const t of (teklifler ?? []) as any[]) {
     for (const s of Array.isArray(t?.secenekler) ? t.secenekler : []) {
-      if ((s as any)?.oturum_tipi === "yuz_yuze") {
-        yuzYuzeSaatler.add(`${String((s as any).gun).slice(0, 10)}|${String((s as any).saat).slice(0, 5)}`);
-      }
+      const anahtar = `${String((s as any)?.gun ?? "").slice(0, 10)}|${String((s as any)?.saat ?? "").slice(0, 5)}`;
+      const tip = String((s as any)?.oturum_tipi ?? "").trim();
+      if (tip) tipEslemesi.set(anahtar, tip);
     }
   }
 
-  let hazirlanan = 0;
   for (const oturum of adaylar) {
+    // TR gün/saat: scheduled_at UTC'den Europe/Istanbul'a çevrilir.
+    const d = new Date(oturum.scheduled_at);
+    const gun = d.toLocaleDateString("en-CA", { timeZone: TZ });
+    const saat = d.toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
     try {
-      const d = new Date(oturum.scheduled_at);
-      const gun = d.toLocaleDateString("en-CA", { timeZone: TZ });
-      const saat = d.toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
-      if (yuzYuzeSaatler.has(`${gun}|${saat}`)) continue;
+      if (tipEslemesi.get(`${gun}|${saat}`) === "yuz_yuze") {
+        ozet.atlanan_yuz_yuze++;
+        ozet.atlama_sebepleri.push(`${oturum.id}: teklifte yüz yüze işaretli (${gun} ${saat})`);
+        continue;
+      }
 
       if (!CRON_SECRET) {
+        ozet.atlama_sebepleri.push(`${oturum.id}: CRON_SECRET tanımlı değil, iç çağrı yapılamadı`);
+        ozet.hatalar.push("CRON_SECRET tanımlı değil");
         console.error("[ajan-nobetci] CRON_SECRET yok, video bağlantısı üretilemedi");
-        return hazirlanan;
+        return ozet;
       }
       const res = await fetch(`${SUPABASE_URL}/functions/v1/create-video-room`, {
         method: "POST",
@@ -254,7 +272,10 @@ async function videoBaglantilariniHazirla(admin: any, dosya: any): Promise<numbe
       const govde = await res.json().catch(() => ({}));
       const link = String((govde as any)?.room_url ?? "").trim();
       if (!res.ok || !link) {
-        console.error(`[ajan-nobetci] video odası üretilemedi (${oturum.id}): HTTP ${res.status} ${String((govde as any)?.error ?? "").slice(0, 200)}`);
+        const sebep = `create-video-room HTTP ${res.status} ${String((govde as any)?.error ?? "").slice(0, 200)}`.trim();
+        ozet.hatalar.push(`${oturum.id}: ${sebep}`);
+        ozet.atlama_sebepleri.push(`${oturum.id}: ${sebep}`);
+        console.error(`[ajan-nobetci] video odası üretilemedi (${oturum.id}): ${sebep}`);
         continue;
       }
       // create-video-room bağlantıyı zaten oturuma yazar; yazılmadıysa burada tamamlanır.
@@ -263,31 +284,39 @@ async function videoBaglantilariniHazirla(admin: any, dosya: any): Promise<numbe
       if (!String((guncel as any)?.video_link ?? "").trim()) {
         const { error: updErr } = await admin.from("case_sessions")
           .update({ video_link: link }).eq("id", oturum.id);
-        if (updErr) console.error(`[ajan-nobetci] video_link yazılamadı (${oturum.id}): ${updErr.message}`);
+        if (updErr) {
+          ozet.hatalar.push(`${oturum.id}: video_link yazılamadı — ${updErr.message}`);
+          console.error(`[ajan-nobetci] video_link yazılamadı (${oturum.id}): ${updErr.message}`);
+        }
       }
 
-      await videoBaglantiEpostasi(admin, dosya, oturum, link, gun, saat);
-      hazirlanan++;
+      const epostaHatalari = await videoBaglantiEpostasi(admin, dosya, oturum, link, gun, saat);
+      for (const h of epostaHatalari) ozet.hatalar.push(`${oturum.id}: ${h}`);
+      ozet.hazirlanan++;
     } catch (e: any) {
-      console.error(`[ajan-nobetci] video bağlantısı hazırlanamadı (${oturum.id}): ${e?.message ?? e}`);
+      const msg = e?.message ?? String(e);
+      ozet.hatalar.push(`${oturum.id}: ${msg}`);
+      ozet.atlama_sebepleri.push(`${oturum.id}: ${msg}`);
+      console.error(`[ajan-nobetci] video bağlantısı hazırlanamadı (${oturum.id}): ${msg}`);
     }
   }
-  return hazirlanan;
+  return ozet;
 }
 
 // Oturumun tarafına kısa bilgilendirme: dosya künyesi, gün-saat ve bağlantı.
 // Karşı tarafa ait hiçbir veri geçmez; imza dosyanın arabulucusunun adıdır.
 async function videoBaglantiEpostasi(
   admin: any, dosya: any, oturum: any, link: string, gun: string, saat: string,
-): Promise<void> {
+): Promise<string[]> {
+  const hatalar: string[] = [];
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) {
     console.error("[ajan-nobetci] RESEND_API_KEY yok, bağlantı e-postası gönderilemedi");
-    return;
+    return ["RESEND_API_KEY yok, bağlantı e-postası gönderilemedi"];
   }
   const partyIds = (Array.isArray(oturum?.participants) ? oturum.participants : [])
     .map((p: any) => String(p?.party_id ?? "")).filter(Boolean);
-  if (partyIds.length === 0) return;
+  if (partyIds.length === 0) return ["oturumda katılımcı taraf kaydı yok, e-posta gönderilmedi"];
 
   const { data: taraflar } = await admin.from("case_parties")
     .select("id, party_type, first_name, last_name, company_name, email")
@@ -309,7 +338,7 @@ async function videoBaglantiEpostasi(
 
   for (const t of (taraflar ?? []) as any[]) {
     const email = String(t?.email ?? "").trim();
-    if (!email) continue;
+    if (!email) { hatalar.push("tarafın e-postası yok, bağlantı iletilemedi"); continue; }
     const ad = t?.party_type === "individual"
       ? `${t?.first_name ?? ""} ${t?.last_name ?? ""}`.trim()
       : String(t?.company_name ?? "").trim();
@@ -334,12 +363,16 @@ async function videoBaglantiEpostasi(
         }),
       });
       if (!res.ok) {
-        console.error("[ajan-nobetci] bağlantı e-postası gönderilemedi", { status: res.status, body: (await res.text()).slice(0, 200) });
+        const govde = (await res.text()).slice(0, 200);
+        hatalar.push(`bağlantı e-postası gönderilemedi (HTTP ${res.status}) ${govde}`.trim());
+        console.error("[ajan-nobetci] bağlantı e-postası gönderilemedi", { status: res.status, body: govde });
       }
     } catch (e: any) {
+      hatalar.push(`bağlantı e-postası hatası: ${e?.message ?? e}`);
       console.error(`[ajan-nobetci] bağlantı e-postası hatası: ${e?.message ?? e}`);
     }
   }
+  return hatalar;
 }
 
 // Koşum kaydı: agent_states'e mevcut upsert deseniyle 'nobetci' satırı (dosya başına bir satır).
@@ -384,6 +417,9 @@ Deno.serve(async (req) => {
     let atlananGorev = 0;
     let yeniRandevuGorevi = 0;
     let hazirlananVideo = 0;
+    let incelenenOturum = 0;
+    let atlananYuzYuze = 0;
+    const atlamaSebepleri: string[] = [];
     const hatalar: string[] = [];
 
     for (const dosya of (dosyalar ?? []) as any[]) {
@@ -422,8 +458,13 @@ Deno.serve(async (req) => {
         }
 
         if (await zamanKontrolu(admin, dosya)) yeniRandevuGorevi++;
-        const videoHazirlanan = await videoBaglantilariniHazirla(admin, dosya);
+        const videoOzet = await videoBaglantilariniHazirla(admin, dosya);
+        const videoHazirlanan = videoOzet.hazirlanan;
         hazirlananVideo += videoHazirlanan;
+        incelenenOturum += videoOzet.incelenen;
+        atlananYuzYuze += videoOzet.atlanan_yuz_yuze;
+        atlamaSebepleri.push(...videoOzet.atlama_sebepleri);
+        hatalar.push(...videoOzet.hatalar);
         islenenDosya++;
 
         await nobetciDurumYaz(admin, dosya.id, {
@@ -457,6 +498,9 @@ Deno.serve(async (req) => {
       gorev_atlandi: atlananGorev,
       randevu_gorevi_acildi: yeniRandevuGorevi,
       video_baglantisi_hazirlandi: hazirlananVideo,
+      incelenen_oturum: incelenenOturum,
+      atlanan_yuz_yuze: atlananYuzYuze,
+      atlama_sebepleri: atlamaSebepleri,
       hata: hatalar,
     });
   } catch (e: any) {

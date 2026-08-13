@@ -392,3 +392,6 @@ model kapısıyla. Ekran parçası sonraki taş.
 yazısına giriyor.
 
 13.08: Taraf ekranına "Dosya Asistanım" sohbet kutusu (taraf-asistan motoruna bağlı).
+
+13.08: Nöbetçi video hattı — saat dilimi eşleştirmesi ve "aksi ispatlanmadıkça online"
+kuralı düzeltildi, koşum özetine teşhis alanları eklendi.
