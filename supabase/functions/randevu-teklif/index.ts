@@ -39,12 +39,11 @@ function normalizeSecenekler(raw: unknown): Secenek[] | null {
 
 // Saatleri ajan seçer: arabulucunun gelecek müsaitlik aralıkları okunur, bekleyen
 // tekliflerde kullanılan saatler dışlanır, taraf tipine göre 1 veya 3 seçenek verilir.
-async function saatleriSec(admin: any, caseRow: any, party: any): Promise<{ secenekler: Secenek[]; hata?: string; tanili?: any }> {
-  // Takvimin sahibi dosyanın kendisidir: mediator_availability.user_id = cases.user_id.
-  // assigned_mediator_id yalnız user_id boşsa yedek olarak kullanılır; tarafın
-  // user_id'si veya başka bir alan kullanılmaz.
-  const mediatorId = caseRow?.user_id ?? caseRow?.assigned_mediator_id;
-  if (!mediatorId) return { secenekler: [], hata: "musaitlik_yok", tanili: { sebep: "dosyada kullanıcı yok" } };
+async function saatleriSec(admin: any, mediatorId: string, party: any): Promise<{ secenekler: Secenek[]; hata?: string; tanili?: any }> {
+  // Takvimin sahibi, isteği yapan kullanıcıdır (Authorization başlığındaki JWT'den
+  // çözülen auth kimliği). cases tablosundaki hiçbir alan bu amaçla kullanılmaz —
+  // dosya sahibi ile takvim sahibi farklı kullanıcılar olabiliyor.
+  if (!mediatorId) return { secenekler: [], hata: "musaitlik_yok", tanili: { sebep: "oturum kullanıcısı yok" } };
 
   const bugun = bugunTR();
   const simdi = suanSaatTR();
@@ -59,15 +58,16 @@ async function saatleriSec(admin: any, caseRow: any, party: any): Promise<{ sece
     .limit(200);
   if (slotErr) return { secenekler: [], hata: "musaitlik_yok", tanili: { sebep: slotErr.message } };
 
-  // Aynı arabulucunun bekleyen tekliflerinde kullanılan saatler tekrar önerilmez.
+  // Aynı kullanıcının bekleyen tekliflerinde kullanılan saatler tekrar önerilmez
+  // (kendi dosyaları: assigned_mediator_id veya user_id kendisi olanlar).
   const { data: pending } = await admin.from("randevu_teklifleri")
     .select("secenekler, cases:case_id(assigned_mediator_id, user_id)")
     .eq("durum", "beklemede")
     .limit(500);
   const dolu = new Set<string>();
   for (const row of (pending ?? []) as any[]) {
-    const owner = row?.cases?.user_id ?? row?.cases?.assigned_mediator_id;
-    if (owner !== mediatorId) continue;
+    const kendi = row?.cases?.assigned_mediator_id === mediatorId || row?.cases?.user_id === mediatorId;
+    if (!kendi) continue;
     for (const s of Array.isArray(row?.secenekler) ? row.secenekler : []) {
       dolu.add(`${String(s?.gun ?? "").slice(0, 10)}|${String(s?.saat ?? "").slice(0, 5)}`);
     }
@@ -110,7 +110,7 @@ async function yetkiKontrol(req: Request, admin: any, supabaseUrl: string, anonK
   if (!authHeader) return { hata: json({ error: "Unauthorized" }, 401) };
   const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
   const { data: u } = await userClient.auth.getUser();
-  if (!u?.user) return { hata: json({ error: "Invalid session" }, 401) };
+  if (!u?.user) return { hata: json({ error: "oturum doğrulanamadı" }, 401) };
 
   if (!case_id || !party_id) return { hata: json({ error: "case_id ve party_id zorunlu" }, 400) };
 
@@ -128,7 +128,8 @@ async function yetkiKontrol(req: Request, admin: any, supabaseUrl: string, anonK
     .select("id, case_id, party_type, is_individual").eq("id", party_id).maybeSingle();
   if (!p || (p as any).case_id !== case_id) return { hata: json({ error: "Taraf bu dosyaya ait değil" }, 400) };
 
-  return { caseRow: c, party: p };
+  // userId = takvim sahibi olarak kullanılacak, isteği yapan auth kullanıcısı.
+  return { caseRow: c, party: p, userId: u.user.id };
 }
 
 Deno.serve(async (req) => {
@@ -148,7 +149,7 @@ Deno.serve(async (req) => {
       const party_id = String((body as any)?.party_id ?? "");
       const k = await yetkiKontrol(req, admin, supabaseUrl, anonKey, case_id, party_id);
       if ((k as any).hata) return (k as any).hata;
-      const { secenekler, hata, tanili } = await saatleriSec(admin, (k as any).caseRow, (k as any).party);
+      const { secenekler, hata, tanili } = await saatleriSec(admin, (k as any).userId, (k as any).party);
       if (hata) return json({ error: hata, tanili });
       return json({ secenekler });
     }
@@ -167,7 +168,7 @@ Deno.serve(async (req) => {
         if (!override) return json({ error: "En az 1, en fazla 3 geçerli seçenek gerekir" }, 400);
         secenekler = override;
       } else {
-        const r = await saatleriSec(admin, (k as any).caseRow, (k as any).party);
+        const r = await saatleriSec(admin, (k as any).userId, (k as any).party);
         if (r.hata) return json({ error: r.hata, tanili: r.tanili });
         secenekler = r.secenekler;
       }

@@ -23,3 +23,7 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   "hiçbir şey olmadı" gibi görünüyor. Sonuç üreten her kartın kendi kalıcı
   durum satırı olsun; invoke hatasında error.context gövdesi okunup gerçek
   mesaj yazılsın. (13.08, randevu teklifi kartı)
+- "Arabulucunun takvimi" cases tablosundan türetilemez: dosya sahibi
+  (cases.user_id) ve takvim sahibi (mediator_availability.user_id) farklı
+  kullanıcılar olabiliyor. Kimlik daima isteği yapan JWT'den alınır.
+  (13.08, randevu-teklif — 1f9856f'teki ilk düzeltme de yanlış kaynağa bakıyordu)
