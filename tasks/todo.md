@@ -40,6 +40,14 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (32)
+randevu-teklif'ten giden her taraf e-postası (teklif maili + davet yazısı) ve davet
+PDF'inin imza bölümü artık dosyanın arabulucusunun adıyla imzalanıyor: profiles.full_name,
+"Arb." önekiyle (ad zaten Arb. ile başlıyorsa tekrarlanmıyor); altında küçük satır
+"Bu ileti MediPact AI aracılığıyla gönderilmiştir." Ad profilde boşsa eski "MediPact AI"
+imzası yedek kalıyor. Başka içerik/davranış değişmedi. tsc temiz.
+REDEPLOY GEREKLİ: randevu-teklif Lovable'dan yeniden deploy edilmeli.
+
 ## Nerede kaldık — 13.08.2026 (31)
 Nöbetçi artık randevu_teklifi görevini de işliyor: dosyada durum='beklemede' teklif varsa
 görev 'atlandi'; yoksa başvuran taraf (case_parties.party_role='applicant') ile

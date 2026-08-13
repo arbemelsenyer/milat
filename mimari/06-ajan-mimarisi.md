@@ -96,3 +96,6 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
   çağrı kapısından çağırır. Saat seçimi ve tarafa e-posta randevu-teklif'in işidir.
   Müsait saat yoksa görev atlanır; HTTP/iç çağrı hatasında görev bekliyor kalır ve
   sonraki koşuda yeniden denenir.
+● 13.08: randevu-teklif'ten giden taraf e-postaları ve davet PDF'i dosyanın arabulucusunun
+  adıyla imzalanır (profiles.full_name, "Arb." önekiyle); imzanın altında "Bu ileti
+  MediPact AI aracılığıyla gönderilmiştir." satırı durur. Ad yoksa imza MediPact AI kalır.

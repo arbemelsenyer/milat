@@ -363,3 +363,6 @@ e-postası. Nöbetçinin randevu_teklifi görevini işlemesi sonraki taş.
 
 13.08: Nöbetçi randevu_teklifi görevini işliyor — başvuran taraf için teklif iç çağrıyla
 oluşturuluyor, link tarafa e-postayla gidiyor. Cron tetikleyici hâlâ yok.
+
+13.08: Taraf e-postaları ve davet PDF'i arabulucunun adıyla imzalanıyor (Arb. Ad Soyad +
+"MediPact AI aracılığıyla gönderilmiştir" notu).

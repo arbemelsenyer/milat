@@ -147,6 +147,15 @@ async function saatleriSec(admin: any, mediatorId: string, party: any): Promise<
   return { secenekler: secilen };
 }
 
+// E-posta ve PDF imzası: dosyanın arabulucusunun adı, "Arb." önekiyle. Ad yoksa
+// eski imza (MediPact AI) yedek kalır — imza boş bırakılmaz.
+const IMZA_NOTU = "Bu ileti MediPact AI aracılığıyla gönderilmiştir.";
+function imzaMetni(fullName: unknown): string {
+  const ad = String(fullName ?? "").trim();
+  if (!ad) return "MediPact AI";
+  return /^arb\.?\s/i.test(ad) ? ad : `Arb. ${ad}`;
+}
+
 function tarafAdiMetni(p: any): string {
   return p?.party_type === "individual"
     ? `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim()
@@ -263,6 +272,7 @@ async function oturumDavetiGonder(
   if (karsiTaraf.length) kunye.push({ etiket: "Karşı taraf", deger: karsiTaraf.join(", ") });
   if (profil?.full_name) kunye.push({ etiket: "Arabulucu", deger: String(profil.full_name) });
 
+  const davetImzasi = imzaMetni((profil as any)?.full_name);
   const esc = (t: string) => String(t).replace(/</g, "&lt;");
   const kunyeHtml = kunye.length
     ? `<p>${kunye.map((k) => `<strong>${esc(k.etiket)}:</strong> ${esc(k.deger)}`).join("<br>")}</p>`
@@ -277,7 +287,8 @@ async function oturumDavetiGonder(
        <strong>Tarih:</strong> ${dateStr}<br>
        <strong>Saat:</strong> ${timeStr}</p>
     <p>${yerSatiri}</p>
-    <p>Saygılarımızla,<br>MediPact AI</p>
+    <p>Saygılarımızla,<br>${esc(davetImzasi)}</p>
+    <p style="font-size:12px;color:#666">${IMZA_NOTU}</p>
   </body></html>`;
 
   const pdfB64 = await davetPdfBase64({
@@ -293,7 +304,8 @@ async function oturumDavetiGonder(
         ? (adres ? `Görüşme adresi: ${adres}` : "Görüşme adresi arabulucunuz tarafından iletilecektir.")
         : "Görüşme çevrim içi yapılacaktır; katılım bağlantısı görüşme öncesi iletilecektir.",
       "Saygılarımızla,",
-      "MediPact AI",
+      davetImzasi,
+      IMZA_NOTU,
     ],
   });
 
@@ -364,7 +376,14 @@ async function teklifEpostasiGonder(
   const displayName = ad || "Sayın Taraf";
 
   const { data: dosya } = await admin.from("cases")
-    .select("application_no, title").eq("id", opts.caseId).maybeSingle();
+    .select("application_no, title, assigned_mediator_id, user_id").eq("id", opts.caseId).maybeSingle();
+
+  // İmza: dosyanın arabulucusunun adı (profiles), yoksa MediPact AI.
+  const arabulucuId = takvimSahibi(dosya);
+  const { data: profil } = arabulucuId
+    ? await admin.from("profiles").select("full_name").eq("user_id", arabulucuId).maybeSingle()
+    : { data: null };
+  const imza = imzaMetni((profil as any)?.full_name);
 
   const esc = (t: string) => String(t).replace(/</g, "&lt;");
   const kunye: string[] = [];
@@ -384,7 +403,8 @@ async function teklifEpostasiGonder(
     ${kunye.length ? `<p>${kunye.join("<br>")}</p>` : ""}
     <ul>${saatler}</ul>
     <p>Uygunluğunuzu tek dokunuşla bildirin:<br><a href="${opts.link}">${esc(opts.link)}</a></p>
-    <p>Saygılarımızla,<br>MediPact AI</p>
+    <p>Saygılarımızla,<br>${esc(imza)}</p>
+    <p style="font-size:12px;color:#666">${IMZA_NOTU}</p>
   </body></html>`;
 
   try {
