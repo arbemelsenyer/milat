@@ -317,3 +317,8 @@ AÇIK UÇ: onaylı e-posta işareti için case_parties'te alan yok — SQL kuruc
 13.08: Onay anı kaydediliyor — case_parties.email_confirmed_at sütunu (kurucu tarafından
 eklendi) taraf kaydı ve e-posta değişikliği onaylandığında yazılıyor; panelsiz değişiklikte
 null'a çekiliyor. Kayıt onay panelinin açık ucu kapandı.
+
+13.08: Belge sürüm saklama + kırmızı/yeşil fark görünümü — her üretim ve onay
+agreement_documents'a yeni satır bırakıyor (metin ve durum metadata'da; migration
+gerekmedi). "Değişiklikleri göster" son iki sürümü kelime bazlı karşılaştırıyor,
+"Onayla" düzeltilmiş metni yeni sürüm olarak yazıyor, durum işareti taslak/onaylandı.

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Loader2, FileText, FileType, FileCode2, Download, AlertTriangle, CheckCircle2, XCircle, Eye } from "lucide-react";
+import { Loader2, FileText, FileType, FileCode2, Download, AlertTriangle, CheckCircle2, XCircle, Eye, History } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { downloadOfficialPdf, downloadOfficialDocx, downloadOfficialUdf, officialTitle } from "@/lib/official-documents";
 
@@ -17,6 +17,80 @@ interface Props {
 }
 
 type DocKind = "son_tutanak" | "davet" | "ilk_oturum" | "anlasma_belgesi";
+
+// Sürüm = agreement_documents tablosundaki bir satır. Yeni tablo/sütun yok;
+// metin ve durum metadata JSONB'sinde durur, sıra created_at'tendir.
+type DocVersion = {
+  id: string;
+  created_at: string;
+  filled_text: string;
+  status: string;          // "taslak" | "onaylandi"
+  template_type: string;
+};
+
+type DiffPart = { type: "same" | "add" | "del"; text: string };
+
+// Kelime bazlı karşılaştırma (harf bazlı değil). Boşluklar da ayrı belirteç
+// olarak tutulur, böylece satır düzeni korunur. Kurulu diff kütüphanesi yok,
+// yeni paket de kurulmadı — LCS burada yazıldı.
+function tokenizeWords(text: string): string[] {
+  return text.match(/\s+|[^\s]+/g) ?? [];
+}
+
+function wordDiff(oldText: string, newText: string): DiffPart[] {
+  const a = tokenizeWords(oldText);
+  const b = tokenizeWords(newText);
+  const parts: DiffPart[] = [];
+  const push = (type: DiffPart["type"], text: string) => {
+    if (!text) return;
+    const last = parts[parts.length - 1];
+    if (last && last.type === type) last.text += text;
+    else parts.push({ type, text });
+  };
+
+  // Ortak baş ve son kısmı kırp — DP yalnız değişen orta bölüme kurulur.
+  let start = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  let endA = a.length;
+  let endB = b.length;
+  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) { endA--; endB--; }
+
+  push("same", a.slice(0, start).join(""));
+
+  const midA = a.slice(start, endA);
+  const midB = b.slice(start, endB);
+  const n = midA.length;
+  const m = midB.length;
+  const CELL_LIMIT = 4_000_000;
+
+  if (n * m > CELL_LIMIT) {
+    // Çok büyük değişiklik: kelime hizalaması yerine blok olarak göster.
+    push("del", midA.join(""));
+    push("add", midB.join(""));
+  } else if (n || m) {
+    const w = m + 1;
+    const dp = new Uint32Array((n + 1) * w);
+    for (let i = n - 1; i >= 0; i--) {
+      for (let j = m - 1; j >= 0; j--) {
+        dp[i * w + j] = midA[i] === midB[j]
+          ? dp[(i + 1) * w + (j + 1)] + 1
+          : Math.max(dp[(i + 1) * w + j], dp[i * w + (j + 1)]);
+      }
+    }
+    let i = 0;
+    let j = 0;
+    while (i < n && j < m) {
+      if (midA[i] === midB[j]) { push("same", midA[i]); i++; j++; }
+      else if (dp[(i + 1) * w + j] >= dp[i * w + (j + 1)]) { push("del", midA[i]); i++; }
+      else { push("add", midB[j]); j++; }
+    }
+    while (i < n) { push("del", midA[i]); i++; }
+    while (j < m) { push("add", midB[j]); j++; }
+  }
+
+  push("same", a.slice(endA).join(""));
+  return parts;
+}
 
 const DOC_SET_AGREED: DocKind[] = ["ilk_oturum", "son_tutanak", "anlasma_belgesi", "davet"];
 const DOC_SET_FAILED: DocKind[] = ["son_tutanak"];
@@ -36,6 +110,9 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
   const [savedTexts, setSavedTexts] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  // Belge türü başına sürüm listesi (en yeni önce) ve fark görünümü anahtarı.
+  const [versions, setVersions] = useState<Record<string, DocVersion[]>>({});
+  const [showDiff, setShowDiff] = useState<Record<string, boolean>>({});
 
   const setKinds: DocKind[] = outcome === "anlasma" ? DOC_SET_AGREED : outcome === "anlasamama" ? DOC_SET_FAILED : [];
 
@@ -44,6 +121,34 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
     setTerms(caseRow?.agreement_terms ?? "");
     setAmount(caseRow?.agreement_amount ? String(caseRow.agreement_amount) : "");
   }, [caseRow?.id]);
+
+  // Sürümler mevcut agreement_documents satırlarından okunur; metni olmayan
+  // eski kayıtlar (henüz filled_text yazılmadan üretilenler) listeye girmez.
+  async function loadVersions() {
+    if (!caseRow?.id) return;
+    const { data } = await supabase
+      .from("agreement_documents")
+      .select("id, created_at, metadata")
+      .eq("case_id", caseRow.id)
+      .order("created_at", { ascending: false });
+    const grouped: Record<string, DocVersion[]> = {};
+    for (const row of (data ?? []) as any[]) {
+      const meta = row?.metadata && typeof row.metadata === "object" ? row.metadata : {};
+      const kind = String(meta.kind ?? "");
+      const text = typeof meta.filled_text === "string" ? meta.filled_text : "";
+      if (!kind || !text) continue;
+      (grouped[kind] ||= []).push({
+        id: row.id,
+        created_at: row.created_at,
+        filled_text: text,
+        status: String(meta.status ?? "taslak"),
+        template_type: String(meta.template_type ?? ""),
+      });
+    }
+    setVersions(grouped);
+  }
+
+  useEffect(() => { void loadVersions(); }, [caseRow?.id]);
 
   async function saveOutcome(nextOutcome: "anlasma" | "anlasamama") {
     setSavingOutcome(true);
@@ -92,18 +197,23 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
       setGeneratedDocs((prev) => ({ ...prev, [kind]: result }));
 
       // Persist metadata record; keep its id so later edits can be synced back into it.
-      const metadata = { template_type: result.template_type, kind, generated_at: new Date().toISOString() };
+      // filled_text + status burada yazılır: her üretim bir sürüm satırı bırakır,
+      // eski metin silinmez (yeni tablo/sütun yok).
+      const metadata = {
+        template_type: result.template_type,
+        kind,
+        generated_at: new Date().toISOString(),
+        filled_text: result.filled_text,
+        status: "taslak",
+      };
       const { data: row } = await supabase.from("agreement_documents").insert({
         case_id: caseRow.id,
         doc_type: officialTitle(result.template_type),
         metadata: metadata as any,
       } as any).select("id, metadata").single();
       if (row) setDocRecords((prev) => ({ ...prev, [kind]: { id: (row as any).id, metadata: (row as any).metadata } }));
-      setSavedTexts((prev) => {
-        const next = { ...prev };
-        delete next[kind];
-        return next;
-      });
+      setSavedTexts((prev) => ({ ...prev, [kind]: result.filled_text }));
+      await loadVersions();
 
       return result;
     } catch (e: any) {
@@ -168,8 +278,41 @@ ${paragraphElems.join("\n")}
     setGenerating(`${kind}_save`);
     try {
       const ok = await syncEditedRecord(kind, doc.filled_text);
-      if (ok) toast({ title: "Düzenleme kaydedildi" });
+      if (ok) { toast({ title: "Düzenleme kaydedildi" }); await loadVersions(); }
       else setError("Düzenleme kaydedilemedi");
+    } finally {
+      setGenerating(null);
+    }
+  }
+
+  // Onay: ekrandaki (elle düzeltilmiş olabilen) metin YENİ sürüm satırı olarak
+  // yazılır ve durumu "onaylandi" olur. Önceki sürüm olduğu gibi kalır.
+  async function handleApprove(kind: DocKind) {
+    const doc = generatedDocs[kind];
+    if (!doc) return;
+    setGenerating(`${kind}_approve`);
+    setError(null);
+    try {
+      const now = new Date().toISOString();
+      const { data: row, error: insErr } = await supabase.from("agreement_documents").insert({
+        case_id: caseRow.id,
+        doc_type: officialTitle(doc.template_type),
+        metadata: {
+          template_type: doc.template_type,
+          kind,
+          generated_at: now,
+          filled_text: doc.filled_text,
+          status: "onaylandi",
+          approved_at: now,
+        } as any,
+      } as any).select("id, metadata").single();
+      if (insErr) throw insErr;
+      if (row) setDocRecords((prev) => ({ ...prev, [kind]: { id: (row as any).id, metadata: (row as any).metadata } }));
+      setSavedTexts((prev) => ({ ...prev, [kind]: doc.filled_text }));
+      await loadVersions();
+      toast({ title: "Belge onaylandı", description: "Onaylanan metin yeni sürüm olarak kaydedildi." });
+    } catch (e: any) {
+      setError(e.message || "Onaylanamadı");
     } finally {
       setGenerating(null);
     }
@@ -302,13 +445,35 @@ ${paragraphElems.join("\n")}
             {setKinds.map((kind) => {
               const previewBusy = generating === `${kind}_preview`;
               const doc = generatedDocs[kind];
+              const kindVersions = versions[kind] ?? [];
+              const latestVersion = kindVersions[0] ?? null;
+              const prevVersion = kindVersions[1] ?? null;
+              const approved = latestVersion?.status === "onaylandi";
+              const diffOpen = !!showDiff[kind];
               return (
               <li key={kind} className="flex flex-col gap-2 p-3 border rounded">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex-1 min-w-[200px]">
-                    <div className="font-medium text-sm">{KIND_LABEL[kind]}</div>
+                    <div className="font-medium text-sm flex items-center gap-2 flex-wrap">
+                      {KIND_LABEL[kind]}
+                      {latestVersion && (
+                        <span
+                          className={
+                            "text-[10px] px-2 py-0.5 rounded-full border " +
+                            (approved
+                              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                              : "border-amber-300 bg-amber-50 text-amber-800")
+                          }
+                        >
+                          {approved ? "Onaylandı" : "Taslak — imza aşamasında"}
+                        </span>
+                      )}
+                    </div>
                     {doc && (
-                      <div className="text-xs text-muted-foreground mt-0.5">Şablon: {doc.template_type}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        Şablon: {doc.template_type}
+                        {kindVersions.length > 0 && <> · {kindVersions.length} sürüm</>}
+                      </div>
                     )}
                   </div>
                   <div className="flex gap-1">
@@ -336,6 +501,39 @@ ${paragraphElems.join("\n")}
                     })}
                   </div>
                 </div>
+                {prevVersion && latestVersion && (
+                  <div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowDiff((prev) => ({ ...prev, [kind]: !prev[kind] }))}
+                    >
+                      <History className="h-3 w-3 mr-1" />
+                      {diffOpen ? "Değişiklikleri gizle" : "Değişiklikleri göster"}
+                    </Button>
+                    {diffOpen && (
+                      <div className="mt-1 space-y-1">
+                        <div className="text-xs text-muted-foreground">
+                          Son sürüm ({new Date(latestVersion.created_at).toLocaleString("tr-TR")}) ↔ önceki sürüm
+                          ({new Date(prevVersion.created_at).toLocaleString("tr-TR")}) —
+                          <span className="text-emerald-700 underline mx-1">eklenen</span>·
+                          <span className="text-red-700 line-through mx-1">silinen</span>
+                        </div>
+                        <div className="border rounded p-3 font-mono text-xs whitespace-pre-wrap max-h-72 overflow-y-auto bg-muted/10">
+                          {wordDiff(prevVersion.filled_text, latestVersion.filled_text).map((part, idx) =>
+                            part.type === "add" ? (
+                              <span key={idx} className="bg-emerald-50 text-emerald-700 underline">{part.text}</span>
+                            ) : part.type === "del" ? (
+                              <span key={idx} className="bg-red-50 text-red-700 line-through">{part.text}</span>
+                            ) : (
+                              <span key={idx}>{part.text}</span>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {doc && (
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Belge metni — indirmeden önce düzenleyebilirsiniz</Label>
@@ -345,15 +543,27 @@ ${paragraphElems.join("\n")}
                       value={doc.filled_text}
                       onChange={(e) => setGeneratedDocs((prev) => ({ ...prev, [kind]: { ...prev[kind], filled_text: e.target.value } }))}
                     />
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={!!generating || savedTexts[kind] === doc.filled_text}
-                      onClick={() => handleSaveEdit(kind)}
-                    >
-                      {generating === `${kind}_save` && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
-                      Kaydet
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={!!generating || savedTexts[kind] === doc.filled_text}
+                        onClick={() => handleSaveEdit(kind)}
+                      >
+                        {generating === `${kind}_save` && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                        Kaydet
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={!!generating}
+                        onClick={() => handleApprove(kind)}
+                      >
+                        {generating === `${kind}_approve`
+                          ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          : <CheckCircle2 className="h-3 w-3 mr-1" />}
+                        Onayla
+                      </Button>
+                    </div>
                   </div>
                 )}
               </li>

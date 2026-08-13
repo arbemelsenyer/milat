@@ -33,3 +33,14 @@ defterden yürür. · Kapanışözeti(§5.1) tutar/sonuç alanlarını buradan o
 istatistik buradan gider. §3'ün kalan o kalemleri, kurucunun göndereceği 2 örnek tutanak (dava şartı *
 ihtiyari, PIl temizlenmiş) ve bilgilendirme belgesi örneği ile hedef çıktı üzerinden bütüncül
 tamamlanacak — alan alan yamama yok.
+
+[EKLEME — BELGE SÜRÜMLERİ VE ONAY DURUMU (13.08)] ● CANLI. Belge yeniden üretildiğinde eski
+metin kaybolmaz: her üretim ve her onay, agreement_documents tablosuna yeni bir satır bırakır
+(sıra created_at). Metin, şablon tipi ve durum metadata JSONB'sinde tutulur — yeni tablo veya
+sütun açılmadı. Durum iki değerlidir: taslak (varsayılan) ve onaylandi. Ekranda belge başlığının
+yanında küçük durum işareti vardır: "Taslak — imza aşamasında" / "Onaylandı".
+"Değişiklikleri göster" düğmesi son sürümle bir önceki sürümü kelime bazlı karşılaştırır —
+eklenen metin yeşil/altı çizili, silinen metin kırmızı/üstü çizili. Önceki sürüm yoksa düğme
+görünmez. Karşılaştırma dış kütüphane kullanmaz, ekranda hesaplanır. "Onayla", ekrandaki elle
+düzeltilmiş metni yeni sürüm olarak yazar; önceki sürüm olduğu gibi durur. Belge üretim mantığı,
+şablonlar ve PDF/DOCX/UDF çıktısı değişmedi (m.8 — çalışan kritik yol).
