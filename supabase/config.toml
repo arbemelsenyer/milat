@@ -109,3 +109,6 @@ verify_jwt = false
 
 [functions.ajan-nobetci]
 verify_jwt = false
+
+[functions.taraf-asistan]
+verify_jwt = true

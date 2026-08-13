@@ -40,6 +40,23 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (39)
+Taraf sohbet asistanının motoru yazıldı: supabase/functions/taraf-asistan (verify_jwt=true,
+config.toml'a eklendi). JWT'deki kullanıcının o dosyada taraf olduğu case_parties.user_id
+ile doğrulanıyor, değilse 403. Bağlama YALNIZ tarafın kendi verisi (beyanı, kendi
+belgelerinin metni, kendine gönderilmiş keşif soruları) ve dosya künyesi (no, konu, aşama,
+taraf adları+rolleri, planlı oturumlar) giriyor; party_analyses, common_ground_reports,
+kök neden/tutarlılık/iletişim analizleri ve karşı tarafın içeriği hiç okunmuyor. Sistem
+talimatı: hukuki tavsiye yok, karşı taraf hakkında yorum yok, teşhis/duygu değerlendirmesi
+yok, bilmiyorsa "bu bilgi bende yok". Model kapısı case-qa ile aynı üç kademe
+(OPENAI_API_KEY → gpt-4o-mini, GEMINI_API_KEY → gemini-2.5-flash, Lovable gateway yedeği);
+sohbet olduğu için JSON zorlaması yok. Her çağrı agent_states (agent_type='taraf_asistan')
+ve agent_worklog'a iz bırakıyor (içerik değil, koşum kaydı); iz yazımı sohbeti düşürmüyor.
+Ekran parçası (parça 2) henüz yok. tsc temiz.
+REDEPLOY GEREKLİ: taraf-asistan Lovable'dan deploy edilmeli.
+NOT: Şemada tarafa özel ayrı "gizli kanal" tablosu yok; tarafın gizli içeriği kendi
+belgeleri ve beyanı üzerinden geliyor — yeni tablo varsayılmadı.
+
 ## Nerede kaldık — 13.08.2026 (38)
 Video bağlantısı artık ajanla üretiliyor (iki fonksiyon):
 create-video-room'a randevu-teklif'teki iç kapı deseni eklendi (x-cron-secret = CRON_SECRET

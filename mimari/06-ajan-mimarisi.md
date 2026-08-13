@@ -111,3 +111,11 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
   tek bilgilendirme e-postası gönderir (künye + gün-saat + bağlantı, arabulucu imzasıyla).
   Bağlantı yazıldıktan sonra oturum yeniden seçilmez, e-posta bir kez gider. Cevaplanmış
   teklifte yüz yüze işaretli saate düşen oturumlar atlanır. Normal JWT yolu değişmedi.
+● 13.08: taraf-asistan (edge function, verify_jwt=true) — gizlilik sınıfı PARTY_SELF.
+  Tarafın kendi sohbet asistanının motoru: yetki case_parties.user_id eşleşmesiyle
+  doğrulanır. Bağlama yalnız tarafın kendi beyanı, kendi belgelerinin metni ve kendine
+  gönderilmiş keşif soruları ile dosya künyesi (no, konu, aşama, taraf adları, planlı
+  oturumlar) girer; analiz raporları, kokpit ve karşı tarafın hiçbir verisi okunmaz.
+  Asistan hukuki tavsiye vermez, karşı taraf hakkında yorum ve teşhis üretmez, veri yoksa
+  "bu bilgi bende yok" der. Model kapısı case-qa ile aynı üç kademedir. Her çağrı
+  agent_states ve agent_worklog'a koşum izi bırakır (içerik değil).

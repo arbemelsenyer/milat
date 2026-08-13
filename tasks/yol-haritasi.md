@@ -384,3 +384,6 @@ istiyor; girişsiz cevap akışında JWT yok) — açık uç.
 
 13.08: Video bağlantısı nöbetçi tarafından üretilip tarafa e-postayla iletiliyor
 (create-video-room iç kapısı). (37)'deki açık uç kapandı.
+
+13.08: Taraf sohbet asistanı motoru (taraf-asistan) yazıldı — kör veri sınırıyla, case-qa
+model kapısıyla. Ekran parçası sonraki taş.
