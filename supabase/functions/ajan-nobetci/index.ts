@@ -257,18 +257,22 @@ async function videoBaglantilariniHazirla(admin: any, dosya: any): Promise<Video
   ozet.incelenen = adaylar.length;
   if (adaylar.length === 0) return ozet;
 
-  // Cevaplanmış tekliflerdeki saat → oturum tipi eşlemesi. Teklifteki gun/saat Türkiye
-  // saatidir; oturumun scheduled_at değeri UTC'dir, bu yüzden karşılaştırma TR'ye
-  // çevrilerek yapılır. Yalnız AÇIKÇA "yuz_yuze" işaretli saat atlanır; işaret yoksa,
-  // teklif bulunamazsa veya seçenekler boşsa oturum çevrim içi sayılır.
-  const tipEslemesi = new Map<string, string>();
+  // Cevaplanmış tekliflerin seçenekleri düz listeye açılır. Teklifteki gun/saat Türkiye
+  // saatidir; oturumun scheduled_at değeri UTC'dir, karşılaştırma TR'ye çevrilerek
+  // yapılır ve GÜN ile SAATİN İKİSİ BİRDEN tutmak zorundadır (yalnız saate bakmak
+  // başka günün teklifini eşleştiriyordu). Hiçbir seçenek tutmazsa oturum çevrim içi
+  // sayılır; yalnız gün+saat tutan seçenekte oturum_tipi "yuz_yuze" ise atlanır.
+  const teklifSecenekleri: { teklifId: string; gun: string; saat: string; tip: string }[] = [];
   const { data: teklifler } = await admin.from("randevu_teklifleri")
-    .select("secenekler, durum").eq("case_id", dosya.id).eq("durum", "cevaplandi").limit(50);
+    .select("id, secenekler, durum").eq("case_id", dosya.id).eq("durum", "cevaplandi").limit(50);
   for (const t of (teklifler ?? []) as any[]) {
     for (const s of Array.isArray(t?.secenekler) ? t.secenekler : []) {
-      const anahtar = `${String((s as any)?.gun ?? "").slice(0, 10)}|${String((s as any)?.saat ?? "").slice(0, 5)}`;
-      const tip = String((s as any)?.oturum_tipi ?? "").trim();
-      if (tip) tipEslemesi.set(anahtar, tip);
+      teklifSecenekleri.push({
+        teklifId: String(t?.id ?? ""),
+        gun: String((s as any)?.gun ?? "").trim().slice(0, 10),
+        saat: String((s as any)?.saat ?? "").trim().slice(0, 5),
+        tip: String((s as any)?.oturum_tipi ?? "").trim(),
+      });
     }
   }
 
@@ -276,9 +280,13 @@ async function videoBaglantilariniHazirla(admin: any, dosya: any): Promise<Video
     // TR gün/saat: scheduled_at UTC'dir, sabit UTC+3 kaymasıyla çevrilir.
     const { gun, saat } = trGunSaat(String(oturum.scheduled_at));
     try {
-      if (tipEslemesi.get(`${gun}|${saat}`) === "yuz_yuze") {
+      // Gün VE saat birebir tutan seçenek aranır; yoksa oturum çevrim içi sayılır.
+      const eslesen = teklifSecenekleri.find((s) => s.gun === gun && s.saat === saat);
+      if (eslesen?.tip === "yuz_yuze") {
         ozet.atlanan_yuz_yuze++;
-        ozet.atlama_sebepleri.push(`${oturum.id}: teklifte yüz yüze işaretli (${gun} ${saat})`);
+        ozet.atlama_sebepleri.push(
+          `${oturum.id}: teklif ${eslesen.teklifId} gün+saat eşleşmesinde yüz yüze işaretli (${gun} ${saat})`,
+        );
         continue;
       }
 

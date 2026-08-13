@@ -40,6 +40,15 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (44)
+ajan-nobetci teklif–oturum eşleştirmesi düzeltildi: cevaplanmış tekliflerin seçenekleri düz
+listeye açılıp GÜN ve SAATİN İKİSİ BİRDEN tutan seçenek aranıyor (oturum saati TR'ye
+çevrilerek). Tutan seçenek yoksa oturum ONLINE sayılıp bağlantı üretiliyor; yalnız gün+saat
+tutan seçenekte oturum_tipi='yuz_yuze' ise atlanıyor ve atlama sebebine eşleşen teklif id'si
+yazılıyor. Canlı veriyle (0f91208a 18.08 10:00 tipsiz · 43c3f252 19.08 10:00 yuz_yuze ·
+8ccd2a8b 18.08 14:00 online) dört senaryo Node'da doğrulandı: 18.08 10:00 → ONLINE.
+tsc temiz. REDEPLOY GEREKLİ: ajan-nobetci.
+
 ## Nerede kaldık — 13.08.2026 (43)
 ajan-nobetci ReferenceError'ları giderildi: TZ değişkeni bu dosyada hiç tanımlı değildi —
 yerine sabit TR_OFFSET_MS (3 saat) ve trGunSaat()/trTarihMetni() yardımcıları tanımlandı;
