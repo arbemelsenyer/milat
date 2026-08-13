@@ -35,3 +35,10 @@ party_consistency ve party_communication ajan tipleri common_ground dalına alı
 durum kaydını yalnız görevli arabulucu ve yönetici görür. Karşı taraf denetimin/analizin
 YAPILDIĞINI dahi göremez — varlığın kendisi de gizli veridir (yalnız içerik değil). Taraf SELECT
 politikası bilerek yazılmamıştır.
+
+[EKLEME — DOSYA YÖNLENDİRMESİ ROL DUYARLI (13.08)] ● CANLI. /cases/:id tek kapıdır:
+kullanıcı o dosyada case_parties.user_id ile eşleşiyorsa taraf ekranına (CaseRoom),
+dosya sahibi/görevli arabulucu/admin ise arabulucu ekranına gider; hiçbiri değilse
+erişim reddedilir. Taraf kaydı önceliklidir. Arabulucu ekranı sayfa seviyesinde de
+korunur: taraf olup yönetici olmayan kullanıcı adresi elle yazsa bile kendi ekranına
+yönlendirilir.

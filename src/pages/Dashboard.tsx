@@ -715,7 +715,8 @@ export default function Dashboard() {
                     ? "Taraflar belirlenmemiş"
                     : "Parties not specified";
                 const next = upcomingByCase.get(c.id);
-                const goTo = c.status === "draft" ? `/legal-reasoning?caseId=${c.id}` : `/case-room/${c.id}`;
+                // Tek kapı: /cases/:id rolü çözer (taraf → CaseRoom, sahibi/arabulucu → 8 aşama).
+                const goTo = `/cases/${c.id}`;
                 const summaryLine = extractSummary(c.ai_summary);
                 const phase = Math.min(TOTAL_PHASES, Math.max(0, c.current_phase ?? 0));
                 const phasePct = Math.round((phase / TOTAL_PHASES) * 100);

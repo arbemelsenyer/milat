@@ -40,6 +40,15 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (47)
+Dosya yönlendirmesi rol duyarlı oldu: /cases/:id (CaseRedirect) artık tek kapı —
+case_parties.user_id eşleşen kullanıcı TARAF sayılıp /case-room/:id'ye, dosya sahibi /
+görevli arabulucu / admin ise /legal-reasoning?caseId=...'e gidiyor, hiçbiri değilse
+"erişim yetkiniz yok" ekranı çıkıyor (taraf kaydı öncelikli). Dashboard'daki kart tıklaması
+da bu kapıdan geçiyor. Sayfa seviyesi koruma: MediationEngine'de taraf olup yönetici
+olmayan kullanıcı adresi elle yazsa bile /case-room/:id'ye yönlendiriliyor; sahibi,
+arabulucu ve admin etkilenmiyor. tsc + build temiz.
+
 ## Nerede kaldık — 13.08.2026 (46)
 "Görüşme bağlantınız" e-postasının imza çözümlemesi randevu-teklif'teki çalışan kodun
 birebir aynısına çevrildi: dosya satırı e-posta içinde id ile yeniden okunuyor

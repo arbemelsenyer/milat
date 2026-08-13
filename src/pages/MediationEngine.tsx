@@ -477,6 +477,25 @@ export default function MediationEngine() {
     }
   }, [params, setParams]);
 
+  // Sayfa seviyesi koruma: dosyada TARAF olan kullanıcı, adresi elle yazsa bile arabulucu
+  // ekranında kalamaz — kendi ekranına (CaseRoom) yönlendirilir. Dosya sahibi, görevli
+  // arabulucu ve admin bu kontrolden etkilenmez.
+  useEffect(() => {
+    if (!caseId || !user?.id || isAdmin) return;
+    let aktif = true;
+    (async () => {
+      const [c, p] = await Promise.all([
+        supabase.from("cases").select("user_id, assigned_mediator_id").eq("id", caseId).maybeSingle(),
+        supabase.from("case_parties").select("id").eq("case_id", caseId).eq("user_id", user.id).limit(1),
+      ]);
+      if (!aktif) return;
+      const yonetici = !!c.data && (c.data.user_id === user.id || c.data.assigned_mediator_id === user.id);
+      const taraf = Array.isArray(p.data) && p.data.length > 0;
+      if (taraf && !yonetici) navigate(`/case-room/${caseId}`, { replace: true });
+    })();
+    return () => { aktif = false; };
+  }, [caseId, user?.id, isAdmin, navigate]);
+
   async function loadCases() {
     setLoading(true);
     const { data, error } = await supabase
