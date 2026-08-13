@@ -322,3 +322,7 @@ null'a çekiliyor. Kayıt onay panelinin açık ucu kapandı.
 agreement_documents'a yeni satır bırakıyor (metin ve durum metadata'da; migration
 gerekmedi). "Değişiklikleri göster" son iki sürümü kelime bazlı karşılaştırıyor,
 "Onayla" düzeltilmiş metni yeni sürüm olarak yazıyor, durum işareti taslak/onaylandı.
+
+13.08: Taraf kaydından sonra davet gönderim kartı — kayıt anında otomatik gönderim yerine
+Gönder / Düzenle / Şimdi değil kartı. Adres değişirse e-posta onay paneli yeniden çalışıyor
+(email_confirmed_at güncelleniyor). send-party-invite ve davet metni değişmedi.

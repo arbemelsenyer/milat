@@ -1874,6 +1874,10 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
   // onay panelinden geçer; onaylanmadan hiçbir şey kaydedilmez.
   const [confirmingDraft, setConfirmingDraft] = useState(false);
   const [confirmingEmail, setConfirmingEmail] = useState(false);
+  // Taraf onaylanıp kaydedildiğinde beliren gönderim kartı. Kart yalnız
+  // e-postası onaylanmış tarafta çıkar; gönderim elle tetiklenir.
+  const [invitePrompt, setInvitePrompt] = useState<{ partyId: string; name: string; email: string } | null>(null);
+  const [promptEmailDraft, setPromptEmailDraft] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -2024,8 +2028,11 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         vekil_sicil_no: draft.vekil_sicil_no ?? null,
       } as any).select().single();
       if (error) throw error;
-      if (draft.email) {
-        sendInvite((inserted as any).id);
+      // Adres onay panelinden geçtiği için onaylıdır (email_confirmed_at yazıldı):
+      // davet kendiliğinden gönderilmez, gönderim kartı açılır.
+      if (String(draft.email ?? "").trim()) {
+        setInvitePrompt({ partyId: (inserted as any).id, name: full_name, email: String(draft.email).trim() });
+        setPromptEmailDraft(null);
       }
       toast({ title: "Taraf eklendi" });
       setConfirmingDraft(false);
@@ -2090,6 +2097,13 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
       if (error) throw error;
       toast({ title: "Taraf bilgileri güncellendi" });
       setConfirmingEmail(false);
+      // Gönderim kartı açıksa onaylanan yeni adresi karta taşı; adres
+      // silinmişse kart kapanır (onaysız/boş adrese gönderim yok).
+      setInvitePrompt((prev) => {
+        if (!prev || prev.partyId !== editing.id) return prev;
+        return newEmail ? { ...prev, email: newEmail } : null;
+      });
+      setPromptEmailDraft(null);
       setEditing(null);
       load();
       if (emailChanged) sendInvite(editing.id);
@@ -2226,6 +2240,97 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         )}
       </Card>
       </motion.div>
+
+      {invitePrompt && (
+        <motion.div variants={itemVariants}>
+        <Card className="p-6 space-y-3 border-accent/40">
+          <div>
+            <h3 className="text-lg font-semibold">Davet gönderilsin mi?</h3>
+            <p className="text-sm text-muted-foreground">
+              Taraf kaydedildi ve e-posta adresi onaylandı. Gönderim sizin onayınızla yapılır.
+            </p>
+          </div>
+          <div className="rounded border divide-y text-sm">
+            <div className="p-3">
+              <div className="text-xs text-muted-foreground">Alıcı</div>
+              <div>{invitePrompt.name}</div>
+            </div>
+            <div className="p-3">
+              <div className="text-xs text-muted-foreground">E-posta</div>
+              {promptEmailDraft === null ? (
+                <div className="break-all">{invitePrompt.email}</div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <Input
+                    type="email"
+                    className="flex-1 min-w-[220px] h-9"
+                    value={promptEmailDraft}
+                    autoFocus
+                    onChange={(e) => setPromptEmailDraft(e.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={
+                      !promptEmailDraft.trim() ||
+                      promptEmailDraft.trim() === invitePrompt.email
+                    }
+                    onClick={() => {
+                      // Yeni adres onay panelinden geçmeden kaydedilmez.
+                      const p = parties.find((x: any) => x.id === invitePrompt.partyId);
+                      if (!p) { toast({ title: "Taraf bulunamadı", variant: "destructive" }); return; }
+                      setEditing({ ...p, email: promptEmailDraft.trim() });
+                      setVekilEditOpen(!!(p.vekil_ad_soyad || p.vekil_baro || p.vekil_sicil_no));
+                      setConfirmingEmail(true);
+                    }}
+                  >
+                    Adresi onayla
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setPromptEmailDraft(null)}>Vazgeç</Button>
+                </div>
+              )}
+            </div>
+            <div className="p-3">
+              <div className="text-xs text-muted-foreground">Gönderilecek içerik (özet)</div>
+              <div className="text-muted-foreground">
+                Konu: “Arabuluculuk Davet — {caseRow.application_no ?? ""}”. Metinde tarafa hitap,
+                dosyaya taraf olarak davet edildiği bilgisi, giriş bağlantısı ve yalnız kendi
+                belgelerini göreceği / karşı tarafın verilerinin gizli kaldığı açıklaması yer alır.
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => { setInvitePrompt(null); setPromptEmailDraft(null); }}
+              disabled={invitingId === invitePrompt.partyId}
+            >
+              Şimdi değil
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setPromptEmailDraft(invitePrompt.email)}
+              disabled={promptEmailDraft !== null || invitingId === invitePrompt.partyId}
+            >
+              <Pencil className="h-4 w-4 mr-1" /> Düzenle
+            </Button>
+            <Button
+              onClick={async () => {
+                const id = invitePrompt.partyId;
+                await sendInvite(id);
+                setInvitePrompt(null);
+                setPromptEmailDraft(null);
+              }}
+              disabled={promptEmailDraft !== null || invitingId === invitePrompt.partyId}
+            >
+              {invitingId === invitePrompt.partyId
+                ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                : <Mail className="h-4 w-4 mr-1" />}
+              Gönder
+            </Button>
+          </div>
+        </Card>
+        </motion.div>
+      )}
 
       {draft && (
         <motion.div variants={itemVariants}>

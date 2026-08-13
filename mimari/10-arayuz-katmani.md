@@ -44,3 +44,9 @@ arabulucunun kendi girdiği kayıttır.
   panel onaylanırsa (adres doluysa) onay anı damgalanır; düzenlemede e-posta değişip panelde
   onaylanırsa damga yenilenir. E-posta panelsiz bir yoldan değişirse damga null'a çekilir,
   onaysız adres onaylı görünmez.
+● 13.08: Taraf onaylanıp kaydedilince davet gönderim kartı çıkıyor (Aşama 2): alıcı adı,
+  onaylı e-posta adresi ve mevcut davet e-postasının özeti; üç düğme — Gönder (mevcut
+  send-party-invite akışı), Düzenle (adres karttan düzeltilir, yeni adres onay panelinden
+  geçmeden kaydedilmez), Şimdi değil (kart kapanır, elle "Davet Gönder" düğmesi yerinde
+  durur). E-postası olmayan tarafta kart çıkmaz; "Davet Linki Oluştur" akışı değişmedi.
+  Kayıt anında kendiliğinden gönderim kaldırıldı — gönderim artık arabulucunun onayıyla.
