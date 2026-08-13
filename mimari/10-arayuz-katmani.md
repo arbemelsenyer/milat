@@ -50,3 +50,10 @@ arabulucunun kendi girdiği kayıttır.
   geçmeden kaydedilmez), Şimdi değil (kart kapanır, elle "Davet Gönder" düğmesi yerinde
   durur). E-postası olmayan tarafta kart çıkmaz; "Davet Linki Oluştur" akışı değişmedi.
   Kayıt anında kendiliğinden gönderim kaldırıldı — gönderim artık arabulucunun onayıyla.
+● 13.08: Takvim sayfası iki sekmeye ayrıldı — "Ajanda" (mevcut toplantı ve yasal süre listesi,
+  değişmedi) ve "Müsaitlik". Müsaitlik ay ızgarasıdır: ileri/geri ay okları, müsaitlik girilen
+  günler yeşil tonda, bugün belirgin. Güne tıklanınca o günün aralıkları listelenir; başlangıç
+  ve bitiş saatiyle aralık eklenir/silinir (mediator_availability, user_id = oturumdaki
+  kullanıcı). Tek kolaylık aracı vardır: günün aralıklarını sonraki N güne kopyalama
+  (aynı aralık iki kez yazılmaz). Geçmiş güne aralık eklenemez. Bu ekran yalnız kayıt içindir —
+  randevu bağlama, ajan entegrasyonu ve bildirim yoktur.

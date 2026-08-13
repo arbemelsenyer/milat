@@ -326,3 +326,8 @@ gerekmedi). "Değişiklikleri göster" son iki sürümü kelime bazlı karşıla
 13.08: Taraf kaydından sonra davet gönderim kartı — kayıt anında otomatik gönderim yerine
 Gönder / Düzenle / Şimdi değil kartı. Adres değişirse e-posta onay paneli yeniden çalışıyor
 (email_confirmed_at güncelleniyor). send-party-invite ve davet metni değişmedi.
+
+13.08: Arabulucu aylık müsaitlik takvimi — Takvim sayfasına "Müsaitlik" sekmesi eklendi
+(ay ızgarası, gün paneli, aralık ekle/sil, sonraki N güne kopyalama, geçmiş gün kapalı).
+Kayıtlar mediator_availability tablosuna yazılıyor; migration yazılmadı. Randevu bağlama,
+ajan ve bildirim yok — sonraki taş.
