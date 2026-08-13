@@ -40,6 +40,17 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (21)
+randevu-teklif "cevapla": Uygun cevabından sonra oturum kaydı açılıyor VE tarafa oturum
+davet e-postası gidiyor — mevcut yol (Resend HTTP API + RESEND_API_KEY, gönderici
+"MİLAT Arabuluculuk <info@milatmediation.com>"; send-party-invite / send-meeting-invite
+ile aynı). Yazıda taraf adı, Ön Görüşme, gün-saat ve yüz yüzeyse adres var; online'da
+"katılım bağlantısı görüşme öncesi iletilecektir" (video linki girişsiz akıştan
+üretilemiyor — create-video-room kullanıcı JWT'si istiyor, uydurma link yazılmadı).
+Arabulucuya yalnız başlık bildirimi düşüyor. Gönderim hatasında cevap ve oturum kaydı
+duruyor, yanıt davet_gonderildi:false dönüyor. "Uymuyor"da gönderim yok. tsc temiz.
+REDEPLOY GEREKLİ: randevu-teklif Lovable'dan yeniden deploy edilmeli.
+
 ## Nerede kaldık — 13.08.2026 (20)
 randevu-teklif dolu saat dışlama düzeltildi: arabulucunun dosya kimlikleri önce cases'ten
 alınıyor, sonra (a) o dosyalardaki durum='beklemede' tekliflerin seçenekleri ve

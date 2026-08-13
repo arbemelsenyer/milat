@@ -145,6 +145,99 @@ async function saatleriSec(admin: any, mediatorId: string, party: any): Promise<
   return { secenekler: secilen };
 }
 
+// Oturum davet yazısı: taraf davet/toplantı e-postalarıyla AYNI yol — Resend HTTP API
+// ve RESEND_API_KEY (send-party-invite / send-meeting-invite ile aynı gönderici).
+// Gizlilik: yazı yalnız o tarafın kendi oturum bilgisini taşır, karşı taraf geçmez.
+async function oturumDavetiGonder(
+  admin: any,
+  opts: { party: any; slot: Secenek; secenekler: any[]; caseId: string },
+): Promise<boolean> {
+  const { party, slot, secenekler, caseId } = opts;
+  const email = String(party?.email ?? "").trim();
+  if (!email) {
+    console.error("[randevu-teklif] davet gönderilemedi: tarafın e-postası yok");
+    return false;
+  }
+  const key = Deno.env.get("RESEND_API_KEY");
+  if (!key) {
+    console.error("[randevu-teklif] davet gönderilemedi: RESEND_API_KEY yok");
+    return false;
+  }
+
+  const ad = party?.party_type === "individual"
+    ? `${party?.first_name ?? ""} ${party?.last_name ?? ""}`.trim()
+    : String(party?.company_name ?? "").trim();
+  const displayName = ad || "Sayın Taraf";
+
+  // Oturum tipi/adres teklifin seçenek girdisinde saklanır.
+  const kayit = (Array.isArray(secenekler) ? secenekler : []).find(
+    (s: any) => String(s?.gun ?? "").slice(0, 10) === slot.gun && String(s?.saat ?? "").slice(0, 5) === slot.saat && s?.oturum_tipi,
+  ) ?? (Array.isArray(secenekler) ? secenekler : []).find((s: any) => s?.oturum_tipi);
+  const yuzYuze = kayit?.oturum_tipi === "yuz_yuze";
+  const adres = String(kayit?.adres ?? "").trim();
+
+  const when = new Date(`${slot.gun}T${slot.saat}:00+03:00`);
+  const dateStr = when.toLocaleDateString("tr-TR", { timeZone: TZ, day: "numeric", month: "long", year: "numeric", weekday: "long" });
+  const timeStr = slot.saat;
+
+  // Video bağlantısı yalnız oturum ekranındaki mevcut akışta (oturum sahibinin
+  // oturumuyla) üretilebiliyor; buradan üretilemediği için uydurma link yazılmaz.
+  const yerSatiri = yuzYuze
+    ? (adres ? `Görüşme adresi: ${adres.replace(/</g, "&lt;")}` : "Görüşme adresi arabulucunuz tarafından iletilecektir.")
+    : "Görüşme çevrim içi yapılacaktır; katılım bağlantısı görüşme öncesi iletilecektir.";
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+  <body style="font-family:Arial,sans-serif;line-height:1.6;color:#222">
+    <p>Sayın ${displayName.replace(/</g, "&lt;")},</p>
+    <p>Onayınızla aşağıdaki görüşme planlanmıştır.</p>
+    <p><strong>Görüşme türü:</strong> Ön Görüşme<br>
+       <strong>Tarih:</strong> ${dateStr}<br>
+       <strong>Saat:</strong> ${timeStr}</p>
+    <p>${yerSatiri}</p>
+    <p>Saygılarımızla,<br>MediPact AI</p>
+  </body></html>`;
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: "MİLAT Arabuluculuk <info@milatmediation.com>",
+        to: [email],
+        subject: "Görüşme daveti — Ön Görüşme",
+        html,
+      }),
+    });
+    if (!res.ok) {
+      console.error("[randevu-teklif] Resend hatası", { status: res.status, body: (await res.text()).slice(0, 300) });
+      return false;
+    }
+  } catch (e) {
+    console.error("[randevu-teklif] davet gönderilemedi", (e as any)?.message ?? e);
+    return false;
+  }
+
+  // Arabulucuya yalnız olay başlığı düşer; taraf verisi bildirime yazılmaz.
+  try {
+    const { data: c } = await admin.from("cases")
+      .select("assigned_mediator_id, user_id").eq("id", caseId).maybeSingle();
+    const mediatorId = takvimSahibi(c);
+    if (mediatorId) {
+      await admin.rpc("create_notification", {
+        p_user_id: mediatorId,
+        p_title: "Randevu onaylandı, davet gönderildi",
+        p_message: "Randevu onaylandı, davet gönderildi.",
+        p_type: "info",
+        p_link: null,
+      });
+    }
+  } catch (e) {
+    console.error("[randevu-teklif] bildirim yazılamadı", (e as any)?.message ?? e);
+  }
+
+  return true;
+}
+
 // Arabulucu JWT'sini doğrular ve dosya yetkisini kontrol eder.
 async function yetkiKontrol(req: Request, admin: any, supabaseUrl: string, anonKey: string, case_id: string, party_id: string) {
   const authHeader = req.headers.get("Authorization");
@@ -294,6 +387,7 @@ Deno.serve(async (req) => {
       // "Uymuyor" dışındaki cevaplarda saat bağlanır: Aşama 5'teki "Yeni Seans Planla"
       // ekranıyla aynı düzende case_sessions satırı açılır. Bu adım hata verse bile
       // tarafın cevabı kayıtlı kalır — hata yalnız fonksiyon loguna düşer.
+      let davetGonderildi: boolean | null = null;
       if (secimRaw !== "uymuyor") {
         try {
           const secilenSlot: Secenek | null = secimRaw === "uygun"
@@ -305,9 +399,11 @@ Deno.serve(async (req) => {
 
           if (!secilenSlot) {
             console.error("[randevu-teklif] oturum açılamadı: seçilen saat çözülemedi", { secimRaw });
+            davetGonderildi = false;
           } else {
             const { data: p } = await admin.from("case_parties")
-              .select("id, user_id, party_role").eq("id", (row as any).party_id).maybeSingle();
+              .select("id, user_id, party_role, party_type, first_name, last_name, company_name, email")
+              .eq("id", (row as any).party_id).maybeSingle();
             // Türkiye saati sabit UTC+3 (yaz saati uygulaması yok).
             const scheduledAt = new Date(`${secilenSlot.gun}T${secilenSlot.saat}:00+03:00`).toISOString();
             const { error: sesErr } = await admin.from("case_sessions").insert({
@@ -321,13 +417,22 @@ Deno.serve(async (req) => {
                 : [],
             } as any);
             if (sesErr) console.error("[randevu-teklif] oturum kaydı yazılamadı", sesErr.message);
+
+            // Oturum davet yazısı: gönderim hatası cevabı ve oturum kaydını etkilemez.
+            davetGonderildi = await oturumDavetiGonder(admin, {
+              party: p,
+              slot: secilenSlot,
+              secenekler,
+              caseId: String((row as any).case_id ?? ""),
+            });
           }
         } catch (e) {
           console.error("[randevu-teklif] oturum kaydı sırasında hata", (e as any)?.message ?? e);
+          davetGonderildi = false;
         }
       }
 
-      return json({ ok: true });
+      return davetGonderildi === null ? json({ ok: true }) : json({ ok: true, davet_gonderildi: davetGonderildi });
     }
 
     return json({ error: "Bilinmeyen eylem" }, 400);
