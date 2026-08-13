@@ -342,3 +342,6 @@ gömülemezse ek konulmaz). Gönderici ve gönderim yolu değişmedi.
 
 13.08: Kokpit "Şimdi ne yapmalısın" — oturum planlama maddesine "Randevu ayarla" eylem
 düğmesi; mevcut Aşama 5 randevu akışını tetikliyor, kopyasını yazmıyor.
+
+13.08: Kokpitteki "Randevu ayarla" düğmesi aşama geçişini sol menüyle aynı tek yoldan
+(gotoPhase) yapıyor; randevu tetiği ref'e alındı.

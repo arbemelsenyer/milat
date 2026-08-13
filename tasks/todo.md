@@ -40,6 +40,15 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (24)
+Kokpitteki "Randevu ayarla" düğmesi aşama geçişini artık sol menüyle TEK kopya üzerinden
+yapıyor: menü satırının tıklama davranışı gotoPhase(id) fonksiyonuna alındı (kilit kontrolü
+ve toast aynı), düğme de onu çağırıyor. Ayrıca randevu tetiği state yerine ref'e alındı —
+geçişe ikinci bir state güncellemesi karışmıyor, tetik geçişin doğurduğu render'da
+okunuyor. Menünün mekanizması değişmedi. tsc + build temiz.
+NOT: Aşama 4'te takılı kalmanın kesin mekanizmasını canlıda doğrulayamadım; düzeltme,
+geçişi menüyle birebir aynı tek işleme indirdi — canlıda tekrar denenmeli.
+
 ## Nerede kaldık — 13.08.2026 (23)
 Kokpit "Şimdi ne yapmalısın" kartında oturum planlama maddesine (Süre X gün kaldı —
 oturumu planla) "Randevu ayarla" düğmesi eklendi (MediationEngine.tsx). Düğme kök

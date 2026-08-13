@@ -322,7 +322,9 @@ export default function MediationEngine() {
   const [cockpitSections, setCockpitSections] = useState<{ id: string; label: string; kind: "layer" | "section"; hint?: string }[]>([]);
   const [cockpitJump, setCockpitJump] = useState<{ id: string; nonce: number } | null>(null);
   // Kokpitteki "Randevu ayarla" düğmesinden Aşama 5'teki mevcut randevu akışına tetik.
-  const [randevuTetik, setRandevuTetik] = useState<{ nonce: number } | null>(null);
+  // State değil ref: aşama geçişi sol menüdekiyle birebir aynı tek işlem kalsın, geçişe
+  // ikinci bir state güncellemesi karışmasın. Değer, geçişin doğurduğu render'da okunur.
+  const randevuTetikRef = useRef<number | null>(null);
   const [phaseStatus, setPhaseStatus] = useState<Record<number, boolean>>({});
   const [deleteTarget, setDeleteTarget] = useState<CaseRow | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -492,6 +494,16 @@ export default function MediationEngine() {
     const p = new URLSearchParams(params);
     p.set("phase", String(phase));
     setParams(p);
+  }
+  // Sol süreç menüsündeki aşama satırının tıklama davranışının tek kopyası; kokpitteki
+  // "Randevu ayarla" düğmesi de aşamayı bununla değiştirir (ayrı bir geçiş yolu yok).
+  function gotoPhase(id: number) {
+    const locked = id >= 4 && !phase3Complete;
+    if (locked) {
+      toast({ title: "Aşama kilitli", description: "Önce Aşama 3'te en az bir taraf analizini tamamlayın." });
+      return;
+    }
+    setPhase(id);
   }
 
   // NOT: Bu hook, aşağıdaki koşullu return'lerden (loading / !caseId / !activeCase) ÖNCE
@@ -667,7 +679,7 @@ export default function MediationEngine() {
               const sideSections = !active ? [] : p.id === 3 ? FAZ3_MENU_ENTRIES : p.id === 4 ? cockpitSections : [];
               return (
                 <div key={p.id}>
-                <button onClick={() => { if (!locked) setPhase(p.id); else toast({ title: "Aşama kilitli", description: "Önce Aşama 3'te en az bir taraf analizini tamamlayın." }); }}
+                <button onClick={() => gotoPhase(p.id)}
                   className={`relative w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors border-l-2
                     ${active ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-accent" : "border-l-transparent hover:border-l-accent hover:text-accent hover:bg-sidebar-accent/40"}
                     ${locked ? "opacity-50 cursor-not-allowed" : ""}
@@ -750,8 +762,8 @@ export default function MediationEngine() {
                 onAdvance={(next) => setPhase(next)}
                 onCockpitSections={setCockpitSections}
                 cockpitJump={cockpitJump}
-                randevuTetik={randevuTetik}
-                onRandevuAyarla={() => { setRandevuTetik({ nonce: Date.now() }); setPhase(5); }}
+                randevuTetik={randevuTetikRef.current ? { nonce: randevuTetikRef.current } : null}
+                onRandevuAyarla={() => { randevuTetikRef.current = Date.now(); gotoPhase(5); }}
               />
             </motion.div>
           </AnimatePresence>
