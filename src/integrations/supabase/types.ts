@@ -651,6 +651,7 @@ export type Database = {
           is_individual: boolean
           last_name: string | null
           organization: string | null
+          otomatik_onay: boolean
           party_role: string | null
           party_type: string
           phone: string | null
@@ -683,6 +684,7 @@ export type Database = {
           is_individual?: boolean
           last_name?: string | null
           organization?: string | null
+          otomatik_onay?: boolean
           party_role?: string | null
           party_type?: string
           phone?: string | null
@@ -715,6 +717,7 @@ export type Database = {
           is_individual?: boolean
           last_name?: string | null
           organization?: string | null
+          otomatik_onay?: boolean
           party_role?: string | null
           party_type?: string
           phone?: string | null
@@ -2615,6 +2618,41 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      taraf_musaitlik: {
+        Row: {
+          baslangic: string
+          bitis: string
+          created_at: string
+          gun: string
+          id: string
+          party_id: string
+        }
+        Insert: {
+          baslangic: string
+          bitis: string
+          created_at?: string
+          gun: string
+          id?: string
+          party_id: string
+        }
+        Update: {
+          baslangic?: string
+          bitis?: string
+          created_at?: string
+          gun?: string
+          id?: string
+          party_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "taraf_musaitlik_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
             referencedColumns: ["id"]
           },
         ]
