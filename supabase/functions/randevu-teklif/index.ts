@@ -429,6 +429,116 @@ async function teklifEpostasiGonder(
   }
 }
 
+// Cevabın işlenmesi — TEK kod yolu: hem tarafın girişsiz sayfadan verdiği cevap, hem de
+// otomatik onay bu fonksiyondan geçer (durum=cevaplandi, oturum kaydı, davet yazısı).
+async function cevaplaIsle(admin: any, token: string, secimRaw: string): Promise<{ status: number; body: any }> {
+  const { data: row } = await admin.from("randevu_teklifleri")
+    .select("id, durum, secenekler, case_id, party_id").eq("token", token).maybeSingle();
+  if (!row) return { status: 404, body: { error: "gecersiz" } };
+  if ((row as any).durum !== "beklemede") return { status: 409, body: { error: "cevaplanmis" } };
+
+  const secenekler = Array.isArray((row as any).secenekler) ? (row as any).secenekler : [];
+  const gecerli = new Set<string>(["uygun", "uymuyor"]);
+  for (const s of secenekler) {
+    gecerli.add(`${String((s as any)?.gun ?? "").slice(0, 10)} ${String((s as any)?.saat ?? "").slice(0, 5)}`);
+  }
+  if (!gecerli.has(secimRaw)) return { status: 400, body: { error: "secim gecersiz" } };
+
+  // Yarış durumunda ikinci cevabın yazılmaması için koşul update'in içinde.
+  const { data: updated, error: updErr } = await admin.from("randevu_teklifleri")
+    .update({ durum: "cevaplandi", secilen: secimRaw, cevap_zamani: new Date().toISOString() } as any)
+    .eq("token", token).eq("durum", "beklemede").select("id");
+  if (updErr) return { status: 500, body: { error: updErr.message } };
+  if (!updated || updated.length === 0) return { status: 409, body: { error: "cevaplanmis" } };
+
+  // "Uymuyor" dışındaki cevaplarda saat bağlanır: Aşama 5'teki "Yeni Seans Planla"
+  // ekranıyla aynı düzende case_sessions satırı açılır. Bu adım hata verse bile
+  // tarafın cevabı kayıtlı kalır — hata yalnız fonksiyon loguna düşer.
+  let davetGonderildi: boolean | null = null;
+  if (secimRaw !== "uymuyor") {
+    try {
+      const secilenSlot: Secenek | null = secimRaw === "uygun"
+        ? (secenekler[0] ? { gun: String(secenekler[0].gun).slice(0, 10), saat: String(secenekler[0].saat).slice(0, 5) } : null)
+        : (() => {
+          const [gun, saat] = secimRaw.split(" ");
+          return GUN_RE.test(gun ?? "") && SAAT_RE.test(saat ?? "") ? { gun, saat } : null;
+        })();
+
+      if (!secilenSlot) {
+        console.error("[randevu-teklif] oturum açılamadı: seçilen saat çözülemedi", { secimRaw });
+        davetGonderildi = false;
+      } else {
+        const { data: p } = await admin.from("case_parties")
+          .select("id, user_id, party_role, party_type, first_name, last_name, company_name, email")
+          .eq("id", (row as any).party_id).maybeSingle();
+        // Türkiye saati sabit UTC+3 (yaz saati uygulaması yok).
+        const scheduledAt = new Date(`${secilenSlot.gun}T${secilenSlot.saat}:00+03:00`).toISOString();
+        const { error: sesErr } = await admin.from("case_sessions").insert({
+          case_id: (row as any).case_id,
+          session_type: "preliminary",
+          scheduled_at: scheduledAt,
+          notes: null,
+          status: "scheduled",
+          participants: p
+            ? [{ party_id: (p as any).id, user_id: (p as any).user_id, role: (p as any).party_role }]
+            : [],
+        } as any);
+        if (sesErr) console.error("[randevu-teklif] oturum kaydı yazılamadı", sesErr.message);
+
+        // Oturum davet yazısı: gönderim hatası cevabı ve oturum kaydını etkilemez.
+        davetGonderildi = await oturumDavetiGonder(admin, {
+          party: p,
+          slot: secilenSlot,
+          secenekler,
+          caseId: String((row as any).case_id ?? ""),
+        });
+      }
+    } catch (e) {
+      console.error("[randevu-teklif] oturum kaydı sırasında hata", (e as any)?.message ?? e);
+      davetGonderildi = false;
+    }
+  }
+
+  return {
+    status: 200,
+    body: davetGonderildi === null ? { ok: true } : { ok: true, davet_gonderildi: davetGonderildi },
+  };
+}
+
+// Otomatik onay eşleştirmesi: taraf otomatik onayı açtıysa ve önerilen saatlerden biri
+// kendi müsaitlik aralığına düşüyorsa o saat döner. Okumalar service role ile yapılır
+// (taraf_musaitlik RLS'i tarafa özeldir). Hata durumunda eşleşme yok sayılır.
+async function otomatikOnayEslesmesi(admin: any, partyId: string, secenekler: Secenek[]): Promise<Secenek | null> {
+  try {
+    const { data: p, error: pErr } = await admin.from("case_parties")
+      .select("otomatik_onay").eq("id", partyId).maybeSingle();
+    if (pErr) {
+      console.error("[randevu-teklif] otomatik_onay okunamadı", pErr.message);
+      return null;
+    }
+    if ((p as any)?.otomatik_onay !== true) return null;
+
+    const { data: araliklar, error: mErr } = await admin.from("taraf_musaitlik")
+      .select("gun, baslangic, bitis").eq("party_id", partyId).limit(500);
+    if (mErr) {
+      console.error("[randevu-teklif] taraf_musaitlik okunamadı", mErr.message);
+      return null;
+    }
+    for (const s of secenekler) {
+      const uyan = ((araliklar ?? []) as any[]).some((a) =>
+        String(a.gun).slice(0, 10) === s.gun &&
+        s.saat >= String(a.baslangic).slice(0, 5) &&
+        s.saat < String(a.bitis).slice(0, 5)
+      );
+      if (uyan) return s;
+    }
+    return null;
+  } catch (e) {
+    console.error("[randevu-teklif] otomatik onay eşleştirmesi başarısız", (e as any)?.message ?? e);
+    return null;
+  }
+}
+
 // Arabulucu JWT'sini doğrular ve dosya yetkisini kontrol eder.
 // isCron=true (geçerli x-cron-secret) ise çağıran sistemin kendisidir: JWT ve dosya
 // erişim kontrolü atlanır, dosya/taraf tutarlılığı yine doğrulanır.
@@ -532,6 +642,25 @@ Deno.serve(async (req) => {
       }
       const link = `${baseUrl}/randevu/${token}`;
 
+      // Otomatik onay: taraf açtıysa ve önerilen saat kendi müsaitliğine düşüyorsa teklif
+      // anında uygun sayılır — cevap yolu TEK: cevaplaIsle (oturum + davet yazısı).
+      // Bu durumda tarafa ayrıca teklif linki maili gönderilmez.
+      const eslesen = await otomatikOnayEslesmesi(admin, party_id, secenekler);
+      if (eslesen) {
+        // Listede otomatik onaylandığı anlaşılsın diye seçenek girdisine işaret konur.
+        const isaretli = secenekler.map((s) =>
+          s.gun === eslesen.gun && s.saat === eslesen.saat ? { ...s, otomatik_onay: true } : s
+        );
+        await admin.from("randevu_teklifleri").update({ secenekler: isaretli } as any).eq("token", token);
+        const r = await cevaplaIsle(admin, token, `${eslesen.gun} ${eslesen.saat}`);
+        return json({
+          token, link, secenekler: isaretli,
+          otomatik_onay: r.status === 200,
+          davet_gonderildi: (r.body as any)?.davet_gonderildi ?? null,
+          ...(r.status !== 200 ? { onay_hatasi: (r.body as any)?.error ?? null } : {}),
+        });
+      }
+
       // E-posta yalnız iç çağrıda gider; ekrandan oluşturmada link ekranda kalır.
       // Gönderim hatası teklifi düşürmez, yalnız loga geçer.
       if (isCron) {
@@ -576,75 +705,8 @@ Deno.serve(async (req) => {
       const secimRaw = String((body as any)?.secim ?? "").trim();
       if (!token || token.length < 16) return json({ error: "gecersiz" }, 404);
       if (!secimRaw) return json({ error: "secim zorunlu" }, 400);
-
-      const { data: row } = await admin.from("randevu_teklifleri")
-        .select("id, durum, secenekler, case_id, party_id").eq("token", token).maybeSingle();
-      if (!row) return json({ error: "gecersiz" }, 404);
-      if ((row as any).durum !== "beklemede") return json({ error: "cevaplanmis" }, 409);
-
-      const secenekler = Array.isArray((row as any).secenekler) ? (row as any).secenekler : [];
-      const gecerli = new Set<string>(["uygun", "uymuyor"]);
-      for (const s of secenekler) {
-        gecerli.add(`${String((s as any)?.gun ?? "").slice(0, 10)} ${String((s as any)?.saat ?? "").slice(0, 5)}`);
-      }
-      if (!gecerli.has(secimRaw)) return json({ error: "secim gecersiz" }, 400);
-
-      // Yarış durumunda ikinci cevabın yazılmaması için koşul update'in içinde.
-      const { data: updated, error: updErr } = await admin.from("randevu_teklifleri")
-        .update({ durum: "cevaplandi", secilen: secimRaw, cevap_zamani: new Date().toISOString() } as any)
-        .eq("token", token).eq("durum", "beklemede").select("id");
-      if (updErr) return json({ error: updErr.message }, 500);
-      if (!updated || updated.length === 0) return json({ error: "cevaplanmis" }, 409);
-
-      // "Uymuyor" dışındaki cevaplarda saat bağlanır: Aşama 5'teki "Yeni Seans Planla"
-      // ekranıyla aynı düzende case_sessions satırı açılır. Bu adım hata verse bile
-      // tarafın cevabı kayıtlı kalır — hata yalnız fonksiyon loguna düşer.
-      let davetGonderildi: boolean | null = null;
-      if (secimRaw !== "uymuyor") {
-        try {
-          const secilenSlot: Secenek | null = secimRaw === "uygun"
-            ? (secenekler[0] ? { gun: String(secenekler[0].gun).slice(0, 10), saat: String(secenekler[0].saat).slice(0, 5) } : null)
-            : (() => {
-              const [gun, saat] = secimRaw.split(" ");
-              return GUN_RE.test(gun ?? "") && SAAT_RE.test(saat ?? "") ? { gun, saat } : null;
-            })();
-
-          if (!secilenSlot) {
-            console.error("[randevu-teklif] oturum açılamadı: seçilen saat çözülemedi", { secimRaw });
-            davetGonderildi = false;
-          } else {
-            const { data: p } = await admin.from("case_parties")
-              .select("id, user_id, party_role, party_type, first_name, last_name, company_name, email")
-              .eq("id", (row as any).party_id).maybeSingle();
-            // Türkiye saati sabit UTC+3 (yaz saati uygulaması yok).
-            const scheduledAt = new Date(`${secilenSlot.gun}T${secilenSlot.saat}:00+03:00`).toISOString();
-            const { error: sesErr } = await admin.from("case_sessions").insert({
-              case_id: (row as any).case_id,
-              session_type: "preliminary",
-              scheduled_at: scheduledAt,
-              notes: null,
-              status: "scheduled",
-              participants: p
-                ? [{ party_id: (p as any).id, user_id: (p as any).user_id, role: (p as any).party_role }]
-                : [],
-            } as any);
-            if (sesErr) console.error("[randevu-teklif] oturum kaydı yazılamadı", sesErr.message);
-
-            // Oturum davet yazısı: gönderim hatası cevabı ve oturum kaydını etkilemez.
-            davetGonderildi = await oturumDavetiGonder(admin, {
-              party: p,
-              slot: secilenSlot,
-              secenekler,
-              caseId: String((row as any).case_id ?? ""),
-            });
-          }
-        } catch (e) {
-          console.error("[randevu-teklif] oturum kaydı sırasında hata", (e as any)?.message ?? e);
-          davetGonderildi = false;
-        }
-      }
-
-      return davetGonderildi === null ? json({ ok: true }) : json({ ok: true, davet_gonderildi: davetGonderildi });
+      const r = await cevaplaIsle(admin, token, secimRaw);
+      return json(r.body, r.status);
     }
 
     return json({ error: "Bilinmeyen eylem" }, 400);

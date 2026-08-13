@@ -369,3 +369,6 @@ oluşturuluyor, link tarafa e-postayla gidiyor. Cron tetikleyici hâlâ yok.
 
 13.08: Taraf ekranına "Randevu Tercihlerim" (müsait saatler + otomatik onay anahtarı).
 Otomatik onayın teklifle eşleştirilmesi sonraki taş.
+
+13.08: Otomatik onay eşleştirmesi — tarafın müsaitliğine uyan teklif anında onaylanıp
+oturuma bağlanıyor, davet yazısı gidiyor.

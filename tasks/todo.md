@@ -40,6 +40,17 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (34)
+randevu-teklif "olustur": otomatik onay eşleştirmesi eklendi. Teklif yazıldıktan sonra
+tarafın case_parties.otomatik_onay TRUE ise ve önerilen saatlerden biri taraf_musaitlik
+aralığına düşüyorsa (gun eşit, saat >= baslangic ve < bitis) teklif anında uygun sayılıyor:
+cevap yolu tek kod parçasına alındı (cevaplaIsle) — durum=cevaplandi, secilen=o saat,
+oturum kaydı ve davet yazısı aynı yerden. Bu durumda tarafa teklif linki maili
+gönderilmiyor; seçenek girdisine otomatik_onay: true işareti yazılıyor. Otomatik onay
+kapalıysa veya saat uymuyorsa akış aynen (iç çağrıda link maili, ekranda link).
+Okumalar service role ile; hata durumunda eşleşme yok sayılıp loga yazılıyor. tsc temiz.
+REDEPLOY GEREKLİ: randevu-teklif Lovable'dan yeniden deploy edilmeli.
+
 ## Nerede kaldık — 13.08.2026 (33)
 Taraf ekranına "Randevu Tercihlerim" sekmesi eklendi (CaseRoom.tsx, yalnız PartyView):
 müsait saat aralığı ekle/listele/sil (taraf_musaitlik, party_id = tarafın kendi kaydı) ve

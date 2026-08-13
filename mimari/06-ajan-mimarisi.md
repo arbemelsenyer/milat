@@ -99,3 +99,9 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
 ● 13.08: randevu-teklif'ten giden taraf e-postaları ve davet PDF'i dosyanın arabulucusunun
   adıyla imzalanır (profiles.full_name, "Arb." önekiyle); imzanın altında "Bu ileti
   MediPact AI aracılığıyla gönderilmiştir." satırı durur. Ad yoksa imza MediPact AI kalır.
+● 13.08: randevu-teklif otomatik onay eşleştirmesi — taraf kendi ekranından otomatik onayı
+  açtıysa (case_parties.otomatik_onay) ve önerilen saatlerden biri kendi müsaitlik
+  aralığına (taraf_musaitlik) düşüyorsa teklif oluşturulduğu anda uygun sayılır: cevap,
+  tarafın kendi verdiği cevapla AYNI kod yolundan geçer (durum=cevaplandi, oturum kaydı,
+  davet yazısı). Bu durumda teklif linki maili gönderilmez; seçenek girdisine
+  otomatik_onay işareti düşer. Kapalıysa veya saat uymuyorsa akış değişmez.
