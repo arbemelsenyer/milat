@@ -45,3 +45,11 @@ bilirkişi yazar (uzman havuzu modeli). Bilirkişi bunu kendi hesabıyla yapar; 
   hata değildir; zinciri durdurmaz.
 Her iki ajan da ajan sözleşmesinin kalıbına uyar: sabit JSON çıktı şeması, zorunlu dayanak alanı,
 sunucu tarafı eleme, "yeterli veri yok" davranışı ve denetim kaydı.
+
+[EKLEME — ORKESTRATÖR DÖNGÜSÜNÜN BELGE TETİĞİ (13.08)] ● CANLI.
+§6.2'deki "yeni belge geldikçe zincir yeniden koşar" kuralının arayüz karşılığı: Aşama 3'te bir
+belge yüklemesi başarıyla bittiğinde 30 saniyelik sayaç başlar; süre dolmadan yeni yükleme
+gelirse sayaç sıfırlanır (arka arkaya yüklemede tek koşum). Sayaç dolunca orchestrator-run,
+"Tüm Analizi Başlat" düğmesiyle aynı çağrıyla tetiklenir — yalnız iki şart sağlanırsa:
+case_parties >= 2 ve agent_states'te koşan bir orkestratör satırı yok. Şartlar sağlanmazsa
+sessizce beklenir, hata gösterilmez. Elle başlatma düğmesi aynen durur.

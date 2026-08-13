@@ -303,3 +303,8 @@ doğrudan yazılı); alt bölüm başlıkları ve süreç adımları değişmedi
 
 13.08: Kelime birliği — görünen her yerde "Aşama"; üst şeritle tekrarlanan sayfa içi
 aşama başlıkları kaldırıldı; Aşama 4 durum şeridi "Sıradaki aşama: N" oldu.
+
+13.08: Belge yüklenince analiz kendiliğinden koşuyor — Aşama 3'te başarılı yüklemeden
+30 sn sonra orchestrator-run (elle "Tüm Analizi Başlat" ile aynı çağrı); arka arkaya
+yüklemede sayaç sıfırlanır, tek koşum olur. Şartlar: taraf sayısı >= 2 ve koşan
+orkestratör yok; sağlanmazsa sessizce beklenir. Elle başlatma düğmesi aynen durur.

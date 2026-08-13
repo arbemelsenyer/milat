@@ -2323,6 +2323,39 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
     return () => clearTimeout(t);
   }, [jump?.id, jump?.nonce]);
 
+  // Belge yüklendikten 30 sn sonra analiz kendiliğinden koşar. Arka arkaya
+  // yüklemede sayaç sıfırlanır → tek koşum. Çağrı, "Tüm Analizi Başlat"
+  // düğmesiyle aynıdır (orchestrator-run, oturum JWT'siyle).
+  const autoRunTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleAutoOrchestrator = useCallback(() => {
+    if (autoRunTimerRef.current) clearTimeout(autoRunTimerRef.current);
+    autoRunTimerRef.current = setTimeout(async () => {
+      autoRunTimerRef.current = null;
+      try {
+        const [partyRes, runningRes] = await Promise.all([
+          supabase.from("case_parties").select("id", { count: "exact", head: true }).eq("case_id", caseRow.id),
+          supabase.from("agent_states").select("id")
+            .eq("case_id", caseRow.id).eq("agent_type", "orchestrator").eq("status", "running").limit(1),
+        ]);
+        // Şart sağlanmıyorsa sessizce bekle — hata gösterilmez.
+        if (partyRes.error || runningRes.error) return;
+        if ((partyRes.count ?? 0) < 2) return;
+        if (Array.isArray(runningRes.data) && runningRes.data.length > 0) return;
+
+        const { error } = await supabase.functions.invoke("orchestrator-run", { body: { case_id: caseRow.id } });
+        if (error) return;
+        toast({ title: "Yeni belge algılandı — analiz başlatıldı" });
+      } catch {
+        /* sessiz: otomatik koşum kullanıcıya hata göstermez */
+      }
+    }, 30_000);
+  }, [caseRow.id]);
+
+  useEffect(() => () => {
+    if (autoRunTimerRef.current) clearTimeout(autoRunTimerRef.current);
+  }, []);
+
   async function handleUpload(partyId: string, e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
@@ -2366,6 +2399,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
           .catch((e) => console.error("[extract-document-text] tetiklenemedi", e));
       }
       toast({ title: "Belge yüklendi" });
+      scheduleAutoOrchestrator();
       loadAll();
     } catch (err: any) {
       toast({ title: "Yükleme başarısız", description: err?.message ?? "Bilinmeyen hata", variant: "destructive" });
