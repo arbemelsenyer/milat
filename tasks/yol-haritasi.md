@@ -372,3 +372,6 @@ Otomatik onayın teklifle eşleştirilmesi sonraki taş.
 
 13.08: Otomatik onay eşleştirmesi — tarafın müsaitliğine uyan teklif anında onaylanıp
 oturuma bağlanıyor, davet yazısı gidiyor.
+
+13.08: Kritik faktör mükerrerliği giderildi · Aşama geçişindeki boş sayfa düzeltildi
+(AnimatePresence bekletmesi kaldırıldı) · Ödeme defteri Düzenle/Sil zaten mevcuttu.

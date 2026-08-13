@@ -83,3 +83,8 @@ arabulucunun kendi girdiği kayıttır.
   saatlerime uyan teklifleri benim adıma onayla" anahtarını (case_parties.otomatik_onay)
   açıp kapatır. Bilgiler yalnız tarafın kendisine ve arabulucusuna aittir; karşı tarafa
   hiçbir yüzeyden açılmaz. Okuma/yazma hataları ekranda gösterilir.
+● 13.08: Aşama geçişinde ana alan artık bekletilmiyor — AnimatePresence mode="wait"
+  kaldırıldı; yeni aşama, eskisinin çıkış animasyonunu beklemeden mount olur (sol menüden
+  Aşama 4'e geçişteki boş sayfa bu yüzden oluşuyordu). Kokpit brifingindeki "Kritik
+  Faktörler" birleştirmesi güçlendirildi: aynı maddenin farklı ifadeleri ve genişletilmiş
+  hâlleri tek satıra iner, kaynak etiketleri korunur.

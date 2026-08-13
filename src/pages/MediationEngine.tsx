@@ -165,13 +165,22 @@ function normalizeFactorText(s: string): string {
   return s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
 }
 function factorSimilarity(a: string, b: string): number {
-  const tokensA = new Set(normalizeFactorText(a).split(" ").filter(Boolean));
-  const tokensB = new Set(normalizeFactorText(b).split(" ").filter(Boolean));
+  const na = normalizeFactorText(a);
+  const nb = normalizeFactorText(b);
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;                        // aynı madde, farklı noktalama/büyük harf
+  const tokensA = new Set(na.split(" ").filter(Boolean));
+  const tokensB = new Set(nb.split(" ").filter(Boolean));
   if (tokensA.size === 0 || tokensB.size === 0) return 0;
   let overlap = 0;
   for (const t of tokensA) if (tokensB.has(t)) overlap++;
   const union = tokensA.size + tokensB.size - overlap;
-  return union === 0 ? 0 : overlap / union;
+  const jaccard = union === 0 ? 0 : overlap / union;
+  // Kapsama: biri diğerinin genişletilmiş hâliyse (aynı madde + ek cümle) Jaccard
+  // düşük kalıyor ve madde iki kez görünüyordu. Kısa olanın sözcüklerinin çoğu
+  // uzun olanda geçiyorsa aynı madde sayılır.
+  const kapsama = overlap / Math.min(tokensA.size, tokensB.size);
+  return Math.max(jaccard, kapsama >= 0.8 ? kapsama : 0);
 }
 // Merges near-duplicate factors across sources (e.g. two parties' own analyses)
 // into one entry, keeping the first phrasing and tracking which sources raised it —
@@ -807,7 +816,11 @@ export default function MediationEngine() {
               fazlarda hiç render edilmez, menünün mevcut yapısı değişmez. */}
         </aside>
         <main className="flex-1 p-6 max-w-5xl mx-auto w-full">
-          <AnimatePresence mode="wait">
+          {/* mode="wait" kaldırıldı: yeni aşama, eskisinin çıkış animasyonu bitene kadar
+              mount edilmiyordu; çıkış tamamlanma sinyali gelmediğinde ana alan boş
+              kalıyordu (sol menüden Aşama 4'e geçişte görülen boş sayfa). Adres
+              doğrudan yazıldığında çıkan bir çocuk olmadığı için sorun görünmüyordu. */}
+          <AnimatePresence>
             <motion.div
               key={phaseParam}
               initial={{ opacity: 0, y: 10 }}

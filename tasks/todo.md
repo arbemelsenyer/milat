@@ -40,6 +40,21 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (35)
+Üç iş tek commit (MediationEngine.tsx):
+A) Kritik Faktörler mükerrer maddesi: factorSimilarity'ye normalize edilmiş tam eşitlik ve
+   kapsama kuralı (kısa maddenin sözcüklerinin %80'i uzun maddede geçiyorsa aynı sayılır)
+   eklendi; birleştirme kaynakları yine koruyor. Node'da örnekle doğrulandı.
+B) Ödeme defteri Düzenle/Sil: KOD DEĞİŞMEDİ — zaten vardı (PaymentAccountingPanel'de
+   canManagePayments ile gizlenen Düzenle/Sil düğmeleri, satır içi düzenleme formu,
+   AAÜT taban guard'ı, ödenmiş kayıt için ek onay ve silme onay penceresi). Taraf
+   ekranındaki "Ödeme Bilgim" görünümüne dokunulmadı.
+C) Aşama 4 boş açılış: ana alandaki AnimatePresence'ten mode="wait" kaldırıldı — yeni
+   aşama, eskisinin çıkış animasyonu tamamlanana kadar mount edilmiyordu; çıkış sinyali
+   gelmediğinde ana alan boş kalıyordu (adres doğrudan yazıldığında çıkan çocuk olmadığı
+   için sorun görünmüyordu). Aşama geçişi ad4f2bc'deki gotoPhase yolunda kaldı.
+tsc + build temiz.
+
 ## Nerede kaldık — 13.08.2026 (34)
 randevu-teklif "olustur": otomatik onay eşleştirmesi eklendi. Teklif yazıldıktan sonra
 tarafın case_parties.otomatik_onay TRUE ise ve önerilen saatlerden biri taraf_musaitlik
