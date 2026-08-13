@@ -39,11 +39,14 @@ function normalizeSecenekler(raw: unknown): Secenek[] | null {
 
 // Saatleri ajan seçer: arabulucunun gelecek müsaitlik aralıkları okunur, bekleyen
 // tekliflerde kullanılan saatler dışlanır, taraf tipine göre 1 veya 3 seçenek verilir.
+// Takvimin sahibi dosyanın arabulucusudur: assigned_mediator_id doluysa o, boşsa
+// cases.user_id. JWT yalnız kimlik doğrulama ve yetki kontrolü içindir.
+function takvimSahibi(caseRow: any): string {
+  return caseRow?.assigned_mediator_id ?? caseRow?.user_id ?? "";
+}
+
 async function saatleriSec(admin: any, mediatorId: string, party: any): Promise<{ secenekler: Secenek[]; hata?: string; tanili?: any }> {
-  // Takvimin sahibi, isteği yapan kullanıcıdır (Authorization başlığındaki JWT'den
-  // çözülen auth kimliği). cases tablosundaki hiçbir alan bu amaçla kullanılmaz —
-  // dosya sahibi ile takvim sahibi farklı kullanıcılar olabiliyor.
-  if (!mediatorId) return { secenekler: [], hata: "musaitlik_yok", tanili: { sebep: "oturum kullanıcısı yok" } };
+  if (!mediatorId) return { secenekler: [], hata: "musaitlik_yok", tanili: { sebep: "dosyada arabulucu yok" } };
 
   const bugun = bugunTR();
   const simdi = suanSaatTR();
@@ -128,7 +131,7 @@ async function yetkiKontrol(req: Request, admin: any, supabaseUrl: string, anonK
     .select("id, case_id, party_type, is_individual").eq("id", party_id).maybeSingle();
   if (!p || (p as any).case_id !== case_id) return { hata: json({ error: "Taraf bu dosyaya ait değil" }, 400) };
 
-  // userId = takvim sahibi olarak kullanılacak, isteği yapan auth kullanıcısı.
+  // userId yalnız kimlik/yetki kaydıdır; takvim sahibi takvimSahibi(caseRow)'dan gelir.
   return { caseRow: c, party: p, userId: u.user.id };
 }
 
@@ -149,7 +152,7 @@ Deno.serve(async (req) => {
       const party_id = String((body as any)?.party_id ?? "");
       const k = await yetkiKontrol(req, admin, supabaseUrl, anonKey, case_id, party_id);
       if ((k as any).hata) return (k as any).hata;
-      const { secenekler, hata, tanili } = await saatleriSec(admin, (k as any).userId, (k as any).party);
+      const { secenekler, hata, tanili } = await saatleriSec(admin, takvimSahibi((k as any).caseRow), (k as any).party);
       if (hata) return json({ error: hata, tanili });
       return json({ secenekler });
     }
@@ -168,7 +171,7 @@ Deno.serve(async (req) => {
         if (!override) return json({ error: "En az 1, en fazla 3 geçerli seçenek gerekir" }, 400);
         secenekler = override;
       } else {
-        const r = await saatleriSec(admin, (k as any).userId, (k as any).party);
+        const r = await saatleriSec(admin, takvimSahibi((k as any).caseRow), (k as any).party);
         if (r.hata) return json({ error: r.hata, tanili: r.tanili });
         secenekler = r.secenekler;
       }
@@ -232,7 +235,7 @@ Deno.serve(async (req) => {
       if (!secimRaw) return json({ error: "secim zorunlu" }, 400);
 
       const { data: row } = await admin.from("randevu_teklifleri")
-        .select("id, durum, secenekler").eq("token", token).maybeSingle();
+        .select("id, durum, secenekler, case_id, party_id").eq("token", token).maybeSingle();
       if (!row) return json({ error: "gecersiz" }, 404);
       if ((row as any).durum !== "beklemede") return json({ error: "cevaplanmis" }, 409);
 
@@ -249,6 +252,42 @@ Deno.serve(async (req) => {
         .eq("token", token).eq("durum", "beklemede").select("id");
       if (updErr) return json({ error: updErr.message }, 500);
       if (!updated || updated.length === 0) return json({ error: "cevaplanmis" }, 409);
+
+      // "Uymuyor" dışındaki cevaplarda saat bağlanır: Aşama 5'teki "Yeni Seans Planla"
+      // ekranıyla aynı düzende case_sessions satırı açılır. Bu adım hata verse bile
+      // tarafın cevabı kayıtlı kalır — hata yalnız fonksiyon loguna düşer.
+      if (secimRaw !== "uymuyor") {
+        try {
+          const secilenSlot: Secenek | null = secimRaw === "uygun"
+            ? (secenekler[0] ? { gun: String(secenekler[0].gun).slice(0, 10), saat: String(secenekler[0].saat).slice(0, 5) } : null)
+            : (() => {
+              const [gun, saat] = secimRaw.split(" ");
+              return GUN_RE.test(gun ?? "") && SAAT_RE.test(saat ?? "") ? { gun, saat } : null;
+            })();
+
+          if (!secilenSlot) {
+            console.error("[randevu-teklif] oturum açılamadı: seçilen saat çözülemedi", { secimRaw });
+          } else {
+            const { data: p } = await admin.from("case_parties")
+              .select("id, user_id, party_role").eq("id", (row as any).party_id).maybeSingle();
+            // Türkiye saati sabit UTC+3 (yaz saati uygulaması yok).
+            const scheduledAt = new Date(`${secilenSlot.gun}T${secilenSlot.saat}:00+03:00`).toISOString();
+            const { error: sesErr } = await admin.from("case_sessions").insert({
+              case_id: (row as any).case_id,
+              session_type: "preliminary",
+              scheduled_at: scheduledAt,
+              notes: null,
+              status: "scheduled",
+              participants: p
+                ? [{ party_id: (p as any).id, user_id: (p as any).user_id, role: (p as any).party_role }]
+                : [],
+            } as any);
+            if (sesErr) console.error("[randevu-teklif] oturum kaydı yazılamadı", sesErr.message);
+          }
+        } catch (e) {
+          console.error("[randevu-teklif] oturum kaydı sırasında hata", (e as any)?.message ?? e);
+        }
+      }
 
       return json({ ok: true });
     }

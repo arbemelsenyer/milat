@@ -40,6 +40,15 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (17)
+randevu-teklif iki değişiklik: (a) müsaitlik takviminin sahibi dosyanın arabulucusu
+(cases.assigned_mediator_id, boşsa cases.user_id) — JWT yalnız kimlik/yetki için;
+(b) "Uygun" (veya belirli saat) cevabında fonksiyon saati bağlıyor: case_sessions'a
+session_type='preliminary', status='scheduled', scheduled_at=teklif saati (TR, UTC+3),
+participants=[{party_id,user_id,role}] satırı yazılıyor. Oturum yazımı hata verirse cevap
+yine kaydediliyor, hata console.error ile loga düşüyor. "Uymuyor"da oturum açılmıyor.
+tsc temiz. REDEPLOY GEREKLİ: randevu-teklif Lovable'dan yeniden deploy edilmeli.
+
 ## Nerede kaldık — 13.08.2026 (16)
 "Randevu ayarla" kartının altına dosyanın randevu teklifi listesi eklendi
 (MediationEngine.tsx, RandevuTeklifKarti): taraf adı, teklif edilen gün-saatler, durum

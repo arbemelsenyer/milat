@@ -63,3 +63,7 @@ yoksa "musaitlik_yok" döner. Teklif satırı randevu_teklifleri tablosuna servi
 yazılır. Kör veri: "getir" yalnız seçenekleri, taraf adını ve dosya başlığını döner; token'ı
 bilmeyen istek hiçbir veri alamaz. Cevap tek seferliktir — durum 'beklemede' değilse ikinci
 cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda yoktur.
+● 13.08: randevu-teklif — takvim sahibi dosyanın arabulucusudur (assigned_mediator_id,
+  boşsa cases.user_id); JWT yalnız kimlik ve yetki kontrolü içindir. "Uygun" cevabında
+  saat bağlanır: case_sessions'a ön görüşme (preliminary) / scheduled kaydı açılır,
+  katılımcı teklifin tarafıdır. Oturum yazımı hata verse de tarafın cevabı kaybolmaz.
