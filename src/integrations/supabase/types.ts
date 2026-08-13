@@ -178,6 +178,57 @@ export type Database = {
           },
         ]
       }
+      ajan_gorevleri: {
+        Row: {
+          case_id: string
+          created_at: string
+          durum: string
+          gerekce: string | null
+          gorev_tipi: string
+          hedef_party_id: string | null
+          id: string
+          sonuc: string | null
+          updated_at: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          durum?: string
+          gerekce?: string | null
+          gorev_tipi: string
+          hedef_party_id?: string | null
+          id?: string
+          sonuc?: string | null
+          updated_at?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          durum?: string
+          gerekce?: string | null
+          gorev_tipi?: string
+          hedef_party_id?: string | null
+          id?: string
+          sonuc?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ajan_gorevleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "ajan_gorevleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blind_bids: {
         Row: {
           case_id: string
@@ -963,6 +1014,7 @@ export type Database = {
           open_to_compromise: boolean | null
           other_party_name: string | null
           other_party_role: string | null
+          otomatik_akis: boolean
           outcome: string | null
           priorities: string[] | null
           relationship: string | null
@@ -1017,6 +1069,7 @@ export type Database = {
           open_to_compromise?: boolean | null
           other_party_name?: string | null
           other_party_role?: string | null
+          otomatik_akis?: boolean
           outcome?: string | null
           priorities?: string[] | null
           relationship?: string | null
@@ -1071,6 +1124,7 @@ export type Database = {
           open_to_compromise?: boolean | null
           other_party_name?: string | null
           other_party_role?: string | null
+          otomatik_akis?: boolean
           outcome?: string | null
           priorities?: string[] | null
           relationship?: string | null
