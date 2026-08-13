@@ -814,6 +814,92 @@ function anaAltLabel(disputeType?: string | null, altUzmanlik?: string | null) {
   return alt ? `${ana} — ${alt}` : ana;
 }
 
+/* ===================== KAYIT ONAY PANELİ ===================== */
+// "Kontrol et → düzelt → onayla": kayıt, panel onaylanana kadar düşmez.
+// Her alan panelin içinde düzeltilir; forma dönmek gerekmez.
+type ConfirmField = {
+  key: string;
+  label: string;
+  value: string;                                   // düzenleme alanının ham değeri
+  display?: string;                                // ekranda gösterilen metin (etiket vb.)
+  editable?: boolean;                              // false → yalnız gösterilir
+  options?: { value: string; label: string }[];    // verilirse açılır liste
+  type?: string;                                   // input type (email vb.)
+};
+
+function ConfirmSavePanel({
+  title, note, fields, onFieldChange, onConfirm, onBack, busy, confirmLabel = "Onayla ve kaydet",
+}: {
+  title: string;
+  note?: string;
+  fields: ConfirmField[];
+  onFieldChange: (key: string, value: string) => void;
+  onConfirm: () => void;
+  onBack: () => void;
+  busy?: boolean;
+  confirmLabel?: string;
+}) {
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-lg font-semibold">{title}</h3>
+        {note && <p className="text-sm text-muted-foreground mt-1">{note}</p>}
+      </div>
+      <div className="rounded border divide-y">
+        {fields.map((f) => {
+          const editing = openKey === f.key && f.editable !== false;
+          return (
+            <div key={f.key} className="p-3 flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-xs text-muted-foreground">{f.label}</div>
+                {editing ? (
+                  f.options ? (
+                    <Select value={f.value || undefined} onValueChange={(v) => onFieldChange(f.key, v)}>
+                      <SelectTrigger className="mt-1"><SelectValue placeholder="Seçin" /></SelectTrigger>
+                      <SelectContent>
+                        {f.options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      className="mt-1"
+                      type={f.type ?? "text"}
+                      value={f.value}
+                      autoFocus
+                      onChange={(e) => onFieldChange(f.key, e.target.value)}
+                    />
+                  )
+                ) : (
+                  <div className="text-sm break-words">{(f.display ?? f.value) || "—"}</div>
+                )}
+              </div>
+              {f.editable !== false && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => setOpenKey(editing ? null : f.key)}
+                  title={editing ? "Düzenlemeyi kapat" : "Düzenle"}
+                >
+                  <Pencil className="h-3.5 w-3.5 mr-1" />{editing ? "Bitti" : "Düzenle"}
+                </Button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={onBack} disabled={busy}>Geri dön</Button>
+        <Button onClick={onConfirm} disabled={busy}>
+          {busy ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Kaydediliyor…</> : confirmLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
   onCancel: () => void; onCreated: (id: string) => void; userId: string; isMediator: boolean;
 }) {
@@ -824,6 +910,8 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
   const [suggesting, setSuggesting] = useState(false);
   const [aiSuggestedType, setAiSuggestedType] = useState(false);
   const [aiSuggestedSubtype, setAiSuggestedSubtype] = useState(false);
+  // Kayıt, onay paneli onaylanana kadar düşmez.
+  const [confirming, setConfirming] = useState(false);
 
   // Salt ön-doldurma: başlıktan ana tür + alt uzmanlık önerir, hiçbir DB yazımı yok
   // (case_id/persist gönderilmez). Menüler öneriyle işaretlenir, arabulucu onaylar/değiştirir.
@@ -850,6 +938,38 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
     } finally {
       setSuggesting(false);
     }
+  }
+
+  // "Başvuruyu Oluştur" artık doğrudan kaydetmez; önce özet paneli açar.
+  function review() {
+    if (!disputeType) {
+      toast({ title: "Ana uyuşmazlık türü zorunlu", description: "Devam etmeden önce bir ana tür seçin.", variant: "destructive" });
+      return;
+    }
+    setConfirming(true);
+  }
+
+  const confirmFields: ConfirmField[] = [
+    { key: "title", label: "Uyuşmazlık konusu (başvuru başlığı)", value: title,
+      display: title || "(boş — Sistem No ile doldurulur)" },
+    { key: "dispute_type", label: "Ana uyuşmazlık türü", value: disputeType,
+      display: ANA_UYUSMAZLIK_TURLERI.find((c) => c.value === disputeType)?.label ?? "—",
+      options: ANA_UYUSMAZLIK_TURLERI.map((c) => ({ value: c.value, label: c.label })) },
+    { key: "alt_uzmanlik", label: "Alt uzmanlık alanı", value: altUzmanlik,
+      display: altUzmanlik !== ALT_UZMANLIK_YOK
+        ? (ALT_UZMANLIK_ALANLARI.find((c) => c.value === altUzmanlik)?.label ?? "—")
+        : "Yok",
+      options: [{ value: ALT_UZMANLIK_YOK, label: "Yok" }, ...ALT_UZMANLIK_ALANLARI.map((c) => ({ value: c.value, label: c.label }))] },
+    { key: "sistem_no", label: "Sistem No", value: "", display: "Kayıt anında atanır (MP-YYYY-XXXX)", editable: false },
+    { key: "basvuru_tarihi", label: "Başvuru tarihi", value: "", display: new Date().toLocaleDateString("tr-TR"), editable: false },
+    { key: "taraflar", label: "Taraflar (ad, rol, e-posta)", value: "",
+      display: "Bu formda girilmez — Aşama 2'de eklenir; her taraf kaydında ayrı onay paneli çıkar.", editable: false },
+  ];
+
+  function onConfirmFieldChange(key: string, value: string) {
+    if (key === "title") setTitle(value);
+    else if (key === "dispute_type") { setDisputeType(value); setAiSuggestedType(false); }
+    else if (key === "alt_uzmanlik") { setAltUzmanlik(value); setAiSuggestedSubtype(false); }
   }
 
   async function create() {
@@ -884,6 +1004,18 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
   return (
     <Card className="p-6 mb-6 space-y-4">
       <h2 className="text-xl font-semibold">Yeni Başvuru</h2>
+      {confirming ? (
+        <ConfirmSavePanel
+          title="Kaydetmeden önce kontrol edin"
+          note="Bilgiler doğruysa onaylayın; kayıt ancak onaydan sonra düşer."
+          fields={confirmFields}
+          onFieldChange={onConfirmFieldChange}
+          onConfirm={create}
+          onBack={() => setConfirming(false)}
+          busy={busy}
+        />
+      ) : (
+      <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="md:col-span-2">
           <div className="flex items-center justify-between gap-2">
@@ -943,10 +1075,12 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
       </div>
       <div className="flex gap-2 justify-end">
         <Button variant="ghost" onClick={onCancel}>İptal</Button>
-        <Button onClick={create} disabled={busy || !disputeType}>
+        <Button onClick={review} disabled={busy || !disputeType}>
           {busy ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Oluşturuluyor</> : "Başvuruyu Oluştur"}
         </Button>
       </div>
+      </>
+      )}
     </Card>
   );
 }
@@ -1736,6 +1870,10 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
   const [invitingId, setInvitingId] = useState<string | null>(null);
   const [inviteUrls, setInviteUrls] = useState<Record<string, string>>({});
   const [revealedId, setRevealedId] = useState<string | null>(null);
+  // Kayıt onayı: hem yeni taraf kaydı hem de sonradan e-posta değişikliği
+  // onay panelinden geçer; onaylanmadan hiçbir şey kaydedilmez.
+  const [confirmingDraft, setConfirmingDraft] = useState(false);
+  const [confirmingEmail, setConfirmingEmail] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1798,6 +1936,55 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
     return null;
   }
 
+  const ROL_ETIKET: Record<string, string> = {
+    applicant: "Başvurucu", respondent: "Karşı Taraf", third_party: "Üçüncü Taraf",
+  };
+
+  // "Tarafı Kaydet" artık doğrudan kaydetmez; önce özet paneli açar.
+  function reviewDraft() {
+    if (!draft) return;
+    if (!draft.kvkk_ok) { toast({ title: "KVKK onayı gerekli", variant: "destructive" }); return; }
+    const isInd = draft.party_type === "individual";
+    const vErr = validateParty(draft, isInd);
+    if (vErr) { toast({ title: "Doğrulama hatası", description: vErr, variant: "destructive" }); return; }
+    setConfirmingDraft(true);
+  }
+
+  function draftConfirmFields(d: PartyDraft): ConfirmField[] {
+    const isInd = d.party_type === "individual";
+    const rows: ConfirmField[] = [
+      { key: "party_role", label: "Rol", value: d.party_role, display: ROL_ETIKET[d.party_role] ?? d.party_role,
+        options: [
+          { value: "applicant", label: "Başvurucu" },
+          { value: "respondent", label: "Karşı Taraf" },
+          { value: "third_party", label: "Üçüncü Taraf" },
+        ] },
+      { key: "party_type", label: "Tür", value: d.party_type, display: isInd ? "Bireysel" : "Kurumsal",
+        options: [{ value: "individual", label: "Bireysel" }, { value: "corporate", label: "Kurumsal" }] },
+    ];
+    if (isInd) {
+      rows.push({ key: "first_name", label: "Ad", value: d.first_name ?? "" });
+      rows.push({ key: "last_name", label: "Soyad", value: d.last_name ?? "" });
+      rows.push({ key: "tc_kimlik", label: "TC Kimlik No", value: d.tc_kimlik ?? "" });
+      rows.push({ key: "gsm", label: "GSM", value: d.gsm ?? "" });
+    } else {
+      rows.push({ key: "company_name", label: "Kurum adı", value: d.company_name ?? "" });
+      rows.push({ key: "authorized_person", label: "Yetkili kişi", value: d.authorized_person ?? "" });
+      rows.push({ key: "tax_office", label: "Vergi dairesi", value: d.tax_office ?? "" });
+      rows.push({ key: "tax_number", label: "Vergi no", value: d.tax_number ?? "" });
+      rows.push({ key: "trade_registry_no", label: "Ticaret sicil no", value: d.trade_registry_no ?? "" });
+    }
+    rows.push({ key: "phone", label: "Telefon", value: d.phone ?? "" });
+    rows.push({ key: "address", label: "Adres", value: d.address ?? "" });
+    rows.push({ key: "email", label: "E-posta (davet bu adrese gider)", value: d.email ?? "", type: "email" });
+    if (d.vekil_ad_soyad || d.vekil_baro || d.vekil_sicil_no) {
+      rows.push({ key: "vekil_ad_soyad", label: "Vekil adı soyadı", value: d.vekil_ad_soyad ?? "" });
+      rows.push({ key: "vekil_baro", label: "Vekil barosu", value: d.vekil_baro ?? "" });
+      rows.push({ key: "vekil_sicil_no", label: "Vekil sicil no", value: d.vekil_sicil_no ?? "" });
+    }
+    return rows;
+  }
+
   async function save() {
     if (!draft) return;
     if (!draft.kvkk_ok) { toast({ title: "KVKK onayı gerekli", variant: "destructive" }); return; }
@@ -1838,6 +2025,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         sendInvite((inserted as any).id);
       }
       toast({ title: "Taraf eklendi" });
+      setConfirmingDraft(false);
       setDraft(null);
       load();
     } catch (e: any) {
@@ -1851,11 +2039,18 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
     else load();
   }
 
-  async function saveEdit() {
+  async function saveEdit(opts?: { emailConfirmed?: boolean }) {
     if (!editing) return;
     const isInd = editing.party_type === "individual";
     const vErr = validateParty(editing, isInd);
     if (vErr) { toast({ title: "Doğrulama hatası", description: vErr, variant: "destructive" }); return; }
+    {
+      // E-posta eklendi/değiştiyse önce yalnız o alanın onay paneli çıkar;
+      // onaylanmadan yeni adres kaydedilmez.
+      const orig = parties.find((p: any) => p.id === editing.id);
+      const changed = String(editing.email ?? "").trim() !== String(orig?.email ?? "").trim();
+      if (changed && !opts?.emailConfirmed) { setConfirmingEmail(true); return; }
+    }
     setSavingEdit(true);
     try {
       const full_name = isInd
@@ -1886,6 +2081,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
       const { error } = await supabase.from("case_parties").update(patch).eq("id", editing.id);
       if (error) throw error;
       toast({ title: "Taraf bilgileri güncellendi" });
+      setConfirmingEmail(false);
       setEditing(null);
       load();
       if (emailChanged) sendInvite(editing.id);
@@ -2027,6 +2223,18 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         <motion.div variants={itemVariants}>
         <Card className="p-6 space-y-4">
           <h3 className="text-lg font-semibold">Yeni Taraf</h3>
+          {confirmingDraft ? (
+            <ConfirmSavePanel
+              title="Kaydetmeden önce kontrol edin"
+              note="Bilgiler doğruysa onaylayın; taraf kaydı ancak onaydan sonra düşer."
+              fields={draftConfirmFields(draft)}
+              onFieldChange={(k, v) => setDraft({ ...draft, [k]: v } as PartyDraft)}
+              onConfirm={save}
+              onBack={() => setConfirmingDraft(false)}
+              busy={busy}
+            />
+          ) : (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <Label>Tür</Label>
@@ -2096,17 +2304,34 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
           </label>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setDraft(null)} disabled={busy}>İptal</Button>
-            <Button onClick={save} disabled={busy}>{busy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Kaydediliyor…</> : "Tarafı Kaydet"}</Button>
+            <Button onClick={reviewDraft} disabled={busy}>{busy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Kaydediliyor…</> : "Tarafı Kaydet"}</Button>
           </div>
+          </>
+          )}
         </Card>
         </motion.div>
       )}
 
-      <Dialog open={!!editing} onOpenChange={(o) => !o && !savingEdit && setEditing(null)}>
+      <Dialog
+        open={!!editing}
+        onOpenChange={(o) => { if (!o && !savingEdit) { setEditing(null); setConfirmingEmail(false); } }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Taraf Bilgilerini Düzenle</DialogTitle>
           </DialogHeader>
+          {editing && confirmingEmail ? (
+            <ConfirmSavePanel
+              title="E-posta adresini onaylayın"
+              note="Yeni adres onaylanmadan kaydedilmez; davet bu adrese gönderilir."
+              fields={[{ key: "email", label: "E-posta", value: editing.email ?? "", type: "email" }]}
+              onFieldChange={(_k, v) => setEditing({ ...editing, email: v })}
+              onConfirm={() => saveEdit({ emailConfirmed: true })}
+              onBack={() => setConfirmingEmail(false)}
+              busy={savingEdit}
+            />
+          ) : (
+          <>
           {editing && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {editing.party_type === "individual" ? (
@@ -2152,10 +2377,12 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
           )}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEditing(null)} disabled={savingEdit}>İptal</Button>
-            <Button onClick={saveEdit} disabled={savingEdit}>
+            <Button onClick={() => saveEdit()} disabled={savingEdit}>
               {savingEdit ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Kaydediliyor…</> : "Kaydet"}
             </Button>
           </DialogFooter>
+          </>
+          )}
         </DialogContent>
       </Dialog>
     </motion.div>

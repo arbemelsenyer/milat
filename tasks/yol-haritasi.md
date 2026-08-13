@@ -308,3 +308,8 @@ aşama başlıkları kaldırıldı; Aşama 4 durum şeridi "Sıradaki aşama: N"
 30 sn sonra orchestrator-run (elle "Tüm Analizi Başlat" ile aynı çağrı); arka arkaya
 yüklemede sayaç sıfırlanır, tek koşum olur. Şartlar: taraf sayısı >= 2 ve koşan
 orkestratör yok; sağlanmazsa sessizce beklenir. Elle başlatma düğmesi aynen durur.
+
+13.08: Kayıt onay paneli ("kontrol et → düzelt → onayla") — yeni başvuru kaydı, yeni taraf
+kaydı ve sonradan e-posta değişikliği artık özet panelden onaylanmadan kaydedilmiyor;
+alanlar panelin içinde düzeltilebiliyor, "Geri dön" hiçbir şey kaydetmeden forma dönüyor.
+AÇIK UÇ: onaylı e-posta işareti için case_parties'te alan yok — SQL kurucudan bekleniyor.

@@ -31,3 +31,12 @@ iki yazı boyu, renk yalnız rozetlerde, emoji yok, ince gri ayraçlar.
   "3. Taraf Analizi" altında girintili katman satırları.
 9. KALICI: Faz 3 tür tespiti iki menüdür (ana tür + alt uzmanlık) — hiçbir düzen değişikliğinde
    kaldırılamaz (§5 v0.36 kalıcı şart).
+
+[EKLEME — KAYIT ONAY PANELİ (13.08)] ● CANLI. 10. Kayıt "kontrol et → düzelt → onayla"
+kapısından geçer: kaydet düğmesi kaydı düşürmez, önce girilen bilgilerin özet paneli çıkar.
+Her satırın yanında Düzenle vardır; düzeltme panelin içinde yapılır, forma dönmek gerekmez.
+Altta iki düğme: "Onayla ve kaydet" (kayıt ancak burada düşer) ve "Geri dön" (forma döner,
+hiçbir şey kaydedilmez). Panel üç yerdedir: yeni başvuru kaydı (Aşama 1) · yeni taraf kaydı
+(Aşama 2) · taraf e-postasının sonradan eklenmesi/değiştirilmesi (yalnız o alanla). Kural
+"Onayla kullanılmaz" (m.4) AI kartlarına ilişkindir; burada onaylanan AI çıktısı değil,
+arabulucunun kendi girdiği kayıttır.
