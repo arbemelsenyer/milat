@@ -1141,6 +1141,9 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
   // Her sonucun ekranda karşılığı olsun diye kartın kendi durum satırı:
   // toast kaçabiliyor, bu satır kartta kalıcı durur.
   const [mesaj, setMesaj] = useState<{ tip: "bilgi" | "hata"; metin: string } | null>(null);
+  // Oturum tipi ve adres, teklif oluşturulurken secenekler jsonb'sinin içine yazılır.
+  const [oturumTipi, setOturumTipi] = useState<"online" | "yuz_yuze">("online");
+  const [adres, setAdres] = useState("");
 
   const BOS_SAAT_MESAJI = "Takviminizde uygun boş saat bulunamadı — Takvim > Müsaitlik bölümünden saat ekleyin.";
 
@@ -1181,6 +1184,17 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
     const saat = String(s?.saat ?? "").slice(0, 5);
     if (!gun) return saat || "—";
     return `${new Date(`${gun}T00:00:00`).toLocaleDateString("tr-TR")} ${saat}`;
+  }
+
+  // Oturum tipi seçenek girdilerinin içinde saklanır; olmayan eski tekliflerde gösterilmez.
+  function oturumTipiMetni(secenekler: any[]): string | null {
+    const kayit = secenekler.find((s: any) => s?.oturum_tipi);
+    if (!kayit) return null;
+    if (kayit.oturum_tipi === "yuz_yuze") {
+      const a = String(kayit.adres ?? "").trim();
+      return a ? `Yüz yüze — ${a}` : "Yüz yüze — adres girilmedi";
+    }
+    return "Online";
   }
 
   function durumMetni(t: any): string {
@@ -1286,7 +1300,12 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
           action: "olustur",
           case_id: caseRow.id,
           party_id: partyId,
-          secenekler: onerilen,
+          // Oturum tipi/adres her seçenek girdisinin içine eklenir (mevcut jsonb alanı).
+          secenekler: onerilen.map((s) => ({
+            ...s,
+            oturum_tipi: oturumTipi,
+            ...(oturumTipi === "yuz_yuze" ? { adres: adres.trim() } : {}),
+          })),
           app_url: window.location.origin,
         },
       });
@@ -1421,6 +1440,28 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
               </div>
             ))}
           </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[200px]">
+              <Label className="text-xs">Görüşme biçimi</Label>
+              <Select value={oturumTipi} onValueChange={(v: any) => setOturumTipi(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="online">Online görüşme</SelectItem>
+                  <SelectItem value="yuz_yuze">Yüz yüze görüşme</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {oturumTipi === "yuz_yuze" && (
+              <div className="flex-1 min-w-[220px]">
+                <Label className="text-xs">Görüşme adresi</Label>
+                <Input value={adres} onChange={(e) => setAdres(e.target.value)} placeholder="Örn. Atatürk Cad. No:5, Kadıköy" />
+              </div>
+            )}
+          </div>
+          {oturumTipi === "yuz_yuze" && !adres.trim() && (
+            <p className="text-sm text-amber-700">Adres girilmedi</p>
+          )}
+
           <div className="flex flex-wrap gap-2">
             <Button onClick={createOffer} disabled={creating}>
               {creating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
@@ -1476,6 +1517,9 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
                       ? secenekler.map((s: any) => gunSaatMetni(s)).join(" · ")
                       : "Saat bilgisi yok"}
                   </div>
+                  {oturumTipiMetni(secenekler) && (
+                    <div className="text-sm">{oturumTipiMetni(secenekler)}</div>
+                  )}
                   <div className="text-sm text-muted-foreground">
                     {durumMetni(t)}
                     {t.cevap_zamani && ` (${new Date(t.cevap_zamani).toLocaleString("tr-TR")})`}

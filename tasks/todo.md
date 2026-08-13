@@ -40,6 +40,15 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (18)
+Randevu kartına oturum tipi eklendi (MediationEngine.tsx): "Online görüşme" (varsayılan) /
+"Yüz yüze görüşme" + adres kutusu, adres boşsa "Adres girilmedi" uyarısı. Seçim, teklif
+oluşturulurken secenekler jsonb girdilerinin içine yazılıyor (oturum_tipi/adres); durum
+listesinde "Online" / "Yüz yüze — adres" satırı gösteriliyor. tsc + build temiz.
+KIRINTI (kod değiştirilmedi, talimat gereği): randevu-teklif fonksiyonundaki
+normalizeSecenekler her girdiyi {gun, saat} olarak yeniden kuruyor; oturum_tipi ve adres
+şu hâliyle kaydedilmiyor. Fonksiyonda ekstra alanların korunması gerekiyor — kurucu kararı.
+
 ## Nerede kaldık — 13.08.2026 (17)
 randevu-teklif iki değişiklik: (a) müsaitlik takviminin sahibi dosyanın arabulucusu
 (cases.assigned_mediator_id, boşsa cases.user_id) — JWT yalnız kimlik/yetki için;
