@@ -167,6 +167,152 @@ async function zamanKontrolu(admin: any, dosya: any): Promise<boolean> {
   return true;
 }
 
+// Video bağlantısı: gelecekteki planlı ve bağlantısı boş oturumlar için create-video-room
+// iç kapıdan çağrılır, dönen adres oturumun video_link alanına yazılır ve oturumun
+// tarafına tek bilgilendirme e-postası gider. Bağlantı yazıldıktan sonra oturum bir daha
+// seçilmediği için e-posta bir kez gönderilir. Yüz yüze olduğu teklif kaydından belli
+// olan oturumlar atlanır; belli değilse oturum çevrim içi kabul edilir (video düğmesi
+// zaten her oturumda var).
+async function videoBaglantilariniHazirla(admin: any, dosya: any): Promise<number> {
+  const simdi = new Date().toISOString();
+  const { data: oturumlar, error: sErr } = await admin.from("case_sessions")
+    .select("id, scheduled_at, status, video_link, participants")
+    .eq("case_id", dosya.id)
+    .eq("status", "scheduled")
+    .gt("scheduled_at", simdi)
+    .limit(50);
+  if (sErr) {
+    console.error(`[ajan-nobetci] oturumlar okunamadı (${dosya.id}): ${sErr.message}`);
+    return 0;
+  }
+  const adaylar = ((oturumlar ?? []) as any[]).filter((s) => !String(s.video_link ?? "").trim());
+  if (adaylar.length === 0) return 0;
+
+  // Cevaplanmış tekliflerdeki yüz yüze saatler — bu saatlere düşen oturumlar atlanır.
+  const yuzYuzeSaatler = new Set<string>();
+  const { data: teklifler } = await admin.from("randevu_teklifleri")
+    .select("secenekler, durum").eq("case_id", dosya.id).eq("durum", "cevaplandi").limit(50);
+  for (const t of (teklifler ?? []) as any[]) {
+    for (const s of Array.isArray(t?.secenekler) ? t.secenekler : []) {
+      if ((s as any)?.oturum_tipi === "yuz_yuze") {
+        yuzYuzeSaatler.add(`${String((s as any).gun).slice(0, 10)}|${String((s as any).saat).slice(0, 5)}`);
+      }
+    }
+  }
+
+  let hazirlanan = 0;
+  for (const oturum of adaylar) {
+    try {
+      const d = new Date(oturum.scheduled_at);
+      const gun = d.toLocaleDateString("en-CA", { timeZone: TZ });
+      const saat = d.toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+      if (yuzYuzeSaatler.has(`${gun}|${saat}`)) continue;
+
+      if (!CRON_SECRET) {
+        console.error("[ajan-nobetci] CRON_SECRET yok, video bağlantısı üretilemedi");
+        return hazirlanan;
+      }
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/create-video-room`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-cron-secret": CRON_SECRET,
+          apikey: SERVICE_KEY,
+          Authorization: `Bearer ${SERVICE_KEY}`,
+        },
+        body: JSON.stringify({ sessionId: oturum.id }),
+      });
+      const govde = await res.json().catch(() => ({}));
+      const link = String((govde as any)?.room_url ?? "").trim();
+      if (!res.ok || !link) {
+        console.error(`[ajan-nobetci] video odası üretilemedi (${oturum.id}): HTTP ${res.status} ${String((govde as any)?.error ?? "").slice(0, 200)}`);
+        continue;
+      }
+      // create-video-room bağlantıyı zaten oturuma yazar; yazılmadıysa burada tamamlanır.
+      const { data: guncel } = await admin.from("case_sessions")
+        .select("video_link").eq("id", oturum.id).maybeSingle();
+      if (!String((guncel as any)?.video_link ?? "").trim()) {
+        const { error: updErr } = await admin.from("case_sessions")
+          .update({ video_link: link }).eq("id", oturum.id);
+        if (updErr) console.error(`[ajan-nobetci] video_link yazılamadı (${oturum.id}): ${updErr.message}`);
+      }
+
+      await videoBaglantiEpostasi(admin, dosya, oturum, link, gun, saat);
+      hazirlanan++;
+    } catch (e: any) {
+      console.error(`[ajan-nobetci] video bağlantısı hazırlanamadı (${oturum.id}): ${e?.message ?? e}`);
+    }
+  }
+  return hazirlanan;
+}
+
+// Oturumun tarafına kısa bilgilendirme: dosya künyesi, gün-saat ve bağlantı.
+// Karşı tarafa ait hiçbir veri geçmez; imza dosyanın arabulucusunun adıdır.
+async function videoBaglantiEpostasi(
+  admin: any, dosya: any, oturum: any, link: string, gun: string, saat: string,
+): Promise<void> {
+  const key = Deno.env.get("RESEND_API_KEY");
+  if (!key) {
+    console.error("[ajan-nobetci] RESEND_API_KEY yok, bağlantı e-postası gönderilemedi");
+    return;
+  }
+  const partyIds = (Array.isArray(oturum?.participants) ? oturum.participants : [])
+    .map((p: any) => String(p?.party_id ?? "")).filter(Boolean);
+  if (partyIds.length === 0) return;
+
+  const { data: taraflar } = await admin.from("case_parties")
+    .select("id, party_type, first_name, last_name, company_name, email")
+    .in("id", partyIds);
+
+  const arabulucuId = takvimSahibi(dosya);
+  const { data: profil } = arabulucuId
+    ? await admin.from("profiles").select("full_name").eq("user_id", arabulucuId).maybeSingle()
+    : { data: null };
+  const adSoyad = String((profil as any)?.full_name ?? "").trim();
+  const imza = adSoyad ? (/^arb\.?\s/i.test(adSoyad) ? adSoyad : `Arb. ${adSoyad}`) : "MediPact AI";
+
+  const esc = (t: string) => String(t).replace(/</g, "&lt;");
+  const tarih = new Date(`${gun}T${saat}:00+03:00`)
+    .toLocaleDateString("tr-TR", { timeZone: TZ, day: "numeric", month: "long", year: "numeric", weekday: "long" });
+  const kunye: string[] = [];
+  if (dosya?.application_no) kunye.push(`<strong>Dosya No:</strong> ${esc(String(dosya.application_no))}`);
+  if (dosya?.title) kunye.push(`<strong>Uyuşmazlık konusu:</strong> ${esc(String(dosya.title))}`);
+
+  for (const t of (taraflar ?? []) as any[]) {
+    const email = String(t?.email ?? "").trim();
+    if (!email) continue;
+    const ad = t?.party_type === "individual"
+      ? `${t?.first_name ?? ""} ${t?.last_name ?? ""}`.trim()
+      : String(t?.company_name ?? "").trim();
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+    <body style="font-family:Arial,sans-serif;line-height:1.6;color:#222">
+      <p>Sayın ${esc(ad || "Taraf")},</p>
+      ${kunye.length ? `<p>${kunye.join("<br>")}</p>` : ""}
+      <p><strong>Görüşme:</strong> ${esc(tarih)} · ${esc(saat)}</p>
+      <p>Görüşme bağlantınız:<br><a href="${link}">${esc(link)}</a></p>
+      <p>Saygılarımızla,<br>${esc(imza)}</p>
+      <p style="font-size:12px;color:#666">Bu ileti MediPact AI aracılığıyla gönderilmiştir.</p>
+    </body></html>`;
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: "MİLAT Arabuluculuk <info@milatmediation.com>",
+          to: [email],
+          subject: "Görüşme bağlantınız",
+          html,
+        }),
+      });
+      if (!res.ok) {
+        console.error("[ajan-nobetci] bağlantı e-postası gönderilemedi", { status: res.status, body: (await res.text()).slice(0, 200) });
+      }
+    } catch (e: any) {
+      console.error(`[ajan-nobetci] bağlantı e-postası hatası: ${e?.message ?? e}`);
+    }
+  }
+}
+
 // Koşum kaydı: agent_states'e mevcut upsert deseniyle 'nobetci' satırı (dosya başına bir satır).
 async function nobetciDurumYaz(admin: any, caseId: string, patch: Record<string, unknown>) {
   const { data: existing } = await admin.from("agent_states")
@@ -199,7 +345,7 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const { data: dosyalar, error: cErr } = await admin.from("cases")
-      .select("id, deadline_total, deadline_extended, extension_used")
+      .select("id, deadline_total, deadline_extended, extension_used, assigned_mediator_id, user_id, application_no, title")
       .eq("otomatik_akis", true)
       .limit(500);
     if (cErr) return json({ error: cErr.message }, 500);
@@ -208,6 +354,7 @@ Deno.serve(async (req) => {
     let yapilanGorev = 0;
     let atlananGorev = 0;
     let yeniRandevuGorevi = 0;
+    let hazirlananVideo = 0;
     const hatalar: string[] = [];
 
     for (const dosya of (dosyalar ?? []) as any[]) {
@@ -246,12 +393,18 @@ Deno.serve(async (req) => {
         }
 
         if (await zamanKontrolu(admin, dosya)) yeniRandevuGorevi++;
+        const videoHazirlanan = await videoBaglantilariniHazirla(admin, dosya);
+        hazirlananVideo += videoHazirlanan;
         islenenDosya++;
 
         await nobetciDurumYaz(admin, dosya.id, {
           status: "completed",
           error_message: null,
-          last_output: { bu_dosyada_yapilan_gorev: buDosyaYapilan, kosum_zamani: new Date().toISOString() },
+          last_output: {
+            bu_dosyada_yapilan_gorev: buDosyaYapilan,
+            bu_dosyada_hazirlanan_video: videoHazirlanan,
+            kosum_zamani: new Date().toISOString(),
+          },
           updated_at: new Date().toISOString(),
         });
       } catch (e: any) {
@@ -274,6 +427,7 @@ Deno.serve(async (req) => {
       gorev_yapildi: yapilanGorev,
       gorev_atlandi: atlananGorev,
       randevu_gorevi_acildi: yeniRandevuGorevi,
+      video_baglantisi_hazirlandi: hazirlananVideo,
       hata: hatalar,
     });
   } catch (e: any) {

@@ -18,18 +18,28 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    // Get auth user from JWT
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
-    }
+    // İç çağrı kapısı (randevu-teklif ile aynı desen): x-cron-secret CRON_SECRET ile
+    // eşleşirse çağıran sistemin kendisidir, kullanıcı JWT'si aranmaz. Boş/yanlış
+    // secret'ta mevcut JWT yolu aynen işler. Gövde sözleşmesi (sessionId) değişmez.
+    const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
+    const isCron = !!CRON_SECRET && req.headers.get('x-cron-secret') === CRON_SECRET;
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    let user: { id: string } | null = null;
+    if (!isCron) {
+      // Get auth user from JWT
+      const authHeader = req.headers.get('authorization');
+      if (!authHeader) {
+        throw new Error('No authorization header');
+      }
 
-    if (authError || !user) {
-      console.error('Auth error:', authError);
-      throw new Error('Unauthorized');
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+
+      if (authError || !authUser) {
+        console.error('Auth error:', authError);
+        throw new Error('Unauthorized');
+      }
+      user = authUser;
     }
 
     const { sessionId } = await req.json();
@@ -62,8 +72,9 @@ serve(async (req) => {
       throw new Error('Case not found');
     }
 
-    // Verify access: case owner, assigned mediator, or admin (same pattern as party-confidential-analysis)
-    if (caseRow.user_id !== user.id && caseRow.assigned_mediator_id !== user.id) {
+    // Verify access: case owner, assigned mediator, or admin (same pattern as party-confidential-analysis).
+    // İç çağrıda (x-cron-secret) bu kontrol atlanır — çağıran sistemin kendisidir.
+    if (!isCron && user && caseRow.user_id !== user.id && caseRow.assigned_mediator_id !== user.id) {
       const { data: roles } = await supabase
         .from('user_roles')
         .select('role')

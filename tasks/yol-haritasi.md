@@ -381,3 +381,6 @@ oturuma bağlanıyor, davet yazısı gidiyor.
 13.08: Aşama 5 "Planlanan Oturum" sayacı gelecekteki scheduled oturumları sayıyor.
 Davet e-postasına gerçek video bağlantısı eklenemedi (link üretimi kullanıcı JWT'si
 istiyor; girişsiz cevap akışında JWT yok) — açık uç.
+
+13.08: Video bağlantısı nöbetçi tarafından üretilip tarafa e-postayla iletiliyor
+(create-video-room iç kapısı). (37)'deki açık uç kapandı.

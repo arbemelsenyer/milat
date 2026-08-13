@@ -40,6 +40,22 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (38)
+Video bağlantısı artık ajanla üretiliyor (iki fonksiyon):
+create-video-room'a randevu-teklif'teki iç kapı deseni eklendi (x-cron-secret = CRON_SECRET
+ise kullanıcı JWT'si ve erişim kontrolü atlanır; gövde sözleşmesi sessionId aynı, normal
+JWT yolu aynen).
+ajan-nobetci her koşuda otomatik akış dosyalarında gelecekteki status='scheduled' ve
+video_link'i boş oturumlar için create-video-room'u iç kapıdan çağırıyor, bağlantıyı
+oturuma yazıyor ve oturumun tarafına tek bilgilendirme e-postası gönderiyor (künye +
+gün-saat + "Görüşme bağlantınız:" + link, arabulucu imzasıyla; karşı taraf verisi yok).
+Bağlantı dolduğu için ikinci koşuda oturum seçilmiyor → e-posta bir kez gidiyor. Cevaplanmış
+tekliflerde yüz yüze işaretli saate düşen oturumlar atlanıyor; belirsizse çevrim içi kabul
+ediliyor. Bir oturumdaki hata diğerlerini durdurmuyor, loga yazılıyor. Mevcut soru_gonder/
+randevu_teklifi işleme, güvenlik ve agent_states düzeni değişmedi (last_output'a
+bu_dosyada_hazirlanan_video eklendi). tsc temiz.
+REDEPLOY GEREKLİ: create-video-room ve ajan-nobetci birlikte deploy edilmeli.
+
 ## Nerede kaldık — 13.08.2026 (37)
 A) Aşama 5 "Planlanan Oturum" sayacı düzeltildi (MediationEngine.tsx): eskiden iptal
    olmayan TÜM oturumları (taslak ve geçmiş dahil) sayıyordu; artık yalnız gelecekteki

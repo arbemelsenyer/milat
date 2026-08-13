@@ -105,3 +105,9 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
   tarafın kendi verdiği cevapla AYNI kod yolundan geçer (durum=cevaplandi, oturum kaydı,
   davet yazısı). Bu durumda teklif linki maili gönderilmez; seçenek girdisine
   otomatik_onay işareti düşer. Kapalıysa veya saat uymuyorsa akış değişmez.
+● 13.08: Video bağlantısı ajanla üretilir — create-video-room'a iç çağrı kapısı
+  (x-cron-secret) eklendi; nöbetçi, otomatik akış dosyalarında gelecekteki planlı ve
+  bağlantısı boş oturumlar için odayı iç kapıdan üretip oturuma yazar ve oturumun tarafına
+  tek bilgilendirme e-postası gönderir (künye + gün-saat + bağlantı, arabulucu imzasıyla).
+  Bağlantı yazıldıktan sonra oturum yeniden seçilmez, e-posta bir kez gider. Cevaplanmış
+  teklifte yüz yüze işaretli saate düşen oturumlar atlanır. Normal JWT yolu değişmedi.
