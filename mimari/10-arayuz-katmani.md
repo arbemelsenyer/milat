@@ -40,3 +40,7 @@ hiçbir şey kaydedilmez). Panel üç yerdedir: yeni başvuru kaydı (Aşama 1) 
 (Aşama 2) · taraf e-postasının sonradan eklenmesi/değiştirilmesi (yalnız o alanla). Kural
 "Onayla kullanılmaz" (m.4) AI kartlarına ilişkindir; burada onaylanan AI çıktısı değil,
 arabulucunun kendi girdiği kayıttır.
+● 13.08: Onay anı kayda yazılıyor — case_parties.email_confirmed_at. Yeni taraf kaydında
+  panel onaylanırsa (adres doluysa) onay anı damgalanır; düzenlemede e-posta değişip panelde
+  onaylanırsa damga yenilenir. E-posta panelsiz bir yoldan değişirse damga null'a çekilir,
+  onaysız adres onaylı görünmez.

@@ -2011,6 +2011,9 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         gsm: draft.gsm ?? null,
         phone: draft.phone ?? null,
         email: draft.email ?? null,
+        // Bu yola yalnız onay panelindeki "Onayla ve kaydet" ile gelinir:
+        // adres varsa onay anı damgalanır, yoksa alan boş kalır.
+        email_confirmed_at: String(draft.email ?? "").trim() ? new Date().toISOString() : null,
         company_name: draft.company_name ?? null,
         tax_office: draft.tax_office ?? null,
         tax_number: draft.tax_number ?? null,
@@ -2078,6 +2081,11 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         vekil_baro: editing.vekil_baro ?? null,
         vekil_sicil_no: editing.vekil_sicil_no ?? null,
       };
+      if (newEmail !== oldEmail) {
+        // Onay panelinden geçen adres onay anıyla damgalanır; panelsiz bir yoldan
+        // gelen değişiklik onaysızdır — damga silinir, adres onaylı görünmez.
+        patch.email_confirmed_at = opts?.emailConfirmed && newEmail ? new Date().toISOString() : null;
+      }
       const { error } = await supabase.from("case_parties").update(patch).eq("id", editing.id);
       if (error) throw error;
       toast({ title: "Taraf bilgileri güncellendi" });

@@ -313,3 +313,7 @@ orkestratör yok; sağlanmazsa sessizce beklenir. Elle başlatma düğmesi aynen
 kaydı ve sonradan e-posta değişikliği artık özet panelden onaylanmadan kaydedilmiyor;
 alanlar panelin içinde düzeltilebiliyor, "Geri dön" hiçbir şey kaydetmeden forma dönüyor.
 AÇIK UÇ: onaylı e-posta işareti için case_parties'te alan yok — SQL kurucudan bekleniyor.
+
+13.08: Onay anı kaydediliyor — case_parties.email_confirmed_at sütunu (kurucu tarafından
+eklendi) taraf kaydı ve e-posta değişikliği onaylandığında yazılıyor; panelsiz değişiklikte
+null'a çekiliyor. Kayıt onay panelinin açık ucu kapandı.
