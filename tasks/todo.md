@@ -40,6 +40,16 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (33)
+Taraf ekranına "Randevu Tercihlerim" sekmesi eklendi (CaseRoom.tsx, yalnız PartyView):
+müsait saat aralığı ekle/listele/sil (taraf_musaitlik, party_id = tarafın kendi kaydı) ve
+"otomatik onay" anahtarı (case_parties.otomatik_onay). Okuma/yazma hataları ekranda
+gösteriliyor, yutulmuyor. Arabulucu ekranlarına ve karşı tarafa hiçbir şey eklenmedi.
+tsc + build temiz.
+DİKKAT (doğrulanamadı): taraf_musaitlik sütun adları anon rolün şemasında görünmüyor;
+kardeş tablo mediator_availability'ye bakılarak gun/baslangic/bitis + party_id varsayıldı.
+Canlı testte sütun adı tutmazsa hata ekranda görünecek — o zaman düzeltilecek.
+
 ## Nerede kaldık — 13.08.2026 (32)
 randevu-teklif'ten giden her taraf e-postası (teklif maili + davet yazısı) ve davet
 PDF'inin imza bölümü artık dosyanın arabulucusunun adıyla imzalanıyor: profiles.full_name,

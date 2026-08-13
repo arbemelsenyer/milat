@@ -366,3 +366,6 @@ oluşturuluyor, link tarafa e-postayla gidiyor. Cron tetikleyici hâlâ yok.
 
 13.08: Taraf e-postaları ve davet PDF'i arabulucunun adıyla imzalanıyor (Arb. Ad Soyad +
 "MediPact AI aracılığıyla gönderilmiştir" notu).
+
+13.08: Taraf ekranına "Randevu Tercihlerim" (müsait saatler + otomatik onay anahtarı).
+Otomatik onayın teklifle eşleştirilmesi sonraki taş.

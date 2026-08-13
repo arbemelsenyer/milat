@@ -32,6 +32,7 @@ import { downloadOfficialPdf } from "@/lib/pdfTemplates";
 import { downloadPaymentInfoPdf } from "@/lib/invoice-pdf";
 import { formatDisputeType } from "@/lib/disputeLabels";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 
 const tabTriggerAccentClass =
   "border-b-2 border-b-transparent transition-colors hover:border-b-accent hover:text-accent data-[state=active]:border-b-accent data-[state=active]:text-accent";
@@ -610,8 +611,15 @@ export default function CaseRoom() {
           <TabsTrigger value="discovery" className={tabTriggerAccentClass}>İhtiyaç Tespiti</TabsTrigger>
           <TabsTrigger value="experts" className={tabTriggerAccentClass}><Award className="h-4 w-4 mr-1" />Bilirkişi Onayı</TabsTrigger>
           <TabsTrigger value="payment" className={tabTriggerAccentClass}><Wallet className="h-4 w-4 mr-1" />Ödeme Bilgim</TabsTrigger>
+          <TabsTrigger value="randevu" className={tabTriggerAccentClass}><Calendar className="h-4 w-4 mr-1" />Randevu Tercihlerim</TabsTrigger>
           <TabsTrigger value="agents" className={tabTriggerAccentClass}><Bot className="h-4 w-4 mr-1" />AI Aktivitelerim</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="randevu">
+          {myParty?.id
+            ? <RandevuTercihlerim partyId={myParty.id} />
+            : <Card className="p-5"><p className="text-sm text-muted-foreground">Taraf kaydınız bulunamadı.</p></Card>}
+        </TabsContent>
 
         <TabsContent value="documents">
           <Card className="p-5 space-y-3">
@@ -819,6 +827,166 @@ function CommonGroundView({ report }: { report: any }) {
           <p className="text-sm whitespace-pre-wrap">{report.opening_offer}</p>
         </Card>
       )}
+    </div>
+  );
+}
+
+/* ===================== RANDEVU TERCİHLERİM (yalnız tarafın kendi ekranı) ===================== */
+// Kayıtlar tarafın kendi party_id'siyle taraf_musaitlik tablosuna yazılır; RLS gereği
+// taraf yalnız kendi satırlarını görür. Arabulucu ekranlarına ve karşı tarafa hiçbir şey
+// sızmaz. Yazma hatası yutulmaz, ekranda gösterilir.
+type MusaitlikRow = { id: string; gun: string; baslangic: string; bitis: string };
+
+function RandevuTercihlerim({ partyId }: { partyId: string }) {
+  const [rows, setRows] = useState<MusaitlikRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [gun, setGun] = useState("");
+  const [baslangic, setBaslangic] = useState("10:00");
+  const [bitis, setBitis] = useState("12:00");
+  const [busy, setBusy] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const [otomatikOnay, setOtomatikOnay] = useState(false);
+  const [onayBusy, setOnayBusy] = useState(false);
+  const [onayHata, setOnayHata] = useState<string | null>(null);
+
+  const hhmm = (t: string) => String(t ?? "").slice(0, 5);
+
+  async function load() {
+    setLoading(true);
+    const [m, p] = await Promise.all([
+      (supabase.from("taraf_musaitlik" as any) as any)
+        .select("id, gun, baslangic, bitis")
+        .eq("party_id", partyId)
+        .order("gun", { ascending: true })
+        .order("baslangic", { ascending: true }),
+      supabase.from("case_parties").select("otomatik_onay" as any).eq("id", partyId).maybeSingle(),
+    ]);
+    if (m.error) { setHata(`Müsait saatler okunamadı: ${m.error.message}`); setRows([]); }
+    else { setHata(null); setRows((m.data ?? []) as MusaitlikRow[]); }
+    if (p.error) setOnayHata(`Otomatik onay durumu okunamadı: ${p.error.message}`);
+    else { setOnayHata(null); setOtomatikOnay(!!(p.data as any)?.otomatik_onay); }
+    setLoading(false);
+  }
+
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [partyId]);
+
+  async function ekle() {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(gun)) { setHata("Önce gün seçin."); return; }
+    if (!/^\d{2}:\d{2}$/.test(baslangic) || !/^\d{2}:\d{2}$/.test(bitis) || bitis <= baslangic) {
+      setHata("Bitiş saati başlangıçtan sonra olmalı."); return;
+    }
+    setBusy(true);
+    const { error } = await (supabase.from("taraf_musaitlik" as any) as any)
+      .insert({ party_id: partyId, gun, baslangic, bitis });
+    if (error) setHata(`Kaydedilemedi: ${error.message}`);
+    else { setHata(null); await load(); }
+    setBusy(false);
+  }
+
+  async function sil(id: string) {
+    setBusy(true);
+    const { error } = await (supabase.from("taraf_musaitlik" as any) as any).delete().eq("id", id);
+    if (error) setHata(`Silinemedi: ${error.message}`);
+    else { setHata(null); await load(); }
+    setBusy(false);
+  }
+
+  async function onayDegistir(next: boolean) {
+    if (onayBusy) return;
+    const onceki = otomatikOnay;
+    setOnayBusy(true);
+    setOnayHata(null);
+    setOtomatikOnay(next);
+    const { data, error } = await supabase.from("case_parties")
+      .update({ otomatik_onay: next } as any)
+      .eq("id", partyId)
+      .select("id");
+    if (error) {
+      setOtomatikOnay(onceki);
+      setOnayHata(`Kaydedilemedi: ${error.message}`);
+    } else if (!Array.isArray(data) || data.length !== 1) {
+      setOtomatikOnay(onceki);
+      setOnayHata("Kaydedilemedi: güncelleme kaydı doğrulanamadı.");
+    }
+    setOnayBusy(false);
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5 space-y-3">
+        <div>
+          <h3 className="font-semibold">Müsait saatlerim</h3>
+          <p className="text-sm text-muted-foreground">
+            <ShieldCheck className="inline h-3 w-3 mr-1" />
+            Bu saatleri yalnız siz ve arabulucunuz görür; karşı tarafa açılmaz.
+          </p>
+        </div>
+
+        {hata && (
+          <div className="text-sm rounded border border-destructive/40 bg-destructive/10 text-destructive p-3">{hata}</div>
+        )}
+
+        {loading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Henüz müsait saat eklemediniz.</p>
+        ) : (
+          <div className="space-y-1">
+            {rows.map((r) => (
+              <div key={r.id} className="flex items-center justify-between border rounded px-3 py-2 text-sm">
+                <span>
+                  {new Date(`${String(r.gun).slice(0, 10)}T00:00:00`).toLocaleDateString("tr-TR")} · {hhmm(r.baslangic)} – {hhmm(r.bitis)}
+                </span>
+                <Button size="sm" variant="ghost" disabled={busy} onClick={() => sil(r.id)} title="Sil">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <Label className="text-xs">Gün</Label>
+            <Input type="date" className="h-9 w-[160px]" value={gun} onChange={(e) => setGun(e.target.value)} />
+          </div>
+          <div>
+            <Label className="text-xs">Başlangıç</Label>
+            <Input type="time" className="h-9 w-[120px]" value={baslangic} onChange={(e) => setBaslangic(e.target.value)} />
+          </div>
+          <div>
+            <Label className="text-xs">Bitiş</Label>
+            <Input type="time" className="h-9 w-[120px]" value={bitis} onChange={(e) => setBitis(e.target.value)} />
+          </div>
+          <Button size="sm" disabled={busy} onClick={ekle}>
+            {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+            Aralık ekle
+          </Button>
+        </div>
+      </Card>
+
+      <Card className="p-5 space-y-2">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold">Müsait saatlerime uyan randevu tekliflerini benim adıma onayla</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Açıkken uyan teklifler otomatik onaylanır; istediğiniz an kapatabilirsiniz.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs text-muted-foreground">{otomatikOnay ? "Açık" : "Kapalı"}</span>
+            <Switch
+              checked={otomatikOnay}
+              disabled={onayBusy}
+              onCheckedChange={(v) => onayDegistir(!!v)}
+              aria-label="Otomatik onay"
+            />
+          </div>
+        </div>
+        {onayHata && (
+          <div className="text-sm rounded border border-destructive/40 bg-destructive/10 text-destructive p-3">{onayHata}</div>
+        )}
+      </Card>
     </div>
   );
 }

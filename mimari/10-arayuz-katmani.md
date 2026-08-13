@@ -78,3 +78,8 @@ arabulucunun kendi girdiği kayıttır.
   yazar." açıklaması. Yalnız arabulucu/admin görür ve değiştirir; taraf yüzeylerinde yok.
   Kayıt hatası ekranda gösterilir. Anahtar şimdilik yalnız değeri saklar; nöbetçi fonksiyon
   gelene kadar hiçbir davranışı tetiklemez.
+● 13.08: Taraf ekranında "Randevu Tercihlerim" sekmesi — taraf kendi müsait gün/saat
+  aralıklarını ekler, listeler, siler (taraf_musaitlik, kendi party_id'si) ve "müsait
+  saatlerime uyan teklifleri benim adıma onayla" anahtarını (case_parties.otomatik_onay)
+  açıp kapatır. Bilgiler yalnız tarafın kendisine ve arabulucusuna aittir; karşı tarafa
+  hiçbir yüzeyden açılmaz. Okuma/yazma hataları ekranda gösterilir.
