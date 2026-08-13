@@ -40,6 +40,18 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (37)
+A) Aşama 5 "Planlanan Oturum" sayacı düzeltildi (MediationEngine.tsx): eskiden iptal
+   olmayan TÜM oturumları (taslak ve geçmiş dahil) sayıyordu; artık yalnız gelecekteki
+   status='scheduled' oturumları sayıyor. NOT: liste bileşen açılışında bir kez okunuyor;
+   sayfa açıkken oluşan oturum, sayfa yenilenmeden sayaca yansımaz (mevcut davranış).
+B) Davet e-postasına gerçek video bağlantısı YAPILMADI: bağlantı yalnız create-video-room
+   ile üretiliyor ve o fonksiyon kullanıcı JWT'si istiyor (auth.getUser + dosya erişim
+   kontrolü); randevu-teklif'in cevap/davet yolu girişsiz çalıştığı için JWT yok, yeni
+   açılan oturumun video_link'i de boş. Uydurma link yazılmadı, "bağlantı görüşme öncesi
+   iletilecektir" metni kaldı.
+tsc + build temiz.
+
 ## Nerede kaldık — 13.08.2026 (36)
 YZ Kullanım Beyanı kapısı eklendi (CaseRoom.tsx): taraf dosyaya girdiğinde
 yz_beyan_onaylari'nda kendi party_id'siyle metin_surumu='v1' kaydı yoksa dosya içeriği

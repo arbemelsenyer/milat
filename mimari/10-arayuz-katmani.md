@@ -93,3 +93,5 @@ arabulucunun kendi girdiği kayıttır.
   metin_surumu) yazılır ve bir daha sorulmaz; metin sürümü değişirse onay yeniden istenir.
   Kart yalnız taraf girişinde görünür, arabulucu/admin ekranlarında çıkmaz. Kayıt hatası
   ekranda gösterilir, kart kapanmaz.
+● 13.08: Aşama 5 üst şeridindeki "Planlanan Oturum" sayacı yalnız GELECEKTEKİ planlı
+  (scheduled) oturumları sayar; taslak ve geçmiş kayıtlar sayaca girmez.

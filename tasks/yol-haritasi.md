@@ -377,3 +377,7 @@ oturuma bağlanıyor, davet yazısı gidiyor.
 (AnimatePresence bekletmesi kaldırıldı) · Ödeme defteri Düzenle/Sil zaten mevcuttu.
 
 13.08: Taraf ekranına YZ kullanım beyanı kapısı (yz_beyan_onaylari, metin sürümü v1).
+
+13.08: Aşama 5 "Planlanan Oturum" sayacı gelecekteki scheduled oturumları sayıyor.
+Davet e-postasına gerçek video bağlantısı eklenemedi (link üretimi kullanıcı JWT'si
+istiyor; girişsiz cevap akışında JWT yok) — açık uç.

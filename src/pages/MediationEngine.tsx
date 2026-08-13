@@ -1688,6 +1688,11 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik }: {
 
   const plannedSessions = sessions.filter((s) => s.status !== "cancelled");
   const nextSession = plannedSessions.find((s) => s.scheduled_at && new Date(s.scheduled_at).getTime() > Date.now());
+  // Şeritteki sayaç: GELECEKTEKİ planlı (scheduled) oturumlar. Önceden taslak/geçmiş
+  // kayıtlar da sayıldığı için sayaç gerçek durumu göstermiyordu.
+  const scheduledFutureSessions = sessions.filter(
+    (s) => s.status === "scheduled" && s.scheduled_at && new Date(s.scheduled_at).getTime() > Date.now()
+  );
 
   async function chooseMeeting(meetingType: "ozel" | "ortak") {
     setNavigating(true);
@@ -1709,7 +1714,7 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik }: {
         label="AŞAMA 5 — OTURUMLAR"
         metrics={[
           { label: "Sıradaki Oturum", value: nextSession?.scheduled_at ? formatPhaseCountdown(nextSession.scheduled_at) : null },
-          { label: "Planlanan Oturum", value: plannedSessions.length },
+          { label: "Planlanan Oturum", value: scheduledFutureSessions.length },
         ]}
       />
     <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
