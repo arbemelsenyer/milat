@@ -16,3 +16,6 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   ara ara doğrulanır.
 - Mimari artık bölünmüştür: kökteki mimari.md okunmaz, okuma daima
   mimari/00-INDEX.md üzerinden ilgili bölüme gidilerek yapılır.
+- Randevu/müsaitlik gibi "arabulucunun kendi takvimi" sorgularında kimlik
+  cases.user_id'dir; assigned_mediator_id her dosyada aynı kimliği taşımıyor
+  ve önce ona bakmak sorguyu sessizce boş döndürüyor. (13.08, randevu-teklif)

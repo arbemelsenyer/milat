@@ -39,20 +39,25 @@ function normalizeSecenekler(raw: unknown): Secenek[] | null {
 
 // Saatleri ajan seçer: arabulucunun gelecek müsaitlik aralıkları okunur, bekleyen
 // tekliflerde kullanılan saatler dışlanır, taraf tipine göre 1 veya 3 seçenek verilir.
-async function saatleriSec(admin: any, caseRow: any, party: any): Promise<{ secenekler: Secenek[]; hata?: string }> {
-  const mediatorId = caseRow?.assigned_mediator_id ?? caseRow?.user_id;
-  if (!mediatorId) return { secenekler: [], hata: "musaitlik_yok" };
+async function saatleriSec(admin: any, caseRow: any, party: any): Promise<{ secenekler: Secenek[]; hata?: string; tanili?: any }> {
+  // Takvimin sahibi dosyanın kendisidir: mediator_availability.user_id = cases.user_id.
+  // assigned_mediator_id yalnız user_id boşsa yedek olarak kullanılır; tarafın
+  // user_id'si veya başka bir alan kullanılmaz.
+  const mediatorId = caseRow?.user_id ?? caseRow?.assigned_mediator_id;
+  if (!mediatorId) return { secenekler: [], hata: "musaitlik_yok", tanili: { sebep: "dosyada kullanıcı yok" } };
 
   const bugun = bugunTR();
   const simdi = suanSaatTR();
 
-  const { data: slots } = await admin.from("mediator_availability")
+  // Okuma service role ile yapılır (verify_jwt=false olduğundan anon istemci RLS'e takılır).
+  const { data: slots, error: slotErr } = await admin.from("mediator_availability")
     .select("gun, baslangic")
     .eq("user_id", mediatorId)
     .gte("gun", bugun)
     .order("gun", { ascending: true })
     .order("baslangic", { ascending: true })
     .limit(200);
+  if (slotErr) return { secenekler: [], hata: "musaitlik_yok", tanili: { sebep: slotErr.message } };
 
   // Aynı arabulucunun bekleyen tekliflerinde kullanılan saatler tekrar önerilmez.
   const { data: pending } = await admin.from("randevu_teklifleri")
@@ -61,7 +66,7 @@ async function saatleriSec(admin: any, caseRow: any, party: any): Promise<{ sece
     .limit(500);
   const dolu = new Set<string>();
   for (const row of (pending ?? []) as any[]) {
-    const owner = row?.cases?.assigned_mediator_id ?? row?.cases?.user_id;
+    const owner = row?.cases?.user_id ?? row?.cases?.assigned_mediator_id;
     if (owner !== mediatorId) continue;
     for (const s of Array.isArray(row?.secenekler) ? row.secenekler : []) {
       dolu.add(`${String(s?.gun ?? "").slice(0, 10)}|${String(s?.saat ?? "").slice(0, 5)}`);
@@ -76,7 +81,13 @@ async function saatleriSec(admin: any, caseRow: any, party: any): Promise<{ sece
     if (dolu.has(`${gun}|${saat}`)) continue;
     bos.push({ gun, saat });
   }
-  if (bos.length === 0) return { secenekler: [], hata: "musaitlik_yok" };
+  if (bos.length === 0) {
+    return {
+      secenekler: [],
+      hata: "musaitlik_yok",
+      tanili: { mediator_id: mediatorId, bugun, satir: (slots ?? []).length, dolu: dolu.size },
+    };
+  }
 
   const bireysel = party?.is_individual === true || party?.party_type === "individual";
   if (bireysel) return { secenekler: [bos[0]] };
@@ -137,8 +148,8 @@ Deno.serve(async (req) => {
       const party_id = String((body as any)?.party_id ?? "");
       const k = await yetkiKontrol(req, admin, supabaseUrl, anonKey, case_id, party_id);
       if ((k as any).hata) return (k as any).hata;
-      const { secenekler, hata } = await saatleriSec(admin, (k as any).caseRow, (k as any).party);
-      if (hata) return json({ error: hata });
+      const { secenekler, hata, tanili } = await saatleriSec(admin, (k as any).caseRow, (k as any).party);
+      if (hata) return json({ error: hata, tanili });
       return json({ secenekler });
     }
 
@@ -157,7 +168,7 @@ Deno.serve(async (req) => {
         secenekler = override;
       } else {
         const r = await saatleriSec(admin, (k as any).caseRow, (k as any).party);
-        if (r.hata) return json({ error: r.hata });
+        if (r.hata) return json({ error: r.hata, tanili: r.tanili });
         secenekler = r.secenekler;
       }
 
