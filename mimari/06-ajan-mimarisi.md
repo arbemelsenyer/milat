@@ -85,3 +85,9 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
   Her koşumda dosya başına agent_states'e 'nobetci' satırı yazar; bir dosyadaki hata
   diğerlerini durdurmaz, görevin sonuc alanına ve loga geçer. Güvenlik: x-cron-secret
   veya admin JWT, ikisi de yoksa 401.
+● 13.08: randevu-teklif "olustur" iç çağrı kapısı — x-cron-secret CRON_SECRET ile
+  eşleşirse kullanıcı JWT'si aranmaz (çağıran sistemin kendisidir; dosya/taraf
+  tutarlılığı yine doğrulanır). Yalnız iç çağrıyla oluşturulan tekliflerde cevap linki
+  ilgili tarafa e-postayla gider: ad, dosya künyesi (no, konu), önerilen saatler ve tek
+  dokunuşluk link; karşı tarafa ait hiçbir veri geçmez. Ekrandan oluşturmada e-posta
+  gönderilmez, link ekranda kalır. Gönderim hatası teklifi düşürmez.

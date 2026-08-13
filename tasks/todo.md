@@ -40,6 +40,16 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (30)
+randevu-teklif: "olustur" artık iç çağrıyla da çalışıyor — x-cron-secret CRON_SECRET ile
+eşleşirse JWT ve dosya erişim kontrolü atlanıyor (dosya/taraf tutarlılığı yine
+doğrulanıyor); secret boş/yanlışsa mevcut JWT yolu aynen. Takvim sahibi mantığı değişmedi.
+İç çağrıyla oluşturulan tekliflerde cevap linki tarafa e-postayla gidiyor (Resend, davet
+üslubu: ad, dosya no + konu, önerilen saatler, "Uygunluğunuzu tek dokunuşla bildirin" +
+link; karşı taraf verisi yok). Hata teklifi düşürmüyor, loga yazılıyor; yanıta yalnız iç
+çağrıda eposta_gonderildi ekleniyor. Ekrandan oluşturmada e-posta yok. tsc temiz.
+REDEPLOY GEREKLİ: randevu-teklif Lovable'dan yeniden deploy edilmeli.
+
 ## Nerede kaldık — 13.08.2026 (29)
 Otomatik akış anahtarı: update zaten .eq("id", activeCase.id) ile tek dosyayı hedefliyordu;
 kodda başka yazıcı yok (grep). Bu yüzden 3 dosyanın true olmasının sebebini koddan

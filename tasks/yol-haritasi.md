@@ -357,3 +357,6 @@ görevi bırakıyor (mükerrer yazmıyor). Nöbetçi/yürütücü sonraki taş.
 
 13.08: Ajan nöbetçisi (ajan-nobetci) yazıldı — pano işleme (soru_gonder) ve zaman
 kontrolü (randevu_teklifi görevi açma). Tetikleyici/cron sonraki taş.
+
+13.08: randevu-teklif iç çağrı kapısı (x-cron-secret) + iç çağrıda tarafa teklif
+e-postası. Nöbetçinin randevu_teklifi görevini işlemesi sonraki taş.

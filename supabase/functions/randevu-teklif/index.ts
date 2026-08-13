@@ -17,6 +17,8 @@ type Secenek = { gun: string; saat: string; [alan: string]: unknown };
 const GUN_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SAAT_RE = /^\d{2}:\d{2}$/;
 const TZ = "Europe/Istanbul";
+// İç çağrı kapısı: nöbetçi bu başlıkla çağırır, kullanıcı JWT'si aranmaz.
+const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 
 // Sunucu UTC koşar; gün/saat karşılaştırmaları Türkiye saatine göre yapılır.
 function bugunTR(): string {
@@ -336,13 +338,93 @@ async function oturumDavetiGonder(
   return true;
 }
 
+// Teklif e-postası: yalnız iç çağrıyla (nöbetçi) oluşturulan tekliflerde gider.
+// Davet yazısıyla aynı yol (Resend + RESEND_API_KEY) ve aynı üslup; künye ve o tarafın
+// kendi seçenekleri dışında hiçbir veri, karşı tarafa ait hiçbir bilgi geçmez.
+async function teklifEpostasiGonder(
+  admin: any,
+  opts: { caseId: string; partyId: string; secenekler: Secenek[]; link: string },
+): Promise<boolean> {
+  const key = Deno.env.get("RESEND_API_KEY");
+  if (!key) {
+    console.error("[randevu-teklif] teklif e-postası gönderilemedi: RESEND_API_KEY yok");
+    return false;
+  }
+  const { data: party } = await admin.from("case_parties")
+    .select("party_type, first_name, last_name, company_name, email")
+    .eq("id", opts.partyId).maybeSingle();
+  const email = String((party as any)?.email ?? "").trim();
+  if (!email) {
+    console.error("[randevu-teklif] teklif e-postası gönderilemedi: tarafın e-postası yok");
+    return false;
+  }
+  const ad = (party as any)?.party_type === "individual"
+    ? `${(party as any)?.first_name ?? ""} ${(party as any)?.last_name ?? ""}`.trim()
+    : String((party as any)?.company_name ?? "").trim();
+  const displayName = ad || "Sayın Taraf";
+
+  const { data: dosya } = await admin.from("cases")
+    .select("application_no, title").eq("id", opts.caseId).maybeSingle();
+
+  const esc = (t: string) => String(t).replace(/</g, "&lt;");
+  const kunye: string[] = [];
+  if ((dosya as any)?.application_no) kunye.push(`<strong>Dosya No:</strong> ${esc((dosya as any).application_no)}`);
+  if ((dosya as any)?.title) kunye.push(`<strong>Uyuşmazlık konusu:</strong> ${esc((dosya as any).title)}`);
+
+  const saatler = opts.secenekler.map((s) => {
+    const when = new Date(`${s.gun}T${s.saat}:00+03:00`);
+    const dateStr = when.toLocaleDateString("tr-TR", { timeZone: TZ, day: "numeric", month: "long", year: "numeric", weekday: "long" });
+    return `<li>${esc(dateStr)} · ${esc(s.saat)}</li>`;
+  }).join("");
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+  <body style="font-family:Arial,sans-serif;line-height:1.6;color:#222">
+    <p>Sayın ${esc(displayName)},</p>
+    <p>Arabuluculuk sürecinizde görüşme için aşağıdaki saat${opts.secenekler.length > 1 ? "ler" : ""} önerilmiştir.</p>
+    ${kunye.length ? `<p>${kunye.join("<br>")}</p>` : ""}
+    <ul>${saatler}</ul>
+    <p>Uygunluğunuzu tek dokunuşla bildirin:<br><a href="${opts.link}">${esc(opts.link)}</a></p>
+    <p>Saygılarımızla,<br>MediPact AI</p>
+  </body></html>`;
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: "MİLAT Arabuluculuk <info@milatmediation.com>",
+        to: [email],
+        subject: "Görüşme saati önerisi",
+        html,
+      }),
+    });
+    if (!res.ok) {
+      console.error("[randevu-teklif] teklif e-postası Resend hatası", { status: res.status, body: (await res.text()).slice(0, 300) });
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("[randevu-teklif] teklif e-postası gönderilemedi", (e as any)?.message ?? e);
+    return false;
+  }
+}
+
 // Arabulucu JWT'sini doğrular ve dosya yetkisini kontrol eder.
-async function yetkiKontrol(req: Request, admin: any, supabaseUrl: string, anonKey: string, case_id: string, party_id: string) {
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) return { hata: json({ error: "Unauthorized" }, 401) };
-  const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
-  const { data: u } = await userClient.auth.getUser();
-  if (!u?.user) return { hata: json({ error: "oturum doğrulanamadı" }, 401) };
+// isCron=true (geçerli x-cron-secret) ise çağıran sistemin kendisidir: JWT ve dosya
+// erişim kontrolü atlanır, dosya/taraf tutarlılığı yine doğrulanır.
+async function yetkiKontrol(
+  req: Request, admin: any, supabaseUrl: string, anonKey: string,
+  case_id: string, party_id: string, isCron = false,
+) {
+  let userId: string | null = null;
+  if (!isCron) {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) return { hata: json({ error: "Unauthorized" }, 401) };
+    const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const { data: u } = await userClient.auth.getUser();
+    if (!u?.user) return { hata: json({ error: "oturum doğrulanamadı" }, 401) };
+    userId = u.user.id;
+  }
 
   if (!case_id || !party_id) return { hata: json({ error: "case_id ve party_id zorunlu" }, 400) };
 
@@ -351,17 +433,19 @@ async function yetkiKontrol(req: Request, admin: any, supabaseUrl: string, anonK
     .eq("id", case_id).maybeSingle();
   if (!c) return { hata: json({ error: "Dosya bulunamadı" }, 404) };
 
-  const { data: roleRow } = await admin.from("user_roles")
-    .select("role").eq("user_id", u.user.id).eq("role", "admin").maybeSingle();
-  const allowed = !!roleRow || (c as any).assigned_mediator_id === u.user.id || (c as any).user_id === u.user.id;
-  if (!allowed) return { hata: json({ error: "Forbidden" }, 403) };
+  if (!isCron) {
+    const { data: roleRow } = await admin.from("user_roles")
+      .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+    const allowed = !!roleRow || (c as any).assigned_mediator_id === userId || (c as any).user_id === userId;
+    if (!allowed) return { hata: json({ error: "Forbidden" }, 403) };
+  }
 
   const { data: p } = await admin.from("case_parties")
     .select("id, case_id, party_type, is_individual").eq("id", party_id).maybeSingle();
   if (!p || (p as any).case_id !== case_id) return { hata: json({ error: "Taraf bu dosyaya ait değil" }, 400) };
 
   // userId yalnız kimlik/yetki kaydıdır; takvim sahibi takvimSahibi(caseRow)'dan gelir.
-  return { caseRow: c, party: p, userId: u.user.id };
+  return { caseRow: c, party: p, userId };
 }
 
 Deno.serve(async (req) => {
@@ -386,11 +470,13 @@ Deno.serve(async (req) => {
       return json({ secenekler });
     }
 
-    /* ---------- OLUŞTUR — arabulucu JWT'si zorunlu ---------- */
+    /* ---------- OLUŞTUR — arabulucu JWT'si veya iç çağrı (x-cron-secret) ---------- */
     if (action === "olustur") {
       const case_id = String((body as any)?.case_id ?? "");
       const party_id = String((body as any)?.party_id ?? "");
-      const k = await yetkiKontrol(req, admin, supabaseUrl, anonKey, case_id, party_id);
+      // Boş/yanlış secret'ta iç çağrı sayılmaz; mevcut JWT yolu aynen işler.
+      const isCron = !!CRON_SECRET && req.headers.get("x-cron-secret") === CRON_SECRET;
+      const k = await yetkiKontrol(req, admin, supabaseUrl, anonKey, case_id, party_id, isCron);
       if ((k as any).hata) return (k as any).hata;
 
       // Saatleri sunucu seçer; yalnız "Düzenle" akışından gelen liste üste yazar.
@@ -424,7 +510,15 @@ Deno.serve(async (req) => {
           if (allowedOrigins.includes(origin)) baseUrl = origin;
         } catch { /* geçersiz URL -> varsayılan */ }
       }
-      return json({ token, link: `${baseUrl}/randevu/${token}`, secenekler });
+      const link = `${baseUrl}/randevu/${token}`;
+
+      // E-posta yalnız iç çağrıda gider; ekrandan oluşturmada link ekranda kalır.
+      // Gönderim hatası teklifi düşürmez, yalnız loga geçer.
+      if (isCron) {
+        const epostaGitti = await teklifEpostasiGonder(admin, { caseId: case_id, partyId: party_id, secenekler, link });
+        return json({ token, link, secenekler, eposta_gonderildi: epostaGitti });
+      }
+      return json({ token, link, secenekler });
     }
 
     /* ---------- GETİR — yalnız token ---------- */
