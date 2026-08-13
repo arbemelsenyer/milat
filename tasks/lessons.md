@@ -19,3 +19,7 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
 - Randevu/müsaitlik gibi "arabulucunun kendi takvimi" sorgularında kimlik
   cases.user_id'dir; assigned_mediator_id her dosyada aynı kimliği taşımıyor
   ve önce ona bakmak sorguyu sessizce boş döndürüyor. (13.08, randevu-teklif)
+- Sonucu yalnız toast ile bildirme: toast kaçarsa ekranda hiçbir iz kalmıyor,
+  "hiçbir şey olmadı" gibi görünüyor. Sonuç üreten her kartın kendi kalıcı
+  durum satırı olsun; invoke hatasında error.context gövdesi okunup gerçek
+  mesaj yazılsın. (13.08, randevu teklifi kartı)

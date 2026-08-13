@@ -1138,6 +1138,11 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
   const [editing, setEditing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [link, setLink] = useState<string | null>(null);
+  // Her sonucun ekranda karşılığı olsun diye kartın kendi durum satırı:
+  // toast kaçabiliyor, bu satır kartta kalıcı durur.
+  const [mesaj, setMesaj] = useState<{ tip: "bilgi" | "hata"; metin: string } | null>(null);
+
+  const BOS_SAAT_MESAJI = "Takviminizde uygun boş saat bulunamadı — Takvim > Müsaitlik bölümünden saat ekleyin.";
 
   const party = parties.find((p) => p.id === partyId) ?? null;
 
@@ -1145,43 +1150,77 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
     setOnerilen(null);
     setEditing(false);
     setLink(null);
+    setMesaj(null);
+  }
+
+  // invoke hatasında gerçek gövde mesajını çıkarır (aksi halde yalnız
+  // "non-2xx status code" görünür ve neden anlaşılmaz).
+  async function hataMetni(error: any): Promise<string> {
+    try {
+      const ctx = (error as any)?.context;
+      if (ctx && typeof ctx.text === "function") {
+        const raw = await (typeof ctx.clone === "function" ? ctx.clone() : ctx).text();
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed?.error) return String(parsed.error);
+          if (parsed?.message) return String(parsed.message);
+        } catch { /* düz metin */ }
+        if (raw) return String(raw).slice(0, 300);
+      }
+    } catch { /* gövde okunamadı */ }
+    return String(error?.message ?? "Bilinmeyen hata");
+  }
+
+  function govde(data: any): any {
+    if (typeof data === "string") {
+      try { return JSON.parse(data); } catch { return { error: data }; }
+    }
+    return data ?? null;
   }
 
   async function askAgent() {
-    if (!partyId) return;
-    setAsking(true);
+    if (!partyId || asking) return;
     reset();
+    setAsking(true);
     try {
       const { data, error } = await supabase.functions.invoke("randevu-teklif", {
         body: { action: "oner", case_id: caseRow.id, party_id: partyId },
       });
-      if (error) throw error;
-      const err = (data as any)?.error;
-      if (err === "musaitlik_yok") {
-        toast({
-          title: "Uygun boş saat yok",
-          description: "Takvim sayfasındaki Müsaitlik sekmesinden gelecek tarihli aralık ekleyin.",
-          variant: "destructive",
-        });
+      if (error) {
+        setMesaj({ tip: "hata", metin: await hataMetni(error) });
         return;
       }
-      if (err) throw new Error(err);
-      const list = Array.isArray((data as any)?.secenekler) ? (data as any).secenekler : [];
+      const payload = govde(data);
+      if (!payload) {
+        setMesaj({ tip: "hata", metin: "Sunucudan boş yanıt geldi." });
+        return;
+      }
+      if (payload.error === "musaitlik_yok") {
+        setMesaj({ tip: "bilgi", metin: BOS_SAAT_MESAJI });
+        return;
+      }
+      if (payload.error) {
+        setMesaj({ tip: "hata", metin: String(payload.error) });
+        return;
+      }
+      const list = Array.isArray(payload.secenekler) ? payload.secenekler : [];
       if (!list.length) {
-        toast({ title: "Uygun boş saat yok", variant: "destructive" });
+        setMesaj({ tip: "bilgi", metin: BOS_SAAT_MESAJI });
         return;
       }
-      setOnerilen(list.map((s: any) => ({ gun: String(s.gun).slice(0, 10), saat: String(s.saat).slice(0, 5) })));
+      setOnerilen(list.map((s: any) => ({ gun: String(s.gun ?? "").slice(0, 10), saat: String(s.saat ?? "").slice(0, 5) })));
+      setMesaj({ tip: "bilgi", metin: `${list.length} saat önerildi — kontrol edin ve oluşturun.` });
     } catch (e: any) {
-      toast({ title: "Saat önerisi alınamadı", description: trErr(e?.message ?? ""), variant: "destructive" });
+      setMesaj({ tip: "hata", metin: trErr(e?.message ?? "") || "Saat önerisi alınamadı." });
     } finally {
       setAsking(false);
     }
   }
 
   async function createOffer() {
-    if (!partyId || !onerilen?.length) return;
+    if (!partyId || !onerilen?.length || creating) return;
     setCreating(true);
+    setMesaj(null);
     try {
       const { data, error } = await supabase.functions.invoke("randevu-teklif", {
         body: {
@@ -1192,13 +1231,30 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
           app_url: window.location.origin,
         },
       });
-      if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
-      setLink(String((data as any)?.link ?? ""));
+      if (error) {
+        setMesaj({ tip: "hata", metin: await hataMetni(error) });
+        return;
+      }
+      const payload = govde(data);
+      if (payload?.error === "musaitlik_yok") {
+        setMesaj({ tip: "bilgi", metin: BOS_SAAT_MESAJI });
+        return;
+      }
+      if (payload?.error) {
+        setMesaj({ tip: "hata", metin: String(payload.error) });
+        return;
+      }
+      const yeniLink = String(payload?.link ?? "");
+      if (!yeniLink) {
+        setMesaj({ tip: "hata", metin: "Teklif oluştu ama link dönmedi." });
+        return;
+      }
+      setLink(yeniLink);
       setEditing(false);
+      setMesaj({ tip: "bilgi", metin: "Randevu teklifi oluşturuldu — linki tarafa iletin." });
       toast({ title: "Randevu teklifi oluşturuldu" });
     } catch (e: any) {
-      toast({ title: "Teklif oluşturulamadı", description: trErr(e?.message ?? ""), variant: "destructive" });
+      setMesaj({ tip: "hata", metin: trErr(e?.message ?? "") || "Teklif oluşturulamadı." });
     } finally {
       setCreating(false);
     }
@@ -1254,9 +1310,22 @@ function RandevuTeklifKarti({ caseRow, parties }: { caseRow: CaseRow; parties: a
         </div>
         <Button onClick={askAgent} disabled={asking || !partyId}>
           {asking ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CalIcon className="h-4 w-4 mr-1" />}
-          Randevu ayarla
+          {asking ? "Hazırlanıyor…" : "Randevu ayarla"}
         </Button>
       </div>
+
+      {mesaj && (
+        <div
+          className={
+            "text-sm rounded border p-3 " +
+            (mesaj.tip === "hata"
+              ? "border-destructive/40 bg-destructive/10 text-destructive"
+              : "border-amber-300 bg-amber-50 text-amber-900")
+          }
+        >
+          {mesaj.metin}
+        </div>
+      )}
 
       {onerilen && !link && (
         <div className="space-y-2">
