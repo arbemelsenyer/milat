@@ -360,3 +360,6 @@ kontrolü (randevu_teklifi görevi açma). Tetikleyici/cron sonraki taş.
 
 13.08: randevu-teklif iç çağrı kapısı (x-cron-secret) + iç çağrıda tarafa teklif
 e-postası. Nöbetçinin randevu_teklifi görevini işlemesi sonraki taş.
+
+13.08: Nöbetçi randevu_teklifi görevini işliyor — başvuran taraf için teklif iç çağrıyla
+oluşturuluyor, link tarafa e-postayla gidiyor. Cron tetikleyici hâlâ yok.

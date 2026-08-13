@@ -40,6 +40,17 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (31)
+Nöbetçi artık randevu_teklifi görevini de işliyor: dosyada durum='beklemede' teklif varsa
+görev 'atlandi'; yoksa başvuran taraf (case_parties.party_role='applicant') ile
+randevu-teklif "olustur" iç çağrı kapısından (x-cron-secret) çağrılıyor. Başarıda
+'yapildi' + "teklif oluşturuldu, link tarafa e-postayla gönderildi"; musaitlik_yok'ta
+'atlandi'; HTTP/iç çağrı hatasında görev 'bekliyor' kalıyor ve neden sonuc alanına
+yazılıyor (sonraki koşuda yeniden denenir). soru_gonder işleme, zaman kontrolü, güvenlik
+ve agent_states kaydı değişmedi. tsc temiz.
+REDEPLOY GEREKLİ: ajan-nobetci Lovable'dan yeniden deploy edilmeli (CRON_SECRET tanımlı
+olmalı, yoksa iç çağrı yapılamıyor ve görev bekliyor kalıyor).
+
 ## Nerede kaldık — 13.08.2026 (30)
 randevu-teklif: "olustur" artık iç çağrıyla da çalışıyor — x-cron-secret CRON_SECRET ile
 eşleşirse JWT ve dosya erişim kontrolü atlanıyor (dosya/taraf tutarlılığı yine

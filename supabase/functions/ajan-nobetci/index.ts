@@ -73,6 +73,53 @@ async function soruGonder(admin: any, caseId: string, partyId: string): Promise<
   return { durum: "yapildi", sonuc: "soru tarafın kanalına yazıldı" };
 }
 
+// randevu_teklifi görevi: randevu-teklif fonksiyonunu iç çağrı kapısından (x-cron-secret)
+// "olustur" ile çağırır. Saat seçimi ve tarafa e-posta o fonksiyonun işidir; burada
+// yalnız tetiklenir. Çifte teklif olmasın diye önce bekleyen teklif kontrol edilir.
+async function randevuTeklifiYurut(admin: any, caseId: string): Promise<{ durum: string; sonuc: string }> {
+  const { data: bekleyenTeklif, error: tErr } = await admin.from("randevu_teklifleri")
+    .select("id").eq("case_id", caseId).eq("durum", "beklemede").limit(1);
+  if (tErr) return { durum: "bekliyor", sonuc: `Mevcut teklifler okunamadı: ${tErr.message}` };
+  if (bekleyenTeklif && bekleyenTeklif.length > 0) {
+    return { durum: "atlandi", sonuc: "Dosyada zaten cevap bekleyen randevu teklifi var" };
+  }
+
+  const { data: taraflar, error: pErr } = await admin.from("case_parties")
+    .select("id, party_role").eq("case_id", caseId).eq("party_role", "applicant").limit(1);
+  if (pErr) return { durum: "bekliyor", sonuc: `Taraf okunamadı: ${pErr.message}` };
+  const basvuran = (taraflar ?? [])[0];
+  if (!basvuran?.id) return { durum: "atlandi", sonuc: "Dosyada başvuran taraf yok" };
+
+  if (!CRON_SECRET) return { durum: "bekliyor", sonuc: "CRON_SECRET tanımlı değil, iç çağrı yapılamadı" };
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/randevu-teklif`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-cron-secret": CRON_SECRET,
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+      },
+      body: JSON.stringify({ action: "olustur", case_id: caseId, party_id: basvuran.id }),
+    });
+    const govde = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { durum: "bekliyor", sonuc: `Teklif oluşturulamadı (HTTP ${res.status}): ${String((govde as any)?.error ?? "").slice(0, 200)}` };
+    }
+    const hata = (govde as any)?.error;
+    if (hata === "musaitlik_yok") {
+      return { durum: "atlandi", sonuc: "Takvimde uygun boş saat yok" };
+    }
+    if (hata) {
+      return { durum: "bekliyor", sonuc: `Teklif oluşturulamadı: ${String(hata).slice(0, 200)}` };
+    }
+    return { durum: "yapildi", sonuc: "teklif oluşturuldu, link tarafa e-postayla gönderildi" };
+  } catch (e: any) {
+    return { durum: "bekliyor", sonuc: `İç çağrı başarısız: ${e?.message ?? String(e)}` };
+  }
+}
+
 // Zaman kontrolü: süre bitimine SURE_ESIGI_GUN veya daha az kaldıysa, gelecekte planlı
 // oturum ve bekleyen randevu teklifi yoksa panoya randevu_teklifi görevi bırakılır.
 async function zamanKontrolu(admin: any, dosya: any): Promise<boolean> {
@@ -176,14 +223,16 @@ Deno.serve(async (req) => {
 
         for (const gorev of (gorevler ?? []) as any[]) {
           // Tanınmayan görev tipine dokunulmaz: 'bekliyor' kalır.
-          if (gorev.gorev_tipi !== "soru_gonder") continue;
-          if (!gorev.hedef_party_id) {
+          if (gorev.gorev_tipi !== "soru_gonder" && gorev.gorev_tipi !== "randevu_teklifi") continue;
+          if (gorev.gorev_tipi === "soru_gonder" && !gorev.hedef_party_id) {
             await admin.from("ajan_gorevleri")
               .update({ durum: "atlandi", sonuc: "Hedef taraf yok" }).eq("id", gorev.id);
             atlananGorev++;
             continue;
           }
-          const { durum, sonuc } = await soruGonder(admin, dosya.id, gorev.hedef_party_id);
+          const { durum, sonuc } = gorev.gorev_tipi === "randevu_teklifi"
+            ? await randevuTeklifiYurut(admin, dosya.id)
+            : await soruGonder(admin, dosya.id, gorev.hedef_party_id);
           if (durum !== "bekliyor") {
             await admin.from("ajan_gorevleri").update({ durum, sonuc }).eq("id", gorev.id);
           } else {

@@ -91,3 +91,8 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
   ilgili tarafa e-postayla gider: ad, dosya künyesi (no, konu), önerilen saatler ve tek
   dokunuşluk link; karşı tarafa ait hiçbir veri geçmez. Ekrandan oluşturmada e-posta
   gönderilmez, link ekranda kalır. Gönderim hatası teklifi düşürmez.
+● 13.08: ajan-nobetci randevu_teklifi görevini işler — dosyada cevap bekleyen teklif varsa
+  görevi atlar (çifte teklif yok); yoksa başvuran taraf için randevu-teklif "olustur"u iç
+  çağrı kapısından çağırır. Saat seçimi ve tarafa e-posta randevu-teklif'in işidir.
+  Müsait saat yoksa görev atlanır; HTTP/iç çağrı hatasında görev bekliyor kalır ve
+  sonraki koşuda yeniden denenir.
