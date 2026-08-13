@@ -92,16 +92,43 @@ async function randevuTeklifiYurut(admin: any, caseId: string): Promise<{ durum:
 
   if (!CRON_SECRET) return { durum: "bekliyor", sonuc: "CRON_SECRET tanımlı değil, iç çağrı yapılamadı" };
 
+  const icBaslik = {
+    "Content-Type": "application/json",
+    "x-cron-secret": CRON_SECRET,
+    apikey: SERVICE_KEY,
+    Authorization: `Bearer ${SERVICE_KEY}`,
+  };
+
   try {
+    // Saatleri fonksiyon seçer ("oner"), sonra her seçeneğe oturum_tipi:"online"
+    // eklenip teklif oluşturulur — ajan akışının varsayılanı çevrim içi görüşmedir.
+    const oRes = await fetch(`${SUPABASE_URL}/functions/v1/randevu-teklif`, {
+      method: "POST",
+      headers: icBaslik,
+      body: JSON.stringify({ action: "oner", case_id: caseId, party_id: basvuran.id }),
+    });
+    const oBody = await oRes.json().catch(() => ({}));
+    if (!oRes.ok) {
+      return { durum: "bekliyor", sonuc: `Saat önerisi alınamadı (HTTP ${oRes.status}): ${String((oBody as any)?.error ?? "").slice(0, 200)}` };
+    }
+    if ((oBody as any)?.error === "musaitlik_yok") {
+      return { durum: "atlandi", sonuc: "Takvimde uygun boş saat yok" };
+    }
+    if ((oBody as any)?.error) {
+      return { durum: "bekliyor", sonuc: `Saat önerisi alınamadı: ${String((oBody as any).error).slice(0, 200)}` };
+    }
+    const onerilen = Array.isArray((oBody as any)?.secenekler) ? (oBody as any).secenekler : [];
+    if (onerilen.length === 0) return { durum: "atlandi", sonuc: "Takvimde uygun boş saat yok" };
+    const secenekler = onerilen.map((s: any) => ({
+      gun: String(s?.gun ?? "").slice(0, 10),
+      saat: String(s?.saat ?? "").slice(0, 5),
+      oturum_tipi: "online",
+    }));
+
     const res = await fetch(`${SUPABASE_URL}/functions/v1/randevu-teklif`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-cron-secret": CRON_SECRET,
-        apikey: SERVICE_KEY,
-        Authorization: `Bearer ${SERVICE_KEY}`,
-      },
-      body: JSON.stringify({ action: "olustur", case_id: caseId, party_id: basvuran.id }),
+      headers: icBaslik,
+      body: JSON.stringify({ action: "olustur", case_id: caseId, party_id: basvuran.id, secenekler }),
     });
     const govde = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -188,7 +215,9 @@ async function videoBaglantilariniHazirla(admin: any, dosya: any): Promise<numbe
   const adaylar = ((oturumlar ?? []) as any[]).filter((s) => !String(s.video_link ?? "").trim());
   if (adaylar.length === 0) return 0;
 
-  // Cevaplanmış tekliflerdeki yüz yüze saatler — bu saatlere düşen oturumlar atlanır.
+  // Cevaplanmış tekliflerdeki saat → oturum tipi eşlemesi. Yalnız açıkça "yuz_yuze"
+  // işaretli saatler dışlanır; işaret yoksa (eski kayıtlar dahil) oturum çevrim içi
+  // sayılır ve bağlantı üretilir.
   const yuzYuzeSaatler = new Set<string>();
   const { data: teklifler } = await admin.from("randevu_teklifleri")
     .select("secenekler, durum").eq("case_id", dosya.id).eq("durum", "cevaplandi").limit(50);

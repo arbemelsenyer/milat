@@ -216,9 +216,9 @@ async function davetPdfBase64(satirlar: { baslik: string; govde: string[] }): Pr
 // o tarafın kendi oturum bilgisini taşır; analiz, gizli kanal ve tutar içeriği girmez.
 async function oturumDavetiGonder(
   admin: any,
-  opts: { party: any; slot: Secenek; secenekler: any[]; caseId: string },
+  opts: { party: any; slot: Secenek; secenekler: any[]; caseId: string; videoLink?: string | null },
 ): Promise<boolean> {
-  const { party, slot, secenekler, caseId } = opts;
+  const { party, slot, secenekler, caseId, videoLink } = opts;
   const email = String(party?.email ?? "").trim();
   if (!email) {
     console.error("[randevu-teklif] davet gönderilemedi: tarafın e-postası yok");
@@ -248,9 +248,15 @@ async function oturumDavetiGonder(
 
   // Video bağlantısı yalnız oturum ekranındaki mevcut akışta (oturum sahibinin
   // oturumuyla) üretilebiliyor; buradan üretilemediği için uydurma link yazılmaz.
+  const link = String(videoLink ?? "").trim();
   const yerSatiri = yuzYuze
     ? (adres ? `Görüşme adresi: ${adres.replace(/</g, "&lt;")}` : "Görüşme adresi arabulucunuz tarafından iletilecektir.")
-    : "Görüşme çevrim içi yapılacaktır; katılım bağlantısı görüşme öncesi iletilecektir.";
+    : (link
+      ? `Görüşme bağlantısı: <a href="${link}">${link.replace(/</g, "&lt;")}</a>`
+      : "Görüşme çevrim içi yapılacaktır; katılım bağlantısı görüşme öncesi iletilecektir.");
+  const yerSatiriDuz = yuzYuze
+    ? (adres ? `Görüşme adresi: ${adres}` : "Görüşme adresi arabulucunuz tarafından iletilecektir.")
+    : (link ? `Görüşme bağlantısı: ${link}` : "Görüşme çevrim içi yapılacaktır; katılım bağlantısı görüşme öncesi iletilecektir.");
 
   // Dosya künyesi: yalnız numara, konu başlığı, taraf ADLARI ve arabulucu adı.
   // Analiz, gizli kanal içeriği ve tutar bu yazıya giremez.
@@ -300,9 +306,7 @@ async function oturumDavetiGonder(
       "Görüşme türü: Ön Görüşme",
       `Tarih: ${dateStr}`,
       `Saat: ${timeStr}`,
-      yuzYuze
-        ? (adres ? `Görüşme adresi: ${adres}` : "Görüşme adresi arabulucunuz tarafından iletilecektir.")
-        : "Görüşme çevrim içi yapılacaktır; katılım bağlantısı görüşme öncesi iletilecektir.",
+      yerSatiriDuz,
       "Saygılarımızla,",
       davetImzasi,
       IMZA_NOTU,
@@ -473,7 +477,7 @@ async function cevaplaIsle(admin: any, token: string, secimRaw: string): Promise
           .eq("id", (row as any).party_id).maybeSingle();
         // Türkiye saati sabit UTC+3 (yaz saati uygulaması yok).
         const scheduledAt = new Date(`${secilenSlot.gun}T${secilenSlot.saat}:00+03:00`).toISOString();
-        const { error: sesErr } = await admin.from("case_sessions").insert({
+        const { data: yeniOturum, error: sesErr } = await admin.from("case_sessions").insert({
           case_id: (row as any).case_id,
           session_type: "preliminary",
           scheduled_at: scheduledAt,
@@ -482,8 +486,46 @@ async function cevaplaIsle(admin: any, token: string, secimRaw: string): Promise
           participants: p
             ? [{ party_id: (p as any).id, user_id: (p as any).user_id, role: (p as any).party_role }]
             : [],
-        } as any);
+        } as any).select("id").maybeSingle();
         if (sesErr) console.error("[randevu-teklif] oturum kaydı yazılamadı", sesErr.message);
+
+        // Çevrim içi görüşmede (oturum_tipi yoksa da çevrim içi sayılır) video odası
+        // hemen iç kapıdan üretilir; link oturuma yazılır ve davet yazısına girer.
+        // Yüz yüze görüşmede link üretilmez. Hata olursa davet linksiz gider.
+        const secilenKayit = (Array.isArray(secenekler) ? secenekler : []).find(
+          (s: any) => String(s?.gun ?? "").slice(0, 10) === secilenSlot.gun &&
+                      String(s?.saat ?? "").slice(0, 5) === secilenSlot.saat,
+        );
+        const yuzYuzeSecim = (secilenKayit as any)?.oturum_tipi === "yuz_yuze";
+        let videoLink: string | null = null;
+        if (!yuzYuzeSecim && (yeniOturum as any)?.id && CRON_SECRET) {
+          try {
+            const vRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/create-video-room`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-cron-secret": CRON_SECRET,
+                apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+                Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}`,
+              },
+              body: JSON.stringify({ sessionId: (yeniOturum as any).id }),
+            });
+            const vBody = await vRes.json().catch(() => ({}));
+            const url = String((vBody as any)?.room_url ?? "").trim();
+            if (vRes.ok && url) {
+              videoLink = url;
+              const { data: guncel } = await admin.from("case_sessions")
+                .select("video_link").eq("id", (yeniOturum as any).id).maybeSingle();
+              if (!String((guncel as any)?.video_link ?? "").trim()) {
+                await admin.from("case_sessions").update({ video_link: url }).eq("id", (yeniOturum as any).id);
+              }
+            } else {
+              console.error("[randevu-teklif] video odası üretilemedi", vRes.status, String((vBody as any)?.error ?? "").slice(0, 200));
+            }
+          } catch (e) {
+            console.error("[randevu-teklif] video odası çağrısı başarısız", (e as any)?.message ?? e);
+          }
+        }
 
         // Oturum davet yazısı: gönderim hatası cevabı ve oturum kaydını etkilemez.
         davetGonderildi = await oturumDavetiGonder(admin, {
@@ -491,6 +533,7 @@ async function cevaplaIsle(admin: any, token: string, secimRaw: string): Promise
           slot: secilenSlot,
           secenekler,
           caseId: String((row as any).case_id ?? ""),
+          videoLink,
         });
       }
     } catch (e) {
@@ -593,7 +636,8 @@ Deno.serve(async (req) => {
     if (action === "oner") {
       const case_id = String((body as any)?.case_id ?? "");
       const party_id = String((body as any)?.party_id ?? "");
-      const k = await yetkiKontrol(req, admin, supabaseUrl, anonKey, case_id, party_id);
+      const isCron = !!CRON_SECRET && req.headers.get("x-cron-secret") === CRON_SECRET;
+      const k = await yetkiKontrol(req, admin, supabaseUrl, anonKey, case_id, party_id, isCron);
       if ((k as any).hata) return (k as any).hata;
       const { secenekler, hata, tanili } = await saatleriSec(admin, takvimSahibi((k as any).caseRow), (k as any).party);
       if (hata) return json({ error: hata, tanili });

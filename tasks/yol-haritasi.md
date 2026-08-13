@@ -387,3 +387,6 @@ istiyor; girişsiz cevap akışında JWT yok) — açık uç.
 
 13.08: Taraf sohbet asistanı motoru (taraf-asistan) yazıldı — kör veri sınırıyla, case-qa
 model kapısıyla. Ekran parçası sonraki taş.
+
+13.08: Ajan teklifleri online işaretleniyor; onay anında video bağlantısı üretilip davet
+yazısına giriyor.

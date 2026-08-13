@@ -40,6 +40,21 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (40)
+Ajan tekliflerinde oturum tipi ve video bağlantısı zinciri kapandı:
+1) ajan-nobetci randevu_teklifi görevinde önce "oner" (iç kapıdan) çağırıp saatleri alıyor,
+   her seçeneğe oturum_tipi:"online" ekleyip "olustur"a gönderiyor. randevu-teklif'in
+   "oner" eylemi de iç kapıyı (x-cron-secret) tanıyor.
+2) Video hattındaki tespit netleştirildi: yalnız cevaplanmış tekliflerde AÇIKÇA "yuz_yuze"
+   işaretli saate düşen oturumlar atlanıyor; işaret yoksa (eski kayıtlar dahil) oturum
+   çevrim içi sayılıp bağlantı üretiliyor.
+3) randevu-teklif "Uygun" cevabında oturum kaydı açılır açılmaz (seçim yüz yüze değilse)
+   create-video-room iç kapıdan çağrılıyor, link video_link'e yazılıyor ve davet
+   e-postası/PDF'inde "Görüşme bağlantısı: <link>" satırı olarak geçiyor; yüz yüzede link
+   satırı hiç çıkmıyor, link üretilemezse eski "iletilecektir" metni kalıyor.
+İmza ve PDF eki değişmedi. tsc temiz.
+REDEPLOY GEREKLİ: randevu-teklif ve ajan-nobetci birlikte deploy edilmeli.
+
 ## Nerede kaldık — 13.08.2026 (39)
 Taraf sohbet asistanının motoru yazıldı: supabase/functions/taraf-asistan (verify_jwt=true,
 config.toml'a eklendi). JWT'deki kullanıcının o dosyada taraf olduğu case_parties.user_id

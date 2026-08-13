@@ -119,3 +119,10 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
   Asistan hukuki tavsiye vermez, karşı taraf hakkında yorum ve teşhis üretmez, veri yoksa
   "bu bilgi bende yok" der. Model kapısı case-qa ile aynı üç kademedir. Her çağrı
   agent_states ve agent_worklog'a koşum izi bırakır (içerik değil).
+● 13.08: Ajanın açtığı randevu tekliflerinde seçenekler oturum_tipi:"online" taşır
+  (nöbetçi önce "oner" ile saatleri alır, işaretleyip "olustur"a gönderir; "oner" de iç
+  kapıyı tanır). Taraf "Uygun" dediğinde oturum kaydı açılır açılmaz — seçim yüz yüze
+  değilse — video odası iç kapıdan üretilir, video_link'e yazılır ve davet yazısına
+  "Görüşme bağlantısı" satırı olarak girer. Yüz yüze görüşmede link üretilmez. Nöbetçinin
+  video hattı yalnız açıkça yüz yüze işaretli saatleri atlar; işaretsiz eski oturumlar
+  çevrim içi sayılır.
