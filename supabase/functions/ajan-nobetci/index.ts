@@ -237,10 +237,11 @@ type VideoOzet = {
   atlanan_yuz_yuze: number;
   atlama_sebepleri: string[];
   hatalar: string[];
+  imza_adi: string;
 };
 
 async function videoBaglantilariniHazirla(admin: any, dosya: any): Promise<VideoOzet> {
-  const ozet: VideoOzet = { hazirlanan: 0, incelenen: 0, atlanan_yuz_yuze: 0, atlama_sebepleri: [], hatalar: [] };
+  const ozet: VideoOzet = { hazirlanan: 0, incelenen: 0, atlanan_yuz_yuze: 0, atlama_sebepleri: [], hatalar: [], imza_adi: "" };
   const simdi = new Date().toISOString();
   const { data: oturumlar, error: sErr } = await admin.from("case_sessions")
     .select("id, scheduled_at, status, video_link, participants")
@@ -327,8 +328,9 @@ async function videoBaglantilariniHazirla(admin: any, dosya: any): Promise<Video
         }
       }
 
-      const epostaHatalari = await videoBaglantiEpostasi(admin, dosya, oturum, link, gun, saat);
-      for (const h of epostaHatalari) ozet.hatalar.push(`${oturum.id}: ${h}`);
+      const eposta = await videoBaglantiEpostasi(admin, dosya, oturum, link, gun, saat);
+      for (const h of eposta.hatalar) ozet.hatalar.push(`${oturum.id}: ${h}`);
+      if (eposta.imzaAdi) ozet.imza_adi = eposta.imzaAdi;
       ozet.hazirlanan++;
     } catch (e: any) {
       const msg = e?.message ?? String(e);
@@ -344,22 +346,29 @@ async function videoBaglantilariniHazirla(admin: any, dosya: any): Promise<Video
 // Karşı tarafa ait hiçbir veri geçmez; imza dosyanın arabulucusunun adıdır.
 async function videoBaglantiEpostasi(
   admin: any, dosya: any, oturum: any, link: string, gun: string, saat: string,
-): Promise<string[]> {
+): Promise<{ hatalar: string[]; imzaAdi: string }> {
   const hatalar: string[] = [];
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) {
     console.error("[ajan-nobetci] RESEND_API_KEY yok, bağlantı e-postası gönderilemedi");
-    return ["RESEND_API_KEY yok, bağlantı e-postası gönderilemedi"];
+    return { hatalar: ["RESEND_API_KEY yok, bağlantı e-postası gönderilemedi"], imzaAdi: "" };
   }
   const partyIds = (Array.isArray(oturum?.participants) ? oturum.participants : [])
     .map((p: any) => String(p?.party_id ?? "")).filter(Boolean);
-  if (partyIds.length === 0) return ["oturumda katılımcı taraf kaydı yok, e-posta gönderilmedi"];
+  if (partyIds.length === 0) {
+    return { hatalar: ["oturumda katılımcı taraf kaydı yok, e-posta gönderilmedi"], imzaAdi: "" };
+  }
 
   const { data: taraflar } = await admin.from("case_parties")
     .select("id, party_type, first_name, last_name, company_name, email")
     .in("id", partyIds);
 
-  const arabulucuId = takvimSahibi(dosya);
+  // İmza çözümlemesi randevu-teklif'teki davet e-postasının BİREBİR aynısı: dosya satırı
+  // burada id ile yeniden okunur (döngüden gelen nesneye güvenilmez), sonra takvimSahibi
+  // ve profiles.full_name sorgusu aynı sırayla çalışır.
+  const { data: dosyaSatiri } = await admin.from("cases")
+    .select("application_no, title, assigned_mediator_id, user_id").eq("id", dosya?.id).maybeSingle();
+  const arabulucuId = takvimSahibi(dosyaSatiri);
   const { data: profil } = arabulucuId
     ? await admin.from("profiles").select("full_name").eq("user_id", arabulucuId).maybeSingle()
     : { data: null };
@@ -367,13 +376,21 @@ async function videoBaglantiEpostasi(
   // "Arb. <ad soyad>". Ad bulunamazsa yalnız "Saygılarımızla," yazılır.
   const adSoyad = String((profil as any)?.full_name ?? "").trim();
   const imza = adSoyad ? (/^arb\.?\s/i.test(adSoyad) ? adSoyad : `Arb. ${adSoyad}`) : "";
-  if (!adSoyad) hatalar.push("arabulucu adı bulunamadı, imza adsız gönderildi");
+  if (!dosyaSatiri) {
+    hatalar.push(`cases sorgusu boş döndü (id=${String(dosya?.id ?? "")}), imza adsız gönderildi`);
+  } else if (!arabulucuId) {
+    hatalar.push("cases satırında assigned_mediator_id ve user_id boş, imza adsız gönderildi");
+  } else if (!adSoyad) {
+    hatalar.push(`profiles sorgusu boş döndü (user_id=${arabulucuId}), imza adsız gönderildi`);
+  }
 
   const esc = (t: string) => String(t).replace(/</g, "&lt;");
   const tarih = trTarihMetni(gun);
   const kunye: string[] = [];
-  if (dosya?.application_no) kunye.push(`<strong>Dosya No:</strong> ${esc(String(dosya.application_no))}`);
-  if (dosya?.title) kunye.push(`<strong>Uyuşmazlık konusu:</strong> ${esc(String(dosya.title))}`);
+  const appNo = (dosyaSatiri as any)?.application_no ?? dosya?.application_no;
+  const baslik = (dosyaSatiri as any)?.title ?? dosya?.title;
+  if (appNo) kunye.push(`<strong>Dosya No:</strong> ${esc(String(appNo))}`);
+  if (baslik) kunye.push(`<strong>Uyuşmazlık konusu:</strong> ${esc(String(baslik))}`);
 
   for (const t of (taraflar ?? []) as any[]) {
     const email = String(t?.email ?? "").trim();
@@ -411,7 +428,7 @@ async function videoBaglantiEpostasi(
       console.error(`[ajan-nobetci] bağlantı e-postası hatası: ${e?.message ?? e}`);
     }
   }
-  return hatalar;
+  return { hatalar, imzaAdi: imza };
 }
 
 // Koşum kaydı: agent_states'e mevcut upsert deseniyle 'nobetci' satırı (dosya başına bir satır).
@@ -459,6 +476,7 @@ Deno.serve(async (req) => {
     let incelenenOturum = 0;
     let atlananYuzYuze = 0;
     const atlamaSebepleri: string[] = [];
+    let imzaAdi = "";
     const hatalar: string[] = [];
 
     for (const dosya of (dosyalar ?? []) as any[]) {
@@ -504,6 +522,7 @@ Deno.serve(async (req) => {
         atlananYuzYuze += videoOzet.atlanan_yuz_yuze;
         atlamaSebepleri.push(...videoOzet.atlama_sebepleri);
         hatalar.push(...videoOzet.hatalar);
+        if (videoOzet.imza_adi) imzaAdi = videoOzet.imza_adi;
         islenenDosya++;
 
         await nobetciDurumYaz(admin, dosya.id, {
@@ -540,6 +559,7 @@ Deno.serve(async (req) => {
       incelenen_oturum: incelenenOturum,
       atlanan_yuz_yuze: atlananYuzYuze,
       atlama_sebepleri: atlamaSebepleri,
+      imza_adi: imzaAdi,
       hata: hatalar,
     });
   } catch (e: any) {

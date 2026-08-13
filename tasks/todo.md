@@ -40,6 +40,15 @@ Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
   hususlara neden_rapora_girmedi alanını da taşıyor. Eşik, 5 husus sınırı, uyarı
   metni, AI çıktı şeması ve PDF çıktısı değişmedi.
 
+## Nerede kaldık — 13.08.2026 (46)
+"Görüşme bağlantınız" e-postasının imza çözümlemesi randevu-teklif'teki çalışan kodun
+birebir aynısına çevrildi: dosya satırı e-posta içinde id ile yeniden okunuyor
+(cases: application_no, title, assigned_mediator_id, user_id) → takvimSahibi →
+profiles.full_name; döngüden gelen nesneye güvenilmiyor. Künye de bu taze satırdan
+alınıyor. Teşhis için koşum özetine imza_adi eklendi ve ad bulunamazsa hangi sorgunun boş
+döndüğü (cases mi, profiles mı, yoksa iki kimlik alanı da boş mu) hata dizisine yazılıyor.
+tsc temiz. REDEPLOY GEREKLİ: ajan-nobetci.
+
 ## Nerede kaldık — 13.08.2026 (45)
 "Görüşme bağlantınız" e-postasının imzası randevu-teklif'teki davet yazısıyla aynı bloğa
 çevrildi: "Saygılarımızla," + "Arb. <arabulucunun ad soyadı>" (ad zaten Arb. ile
