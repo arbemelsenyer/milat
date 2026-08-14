@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AppNavbar } from "@/components/AppNavbar";
 import { Card } from "@/components/ui/card";
@@ -689,8 +689,15 @@ export default function CaseRoom() {
           <TabsTrigger value="experts" className={tabTriggerAccentClass}><Award className="h-4 w-4 mr-1" />Bilirkişi Onayı</TabsTrigger>
           <TabsTrigger value="payment" className={tabTriggerAccentClass}><Wallet className="h-4 w-4 mr-1" />Ödeme Bilgim</TabsTrigger>
           <TabsTrigger value="randevu" className={tabTriggerAccentClass}><Calendar className="h-4 w-4 mr-1" />Randevu Tercihlerim</TabsTrigger>
+          <TabsTrigger value="ajanim" className={tabTriggerAccentClass}><Bot className="h-4 w-4 mr-1" />Ajanım</TabsTrigger>
           <TabsTrigger value="agents" className={tabTriggerAccentClass}><Bot className="h-4 w-4 mr-1" />AI Aktivitelerim</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="ajanim">
+          {myParty?.id
+            ? <AjanimBolumu caseId={caseId!} partyId={myParty.id} />
+            : <Card className="p-5"><p className="text-sm text-muted-foreground">Taraf kaydınız bulunamadı.</p></Card>}
+        </TabsContent>
 
         <TabsContent value="randevu">
           {myParty?.id
@@ -1018,6 +1025,188 @@ function CommonGroundView({ report }: { report: any }) {
 // taraf yalnız kendi satırlarını görür. Arabulucu ekranlarına ve karşı tarafa hiçbir şey
 // sızmaz. Yazma hatası yutulmaz, ekranda gösterilir.
 type MusaitlikRow = { id: string; gun: string; baslangic: string; bitis: string };
+
+/* ===================== AJANIM (yalnız taraf görünümü) =====================
+   Tarafın kendi ajanının ne yaptığı / ne yapamadığı ve yetki anahtarları.
+   KÖR VERİ: liste yalnız hedef_party_id bu tarafa ait satırları okur; karşı
+   tarafın veya dosya genelinin kayıtları hiçbir yoldan bu ekrana gelmez
+   (aynı sınır veritabanı politikasında da kuruludur).
+   ======================================================================== */
+type AjanimGorev = {
+  id: string;
+  gorev_tipi: string;
+  durum: string;
+  gerekce: string | null;
+  sonuc: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const AJANIM_ETIKET: Record<string, string> = {
+  taraf_musaitlik_iste: "Müsait saat isteği",
+  teklif_degerlendir: "Randevu teklifi değerlendirmesi",
+  taraf_alternatif_saat: "Alternatif saat önerisi",
+  taraf_eksik_bilgi: "Belge/bilgi isteği",
+  soru_gonder: "Keşif sorusu",
+};
+
+const AJANIM_DURUM: Record<string, { label: string; tone: string }> = {
+  yapildi: { label: "yapıldı", tone: "text-emerald-700 bg-emerald-500/10" },
+  atlandi: { label: "yapılmadı", tone: "text-muted-foreground bg-muted" },
+  bekliyor: { label: "sırada", tone: "text-amber-700 bg-amber-500/10" },
+};
+
+function AjanimBolumu({ caseId, partyId }: { caseId: string; partyId: string }) {
+  const [gorevler, setGorevler] = useState<AjanimGorev[]>([]);
+  const [listeHata, setListeHata] = useState<string | null>(null);
+  const [yukleniyor, setYukleniyor] = useState(true);
+
+  const [otomatikOnay, setOtomatikOnay] = useState(false);
+  const [hatirlatma, setHatirlatma] = useState(true);
+  // Kolon henüz eklenmediyse (göç çalıştırılmadıysa) anahtar gösterilmez.
+  const [hatirlatmaVar, setHatirlatmaVar] = useState(false);
+  const [anahtarBusy, setAnahtarBusy] = useState<string | null>(null);
+  const [anahtarHata, setAnahtarHata] = useState<string | null>(null);
+
+  async function yukle() {
+    setYukleniyor(true);
+    const [g, p] = await Promise.all([
+      (supabase.from("ajan_gorevleri" as any) as any)
+        .select("id, gorev_tipi, durum, gerekce, sonuc, created_at, updated_at")
+        .eq("case_id", caseId)
+        .eq("hedef_party_id", partyId)
+        .order("updated_at", { ascending: false })
+        .limit(50),
+      supabase.from("case_parties").select("*").eq("id", partyId).maybeSingle(),
+    ]);
+    if (g.error) { setListeHata(`Ajan kayıtları okunamadı: ${g.error.message}`); setGorevler([]); }
+    else { setListeHata(null); setGorevler((g.data ?? []) as AjanimGorev[]); }
+
+    if (p.error) setAnahtarHata(`Tercihler okunamadı: ${p.error.message}`);
+    else {
+      const satir = (p.data ?? {}) as Record<string, unknown>;
+      setOtomatikOnay(satir.otomatik_onay === true);
+      const kolonVar = Object.prototype.hasOwnProperty.call(satir, "hatirlatma_izni");
+      setHatirlatmaVar(kolonVar);
+      setHatirlatma(kolonVar ? satir.hatirlatma_izni !== false : true);
+    }
+    setYukleniyor(false);
+  }
+
+  useEffect(() => { void yukle(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [caseId, partyId]);
+
+  // Yazım geri okunarak doğrulanır: tek satır etkilenmediyse anahtar eski değerine
+  // döner ve hata ekranda kalır (yutulmaz).
+  async function anahtarYaz(alan: "otomatik_onay" | "hatirlatma_izni", next: boolean) {
+    if (anahtarBusy) return;
+    const onceki = alan === "otomatik_onay" ? otomatikOnay : hatirlatma;
+    const geriAl = () => (alan === "otomatik_onay" ? setOtomatikOnay(onceki) : setHatirlatma(onceki));
+    setAnahtarBusy(alan);
+    setAnahtarHata(null);
+    if (alan === "otomatik_onay") setOtomatikOnay(next); else setHatirlatma(next);
+    const { data, error } = await supabase.from("case_parties")
+      .update({ [alan]: next } as any).eq("id", partyId).select("id");
+    if (error) { geriAl(); setAnahtarHata(`Kaydedilemedi: ${error.message}`); }
+    else if (!Array.isArray(data) || data.length !== 1) {
+      geriAl();
+      setAnahtarHata(`Kaydedilemedi: beklenen tek kayıt yerine ${Array.isArray(data) ? data.length : 0} satır etkilendi.`);
+    }
+    setAnahtarBusy(null);
+  }
+
+  const satirlar = useMemo(
+    () => gorevler.map((g) => ({
+      ...g,
+      baslik: AJANIM_ETIKET[g.gorev_tipi] ?? g.gorev_tipi,
+      detay: g.sonuc || String(g.gerekce ?? "").replace(/^\[[^\]]+\]\s*/, "").trim(),
+    })),
+    [gorevler],
+  );
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div>
+        <h3 className="text-base font-semibold">Ajanım</h3>
+        <p className="text-sm text-muted-foreground">
+          Dosya asistanınızın sizin adınıza yaptıkları ve yapamadıkları. Bu bölüm yalnız size
+          görünür; karşı tarafın verisi burada yer almaz ve buradaki hiçbir bilgi karşı tarafa
+          gösterilmez.
+        </p>
+      </div>
+
+      <div className="border-t pt-3 space-y-3">
+        <div className="text-sm font-medium">Ajanıma verdiğim yetkiler</div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-sm">Randevuları benim adıma onaylayabilir</div>
+            <p className="text-xs text-muted-foreground">
+              Müsait saatlerinize uyan bir teklif geldiğinde ajanınız sizin adınıza onaylar.
+            </p>
+          </div>
+          <Switch
+            checked={otomatikOnay}
+            disabled={anahtarBusy === "otomatik_onay"}
+            onCheckedChange={(v) => anahtarYaz("otomatik_onay", !!v)}
+            aria-label="Randevuları benim adıma onaylayabilir"
+          />
+        </div>
+        {hatirlatmaVar ? (
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm">Bana hatırlatma gönderebilir</div>
+              <p className="text-xs text-muted-foreground">
+                Müsait saat, belge ve randevu onayı hatırlatmaları e-postayla gönderilir.
+              </p>
+            </div>
+            <Switch
+              checked={hatirlatma}
+              disabled={anahtarBusy === "hatirlatma_izni"}
+              onCheckedChange={(v) => anahtarYaz("hatirlatma_izni", !!v)}
+              aria-label="Bana hatırlatma gönderebilir"
+            />
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground italic">
+            Hatırlatma anahtarı için veritabanı alanı bekleniyor; şimdilik hatırlatmalar açıktır.
+          </p>
+        )}
+        {anahtarHata && <p className="text-sm text-destructive">{anahtarHata}</p>}
+      </div>
+
+      <div className="border-t pt-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-sm font-medium">Ajanım ne yaptı, ne yapmadı</div>
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => void yukle()} disabled={yukleniyor}>
+            {yukleniyor ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Yenile"}
+          </Button>
+        </div>
+        {listeHata && <p className="text-sm text-destructive">{listeHata}</p>}
+        {!listeHata && satirlar.length === 0 && !yukleniyor && (
+          <p className="text-sm text-muted-foreground italic">Ajanınız henüz bir işlem yapmadı.</p>
+        )}
+        <ul className="divide-y">
+          {satirlar.map((r) => {
+            const durum = AJANIM_DURUM[r.durum] ?? { label: r.durum, tone: "text-muted-foreground bg-muted" };
+            return (
+              <li key={r.id} className="py-2 flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm flex items-center gap-2 flex-wrap">
+                    <span className="font-medium">{r.baslik}</span>
+                    <span className={`text-[11px] px-1.5 py-0.5 rounded-full ${durum.tone}`}>{durum.label}</span>
+                  </div>
+                  {r.detay && <div className="text-xs text-muted-foreground break-words">{r.detay}</div>}
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {new Date(r.updated_at || r.created_at).toLocaleString("tr-TR")}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </Card>
+  );
+}
 
 function RandevuTercihlerim({ partyId }: { partyId: string }) {
   const [rows, setRows] = useState<MusaitlikRow[]>([]);
