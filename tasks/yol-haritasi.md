@@ -409,3 +409,29 @@ linkleri dahil) /cases/:id tek kapısından geçiyor; kapı query parametrelerin
 yasal süre, TARAFLAR ve BELGELER tek ekranda. Eski Aşama 2 (Taraflar) kalktı, aşama
 sayısı 8'den 7'ye indi; eski numaralı bağlantılar (pv işareti taşımayanlar) yeni
 numaraya çevriliyor.
+
+[14.08 KURUCU KARARLARI — YENİ YOL KALEMLERİ (hepsi YAPILACAK, bu sırayla)]
+1. BATNA'nın taraf yüzü (IBA kararı) — tarafa emsal sonuç dağılımı + türetilmiş risk
+   bandı gösterilir; TEK RAKAM VERİLMEZ. Arabulucu yüzü (§5.2h Dava Alternatifi Hesabı)
+   olduğu gibi kalır.
+2. İletişim Tercihi Katmanı (IBA kararı) — taraf, hangi kanaldan ve hangi sıklıkta
+   bilgilendirileceğini kendi ekranından seçer; bildirimler bu tercihe göre gider.
+3. AI Oturum Notları (IBA kararı) — oturum notunun yapay zekâ üretimi hâli; arabulucuya
+   düzenlenebilir taslak olarak gelir, onaylanınca föye ve analiz zincirine girer.
+4. Belge özeti — yüklenen her belgeye tek paragraf özet + "neyi kanıtlıyor" satırı;
+   arabulucu ekranında görünür.
+5. İletişimdeki değişim işareti — party-communication-analysis üzerinden "bu konuda dil
+   sertleşti / yumuşadı" işareti. ÇİZGİ: kişilik/psikoloji etiketi yok, teşhis yok;
+   yalnız tarafın kendi metinlerindeki değişim, yalnız arabulucuya, karşı tarafa asla.
+6. Görüşme kaydı ve dökümü — (a) kayıt onayı katmanı (YZ Beyanı kalıbı; bir taraf bile
+   onay vermezse kayıt açılamaz) · (b) video kaydı ve elle yüklenen kayıt (WhatsApp/PC)
+   yazıya dökülüp AI Oturum Notu olarak yalnız arabulucuya gösterilir · (c) v1'de kaydı
+   kullanıcı yükler, masaüstü kayıt aracı sonraya · (d) SAKLAMA YOK: ses dosyası döküm
+   çıkınca, döküm metni dosya kapanınca otomatik silinir.
+7. Nitelikli arabulucu ataması — başvuru gelince ajan uyuşmazlık türüne göre uygun
+   uzmanlıktaki arabulucuyu atar; yanında "Değiştir" düğmesi, son söz insanda.
+8. Ajan Paneli'nde "yapılmayanlar ve sebebi" — nöbetçinin atlama sebepleri (süre kaydı
+   yok, keşif sorusu yok, ortak zemin bekleniyor vb.) zaman damgalı gösterilir.
+9. Kör Teklif v2 / braketleme (GÜNCELLENDİ) — taraflardan tek rakam yerine alt-üst aralık
+   alınır; braketlerin çakışması ve yakınlaşma taraflara rakam sızdırmadan bildirilir;
+   yakınlık seyri yalnız arabulucuya görünür.

@@ -1,3 +1,40 @@
+## SIRADAKİ İŞLER — 14.08.2026 kurucu kararları (yapılacak, bu sırayla)
+
+- [ ] 1. BATNA'nın TARAF YÜZÜ (IBA kararı) — Tarafa dava alternatifi gösterilirken emsal
+      sonuç dağılımı ve bundan türetilmiş RİSK BANDI gösterilir. TEK RAKAM VERİLMEZ:
+      "şu kadar alırsınız" yasak; yalnız dağılım + bant + dayanak. Arabulucu yüzündeki
+      Dava Alternatifi Hesabı (mimari §5.2h) bozulmadan kalır.
+- [ ] 2. İLETİŞİM TERCİHİ KATMANI (IBA kararı) — Taraf, hangi kanaldan (e-posta ·
+      WhatsApp/SMS · uygulama içi) ve hangi sıklıkta bilgilendirilmek istediğini kendi
+      ekranından seçer; sistem bildirimleri bu tercihe göre gönderir.
+- [ ] 3. AI OTURUM NOTLARI (IBA kararı) — Oturum sonrası notun yapay zekâ ile üretilen
+      hâli; arabulucuya düzenlenebilir taslak olarak gelir, onaylanınca föye ve analiz
+      zincirine girer (manuel her zaman kazanır).
+- [ ] 4. BELGE ÖZETİ — Yüklenen her belgeye tek paragraf özet + "neyi kanıtlıyor" satırı;
+      arabulucu ekranında belgenin yanında görünür.
+- [ ] 5. İLETİŞİMDEKİ DEĞİŞİM İŞARETİ — party-communication-analysis üzerinden
+      arabulucuya "bu konuda dil sertleşti / yumuşadı" işareti.
+      ÇİZGİ (değişmez): kişilik veya psikoloji etiketi YOK, teşhis YOK; yalnız tarafın
+      KENDİ metinlerindeki değişim ölçülür, yalnız arabulucuya gösterilir, karşı tarafa
+      hiçbir yüzeyden sızmaz.
+- [ ] 6. GÖRÜŞME KAYDI VE DÖKÜMÜ — dört parça:
+      (a) KAYIT ONAYI katmanı: YZ Beyanı kapısıyla aynı kalıpta taraf onayı; bir taraf
+          bile onay vermezse kayıt açılamaz.
+      (b) Video kaydı ve elle yüklenen kayıt (WhatsApp / bilgisayardan) yazıya dökülür ve
+          AI Oturum Notu olarak YALNIZ arabulucuya gösterilir.
+      (c) v1'de kaydı kullanıcı yükler; masaüstü kayıt aracı sonraya bırakıldı.
+      (d) SAKLAMA YOK: ses dosyası döküm çıkar çıkmaz, döküm metni dosya kapanınca
+          otomatik silinir.
+- [ ] 7. NİTELİKLİ ARABULUCU ATAMASI — Başvuru gelince ajan, uyuşmazlık türüne göre uygun
+      uzmanlıktaki arabulucuyu atar; atamanın yanında "Değiştir" düğmesi durur — son söz
+      insanda.
+- [ ] 8. AJAN PANELİNDE "YAPILMAYANLAR VE SEBEBİ" — Nöbetçinin atlama sebepleri (süre
+      kaydı yok · keşif sorusu yok · ortak zemin bekleniyor vb.) zaman damgalı olarak
+      arabulucuya gösterilir.
+- [ ] 9. KÖR TEKLİF v2 / BRAKETLEME (güncellendi) — Taraflardan tek rakam yerine ALT-ÜST
+      ARALIK alınır; braketlerin çakışması ve turlar arası yakınlaşma taraflara rakam
+      sızdırmadan bildirilir. Yakınlık seyri yalnız arabulucuya görünür.
+
 ## Nerede kaldık — 14.08.2026 (50) · AŞAMA 1 TEK GİRİŞ KAPISI
 - [x] Aşama 1 tek ekran: uyuşmazlık konusu/türü · dava şartı-ihtiyari ve yasal süre
       (cases.mediation_type + mevcut süre alanları) · TARAFLAR (eski Aşama 2 bloğu
