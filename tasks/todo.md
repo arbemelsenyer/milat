@@ -23,6 +23,36 @@ AÇIK UÇLAR:
 - Oturum notu taslağının METNİ üretilmiyor (uydurma yasağı): kayıt/döküm hattı gelince
   taslak dökümden beslenecek.
 
+## Nerede kaldık — 14.08.2026 (52) · TUR B — TARAF AJANI
+- [x] Yeni görev tipleri (ajan-nobetci): taraf_musaitlik_iste · teklif_degerlendir ·
+      taraf_eksik_bilgi · taraf_alternatif_saat (veri satırı, süreç ajanı okur).
+- [x] teklif_degerlendir üç kol: uyan saat + otomatik onay açık → mevcut "Uygun" akışı iç
+      kapıdan; uyan saat + onay kapalı → teklif başına tek kez onay hatırlatması;
+      uymayan saat → "uymuyor" yazılmaz, tarafın kendi aralıklarından en yakın üç saat
+      alternatif olarak panoya yazılır.
+- [x] randevu-teklif: saat seçerken panodaki alternatifleri önce deniyor, kullanınca
+      satırı kapatıyor.
+- [x] Kör veri: taraf ajanının her satırında hedef_party_id dolu; panoya alternatif
+      saatler dışında taraf verisi geçmiyor.
+- [x] Taraf ekranına "Ajanım" sekmesi: kendi kayıtları + iki yetki anahtarı.
+- [x] Dönüş özetine sayaçlar: musaitlik_istendi, teklif_degerlendirildi,
+      otomatik_onaylandi, alternatif_yazildi, eksik_bilgi_istendi.
+tsc (tsconfig.app.json) yeni hata üretmiyor — depoda önceden duran 7 hata
+(mediator_availability şema kayması) aynen duruyor. vite build temiz. CANLI TEST YOK.
+REDEPLOY GEREKLİ: ajan-nobetci, randevu-teklif.
+SQL GEREKLİ (kurucu, Lovable SQL'den — idempotent, depoda
+supabase/migrations/20260814120000_*.sql):
+  · case_parties.hatirlatma_izni (default true)
+  · ajan_gorevleri RLS: arabulucu/yönetici tam yetki, taraf yalnız kendi
+    hedef_party_id satırlarını OKUR.
+AÇIK UÇLAR:
+- case_parties üzerinde kolon-koruma tetikleyicisi varsa hatirlatma_izni izin listesine
+  eklenmeli; yoksa taraf anahtarı hata döndürür (ekranda görünür).
+- otomatik_onay anahtarı artık iki yerde (Randevu Tercihlerim + Ajanım); ikisi de aynı
+  alanı yazıyor, tek anahtara indirilmesi kurucu kararı.
+- DİKKAT: kök tsconfig.json "files": [] taşıyor, hiçbir dosyayı denetlemiyor.
+  Gerçek denetim `npx tsc --noEmit -p tsconfig.app.json` ile yapılır.
+
 ## SIRADAKİ İŞLER — 14.08.2026 kurucu kararları (yapılacak, bu sırayla)
 
 - [ ] 1. BATNA'nın TARAF YÜZÜ (IBA kararı) — Tarafa dava alternatifi gösterilirken emsal

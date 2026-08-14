@@ -453,3 +453,12 @@ aşamalar 1→7 kendiliğinden ilerliyor (yalnız ileri), zorunlu insan noktalar
 'onay_bekliyor' olarak düşüyor, oturumdan 1 gün önce taraflara hatırlatma gidiyor ve
 her çalıştırılamayan kolun sebebi zaman damgasıyla kaydediliyor. Ajan Paneli'ne
 "ne yaptı, ne yapmadı" listesi eklendi.
+
+14.08 (Tur B): TARAF AJANI. Her tarafın kendi ajanı var; yalnız kendi verisini görüyor ve
+süreç ajanıyla ajan_gorevleri panosu üzerinden konuşuyor. Yeni görev tipleri:
+taraf_musaitlik_iste · teklif_degerlendir (uyuyorsa otomatik onay ya da onay hatırlatması,
+uymuyorsa alternatif üç saat) · taraf_eksik_bilgi · taraf_alternatif_saat (veri satırı).
+randevu-teklif saat seçerken alternatif saatleri önce deniyor. Taraf ekranına "Ajanım"
+sekmesi eklendi: ajanın o taraf için yaptıkları/yapamadıkları + iki yetki anahtarı
+(randevuyu benim adıma onayla · bana hatırlatma gönder). SQL göçü bekliyor:
+case_parties.hatirlatma_izni + ajan_gorevleri politikaları.

@@ -53,3 +53,8 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
 - Ön yüz değişikliği Publish edilmeden taraf ekranında görünmez; "eski stil
   duruyor" şikâyeti önce Publish eksikliği olarak okunur, kod aranmadan önce
   yayın durumu sorulur. (13.08)
+- KÖK tsconfig.json BOŞTUR ("files": []): `tsc -p tsconfig.json` hiçbir dosyayı
+  denetlemez ve her zaman 0 döner. Gerçek denetim `npx tsc --noEmit -p
+  tsconfig.app.json` ile yapılır; vite build de tip denetlemez (esbuild yalnız
+  tipleri siler), bu yüzden eksik import runtime'da patlar. (14.08, CaseRoom
+  useMemo importu)

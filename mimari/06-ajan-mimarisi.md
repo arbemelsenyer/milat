@@ -138,6 +138,30 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
   İç kapı (x-cron-secret) orchestrator-run'a ve zincirin altı adımına eklendi; kullanıcı
   JWT yolu ve yetki kontrolleri değişmedi.
 
+[EKLEME — TARAF AJANI / TUR B (14.08)] ● CANLI (kod).
+Her tarafın kendi ajanı vardır; YALNIZ kendi tarafının verisini görür, karşı tarafınkini
+hiçbir yoldan görmez. Süreç ajanıyla doğrudan konuşmaz — iletişim ajan_gorevleri panosu
+üzerinden yürür ve taraf ajanının yazdığı her satırda hedef_party_id DOLUDUR.
+· taraf_musaitlik_iste — tarafın taraf_musaitlik kaydı yoksa arabulucu imzalı, taraf
+  başına TEK KEZ e-posta ([musaitlik:<party>] etiketiyle mükerrer engellenir).
+· teklif_degerlendir — tarafa açık teklif varken tarafın müsaitliğiyle karşılaştırır:
+  (a) saat uyuyor + case_parties.otomatik_onay açık → randevu-teklif "cevapla" iç
+      kapıdan koşar (mevcut "Uygun" akışı: oturum kaydı + davet yazısı),
+  (b) saat uyuyor + otomatik onay kapalı → tarafa teklif başına tek kez "ajanınız bu
+      saati uygun buldu, onaylıyor musunuz?" hatırlatması,
+  (c) hiçbir saat uymuyor → teklif "uymuyor" olarak İŞLENMEZ; tarafın kendi
+      aralıklarından en yakın üç saat 'taraf_alternatif_saat' satırına yazılır.
+· taraf_eksik_bilgi — tarafın kendi belgesi yoksa taraf başına tek kez nazik istek.
+· KÖR VERİ SINIRI: panoya giden tek taraf verisi alternatif saatlerdir; tarafın gizli
+  bilgisi süreç ajanına geçmez, karşı tarafın verisi hiçbir kayda girmez.
+· SÜREÇ AJANI TARAFI: randevu-teklif saat seçerken önce panodaki alternatif saatleri
+  dener (arabulucunun takviminde de boş olanlar); kayıt kullanılınca satır 'yapildi'
+  olur ve ikinci kez teklife dönüşmez. Kayıt yoksa mevcut davranış aynen sürer.
+· İZİN: case_parties.hatirlatma_izni kapalıysa taraf ajanı e-posta göndermez (kolon
+  yoksa izin var sayılır — bugünkü davranış korunur).
+· Koşum özetine sayaçlar: musaitlik_istendi · teklif_degerlendirildi ·
+  otomatik_onaylandi · alternatif_yazildi · eksik_bilgi_istendi.
+
 [EKLEME — OTONOM AKIŞ: NÖBETÇİ SÜRECİ BAŞTAN SONA YÜRÜTÜR (14.08)] ● CANLI (kod).
 · RANDEVU TETİKLEYİCİSİ DEĞİŞTİ: "son tarihe 3 günden az kaldıysa teklif aç" kuralı
   KALDIRILDI. Yeni kural: analiz zinciri tamamlandıysa (en az bir party_analyses satırı

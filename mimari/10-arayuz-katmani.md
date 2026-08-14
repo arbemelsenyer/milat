@@ -95,6 +95,15 @@ arabulucunun kendi girdiği kayıttır.
   ekranda gösterilir, kart kapanmaz.
 ● 13.08: Aşama 5 üst şeridindeki "Planlanan Oturum" sayacı yalnız GELECEKTEKİ planlı
   (scheduled) oturumları sayar; taslak ve geçmiş kayıtlar sayaca girmez.
+● 14.08 ● CANLI (kod): TARAF EKRANINDA "AJANIM" SEKMESİ. Tarafın kendi ajanının onun
+  adına yaptıkları ve yapamadıkları zaman damgalı liste hâlinde durur; sorgu
+  hedef_party_id = tarafın kendi kaydıyla sınırlıdır — karşı tarafın ve dosya genelinin
+  kayıtları bu ekrana hiçbir yoldan gelmez. Aynı bölümde iki yetki anahtarı vardır:
+  "Randevuları benim adıma onaylayabilir" (case_parties.otomatik_onay — Randevu
+  Tercihlerim sekmesindeki anahtarla aynı alan) ve "Bana hatırlatma gönderebilir"
+  (case_parties.hatirlatma_izni). Anahtar yazımı geri okunarak doğrulanır; tek satır
+  etkilenmediyse anahtar eski değerine döner ve hata ekranda kalır. hatirlatma_izni
+  kolonu eklenmemişse anahtar hiç çizilmez, yerine tek satırlık not çıkar.
 ● 14.08 ● CANLI (kod): AJAN PANELİNDE "NE YAPTI, NE YAPMADI". Ajan Kontrol Paneli'nin
   altında yeni bir kart açılmadan bölüm olarak durur: ajan_gorevleri satırları ile
   nöbetçinin ön koşul uyarıları (agent_states.last_output.yapilmayanlar) tek zaman
