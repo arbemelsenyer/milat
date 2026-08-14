@@ -564,9 +564,15 @@ async function cevaplaIsle(admin: any, token: string, secimRaw: string): Promise
           .eq("id", (row as any).party_id).maybeSingle();
         // Türkiye saati sabit UTC+3 (yaz saati uygulaması yok).
         const scheduledAt = new Date(`${secilenSlot.gun}T${secilenSlot.saat}:00+03:00`).toISOString();
+        // Özel oturum (caucus): teklif seçeneklerinde ozel_oturum işareti varsa oturum
+        // mevcut "private" tipiyle açılır — yeni bir tip veya sütun eklenmedi. Bu tip
+        // zaten özel görüşme olarak tanınır ve notları yalnız katılımcısına + arabulucuya
+        // görünür (MeetingNotesPanel). Karşı tarafa hiçbir yüzeyden açılmaz.
+        const ozelOturum = (Array.isArray(secenekler) ? secenekler : [])
+          .some((s: any) => (s as any)?.ozel_oturum === true);
         const { data: yeniOturum, error: sesErr } = await admin.from("case_sessions").insert({
           case_id: (row as any).case_id,
-          session_type: "preliminary",
+          session_type: ozelOturum ? "private" : "preliminary",
           scheduled_at: scheduledAt,
           notes: null,
           status: "scheduled",

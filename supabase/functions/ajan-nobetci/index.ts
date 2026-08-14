@@ -321,6 +321,13 @@ async function analizGoreviAc(admin: any, dosya: any): Promise<{ acildi: boolean
 // tamamlandıysa VE planlanmış oturum yoksa VE bekleyen teklif yoksa randevu teklifi
 // HEMEN açılır — taraflar süreç başlar başlamaz oturuma çağrılır.
 async function randevuGoreviAc(admin: any, dosya: any): Promise<{ acildi: boolean; sebep?: string }> {
+  // Katılım teyidi: bir taraf "katılmıyorum" dediyse ajan bu dosyada randevu açmaz.
+  const { data: katilmayan } = await admin.from("case_parties")
+    .select("id").eq("case_id", dosya.id).eq("katilim_durumu", "katilmiyor").limit(1);
+  if (katilmayan && katilmayan.length > 0) {
+    return { acildi: false, sebep: "randevu açılmadı: taraflardan biri sürece katılmadığını bildirdi" };
+  }
+
   const { data: analizler, error: aErr } = await admin.from("party_analyses")
     .select("id").eq("case_id", dosya.id).limit(1);
   if (aErr) return { acildi: false, sebep: `randevu açılamadı: analizler okunamadı — ${aErr.message}` };
@@ -942,6 +949,211 @@ async function eksikBilgiYurut(admin: any, dosya: any, partyId: string): Promise
   return { durum: "yapildi", sonuc: "Taraftan belge/bilgi istendi" };
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   TUR C-1 — İLK TEMAS, KATILIM TEYİDİ, ÇOKLU VE ÖZEL OTURUM
+   ──────────────────────────────────────────────────────────────────────────── */
+
+// Uygulamanın taraf yüzeyi adresi (davet/randevu bağlantılarıyla aynı liste).
+function uygulamaAdresi(): string {
+  const liste = (Deno.env.get("APP_ALLOWED_ORIGINS") ?? "https://medipact-ai.lovable.app")
+    .split(",").map((s) => s.trim()).filter(Boolean);
+  return liste[0];
+}
+
+// 'ilk_temas': dosyaya eklenen her tarafa TEK KEZ bilgilendirme + katılım sorusu.
+async function ilkTemasGorevleriAc(admin: any, dosya: any, taraflar: any[]): Promise<{ acilan: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  let acilan = 0;
+  for (const t of taraflar) {
+    if (String((t as any).katilim_durumu ?? "beklemede") !== "beklemede") continue;
+    const r = await gorevAc(
+      admin, dosya.id, "ilk_temas", `[ilktemas:${t.id}]`,
+      "Tarafa süreç bilgilendirmesi ve katılım sorusu gönderilecek",
+      { hedefPartyId: t.id },
+    );
+    if (r.acildi) acilan++;
+    else if (r.sebep && !r.sebep.includes("zaten açılmış")) sebepler.push(r.sebep);
+  }
+  return { acilan, sebepler };
+}
+
+async function ilkTemasYurut(admin: any, dosya: any, partyId: string): Promise<{ durum: string; sonuc: string }> {
+  const { data: taraf } = await admin.from("case_parties").select("*").eq("id", partyId).maybeSingle();
+  if (!taraf) return { durum: "atlandi", sonuc: "Taraf kaydı bulunamadı" };
+  if (String((taraf as any).katilim_durumu ?? "beklemede") !== "beklemede") {
+    return { durum: "atlandi", sonuc: "Taraf katılım cevabını bu arada vermiş" };
+  }
+  if (!String((taraf as any).email ?? "").trim()) {
+    return { durum: "atlandi", sonuc: "Tarafın e-posta adresi yok, ilk temas gönderilemedi" };
+  }
+
+  // Token bir kez üretilir; varsa yeniden kullanılır (mükerrer bağlantı çıkmaz).
+  let token = String((taraf as any).katilim_token ?? "").trim();
+  if (!token) {
+    token = (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, "");
+    const { error: tErr } = await admin.from("case_parties")
+      .update({ katilim_token: token } as any).eq("id", partyId);
+    if (tErr) return { durum: "bekliyor", sonuc: `Katılım anahtarı yazılamadı: ${tErr.message}` };
+  }
+  const link = `${uygulamaAdresi()}/katilim/${token}`;
+
+  const { imza } = await imzaBlogu(admin, dosya.id);
+  const arabulucuSatiri = imza ? `<p><strong>Arabulucu:</strong> ${imza}</p>` : "";
+  const r = await tarafaEposta(admin, dosya, taraf,
+    "Arabuluculuk süreci hakkında bilgilendirme",
+    `${arabulucuSatiri}
+     <p>Yukarıda künyesi yazılı uyuşmazlıkta arabuluculuk süreci başlatılmıştır ve siz bu
+      sürece taraf olarak davet edildiniz.</p>
+     <p>Arabuluculuk, tarafların bir arabulucu eşliğinde anlaşmaya çalıştığı GİZLİ bir
+      süreçtir. Süreçte paylaştığınız bilgiler karşı tarafa açılmaz; kararı taraflar verir.</p>
+     <p>Katılım durumunuzu tek dokunuşla bildirebilirsiniz:<br>
+      <a href="${link}">${link}</a></p>`);
+  if (!r.gonderildi) return { durum: "bekliyor", sonuc: `İlk temas gönderilemedi: ${r.sebep ?? "bilinmeyen hata"}` };
+  return { durum: "yapildi", sonuc: "Tarafa bilgilendirme ve katılım sorusu gönderildi" };
+}
+
+// Katılım cevaplarının işlenmesi. "Katılmıyorum" ve "Bilgi istiyorum" cevapları
+// panoya ve arabulucuya taşınır; ajan taraf adına hukuki açıklama YAPMAZ.
+async function katilimCevaplariniIsle(admin: any, dosya: any, taraflar: any[]): Promise<{ islenen: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  let islenen = 0;
+  for (const t of taraflar) {
+    const durum = String((t as any).katilim_durumu ?? "beklemede");
+    if (durum === "katilmiyor") {
+      const r = await onayGoreviAc(
+        admin, dosya, `[onay:katilmiyor:${t.id}]`,
+        "Taraf sürece katılmadığını bildirdi — ajan bu dosyada randevu açmıyor",
+        "Taraf katılmıyor",
+      );
+      if (r.acildi) islenen++;
+      sebepler.push("randevu açılmadı: taraf sürece katılmadığını bildirdi");
+    } else if (durum === "bilgi_istiyor") {
+      const r = await onayGoreviAc(
+        admin, dosya, `[onay:bilgi_istiyor:${t.id}]`,
+        "Taraf süreç hakkında bilgi istiyor — açıklamayı arabulucu yapar",
+        "Taraf bilgi istiyor",
+      );
+      if (r.acildi) islenen++;
+    }
+  }
+  return { islenen, sebepler };
+}
+
+// 'ek_oturum_gerekli_mi': yapılmış oturum varken dosya kapanmadıysa arabulucuya sorulur.
+async function ekOturumSorusuAc(admin: any, dosya: any): Promise<{ acilan: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  const kapali = dosya?.status === "agreed" || dosya?.status === "failed";
+  if (kapali) return { acilan: 0, sebepler: ["ek oturum sorulmadı: dosya kapanmış"] };
+
+  const { data: yapilanlar, error } = await admin.from("case_sessions")
+    .select("id, scheduled_at").eq("case_id", dosya.id).eq("status", "completed")
+    .order("scheduled_at", { ascending: false }).limit(1);
+  if (error) return { acilan: 0, sebepler: [`ek oturum sorulamadı: oturumlar okunamadı — ${error.message}`] };
+  const son = ((yapilanlar ?? []) as any[])[0];
+  if (!son) return { acilan: 0, sebepler: ["ek oturum sorulmadı: yapıldı işaretli oturum yok"] };
+
+  // Sonraki oturum zaten planlandıysa soru açılmaz.
+  const { data: planli } = await admin.from("case_sessions")
+    .select("id").eq("case_id", dosya.id).eq("status", "scheduled")
+    .gt("scheduled_at", new Date().toISOString()).limit(1);
+  if (planli && planli.length > 0) {
+    return { acilan: 0, sebepler: ["ek oturum sorulmadı: gelecekte planlı oturum var"] };
+  }
+
+  const { gun, saat } = trGunSaat(String(son.scheduled_at));
+  const r = await onayGoreviAc(
+    admin, dosya, `[onay:ek_oturum:${son.id}]`,
+    `${trTarihMetni(gun)} ${saat} oturumu yapıldı — ikinci oturum gerekli mi?`,
+    "İkinci oturum gerekli mi?",
+  );
+  if (r.acildi) return { acilan: 1, sebepler };
+  if (r.sebep && !r.sebep.includes("zaten açılmış")) sebepler.push(r.sebep);
+  return { acilan: 0, sebepler };
+}
+
+// Arabulucu "gerekli" dediyse (onay görevi 'yapildi') randevu hattı yeniden başlar.
+// "Gerekli değil" (atlandi) hâlinde ajan yeni randevu açmaz; dosya kapanış hattına
+// aşama geçişi kolundan ilerler.
+async function ekOturumKararlariniIsle(admin: any, dosya: any): Promise<{ acilan: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  const { data: gorevler, error } = await admin.from("ajan_gorevleri")
+    .select("id, gerekce, durum, sonuc").eq("case_id", dosya.id)
+    .eq("gorev_tipi", "arabulucu_onayi").eq("durum", "yapildi").limit(50);
+  if (error) return { acilan: 0, sebepler: [`ek oturum kararı okunamadı: ${error.message}`] };
+
+  let acilan = 0;
+  for (const g of (gorevler ?? []) as any[]) {
+    const gerekce = String(g?.gerekce ?? "");
+    if (!gerekce.startsWith("[onay:ek_oturum:")) continue;
+    // Karar bir kez uygulanır: uygulandığında sonuc alanına işaret düşer.
+    if (String(g?.sonuc ?? "").includes("randevu hattı yeniden başlatıldı")) continue;
+
+    const r = await randevuGoreviAc(admin, dosya);
+    if (r.acildi) {
+      acilan++;
+      await admin.from("ajan_gorevleri")
+        .update({ sonuc: `${String(g?.sonuc ?? "Arabulucu onayladı")} · randevu hattı yeniden başlatıldı` })
+        .eq("id", g.id);
+    } else if (r.sebep) {
+      sebepler.push(`ek oturum randevusu açılamadı: ${r.sebep}`);
+    }
+  }
+  return { acilan, sebepler };
+}
+
+// 'ozel_oturum': arabulucunun ekrandan açtığı görev. Ajan YALNIZ o tarafa teklif
+// gönderir; seçeneklere ozel_oturum işareti konur ve randevu-teklif cevabı
+// işlerken oturumu session_type='private' olarak açar. Özel oturumun varlığı,
+// saati ve içeriği karşı tarafa hiçbir yüzeyden gösterilmez.
+async function ozelOturumYurut(admin: any, dosya: any, partyId: string): Promise<{ durum: string; sonuc: string }> {
+  const { data: taraf } = await admin.from("case_parties")
+    .select("id, case_id, katilim_durumu").eq("id", partyId).maybeSingle();
+  if (!taraf || String((taraf as any).case_id) !== String(dosya.id)) {
+    return { durum: "atlandi", sonuc: "Taraf bu dosyaya ait değil" };
+  }
+  if (String((taraf as any).katilim_durumu ?? "beklemede") === "katilmiyor") {
+    return { durum: "atlandi", sonuc: "Taraf sürece katılmadığını bildirdi" };
+  }
+  if (!CRON_SECRET) return { durum: "bekliyor", sonuc: "CRON_SECRET tanımlı değil, iç çağrı yapılamadı" };
+
+  const icBaslik = {
+    "Content-Type": "application/json",
+    "x-cron-secret": CRON_SECRET,
+    apikey: SERVICE_KEY,
+    Authorization: `Bearer ${SERVICE_KEY}`,
+  };
+  try {
+    const oRes = await fetch(`${SUPABASE_URL}/functions/v1/randevu-teklif`, {
+      method: "POST", headers: icBaslik,
+      body: JSON.stringify({ action: "oner", case_id: dosya.id, party_id: partyId }),
+    });
+    const oBody = await oRes.json().catch(() => ({}));
+    if (!oRes.ok) return { durum: "bekliyor", sonuc: `Saat önerisi alınamadı (HTTP ${oRes.status})` };
+    if ((oBody as any)?.error === "musaitlik_yok") return { durum: "atlandi", sonuc: "Takvimde uygun boş saat yok" };
+    if ((oBody as any)?.error) return { durum: "bekliyor", sonuc: `Saat önerisi alınamadı: ${String((oBody as any).error).slice(0, 200)}` };
+    const onerilen = Array.isArray((oBody as any)?.secenekler) ? (oBody as any).secenekler : [];
+    if (onerilen.length === 0) return { durum: "atlandi", sonuc: "Takvimde uygun boş saat yok" };
+
+    const secenekler = onerilen.map((s: any) => ({
+      gun: String(s?.gun ?? "").slice(0, 10),
+      saat: String(s?.saat ?? "").slice(0, 5),
+      oturum_tipi: "online",
+      ozel_oturum: true,
+    }));
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/randevu-teklif`, {
+      method: "POST", headers: icBaslik,
+      body: JSON.stringify({ action: "olustur", case_id: dosya.id, party_id: partyId, secenekler }),
+    });
+    const govde = await res.json().catch(() => ({}));
+    if (!res.ok || (govde as any)?.error) {
+      return { durum: "bekliyor", sonuc: `Özel oturum daveti oluşturulamadı: ${String((govde as any)?.error ?? res.status)}` };
+    }
+    return { durum: "yapildi", sonuc: "Özel oturum daveti yalnız ilgili tarafa gönderildi" };
+  } catch (e: any) {
+    return { durum: "bekliyor", sonuc: `İç çağrı başarısız: ${e?.message ?? e}` };
+  }
+}
+
 // Video bağlantısı: gelecekteki planlı ve bağlantısı boş oturumlar için create-video-room
 // iç kapıdan çağrılır, dönen adres oturumun video_link alanına yazılır ve oturumun
 // tarafına tek bilgilendirme e-postası gider. Bağlantı yazıldıktan sonra oturum bir daha
@@ -1207,6 +1419,11 @@ Deno.serve(async (req) => {
     let otomatikOnaylandi = 0;
     let alternatifYazildi = 0;
     let eksikBilgiIstendi = 0;
+    // Tur C-1 sayaçları
+    let ilkTemasGonderildi = 0;
+    let katilimCevabiIslendi = 0;
+    let ekOturumSorusuAcildi = 0;
+    let ozelOturumDaveti = 0;
     const hatalar: string[] = [];
 
     for (const dosya of (dosyalar ?? []) as any[]) {
@@ -1248,10 +1465,26 @@ Deno.serve(async (req) => {
 
         // ── TARAF AJANI KOLLARI (Tur B) — her taraf için ayrı, kendi verisiyle ──
         const { data: dosyaTaraflari, error: tErr } = await admin.from("case_parties")
-          .select("id, party_type, first_name, last_name, company_name, email")
+          .select("id, party_type, first_name, last_name, company_name, email, katilim_durumu")
           .eq("case_id", dosya.id).limit(50);
         if (tErr) sebepEkle(`taraf ajanı çalışamadı: taraflar okunamadı — ${tErr.message}`);
         const taraflar = (dosyaTaraflari ?? []) as any[];
+
+        // ── TUR C-1: ilk temas · katılım cevapları · çoklu oturum ──
+        const ilkTemasKol = await ilkTemasGorevleriAc(admin, dosya, taraflar);
+        ilkTemasKol.sebepler.forEach(sebepEkle);
+
+        const katilimKol = await katilimCevaplariniIsle(admin, dosya, taraflar);
+        katilimCevabiIslendi += katilimKol.islenen;
+        katilimKol.sebepler.forEach(sebepEkle);
+
+        const ekOturumKol = await ekOturumSorusuAc(admin, dosya);
+        ekOturumSorusuAcildi += ekOturumKol.acilan;
+        ekOturumKol.sebepler.forEach(sebepEkle);
+
+        const ekOturumKarar = await ekOturumKararlariniIsle(admin, dosya);
+        yeniRandevuGorevi += ekOturumKarar.acilan;
+        ekOturumKarar.sebepler.forEach(sebepEkle);
 
         const musaitlikKol = await musaitlikGorevleriAc(admin, dosya, taraflar);
         musaitlikKol.sebepler.forEach(sebepEkle);
@@ -1276,8 +1509,12 @@ Deno.serve(async (req) => {
         const YURUTULEN_TIPLER = [
           "soru_gonder", "randevu_teklifi", "analiz_baslat", "asama_gecisi", "oturum_hatirlatma",
           "taraf_musaitlik_iste", "teklif_degerlendir", "taraf_eksik_bilgi",
+          "ilk_temas", "ozel_oturum",
         ];
-        const TARAF_TIPLERI = ["soru_gonder", "taraf_musaitlik_iste", "teklif_degerlendir", "taraf_eksik_bilgi"];
+        const TARAF_TIPLERI = [
+          "soru_gonder", "taraf_musaitlik_iste", "teklif_degerlendir", "taraf_eksik_bilgi",
+          "ilk_temas", "ozel_oturum",
+        ];
         for (const gorev of (gorevler ?? []) as any[]) {
           // Tanınmayan görev tipine dokunulmaz: 'bekliyor' kalır.
           if (!YURUTULEN_TIPLER.includes(gorev.gorev_tipi)) continue;
@@ -1306,7 +1543,11 @@ Deno.serve(async (req) => {
                       ? await musaitlikIsteYurut(admin, dosya, gorev.hedef_party_id)
                       : gorev.gorev_tipi === "taraf_eksik_bilgi"
                         ? await eksikBilgiYurut(admin, dosya, gorev.hedef_party_id)
-                        : await soruGonder(admin, dosya.id, gorev.hedef_party_id);
+                        : gorev.gorev_tipi === "ilk_temas"
+                          ? await ilkTemasYurut(admin, dosya, gorev.hedef_party_id)
+                          : gorev.gorev_tipi === "ozel_oturum"
+                            ? await ozelOturumYurut(admin, dosya, gorev.hedef_party_id)
+                            : await soruGonder(admin, dosya.id, gorev.hedef_party_id);
           if (durum !== "bekliyor") {
             await admin.from("ajan_gorevleri").update({ durum, sonuc }).eq("id", gorev.id);
           } else {
@@ -1322,6 +1563,8 @@ Deno.serve(async (req) => {
             if (gorev.gorev_tipi === "oturum_hatirlatma") hatirlatmaGonderildi++;
             if (gorev.gorev_tipi === "taraf_musaitlik_iste") musaitlikIstendi++;
             if (gorev.gorev_tipi === "taraf_eksik_bilgi") eksikBilgiIstendi++;
+            if (gorev.gorev_tipi === "ilk_temas") ilkTemasGonderildi++;
+            if (gorev.gorev_tipi === "ozel_oturum") ozelOturumDaveti++;
             if (gorev.gorev_tipi === "teklif_degerlendir") {
               teklifDegerlendirildi++;
               if (tarafSonuc?.otomatikOnay) otomatikOnaylandi++;
@@ -1391,6 +1634,10 @@ Deno.serve(async (req) => {
       otomatik_onaylandi: otomatikOnaylandi,
       alternatif_yazildi: alternatifYazildi,
       eksik_bilgi_istendi: eksikBilgiIstendi,
+      ilk_temas_gonderildi: ilkTemasGonderildi,
+      katilim_cevabi_islendi: katilimCevabiIslendi,
+      ek_oturum_sorusu_acildi: ekOturumSorusuAcildi,
+      ozel_oturum_daveti: ozelOturumDaveti,
       atlama_sebepleri: atlamaSebepleri,
       imza_adi: imzaAdi,
       hata: hatalar,
