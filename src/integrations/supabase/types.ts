@@ -650,6 +650,9 @@ export type Database = {
           id: string
           invite_status: string
           is_individual: boolean
+          katilim_durumu: string
+          katilim_token: string | null
+          katilim_zamani: string | null
           last_name: string | null
           organization: string | null
           otomatik_onay: boolean
@@ -684,6 +687,9 @@ export type Database = {
           id?: string
           invite_status?: string
           is_individual?: boolean
+          katilim_durumu?: string
+          katilim_token?: string | null
+          katilim_zamani?: string | null
           last_name?: string | null
           organization?: string | null
           otomatik_onay?: boolean
@@ -718,6 +724,9 @@ export type Database = {
           id?: string
           invite_status?: string
           is_individual?: boolean
+          katilim_durumu?: string
+          katilim_token?: string | null
+          katilim_zamani?: string | null
           last_name?: string | null
           organization?: string | null
           otomatik_onay?: boolean
