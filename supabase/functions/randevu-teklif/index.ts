@@ -50,7 +50,34 @@ function takvimSahibi(caseRow: any): string {
   return caseRow?.assigned_mediator_id ?? caseRow?.user_id ?? "";
 }
 
-async function saatleriSec(admin: any, mediatorId: string, party: any): Promise<{ secenekler: Secenek[]; hata?: string; tanili?: any }> {
+// Taraf ajanıyla eşleşme (14.08): tarafın KENDİ müsaitliği (taraf_musaitlik) önce okunur.
+// Arabulucunun boş saatlerinden tarafın aralığına düşenler varsa teklif ÖNCE onlardan
+// kurulur; taraf müsaitlik girmemişse veya hiçbiri uymuyorsa arabulucunun takvimi aynen
+// kullanılır. Okuma service role ile (taraf_musaitlik RLS'i tarafa özeldir); hata
+// hâlinde eşleşme yok sayılır ve eski davranış sürer.
+async function tarafaUyanSaatler(admin: any, partyId: string, bos: Secenek[]): Promise<Secenek[]> {
+  if (!partyId || bos.length === 0) return [];
+  try {
+    const { data: araliklar, error } = await admin.from("taraf_musaitlik")
+      .select("gun, baslangic, bitis").eq("party_id", partyId).limit(500);
+    if (error) {
+      console.error("[randevu-teklif] taraf_musaitlik okunamadı (öneri)", error.message);
+      return [];
+    }
+    const satirlar = (araliklar ?? []) as any[];
+    if (satirlar.length === 0) return [];
+    return bos.filter((s) => satirlar.some((a) =>
+      String(a.gun).slice(0, 10) === s.gun &&
+      s.saat >= String(a.baslangic).slice(0, 5) &&
+      s.saat < String(a.bitis).slice(0, 5)
+    ));
+  } catch (e) {
+    console.error("[randevu-teklif] taraf müsaitliği okunamadı", (e as any)?.message ?? e);
+    return [];
+  }
+}
+
+async function saatleriSec(admin: any, mediatorId: string, party: any): Promise<{ secenekler: Secenek[]; hata?: string; tanili?: any; taraf_musaitligi_kullanildi?: boolean }> {
   if (!mediatorId) return { secenekler: [], hata: "musaitlik_yok", tanili: { sebep: "dosyada arabulucu yok" } };
 
   const bugun = bugunTR();
@@ -132,19 +159,24 @@ async function saatleriSec(admin: any, mediatorId: string, party: any): Promise<
     };
   }
 
+  // Önce tarafın kendi müsaitliğine düşen saatler; yoksa arabulucunun boş saatleri.
+  const uyan = await tarafaUyanSaatler(admin, String(party?.id ?? ""), bos);
+  const tarafEslesti = uyan.length > 0;
+  const havuz = tarafEslesti ? uyan : bos;
+
   const bireysel = party?.is_individual === true || party?.party_type === "individual";
-  if (bireysel) return { secenekler: [bos[0]] };
+  if (bireysel) return { secenekler: [havuz[0]], taraf_musaitligi_kullanildi: tarafEslesti };
 
   // Kurumsal: en yakın 3 FARKLI günden birer seçenek.
   const secilen: Secenek[] = [];
   const gunler = new Set<string>();
-  for (const s of bos) {
+  for (const s of havuz) {
     if (gunler.has(s.gun)) continue;
     gunler.add(s.gun);
     secilen.push(s);
     if (secilen.length === 3) break;
   }
-  return { secenekler: secilen };
+  return { secenekler: secilen, taraf_musaitligi_kullanildi: tarafEslesti };
 }
 
 // E-posta ve PDF imzası: dosyanın arabulucusunun adı, "Arb." önekiyle. Ad yoksa
@@ -639,9 +671,10 @@ Deno.serve(async (req) => {
       const isCron = !!CRON_SECRET && req.headers.get("x-cron-secret") === CRON_SECRET;
       const k = await yetkiKontrol(req, admin, supabaseUrl, anonKey, case_id, party_id, isCron);
       if ((k as any).hata) return (k as any).hata;
-      const { secenekler, hata, tanili } = await saatleriSec(admin, takvimSahibi((k as any).caseRow), (k as any).party);
+      const { secenekler, hata, tanili, taraf_musaitligi_kullanildi } =
+        await saatleriSec(admin, takvimSahibi((k as any).caseRow), (k as any).party);
       if (hata) return json({ error: hata, tanili });
-      return json({ secenekler });
+      return json({ secenekler, taraf_musaitligi_kullanildi: !!taraf_musaitligi_kullanildi });
     }
 
     /* ---------- OLUŞTUR — arabulucu JWT'si veya iç çağrı (x-cron-secret) ---------- */
