@@ -533,8 +533,179 @@ export function AgentControlPanel({ caseId, isMediator }: { caseId: string; isMe
               </AnimatePresence>
             </div>
           )}
+
+          {/* Ajanın yaptıkları ve YAPMADIKLARI + sebebi — tek zaman damgalı liste.
+              Yeni kart açılmadı; mevcut panelin altına bölüm olarak eklendi. */}
+          {isMediator && <AjanIsListesi caseId={caseId} />}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+/* ===================== AJANIN YAPTIKLARI VE YAPMADIKLARI ===================== */
+
+const GOREV_ETIKET: Record<string, string> = {
+  analiz_baslat: "Analiz zinciri",
+  soru_gonder: "Keşif sorusu",
+  randevu_teklifi: "Randevu teklifi",
+  asama_gecisi: "Aşama geçişi",
+  oturum_hatirlatma: "Oturum hatırlatması",
+  arabulucu_onayi: "Arabulucu onayı",
+};
+
+const DURUM_ETIKET: Record<string, { label: string; tone: string }> = {
+  yapildi: { label: "yapıldı", tone: "text-emerald-700 bg-emerald-500/10" },
+  atlandi: { label: "atlandı", tone: "text-muted-foreground bg-muted" },
+  bekliyor: { label: "sırada", tone: "text-amber-700 bg-amber-500/10" },
+  onay_bekliyor: { label: "onayınız bekleniyor", tone: "text-primary bg-primary/10" },
+};
+
+type GorevRow = {
+  id: string;
+  gorev_tipi: string;
+  durum: string;
+  gerekce: string | null;
+  sonuc: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// Gerekçenin başındaki makine etiketi ([gecis:2->3] gibi) ekranda gösterilmez.
+function gerekceMetni(g: string | null): string {
+  return String(g ?? "").replace(/^\[[^\]]+\]\s*/, "").trim();
+}
+function onayAnahtari(g: string | null): string {
+  const m = /^\[onay:([^\]]+)\]/.exec(String(g ?? ""));
+  return m ? m[1] : "";
+}
+
+function AjanIsListesi({ caseId }: { caseId: string }) {
+  const [gorevler, setGorevler] = useState<GorevRow[]>([]);
+  const [yapilmayanlar, setYapilmayanlar] = useState<{ zaman: string; sebep: string }[]>([]);
+  const [hata, setHata] = useState<string | null>(null);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [islenen, setIslenen] = useState<string | null>(null);
+
+  async function yukle() {
+    setYukleniyor(true);
+    const [g, s] = await Promise.all([
+      supabase.from("ajan_gorevleri" as any)
+        .select("id, gorev_tipi, durum, gerekce, sonuc, created_at, updated_at")
+        .eq("case_id", caseId).order("updated_at", { ascending: false }).limit(60),
+      supabase.from("agent_states")
+        .select("last_output, updated_at").eq("case_id", caseId).eq("agent_type", "nobetci")
+        .order("updated_at", { ascending: false }).limit(1),
+    ]);
+    // Okuma hatası yutulmaz: politika eksikse ekranda görünür.
+    if (g.error) setHata(`Görev panosu okunamadı: ${g.error.message}`);
+    else setHata(null);
+    setGorevler(((g.data ?? []) as any[]) as GorevRow[]);
+    const cikti = (s.data?.[0] as any)?.last_output;
+    const liste = Array.isArray(cikti?.yapilmayanlar) ? cikti.yapilmayanlar : [];
+    setYapilmayanlar(liste.filter((x: any) => x?.sebep).map((x: any) => ({ zaman: String(x.zaman ?? ""), sebep: String(x.sebep) })));
+    setYukleniyor(false);
+  }
+
+  useEffect(() => { yukle(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [caseId]);
+
+  // Zorunlu insan noktaları: karar arabulucunundur, ajan bu satırları yürütmez.
+  async function onayla(g: GorevRow, secim: "yapildi" | "atlandi") {
+    setIslenen(g.id);
+    try {
+      const anahtar = onayAnahtari(g.gerekce);
+      if (anahtar.startsWith("oturum_yapildi:") && secim === "yapildi") {
+        const sessionId = anahtar.split(":")[1];
+        const { error } = await supabase.from("case_sessions")
+          .update({ status: "completed" } as any).eq("id", sessionId);
+        if (error) throw error;
+      }
+      const { error: gErr } = await supabase.from("ajan_gorevleri" as any).update({
+        durum: secim,
+        sonuc: secim === "yapildi" ? "Arabulucu onayladı" : "Arabulucu: yapılmadı",
+      } as any).eq("id", g.id);
+      if (gErr) throw gErr;
+      await yukle();
+    } catch (e: any) {
+      setHata(`Kaydedilemedi: ${e?.message ?? "bilinmeyen hata"}`);
+    } finally {
+      setIslenen(null);
+    }
+  }
+
+  const satirlar = useMemo(() => {
+    const a = gorevler.map((g) => ({
+      key: `g-${g.id}`,
+      zaman: g.updated_at || g.created_at,
+      baslik: GOREV_ETIKET[g.gorev_tipi] ?? g.gorev_tipi,
+      detay: g.sonuc || gerekceMetni(g.gerekce),
+      durum: g.durum,
+      gorev: g,
+    }));
+    const b = yapilmayanlar.map((y, i) => ({
+      key: `y-${i}`,
+      zaman: y.zaman,
+      baslik: "Yapılmadı",
+      detay: y.sebep,
+      durum: "yapilmadi",
+      gorev: null as GorevRow | null,
+    }));
+    return [...a, ...b].sort((x, y) => String(y.zaman).localeCompare(String(x.zaman))).slice(0, 60);
+  }, [gorevler, yapilmayanlar]);
+
+  return (
+    <div className="mt-4 border-t pt-4 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-medium">Ajan ne yaptı, ne yapmadı</div>
+        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={yukle} disabled={yukleniyor}>
+          {yukleniyor ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Yenile"}
+        </Button>
+      </div>
+      {hata && (
+        <p className="text-xs text-destructive flex items-start gap-1.5">
+          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" /> {hata}
+        </p>
+      )}
+      {satirlar.length === 0 && !yukleniyor && !hata && (
+        <p className="text-xs text-muted-foreground italic">Bu dosyada henüz ajan kaydı yok.</p>
+      )}
+      <ul className="divide-y">
+        {satirlar.map((r) => {
+          const durumMeta = DURUM_ETIKET[r.durum] ?? { label: "yapılmadı", tone: "text-muted-foreground bg-muted" };
+          const onayli = r.gorev?.durum === "onay_bekliyor";
+          const anahtar = onayAnahtari(r.gorev?.gerekce ?? null);
+          return (
+            <li key={r.key} className="py-2 flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="text-sm flex items-center gap-2 flex-wrap">
+                  <span className="font-medium">{r.baslik}</span>
+                  <span className={`text-[11px] px-1.5 py-0.5 rounded-full ${durumMeta.tone}`}>{durumMeta.label}</span>
+                </div>
+                {r.detay && <div className="text-xs text-muted-foreground break-words">{r.detay}</div>}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {onayli && r.gorev && (
+                  <>
+                    <Button size="sm" variant="outline" className="h-7 text-xs"
+                      disabled={islenen === r.gorev.id}
+                      onClick={() => onayla(r.gorev!, "yapildi")}>
+                      {anahtar.startsWith("oturum_yapildi:") ? "Yapıldı" : "Tamamladım"}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs"
+                      disabled={islenen === r.gorev.id}
+                      onClick={() => onayla(r.gorev!, "atlandi")}>
+                      {anahtar.startsWith("oturum_yapildi:") ? "Yapılmadı" : "Şimdi değil"}
+                    </Button>
+                  </>
+                )}
+                <span className="text-xs text-muted-foreground w-16 text-right">
+                  {r.zaman ? formatRelativeTime(r.zaman) : "—"}
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
