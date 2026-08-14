@@ -77,7 +77,43 @@ async function tarafaUyanSaatler(admin: any, partyId: string, bos: Secenek[]): P
   }
 }
 
-async function saatleriSec(admin: any, mediatorId: string, party: any): Promise<{ secenekler: Secenek[]; hata?: string; tanili?: any; taraf_musaitligi_kullanildi?: boolean }> {
+// Taraf ajanının panosundaki alternatif saat kaydı (gorev_tipi='taraf_alternatif_saat',
+// durum='bekliyor'). Kayıt tarafın KENDİ aralıklarından üretilir; panoya yalnız saatler
+// yazılır, tarafın başka hiçbir verisi geçmez. Arabulucunun takviminde de boş olan
+// saatler seçilir; kayıt yoksa boş liste döner ve akış eskisi gibi sürer.
+async function panodakiAlternatifSaatler(
+  admin: any, partyId: string, bos: Secenek[],
+): Promise<{ secenekler: Secenek[]; gorevId?: string }> {
+  if (!partyId || bos.length === 0) return { secenekler: [] };
+  try {
+    const { data, error } = await admin.from("ajan_gorevleri")
+      .select("id, sonuc, created_at")
+      .eq("gorev_tipi", "taraf_alternatif_saat")
+      .eq("hedef_party_id", partyId)
+      .eq("durum", "bekliyor")
+      .order("created_at", { ascending: false })
+      .limit(5);
+    if (error) {
+      console.error("[randevu-teklif] alternatif saatler okunamadı", error.message);
+      return { secenekler: [] };
+    }
+    const bosAnahtar = new Set(bos.map((s) => `${s.gun}|${s.saat}`));
+    for (const row of (data ?? []) as any[]) {
+      let liste: any[] = [];
+      try { liste = JSON.parse(String(row?.sonuc ?? "")).alternatifler ?? []; } catch { liste = []; }
+      const uygun = liste
+        .map((a: any) => ({ gun: String(a?.gun ?? "").slice(0, 10), saat: String(a?.saat ?? "").slice(0, 5) }))
+        .filter((a: Secenek) => a.gun && a.saat && bosAnahtar.has(`${a.gun}|${a.saat}`));
+      if (uygun.length > 0) return { secenekler: uygun, gorevId: String(row.id) };
+    }
+    return { secenekler: [] };
+  } catch (e) {
+    console.error("[randevu-teklif] alternatif saat okuması başarısız", (e as any)?.message ?? e);
+    return { secenekler: [] };
+  }
+}
+
+async function saatleriSec(admin: any, mediatorId: string, party: any): Promise<{ secenekler: Secenek[]; hata?: string; tanili?: any; taraf_musaitligi_kullanildi?: boolean; alternatiften_secildi?: boolean }> {
   if (!mediatorId) return { secenekler: [], hata: "musaitlik_yok", tanili: { sebep: "dosyada arabulucu yok" } };
 
   const bugun = bugunTR();
@@ -156,6 +192,25 @@ async function saatleriSec(admin: any, mediatorId: string, party: any): Promise<
         mediator_id: mediatorId, bugun, satir: (slots ?? []).length, dolu: dolu.size,
         dosya: caseIds.length, teklif_hatasi: pendingErr, oturum_hatasi: sessionErr,
       },
+    };
+  }
+
+  // Taraf ajanının panoya yazdığı ALTERNATİF saatler varsa önce onlar denenir
+  // (Tur B): taraf önceki teklife "uymuyor" demek yerine kendi aralıklarından üç
+  // saat önermiş olur. Arabulucunun takviminde de boş olan ilk eşleşme kullanılır.
+  const alternatif = await panodakiAlternatifSaatler(admin, String(party?.id ?? ""), bos);
+  if (alternatif.secenekler.length > 0) {
+    const secilenAlt = alternatif.secenekler.slice(0, 3);
+    if (alternatif.gorevId) {
+      await admin.from("ajan_gorevleri")
+        .update({ durum: "yapildi", sonuc: `Alternatif saat teklife dönüştü: ${secilenAlt.map((s) => `${s.gun} ${s.saat}`).join(" · ")}` })
+        .eq("id", alternatif.gorevId);
+    }
+    const bireyselAlt = party?.is_individual === true || party?.party_type === "individual";
+    return {
+      secenekler: bireyselAlt ? [secilenAlt[0]] : secilenAlt,
+      taraf_musaitligi_kullanildi: true,
+      alternatiften_secildi: true,
     };
   }
 
@@ -671,10 +726,14 @@ Deno.serve(async (req) => {
       const isCron = !!CRON_SECRET && req.headers.get("x-cron-secret") === CRON_SECRET;
       const k = await yetkiKontrol(req, admin, supabaseUrl, anonKey, case_id, party_id, isCron);
       if ((k as any).hata) return (k as any).hata;
-      const { secenekler, hata, tanili, taraf_musaitligi_kullanildi } =
+      const { secenekler, hata, tanili, taraf_musaitligi_kullanildi, alternatiften_secildi } =
         await saatleriSec(admin, takvimSahibi((k as any).caseRow), (k as any).party);
       if (hata) return json({ error: hata, tanili });
-      return json({ secenekler, taraf_musaitligi_kullanildi: !!taraf_musaitligi_kullanildi });
+      return json({
+        secenekler,
+        taraf_musaitligi_kullanildi: !!taraf_musaitligi_kullanildi,
+        alternatiften_secildi: !!alternatiften_secildi,
+      });
     }
 
     /* ---------- OLUŞTUR — arabulucu JWT'si veya iç çağrı (x-cron-secret) ---------- */
