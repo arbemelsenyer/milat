@@ -462,3 +462,11 @@ randevu-teklif saat seçerken alternatif saatleri önce deniyor. Taraf ekranına
 sekmesi eklendi: ajanın o taraf için yaptıkları/yapamadıkları + iki yetki anahtarı
 (randevuyu benim adıma onayla · bana hatırlatma gönder). SQL göçü bekliyor:
 case_parties.hatirlatma_izni + ajan_gorevleri politikaları.
+
+14.08 (Tur C-1): İLK TEMAS, KATILIM TEYİDİ, ÇOKLU VE ÖZEL OTURUM. Dosyaya eklenen her
+tarafa tek kez arabulucu imzalı bilgilendirme + girişsiz katılım sayfası
+(/katilim/:token, taraf-katilim fonksiyonu). "Katılmıyorum" randevuyu durduruyor,
+"Bilgi istiyorum" arabulucuya görev açıyor. Yapılan oturumdan sonra "ikinci oturum
+gerekli mi" sorusu; gerekli denirse randevu hattı yeniden başlıyor. Arabulucu Ajan
+Paneli'nden özel oturum (caucus) talep edebiliyor; davet yalnız o tarafa gidiyor ve
+oturum mevcut "private" tipiyle açılıyor. SQL göçü bekliyor: case_parties.katilim_*.

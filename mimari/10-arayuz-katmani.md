@@ -95,6 +95,16 @@ arabulucunun kendi girdiği kayıttır.
   ekranda gösterilir, kart kapanmaz.
 ● 13.08: Aşama 5 üst şeridindeki "Planlanan Oturum" sayacı yalnız GELECEKTEKİ planlı
   (scheduled) oturumları sayar; taslak ve geçmiş kayıtlar sayaca girmez.
+● 14.08 ● CANLI (kod): GİRİŞSİZ KATILIM TEYİDİ SAYFASI (/katilim/:token) — menü, giriş
+  ve başka bağlantı yok; tarafın adı, dosya künyesi (no + konu), arabulucunun adı ve
+  kısa süreç açıklaması ile üç düğme: [Katılıyorum] · [Bilgi istiyorum] ·
+  [Katılmıyorum]. Cevap sonrası tek satırlık teşekkür; geçersiz veya cevaplanmış
+  bağlantıda "Bu bağlantının süresi dolmuş." Randevu cevap sayfasının birebir deseni.
+● 14.08 ● CANLI (kod): AJAN PANELİNDE ÖZEL OTURUM TALEBİ — Ajan Paneli'ndeki "ne yaptı,
+  ne yapmadı" bölümünün içinde taraf seçimi + [Özel oturum talep et] düğmesi (yeni kart
+  açılmadı). Davet yalnız seçilen tarafa gider; altında "karşı taraf bu oturumu hiçbir
+  ekranda göremez" notu durur. "İkinci oturum gerekli mi?" görevinde düğmeler
+  [Gerekli] / [Gerekli değil] etiketiyle çıkar.
 ● 14.08 ● CANLI (kod): TARAF EKRANINDA "AJANIM" SEKMESİ. Tarafın kendi ajanının onun
   adına yaptıkları ve yapamadıkları zaman damgalı liste hâlinde durur; sorgu
   hedef_party_id = tarafın kendi kaydıyla sınırlıdır — karşı tarafın ve dosya genelinin

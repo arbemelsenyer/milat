@@ -53,6 +53,35 @@ AÇIK UÇLAR:
 - DİKKAT: kök tsconfig.json "files": [] taşıyor, hiçbir dosyayı denetlemiyor.
   Gerçek denetim `npx tsc --noEmit -p tsconfig.app.json` ile yapılır.
 
+## Nerede kaldık — 14.08.2026 (53) · TUR C-1 — İLK TEMAS, KATILIM, ÇOKLU/ÖZEL OTURUM
+- [x] 'ilk_temas': dosyaya eklenen her tarafa TEK KEZ arabulucu imzalı bilgilendirme +
+      tek dokunuşluk katılım bağlantısı; girişsiz sayfa /katilim/:token, motor
+      taraf-katilim (verify_jwt=false). Cevap tek kullanımlık.
+- [x] Katılım kaydı: case_parties.katilim_durumu / katilim_zamani / katilim_token.
+- [x] "Katılmıyorum" → ajan randevu açmıyor, sebep panoya + yapılmayanlara, arabulucuya
+      onay_bekliyor kaydı ve bildirim. "Bilgi istiyorum" → arabulucuya görev (ajan hukuki
+      açıklama yapmıyor).
+- [x] 'ek_oturum_gerekli_mi': yapılan oturumdan sonra "ikinci oturum gerekli mi?" sorusu;
+      Gerekli → randevu hattı yeniden başlıyor (karar bir kez uygulanıyor),
+      Gerekli değil → yeni randevu açılmıyor.
+- [x] 'ozel_oturum': Ajan Paneli'nden taraf seçilip talep ediliyor; davet yalnız o tarafa
+      gidiyor, oturum mevcut "private" (Özel Görüşme) tipiyle açılıyor.
+- [x] Sayaçlar: ilk_temas_gonderildi, katilim_cevabi_islendi, ek_oturum_sorusu_acildi,
+      ozel_oturum_daveti.
+tsc (tsconfig.app.json) 0 hata; vite build temiz; edge fonksiyonları esbuild ile
+sözdizimi doğrulandı. CANLI TEST YOK.
+REDEPLOY GEREKLİ: taraf-katilim (YENİ), ajan-nobetci, randevu-teklif.
+SQL GEREKLİ (idempotent, depoda supabase/migrations/20260814160000_*.sql):
+case_parties.katilim_durumu + katilim_zamani + katilim_token (+ CHECK + kısmi unique).
+AÇIK UÇLAR:
+- Özel oturumun karşı taraftan gizliliği bugün taraf ekranında oturum listesi
+  OLMAMASINA dayanıyor; taraf ekranına ileride oturum listesi eklenirse private
+  oturumların o listeden çıkarılması ZORUNLU (aksi hâlde kör veri delinir).
+- İlk temas e-postası taraf eklenir eklenmez gider; mevcut "Davet Gönder" akışı ayrı
+  durur — iki e-postanın birleştirilmesi kurucu kararı.
+- Katılım cevabı sonrası ajanın davranışı yalnız randevu hattını etkiliyor; analiz ve
+  aşama geçişi kolları katılım durumundan bağımsız çalışıyor.
+
 ## SIRADAKİ İŞLER — 14.08.2026 kurucu kararları (yapılacak, bu sırayla)
 
 - [ ] 1. BATNA'nın TARAF YÜZÜ (IBA kararı) — Tarafa dava alternatifi gösterilirken emsal

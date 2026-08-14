@@ -138,6 +138,31 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
   İç kapı (x-cron-secret) orchestrator-run'a ve zincirin altı adımına eklendi; kullanıcı
   JWT yolu ve yetki kontrolleri değişmedi.
 
+[EKLEME — TUR C-1: İLK TEMAS, KATILIM TEYİDİ, ÇOKLU VE ÖZEL OTURUM (14.08)] ● CANLI (kod).
+· ilk_temas — Dosyaya eklenen her tarafa TEK KEZ arabulucu imzalı bilgilendirme
+  e-postası: sürecin ne olduğu, arabulucunun adı, dosya künyesi (gizli içerik yok) ve
+  tek dokunuşluk cevap bağlantısı. Cevap sayfası girişsizdir (/katilim/:token,
+  RandevuCevap deseninin aynısı) ve token tek kullanımlıktır.
+· Katılım kaydı — case_parties.katilim_durumu (beklemede | katiliyor | katilmiyor |
+  bilgi_istiyor) + katilim_zamani + katilim_token. Token hiçbir istemci yüzeyine
+  açılmaz; okuma/yazma yalnız taraf-katilim edge fonksiyonunda service role ile olur.
+· "Katılmıyorum" → ajan o dosyada randevu AÇMAZ; sebep panoya ve yapılmayanlar
+  listesine yazılır, arabulucuya onay_bekliyor kaydı ve bildirim düşer.
+· "Bilgi istiyorum" → arabulucuya görev + bildirim; ajan kendi hukuki açıklama YAPMAZ.
+· ek_oturum_gerekli_mi — Bir oturum "yapıldı" işaretlenip dosya kapanmadıysa ve
+  gelecekte planlı oturum yoksa arabulucuya "ikinci oturum gerekli mi?" sorusu düşer
+  (onay_bekliyor + bildirim). "Gerekli" denince ajan mevcut randevu hattını yeniden
+  başlatır (taraf müsaitliği → teklif → davet) ve karar bir kez uygulanır; "Gerekli
+  değil" denince yeni randevu açılmaz, dosya kapanış hattına aşama geçişiyle ilerler.
+· ozel_oturum — Arabulucu Ajan Paneli'nden bir tarafla özel oturum talep eder; ajan
+  YALNIZ o tarafa teklif gönderir, seçeneklere ozel_oturum işareti konur ve cevap
+  işlenirken oturum MEVCUT "private" (Özel Görüşme) tipiyle açılır — yeni tip veya
+  sütun eklenmedi. KÖR VERİ: özel oturumun varlığı, saati ve içeriği karşı tarafa
+  hiçbir yüzeyden gösterilmez (taraf ekranında oturum listesi zaten yoktur; özel
+  oturum notları da yalnız katılımcısına ve arabulucuya görünür).
+· Koşum özetine sayaçlar: ilk_temas_gonderildi · katilim_cevabi_islendi ·
+  ek_oturum_sorusu_acildi · ozel_oturum_daveti.
+
 [EKLEME — TARAF AJANI / TUR B (14.08)] ● CANLI (kod).
 Her tarafın kendi ajanı vardır; YALNIZ kendi tarafının verisini görür, karşı tarafınkini
 hiçbir yoldan görmez. Süreç ajanıyla doğrudan konuşmaz — iletişim ajan_gorevleri panosu
