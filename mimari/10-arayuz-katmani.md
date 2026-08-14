@@ -95,6 +95,14 @@ arabulucunun kendi girdiği kayıttır.
   ekranda gösterilir, kart kapanmaz.
 ● 13.08: Aşama 5 üst şeridindeki "Planlanan Oturum" sayacı yalnız GELECEKTEKİ planlı
   (scheduled) oturumları sayar; taslak ve geçmiş kayıtlar sayaca girmez.
+● 14.08 ● CANLI (kod): AJAN PANELİNDE "NE YAPTI, NE YAPMADI". Ajan Kontrol Paneli'nin
+  altında yeni bir kart açılmadan bölüm olarak durur: ajan_gorevleri satırları ile
+  nöbetçinin ön koşul uyarıları (agent_states.last_output.yapilmayanlar) tek zaman
+  damgalı listede birleşir. Durum rozetleri: yapıldı · atlandı · sırada · onayınız
+  bekleniyor · yapılmadı. Zorunlu insan noktalarında satırın yanında düğme vardır —
+  "oturum yapıldı mı?" görevinde [Yapıldı] (oturumu completed işaretler) / [Yapılmadı],
+  diğer onay görevlerinde [Tamamladım] / [Şimdi değil]. Okuma ve yazma hataları
+  ekranda kırmızı satır olarak kalır.
 ● 14.08 ● CANLI (kod tarafı): AŞAMA 1 TEK GİRİŞ KAPISI. Dosya kurulumunun tamamı tek
   ekranda: uyuşmazlık konusu ve tür tespiti · sürecin dava şartı mı ihtiyari mi olduğu
   ve buna bağlı yasal süre (cases.mediation_type ve mevcut süre alanları) · TARAFLAR

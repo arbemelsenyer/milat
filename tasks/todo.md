@@ -1,3 +1,28 @@
+## Nerede kaldık — 14.08.2026 (51) · OTONOM AKIŞ (nöbetçi süreci yürütüyor)
+- [x] Randevu tetikleyicisi değişti: "son tarihe 3 gün" kuralı kaldırıldı; analiz
+      zinciri bitince + planlı oturum yoksa + bekleyen teklif yoksa teklif HEMEN açılıyor.
+- [x] Saat önerisinde tarafın kendi müsaitliği (taraf_musaitlik) önce okunuyor;
+      uyan saat varsa o teklif ediliyor, yoksa arabulucunun takvimi. Otomatik onay akışı
+      aynen çalışıyor.
+- [x] 'asama_gecisi' görev tipi (1→7): şartlar mimari/06'da; aşama yalnız ileri gidiyor,
+      aynı geçiş iki kez yazılmıyor.
+- [x] Zorunlu insan noktaları 'onay_bekliyor' olarak panoya + bildirim: tutanak imzaya
+      sunulması · sonuç kaydı · dosya kapatma · "oturum yapıldı mı?".
+- [x] Aşama 4-7 kolları: oturumdan 1 gün önce arabulucu imzalı hatırlatma (tek kez),
+      oturum sonrası soru, oturum notu taslağı ve kapanış onayları.
+- [x] Ön koşul uyarıları: her çalıştırılamayan kolun sebebi zaman damgasıyla
+      agent_states.last_output.yapilmayanlar'a yazılıyor.
+- [x] Ajan Paneli'ne "ajan ne yaptı, ne yapmadı" bölümü + onay düğmeleri.
+tsc + build temiz; edge fonksiyonların sözdizimi esbuild ile doğrulandı. CANLI TEST YOK.
+REDEPLOY GEREKLİ: ajan-nobetci, randevu-teklif.
+AÇIK UÇLAR:
+- ajan_gorevleri için arabulucu SELECT/UPDATE politikası doğrulanmadı; yoksa panelde
+  kırmızı hata satırı çıkar (SQL kurucudan).
+- case_sessions.status='completed' değeri ilk kez bu akışla yazılıyor; başka ekranlar
+  bu değeri "iptal değil" olarak sayıyor, sayaçlar kontrol edilmeli.
+- Oturum notu taslağının METNİ üretilmiyor (uydurma yasağı): kayıt/döküm hattı gelince
+  taslak dökümden beslenecek.
+
 ## SIRADAKİ İŞLER — 14.08.2026 kurucu kararları (yapılacak, bu sırayla)
 
 - [ ] 1. BATNA'nın TARAF YÜZÜ (IBA kararı) — Tarafa dava alternatifi gösterilirken emsal

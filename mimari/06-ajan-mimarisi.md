@@ -138,6 +138,40 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
   İç kapı (x-cron-secret) orchestrator-run'a ve zincirin altı adımına eklendi; kullanıcı
   JWT yolu ve yetki kontrolleri değişmedi.
 
+[EKLEME — OTONOM AKIŞ: NÖBETÇİ SÜRECİ BAŞTAN SONA YÜRÜTÜR (14.08)] ● CANLI (kod).
+· RANDEVU TETİKLEYİCİSİ DEĞİŞTİ: "son tarihe 3 günden az kaldıysa teklif aç" kuralı
+  KALDIRILDI. Yeni kural: analiz zinciri tamamlandıysa (en az bir party_analyses satırı
+  ve koşan orkestratör yok), planlanmış oturum yoksa ve cevap bekleyen teklif yoksa
+  randevu teklifi HEMEN açılır — süreç başlar başlamaz taraflar oturuma çağrılır.
+· TARAF AJANIYLA EŞLEŞME: randevu-teklif saat önerisinde tarafın KENDİ müsaitliği
+  (taraf_musaitlik) önce okunur; arabulucunun boş saatlerinden tarafın aralığına
+  düşenler varsa teklif önce onlardan kurulur. Taraf müsaitlik girmemişse veya hiçbiri
+  uymuyorsa arabulucunun takvimi aynen kullanılır. Tarafta otomatik onay açıksa mevcut
+  anlık onay akışı çalışır; değilse tek dokunuşluk cevap linki e-postayla gider.
+· AŞAMA GEÇİŞİ — 'asama_gecisi' görev tipi (yeni numaralandırma 1-7):
+  1→2 en az iki taraf + belge veya başvuru metni + analiz zinciri başlatıldı ·
+  2→3 taraf analizleri tamam (taraf başına en az bir analiz) + ortak zemin raporu ·
+  3→4 kabul edilmiş randevudan planlanmış oturum var ·
+  4→5 oturum tarihi geçmiş ve oturum 'yapıldı' işaretlenmiş ·
+  5→6 bilirkişi istenmemişse (case_expert_assignments boş) doğrudan geçilir ·
+  6→7 oturum notu üretilmiş ve arabulucu onayıyla kaydedilmiş (case_notes phase=7).
+  Aşama YALNIZ İLERİ gider; ajan geri almaz. Her geçiş panoya [gecis:X->Y] etiketiyle
+  bir kez yazılır, gerekçesiyle birlikte.
+· ZORUNLU İNSAN NOKTALARI: tutanağın imzaya sunulması · anlaşma/anlaşmama kararının
+  kaydı · dosyanın kapatılması · "oturum yapıldı mı?" sorusu. Bunlar panoya
+  durum='onay_bekliyor' satırı olarak düşer ve arabulucuya bildirim gider; nöbetçi bu
+  satırlara hiçbir koşulda dokunmaz (yürütülen tipler yalnız durum='bekliyor').
+· AŞAMA 4-7 KOLLARI: oturumdan 1 gün önce (24 saat) taraflara arabulucu imzalı
+  hatırlatma e-postası — oturum başına TEK KEZ ([hatirlatma:<oturum>] etiketi) ·
+  oturum saati geçince arabulucuya "oturum yapıldı mı?" sorusu · yapıldı işaretli
+  oturum için oturum notu taslağının arabulucuya sunulması · kapanış aşamasında üç
+  onay görevi. Oturum notunun METNİ ajan tarafından uydurulmaz (m.2): taslak kayıtlı
+  olgulardan kurulur, içeriği arabulucu yazar/onaylar.
+· ÖN KOŞUL UYARILARI: bir kol çalıştırılamıyorsa sessiz kalınmaz — sebep zaman
+  damgasıyla agent_states.last_output.yapilmayanlar listesine yazılır
+  ("randevu açılamadı: analiz zinciri henüz tamamlanmadı", "aşama geçilemedi: ortak
+  zemin raporu bekleniyor" gibi) ve koşum özetindeki atlama_sebepleri'ne düşer.
+
 [EKLEME — İÇ ÇAĞRI KAPISI VE NÖBETÇİ GÖREV TİPLERİ (13.08)] ● CANLI.
 · İç çağrı kapısı deseni (x-cron-secret + CRON_SECRET): önce randevu-teklif ve
   create-video-room'da açılmıştı; artık orchestrator-run'da ve analiz zincirinin altı

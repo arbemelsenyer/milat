@@ -444,3 +444,12 @@ otomatik silinir. İki veri tipi saklama-imha motorunda ayrı satır olarak tutu
 [14.08 KALICI ÇALIŞMA KURALI]
 Her gün sonunda yalnız yapılan işler değil, o gün ALINAN KARARLAR da tasks/todo.md ve
 tasks/yol-haritasi.md dosyalarına işlenir. Kod değişmemiş olsa bile karar kaydedilir.
+
+14.08: OTONOM AKIŞ — nöbetçi süreci baştan sona yürütüyor. Randevu tetikleyicisi
+değişti (süre yaklaşmasını beklemiyor; analiz zinciri biter bitmez teklif açılıyor),
+saat önerisinde tarafın kendi müsaitliği önce okunuyor, 'asama_gecisi' görev tipiyle
+aşamalar 1→7 kendiliğinden ilerliyor (yalnız ileri), zorunlu insan noktaları
+(tutanak imzası · sonuç kaydı · dosya kapanışı · "oturum yapıldı mı") panoya
+'onay_bekliyor' olarak düşüyor, oturumdan 1 gün önce taraflara hatırlatma gidiyor ve
+her çalıştırılamayan kolun sebebi zaman damgasıyla kaydediliyor. Ajan Paneli'ne
+"ne yaptı, ne yapmadı" listesi eklendi.
