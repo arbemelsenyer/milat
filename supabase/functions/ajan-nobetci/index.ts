@@ -676,6 +676,272 @@ async function kapanisKollari(admin: any, dosya: any): Promise<{ acilan: number;
   return { acilan, sebepler };
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   TARAF AJANI (Tur B)
+   Her tarafın kendi ajanı vardır ve YALNIZ kendi tarafının verisini görür. Süreç
+   ajanıyla doğrudan konuşmaz; iletişim ajan_gorevleri panosu üzerinden yürür ve
+   panoya yazılan hiçbir kayıt karşı tarafın verisini taşımaz. Taraf ajanının
+   ürettiği her satırda hedef_party_id DOLUDUR (kör veri kapısı: taraf yalnız
+   kendi hedef_party_id satırlarını okuyabilir).
+   ──────────────────────────────────────────────────────────────────────────── */
+
+// Tarafa e-posta: arabulucu imzalı, tek seferlik (mükerrer gönderim panodaki
+// etiketle engellenir). Yalnız kendi tarafına gider; karşı taraf verisi geçmez.
+async function tarafaEposta(
+  admin: any, dosya: any, taraf: any, konu: string, govdeHtml: string,
+): Promise<{ gonderildi: boolean; sebep?: string }> {
+  const key = Deno.env.get("RESEND_API_KEY");
+  if (!key) return { gonderildi: false, sebep: "RESEND_API_KEY yok" };
+  const email = String(taraf?.email ?? "").trim();
+  if (!email) return { gonderildi: false, sebep: "tarafın e-posta adresi yok" };
+
+  const { imza, dosyaSatiri } = await imzaBlogu(admin, dosya.id);
+  const esc = (t: string) => String(t).replace(/</g, "&lt;");
+  const ad = taraf?.party_type === "individual"
+    ? `${taraf?.first_name ?? ""} ${taraf?.last_name ?? ""}`.trim()
+    : String(taraf?.company_name ?? "").trim();
+  const kunye: string[] = [];
+  const appNo = (dosyaSatiri as any)?.application_no;
+  const baslik = (dosyaSatiri as any)?.title;
+  if (appNo) kunye.push(`<strong>Dosya No:</strong> ${esc(String(appNo))}`);
+  if (baslik) kunye.push(`<strong>Uyuşmazlık konusu:</strong> ${esc(String(baslik))}`);
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+  <body style="font-family:Arial,sans-serif;line-height:1.6;color:#222">
+    <p>Sayın ${esc(ad || "Taraf")},</p>
+    ${kunye.length ? `<p>${kunye.join("<br>")}</p>` : ""}
+    ${govdeHtml}
+    <p>Saygılarımızla,${imza ? `<br>${esc(imza)}` : ""}</p>
+    <p style="font-size:12px;color:#666">Bu ileti MediPact AI aracılığıyla gönderilmiştir.</p>
+  </body></html>`;
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: "MİLAT Arabuluculuk <info@milatmediation.com>", to: [email], subject: konu, html }),
+    });
+    if (!res.ok) return { gonderildi: false, sebep: `HTTP ${res.status} ${(await res.text()).slice(0, 150)}` };
+    return { gonderildi: true };
+  } catch (e: any) {
+    return { gonderildi: false, sebep: e?.message ?? String(e) };
+  }
+}
+
+// Tarafın hatırlatma izni. Kolon henüz eklenmemişse (göç çalıştırılmadıysa)
+// alan undefined döner ve izin VAR sayılır — bugünkü davranış korunur.
+function hatirlatmaIzniVar(taraf: any): boolean {
+  return (taraf as any)?.hatirlatma_izni !== false;
+}
+
+// 'taraf_musaitlik_iste': tarafın hiç müsaitlik kaydı yoksa bir kez istenir.
+async function musaitlikGorevleriAc(admin: any, dosya: any, taraflar: any[]): Promise<{ acilan: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  let acilan = 0;
+  for (const t of taraflar) {
+    const { data: araliklar, error } = await admin.from("taraf_musaitlik")
+      .select("id").eq("party_id", t.id).limit(1);
+    if (error) { sebepler.push(`müsaitlik istenemedi: taraf_musaitlik okunamadı — ${error.message}`); continue; }
+    if (araliklar && araliklar.length > 0) continue;
+    const r = await gorevAc(
+      admin, dosya.id, "taraf_musaitlik_iste", `[musaitlik:${t.id}]`,
+      "Tarafın müsait saat kaydı yok, kendisinden isteniyor",
+      { hedefPartyId: t.id },
+    );
+    if (r.acildi) acilan++;
+    else if (r.sebep && !r.sebep.includes("zaten açılmış")) sebepler.push(r.sebep);
+  }
+  return { acilan, sebepler };
+}
+
+async function musaitlikIsteYurut(admin: any, dosya: any, partyId: string): Promise<{ durum: string; sonuc: string }> {
+  const { data: taraf } = await admin.from("case_parties").select("*").eq("id", partyId).maybeSingle();
+  if (!taraf) return { durum: "atlandi", sonuc: "Taraf kaydı bulunamadı" };
+  const { data: araliklar } = await admin.from("taraf_musaitlik").select("id").eq("party_id", partyId).limit(1);
+  if (araliklar && araliklar.length > 0) return { durum: "atlandi", sonuc: "Taraf müsaitliğini bu arada girmiş" };
+  if (!hatirlatmaIzniVar(taraf)) return { durum: "atlandi", sonuc: "Taraf hatırlatma iznini kapatmış" };
+
+  const r = await tarafaEposta(admin, dosya, taraf,
+    "Müsait saatlerinizi bildirir misiniz?",
+    `<p>Görüşme saatini sizin uygunluğunuza göre planlayabilmemiz için dosya ekranınızdaki
+      <strong>“Randevu Tercihlerim”</strong> bölümünden müsait gün ve saatlerinizi
+      girmenizi rica ederiz.</p>
+     <p>Dilerseniz aynı bölümden “randevuları benim adıma onaylayabilir” anahtarını açarak
+      uygun saatlerinizle örtüşen teklifleri otomatik onaylatabilirsiniz.</p>`);
+  if (!r.gonderildi) return { durum: "bekliyor", sonuc: `Müsaitlik istenemedi: ${r.sebep ?? "bilinmeyen hata"}` };
+  return { durum: "yapildi", sonuc: "Taraftan müsait saatleri istendi" };
+}
+
+// 'teklif_degerlendir': tarafa açık teklif varken taraf ajanı devreye girer.
+async function teklifDegerlendirGorevleriAc(admin: any, dosya: any): Promise<{ acilan: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  let acilan = 0;
+  const { data: teklifler, error } = await admin.from("randevu_teklifleri")
+    .select("id, party_id, durum").eq("case_id", dosya.id).eq("durum", "beklemede").limit(20);
+  if (error) {
+    sebepler.push(`teklif değerlendirilemedi: teklifler okunamadı — ${error.message}`);
+    return { acilan, sebepler };
+  }
+  for (const t of (teklifler ?? []) as any[]) {
+    if (!t?.party_id) { sebepler.push("teklif değerlendirilemedi: teklifte taraf yok"); continue; }
+    const r = await gorevAc(
+      admin, dosya.id, "teklif_degerlendir", `[teklif:${t.id}]`,
+      "Tarafa açık randevu teklifi var, taraf ajanı müsaitlikle karşılaştıracak",
+      { hedefPartyId: String(t.party_id) },
+    );
+    if (r.acildi) acilan++;
+    else if (r.sebep && !r.sebep.includes("zaten açılmış")) sebepler.push(r.sebep);
+  }
+  return { acilan, sebepler };
+}
+
+type TeklifSonuc = { durum: string; sonuc: string; otomatikOnay?: boolean; alternatif?: boolean };
+
+async function teklifDegerlendirYurut(admin: any, dosya: any, gerekce: string, partyId: string): Promise<TeklifSonuc> {
+  const m = /^\[teklif:([0-9a-f-]+)\]/i.exec(String(gerekce ?? ""));
+  if (!m) return { durum: "atlandi", sonuc: "Teklif etiketi okunamadı" };
+  const teklifId = m[1];
+
+  const { data: teklif, error: tErr } = await admin.from("randevu_teklifleri")
+    .select("id, token, durum, secenekler, party_id").eq("id", teklifId).maybeSingle();
+  if (tErr) return { durum: "bekliyor", sonuc: `Teklif okunamadı: ${tErr.message}` };
+  if (!teklif) return { durum: "atlandi", sonuc: "Teklif kaydı bulunamadı" };
+  if (String((teklif as any).durum) !== "beklemede") return { durum: "atlandi", sonuc: "Teklif zaten cevaplanmış" };
+
+  const { data: taraf } = await admin.from("case_parties").select("*").eq("id", partyId).maybeSingle();
+  if (!taraf) return { durum: "atlandi", sonuc: "Taraf kaydı bulunamadı" };
+
+  const { data: araliklar, error: mErr } = await admin.from("taraf_musaitlik")
+    .select("gun, baslangic, bitis").eq("party_id", partyId).limit(500);
+  if (mErr) return { durum: "bekliyor", sonuc: `Taraf müsaitliği okunamadı: ${mErr.message}` };
+  const satirlar = (araliklar ?? []) as any[];
+  if (satirlar.length === 0) {
+    return { durum: "atlandi", sonuc: "Tarafın müsaitlik kaydı yok, teklif kendi cevabını bekliyor" };
+  }
+
+  const secenekler = (Array.isArray((teklif as any).secenekler) ? (teklif as any).secenekler : [])
+    .map((s: any) => ({ gun: String(s?.gun ?? "").slice(0, 10), saat: String(s?.saat ?? "").slice(0, 5) }))
+    .filter((s: any) => s.gun && s.saat);
+  const uyan = secenekler.find((s: any) => satirlar.some((a) =>
+    String(a.gun).slice(0, 10) === s.gun &&
+    s.saat >= String(a.baslangic).slice(0, 5) &&
+    s.saat < String(a.bitis).slice(0, 5)
+  ));
+
+  // (a) Saat uyuyor VE otomatik onay açık → mevcut "Uygun" akışı iç kapıdan koşar.
+  if (uyan && (taraf as any).otomatik_onay === true) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/randevu-teklif`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-cron-secret": CRON_SECRET,
+          apikey: SERVICE_KEY,
+          Authorization: `Bearer ${SERVICE_KEY}`,
+        },
+        body: JSON.stringify({ action: "cevapla", token: (teklif as any).token, secim: `${uyan.gun} ${uyan.saat}` }),
+      });
+      const govde = await res.json().catch(() => ({}));
+      if (!res.ok || (govde as any)?.error) {
+        return { durum: "bekliyor", sonuc: `Otomatik onay yazılamadı: ${String((govde as any)?.error ?? res.status)}` };
+      }
+      return { durum: "yapildi", sonuc: `Taraf ajanı ${uyan.gun} ${uyan.saat} saatini taraf adına onayladı`, otomatikOnay: true };
+    } catch (e: any) {
+      return { durum: "bekliyor", sonuc: `Otomatik onay iç çağrısı başarısız: ${e?.message ?? e}` };
+    }
+  }
+
+  // (b) Saat uyuyor ama otomatik onay kapalı → tarafa tek seferlik hatırlatma.
+  if (uyan) {
+    if (!hatirlatmaIzniVar(taraf)) {
+      return { durum: "atlandi", sonuc: "Uygun saat bulundu ama taraf hatırlatma iznini kapatmış" };
+    }
+    const r = await tarafaEposta(admin, dosya, taraf,
+      "Ajanınız uygun bir saat buldu",
+      `<p>Dosya asistanınız, size iletilen randevu teklifindeki
+        <strong>${trTarihMetni(uyan.gun)} · ${uyan.saat}</strong> saatinin girdiğiniz müsaitlik
+        aralığınıza uyduğunu tespit etti.</p>
+       <p>Onaylıyor musunuz? Size gönderilen randevu bağlantısından tek dokunuşla
+        cevaplayabilirsiniz.</p>`);
+    if (!r.gonderildi) return { durum: "bekliyor", sonuc: `Hatırlatma gönderilemedi: ${r.sebep ?? "bilinmeyen hata"}` };
+    return { durum: "yapildi", sonuc: `Uygun saat (${uyan.gun} ${uyan.saat}) için tarafa onay hatırlatması gönderildi` };
+  }
+
+  // (c) Hiçbir saat uymuyor → teklif "uymuyor" olarak İŞLENMEZ; tarafın kendi
+  // aralıklarından en yakın üç saat ALTERNATİF olarak panoya yazılır. Panoya giden
+  // tek bilgi bu saatlerdir; tarafın başka hiçbir verisi süreç ajanına geçmez.
+  const bugun = new Date(Date.now() + TR_OFFSET_MS).toISOString().slice(0, 10);
+  const adaylar = satirlar
+    .map((a) => ({ gun: String(a.gun).slice(0, 10), saat: String(a.baslangic).slice(0, 5) }))
+    .filter((a) => a.gun >= bugun)
+    .sort((x, y) => (x.gun === y.gun ? x.saat.localeCompare(y.saat) : x.gun.localeCompare(y.gun)))
+    .slice(0, 3);
+  if (adaylar.length === 0) {
+    return { durum: "atlandi", sonuc: "Teklif tarafın müsaitliğine uymuyor ve ileri tarihli boş aralığı yok" };
+  }
+  const yazim = await gorevAc(
+    admin, dosya.id, "taraf_alternatif_saat", `[alternatif:${teklifId}]`,
+    "Taraf ajanının önerdiği alternatif saatler — sonraki teklif bunlardan seçilir",
+    { hedefPartyId: partyId },
+  );
+  if (!yazim.acildi && !String(yazim.sebep ?? "").includes("zaten açılmış")) {
+    return { durum: "bekliyor", sonuc: `Alternatif saatler yazılamadı: ${yazim.sebep ?? ""}` };
+  }
+  // Saatler sonuc alanına makine okunur JSON olarak konur (randevu-teklif okur).
+  const { data: altSatir } = await admin.from("ajan_gorevleri")
+    .select("id, gerekce").eq("case_id", dosya.id).eq("gorev_tipi", "taraf_alternatif_saat")
+    .eq("hedef_party_id", partyId).limit(50);
+  const hedefSatir = ((altSatir ?? []) as any[]).find((r) => String(r?.gerekce ?? "").startsWith(`[alternatif:${teklifId}]`));
+  if (hedefSatir?.id) {
+    await admin.from("ajan_gorevleri")
+      .update({ sonuc: JSON.stringify({ alternatifler: adaylar }) }).eq("id", hedefSatir.id);
+  }
+  return {
+    durum: "yapildi",
+    sonuc: `Teklif tarafın müsaitliğine uymuyor; ${adaylar.length} alternatif saat panoya yazıldı`,
+    alternatif: true,
+  };
+}
+
+// 'taraf_eksik_bilgi': tarafın dosyasında hiç belge yoksa bir kez nazikçe istenir.
+// Beklenen-belge listeleri (evrak tespit ajanı) gelene kadar ölçüt budur.
+async function eksikBilgiGorevleriAc(admin: any, dosya: any, taraflar: any[]): Promise<{ acilan: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  let acilan = 0;
+  for (const t of taraflar) {
+    const { data: belgeler, error } = await admin.from("case_documents")
+      .select("id").eq("case_id", dosya.id).eq("party_id", t.id).limit(1);
+    if (error) { sebepler.push(`eksik bilgi istenemedi: belgeler okunamadı — ${error.message}`); continue; }
+    if (belgeler && belgeler.length > 0) continue;
+    const r = await gorevAc(
+      admin, dosya.id, "taraf_eksik_bilgi", `[eksik:${t.id}]`,
+      "Tarafın kendi belgesi yok, kendisinden isteniyor",
+      { hedefPartyId: t.id },
+    );
+    if (r.acildi) acilan++;
+    else if (r.sebep && !r.sebep.includes("zaten açılmış")) sebepler.push(r.sebep);
+  }
+  return { acilan, sebepler };
+}
+
+async function eksikBilgiYurut(admin: any, dosya: any, partyId: string): Promise<{ durum: string; sonuc: string }> {
+  const { data: taraf } = await admin.from("case_parties").select("*").eq("id", partyId).maybeSingle();
+  if (!taraf) return { durum: "atlandi", sonuc: "Taraf kaydı bulunamadı" };
+  const { data: belgeler } = await admin.from("case_documents")
+    .select("id").eq("case_id", dosya.id).eq("party_id", partyId).limit(1);
+  if (belgeler && belgeler.length > 0) return { durum: "atlandi", sonuc: "Taraf bu arada belge yüklemiş" };
+  if (!hatirlatmaIzniVar(taraf)) return { durum: "atlandi", sonuc: "Taraf hatırlatma iznini kapatmış" };
+
+  const r = await tarafaEposta(admin, dosya, taraf,
+    "Dosyanıza belge ekleyebilir misiniz?",
+    `<p>Sürecin sağlıklı ilerleyebilmesi için dosyanıza ilişkin belgelerinizi
+      (sözleşme, yazışma, fatura, bordro gibi) dosya ekranınızdaki
+      <strong>“Belgelerim”</strong> bölümünden yükleyebilirsiniz.</p>
+     <p>Belge yüklemek zorunlu değildir; yüklediğiniz belgeler yalnız sizin ve
+      arabulucunun görebileceği şekilde saklanır.</p>`);
+  if (!r.gonderildi) return { durum: "bekliyor", sonuc: `Eksik bilgi istenemedi: ${r.sebep ?? "bilinmeyen hata"}` };
+  return { durum: "yapildi", sonuc: "Taraftan belge/bilgi istendi" };
+}
+
 // Video bağlantısı: gelecekteki planlı ve bağlantısı boş oturumlar için create-video-room
 // iç kapıdan çağrılır, dönen adres oturumun video_link alanına yazılır ve oturumun
 // tarafına tek bilgilendirme e-postası gider. Bağlantı yazıldıktan sonra oturum bir daha
@@ -935,6 +1201,12 @@ Deno.serve(async (req) => {
     let yeniOnayGorevi = 0;
     let yeniHatirlatmaGorevi = 0;
     let hatirlatmaGonderildi = 0;
+    // Taraf ajanı sayaçları (Tur B)
+    let musaitlikIstendi = 0;
+    let teklifDegerlendirildi = 0;
+    let otomatikOnaylandi = 0;
+    let alternatifYazildi = 0;
+    let eksikBilgiIstendi = 0;
     const hatalar: string[] = [];
 
     for (const dosya of (dosyalar ?? []) as any[]) {
@@ -974,6 +1246,22 @@ Deno.serve(async (req) => {
         yeniOnayGorevi += kapanis.acilan;
         kapanis.sebepler.forEach(sebepEkle);
 
+        // ── TARAF AJANI KOLLARI (Tur B) — her taraf için ayrı, kendi verisiyle ──
+        const { data: dosyaTaraflari, error: tErr } = await admin.from("case_parties")
+          .select("id, party_type, first_name, last_name, company_name, email")
+          .eq("case_id", dosya.id).limit(50);
+        if (tErr) sebepEkle(`taraf ajanı çalışamadı: taraflar okunamadı — ${tErr.message}`);
+        const taraflar = (dosyaTaraflari ?? []) as any[];
+
+        const musaitlikKol = await musaitlikGorevleriAc(admin, dosya, taraflar);
+        musaitlikKol.sebepler.forEach(sebepEkle);
+
+        const teklifKol = await teklifDegerlendirGorevleriAc(admin, dosya);
+        teklifKol.sebepler.forEach(sebepEkle);
+
+        const eksikKol = await eksikBilgiGorevleriAc(admin, dosya, taraflar);
+        eksikKol.sebepler.forEach(sebepEkle);
+
         // YALNIZ durum='bekliyor' görevler yürütülür. 'onay_bekliyor' satırları
         // arabulucunundur — ajan bunlara hiçbir koşulda dokunmaz.
         const { data: gorevler, error: gErr } = await admin.from("ajan_gorevleri")
@@ -983,25 +1271,42 @@ Deno.serve(async (req) => {
           .limit(100);
         if (gErr) throw new Error(gErr.message);
 
-        const YURUTULEN_TIPLER = ["soru_gonder", "randevu_teklifi", "analiz_baslat", "asama_gecisi", "oturum_hatirlatma"];
+        // taraf_alternatif_saat panoda VERİ satırıdır; süreç ajanı (randevu-teklif)
+        // okur, nöbetçi yürütmez — bu yüzden listede yoktur.
+        const YURUTULEN_TIPLER = [
+          "soru_gonder", "randevu_teklifi", "analiz_baslat", "asama_gecisi", "oturum_hatirlatma",
+          "taraf_musaitlik_iste", "teklif_degerlendir", "taraf_eksik_bilgi",
+        ];
+        const TARAF_TIPLERI = ["soru_gonder", "taraf_musaitlik_iste", "teklif_degerlendir", "taraf_eksik_bilgi"];
         for (const gorev of (gorevler ?? []) as any[]) {
           // Tanınmayan görev tipine dokunulmaz: 'bekliyor' kalır.
           if (!YURUTULEN_TIPLER.includes(gorev.gorev_tipi)) continue;
-          if (gorev.gorev_tipi === "soru_gonder" && !gorev.hedef_party_id) {
+          // Taraf ajanı görevlerinde hedef taraf ZORUNLUDUR (kör veri kapısı).
+          if (TARAF_TIPLERI.includes(gorev.gorev_tipi) && !gorev.hedef_party_id) {
             await admin.from("ajan_gorevleri")
               .update({ durum: "atlandi", sonuc: "Hedef taraf yok" }).eq("id", gorev.id);
             atlananGorev++;
             continue;
           }
-          const { durum, sonuc } = gorev.gorev_tipi === "randevu_teklifi"
-            ? await randevuTeklifiYurut(admin, dosya.id)
-            : gorev.gorev_tipi === "analiz_baslat"
-              ? await analizBaslat(admin, dosya.id)
-              : gorev.gorev_tipi === "asama_gecisi"
-                ? await asamaGecisiYurut(admin, dosya.id, gorev.gerekce)
-                : gorev.gorev_tipi === "oturum_hatirlatma"
-                  ? await oturumHatirlatmaYurut(admin, dosya, gorev.gerekce)
-                  : await soruGonder(admin, dosya.id, gorev.hedef_party_id);
+          let tarafSonuc: TeklifSonuc | null = null;
+          if (gorev.gorev_tipi === "teklif_degerlendir") {
+            tarafSonuc = await teklifDegerlendirYurut(admin, dosya, gorev.gerekce, gorev.hedef_party_id);
+          }
+          const { durum, sonuc } = tarafSonuc
+            ? { durum: tarafSonuc.durum, sonuc: tarafSonuc.sonuc }
+            : gorev.gorev_tipi === "randevu_teklifi"
+              ? await randevuTeklifiYurut(admin, dosya.id)
+              : gorev.gorev_tipi === "analiz_baslat"
+                ? await analizBaslat(admin, dosya.id)
+                : gorev.gorev_tipi === "asama_gecisi"
+                  ? await asamaGecisiYurut(admin, dosya.id, gorev.gerekce)
+                  : gorev.gorev_tipi === "oturum_hatirlatma"
+                    ? await oturumHatirlatmaYurut(admin, dosya, gorev.gerekce)
+                    : gorev.gorev_tipi === "taraf_musaitlik_iste"
+                      ? await musaitlikIsteYurut(admin, dosya, gorev.hedef_party_id)
+                      : gorev.gorev_tipi === "taraf_eksik_bilgi"
+                        ? await eksikBilgiYurut(admin, dosya, gorev.hedef_party_id)
+                        : await soruGonder(admin, dosya.id, gorev.hedef_party_id);
           if (durum !== "bekliyor") {
             await admin.from("ajan_gorevleri").update({ durum, sonuc }).eq("id", gorev.id);
           } else {
@@ -1015,6 +1320,13 @@ Deno.serve(async (req) => {
             if (gorev.gorev_tipi === "analiz_baslat") analizBaslatildi++;
             if (gorev.gorev_tipi === "asama_gecisi") asamaIlerletildi++;
             if (gorev.gorev_tipi === "oturum_hatirlatma") hatirlatmaGonderildi++;
+            if (gorev.gorev_tipi === "taraf_musaitlik_iste") musaitlikIstendi++;
+            if (gorev.gorev_tipi === "taraf_eksik_bilgi") eksikBilgiIstendi++;
+            if (gorev.gorev_tipi === "teklif_degerlendir") {
+              teklifDegerlendirildi++;
+              if (tarafSonuc?.otomatikOnay) otomatikOnaylandi++;
+              if (tarafSonuc?.alternatif) alternatifYazildi++;
+            }
           }
           if (durum === "atlandi") {
             atlananGorev++;
@@ -1074,6 +1386,11 @@ Deno.serve(async (req) => {
       onay_gorevi_acildi: yeniOnayGorevi,
       hatirlatma_gorevi_acildi: yeniHatirlatmaGorevi,
       hatirlatma_gonderildi: hatirlatmaGonderildi,
+      musaitlik_istendi: musaitlikIstendi,
+      teklif_degerlendirildi: teklifDegerlendirildi,
+      otomatik_onaylandi: otomatikOnaylandi,
+      alternatif_yazildi: alternatifYazildi,
+      eksik_bilgi_istendi: eksikBilgiIstendi,
       atlama_sebepleri: atlamaSebepleri,
       imza_adi: imzaAdi,
       hata: hatalar,
