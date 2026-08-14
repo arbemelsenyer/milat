@@ -435,3 +435,12 @@ numaraya çevriliyor.
 9. Kör Teklif v2 / braketleme (GÜNCELLENDİ) — taraflardan tek rakam yerine alt-üst aralık
    alınır; braketlerin çakışması ve yakınlaşma taraflara rakam sızdırmadan bildirilir;
    yakınlık seyri yalnız arabulucuya görünür.
+
+[14.08 KARARI — SAKLAMA AYRIMI]
+Belgeler mevcut karara göre saklanır (5 yıl — mimari §12.5.9). Görüşme SES KAYDI ve
+DÖKÜMÜ ise HİÇ SAKLANMAZ: ses dosyası döküm çıkar çıkmaz, döküm metni dosya kapanınca
+otomatik silinir. İki veri tipi saklama-imha motorunda ayrı satır olarak tutulur.
+
+[14.08 KALICI ÇALIŞMA KURALI]
+Her gün sonunda yalnız yapılan işler değil, o gün ALINAN KARARLAR da tasks/todo.md ve
+tasks/yol-haritasi.md dosyalarına işlenir. Kod değişmemiş olsa bile karar kaydedilir.

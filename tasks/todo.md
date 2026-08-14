@@ -25,6 +25,10 @@
       (c) v1'de kaydı kullanıcı yükler; masaüstü kayıt aracı sonraya bırakıldı.
       (d) SAKLAMA YOK: ses dosyası döküm çıkar çıkmaz, döküm metni dosya kapanınca
           otomatik silinir.
+- [ ] 6b. SAKLAMA AYRIMI (14.08 kararı) — Belgeler mevcut karara göre saklanır (5 yıl);
+      GÖRÜŞME SES KAYDI VE DÖKÜMÜ HİÇ SAKLANMAZ: ses dosyası döküm çıkar çıkmaz, döküm
+      metni dosya kapanınca otomatik silinir. Bu ayrım saklama-imha motorunda (mimari
+      §12.5.9) ayrı veri tipi olarak kurulur.
 - [ ] 7. NİTELİKLİ ARABULUCU ATAMASI — Başvuru gelince ajan, uyuşmazlık türüne göre uygun
       uzmanlıktaki arabulucuyu atar; atamanın yanında "Değiştir" düğmesi durur — son söz
       insanda.
@@ -122,6 +126,11 @@ Kırıntılar:
 
 # tasks/todo.md — Güncel İş Listesi
 Her oturumda önce burayı oku. Biten maddeyi [x] yap, yeni işi buraya ekle.
+
+## KALICI ÇALIŞMA KURALI (14.08 — atlanamaz)
+Her gün sonunda yalnız YAPILAN İŞLER değil, o gün ALINAN KARARLAR da bu iki dosyaya
+(tasks/todo.md ve tasks/yol-haritasi.md) işlenir. Kod değişmemiş olsa bile karar
+kaydedilir; kaydedilmemiş karar alınmamış sayılır.
 
 ## Devam Eden
 - [ ] Dürüstlük bandı canlı testi (Lovable redeploy sonrası: bant çıkıyor mu,
