@@ -1,7 +1,11 @@
-// Ajan nöbetçisi: otomatik akışı açık dosyalarda sıradaki adımı yürütür.
-// Yalnız panoyu (ajan_gorevleri) işler ve zaman kontrolü yapar; analiz, randevu
-// ve belge akışlarının kendisine dokunmaz. Güvenlik deseni check-new-tariff ile aynı:
-// x-cron-secret veya admin JWT; ikisi de yoksa 401.
+// Ajan nöbetçisi: otomatik akışı açık dosyalarda süreci baştan sona yürütür.
+// Her koşumda önce KOLLAR çalışır (analiz · randevu · aşama geçişi · oturum
+// hatırlatması · oturum yapıldı mı · kapanış onayları) ve panoya (ajan_gorevleri)
+// görev bırakır; sonra durumu 'bekliyor' olan görevler yürütülür. Durumu
+// 'onay_bekliyor' olan satırlar ZORUNLU İNSAN NOKTALARIDIR — ajan onlara dokunmaz.
+// Bir kol çalıştırılamıyorsa sebebi sessizce yutulmaz: agent_states.last_output
+// içindeki "yapilmayanlar" listesine zaman damgasıyla yazılır (Ajan Paneli okur).
+// Güvenlik deseni check-new-tariff ile aynı: x-cron-secret veya admin JWT; yoksa 401.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
@@ -14,7 +18,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 
-const SURE_ESIGI_GUN = 3;
+// Oturum hatırlatması bu kadar saat kala gönderilir (oturumdan 1 gün önce).
+const HATIRLATMA_SAAT = 24;
 
 // Türkiye saati sabit UTC+3 (yaz saati uygulaması yok). Saat dilimi adı yerine sabit
 // kayma kullanılır — teklif kayıtlarındaki gun/saat de Türkiye saatidir.
@@ -53,6 +58,73 @@ function json(body: unknown, status = 200) {
 
 function metin(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   PANO YARDIMCILARI
+   Görev satırının gerekçesi makine okunur bir ETİKETLE başlar: "[gecis:2->3] …".
+   Etiket hem aynı işin iki kez yazılmasını önler hem Ajan Paneli'nde gruplamayı
+   sağlar. Etiket taraması JS tarafında yapılır (LIKE deseni yerine) — köşeli
+   parantez ve ok işareti sorgu diline karışmasın.
+   Durum sözlüğü:
+     bekliyor      → nöbetçi yürütecek
+     onay_bekliyor → ARABULUCU yürütecek; nöbetçi dokunmaz (zorunlu insan noktası)
+     yapildi / atlandi → kapanmış
+   ──────────────────────────────────────────────────────────────────────────── */
+async function gorevEtiketiVarMi(admin: any, caseId: string, gorevTipi: string, etiket: string): Promise<boolean> {
+  const { data } = await admin.from("ajan_gorevleri")
+    .select("id, gerekce").eq("case_id", caseId).eq("gorev_tipi", gorevTipi).limit(200);
+  return ((data ?? []) as any[]).some((r) => String(r?.gerekce ?? "").startsWith(etiket));
+}
+
+async function gorevAc(
+  admin: any, caseId: string, gorevTipi: string, etiket: string, aciklama: string,
+  opts?: { durum?: string; hedefPartyId?: string | null },
+): Promise<{ acildi: boolean; sebep?: string }> {
+  if (await gorevEtiketiVarMi(admin, caseId, gorevTipi, etiket)) {
+    return { acildi: false, sebep: `${gorevTipi} görevi zaten açılmış (${etiket})` };
+  }
+  const { error } = await admin.from("ajan_gorevleri").insert({
+    case_id: caseId,
+    gorev_tipi: gorevTipi,
+    durum: opts?.durum ?? "bekliyor",
+    gerekce: `${etiket} ${aciklama}`.trim(),
+    hedef_party_id: opts?.hedefPartyId ?? null,
+  });
+  if (error) return { acildi: false, sebep: `görev yazılamadı: ${error.message}` };
+  return { acildi: true };
+}
+
+// Arabulucuya bildirim: yalnız olay başlığı ve dosya künyesi taşır (kör veri).
+async function arabulucuyaBildir(admin: any, dosya: any, baslik: string, mesaj: string) {
+  const hedef = takvimSahibi(dosya);
+  if (!hedef) return;
+  try {
+    await admin.rpc("create_notification", {
+      p_user_id: hedef,
+      p_title: baslik,
+      p_message: mesaj,
+      p_type: "info",
+      p_link: `/cases/${dosya.id}`,
+    });
+  } catch (e: any) {
+    console.error(`[ajan-nobetci] bildirim yazılamadı (${dosya.id}): ${e?.message ?? e}`);
+  }
+}
+
+// Zorunlu insan noktası: ajan tek başına yapmaz, panoya "arabulucu onayı bekliyor"
+// kaydı düşer ve bildirim oluşur. Nöbetçi bu görevleri ASLA yürütmez.
+async function onayGoreviAc(
+  admin: any, dosya: any, etiket: string, aciklama: string, bildirimBasligi: string,
+): Promise<{ acildi: boolean; sebep?: string }> {
+  const r = await gorevAc(admin, dosya.id, "arabulucu_onayi", etiket, aciklama, { durum: "onay_bekliyor" });
+  if (r.acildi) {
+    await arabulucuyaBildir(
+      admin, dosya, bildirimBasligi,
+      `"${String(dosya?.application_no ?? dosya.id)}" dosyasında arabulucu onayı bekleniyor.`,
+    );
+  }
+  return r;
 }
 
 // Kokpitteki [Soruyu gönder] düğmesiyle AYNI yazım: ajanın ürettiği sıradaki
@@ -179,7 +251,7 @@ async function randevuTeklifiYurut(admin: any, caseId: string): Promise<{ durum:
 }
 
 // analiz_baslat görevi: "Tüm Analizi Başlat" düğmesinin çağırdığı orchestrator-run,
-// iç kapıdan (x-cron-secret) tetiklenir. Analiz sonucu oluşmuşsa veya orkestratör
+// iç kapıdan (x-cron-secret) tetiklenir. Analiz sonucu oluşmuşsa veya orkestrator
 // zaten koşuyorsa görev atlanır.
 async function analizBaslat(admin: any, caseId: string): Promise<{ durum: string; sonuc: string }> {
   const { data: analizler, error: aErr } = await admin.from("party_analyses")
@@ -244,51 +316,364 @@ async function analizGoreviAc(admin: any, dosya: any): Promise<{ acildi: boolean
   return { acildi: true };
 }
 
-// Zaman kontrolü: süre bitimine SURE_ESIGI_GUN veya daha az kaldıysa, gelecekte planlı
-// oturum ve bekleyen randevu teklifi yoksa panoya randevu_teklifi görevi bırakılır.
-async function zamanKontrolu(admin: any, dosya: any): Promise<boolean> {
-  const sonTarih = dosya?.extension_used && dosya?.deadline_extended
-    ? dosya.deadline_extended
-    : dosya?.deadline_total;
-  if (!sonTarih) return false;
-  const kalanGun = Math.ceil((new Date(sonTarih).getTime() - Date.now()) / 86_400_000);
-  if (!Number.isFinite(kalanGun) || kalanGun > SURE_ESIGI_GUN) return false;
+// RANDEVU TETİKLEYİCİSİ (14.08 — yeni kural). Eski kural "son tarihe 3 günden az kaldıysa"
+// idi ve süreç sonuna kadar bekliyordu; KALDIRILDI. Yeni kural: analiz zinciri
+// tamamlandıysa VE planlanmış oturum yoksa VE bekleyen teklif yoksa randevu teklifi
+// HEMEN açılır — taraflar süreç başlar başlamaz oturuma çağrılır.
+async function randevuGoreviAc(admin: any, dosya: any): Promise<{ acildi: boolean; sebep?: string }> {
+  const { data: analizler, error: aErr } = await admin.from("party_analyses")
+    .select("id").eq("case_id", dosya.id).limit(1);
+  if (aErr) return { acildi: false, sebep: `randevu açılamadı: analizler okunamadı — ${aErr.message}` };
+  if (!analizler || analizler.length === 0) {
+    return { acildi: false, sebep: "randevu açılamadı: analiz zinciri henüz tamamlanmadı" };
+  }
+  const { data: kosan } = await admin.from("agent_states")
+    .select("id").eq("case_id", dosya.id).eq("agent_type", "orchestrator").eq("status", "running").limit(1);
+  if (kosan && kosan.length > 0) {
+    return { acildi: false, sebep: "randevu açılamadı: analiz zinciri hâlâ koşuyor" };
+  }
 
   const simdi = new Date().toISOString();
   const { data: oturumlar } = await admin.from("case_sessions")
-    .select("id")
-    .eq("case_id", dosya.id)
-    .eq("status", "scheduled")
-    .gt("scheduled_at", simdi)
-    .limit(1);
-  if (oturumlar && oturumlar.length > 0) return false;
+    .select("id").eq("case_id", dosya.id).eq("status", "scheduled").gt("scheduled_at", simdi).limit(1);
+  if (oturumlar && oturumlar.length > 0) {
+    return { acildi: false, sebep: "randevu açılmadı: dosyada planlanmış oturum zaten var" };
+  }
 
   const { data: teklifler } = await admin.from("randevu_teklifleri")
-    .select("id")
-    .eq("case_id", dosya.id)
-    .eq("durum", "beklemede")
-    .limit(1);
-  if (teklifler && teklifler.length > 0) return false;
+    .select("id").eq("case_id", dosya.id).eq("durum", "beklemede").limit(1);
+  if (teklifler && teklifler.length > 0) {
+    return { acildi: false, sebep: "randevu açılmadı: cevap bekleyen teklif var" };
+  }
 
   const { data: bekleyen } = await admin.from("ajan_gorevleri")
-    .select("id")
-    .eq("case_id", dosya.id)
-    .eq("gorev_tipi", "randevu_teklifi")
-    .eq("durum", "bekliyor")
-    .limit(1);
-  if (bekleyen && bekleyen.length > 0) return false;
+    .select("id").eq("case_id", dosya.id).eq("gorev_tipi", "randevu_teklifi").eq("durum", "bekliyor").limit(1);
+  if (bekleyen && bekleyen.length > 0) {
+    return { acildi: false, sebep: "randevu açılmadı: bekleyen randevu görevi var" };
+  }
 
   const { error } = await admin.from("ajan_gorevleri").insert({
     case_id: dosya.id,
     gorev_tipi: "randevu_teklifi",
     durum: "bekliyor",
-    gerekce: "Süre yaklaşıyor, planlı oturum yok",
+    gerekce: "Analiz zinciri tamamlandı, planlı oturum yok — taraf oturuma çağrılıyor",
   });
   if (error) {
     console.error(`[ajan-nobetci] randevu_teklifi görevi yazılamadı (${dosya.id}): ${error.message}`);
-    return false;
+    return { acildi: false, sebep: `randevu görevi yazılamadı: ${error.message}` };
   }
-  return true;
+  return { acildi: true };
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   AŞAMA GEÇİŞİ (yeni numaralandırma 1-7)
+   Aşama YALNIZ İLERİ gider; ajan hiçbir koşulda geri almaz. Her geçiş panoya
+   gerekçesiyle yazılır ve aynı geçiş iki kez açılmaz (etiket: [gecis:X->Y]).
+   Geçiş şartı sağlanmıyorsa sebebi ön koşul uyarısı olarak kaydedilir.
+   ──────────────────────────────────────────────────────────────────────────── */
+async function asamaGecisiDegerlendir(
+  admin: any, dosya: any,
+): Promise<{ hedef: number | null; gerekce: string; sebep?: string }> {
+  const mevcut = Math.min(7, Math.max(1, Number(dosya?.current_phase ?? 1) || 1));
+  const say = async (tablo: string, filtre?: (q: any) => any) => {
+    let q = admin.from(tablo).select("id", { count: "exact", head: true }).eq("case_id", dosya.id);
+    if (filtre) q = filtre(q);
+    const { count } = await q;
+    return count ?? 0;
+  };
+
+  if (mevcut === 1) {
+    const taraf = await say("case_parties");
+    if (taraf < 2) return { hedef: null, gerekce: "", sebep: "aşama geçilemedi: en az iki taraf gerekiyor" };
+    const belge = await say("case_documents");
+    const girdiVar = belge > 0 || !!String(dosya?.issue_description ?? "").trim();
+    if (!girdiVar) return { hedef: null, gerekce: "", sebep: "aşama geçilemedi: belge veya başvuru metni yok" };
+    const analiz = await say("party_analyses");
+    const { data: orkestrator } = await admin.from("agent_states")
+      .select("id").eq("case_id", dosya.id).eq("agent_type", "orchestrator").limit(1);
+    const baslatildi = analiz > 0 || (Array.isArray(orkestrator) && orkestrator.length > 0);
+    if (!baslatildi) return { hedef: null, gerekce: "", sebep: "aşama geçilemedi: analiz zinciri henüz başlatılmadı" };
+    return { hedef: 2, gerekce: `${taraf} taraf, ${belge} belge, analiz zinciri başlatıldı` };
+  }
+
+  if (mevcut === 2) {
+    const taraf = await say("case_parties");
+    const analiz = await say("party_analyses");
+    if (taraf === 0 || analiz < taraf) {
+      return { hedef: null, gerekce: "", sebep: `aşama geçilemedi: taraf analizleri tamam değil (${analiz}/${taraf})` };
+    }
+    const rapor = await say("common_ground_reports");
+    if (rapor < 1) return { hedef: null, gerekce: "", sebep: "aşama geçilemedi: ortak zemin raporu bekleniyor" };
+    return { hedef: 3, gerekce: `taraf analizleri tamam (${analiz}/${taraf}), ortak zemin raporu üretildi` };
+  }
+
+  if (mevcut === 3) {
+    const { data: oturum } = await admin.from("case_sessions")
+      .select("id, scheduled_at").eq("case_id", dosya.id).eq("status", "scheduled").limit(1);
+    if (!oturum || oturum.length === 0) {
+      return { hedef: null, gerekce: "", sebep: "aşama geçilemedi: kabul edilmiş randevudan planlanmış oturum yok" };
+    }
+    return { hedef: 4, gerekce: "randevu kabul edildi, oturum planlandı" };
+  }
+
+  if (mevcut === 4) {
+    const simdi = new Date().toISOString();
+    const { data: yapilan } = await admin.from("case_sessions")
+      .select("id").eq("case_id", dosya.id).eq("status", "completed").lt("scheduled_at", simdi).limit(1);
+    if (!yapilan || yapilan.length === 0) {
+      return { hedef: null, gerekce: "", sebep: "aşama geçilemedi: oturum henüz 'yapıldı' işaretlenmedi" };
+    }
+    return { hedef: 5, gerekce: "oturum tarihi geçti ve yapıldı işaretlendi" };
+  }
+
+  if (mevcut === 5) {
+    // Bilirkişi opsiyonel: dosyada bilirkişi atama kaydı yoksa doğrudan geçilir.
+    const { data: bilirkisi, error: bErr } = await admin.from("case_expert_assignments")
+      .select("id").eq("case_id", dosya.id).limit(1);
+    if (bErr) return { hedef: null, gerekce: "", sebep: `aşama geçilemedi: bilirkişi kaydı okunamadı — ${bErr.message}` };
+    if (bilirkisi && bilirkisi.length > 0) {
+      return { hedef: null, gerekce: "", sebep: "aşama geçilemedi: dosyada bilirkişi görevi var, raporu bekleniyor" };
+    }
+    return { hedef: 6, gerekce: "bilirkişi istenmedi, opsiyonel aşama atlandı" };
+  }
+
+  if (mevcut === 6) {
+    // Görüşme notu kaydı VERİ olarak phase=7 taşır (aşama numarası değil, not işareti).
+    const not = await say("case_notes", (q: any) => q.eq("phase", 7));
+    if (not < 1) return { hedef: null, gerekce: "", sebep: "aşama geçilemedi: oturum notu taslağı arabulucu tarafından onaylanmadı" };
+    return { hedef: 7, gerekce: "oturum notu üretildi ve arabulucu onayıyla kaydedildi" };
+  }
+
+  return { hedef: null, gerekce: "", sebep: "aşama geçişi yok: dosya son aşamada" };
+}
+
+async function asamaGecisiGoreviAc(admin: any, dosya: any): Promise<{ acildi: boolean; sebep?: string }> {
+  const mevcut = Math.min(7, Math.max(1, Number(dosya?.current_phase ?? 1) || 1));
+  const { hedef, gerekce, sebep } = await asamaGecisiDegerlendir(admin, dosya);
+  if (!hedef) return { acildi: false, sebep };
+  if (hedef <= mevcut) return { acildi: false, sebep: "aşama geri alınmaz" };
+  return gorevAc(admin, dosya.id, "asama_gecisi", `[gecis:${mevcut}->${hedef}]`, gerekce);
+}
+
+// asama_gecisi yürütücüsü: cases.current_phase yalnız İLERİ yazılır.
+async function asamaGecisiYurut(admin: any, caseId: string, gerekce: string): Promise<{ durum: string; sonuc: string }> {
+  const m = /^\[gecis:(\d+)->(\d+)\]/.exec(String(gerekce ?? ""));
+  if (!m) return { durum: "atlandi", sonuc: "Geçiş etiketi okunamadı" };
+  const kaynak = Number(m[1]);
+  const hedef = Number(m[2]);
+  if (!Number.isFinite(hedef) || hedef < 1 || hedef > 7) return { durum: "atlandi", sonuc: "Geçersiz hedef aşama" };
+
+  const { data: satir, error: rErr } = await admin.from("cases")
+    .select("current_phase").eq("id", caseId).maybeSingle();
+  if (rErr) return { durum: "bekliyor", sonuc: `Dosya okunamadı: ${rErr.message}` };
+  const simdiki = Number((satir as any)?.current_phase ?? 1) || 1;
+  if (simdiki >= hedef) return { durum: "atlandi", sonuc: `Dosya zaten Aşama ${simdiki}'de (geri alınmaz)` };
+
+  const { error } = await admin.from("cases").update({ current_phase: hedef }).eq("id", caseId);
+  if (error) return { durum: "bekliyor", sonuc: `Aşama yazılamadı: ${error.message}` };
+  return { durum: "yapildi", sonuc: `Aşama ${kaynak} → ${hedef} ilerletildi` };
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   AŞAMA 4-7 KOLLARI
+   · Oturumdan 1 gün önce taraflara hatırlatma (arabulucu imzalı, TEK KEZ)
+   · Oturum saati geçince arabulucuya "oturum yapıldı mı?" sorusu (insan noktası)
+   · Oturum notu taslağının arabulucuya sunulması (insan noktası)
+   · Kapanış: tutanağın imzaya sunulması, sonuç kaydı, dosyanın kapatılması
+   ──────────────────────────────────────────────────────────────────────────── */
+
+// Dosyanın arabulucusunun imza bloğu — randevu/video e-postalarındaki kalıbın aynısı.
+async function imzaBlogu(admin: any, caseId: string): Promise<{ imza: string; dosyaSatiri: any; sebep?: string }> {
+  const { data: dosyaSatiri } = await admin.from("cases")
+    .select("application_no, title, assigned_mediator_id, user_id").eq("id", caseId).maybeSingle();
+  const arabulucuId = takvimSahibi(dosyaSatiri);
+  if (!arabulucuId) return { imza: "", dosyaSatiri, sebep: "dosyada arabulucu kimliği yok" };
+  const { data: profil } = await admin.from("profiles")
+    .select("full_name").eq("user_id", arabulucuId).maybeSingle();
+  const adSoyad = String((profil as any)?.full_name ?? "").trim();
+  if (!adSoyad) return { imza: "", dosyaSatiri, sebep: `profiles boş döndü (user_id=${arabulucuId})` };
+  return { imza: /^arb\.?\s/i.test(adSoyad) ? adSoyad : `Arb. ${adSoyad}`, dosyaSatiri };
+}
+
+// Oturum hatırlatması: 24 saat içinde başlayacak planlı oturumlar için görev açılır.
+// Etiket oturum kimliğini taşır — aynı oturum için ikinci hatırlatma yazılmaz.
+async function oturumHatirlatmaGorevleriAc(admin: any, dosya: any): Promise<{ acilan: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  let acilan = 0;
+  const simdi = Date.now();
+  const sinir = new Date(simdi + HATIRLATMA_SAAT * 3_600_000).toISOString();
+  const { data: oturumlar, error } = await admin.from("case_sessions")
+    .select("id, scheduled_at, participants, status")
+    .eq("case_id", dosya.id).eq("status", "scheduled")
+    .gt("scheduled_at", new Date(simdi).toISOString())
+    .lt("scheduled_at", sinir)
+    .limit(20);
+  if (error) {
+    sebepler.push(`hatırlatma açılamadı: oturumlar okunamadı — ${error.message}`);
+    return { acilan, sebepler };
+  }
+  for (const o of (oturumlar ?? []) as any[]) {
+    const r = await gorevAc(
+      admin, dosya.id, "oturum_hatirlatma", `[hatirlatma:${o.id}]`,
+      "Oturuma 1 günden az kaldı, taraflara hatırlatma gönderilecek",
+    );
+    if (r.acildi) acilan++;
+    else if (r.sebep && !r.sebep.includes("zaten açılmış")) sebepler.push(r.sebep);
+  }
+  return { acilan, sebepler };
+}
+
+// Hatırlatma yürütücüsü: oturumun taraflarına tek e-posta. Karşı taraf verisi geçmez.
+async function oturumHatirlatmaYurut(admin: any, dosya: any, gerekce: string): Promise<{ durum: string; sonuc: string }> {
+  const m = /^\[hatirlatma:([0-9a-f-]+)\]/i.exec(String(gerekce ?? ""));
+  if (!m) return { durum: "atlandi", sonuc: "Hatırlatma etiketi okunamadı" };
+  const sessionId = m[1];
+
+  const { data: oturum, error: sErr } = await admin.from("case_sessions")
+    .select("id, scheduled_at, status, participants, video_link").eq("id", sessionId).maybeSingle();
+  if (sErr) return { durum: "bekliyor", sonuc: `Oturum okunamadı: ${sErr.message}` };
+  if (!oturum) return { durum: "atlandi", sonuc: "Oturum kaydı bulunamadı" };
+  if (String((oturum as any).status) !== "scheduled") return { durum: "atlandi", sonuc: "Oturum artık planlı değil" };
+
+  const key = Deno.env.get("RESEND_API_KEY");
+  if (!key) return { durum: "bekliyor", sonuc: "RESEND_API_KEY yok, hatırlatma gönderilemedi" };
+
+  const partyIds = (Array.isArray((oturum as any).participants) ? (oturum as any).participants : [])
+    .map((p: any) => String(p?.party_id ?? "")).filter(Boolean);
+  if (partyIds.length === 0) return { durum: "atlandi", sonuc: "Oturumda katılımcı taraf kaydı yok" };
+
+  const { data: taraflar } = await admin.from("case_parties")
+    .select("id, party_type, first_name, last_name, company_name, email").in("id", partyIds);
+  const { imza, dosyaSatiri } = await imzaBlogu(admin, dosya.id);
+  const { gun, saat } = trGunSaat(String((oturum as any).scheduled_at));
+  const esc = (t: string) => String(t).replace(/</g, "&lt;");
+  const link = String((oturum as any).video_link ?? "").trim();
+
+  let gonderilen = 0;
+  const hatalar: string[] = [];
+  for (const t of (taraflar ?? []) as any[]) {
+    const email = String(t?.email ?? "").trim();
+    if (!email) { hatalar.push("tarafın e-postası yok"); continue; }
+    const ad = t?.party_type === "individual"
+      ? `${t?.first_name ?? ""} ${t?.last_name ?? ""}`.trim()
+      : String(t?.company_name ?? "").trim();
+    const kunye: string[] = [];
+    const appNo = (dosyaSatiri as any)?.application_no;
+    const baslik = (dosyaSatiri as any)?.title;
+    if (appNo) kunye.push(`<strong>Dosya No:</strong> ${esc(String(appNo))}`);
+    if (baslik) kunye.push(`<strong>Uyuşmazlık konusu:</strong> ${esc(String(baslik))}`);
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+    <body style="font-family:Arial,sans-serif;line-height:1.6;color:#222">
+      <p>Sayın ${esc(ad || "Taraf")},</p>
+      ${kunye.length ? `<p>${kunye.join("<br>")}</p>` : ""}
+      <p>Yarın planlanan görüşmenizi hatırlatırız:</p>
+      <p><strong>${esc(trTarihMetni(gun))} · ${esc(saat)}</strong></p>
+      ${link ? `<p>Görüşme bağlantınız:<br><a href="${link}">${esc(link)}</a></p>` : ""}
+      <p>Saygılarımızla,${imza ? `<br>${esc(imza)}` : ""}</p>
+      <p style="font-size:12px;color:#666">Bu ileti MediPact AI aracılığıyla gönderilmiştir.</p>
+    </body></html>`;
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: "MİLAT Arabuluculuk <info@milatmediation.com>",
+          to: [email], subject: "Görüşme hatırlatması", html,
+        }),
+      });
+      if (res.ok) gonderilen++;
+      else hatalar.push(`HTTP ${res.status} ${(await res.text()).slice(0, 150)}`);
+    } catch (e: any) {
+      hatalar.push(e?.message ?? String(e));
+    }
+  }
+  if (gonderilen === 0) {
+    return { durum: "bekliyor", sonuc: `Hatırlatma gönderilemedi: ${hatalar.join(" · ").slice(0, 300)}` };
+  }
+  return {
+    durum: "yapildi",
+    sonuc: `${gonderilen} tarafa hatırlatma gönderildi${hatalar.length ? ` (${hatalar.length} hata)` : ""}`,
+  };
+}
+
+// Oturum saati geçmiş ve hâlâ 'scheduled' duran oturumlar için arabulucuya soru.
+// Cevabı ARABULUCU verir (Ajan Paneli'ndeki Yapıldı / Yapılmadı düğmeleri).
+async function oturumYapildiMiGorevleriAc(admin: any, dosya: any): Promise<{ acilan: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  let acilan = 0;
+  const { data: oturumlar, error } = await admin.from("case_sessions")
+    .select("id, scheduled_at, status")
+    .eq("case_id", dosya.id).eq("status", "scheduled")
+    .lt("scheduled_at", new Date().toISOString())
+    .limit(20);
+  if (error) {
+    sebepler.push(`oturum sorusu açılamadı: oturumlar okunamadı — ${error.message}`);
+    return { acilan, sebepler };
+  }
+  for (const o of (oturumlar ?? []) as any[]) {
+    const { gun, saat } = trGunSaat(String(o.scheduled_at));
+    const r = await onayGoreviAc(
+      admin, dosya, `[onay:oturum_yapildi:${o.id}]`,
+      `${trTarihMetni(gun)} ${saat} oturumu yapıldı mı?`,
+      "Oturum yapıldı mı?",
+    );
+    if (r.acildi) acilan++;
+    else if (r.sebep && !r.sebep.includes("zaten açılmış")) sebepler.push(r.sebep);
+  }
+  return { acilan, sebepler };
+}
+
+// Kapanış kolları: oturum notu taslağı ve üç zorunlu insan noktası.
+// NOT: Oturum notunun METNİ ajan tarafından uydurulmaz (halüsinasyon yasağı) —
+// taslak, kayıtlı olgulardan (tarih, katılımcı sayısı) kurulan bir iskelettir;
+// içeriği arabulucu yazar/onaylar. Kayıt ve döküm hattı geldiğinde bu iskelet
+// dökümden beslenecektir.
+async function kapanisKollari(admin: any, dosya: any): Promise<{ acilan: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  let acilan = 0;
+  const asama = Math.min(7, Math.max(1, Number(dosya?.current_phase ?? 1) || 1));
+
+  // Yapılmış oturum varsa ve o oturum için not yoksa taslak arabulucuya sunulur.
+  const { data: yapilanlar } = await admin.from("case_sessions")
+    .select("id, scheduled_at").eq("case_id", dosya.id).eq("status", "completed").limit(20);
+  if (yapilanlar && yapilanlar.length > 0) {
+    const { count: notSayisi } = await admin.from("case_notes")
+      .select("id", { count: "exact", head: true }).eq("case_id", dosya.id).eq("phase", 7);
+    if ((notSayisi ?? 0) === 0) {
+      const son = (yapilanlar as any[])[0];
+      const { gun, saat } = trGunSaat(String(son.scheduled_at));
+      const r = await onayGoreviAc(
+        admin, dosya, `[onay:oturum_notu:${son.id}]`,
+        `${trTarihMetni(gun)} ${saat} oturumunun notu bekleniyor — taslak Görüşme Notları ekranında düzenlenip onaylanır`,
+        "Oturum notu taslağı hazır",
+      );
+      if (r.acildi) acilan++;
+      else if (r.sebep && !r.sebep.includes("zaten açılmış")) sebepler.push(r.sebep);
+    } else {
+      sebepler.push("oturum notu taslağı açılmadı: dosyada görüşme notu zaten var");
+    }
+  } else {
+    sebepler.push("oturum notu taslağı açılmadı: yapıldı işaretli oturum yok");
+  }
+
+  // Son aşamada üç zorunlu insan noktası: tutanağın imzaya sunulması, sonuç kaydı,
+  // dosyanın kapatılması. Ajan hiçbirini tek başına yapmaz.
+  const kapali = dosya?.status === "agreed" || dosya?.status === "failed";
+  if (asama >= 7 && !kapali) {
+    for (const [etiket, aciklama, baslik] of [
+      ["[onay:tutanak_imza]", "Kapanış belgesi taslağı hazır — imzaya sunulması arabulucudadır", "Tutanak imzaya hazır"],
+      ["[onay:sonuc_kaydi]", "Anlaşma / anlaşmama kararının kaydı arabulucudadır", "Sonuç kaydı bekleniyor"],
+      ["[onay:dosya_kapat]", "Dosyanın kapatılması arabulucudadır", "Dosya kapanışı bekleniyor"],
+    ] as [string, string, string][]) {
+      const r = await onayGoreviAc(admin, dosya, etiket, aciklama, baslik);
+      if (r.acildi) acilan++;
+      else if (r.sebep && !r.sebep.includes("zaten açılmış")) sebepler.push(r.sebep);
+    }
+  } else if (!kapali) {
+    sebepler.push(`kapanış onayları açılmadı: dosya Aşama ${asama}, kapanış aşamasına gelmedi`);
+  }
+
+  return { acilan, sebepler };
 }
 
 // Video bağlantısı: gelecekteki planlı ve bağlantısı boş oturumlar için create-video-room
@@ -529,7 +914,7 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const { data: dosyalar, error: cErr } = await admin.from("cases")
-      .select("id, deadline_total, deadline_extended, extension_used, assigned_mediator_id, user_id, application_no, title, issue_description")
+      .select("id, deadline_total, deadline_extended, extension_used, assigned_mediator_id, user_id, application_no, title, issue_description, current_phase, status")
       .eq("otomatik_akis", true)
       .limit(500);
     if (cErr) return json({ error: cErr.message }, 500);
@@ -545,27 +930,63 @@ Deno.serve(async (req) => {
     let imzaAdi = "";
     let analizBaslatildi = 0;
     let yeniAnalizGorevi = 0;
+    let yeniAsamaGorevi = 0;
+    let asamaIlerletildi = 0;
+    let yeniOnayGorevi = 0;
+    let yeniHatirlatmaGorevi = 0;
+    let hatirlatmaGonderildi = 0;
     const hatalar: string[] = [];
 
     for (const dosya of (dosyalar ?? []) as any[]) {
       // Bir dosyadaki hata diğer dosyaları durdurmaz.
       let buDosyaYapilan = 0;
+      // Ön koşul uyarıları: ajan bir kolu çalıştıramadıysa SESSİZ KALMAZ — sebebi
+      // zaman damgasıyla buraya, oradan agent_states.last_output'a ve Ajan Paneli'ne düşer.
+      const buDosyaSebepleri: { zaman: string; sebep: string }[] = [];
+      const sebepEkle = (s?: string) => {
+        if (!s) return;
+        buDosyaSebepleri.push({ zaman: new Date().toISOString(), sebep: s });
+        atlamaSebepleri.push(`${dosya.id}: ${s}`);
+      };
       try {
-        // Analiz görevi görev listesi okunmadan ÖNCE açılır ki aynı turda işlensin.
+        // Kollar görev listesi okunmadan ÖNCE çalışır ki açtıkları görev aynı turda işlensin.
         const analizGorev = await analizGoreviAc(admin, dosya);
         if (analizGorev.acildi) yeniAnalizGorevi++;
-        else if (analizGorev.sebep) atlamaSebepleri.push(`${dosya.id}: analiz görevi açılmadı — ${analizGorev.sebep}`);
+        else sebepEkle(analizGorev.sebep ? `analiz görevi açılmadı — ${analizGorev.sebep}` : undefined);
 
+        const randevuGorev = await randevuGoreviAc(admin, dosya);
+        if (randevuGorev.acildi) yeniRandevuGorevi++;
+        else sebepEkle(randevuGorev.sebep);
+
+        const asamaGorev = await asamaGecisiGoreviAc(admin, dosya);
+        if (asamaGorev.acildi) yeniAsamaGorevi++;
+        else sebepEkle(asamaGorev.sebep);
+
+        const hatirlatma = await oturumHatirlatmaGorevleriAc(admin, dosya);
+        yeniHatirlatmaGorevi += hatirlatma.acilan;
+        hatirlatma.sebepler.forEach(sebepEkle);
+
+        const oturumSorusu = await oturumYapildiMiGorevleriAc(admin, dosya);
+        yeniOnayGorevi += oturumSorusu.acilan;
+        oturumSorusu.sebepler.forEach(sebepEkle);
+
+        const kapanis = await kapanisKollari(admin, dosya);
+        yeniOnayGorevi += kapanis.acilan;
+        kapanis.sebepler.forEach(sebepEkle);
+
+        // YALNIZ durum='bekliyor' görevler yürütülür. 'onay_bekliyor' satırları
+        // arabulucunundur — ajan bunlara hiçbir koşulda dokunmaz.
         const { data: gorevler, error: gErr } = await admin.from("ajan_gorevleri")
-          .select("id, gorev_tipi, hedef_party_id, durum")
+          .select("id, gorev_tipi, hedef_party_id, durum, gerekce")
           .eq("case_id", dosya.id)
           .eq("durum", "bekliyor")
           .limit(100);
         if (gErr) throw new Error(gErr.message);
 
+        const YURUTULEN_TIPLER = ["soru_gonder", "randevu_teklifi", "analiz_baslat", "asama_gecisi", "oturum_hatirlatma"];
         for (const gorev of (gorevler ?? []) as any[]) {
           // Tanınmayan görev tipine dokunulmaz: 'bekliyor' kalır.
-          if (gorev.gorev_tipi !== "soru_gonder" && gorev.gorev_tipi !== "randevu_teklifi" && gorev.gorev_tipi !== "analiz_baslat") continue;
+          if (!YURUTULEN_TIPLER.includes(gorev.gorev_tipi)) continue;
           if (gorev.gorev_tipi === "soru_gonder" && !gorev.hedef_party_id) {
             await admin.from("ajan_gorevleri")
               .update({ durum: "atlandi", sonuc: "Hedef taraf yok" }).eq("id", gorev.id);
@@ -576,7 +997,11 @@ Deno.serve(async (req) => {
             ? await randevuTeklifiYurut(admin, dosya.id)
             : gorev.gorev_tipi === "analiz_baslat"
               ? await analizBaslat(admin, dosya.id)
-              : await soruGonder(admin, dosya.id, gorev.hedef_party_id);
+              : gorev.gorev_tipi === "asama_gecisi"
+                ? await asamaGecisiYurut(admin, dosya.id, gorev.gerekce)
+                : gorev.gorev_tipi === "oturum_hatirlatma"
+                  ? await oturumHatirlatmaYurut(admin, dosya, gorev.gerekce)
+                  : await soruGonder(admin, dosya.id, gorev.hedef_party_id);
           if (durum !== "bekliyor") {
             await admin.from("ajan_gorevleri").update({ durum, sonuc }).eq("id", gorev.id);
           } else {
@@ -588,30 +1013,33 @@ Deno.serve(async (req) => {
           if (durum === "yapildi") {
             yapilanGorev++; buDosyaYapilan++;
             if (gorev.gorev_tipi === "analiz_baslat") analizBaslatildi++;
+            if (gorev.gorev_tipi === "asama_gecisi") asamaIlerletildi++;
+            if (gorev.gorev_tipi === "oturum_hatirlatma") hatirlatmaGonderildi++;
           }
           if (durum === "atlandi") {
             atlananGorev++;
-            atlamaSebepleri.push(`${gorev.id} (${gorev.gorev_tipi}): ${sonuc}`);
+            sebepEkle(`${gorev.gorev_tipi} atlandı: ${sonuc}`);
           }
         }
 
-        if (await zamanKontrolu(admin, dosya)) yeniRandevuGorevi++;
         const videoOzet = await videoBaglantilariniHazirla(admin, dosya);
         const videoHazirlanan = videoOzet.hazirlanan;
         hazirlananVideo += videoHazirlanan;
         incelenenOturum += videoOzet.incelenen;
         atlananYuzYuze += videoOzet.atlanan_yuz_yuze;
-        atlamaSebepleri.push(...videoOzet.atlama_sebepleri);
+        videoOzet.atlama_sebepleri.forEach((s) => sebepEkle(s));
         hatalar.push(...videoOzet.hatalar);
         if (videoOzet.imza_adi) imzaAdi = videoOzet.imza_adi;
         islenenDosya++;
 
+        // "Yapılmayanlar ve sebebi" Ajan Paneli'nde buradan okunur.
         await nobetciDurumYaz(admin, dosya.id, {
           status: "completed",
           error_message: null,
           last_output: {
             bu_dosyada_yapilan_gorev: buDosyaYapilan,
             bu_dosyada_hazirlanan_video: videoHazirlanan,
+            yapilmayanlar: buDosyaSebepleri.slice(-40),
             kosum_zamani: new Date().toISOString(),
           },
           updated_at: new Date().toISOString(),
@@ -641,6 +1069,11 @@ Deno.serve(async (req) => {
       atlanan_yuz_yuze: atlananYuzYuze,
       analiz_baslatildi: analizBaslatildi,
       analiz_gorevi_acildi: yeniAnalizGorevi,
+      asama_gorevi_acildi: yeniAsamaGorevi,
+      asama_ilerletildi: asamaIlerletildi,
+      onay_gorevi_acildi: yeniOnayGorevi,
+      hatirlatma_gorevi_acildi: yeniHatirlatmaGorevi,
+      hatirlatma_gonderildi: hatirlatmaGonderildi,
       atlama_sebepleri: atlamaSebepleri,
       imza_adi: imzaAdi,
       hata: hatalar,
