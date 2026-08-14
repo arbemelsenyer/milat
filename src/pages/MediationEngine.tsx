@@ -209,21 +209,36 @@ const DISPUTE_TYPES = [
   "Marka & Patent",
 ];
 
+// Aşama modeli (14.08 — tek giriş kapısı): eski Aşama 1 (Başvuru) ile eski Aşama 2
+// (Taraflar) tek ekranda birleşti; sonraki aşamalar birer basamak kaydı. Toplam 8 → 7.
 const PHASES = [
-  { id: 1, label: "Başvuru", icon: FileText },
-  { id: 2, label: "Taraflar", icon: Users },
-  { id: 3, label: "Taraf Analizi", icon: Brain },
-  { id: 4, label: "Arabulucu Paneli", icon: ShieldCheck },
-  { id: 5, label: "Toplantı", icon: CalIcon },
-  { id: 6, label: "Bilirkişi", icon: UserCheck, optional: true },
-  { id: 7, label: "Görüşme Notları", icon: MessageSquare },
-  { id: 8, label: "Belgeler & Kapanış", icon: FileCheck2 },
+  { id: 1, label: "Dosya Kurulumu", icon: FileText },
+  { id: 2, label: "Taraf Analizi", icon: Brain },
+  { id: 3, label: "Arabulucu Paneli", icon: ShieldCheck },
+  { id: 4, label: "Toplantı", icon: CalIcon },
+  { id: 5, label: "Bilirkişi", icon: UserCheck, optional: true },
+  { id: 6, label: "Görüşme Notları", icon: MessageSquare },
+  { id: 7, label: "Belgeler & Kapanış", icon: FileCheck2 },
 ] as const;
 
-// Sıradaki erişilebilir (kilidi açık, tamamlanmamış) en küçük numaralı faz — opsiyonel Faz 6 hiçbir zaman engellemez.
-function computeNextActionablePhase(phaseStatus: Record<number, boolean>, phase3Complete: boolean): number | null {
+export const ASAMA_SAYISI = PHASES.length;
+
+// Eski (8 aşamalı) numaradan yeni (7 aşamalı) numaraya eşleme. Eski Aşama 1 ve 2
+// artık tek ekran olduğu için ikisi de 1'e düşer.
+const ESKI_YENI_ASAMA: Record<number, number> = { 1: 1, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 7 };
+// URL'deki phase parametresinin hangi numaralamada olduğunu gösteren işaret.
+// Uygulamanın ürettiği her bağlantı pv=2 taşır; pv taşımayan (eski e-posta,
+// yer imi, eski ekran) bağlantılar eski numaralı sayılıp yenisine çevrilir.
+const ASAMA_SURUM = "2";
+function asamaSinirla(n: number): number {
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(ASAMA_SAYISI, Math.max(1, Math.round(n)));
+}
+
+// Sıradaki erişilebilir (kilidi açık, tamamlanmamış) en küçük numaralı faz — opsiyonel Faz 5 hiçbir zaman engellemez.
+function computeNextActionablePhase(phaseStatus: Record<number, boolean>, analizTamam: boolean): number | null {
   for (const p of PHASES) {
-    const locked = p.id >= 4 && !phase3Complete;
+    const locked = p.id >= 3 && !analizTamam;
     if (locked) continue;
     const optional = "optional" in p && p.optional;
     if (optional) continue;
@@ -322,18 +337,24 @@ export default function MediationEngine() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const caseId = params.get("caseId");
-  const phaseParam = Number(params.get("phase") || 1);
+  // Aşama numarası: pv=2 taşıyan bağlantı yeni numaralamadadır; taşımayan
+  // (eski) bağlantı eski numaralamadan yenisine çevrilir — kırık link kalmaz.
+  const phaseRaw = Number(params.get("phase") || 1);
+  const phaseSurumu = params.get("pv");
+  const phaseParam = phaseSurumu === ASAMA_SURUM
+    ? asamaSinirla(phaseRaw)
+    : (ESKI_YENI_ASAMA[Math.min(8, Math.max(1, Math.round(phaseRaw) || 1))] ?? 1);
 
   const [cases, setCases] = useState<CaseRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [activeCase, setActiveCase] = useState<CaseRow | null>(null);
-  const [phase3Complete, setPhase3Complete] = useState(false);
+  const [analizTamam, setAnalizTamam] = useState(false);
   // Faz 4 kokpitinin bildirdiği bölüm listesi (sol menüdeki alt katman) ve
   // menüden gelen "şu bölümü aç" isteği. Faz 4 dışında liste boş kalır.
   const [cockpitSections, setCockpitSections] = useState<{ id: string; label: string; kind: "layer" | "section"; hint?: string }[]>([]);
   const [cockpitJump, setCockpitJump] = useState<{ id: string; nonce: number } | null>(null);
-  // Kokpitteki "Randevu ayarla" düğmesinden Aşama 5'teki mevcut randevu akışına tetik.
+  // Kokpitteki "Randevu ayarla" düğmesinden Aşama 4'teki mevcut randevu akışına tetik.
   // State değil ref: aşama geçişi sol menüdekiyle birebir aynı tek işlem kalsın, geçişe
   // ikinci bir state güncellemesi karışmasın. Değer, geçişin doğurduğu render'da okunur.
   const randevuTetikRef = useRef<number | null>(null);
@@ -416,17 +437,19 @@ export default function MediationEngine() {
     if (caseId) loadCase(caseId); else setActiveCase(null);
   }, [caseId]);
 
-  const checkPhase3 = useCallback(async (id: string) => {
+  const checkAnaliz = useCallback(async (id: string) => {
     const { count: aCount } = await supabase.from("party_analyses").select("id", { count: "exact", head: true }).eq("case_id", id);
-    setPhase3Complete((aCount ?? 0) >= 1);
+    setAnalizTamam((aCount ?? 0) >= 1);
   }, []);
 
   useEffect(() => {
-    if (caseId) checkPhase3(caseId);
-  }, [caseId, checkPhase3, phaseParam]);
+    if (caseId) checkAnaliz(caseId);
+  }, [caseId, checkAnaliz, phaseParam]);
 
   // Faz tamamlanma koşulları — mevcut verilerden türetilir, tek toplu sorgu.
-  // Faz1/Faz8 caseRow alanlarından, Faz6 (bilirkişi) opsiyonel olduğu için hiç sorgulanmaz.
+  // Faz1/Faz7 caseRow alanlarından, Faz5 (bilirkişi) opsiyonel olduğu için hiç sorgulanmaz.
+  // NOT: case_notes.phase = 7 bir VERİ işaretidir (görüşme notu satırı), ekrandaki
+  // aşama numarası değildir — aşama numaraları kayarken bu değere dokunulmadı.
   const checkPhaseCompletion = useCallback(async (id: string, c: CaseRow) => {
     const [parties, analyses, reports, sessions, notes] = await Promise.all([
       supabase.from("case_parties").select("id", { count: "exact", head: true }).eq("case_id", id),
@@ -436,14 +459,14 @@ export default function MediationEngine() {
       supabase.from("case_notes").select("id", { count: "exact", head: true }).eq("case_id", id).eq("phase", 7),
     ]);
     const nextStatus: Record<number, boolean> = {
-      1: !!c.dispute_type,
-      2: (parties.count ?? 0) >= 2,
-      3: (analyses.count ?? 0) >= 1,
-      4: (reports.count ?? 0) >= 1,
-      5: (sessions.count ?? 0) >= 1,
-      6: false, // opsiyonel — tamamlanma aranmaz
-      7: (notes.count ?? 0) >= 1,
-      8: c.status === "agreed" || c.status === "failed",
+      // Aşama 1 artık tek giriş kapısı: tür tespiti + en az iki taraf birlikte aranır.
+      1: !!c.dispute_type && (parties.count ?? 0) >= 2,
+      2: (analyses.count ?? 0) >= 1,
+      3: (reports.count ?? 0) >= 1,
+      4: (sessions.count ?? 0) >= 1,
+      5: false, // opsiyonel (bilirkişi) — tamamlanma aranmaz
+      6: (notes.count ?? 0) >= 1,
+      7: c.status === "agreed" || c.status === "failed",
     };
 
     // Davet modeli: sadece tamamlanmadı→tamamlandı geçişinde tetikle (ilk yüklemede sessiz kal).
@@ -462,11 +485,21 @@ export default function MediationEngine() {
     }
     prevPhaseStatusRef.current = nextStatus;
     setPhaseStatus(nextStatus);
-  }, [phase3Complete]);
+  }, [analizTamam]);
 
   useEffect(() => {
     if (caseId && activeCase) checkPhaseCompletion(caseId, activeCase);
   }, [caseId, phaseParam, activeCase, checkPhaseCompletion]);
+
+  // Eski numaralı bağlantı geldiyse adresi bir kez yeni numaraya çevir (replace):
+  // ekran zaten doğru aşamayı gösteriyor, bu yalnız adres çubuğunu düzeltir.
+  useEffect(() => {
+    if (!caseId || phaseSurumu === ASAMA_SURUM) return;
+    const p = new URLSearchParams(params);
+    p.set("phase", String(phaseParam));
+    p.set("pv", ASAMA_SURUM);
+    setParams(p, { replace: true });
+  }, [caseId, phaseSurumu, phaseParam, params, setParams]);
 
   useEffect(() => {
     if (params.get("new") === "1") {
@@ -518,20 +551,21 @@ export default function MediationEngine() {
 
   function openCase(id: string, phase = 1) {
     const p = new URLSearchParams();
-    p.set("caseId", id); p.set("phase", String(phase));
+    p.set("caseId", id); p.set("phase", String(asamaSinirla(phase))); p.set("pv", ASAMA_SURUM);
     setParams(p);
   }
   function setPhase(phase: number) {
     const p = new URLSearchParams(params);
-    p.set("phase", String(phase));
+    p.set("phase", String(asamaSinirla(phase)));
+    p.set("pv", ASAMA_SURUM);
     setParams(p);
   }
   // Sol süreç menüsündeki aşama satırının tıklama davranışının tek kopyası; kokpitteki
   // "Randevu ayarla" düğmesi de aşamayı bununla değiştirir (ayrı bir geçiş yolu yok).
   function gotoPhase(id: number) {
-    const locked = id >= 4 && !phase3Complete;
+    const locked = id >= 3 && !analizTamam;
     if (locked) {
-      toast({ title: "Aşama kilitli", description: "Önce Aşama 3'te en az bir taraf analizini tamamlayın." });
+      toast({ title: "Aşama kilitli", description: "Önce Aşama 2'de en az bir taraf analizini tamamlayın." });
       return;
     }
     setPhase(id);
@@ -577,8 +611,8 @@ export default function MediationEngine() {
   // NOT: Bu hook, aşağıdaki koşullu return'lerden (loading / !caseId / !activeCase) ÖNCE
   // durmalı — Hooks Rules gereği hook çağrı sırası her render'da sabit kalmalı (React #310).
   const nextActionablePhase = useMemo(
-    () => computeNextActionablePhase(phaseStatus, phase3Complete),
-    [phaseStatus, phase3Complete]
+    () => computeNextActionablePhase(phaseStatus, analizTamam),
+    [phaseStatus, analizTamam]
   );
 
   // Altın parlama: tamamlanma geçişinde bir defalık, ~1.3sn sonra kendiliğinden söner.
@@ -613,7 +647,7 @@ export default function MediationEngine() {
           {showNew && (
             <NewCaseForm
               onCancel={() => setShowNew(false)}
-              onCreated={(id) => { setShowNew(false); loadCases(); openCase(id, 2); }}
+              onCreated={(id) => { setShowNew(false); loadCases(); openCase(id, 1); }}
               userId={user!.id}
               isMediator={isMediator || isAdmin}
             />
@@ -632,12 +666,12 @@ export default function MediationEngine() {
                 {cases.map((c) => (
                   <div key={c.id}
                     className="w-full p-4 rounded-lg border hover:bg-accent/10 transition flex items-center justify-between gap-2">
-                    <button onClick={() => openCase(c.id, c.current_phase || 1)}
+                    <button onClick={() => openCase(c.id, asamaSinirla(c.current_phase || 1))}
                       className="flex-1 text-left flex items-center justify-between gap-2">
                       <div>
                         <div className="font-medium">{c.title || "(başlıksız)"}</div>
                         <div className="text-sm text-muted-foreground">
-                          {c.application_no ?? "—"} · {c.dispute_type ? anaAltLabel(c.dispute_type, c.dispute_subtype) : ""} · Aşama {c.current_phase ?? 1}/8
+                          {c.application_no ?? "—"} · {c.dispute_type ? anaAltLabel(c.dispute_type, c.dispute_subtype) : ""} · Aşama {asamaSinirla(c.current_phase ?? 1)}/{ASAMA_SAYISI}
                         </div>
                       </div>
                       <Badge variant="secondary">{c.status ?? "active"}</Badge>
@@ -692,7 +726,7 @@ export default function MediationEngine() {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
   }
 
-  const completed = activeCase.current_phase ?? 1;
+  const completed = asamaSinirla(activeCase.current_phase ?? 1);
 
   return (
     <div className="min-h-screen bg-background">
@@ -762,11 +796,16 @@ export default function MediationEngine() {
               const done = optional ? p.id < completed : !!phaseStatus[p.id];
               const active = p.id === phaseParam;
               const Icon = p.icon;
-              const locked = p.id >= 4 && !phase3Complete;
+              const locked = p.id >= 3 && !analizTamam;
               const isNext = !locked && !active && p.id === nextActionablePhase;
-              // Aktif fazın sol bölüm dizini — Faz 3 statik listeden, Faz 4
-              // kokpitin bildirdiği listeden; ikisi de aynı biçimle çizilir.
-              const sideSections = !active ? [] : p.id === 3 ? FAZ3_MENU_ENTRIES : p.id === 4 ? cockpitSections : [];
+              // Aktif fazın sol bölüm dizini — Aşama 1 ve Aşama 2 statik listeden,
+              // Aşama 3 (kokpit) bildirdiği listeden; hepsi aynı biçimle çizilir.
+              const sideSections = !active
+                ? []
+                : p.id === 1 ? FAZ1_MENU_ENTRIES
+                : p.id === 2 ? FAZ3_MENU_ENTRIES
+                : p.id === 3 ? cockpitSections
+                : [];
               return (
                 <div key={p.id}>
                 <button onClick={() => gotoPhase(p.id)}
@@ -774,7 +813,7 @@ export default function MediationEngine() {
                     ${active ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-accent" : "border-l-transparent hover:border-l-accent hover:text-accent hover:bg-sidebar-accent/40"}
                     ${locked ? "opacity-50 cursor-not-allowed" : ""}
                     ${isNext ? "border-l-accent/60" : ""}`}
-                  title={locked ? "Aşama 3 tamamlanmadı" : isNext ? "Sıradaki aşama" : ""}>
+                  title={locked ? "Aşama 2 tamamlanmadı" : isNext ? "Sıradaki aşama" : ""}>
                   <AnimatePresence>
                     {glowPhase === p.id && (
                       <motion.span
@@ -837,7 +876,7 @@ export default function MediationEngine() {
         <main className="flex-1 p-6 max-w-5xl mx-auto w-full">
           {/* mode="wait" kaldırıldı: yeni aşama, eskisinin çıkış animasyonu bitene kadar
               mount edilmiyordu; çıkış tamamlanma sinyali gelmediğinde ana alan boş
-              kalıyordu (sol menüden Aşama 4'e geçişte görülen boş sayfa). Adres
+              kalıyordu (sol menüden Aşama 3'e geçişte görülen boş sayfa). Adres
               doğrudan yazıldığında çıkan bir çocuk olmadığı için sorun görünmüyordu. */}
           <AnimatePresence>
             <motion.div
@@ -850,14 +889,14 @@ export default function MediationEngine() {
               <PhaseRenderer
                 phase={phaseParam}
                 caseRow={activeCase}
-                reload={() => { loadCase(activeCase.id); checkPhase3(activeCase.id); checkPhaseCompletion(activeCase.id, activeCase); }}
+                reload={() => { loadCase(activeCase.id); checkAnaliz(activeCase.id); checkPhaseCompletion(activeCase.id, activeCase); }}
                 isMediator={isMediator || isAdmin}
                 userId={user!.id}
                 onAdvance={(next) => setPhase(next)}
                 onCockpitSections={setCockpitSections}
                 cockpitJump={cockpitJump}
                 randevuTetik={randevuTetikRef.current ? { nonce: randevuTetikRef.current } : null}
-                onRandevuAyarla={() => { randevuTetikRef.current = Date.now(); gotoPhase(5); }}
+                onRandevuAyarla={() => { randevuTetikRef.current = Date.now(); gotoPhase(4); }}
               />
             </motion.div>
           </AnimatePresence>
@@ -1073,7 +1112,7 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
     { key: "sistem_no", label: "Sistem No", value: "", display: "Kayıt anında atanır (MP-YYYY-XXXX)", editable: false },
     { key: "basvuru_tarihi", label: "Başvuru tarihi", value: "", display: new Date().toLocaleDateString("tr-TR"), editable: false },
     { key: "taraflar", label: "Taraflar (ad, rol, e-posta)", value: "",
-      display: "Bu formda girilmez — Aşama 2'de eklenir; her taraf kaydında ayrı onay paneli çıkar.", editable: false },
+      display: "Bu formda girilmez — Aşama 1'de eklenir; her taraf kaydında ayrı onay paneli çıkar.", editable: false },
   ];
 
   function onConfirmFieldChange(key: string, value: string) {
@@ -1100,7 +1139,8 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
         application_no,
         uyap_no: null,
         status: "active",
-        current_phase: 2,
+        // Yeni dosya doğrudan tek giriş kapısında (Aşama 1) açılır.
+        current_phase: 1,
         round_number: 1,
       } as any).select().single();
       if (error) throw error;
@@ -1221,25 +1261,27 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance, 
       reload();
     }
   }
+  // Aşama eşlemesi (14.08): 1 = tek giriş kapısı (başvuru + süre + taraflar + belgeler),
+  // 2 = taraf analizi (eski 3), 3 = arabulucu paneli (eski 4), 4 = toplantı (eski 5),
+  // 5 = bilirkişi (eski 6), 6 = görüşme notları (eski 7), 7 = belgeler & kapanış (eski 8).
   switch (phase) {
-    case 1: return <><Phase1Summary caseRow={caseRow} reload={reload} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
-    case 2: return <><Phase2Parties caseRow={caseRow} isMediator={isMediator} userId={userId} onDone={() => { bumpPhase(3); onAdvance(3); }} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
-    case 3: return <><Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} jump={cockpitJump} /></Phase3ErrorBoundary><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
-    case 4: return <>
+    case 1: return <><Phase1Setup caseRow={caseRow} reload={reload} isMediator={isMediator} userId={userId} jump={cockpitJump} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 2: return <><Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} jump={cockpitJump} /></Phase3ErrorBoundary><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 3: return <>
       {isMediator
         ? <Phase4Summary caseRow={caseRow} onSectionsChange={onCockpitSections} jump={cockpitJump} onRandevuAyarla={onRandevuAyarla} />
         : <BlindBidPartyForm caseId={caseRow.id} userId={userId} />}
       <NextPhaseButton phase={phase} onAdvance={onAdvance} />
     </>;
-    case 5: return <><Phase5Sessions caseRow={caseRow} bumpPhase={bumpPhase} onAdvance={onAdvance} randevuTetik={randevuTetik} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
-    case 6: return <><Phase7Expert caseRow={caseRow} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
-    case 7: return <><Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(8); onAdvance(8); }} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
-    case 8: return <Phase9Closing caseRow={caseRow} reload={reload} />;
+    case 4: return <><Phase5Sessions caseRow={caseRow} bumpPhase={bumpPhase} onAdvance={onAdvance} randevuTetik={randevuTetik} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 5: return <><Phase7Expert caseRow={caseRow} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 6: return <><Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(7); onAdvance(7); }} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 7: return <Phase9Closing caseRow={caseRow} reload={reload} />;
     default: return null;
   }
 }
 
-/* ===================== RANDEVU TEKLİFİ (Aşama 5) ===================== */
+/* ===================== RANDEVU TEKLİFİ (Aşama 4) ===================== */
 // Kokpitteki eylem düğmesinin kaydırma hedefi.
 const RANDEVU_KART_ID = "faz5-randevu-ayarla";
 
@@ -1720,7 +1762,7 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik }: {
       await supabase.from("case_sessions").insert({
         case_id: caseRow.id, session_type: "joint", meeting_type: meetingType, status: "draft",
       } as any).select().maybeSingle();
-      await bumpPhase(5);
+      await bumpPhase(4);
       onAdvance(5);
     } catch (e: any) {
       toast({ title: "Geçiş hatası", description: trErr(e.message), variant: "destructive" });
@@ -1730,7 +1772,7 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik }: {
   return (
     <div className="space-y-4">
       <PhaseHero
-        label="AŞAMA 5 — OTURUMLAR"
+        label="AŞAMA 4 — OTURUMLAR"
         metrics={[
           { label: "Sıradaki Oturum", value: nextSession?.scheduled_at ? formatPhaseCountdown(nextSession.scheduled_at) : null },
           { label: "Planlanan Oturum", value: scheduledFutureSessions.length },
@@ -1767,13 +1809,73 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik }: {
   );
 }
 
-function Phase1Summary({ caseRow, reload }: { caseRow: CaseRow; reload: () => void }) {
-  const classified = !!caseRow.dispute_type;
+/* ===================== AŞAMA 1 — DOSYA KURULUMU (TEK GİRİŞ KAPISI) ===================== */
+
+// 14.08: Dosya kurulumunun tamamı tek ekranda toplandı — uyuşmazlık konusu ve türü,
+// dava şartı mı ihtiyari mi seçimi ve yasal süre, TARAFLAR (eski Aşama 2'nin bloğu
+// aynen) ve BELGELER (dosya bazında yükleme). Sayfa düzeni Aşama 4'ü örnek alır:
+// solda ve sağda ANA KATMANLAR (büyük harf), altlarında alt katmanlar (normal
+// yazım). Mobilde tek sütuna iner; kart ve düğme stilleri değişmedi.
+function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
+  caseRow: CaseRow; reload: () => void; isMediator: boolean; userId: string;
+  // Sol menüden gelen "şu katmanı aç ve oraya kay" isteği; nonce her tıklamada artar.
+  jump?: { id: string; nonce: number } | null;
+}) {
   const { user, isAdmin } = useAuth();
   const canEditIssue = caseRow.assigned_mediator_id === user?.id || caseRow.user_id === user?.id || isAdmin;
   const [editIssueOpen, setEditIssueOpen] = useState(false);
   const [issueDescDraft, setIssueDescDraft] = useState("");
   const [savingIssue, setSavingIssue] = useState(false);
+
+  // Ana katmanlar açık gelir (dosya kurulumu tek oturuşta yapılır); alt bölümlerin
+  // hepsi de açık — bu ekranda gizlenecek uzun analiz çıktısı yok.
+  const [openLayers, setOpenLayers] = useState<Set<string>>(() => new Set(FAZ1_LAYERS.map((l) => l.id)));
+  const [openSections, setOpenSections] = useState<Set<string>>(() => new Set(FAZ1_SECTION_IDS));
+  const toggleLayer = useCallback((id: string) => {
+    setOpenLayers((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+  const toggleSection = useCallback((id: string) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const [parties, setParties] = useState<any[]>([]);
+  const [docCount, setDocCount] = useState(0);
+
+  const loadParties = useCallback(async () => {
+    const { data } = await supabase
+      .from("case_parties")
+      .select("id, full_name, company_name, first_name, last_name, party_type, party_role")
+      .eq("case_id", caseRow.id)
+      .order("created_at");
+    setParties(Array.isArray(data) ? data : []);
+  }, [caseRow.id]);
+
+  useEffect(() => { loadParties(); }, [loadParties]);
+
+  // Sol menüden gelen istek: katmanı (gerekirse bölümü de) aç, sonra oraya kaydır.
+  // Faz 3/4 ile aynı kalıp; yalnız "faz1-" ile başlayan istekler işlenir.
+  useEffect(() => {
+    if (!jump?.id || !jump.id.startsWith("faz1-")) return;
+    if (jump.id.startsWith("faz1-katman-")) {
+      setOpenLayers((prev) => (prev.has(jump.id) ? prev : new Set(prev).add(jump.id)));
+    } else {
+      const layerId = FAZ1_SECTION_LAYER[jump.id];
+      if (layerId) setOpenLayers((prev) => (prev.has(layerId) ? prev : new Set(prev).add(layerId)));
+      setOpenSections((prev) => (prev.has(jump.id) ? prev : new Set(prev).add(jump.id)));
+    }
+    const t = setTimeout(() => {
+      document.getElementById(jump.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+    return () => clearTimeout(t);
+  }, [jump?.id, jump?.nonce]);
 
   function openEditIssue() {
     setIssueDescDraft(caseRow.issue_description ?? "");
@@ -1808,54 +1910,165 @@ function Phase1Summary({ caseRow, reload }: { caseRow: CaseRow; reload: () => vo
     }
   }
 
+  const classified = !!caseRow.dispute_type;
+  const sureEtiketi = caseRow.mediation_type === "dava_sarti"
+    ? "Dava şartı"
+    : caseRow.mediation_type === "ihtiyari" ? "İhtiyari" : null;
+  const bitis = caseRow.extension_used && caseRow.deadline_extended ? caseRow.deadline_extended : caseRow.deadline_total;
+  const kalanGun = bitis ? Math.ceil((new Date(bitis).getTime() - Date.now()) / 86400000) : null;
+
+  const statusStripItems: { label: string; value: string }[] = [
+    { label: "Sistem No", value: caseRow.application_no || "—" },
+    { label: "Uyuşmazlık Türü", value: classified ? anaAltLabel(caseRow.dispute_type, caseRow.dispute_subtype) : "Bekliyor" },
+    { label: "Süreç Türü", value: sureEtiketi ?? "Seçilmedi" },
+    { label: "Başvuru Tarihi", value: new Date(caseRow.application_date ?? caseRow.created_at).toLocaleDateString("tr-TR") },
+  ];
+
+  const layerCounts: Record<string, string> = {
+    "faz1-katman-ozet": "2 bölüm",
+    "faz1-katman-sure": sureEtiketi ?? "seçilmedi",
+    "faz1-katman-taraflar": `${parties.length} taraf`,
+    "faz1-katman-belgeler": `${docCount} belge`,
+  };
+
   return (
     <div className="space-y-4">
       <PhaseHero
-        label="AŞAMA 1 — BAŞVURU"
+        label="AŞAMA 1 — DOSYA KURULUMU"
         metrics={[
-          { label: "Uyuşmazlık Türü", value: classified ? anaAltLabel(caseRow.dispute_type, caseRow.dispute_subtype) : null },
-          { label: "Sınıflandırma Durumu", value: classified ? "Tamamlandı" : "Bekliyor", tone: classified ? "low" : "medium" },
+          { label: "Taraf", value: parties.length },
+          { label: "Belge", value: docCount },
+          { label: "Kalan Süre", value: kalanGun == null ? null : kalanGun, suffix: kalanGun == null ? "" : " gün",
+            tone: kalanGun == null ? undefined : kalanGun < 3 ? "high" : kalanGun < 7 ? "medium" : "low" },
         ]}
       />
-      <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
-      <motion.div variants={itemVariants}>
-        <Card className="p-6 space-y-3">
-          {/* Aşama başlığı üst şeritte (PhaseHero); burada tekrarlanmaz. */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div><span className="text-muted-foreground">Sistem No:</span> <b className="font-mono">{caseRow.application_no}</b></div>
-            <div><span className="text-muted-foreground">Başlık:</span> {caseRow.title}</div>
-            <div><span className="text-muted-foreground">Uyuşmazlık Türü:</span> {caseRow.dispute_type ? anaAltLabel(caseRow.dispute_type, caseRow.dispute_subtype) : <span className="italic text-muted-foreground">Aşağıdaki karttan otomatik tespit edilebilir</span>}</div>
-            <div><span className="text-muted-foreground">Tarih:</span> {caseRow.application_date ? new Date(caseRow.application_date).toLocaleDateString("tr-TR") : new Date(caseRow.created_at).toLocaleDateString("tr-TR")}</div>
-            <div><span className="text-muted-foreground">Durum:</span> {caseRow.status}</div>
-            <div><span className="text-muted-foreground">UYAP Kayıt No:</span> {caseRow.uyap_no || <span className="italic text-muted-foreground">Henüz kaydedilmedi</span>}</div>
-          </div>
-          <p className="text-xs text-muted-foreground border-t pt-3">
-            UYAP Kayıt Numarası, başvuru resmi sisteme kaydedildiğinde Aşama 4 (Arabulucu Paneli) üzerinden eklenebilir.
-          </p>
-          {canEditIssue && (
-            <div className="border-t pt-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Uyuşmazlık Konusu</Label>
-                  <p className="text-sm mt-1 whitespace-pre-wrap">
-                    {caseRow.issue_description || <span className="text-muted-foreground italic">Girilmemiş.</span>}
-                  </p>
-                </div>
-                <Button variant="ghost" size="sm" onClick={openEditIssue}>
-                  <Pencil className="h-4 w-4 mr-1" /> Düzenle
-                </Button>
+      <Card className="p-6 space-y-4">
+        {/* Aşama başlığı üst şeritte (PhaseHero); burada tekrarlanmaz. */}
+        <p className="text-sm text-muted-foreground">
+          Dosya kurulumunun tamamı bu ekrandadır: uyuşmazlık konusu ve türü, sürecin dava
+          şartı mı ihtiyari mi olduğu ve yasal süresi, taraflar ve belgeler. Ajan, belge
+          ve taraf girildiği anda çalışabilir.
+        </p>
+
+        <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+          {/* ── DURUM ŞERİDİ — katlanmaz ── */}
+          <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {statusStripItems.map((m, i) => (
+              <div key={i} className="min-w-0">
+                <div className="text-sm text-muted-foreground truncate">{m.label}</div>
+                <div className="text-sm font-semibold truncate">{m.value}</div>
               </div>
+            ))}
+          </motion.div>
+
+          {/* ── ANA KATMANLAR — solda iki, sağda iki; mobilde alt alta ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+            {/* SOL SÜTUN */}
+            <div className="space-y-4">
+              <Phase3Layer
+                layer={FAZ1_LAYERS[0]}
+                count={layerCounts["faz1-katman-ozet"]}
+                boxClass={FAZ1_LAYER_BOX}
+                open={openLayers.has("faz1-katman-ozet")}
+                onToggle={() => toggleLayer("faz1-katman-ozet")}
+              >
+                <CockpitCollapsible
+                  id="faz1-uyusmazlik-konusu"
+                  title="Uyuşmazlık konusu"
+                  open={openSections.has("faz1-uyusmazlik-konusu")}
+                  onToggle={() => toggleSection("faz1-uyusmazlik-konusu")}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm whitespace-pre-wrap flex-1 min-w-0">
+                      {caseRow.issue_description || <span className="text-muted-foreground italic">Girilmemiş.</span>}
+                    </p>
+                    {canEditIssue && (
+                      <Button variant="ghost" size="sm" className="shrink-0" onClick={openEditIssue}>
+                        <Pencil className="h-4 w-4 mr-1" /> Düzenle
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-3">
+                    Başlık: {caseRow.title || "—"} · Durum: {caseRow.status ?? "—"} · UYAP Kayıt No:{" "}
+                    {caseRow.uyap_no || "henüz kaydedilmedi"} (Aşama 3 — Arabulucu Paneli'nden eklenir).
+                  </p>
+                </CockpitCollapsible>
+                <CockpitCollapsible
+                  id="faz1-tur-tespiti"
+                  title="Uyuşmazlık tür tespiti"
+                  open={openSections.has("faz1-tur-tespiti")}
+                  onToggle={() => toggleSection("faz1-tur-tespiti")}
+                >
+                  {/* Ana tür + alt uzmanlık menüleri ve AI önerisi düğmesi — bileşen aynen korunur. */}
+                  <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} bare />
+                </CockpitCollapsible>
+              </Phase3Layer>
+
+              <Phase3Layer
+                layer={FAZ1_LAYERS[1]}
+                count={layerCounts["faz1-katman-sure"]}
+                boxClass={FAZ1_LAYER_BOX}
+                open={openLayers.has("faz1-katman-sure")}
+                onToggle={() => toggleLayer("faz1-katman-sure")}
+              >
+                <CockpitCollapsible
+                  id="faz1-sure"
+                  title="Dava şartı / ihtiyari ve yasal süre"
+                  open={openSections.has("faz1-sure")}
+                  onToggle={() => toggleSection("faz1-sure")}
+                >
+                  {/* Seçim ve süre göstergesi cases.mediation_type üzerinden yürür — mevcut kart aynen. */}
+                  <DeadlineCard caseRow={caseRow} bare />
+                </CockpitCollapsible>
+              </Phase3Layer>
             </div>
-          )}
-        </Card>
-      </motion.div>
-      <motion.div variants={itemVariants}>
-        <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} autoRun />
-      </motion.div>
-      <motion.div variants={itemVariants}>
-        <DeadlineCard caseRow={caseRow} />
-      </motion.div>
-      </motion.div>
+
+            {/* SAĞ SÜTUN */}
+            <div className="space-y-4">
+              <Phase3Layer
+                layer={FAZ1_LAYERS[2]}
+                count={layerCounts["faz1-katman-taraflar"]}
+                boxClass={FAZ1_LAYER_BOX}
+                open={openLayers.has("faz1-katman-taraflar")}
+                onToggle={() => toggleLayer("faz1-katman-taraflar")}
+              >
+                <CockpitCollapsible
+                  id="faz1-taraf-listesi"
+                  title="Taraf ekleme, düzenleme ve davet"
+                  open={openSections.has("faz1-taraf-listesi")}
+                  onToggle={() => toggleSection("faz1-taraf-listesi")}
+                >
+                  {/* Eski Aşama 2'nin bloğu birebir taşındı; hiçbir işlev kaldırılmadı. */}
+                  <Phase2Parties
+                    caseRow={caseRow}
+                    isMediator={isMediator}
+                    userId={userId}
+                    bare
+                    onChanged={loadParties}
+                  />
+                </CockpitCollapsible>
+              </Phase3Layer>
+
+              <Phase3Layer
+                layer={FAZ1_LAYERS[3]}
+                count={layerCounts["faz1-katman-belgeler"]}
+                boxClass={FAZ1_LAYER_BOX}
+                open={openLayers.has("faz1-katman-belgeler")}
+                onToggle={() => toggleLayer("faz1-katman-belgeler")}
+              >
+                <Faz1Belgeler
+                  caseRow={caseRow}
+                  userId={userId}
+                  parties={parties}
+                  openSections={openSections}
+                  onToggleSection={toggleSection}
+                  onCountChange={setDocCount}
+                />
+              </Phase3Layer>
+            </div>
+          </div>
+        </motion.div>
+      </Card>
 
       <Dialog open={editIssueOpen} onOpenChange={(o) => !o && !savingIssue && setEditIssueOpen(false)}>
         <DialogContent className="max-w-lg">
@@ -1880,6 +2093,171 @@ function Phase1Summary({ caseRow, reload }: { caseRow: CaseRow; reload: () => vo
   );
 }
 
+// Aşama 1 — BELGELER katmanı. Dosya bazında yükleme: taraf seçimi ZORUNLU DEĞİL,
+// isteğe bağlı işaretlenir (party_id boş bırakılırsa belge dosyanın genelidir).
+// Yükleme kuralları Aşama 2'deki (eski Aşama 3) taraf bazlı yüklemeyle aynıdır:
+// PDF / Word / metin, en çok 10 MB. Taraf bazlı yükleme Taraf Analizi ekranında
+// olduğu gibi durur — buradaki blok onun yerine geçmez, ona ek gelir.
+function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection, onCountChange }: {
+  caseRow: CaseRow; userId: string; parties: any[];
+  openSections: Set<string>; onToggleSection: (id: string) => void;
+  onCountChange: (n: number) => void;
+}) {
+  const [docs, setDocs] = useState<any[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const [secilenTaraf, setSecilenTaraf] = useState<string>(FAZ1_BELGE_TARAFSIZ);
+
+  const loadDocs = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("case_documents")
+      .select("id, file_name, file_path, party_id, mime_type, created_at")
+      .eq("case_id", caseRow.id)
+      .order("created_at", { ascending: false });
+    if (error) { setHata(`Belgeler okunamadı: ${trErr(error.message)}`); return; }
+    setHata(null);
+    const liste = Array.isArray(data) ? data : [];
+    setDocs(liste);
+    onCountChange(liste.length);
+  }, [caseRow.id, onCountChange]);
+
+  useEffect(() => { loadDocs(); }, [loadDocs]);
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+
+    for (const f of files) {
+      const ext = f.name.split(".").pop()?.toLowerCase() ?? "";
+      if (!ALLOWED_EXT.includes(ext) && !ALLOWED_MIME.includes(f.type)) {
+        toast({ title: "Geçersiz dosya türü", description: `"${f.name}" yalnızca PDF, Word veya metin dosyası olabilir.`, variant: "destructive" });
+        e.target.value = ""; return;
+      }
+      if (f.size > MAX_SIZE) {
+        toast({ title: "Dosya çok büyük", description: `"${f.name}" 10MB sınırını aşıyor.`, variant: "destructive" });
+        e.target.value = ""; return;
+      }
+    }
+
+    const partyId = secilenTaraf === FAZ1_BELGE_TARAFSIZ ? null : secilenTaraf;
+    setUploading(true);
+    setHata(null);
+    try {
+      for (const f of files) {
+        const safeName = f.name.replace(/[^\w.\-]+/g, "_");
+        const path = `${userId}/${caseRow.id}/${partyId ?? "dosya"}-${Date.now()}-${safeName}`;
+        const { error: upErr } = await supabase.storage.from("case-documents").upload(path, f, {
+          cacheControl: "3600", upsert: false, contentType: f.type || undefined,
+        });
+        if (upErr) {
+          const msg = /row-level security|not authorized|permission/i.test(upErr.message)
+            ? "Bu başvuruya belge yükleme yetkiniz yok."
+            : `Depolama hatası: ${upErr.message}`;
+          throw new Error(msg);
+        }
+        const { data: inserted, error: insErr } = await supabase.from("case_documents").insert({
+          case_id: caseRow.id, party_id: partyId,
+          file_name: f.name, file_path: path, file_size: f.size, mime_type: f.type, uploaded_by: userId,
+        } as any).select("id").single();
+        if (insErr) {
+          await supabase.storage.from("case-documents").remove([path]);
+          throw new Error(`Veritabanı hatası: ${insErr.message}`);
+        }
+        // Metin çıkarma: beklemesiz (fire-and-forget) — yüklemeyi bloklamaz, hata sessizce loglanır.
+        supabase.functions.invoke("extract-document-text", { body: { document_id: inserted?.id } })
+          .catch((err) => console.error("[extract-document-text] tetiklenemedi", err));
+      }
+      toast({ title: "Belge yüklendi" });
+      loadDocs();
+    } catch (err: any) {
+      const msg = err?.message ?? "Bilinmeyen hata";
+      setHata(msg);
+      toast({ title: "Yükleme başarısız", description: msg, variant: "destructive" });
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  async function deleteDoc(d: any) {
+    await supabase.storage.from("case-documents").remove([d.file_path]);
+    const { error } = await supabase.from("case_documents").delete().eq("id", d.id);
+    if (error) { setHata(`Silinemedi: ${trErr(error.message)}`); return; }
+    loadDocs();
+  }
+
+  function tarafAdi(partyId: string | null) {
+    if (!partyId) return "Dosya geneli";
+    const p = parties.find((x) => x.id === partyId);
+    return p ? partyDisplay(p) : "Taraf";
+  }
+
+  return (
+    <>
+      <CockpitCollapsible
+        id="faz1-belge-yukle"
+        title="Belge yükle"
+        open={openSections.has("faz1-belge-yukle")}
+        onToggle={() => onToggleSection("faz1-belge-yukle")}
+      >
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs">Taraf (isteğe bağlı)</Label>
+            <Select value={secilenTaraf} onValueChange={(v) => setSecilenTaraf(v)}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={FAZ1_BELGE_TARAFSIZ}>Dosya geneli (taraf seçilmedi)</SelectItem>
+                {parties.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{partyDisplay(p)} — {roleLabel(p.party_role)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Taraf seçmek zorunlu değildir. Seçilmezse belge dosyanın geneline yüklenir.
+            </p>
+          </div>
+          <label className="text-sm cursor-pointer text-primary hover:underline flex items-center gap-1 w-fit">
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            Belge Yükle
+            <input type="file" multiple className="hidden"
+              accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              onChange={handleUpload} disabled={uploading} />
+          </label>
+          <p className="text-xs text-muted-foreground">PDF, Word veya metin dosyası · en çok 10 MB.</p>
+          {hata && (
+            <p className="text-sm text-destructive flex items-start gap-1.5">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" /> {hata}
+            </p>
+          )}
+        </div>
+      </CockpitCollapsible>
+
+      <CockpitCollapsible
+        id="faz1-belgeler-liste"
+        title="Dosyadaki belgeler"
+        summary={`${docs.length} belge`}
+        open={openSections.has("faz1-belgeler-liste")}
+        onToggle={() => onToggleSection("faz1-belgeler-liste")}
+      >
+        {docs.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">Bu dosyaya henüz belge yüklenmedi.</p>
+        ) : (
+          <ul className="divide-y">
+            {docs.map((d) => (
+              <li key={d.id} className="flex items-center gap-2 text-sm py-1.5">
+                <FileText className="h-4 w-4 text-primary shrink-0" />
+                <span className="flex-1 truncate">{d.file_name}</span>
+                <span className="text-xs text-muted-foreground truncate max-w-[40%]">{tarafAdi(d.party_id)}</span>
+                <Button variant="ghost" size="sm" onClick={() => deleteDoc(d)} title="Sil"><Trash2 className="h-3 w-3" /></Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CockpitCollapsible>
+    </>
+  );
+}
+
 /* ============ DEADLINE / TAKVIM CARD ============ */
 
 const COURT_LABEL: Record<string, string> = {
@@ -1898,7 +2276,9 @@ function statusChipFor(remainingDays: number | null) {
   return <Badge className="bg-emerald-600 text-white">🟢 {remainingDays} gün</Badge>;
 }
 
-function DeadlineCard({ caseRow }: { caseRow: CaseRow }) {
+// bare: Aşama 1'de kendi kartı yok — kapsayan katmanın içinde bölüm olarak durur
+// (kutu içinde kutu olmasın). İçerik ve davranış her iki halde de aynıdır.
+function DeadlineCard({ caseRow, bare = false }: { caseRow: CaseRow; bare?: boolean }) {
   const [local, setLocal] = useState<Partial<CaseRow>>({ ...caseRow });
   const [busy, setBusy] = useState(false);
   const [extending, setExtending] = useState(false);
@@ -2032,13 +2412,15 @@ function DeadlineCard({ caseRow }: { caseRow: CaseRow }) {
   const remainingDays = active ? Math.ceil((new Date(active).getTime() - Date.now()) / 86400000) : null;
   const chip = statusChipFor(remainingDays);
 
-  return (
-    <Card className="p-6 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <CalIcon className="h-4 w-4 text-primary" /> 📅 Takvim & Süreler
-        </h3>
-      </div>
+  const inner = (
+    <>
+      {!bare && (
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <CalIcon className="h-4 w-4 text-primary" /> 📅 Takvim & Süreler
+          </h3>
+        </div>
+      )}
 
       {/* ARABULUCULUK TÜRÜ SEÇİMİ */}
       <div>
@@ -2196,8 +2578,10 @@ function DeadlineCard({ caseRow }: { caseRow: CaseRow }) {
           )}
         </div>
       )}
-    </Card>
+    </>
   );
+
+  return bare ? <div className="space-y-4">{inner}</div> : <Card className="p-6 space-y-4">{inner}</Card>;
 }
 
 /* ============ DISPUTE CLASSIFIER (AI tür tespiti) ============ */
@@ -2420,7 +2804,13 @@ function DisputeClassifierCard({
 
 /* ===================== PHASE 2 - PARTIES ===================== */
 
-function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseRow; isMediator: boolean; userId: string; onDone: () => void }) {
+// TARAFLAR bloğu. 14.08'den beri kendi aşaması yok: Aşama 1'in "TARAFLAR" katmanı
+// içinde bare=true ile çizilir (üst şerit ve "Aşamayı Tamamla" düğmesi olmadan).
+// Ekleme / düzenleme / silme / davet akışlarının hiçbiri değişmedi.
+function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onChanged }: {
+  caseRow: CaseRow; isMediator: boolean; userId: string; onDone?: () => void;
+  bare?: boolean; onChanged?: () => void;
+}) {
   const [parties, setParties] = useState<any[]>([]);
   const [draft, setDraft] = useState<PartyDraft | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
@@ -2446,7 +2836,9 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
     const { data } = await supabase.from("case_parties").select("*").eq("case_id", caseRow.id).order("created_at");
     setParties(data ?? []);
     setLoading(false);
-  }, [caseRow.id]);
+    // Kapsayan ekran (Aşama 1) taraf listesini kendi belgeler bölümünde de kullanıyor.
+    onChanged?.();
+  }, [caseRow.id, onChanged]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -2682,20 +3074,17 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
     ? `${acceptedCount}/${withEmail.length} Kabul`
     : parties.length ? "Davet gönderilmedi" : null;
 
-  return (
-    <div className="space-y-4">
-      <PhaseHero
-        label="AŞAMA 2 — TARAFLAR"
-        metrics={[
-          { label: "Kayıtlı Taraf", value: parties.length },
-          { label: "Davet Durumu", value: inviteSummary, tone: acceptedCount && acceptedCount === withEmail.length ? "low" : undefined },
-        ]}
-      />
+  const govde = (
+    <>
     <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
       <motion.div variants={itemVariants}>
-      <Card className="p-6">
-        {/* Aşama başlığı üst şeritte (PhaseHero); burada tekrarlanmaz. */}
-        <div className="flex items-center justify-end mb-4">
+      <TarafKutusu bare={bare}>
+        {/* Davet durumu eski Aşama 2'nin üst şeridinde duruyordu; şerit kalkınca
+            bilgi kaybolmasın diye blok başlığına taşındı. */}
+        <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+          <span className="text-sm text-muted-foreground">
+            {inviteSummary ? `Davet durumu: ${inviteSummary}` : ""}
+          </span>
           <Button onClick={() => setDraft(emptyParty(parties.length === 0 ? "applicant" : "respondent"))}>
             <Plus className="h-4 w-4 mr-1" /> Taraf Ekle
           </Button>
@@ -2795,12 +3184,12 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
             ))}
           </div>
         )}
-        {parties.length >= 2 && (
+        {!bare && parties.length >= 2 && onDone && (
           <div className="mt-4 flex justify-end">
             <Button variant="default" onClick={onDone}>Aşamayı Tamamla →</Button>
           </div>
         )}
-      </Card>
+      </TarafKutusu>
       </motion.div>
 
       {invitePrompt && (
@@ -3061,8 +3450,17 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone }: { caseRow: CaseR
         </DialogContent>
       </Dialog>
     </motion.div>
-    </div>
+    </>
   );
+
+  // Blok artık her zaman kapsayan bir ekranın içinde çizilir; kendi üst şeridi yoktur.
+  return bare ? govde : <div className="space-y-4">{govde}</div>;
+}
+
+// Taraflar bloğunun kabı: tek başına aşamayken kart, Aşama 1 katmanının içindeyken
+// düz kutu (kutu içinde kutu olmaz).
+function TarafKutusu({ bare, children }: { bare: boolean; children: React.ReactNode }) {
+  return bare ? <div>{children}</div> : <Card className="p-6">{children}</Card>;
 }
 
 
@@ -3141,6 +3539,59 @@ const FAZ3_MENU_ENTRIES: { id: string; label: string; kind: "layer" | "section";
     { id: "faz3-tur-tespiti", label: "Uyuşmazlık tür tespiti", kind: "section" },
     { id: FAZ3_LAYERS[1].id, label: FAZ3_LAYERS[1].label, kind: "layer", hint: FAZ3_LAYERS[1].hint },
     { id: FAZ3_LAYERS[2].id, label: FAZ3_LAYERS[2].label, kind: "layer", hint: FAZ3_LAYERS[2].hint },
+  ]);
+
+// ── AŞAMA 1 (tek giriş kapısı) katmanları ve sol dizini ───────────────────────
+// Kalıp Faz 3/4 ile aynı: ANA KATMAN başlıkları BÜYÜK HARF (Türkçe İ ile doğrudan
+// yazılır), alt katman başlıkları normal yazımdadır. İlk iki katman solda, son iki
+// katman sağda çizilir; dizin sırası ekrandaki okuma sırasıdır (önce sol sütun).
+const FAZ1_LAYER_BOX = "rounded-lg border bg-card p-6 space-y-4";
+// Belge yüklerken "taraf seçilmedi" seçeneğinin değeri (Select boş değer kabul etmez).
+const FAZ1_BELGE_TARAFSIZ = "__dosya__";
+const FAZ1_LAYERS = [
+  {
+    id: "faz1-katman-ozet",
+    label: "DOSYA ÖZETİ",
+    hint: "Bu katman, uyuşmazlığın konusunu ve tür tespitini içerir; metni ve tespiti buradan girip düzeltebilirsiniz.",
+  },
+  {
+    id: "faz1-katman-sure",
+    label: "SÜREÇ TÜRÜ VE SÜRE",
+    hint: "Bu katman, sürecin dava şartı mı ihtiyari mi olduğunu ve buna bağlı yasal süreyi tutar.",
+  },
+  {
+    id: "faz1-katman-taraflar",
+    label: "TARAFLAR",
+    hint: "Bu katman, tarafların eklenmesi, düzenlenmesi, silinmesi ve davet gönderimini içerir.",
+  },
+  {
+    id: "faz1-katman-belgeler",
+    label: "BELGELER",
+    hint: "Bu katman, dosya bazında belge yüklemeyi içerir; taraf seçimi isteğe bağlıdır.",
+  },
+];
+// Bölüm → kapsayan katman: sol menüden bölüme atlanınca önce katman açılır.
+const FAZ1_SECTION_LAYER: Record<string, string> = {
+  "faz1-uyusmazlik-konusu": "faz1-katman-ozet",
+  "faz1-tur-tespiti": "faz1-katman-ozet",
+  "faz1-sure": "faz1-katman-sure",
+  "faz1-taraf-listesi": "faz1-katman-taraflar",
+  "faz1-belge-yukle": "faz1-katman-belgeler",
+  "faz1-belgeler-liste": "faz1-katman-belgeler",
+};
+const FAZ1_SECTION_IDS = Object.keys(FAZ1_SECTION_LAYER);
+const FAZ1_MENU_ENTRIES: { id: string; label: string; kind: "layer" | "section"; hint?: string }[] =
+  numberMenuEntries([
+    { id: FAZ1_LAYERS[0].id, label: FAZ1_LAYERS[0].label, kind: "layer", hint: FAZ1_LAYERS[0].hint },
+    { id: "faz1-uyusmazlik-konusu", label: "Uyuşmazlık konusu", kind: "section" },
+    { id: "faz1-tur-tespiti", label: "Uyuşmazlık tür tespiti", kind: "section" },
+    { id: FAZ1_LAYERS[1].id, label: FAZ1_LAYERS[1].label, kind: "layer", hint: FAZ1_LAYERS[1].hint },
+    { id: "faz1-sure", label: "Dava şartı / ihtiyari ve yasal süre", kind: "section" },
+    { id: FAZ1_LAYERS[2].id, label: FAZ1_LAYERS[2].label, kind: "layer", hint: FAZ1_LAYERS[2].hint },
+    { id: "faz1-taraf-listesi", label: "Taraf ekleme, düzenleme ve davet", kind: "section" },
+    { id: FAZ1_LAYERS[3].id, label: FAZ1_LAYERS[3].label, kind: "layer", hint: FAZ1_LAYERS[3].hint },
+    { id: "faz1-belge-yukle", label: "Belge yükle", kind: "section" },
+    { id: "faz1-belgeler-liste", label: "Dosyadaki belgeler", kind: "section" },
   ]);
 
 function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
@@ -3370,7 +3821,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
 
   // İç Tutarlılık Denetimi — party-consistency-check. runAnalysis'ten tamamen ayrı
   // akış: kendi state'i var, analysisError'a dokunmaz, loadAll() çağırmaz (sonuç
-  // Aşama 4 kokpitinde okunur). Fonksiyonun döndürdüğü Türkçe mesaj olduğu gibi gösterilir.
+  // Aşama 3 kokpitinde okunur). Fonksiyonun döndürdüğü Türkçe mesaj olduğu gibi gösterilir.
   async function runConsistencyCheck(partyId: string) {
     setConsistencyChecking(partyId);
     try {
@@ -3391,7 +3842,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
       const findings = Array.isArray((data as any)?.findings) ? (data as any).findings : [];
       toast(
         findings.length > 0
-          ? { title: `İç tutarlılık denetimi tamamlandı — ${findings.length} bulgu`, description: "Sonuç Aşama 4 kokpitinde" }
+          ? { title: `İç tutarlılık denetimi tamamlandı — ${findings.length} bulgu`, description: "Sonuç Aşama 3 kokpitinde" }
           : { title: "Uyumsuzluk bulunmadı" }
       );
     } catch (e: any) {
@@ -3404,7 +3855,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
   }
 
   // İletişim Analizi — party-communication-analysis. İç Tutarlılık düğmesiyle aynı
-  // kalıp: kendi state'i, analysisError'a dokunmaz, sonuç Aşama 4 kokpitinde okunur.
+  // kalıp: kendi state'i, analysisError'a dokunmaz, sonuç Aşama 3 kokpitinde okunur.
   async function runCommunicationAnalysis(partyId: string) {
     setCommunicationRunning(partyId);
     try {
@@ -3426,7 +3877,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
         findings.length > 0 || questions.length > 0
           ? {
               title: `İletişim analizi tamamlandı — ${findings.length} iz, ${questions.length} soru`,
-              description: "Sonuç Aşama 4 kokpitinde",
+              description: "Sonuç Aşama 3 kokpitinde",
             }
           : { title: "İletişim izi bulunmadı" }
       );
@@ -3491,7 +3942,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
       ) : (
       <>
       <PhaseHero
-        label="AŞAMA 3 — TARAF ANALİZİ"
+        label="AŞAMA 2 — TARAF ANALİZİ"
         metrics={[
           { label: "Taraf Analizi", value: parties.length ? analysedCount : null, suffix: parties.length ? ` / ${parties.length}` : "" },
           { label: "Ortalama Risk Puanı", value: dominantRiskLabel, tone: dominantRisk ?? undefined },
@@ -3500,7 +3951,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
       <Card className="p-6 space-y-4">
         {/* Aşama başlığı üst şeritte (PhaseHero); burada tekrarlanmaz. */}
         <p className="text-sm text-muted-foreground">
-          Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. Analizler tamamlandığında Ortak Zemin Raporu, Aşama 4 — Arabulucu Paneli'nde üretilir.
+          Her tarafa ait bilgileri görüntüleyin, belge yükleyin ve AI analizi başlatın. Analizler tamamlandığında Ortak Zemin Raporu, Aşama 3 — Arabulucu Paneli'nde üretilir.
         </p>
 
       <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
@@ -3554,7 +4005,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
         >
           {parties.length === 0 && (
             <p className="text-sm text-muted-foreground border-t pt-3">
-              Bu başvuruya henüz taraf eklenmemiş. Aşama 2 — Taraf Bilgileri ekranından en az iki taraf ekleyin, ardından bu adımda belge yükleyip analiz başlatabilirsiniz.
+              Bu başvuruya henüz taraf eklenmemiş. Aşama 1 — Dosya Kurulumu ekranından en az iki taraf ekleyin, ardından bu adımda belge yükleyip analiz başlatabilirsiniz.
             </p>
           )}
         {parties.map((p) => {
@@ -3686,12 +4137,12 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
                       {analysing === p.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
                       {a ? "Yeniden Analiz Et" : "Analiz Başlat"}
                     </Button>
-                    {/* İç Tutarlılık Denetimi — ayrı fonksiyon, sonuç yalnız Aşama 4 kokpitinde görünür */}
+                    {/* İç Tutarlılık Denetimi — ayrı fonksiyon, sonuç yalnız Aşama 3 kokpitinde görünür */}
                     <Button size="sm" variant="outline" onClick={() => runConsistencyCheck(p.id)} disabled={consistencyChecking === p.id}>
                       {consistencyChecking === p.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <ShieldCheck className="h-4 w-4 mr-1" />}
                       {consistencyChecking === p.id ? "Denetleniyor..." : "İç Tutarlılık Denetimi"}
                     </Button>
-                    {/* İletişim Analizi — ayrı fonksiyon, sonuç yalnız Aşama 4 kokpitinde görünür */}
+                    {/* İletişim Analizi — ayrı fonksiyon, sonuç yalnız Aşama 3 kokpitinde görünür */}
                     <Button size="sm" variant="outline" onClick={() => runCommunicationAnalysis(p.id)} disabled={communicationRunning === p.id}>
                       {communicationRunning === p.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <MessageSquare className="h-4 w-4 mr-1" />}
                       {communicationRunning === p.id ? "Analiz ediliyor..." : "İletişim Analizi"}
@@ -4192,7 +4643,7 @@ function ComparativeRiskAnalysis({
         <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
         <div>
           <div className="font-semibold mb-0.5">Karşılaştırmalı risk verisi bulunamadı</div>
-          Taraf analizlerinde henüz <code className="font-mono">risk_analizi</code> alanı yok. Aşama 3'te "Risk Analizini Güncelle" butonu ile her taraf için risk analizini yeniden üretin.
+          Taraf analizlerinde henüz <code className="font-mono">risk_analizi</code> alanı yok. Aşama 2'de "Risk Analizini Güncelle" butonu ile her taraf için risk analizini yeniden üretin.
         </div>
       </div>
     );
@@ -4460,7 +4911,7 @@ function RiskAnalysisCard({
           <b>Bazı metrikler için yeterli veri bulunamadı.</b> Daha net bir risk analizi için taraf profilinde
           <span className="mx-1 font-medium">talep tutarı, uyuşmazlık alt türü ve olayın kısa özetini</span>
           netleştirin; ilgili sözleşme/fatura/yazışma belgelerini <b>.txt</b> veya metin katmanlı PDF olarak yükleyin ve
-          BATNA (dava yolu) ile menfaat/pozisyon ayrımını Aşama 2/3 formunda doldurun. Ardından
+          BATNA (dava yolu) ile menfaat/pozisyon ayrımını Aşama 1/2 formunda doldurun. Ardından
           <b> "Risk Analizini Güncelle"</b> butonuyla yeniden hesaplatın.
         </MissingDataHint>
       )}
@@ -5532,7 +5983,7 @@ function CockpitCommunicationItem({ finding, partyLabel }: { finding: any; party
 
 function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
   caseRow: CaseRow;
-  // "Şimdi ne yapmalısın"daki oturum planlama maddesinin eylem düğmesi; Aşama 5'teki
+  // "Şimdi ne yapmalısın"daki oturum planlama maddesinin eylem düğmesi; Aşama 4'teki
   // mevcut randevu akışını tetikler, kopyasını yazmaz.
   onRandevuAyarla?: () => void;
   // Sol menüdeki alt katmanı besler: hangi bölümlerin verisi var. Yeni sorgu yok —
@@ -5909,7 +6360,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
   if (analyses.length === 0) {
     yonlendirmeMaddeleri.push({
       baslik: "Analiz henüz koşmadı — başlat",
-      dayanak: ["Tamamlanmış taraf analizi: 0 (Aşama 3'te en az bir analiz gerekir)"],
+      dayanak: ["Tamamlanmış taraf analizi: 0 (Aşama 2'de en az bir analiz gerekir)"],
     });
   }
   if (partyCount !== null && partyCount < 2) {
@@ -6453,7 +6904,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
           <p className="text-sm text-muted-foreground italic">Henüz rapor üretilmedi. "Rapor Üret" butonuna basın.</p>
         ) : (
           <p className="text-sm text-destructive">
-            Rapor üretmeden önce Aşama 3'te en az bir taraf analizini tamamlayın.
+            Rapor üretmeden önce Aşama 2'de en az bir taraf analizini tamamlayın.
           </p>
         )}
       </div>
@@ -6621,7 +7072,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
   return (
     <div className="space-y-4">
       <PhaseHero
-        label="AŞAMA 4 — ARABULUCU PANELİ"
+        label="AŞAMA 3 — ARABULUCU PANELİ"
         metrics={[
           { label: "Uzlaşma Tahmini", value: heroUzlasmaPct, suffix: "%" },
         ]}
@@ -6642,7 +7093,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
       />
     <Card className="p-6 space-y-4">
       {/* Aşama başlığı üst şeritte (PhaseHero); burada tekrarlanmaz. */}
-      <p className="text-sm text-muted-foreground">Aşama 3'te üretilen taraf analizlerinin özeti ve Ortak Zemin Raporu üretimi.</p>
+      <p className="text-sm text-muted-foreground">Aşama 2'de üretilen taraf analizlerinin özeti ve Ortak Zemin Raporu üretimi.</p>
 
       <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
 
@@ -6729,7 +7180,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
 
         {analyses.length === 0 && (
           <motion.div variants={itemVariants} className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground italic text-center">
-            Kokpit, Aşama 3'te en az bir taraf analizi tamamlandığında dolmaya başlar.
+            Kokpit, Aşama 2'de en az bir taraf analizi tamamlandığında dolmaya başlar.
           </motion.div>
         )}
 
@@ -7035,7 +7486,7 @@ function BlindBidMediatorPanel({ caseId }: { caseId: string }) {
       <p className="text-xs text-sidebar-foreground/60 leading-snug">
         Taraflar birbirinin teklifini göremez — yalnızca siz (arabulucu) her iki tarafın teklif
         durumunu ve, ikisi de teklif girdiğinde, örtüşme (tatmin) bölgesini görürsünüz. Taraflara,
-        kendi Kör Teklif formlarını Aşama 4 sekmesinden doldurmalarını hatırlatabilirsiniz.
+        kendi Kör Teklif formlarını Aşama 3 sekmesinden doldurmalarını hatırlatabilirsiniz.
       </p>
 
       {rows.length === 0 ? (
@@ -7218,7 +7669,7 @@ function Phase8Negotiation({ caseRow, userId, onDone }: { caseRow: CaseRow; user
   return (
     <div className="space-y-4">
       <PhaseHero
-        label="AŞAMA 7 — GÖRÜŞME NOTLARI"
+        label="AŞAMA 6 — GÖRÜŞME NOTLARI"
         metrics={[
           { label: "Görüşme Notu", value: notesMeta.count },
           { label: "Son Not", value: notesMeta.lastAt ? formatPhaseRelative(notesMeta.lastAt) : null },
@@ -8394,7 +8845,7 @@ function Phase9Closing({ caseRow, reload }: { caseRow: CaseRow; reload: () => vo
   return (
     <div className="space-y-4">
       <PhaseHero
-        label="AŞAMA 8 — BELGELER & KAPANIŞ"
+        label="AŞAMA 7 — BELGELER & KAPANIŞ"
         metrics={[
           { label: "Üretilen Belge", value: docCount },
           { label: "Kapanış Durumu", value: closingLabel, tone: closingTone },
@@ -8548,7 +8999,7 @@ function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
   return (
     <div className="space-y-4">
       <PhaseHero
-        label="AŞAMA 6 — BİLİRKİŞİ (OPSİYONEL)"
+        label="AŞAMA 5 — BİLİRKİŞİ (OPSİYONEL)"
         metrics={[
           {
             label: "Bilirkişi Durumu",

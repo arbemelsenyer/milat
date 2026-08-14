@@ -30,10 +30,12 @@ interface CaseRow {
 
 const CLOSED = ["completed", "resolved", "closed", "archived"];
 
+// 14.08: aşama sayısı 8 → 7 (eski Aşama 1 ve 2 tek giriş kapısında birleşti);
+// durum → aşama eşlemesi yeni numaralamaya çekildi.
 function statusPhase(status: string): number {
   const map: Record<string, number> = {
-    draft: 1, submitted: 2, assigned: 4, scheduled: 5,
-    in_progress: 5, completed: 8, resolved: 8,
+    draft: 1, submitted: 1, assigned: 3, scheduled: 4,
+    in_progress: 4, completed: 7, resolved: 7,
   };
   return map[status] ?? 1;
 }
@@ -132,7 +134,7 @@ export default function Cases() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-xs text-muted-foreground">{c.application_no ?? "—"}</span>
-                        <Badge variant="secondary">Aşama {phase}/8</Badge>
+                        <Badge variant="secondary">Aşama {phase}/7</Badge>
                         {c.dispute_type && <Badge variant="outline">{formatDisputeType(c.dispute_type, c.dispute_subtype)}</Badge>}
                       </div>
                       <h3 className="font-medium mt-1 truncate">

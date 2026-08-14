@@ -95,6 +95,24 @@ arabulucunun kendi girdiği kayıttır.
   ekranda gösterilir, kart kapanmaz.
 ● 13.08: Aşama 5 üst şeridindeki "Planlanan Oturum" sayacı yalnız GELECEKTEKİ planlı
   (scheduled) oturumları sayar; taslak ve geçmiş kayıtlar sayaca girmez.
+● 14.08 ● CANLI (kod tarafı): AŞAMA 1 TEK GİRİŞ KAPISI. Dosya kurulumunun tamamı tek
+  ekranda: uyuşmazlık konusu ve tür tespiti · sürecin dava şartı mı ihtiyari mi olduğu
+  ve buna bağlı yasal süre (cases.mediation_type ve mevcut süre alanları) · TARAFLAR
+  (eski Aşama 2'nin ekleme/düzenleme/silme/davet bloğu birebir taşındı) · BELGELER
+  (dosya bazında yükleme; taraf seçimi ZORUNLU DEĞİL, isteğe bağlı işaretlenir —
+  seçilmezse case_documents.party_id boş kalır; kural Aşama 2'dekiyle aynı: PDF/Word/
+  metin, 10 MB). Sayfa düzeni Aşama 3 (kokpit) kalıbındadır: üstte katlanmayan durum
+  şeridi, altında SOLDA iki ANA KATMAN (DOSYA ÖZETİ · SÜREÇ TÜRÜ VE SÜRE) ve SAĞDA iki
+  ANA KATMAN (TARAFLAR · BELGELER); ana katman başlıkları BÜYÜK HARF, alt katman
+  başlıkları normal yazım. Mobilde tek sütuna iner. Sol menüde aynı numaralı dizin
+  (1. DOSYA ÖZETİ · 1.1 … · 4.2 Dosyadaki belgeler) çizilir.
+● 14.08: AŞAMA SAYISI 8 → 7. Eski Aşama 2 (Taraflar) kalktı; eski 3 Taraf Analizi → 2,
+  4 Arabulucu Paneli → 3, 5 Toplantı → 4, 6 Bilirkişi → 5, 7 Görüşme Notları → 6,
+  8 Belgeler & Kapanış → 7. Aşama kilidi artık "Aşama 3 ve sonrası, Aşama 2'de en az
+  bir taraf analizi tamamlanana kadar kapalı". Üst şeritler, sol menü, gotoPhase yolları
+  ve kokpitteki aşama göndermeleri bu numaralara çekildi. URL'de aşama numarası
+  ?phase=N&pv=2 biçimindedir; pv taşımayan (eski) bağlantı eski numaralı sayılıp yeni
+  numaraya çevrilir ve adres bir kez düzeltilir — kırık link kalmaz.
 ● 13.08: Taraf görünümünde "Dosya Asistanım" sohbet kartı — taraf kendi sürecini sorar,
   yanıt taraf-asistan fonksiyonundan gelir (kendi JWT'siyle). Geçmiş yalnız ekranda tutulur,
   veritabanına yazılmaz. Bekleme "yazıyor…" ile, hata kırmızı tek satırla gösterilir.

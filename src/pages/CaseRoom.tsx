@@ -434,7 +434,7 @@ export default function CaseRoom() {
               </div>
               <h1 className="text-2xl font-bold text-primary">{caseRow.title}</h1>
               <div className="text-sm text-muted-foreground mt-1">
-                {formatDisputeType(caseRow.dispute_type, caseRow.dispute_subtype)} · Aşama {caseRow.current_phase ?? 1}/8 · Tur {caseRow.round_number ?? 1}
+                {formatDisputeType(caseRow.dispute_type, caseRow.dispute_subtype)} · Aşama {Math.min(7, Math.max(1, caseRow.current_phase ?? 1))}/7 · Tur {caseRow.round_number ?? 1}
               </div>
             </div>
             <div className="flex gap-2">
@@ -1202,7 +1202,7 @@ function ProcessOverview({
             Gizli taraf analizleri, ortak zemin, ihtiyaç tespiti, toplantı, bilirkişi, müzakere ve belge üretimi tek akışta ilerler.
           </p>
         </div>
-        <Badge variant="secondary">Aşama {currentPhase}/8</Badge>
+        <Badge variant="secondary">Aşama {Math.min(7, Math.max(1, currentPhase))}/7</Badge>
       </div>
 
       <StepTimeline steps={PROCESS_STEPS} current={current} />

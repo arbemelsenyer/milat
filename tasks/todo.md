@@ -1,3 +1,26 @@
+## Nerede kaldık — 14.08.2026 (50) · AŞAMA 1 TEK GİRİŞ KAPISI
+- [x] Aşama 1 tek ekran: uyuşmazlık konusu/türü · dava şartı-ihtiyari ve yasal süre
+      (cases.mediation_type + mevcut süre alanları) · TARAFLAR (eski Aşama 2 bloğu
+      birebir taşındı) · BELGELER (dosya bazında yükleme, taraf seçimi isteğe bağlı,
+      PDF/Word/metin 10 MB).
+- [x] Eski Aşama 2 kaldırıldı; aşamalar 8 → 7'ye indi (3→2, 4→3, 5→4, 6→5, 7→6, 8→7).
+      Üst şerit, sol menü, kilit kuralı, gotoPhase, kokpit göndermeleri güncellendi.
+- [x] URL: ?phase=N&pv=2. pv taşımayan eski bağlantı eski numaralı sayılıp yenisine
+      çevriliyor ve adres bir kez düzeltiliyor.
+- [x] Aşama 1 düzeni Aşama 3 (kokpit) kalıbında: solda ve sağda ikişer ANA KATMAN
+      (BÜYÜK HARF), altlarında alt katmanlar (normal yazım), mobilde tek sütun.
+- [x] Taraf Analizi ekranındaki taraf bazlı belge yükleme aynen duruyor.
+tsc + build temiz. CANLI TEST YAPILMADI.
+REDEPLOY GEREKLİ: create-video-room (bildirim linki phase=5 → phase=4&pv=2).
+AÇIK UÇLAR (kurucu kararı bekliyor):
+- cases.current_phase kayıtlı sayıları eski numaralamada; yalnız "hangi aşama açılsın"
+  ipucu olarak kullanılıyor ve 1..7 aralığına sınırlanıyor. İstenirse tek seferlik
+  SQL ile kaydırılabilir.
+- case_notes.phase = 7 (görüşme notu işareti) VERİ alanıdır, dokunulmadı;
+  CaseNotesFAB'daki 8 satırlık aşama etiketleri de bu yüzden eski adlarda bırakıldı.
+- CaseRoom'daki taraf zaman çizelgesi (8 adımlı PROCESS_STEPS) ayrı bir listedir,
+  aşama numarasıyla birebir eşleşmiyor; taraf ekranı olduğu için değiştirilmedi.
+
 ## 13.08.2026 — GÜN SONU · Nerede kaldık
 
 BİTENLER (canlı doğrulandı):

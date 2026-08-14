@@ -404,3 +404,8 @@ linkleri dahil) /cases/:id tek kapısından geçiyor; kapı query parametrelerin
 
 14.08: Otomatik akış açık dosyalarda analiz zinciri nöbetçi tarafından başlatılıyor
 (analiz_baslat görevi + orchestrator-run iç kapısı).
+
+14.08: Aşama 1 tek giriş kapısı oldu — uyuşmazlık konusu/türü, dava şartı-ihtiyari ve
+yasal süre, TARAFLAR ve BELGELER tek ekranda. Eski Aşama 2 (Taraflar) kalktı, aşama
+sayısı 8'den 7'ye indi; eski numaralı bağlantılar (pv işareti taşımayanlar) yeni
+numaraya çevriliyor.

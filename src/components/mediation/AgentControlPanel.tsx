@@ -425,7 +425,9 @@ export function AgentControlPanel({ caseId, isMediator }: { caseId: string; isMe
               )}
             </dl>
             <div className="flex flex-wrap gap-2 pt-1">
-              <Button size="sm" variant="outline" onClick={() => navigate(`/cases/${caseId}?phase=4`)}>
+              {/* Arabulucu Paneli 14.08'de Aşama 4 → Aşama 3 oldu; pv=2 bağlantının
+                  yeni numaralamada olduğunu söyler (pv'siz eski linkler çevrilir). */}
+              <Button size="sm" variant="outline" onClick={() => navigate(`/cases/${caseId}?phase=3&pv=2`)}>
                 Açıkla
               </Button>
               <Button size="sm" variant="outline" onClick={() => navigate(`/cases/${caseId}`)}>

@@ -119,7 +119,9 @@ serve(async (req) => {
 
     // Create notifications for the case owner and the assigned mediator
     const notifications = [];
-    const caseLink = `/legal-reasoning?caseId=${caseRow.id}&phase=5`;
+    // Toplantı aşaması 14.08'de 5 → 4 oldu; pv=2 bağlantının yeni numaralamada
+    // olduğunu belirtir (pv taşımayan eski bağlantılar ekranda çevrilir).
+    const caseLink = `/legal-reasoning?caseId=${caseRow.id}&phase=4&pv=2`;
 
     if (caseRow.user_id) {
       notifications.push({

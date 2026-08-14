@@ -41,6 +41,15 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
 - Tarih/saat karşılaştırmasında UTC↔TR farkını düzeltmek tek başına yetmez:
   eşleşme GÜN ve SAATİN ikisi birden tutunca kabul edilir, yoksa başka günün
   kaydı yanlışlıkla eşleşir. (13.08, teklif–oturum eşleştirmesi)
+- KAYNAK DOSYAYA POWERSHELL Get-Content/Set-Content İLE DOKUNMA: UTF-8 dosyayı
+  ANSI (cp1254) okuyup geri yazınca tüm Türkçe karakterler bozuldu ve satır
+  sonları CRLF oldu. Dosya birleştirme/parça ekleme işleri Edit aracıyla ya da
+  Node/Python ile açıkça utf-8 belirtilerek yapılır. (14.08, MediationEngine.tsx)
+- Aşama numarası hem URL'de hem veritabanında duruyorsa numaralama değişince
+  ikisi ayrışır: URL'ye sürüm işareti (pv=2) konup eski bağlantı çevrilebilir,
+  ama cases.current_phase gibi KAYITLI sayılar eski numaralamada kalır. Kayıtlı
+  sayı yalnız "hangi aşama açılsın" ipucu olarak kullanılıp sınırlandırılır.
+  (14.08, aşama 8 → 7)
 - Ön yüz değişikliği Publish edilmeden taraf ekranında görünmez; "eski stil
   duruyor" şikâyeti önce Publish eksikliği olarak okunur, kod aranmadan önce
   yayın durumu sorulur. (13.08)
