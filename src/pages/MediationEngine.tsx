@@ -3095,37 +3095,42 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
           <div className="space-y-2">
             {parties.map((p) => (
               <motion.div variants={itemVariants} key={p.id} className="p-3 border rounded space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">{p.full_name || p.company_name || "(isimsiz)"}</div>
-                    <div className="text-xs text-muted-foreground">
+                <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+                  <div className="min-w-0">
+                    <div className="font-medium break-words">{p.full_name || p.company_name || "(isimsiz)"}</div>
+                    <div className="text-xs text-muted-foreground break-words">
                       {p.party_role === "applicant" ? "Başvurucu" : p.party_role === "respondent" ? "Karşı Taraf" : "Üçüncü Taraf"}
                       {" · "}{p.party_type === "corporate" ? "Kurumsal" : "Bireysel"}
                       {" · "}{p.email || "e-posta yok"}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  {/* Düğme satırı dar sütunda (Aşama 1'in iki sütunlu düzeni ~320px)
+                      alt satıra iner: flex-wrap + min-w-0, düğmelerde metin sarabilir.
+                      Sabit tek satır kaldığında sayfa yana taşıyordu. */}
+                  <div className="flex flex-wrap items-center justify-end gap-1 min-w-0 max-w-full">
                     {p.email && p.invite_status !== "accepted" && (
                       <Button
                         variant="ghost"
                         size="sm"
+                        className="max-w-full whitespace-normal text-left h-auto py-1.5"
                         onClick={() => sendInvite(p.id)}
                         disabled={invitingId === p.id}
-                        title="Davet Gönder / Yeniden Gönder"
+                        title={inviteUrls[p.id] ? "Yeniden gönder" : "Davet gönder"}
                       >
-                        {invitingId === p.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Mail className="h-4 w-4 mr-1" />}
-                        Davet Gönder / Yeniden Gönder
+                        {invitingId === p.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin shrink-0" /> : <Mail className="h-4 w-4 mr-1 shrink-0" />}
+                        {inviteUrls[p.id] ? "Yeniden gönder" : "Davet gönder"}
                       </Button>
                     )}
                     {!p.email && p.invite_status !== "accepted" && (
                       <Button
                         variant="ghost"
                         size="sm"
+                        className="max-w-full whitespace-normal text-left h-auto py-1.5"
                         onClick={() => sendInvite(p.id, { skipEmail: true })}
                         disabled={invitingId === p.id}
                         title="Davet Linki Oluştur"
                       >
-                        {invitingId === p.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Mail className="h-4 w-4 mr-1" />}
+                        {invitingId === p.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin shrink-0" /> : <Mail className="h-4 w-4 mr-1 shrink-0" />}
                         Davet Linki Oluştur
                       </Button>
                     )}
@@ -3133,6 +3138,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
                       <Button
                         variant="ghost"
                         size="sm"
+                        className="max-w-full whitespace-normal text-left h-auto py-1.5"
                         onClick={() => setRevealedId(p.id)}
                         title="Davet linkini göster"
                       >
@@ -3142,15 +3148,16 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="max-w-full whitespace-normal text-left h-auto py-1.5"
                       onClick={() => {
                         setEditing({ ...p });
                         setVekilEditOpen(!!(p.vekil_ad_soyad || p.vekil_baro || p.vekil_sicil_no));
                       }}
                       title="Düzenle"
                     >
-                      <Pencil className="h-4 w-4 mr-1" /> Düzenle
+                      <Pencil className="h-4 w-4 mr-1 shrink-0" /> Düzenle
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => remove(p.id)} title="Sil">
+                    <Button variant="ghost" size="sm" className="shrink-0" onClick={() => remove(p.id)} title="Sil">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
