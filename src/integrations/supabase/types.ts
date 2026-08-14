@@ -646,6 +646,7 @@ export type Database = {
           first_name: string | null
           full_name: string | null
           gsm: string | null
+          hatirlatma_izni: boolean
           id: string
           invite_status: string
           is_individual: boolean
@@ -679,6 +680,7 @@ export type Database = {
           first_name?: string | null
           full_name?: string | null
           gsm?: string | null
+          hatirlatma_izni?: boolean
           id?: string
           invite_status?: string
           is_individual?: boolean
@@ -712,6 +714,7 @@ export type Database = {
           first_name?: string | null
           full_name?: string | null
           gsm?: string | null
+          hatirlatma_izni?: boolean
           id?: string
           invite_status?: string
           is_individual?: boolean
