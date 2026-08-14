@@ -57,9 +57,9 @@ AÇIK UÇLAR:
 - [ ] 7. NİTELİKLİ ARABULUCU ATAMASI — Başvuru gelince ajan, uyuşmazlık türüne göre uygun
       uzmanlıktaki arabulucuyu atar; atamanın yanında "Değiştir" düğmesi durur — son söz
       insanda.
-- [ ] 8. AJAN PANELİNDE "YAPILMAYANLAR VE SEBEBİ" — Nöbetçinin atlama sebepleri (süre
-      kaydı yok · keşif sorusu yok · ortak zemin bekleniyor vb.) zaman damgalı olarak
-      arabulucuya gösterilir.
+- [x] 8. AJAN PANELİNDE "YAPILMAYANLAR VE SEBEBİ" — 14.08'de yapıldı (bkz. oturum 51);
+      nöbetçinin atlama sebepleri zaman damgalı olarak Ajan Paneli'nde görünüyor.
+      CANLI TEST BEKLİYOR.
 - [ ] 9. KÖR TEKLİF v2 / BRAKETLEME (güncellendi) — Taraflardan tek rakam yerine ALT-ÜST
       ARALIK alınır; braketlerin çakışması ve turlar arası yakınlaşma taraflara rakam
       sızdırmadan bildirilir. Yakınlık seyri yalnız arabulucuya görünür.
