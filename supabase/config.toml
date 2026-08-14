@@ -112,3 +112,6 @@ verify_jwt = false
 
 [functions.taraf-asistan]
 verify_jwt = true
+
+[functions.taraf-katilim]
+verify_jwt = false

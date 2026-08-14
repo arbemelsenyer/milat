@@ -30,6 +30,7 @@ import Archive from "./pages/Archive";
 import CalendarPage from "./pages/CalendarPage";
 import CaseRedirect from "./pages/CaseRedirect";
 import RandevuCevap from "./pages/RandevuCevap";
+import KatilimCevap from "./pages/KatilimCevap";
 import AppLayout from "./components/AppLayout";
 import { HelmetProvider } from "react-helmet-async";
 
@@ -59,6 +60,8 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             {/* Girişsiz randevu cevap sayfası — AppLayout dışında, guard yok. */}
             <Route path="/randevu/:token" element={<RandevuCevap />} />
+            {/* Girişsiz katılım teyidi sayfası — AppLayout dışında, guard yok. */}
+            <Route path="/katilim/:token" element={<KatilimCevap />} />
 
             {/* App shell with left sidebar */}
             <Route element={<AppLayout />}>
