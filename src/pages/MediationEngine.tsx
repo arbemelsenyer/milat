@@ -1961,10 +1961,10 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
             ))}
           </motion.div>
 
-          {/* ── ANA KATMANLAR — solda iki, sağda iki; mobilde alt alta ── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-            {/* SOL SÜTUN */}
-            <div className="space-y-4">
+          {/* ── ANA KATMANLAR — tek sütun, sol menüdeki numara sırasıyla alt alta:
+                 1. DOSYA ÖZETİ → 2. SÜREÇ TÜRÜ VE SÜRE → 3. TARAFLAR → 4. BELGELER.
+                 İki sütunlu ızgara kaldırıldı; katmanların içeriği ve davranışı aynı. ── */}
+          <div className="space-y-4">
               <Phase3Layer
                 layer={FAZ1_LAYERS[0]}
                 count={layerCounts["faz1-katman-ozet"]}
@@ -2021,10 +2021,7 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
                   <DeadlineCard caseRow={caseRow} bare />
                 </CockpitCollapsible>
               </Phase3Layer>
-            </div>
 
-            {/* SAĞ SÜTUN */}
-            <div className="space-y-4">
               <Phase3Layer
                 layer={FAZ1_LAYERS[2]}
                 count={layerCounts["faz1-katman-taraflar"]}
@@ -2065,7 +2062,6 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
                   onCountChange={setDocCount}
                 />
               </Phase3Layer>
-            </div>
           </div>
         </motion.div>
       </Card>
