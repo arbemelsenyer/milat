@@ -49,12 +49,16 @@ export default function MediatorDetail() {
       const { data: m } = await supabase.from("mediators_public" as any).select("id, user_id, full_name, photo_url, specializations, total_cases, success_rate, avg_resolution_days, languages, bio, rating, city, is_available").eq("id", id).maybeSingle();
       setMediator(m as unknown as Mediator | null);
 
-      const { data: av } = await supabase
-        .from("mediator_availability")
-        .select("day_of_week")
-        .eq("mediator_id", id)
-        .eq("is_recurring", true);
-      setAvailability(new Set((av ?? []).map((a) => a.day_of_week as number)));
+      // mediator_availability gerçek şemada user_id + gun (somut tarih) taşır;
+      // day_of_week / is_recurring / mediator_id sütunları yoktur. Ekranın beklediği
+      // "müsait haftanın günleri" kümesi bu tarihlerden türetilir.
+      const arabulucuUserId = String((m as any)?.user_id ?? "");
+      const { data: av } = arabulucuUserId
+        ? await supabase.from("mediator_availability").select("gun").eq("user_id", arabulucuUserId)
+        : { data: [] as { gun: string }[] };
+      setAvailability(new Set(((av ?? []) as { gun: string }[])
+        .map((a) => new Date(`${String(a.gun).slice(0, 10)}T00:00:00`).getDay())
+        .filter((n) => Number.isFinite(n))));
 
       const { data: u } = await supabase.auth.getUser();
       if (u.user) {

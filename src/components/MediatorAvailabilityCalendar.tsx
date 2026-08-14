@@ -17,14 +17,16 @@ import { format } from 'date-fns';
 import { tr, enUS } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
+// mediator_availability tablosunun GERÇEK sütunları Türkçedir: user_id · gun (tarih) ·
+// baslangic · bitis. day_of_week / start_time / end_time / is_recurring / specific_date
+// alanları veritabanında YOKTUR — bu ekranın sorguları o yüzden hata döndürüyordu.
+// Tip gerçek şemaya hizalandı; tabloya ve sütun adlarına dokunulmadı.
 interface AvailabilitySlot {
   id: string;
-  mediator_id: string;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  is_recurring: boolean;
-  specific_date: string | null;
+  user_id: string;
+  gun: string;         // YYYY-MM-DD
+  baslangic: string;   // HH:MM:SS
+  bitis: string;       // HH:MM:SS
 }
 
 const dayNames = {
@@ -105,13 +107,13 @@ export function MediatorAvailabilityCalendar() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('mediator_availability')
-      .select('*')
-      .eq('mediator_id', user.id)
-      .order('day_of_week', { ascending: true })
-      .order('start_time', { ascending: true });
+      .select('id, user_id, gun, baslangic, bitis')
+      .eq('user_id', user.id)
+      .order('gun', { ascending: true })
+      .order('baslangic', { ascending: true });
 
     if (!error && data) {
-      setAvailability(data);
+      setAvailability(data as AvailabilitySlot[]);
     }
     setIsLoading(false);
   };
@@ -121,17 +123,26 @@ export function MediatorAvailabilityCalendar() {
     
     setIsSaving(true);
     
-    const slotData: any = {
-      mediator_id: user.id,
-      day_of_week: parseInt(selectedDay),
-      start_time: startTime,
-      end_time: endTime,
-      is_recurring: isRecurring,
-    };
+    // Tabloda tekrar eden gün (is_recurring / day_of_week) sütunu YOKTUR; kayıt somut
+    // tarihlidir. Belirli tarih seçilmişse o yazılır; seçilmemişse formdaki haftanın
+    // gününün BİR SONRAKİ tarihi hesaplanır — uydurma bir tekrar kaydı üretilmez.
+    const secilenGunNo = parseInt(selectedDay, 10);
+    const hedefTarih = (!isRecurring && specificDate)
+      ? specificDate
+      : (() => {
+          const d = new Date();
+          d.setHours(0, 0, 0, 0);
+          const fark = (secilenGunNo - d.getDay() + 7) % 7 || 7;
+          d.setDate(d.getDate() + fark);
+          return d;
+        })();
 
-    if (!isRecurring && specificDate) {
-      slotData.specific_date = format(specificDate, 'yyyy-MM-dd');
-    }
+    const slotData = {
+      user_id: user.id,
+      gun: format(hedefTarih, 'yyyy-MM-dd'),
+      baslangic: startTime,
+      bitis: endTime,
+    };
 
     const { error } = await supabase
       .from('mediator_availability')
@@ -183,8 +194,10 @@ export function MediatorAvailabilityCalendar() {
     setSpecificDate(undefined);
   };
 
+  // Ekran haftanın günlerine göre gruplar; gün numarası somut tarihten türetilir.
   const groupedByDay = availability.reduce((acc, slot) => {
-    const day = slot.day_of_week;
+    const day = new Date(`${String(slot.gun).slice(0, 10)}T00:00:00`).getDay();
+    if (!Number.isFinite(day)) return acc;
     if (!acc[day]) acc[day] = [];
     acc[day].push(slot);
     return acc;
@@ -352,10 +365,12 @@ export function MediatorAvailabilityCalendar() {
                         className="flex items-center gap-2 py-1.5 px-3"
                       >
                         <Clock className="w-3 h-3" />
-                        {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
-                        {slot.specific_date && (
+                        {String(slot.baslangic).slice(0, 5)} - {String(slot.bitis).slice(0, 5)}
+                        {/* Kayıt somut tarihlidir; rozetteki küçük tarih notu aynı yerde
+                            kalır, yalnız kaynağı specific_date yerine gun sütunudur. */}
+                        {slot.gun && (
                           <span className="text-xs opacity-70">
-                            ({format(new Date(slot.specific_date), 'dd/MM', { locale: language === 'tr' ? tr : enUS })})
+                            ({format(new Date(`${String(slot.gun).slice(0, 10)}T00:00:00`), 'dd/MM', { locale: language === 'tr' ? tr : enUS })})
                           </span>
                         )}
                         <button

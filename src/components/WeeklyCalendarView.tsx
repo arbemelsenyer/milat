@@ -10,14 +10,16 @@ import { tr, enUS } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Calendar, Clock, Video, Users, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// mediator_availability tablosunun GERÇEK sütunları Türkçedir: user_id · gun (tarih) ·
+// baslangic · bitis. Eski İngilizce alanlar (mediator_id, day_of_week, start_time,
+// end_time, is_recurring, specific_date) veritabanında YOKTUR; bu ekran o alanları
+// beklediği için sorgular sessizce hata döndürüyordu. Tip gerçek şemaya hizalandı.
 interface MediatorAvailability {
   id: string;
-  mediator_id: string;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  is_recurring: boolean;
-  specific_date: string | null;
+  user_id: string;
+  gun: string;         // YYYY-MM-DD — somut tarih (tekrar eden gün kaydı yok)
+  baslangic: string;   // HH:MM:SS
+  bitis: string;       // HH:MM:SS
 }
 
 interface ScheduledSession {
@@ -90,11 +92,11 @@ export function WeeklyCalendarView() {
     // Fetch mediator availability
     const { data: availabilityData } = await supabase
       .from('mediator_availability')
-      .select('*')
-      .eq('mediator_id', user.id);
+      .select('id, user_id, gun, baslangic, bitis')
+      .eq('user_id', user.id);
 
     if (availabilityData) {
-      setAvailability(availabilityData);
+      setAvailability(availabilityData as MediatorAvailability[]);
     }
 
     // Fetch scheduled sessions for this week
@@ -127,16 +129,10 @@ export function WeeklyCalendarView() {
     }
   };
 
+  // Kayıtlar somut tarihlidir; günün müsaitliği tarih eşleşmesinden gelir.
   const getAvailabilityForDay = (date: Date) => {
-    const dayOfWeek = date.getDay();
     const dateString = format(date, 'yyyy-MM-dd');
-    
-    return availability.filter(slot => {
-      if (slot.specific_date) {
-        return slot.specific_date === dateString;
-      }
-      return slot.is_recurring && slot.day_of_week === dayOfWeek;
-    });
+    return availability.filter(slot => String(slot.gun).slice(0, 10) === dateString);
   };
 
   const getSessionsForDay = (date: Date) => {
@@ -237,8 +233,8 @@ export function WeeklyCalendarView() {
                   const daySessions = getSessionsForDay(day);
                   
                   const availableInHour = dayAvailability.some(slot => {
-                    const startHour = parseInt(slot.start_time.split(':')[0]);
-                    const endHour = parseInt(slot.end_time.split(':')[0]);
+                    const startHour = parseInt(String(slot.baslangic).split(':')[0]);
+                    const endHour = parseInt(String(slot.bitis).split(':')[0]);
                     return hour >= startHour && hour < endHour;
                   });
 
