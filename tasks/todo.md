@@ -1,3 +1,37 @@
+## 13.08.2026 — GÜN SONU · Nerede kaldık
+
+BİTENLER (canlı doğrulandı):
+- Randevu ajanı uçtan uca çalışıyor: saatleri sistem seçiyor, teklif linki tarafa
+  gidiyor, taraf tek dokunuşla cevaplıyor, oturum kaydı ve davet yazısı açılıyor.
+- Otomatik pilot tam otonom döngü: nöbetçi panoyu işliyor, süre yaklaşınca randevu
+  teklifi açıyor, keşif sorularını tarafın kanalına yazıyor.
+- Video bağlantısı hattı düzeldi: TZ tanımsızlığı (ReferenceError), UTC↔TR saat farkı ve
+  günü gözetmeyen teklif eşleştirmesi giderildi; arabulucu imzalı bağlantı e-postası canlı.
+- Taraf asistanı motoru (taraf-asistan) yayında; CaseRoom'da "Dosya Asistanım" kutusu canlı.
+- Rol duyarlı yönlendirme: dosya açan tüm bağlantılar tek kapıdan (/cases/<id>) geçiyor;
+  taraf CaseRoom'a, arabulucu 8 aşamalı ekrana gidiyor. Taraf girişi çalışır hâlde.
+- Otomatik akış varsayılanı false'a sabitlendi.
+- Nöbetçiye analiz_baslat görevi + zincirdeki 6 analiz fonksiyonuna iç kapı (e9df31a):
+  yayında, CANLI TESTİ YAPILMADI.
+
+YENİ İŞLER (kurucu kararı, bu sırayla):
+1. Aşama 1 TEK GİRİŞ KAPISI olacak: uyuşmazlık konusu, türü, dava şartı mı ihtiyari mi
+   (süreler buna bağlı), taraf bilgileri ve BELGELER hepsi Aşama 1'de toplanacak.
+   Sebep: belge yalnız Aşama 3'te girilebildiği için ajan dosya açılışında işe
+   başlayamıyor.
+2. Eski Aşama 2 (Taraflar) kalkacak; Taraf Analizi yeni Aşama 2 olacak, sonraki
+   aşamalar birer basamak kayacak.
+3. Yeni Aşama 1'in sayfa düzeni Aşama 4'ü örnek alacak: solda ve sağda ana katmanlar,
+   altlarında alt katmanlar; büyük harf/küçük harf düzenine dikkat.
+4. Sağlık test dosyasında otomatik analizin canlı testi (taraflar eklendi, 7 farazi
+   PDF hazır).
+
+AÇIK UÇLAR:
+- analiz_baslat zinciri canlıda hiç koşmadı (madde 4 bunu da kapatacak).
+- Sekiz edge fonksiyonu redeploy bekliyor olabilir: ajan-nobetci, orchestrator-run,
+  classify-dispute, detect-legal-deadlines, party-confidential-analysis,
+  party-consistency-check, party-communication-analysis, common-ground-report.
+
 ## 09.08.2026 — Nerede kaldık
 
 Bugün biten:

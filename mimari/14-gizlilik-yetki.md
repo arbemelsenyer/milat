@@ -42,3 +42,7 @@ dosya sahibi/görevli arabulucu/admin ise arabulucu ekranına gider; hiçbiri de
 erişim reddedilir. Taraf kaydı önceliklidir. Arabulucu ekranı sayfa seviyesinde de
 korunur: taraf olup yönetici olmayan kullanıcı adresi elle yazsa bile kendi ekranına
 yönlendirilir.
+· Dosya erişim kapısı tek noktadır: /cases/<id>. Kullanıcı o dosyada taraf ise (case_parties
+  .user_id eşleşmesi) taraf ekranına, dosya sahibi/görevli arabulucu/admin ise arabulucu
+  ekranına yönlendirilir; hiçbiri değilse erişim reddedilir. Dosya açan tüm bağlantılar
+  (liste kartları, davet sonrası yönlendirme, bildirim linkleri) bu kapıdan geçer.

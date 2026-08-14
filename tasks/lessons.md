@@ -35,3 +35,12 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   değişken ancak canlıda ReferenceError olarak çıkar. Bir fonksiyondan diğerine
   kod taşırken yardımcıların (TZ, takvimSahibi gibi) hedef dosyada tanımlı
   olduğu ayrıca doğrulanır. (13.08, ajan-nobetci)
+- Edge fonksiyonun canlı hatası tahminle bulunmaz: dönüş özetine teşhis alanı
+  (incelenen sayısı, atlama sebepleri, boş dönen sorgu adı) eklenip bir kez
+  koşturulur; hata o alanda görünür. (13.08, ajan-nobetci video hattı)
+- Tarih/saat karşılaştırmasında UTC↔TR farkını düzeltmek tek başına yetmez:
+  eşleşme GÜN ve SAATİN ikisi birden tutunca kabul edilir, yoksa başka günün
+  kaydı yanlışlıkla eşleşir. (13.08, teklif–oturum eşleştirmesi)
+- Ön yüz değişikliği Publish edilmeden taraf ekranında görünmez; "eski stil
+  duruyor" şikâyeti önce Publish eksikliği olarak okunur, kod aranmadan önce
+  yayın durumu sorulur. (13.08)

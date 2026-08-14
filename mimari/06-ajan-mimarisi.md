@@ -137,3 +137,17 @@ cevap kabul edilmez (koşul update'in içindedir). E-posta gönderimi bu turda y
   Analiz sonucu varsa, bekleyen görev varsa veya orkestratör koşuyorsa görev atlanır.
   İç kapı (x-cron-secret) orchestrator-run'a ve zincirin altı adımına eklendi; kullanıcı
   JWT yolu ve yetki kontrolleri değişmedi.
+
+[EKLEME — İÇ ÇAĞRI KAPISI VE NÖBETÇİ GÖREV TİPLERİ (13.08)] ● CANLI.
+· İç çağrı kapısı deseni (x-cron-secret + CRON_SECRET): önce randevu-teklif ve
+  create-video-room'da açılmıştı; artık orchestrator-run'da ve analiz zincirinin altı
+  fonksiyonunda da var — classify-dispute, detect-legal-deadlines,
+  party-confidential-analysis, party-consistency-check, party-communication-analysis,
+  common-ground-report. Kapı yalnız CRON_SECRET eşleşmesinde açılır; kullanıcı JWT yolu
+  ve dosya yetki kontrolleri olduğu gibi durur. Orchestrator iç çağrıda alt adımlara da
+  aynı başlığı iletir, böylece zincir kullanıcı oturumu olmadan yürüyebilir.
+· Nöbetçi (ajan-nobetci) görev tipleri: randevu_teklifi (süre yaklaşırken teklif açar ve
+  iç kapıdan oluşturur), video bağlantısı hattı (gelecekteki planlı, bağlantısı boş ve
+  yüz yüze işaretli olmayan oturumlar için oda üretip tarafa arabulucu imzalı e-posta
+  gönderir) ve analiz_baslat (otomatik akış açık, analiz sonucu yok, girdi varsa
+  orchestrator-run'ı iç kapıdan tetikler). Tanınmayan görev tipine dokunulmaz.
