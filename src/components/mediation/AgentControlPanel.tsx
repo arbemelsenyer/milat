@@ -552,6 +552,12 @@ const GOREV_ETIKET: Record<string, string> = {
   asama_gecisi: "Aşama geçişi",
   oturum_hatirlatma: "Oturum hatırlatması",
   arabulucu_onayi: "Arabulucu onayı",
+  ilk_temas: "İlk temas ve katılım sorusu",
+  teklif_degerlendir: "Teklif değerlendirmesi",
+  taraf_musaitlik_iste: "Müsait saat isteği",
+  taraf_eksik_bilgi: "Belge/bilgi isteği",
+  taraf_alternatif_saat: "Alternatif saat önerisi",
+  ozel_oturum: "Özel oturum daveti",
 };
 
 const DURUM_ETIKET: Record<string, { label: string; tone: string }> = {
@@ -586,16 +592,24 @@ function AjanIsListesi({ caseId }: { caseId: string }) {
   const [hata, setHata] = useState<string | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [islenen, setIslenen] = useState<string | null>(null);
+  // Özel oturum (caucus) talebi: arabulucu tarafı seçer, ajan yalnız o tarafa davet gönderir.
+  const [taraflar, setTaraflar] = useState<{ id: string; ad: string }[]>([]);
+  const [ozelTaraf, setOzelTaraf] = useState<string>("");
+  const [ozelBusy, setOzelBusy] = useState(false);
+  const [ozelBilgi, setOzelBilgi] = useState<string | null>(null);
 
   async function yukle() {
     setYukleniyor(true);
-    const [g, s] = await Promise.all([
+    const [g, s, p] = await Promise.all([
       supabase.from("ajan_gorevleri" as any)
         .select("id, gorev_tipi, durum, gerekce, sonuc, created_at, updated_at")
         .eq("case_id", caseId).order("updated_at", { ascending: false }).limit(60),
       supabase.from("agent_states")
         .select("last_output, updated_at").eq("case_id", caseId).eq("agent_type", "nobetci")
         .order("updated_at", { ascending: false }).limit(1),
+      supabase.from("case_parties")
+        .select("id, full_name, company_name, first_name, last_name, party_type")
+        .eq("case_id", caseId).order("created_at"),
     ]);
     // Okuma hatası yutulmaz: politika eksikse ekranda görünür.
     if (g.error) setHata(`Görev panosu okunamadı: ${g.error.message}`);
@@ -604,7 +618,34 @@ function AjanIsListesi({ caseId }: { caseId: string }) {
     const cikti = (s.data?.[0] as any)?.last_output;
     const liste = Array.isArray(cikti?.yapilmayanlar) ? cikti.yapilmayanlar : [];
     setYapilmayanlar(liste.filter((x: any) => x?.sebep).map((x: any) => ({ zaman: String(x.zaman ?? ""), sebep: String(x.sebep) })));
+    setTaraflar(((p.data ?? []) as any[]).map((x) => ({
+      id: String(x.id),
+      ad: String(x.full_name || x.company_name || `${x.first_name ?? ""} ${x.last_name ?? ""}`.trim() || "(isimsiz)"),
+    })));
     setYukleniyor(false);
+  }
+
+  // Ajan görevi açılır; daveti nöbetçi gönderir. Oturum "özel oturum" olarak açılır ve
+  // karşı tarafa hiçbir yüzeyden gösterilmez.
+  async function ozelOturumTalepEt() {
+    if (!ozelTaraf || ozelBusy) return;
+    setOzelBusy(true);
+    setOzelBilgi(null);
+    const secilen = taraflar.find((t) => t.id === ozelTaraf);
+    const { error } = await supabase.from("ajan_gorevleri" as any).insert({
+      case_id: caseId,
+      gorev_tipi: "ozel_oturum",
+      durum: "bekliyor",
+      gerekce: `[ozel:${ozelTaraf}] Arabulucu ${secilen?.ad ?? "taraf"} ile özel oturum talep etti`,
+      hedef_party_id: ozelTaraf,
+    } as any);
+    if (error) setHata(`Özel oturum talebi yazılamadı: ${error.message}`);
+    else {
+      setOzelBilgi("Talep alındı — davet yalnız seçtiğiniz tarafa gönderilecek.");
+      setOzelTaraf("");
+      await yukle();
+    }
+    setOzelBusy(false);
   }
 
   useEffect(() => { yukle(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [caseId]);
@@ -620,9 +661,12 @@ function AjanIsListesi({ caseId }: { caseId: string }) {
           .update({ status: "completed" } as any).eq("id", sessionId);
         if (error) throw error;
       }
+      const ekOturum = anahtar.startsWith("ek_oturum:");
       const { error: gErr } = await supabase.from("ajan_gorevleri" as any).update({
         durum: secim,
-        sonuc: secim === "yapildi" ? "Arabulucu onayladı" : "Arabulucu: yapılmadı",
+        sonuc: ekOturum
+          ? (secim === "yapildi" ? "Arabulucu: ikinci oturum gerekli" : "Arabulucu: ikinci oturum gerekli değil")
+          : (secim === "yapildi" ? "Arabulucu onayladı" : "Arabulucu: yapılmadı"),
       } as any).eq("id", g.id);
       if (gErr) throw gErr;
       await yukle();
@@ -666,6 +710,33 @@ function AjanIsListesi({ caseId }: { caseId: string }) {
           <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" /> {hata}
         </p>
       )}
+
+      {/* Özel oturum (caucus): yalnız seçilen tarafa davet gider; oturum "Özel Görüşme"
+          olarak açılır ve varlığı karşı tarafa hiçbir yüzeyden gösterilmez. */}
+      {taraflar.length > 0 && (
+        <div className="rounded-md border p-3 space-y-2">
+          <div className="text-xs font-medium">Özel oturum talebi</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={ozelTaraf}
+              onChange={(e) => setOzelTaraf(e.target.value)}
+              className="h-8 rounded-md border bg-background px-2 text-xs min-w-[160px]"
+              aria-label="Özel oturum yapılacak taraf"
+            >
+              <option value="">Taraf seçin…</option>
+              {taraflar.map((t) => <option key={t.id} value={t.id}>{t.ad}</option>)}
+            </select>
+            <Button size="sm" variant="outline" className="h-8 text-xs"
+              disabled={!ozelTaraf || ozelBusy} onClick={ozelOturumTalepEt}>
+              {ozelBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Özel oturum talep et"}
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Davet yalnız seçtiğiniz tarafa gider; karşı taraf bu oturumu hiçbir ekranda göremez.
+          </p>
+          {ozelBilgi && <p className="text-[11px] text-emerald-700">{ozelBilgi}</p>}
+        </div>
+      )}
       {satirlar.length === 0 && !yukleniyor && !hata && (
         <p className="text-xs text-muted-foreground italic">Bu dosyada henüz ajan kaydı yok.</p>
       )}
@@ -689,12 +760,16 @@ function AjanIsListesi({ caseId }: { caseId: string }) {
                     <Button size="sm" variant="outline" className="h-7 text-xs"
                       disabled={islenen === r.gorev.id}
                       onClick={() => onayla(r.gorev!, "yapildi")}>
-                      {anahtar.startsWith("oturum_yapildi:") ? "Yapıldı" : "Tamamladım"}
+                      {anahtar.startsWith("oturum_yapildi:") ? "Yapıldı"
+                        : anahtar.startsWith("ek_oturum:") ? "Gerekli"
+                        : "Tamamladım"}
                     </Button>
                     <Button size="sm" variant="ghost" className="h-7 text-xs"
                       disabled={islenen === r.gorev.id}
                       onClick={() => onayla(r.gorev!, "atlandi")}>
-                      {anahtar.startsWith("oturum_yapildi:") ? "Yapılmadı" : "Şimdi değil"}
+                      {anahtar.startsWith("oturum_yapildi:") ? "Yapılmadı"
+                        : anahtar.startsWith("ek_oturum:") ? "Gerekli değil"
+                        : "Şimdi değil"}
                     </Button>
                   </>
                 )}
