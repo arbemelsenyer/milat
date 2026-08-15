@@ -19,7 +19,13 @@ tax_number · trade_registry_no) ve case_documents.file_name'de zaten vardı.
 - [x] YENİ TABLO / EDGE FONKSİYON / AI ÇAĞRISI YOK: hesap ekranda zaten yüklü veriden
       deterministik türetiliyor (parties + docs + caseRow). "Yenile" mevcut loadAll'ı
       çağırıyor. Bu yüzden SQL ve redeploy gerekmiyor.
-tsc (tsconfig.app.json) temiz. CANLI TEST YOK. PUBLISH GEREKLİ (yeni katman).
+tsc (tsconfig.app.json) temiz.
+- [x] CANLIDA DOĞRULANDI (15.08.2026).
+      · Aşama 2'de ayrı katman; altı deterministik kontrol; yeni tablo/edge fonksiyon
+        gerekmedi.
+      · Sağlık dosyasında 6 eksik saydı (tebligat x2, kimlik/sıfat x2, temsil yetkisi,
+        katılım durumu), hepsi dayanaklı, kanun yorumu yok.
+      · Publish e8efe98 ile yapıldı.
 AÇIK UÇ: Kontroller belge ADI eşleşmesine dayanıyor (vekaletname · kimlik · sicil).
 Belge adı farklı yazılmışsa eksik görünebilir — belge türü etiketi eklenirse kesinleşir.
 AÇIK UÇ: Vekaletname dışındaki satırlarda mevzuat referansı boş kalıyor; doğrulanmış
