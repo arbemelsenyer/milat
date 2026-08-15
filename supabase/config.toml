@@ -115,3 +115,6 @@ verify_jwt = true
 
 [functions.taraf-katilim]
 verify_jwt = false
+
+[functions.dosya-ozeti-oner]
+verify_jwt = true

@@ -1826,6 +1826,11 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
   const [editIssueOpen, setEditIssueOpen] = useState(false);
   const [issueDescDraft, setIssueDescDraft] = useState("");
   const [savingIssue, setSavingIssue] = useState(false);
+  // Uyuşmazlık konusu AI ÖNERİSİ — hiçbir yere yazılmaz, yalnız ekranda durur.
+  // Kaydetme kararı arabulucunundur; elle girilmiş metin varsa öneri hiç istenmez.
+  const [ozetOneri, setOzetOneri] = useState<{ ozet: string; dayanak: string[] } | null>(null);
+  const [ozetBusy, setOzetBusy] = useState(false);
+  const [ozetDurum, setOzetDurum] = useState<string | null>(null);
 
   // Ana katmanlar açık gelir (dosya kurulumu tek oturuşta yapılır); alt bölümlerin
   // hepsi de açık — bu ekranda gizlenecek uzun analiz çıktısı yok.
@@ -1882,11 +1887,47 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
     setEditIssueOpen(true);
   }
 
-  async function saveIssueDescription() {
+  // Öneriyi üretir. Kaynak sınırı fonksiyonun kendisinde: yalnız başlık, başvuru
+  // alanları ve belge ADI+TÜRÜ. Taraf analizleri / belge içeriği okunmaz.
+  async function ozetOneriGetir() {
+    setOzetBusy(true);
+    setOzetDurum(null);
+    setOzetOneri(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("dosya-ozeti-oner", {
+        body: { case_id: caseRow.id },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+      if ((data as any)?.atlandi) {
+        setOzetDurum(String((data as any).sebep ?? "Öneri üretilmedi"));
+        return;
+      }
+      const ozet = String((data as any)?.ozet ?? "").trim();
+      if (!ozet) { setOzetDurum("Yeterli veri yok — metni elle yazın."); return; }
+      setOzetOneri({
+        ozet,
+        dayanak: Array.isArray((data as any)?.dayanak) ? (data as any).dayanak.map(String) : [],
+      });
+    } catch (e: any) {
+      setOzetDurum(`Öneri alınamadı: ${trErr(e?.message ?? "bilinmeyen hata")}`);
+    } finally {
+      setOzetBusy(false);
+    }
+  }
+
+  async function ozetOneriKaydet() {
+    if (!ozetOneri) return;
+    await saveIssueDescription(ozetOneri.ozet);
+    setOzetOneri(null);
+    setOzetDurum(null);
+  }
+
+  async function saveIssueDescription(metin?: string) {
     setSavingIssue(true);
     try {
       const previous = caseRow.issue_description ?? "";
-      const next = issueDescDraft;
+      const next = metin !== undefined ? metin : issueDescDraft;
       const changed = previous.trim() !== next.trim();
       const { error } = await supabase.from("cases").update({ issue_description: next || null }).eq("id", caseRow.id);
       if (error) throw error;
@@ -1988,6 +2029,56 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
                       </Button>
                     )}
                   </div>
+                  {/* AI ÖNERİSİ — yalnız alan BOŞKEN ve yalnız düzenleme yetkisi olana.
+                      Öneri hiçbir yere yazılmaz; "Onayla ve kaydet" ile arabulucu yazar. */}
+                  {canEditIssue && !String(caseRow.issue_description ?? "").trim() && (
+                    <div className="mt-3 rounded-lg border border-dashed p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="text-xs font-medium flex items-center gap-1.5">
+                          <Sparkles className="h-3.5 w-3.5 text-primary" /> AI önerisi
+                        </div>
+                        {!ozetOneri && (
+                          <Button size="sm" variant="outline" className="h-7 text-xs"
+                            onClick={ozetOneriGetir} disabled={ozetBusy}>
+                            {ozetBusy ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                            Öneri getir
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        Öneri yalnız dosya başlığı, başvuru/talep alanları ve yüklü belgelerin adı ile
+                        türünden üretilir; taraf analizleri ve belge içerikleri kullanılmaz. Metin
+                        onaylanmadan hiçbir yere kaydedilmez.
+                      </p>
+                      {ozetOneri && (
+                        <div className="space-y-2">
+                          <p className="text-sm whitespace-pre-wrap bg-muted/40 rounded-md p-2">{ozetOneri.ozet}</p>
+                          {ozetOneri.dayanak.length > 0 && (
+                            <div className="text-[11px] text-muted-foreground">
+                              Dayanak: {ozetOneri.dayanak.join(" · ")}
+                            </div>
+                          )}
+                          <div className="flex gap-2 flex-wrap">
+                            <Button size="sm" className="h-7 text-xs" onClick={ozetOneriKaydet} disabled={savingIssue}>
+                              {savingIssue ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                              Onayla ve kaydet
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs"
+                              onClick={() => { setIssueDescDraft(ozetOneri.ozet); setEditIssueOpen(true); }}
+                              disabled={savingIssue}>
+                              Düzenleyerek kaydet
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs"
+                              onClick={() => { setOzetOneri(null); setOzetDurum(null); }} disabled={savingIssue}>
+                              Vazgeç
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      {ozetDurum && <p className="text-[11px] text-amber-600 dark:text-amber-400">{ozetDurum}</p>}
+                    </div>
+                  )}
+
                   <p className="text-xs text-muted-foreground mt-3">
                     Başlık: {caseRow.title || "—"} · Durum: {caseRow.status ?? "—"} · UYAP Kayıt No:{" "}
                     {caseRow.uyap_no || "henüz kaydedilmedi"} (Aşama 3 — Arabulucu Paneli'nden eklenir).
@@ -2079,7 +2170,7 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
           />
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEditIssueOpen(false)} disabled={savingIssue}>İptal</Button>
-            <Button onClick={saveIssueDescription} disabled={savingIssue}>
+            <Button onClick={() => saveIssueDescription()} disabled={savingIssue}>
               {savingIssue ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Kaydediliyor…</> : "Kaydet"}
             </Button>
           </DialogFooter>
