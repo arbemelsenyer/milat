@@ -2293,6 +2293,73 @@ export type Database = {
           },
         ]
       }
+      olay_cizelgesi: {
+        Row: {
+          case_id: string
+          celiski_notu: string | null
+          created_at: string
+          id: string
+          kaynak_adi: string | null
+          kaynak_bolum: string | null
+          kaynak_document_id: string | null
+          kaynak_tipi: string
+          olay: string
+          sira: number
+          tarih: string | null
+          tarih_metni: string
+        }
+        Insert: {
+          case_id: string
+          celiski_notu?: string | null
+          created_at?: string
+          id?: string
+          kaynak_adi?: string | null
+          kaynak_bolum?: string | null
+          kaynak_document_id?: string | null
+          kaynak_tipi?: string
+          olay: string
+          sira?: number
+          tarih?: string | null
+          tarih_metni: string
+        }
+        Update: {
+          case_id?: string
+          celiski_notu?: string | null
+          created_at?: string
+          id?: string
+          kaynak_adi?: string | null
+          kaynak_bolum?: string | null
+          kaynak_document_id?: string | null
+          kaynak_tipi?: string
+          olay?: string
+          sira?: number
+          tarih?: string | null
+          tarih_metni?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "olay_cizelgesi_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "olay_cizelgesi_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "olay_cizelgesi_kaynak_document_id_fkey"
+            columns: ["kaynak_document_id"]
+            isOneToOne: false
+            referencedRelation: "case_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       party_analyses: {
         Row: {
           analysis: Json
