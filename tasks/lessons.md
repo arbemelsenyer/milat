@@ -69,3 +69,8 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
 - Canlıda elle kurulan altyapı depoda görünmez. 15.08'de ajan-nobetci cron'u ikinci kez
   kuruldu çünkü depoda tanım yoktu. Ders: depo "yok" diyorsa canlıya sorulacak.
   (Kayıt yeri: tasks/kurulu-envanter.md)
+- supabase.functions.invoke hatasında error.message her zaman genel bir cümledir
+  ("non-2xx status code"); gerçek sebep error.context gövdesindedir. Gövde okunmazsa
+  kullanıcı "hiçbir şey olmadı" görür. Her invoke çağrısında context gövdesi okunup
+  KIRMIZI ve KALICI bir satıra, çağrılan fonksiyon adıyla birlikte yazılacak.
+  (15.08, dosya-ozeti-oner "Öneri getir" düğmesi)

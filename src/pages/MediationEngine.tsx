@@ -1830,7 +1830,9 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
   // Kaydetme kararı arabulucunundur; elle girilmiş metin varsa öneri hiç istenmez.
   const [ozetOneri, setOzetOneri] = useState<{ ozet: string; dayanak: string[] } | null>(null);
   const [ozetBusy, setOzetBusy] = useState(false);
+  // ozetDurum = bilgi satırı (öneri üretilmedi/veri yok) · ozetHata = KIRMIZI hata satırı
   const [ozetDurum, setOzetDurum] = useState<string | null>(null);
+  const [ozetHata, setOzetHata] = useState<string | null>(null);
 
   // Ana katmanlar açık gelir (dosya kurulumu tek oturuşta yapılır); alt bölümlerin
   // hepsi de açık — bu ekranda gizlenecek uzun analiz çıktısı yok.
@@ -1887,11 +1889,33 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
     setEditIssueOpen(true);
   }
 
+  // functions.invoke hatası SESSİZ DÜŞMESİN: FunctionsHttpError'ın .message'ı hep
+  // "non-2xx status code" der; gerçek sebep .context gövdesindedir (lessons.md, 13.08).
+  async function invokeHataMetni(e: any): Promise<string> {
+    const ctx = e?.context;
+    if (ctx && typeof ctx.text === "function") {
+      try {
+        const govde = await ctx.text();
+        if (govde) {
+          try {
+            const j = JSON.parse(govde);
+            const m = j?.error ?? j?.message ?? j?.detay;
+            if (m) return `${String(m)}${j?.detay && j?.error ? ` — ${String(j.detay)}` : ""}`;
+          } catch { /* JSON değilse düz metin kullanılır */ }
+          return String(govde).slice(0, 400);
+        }
+      } catch { /* gövde okunamadıysa mesaja düşülür */ }
+      if (ctx.status) return `HTTP ${ctx.status}`;
+    }
+    return String(e?.message ?? "bilinmeyen hata");
+  }
+
   // Öneriyi üretir. Kaynak sınırı fonksiyonun kendisinde: yalnız başlık, başvuru
   // alanları ve belge ADI+TÜRÜ. Taraf analizleri / belge içeriği okunmaz.
   async function ozetOneriGetir() {
     setOzetBusy(true);
     setOzetDurum(null);
+    setOzetHata(null);
     setOzetOneri(null);
     try {
       const { data, error } = await supabase.functions.invoke("dosya-ozeti-oner", {
@@ -1910,7 +1934,9 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
         dayanak: Array.isArray((data as any)?.dayanak) ? (data as any).dayanak.map(String) : [],
       });
     } catch (e: any) {
-      setOzetDurum(`Öneri alınamadı: ${trErr(e?.message ?? "bilinmeyen hata")}`);
+      const ham = await invokeHataMetni(e);
+      console.error("[dosya-ozeti-oner] çağrı başarısız", ham, e);
+      setOzetHata(`dosya-ozeti-oner çağrısı başarısız: ${trErr(ham)}`);
     } finally {
       setOzetBusy(false);
     }
@@ -2041,7 +2067,7 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
                           <Button size="sm" variant="outline" className="h-7 text-xs"
                             onClick={ozetOneriGetir} disabled={ozetBusy}>
                             {ozetBusy ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
-                            Öneri getir
+                            {ozetBusy ? "Hazırlanıyor…" : "Öneri getir"}
                           </Button>
                         )}
                       </div>
@@ -2069,13 +2095,20 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
                               Düzenleyerek kaydet
                             </Button>
                             <Button size="sm" variant="ghost" className="h-7 text-xs"
-                              onClick={() => { setOzetOneri(null); setOzetDurum(null); }} disabled={savingIssue}>
+                              onClick={() => { setOzetOneri(null); setOzetDurum(null); setOzetHata(null); }} disabled={savingIssue}>
                               Vazgeç
                             </Button>
                           </div>
                         </div>
                       )}
                       {ozetDurum && <p className="text-[11px] text-amber-600 dark:text-amber-400">{ozetDurum}</p>}
+                      {/* Hata SESSİZ DÜŞMEZ: kırmızı, kalıcı, fonksiyon adı + gerçek mesajla. */}
+                      {ozetHata && (
+                        <p className="text-xs text-destructive flex items-start gap-1.5 break-words">
+                          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>{ozetHata}</span>
+                        </p>
+                      )}
                     </div>
                   )}
 
