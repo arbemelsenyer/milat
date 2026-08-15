@@ -30,6 +30,44 @@ function temiz(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
+// ── HÜKÜM DENETİMİ (15.08 düzeltmesi) ────────────────────────────────────────
+// Yasak, ajanın KENDİ NİTELEMESİNE uygulanır; tarafın iddiasının AKTARILMASINA
+// uygulanmaz. "Hastanenin kusurlu olduğu ileri sürülmektedir" serbesttir;
+// "Hastane kusurludur" elenir. Denetim cümle cümle yapılır.
+const HUKUM_KELIMELERI = [
+  "haksız", "hukuka aykırı", "ihlal", "kusur", "suç", "geçersiz", "borçlu", "sorumludur",
+];
+const ATIF_KALIPLARI = [
+  "ileri sür", "iddia", "belirtil", "belirtiyor", "belirtmekte", "talep ed", "talep edil",
+  "denilmekte", "denmekte", "ifade ed", "beyan ed", "öne sür", "aktarıl", "savun",
+  "yer alıyor", "yer almakta", "yer veril", "kaydedil", "istenmekte", "bildiril",
+  "şikayet", "şikâyet", "göre",
+];
+
+function cumlelereBol(metin: string): string[] {
+  return metin
+    .split(/(?<=[.!?…])\s+/)
+    .map((c) => c.trim())
+    .filter(Boolean);
+}
+
+// Hüküm kuran cümleleri döndürür (aktarım kalıbı taşıyanlar serbesttir).
+function hukumCumleleri(metin: string): string[] {
+  return cumlelereBol(metin).filter((c) => {
+    const k = c.toLocaleLowerCase("tr-TR");
+    const hukumVar = HUKUM_KELIMELERI.some((w) => k.includes(w));
+    if (!hukumVar) return false;
+    const atifVar = ATIF_KALIPLARI.some((a) => k.includes(a));
+    return !atifVar;
+  });
+}
+
+// "Neyi kanıtlıyor" satırında yasak olan içi boş kalıplar.
+const BOS_KALIPLAR = [
+  "bilgi yer almakta", "bilgiler yer almakta", "bilgileri içer", "bilgi içer",
+  "bilgilerini içer", "hakkında bilgi", "bilgi vermekte", "bilgi sunmakta",
+];
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -59,6 +97,8 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const document_id = temiz((body as any)?.document_id);
+    // yenile=true: mevcut özet YENİDEN üretilir ve aynı kayıt güncellenir.
+    const yenile = (body as any)?.yenile === true;
     if (!document_id) return json({ error: "document_id gerekli" }, 400);
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -82,12 +122,23 @@ Deno.serve(async (req) => {
       if (!yetkili) return json({ error: "Bu belge için yetkiniz yok" }, 403);
     }
 
-    // Zaten özeti olan belge için TEKRAR ÜRETİLMEZ.
+    // Zaten özeti olan belge için TEKRAR ÜRETİLMEZ — yalnız açık istekle (yenile:true)
+    // yeniden üretilir ve aynı kayıt güncellenir.
     const { data: varOlan } = await admin.from("belge_ozetleri")
       .select("id, durum").eq("document_id", document_id).maybeSingle();
-    if (varOlan?.id) {
+    const mevcutId = (varOlan as any)?.id ?? null;
+    if (mevcutId && !yenile) {
       return json({ atlandi: true, sebep: "Bu belgenin özeti zaten var", durum: (varOlan as any).durum });
     }
+
+    // Kaydı yaz: mevcut satır varsa güncelle, yoksa ekle.
+    const kayitYaz = async (patch: Record<string, unknown>) => {
+      if (mevcutId) {
+        return await admin.from("belge_ozetleri").update(patch).eq("id", mevcutId);
+      }
+      return await admin.from("belge_ozetleri")
+        .insert({ case_id: (doc as any).case_id, document_id, ...patch });
+    };
 
     const metin = temiz((doc as any).extracted_text);
     const dosyaAdi = temiz((doc as any).file_name);
@@ -97,9 +148,8 @@ Deno.serve(async (req) => {
       const durumSebep = String((doc as any).extraction_status ?? "") === "desteklenmeyen_format"
         ? "belge metni okunamadı (desteklenmeyen format)"
         : "belge metni okunamadı";
-      const { error: iErr } = await admin.from("belge_ozetleri").insert({
-        case_id: (doc as any).case_id, document_id, ozet: null, kaniti: null,
-        durum: "metin_yok", sebep: durumSebep,
+      const { error: iErr } = await kayitYaz({
+        ozet: null, kaniti: null, durum: "metin_yok", sebep: durumSebep,
       });
       if (iErr) return json({ error: `Kayıt yazılamadı: ${iErr.message}` }, 500);
       return json({ durum: "metin_yok", sebep: durumSebep });
@@ -111,13 +161,26 @@ Sana TEK BİR belgenin metni verilir. Görevin o belgeyi özetlemek.
 MUTLAK KURALLAR:
 1. Yalnızca sana verilen belge metnini kullan. Başka belge, dosya bilgisi veya genel bilgi ekleme.
 2. Belgede AÇIKÇA yazmayan hiçbir tarih, rakam, taraf adı veya olay ekleme. Emin değilsen yazma.
-3. HUKUKİ NİTELEME YAPMA: "haksız", "hukuka aykırı", "ihlal", "geçersiz", kanun/madde adı yazma.
-4. KUSUR ATFETME: kimseyi haklı/haksız gösterme, ihmal veya suç yükleme.
+3. KENDİ HUKUKİ NİTELEMENİ YAPMA. "haksızdır", "hukuka aykırıdır", "kusurludur",
+   "geçersizdir", "sorumludur" gibi HÜKÜM cümlesi kurma; kanun/madde adı yazma.
+   ANCAK belgede bir taraf böyle bir iddia ileri sürüyorsa bunu AKTARABİLİRSİN —
+   aktarım kalıbıyla: "…olduğu ileri sürülmektedir", "…iddia edilmektedir",
+   "…talep edilmektedir", "yazıda … denilmektedir". Hüküm senin cümlen olamaz,
+   iddianın aktarımı serbesttir.
+4. KUSURU SEN ATFETME: kimseyi haklı/haksız gösterme. Tarafın kusur iddiasını yalnız
+   aktarım kalıbıyla yazabilirsin.
 5. İDDİAYI TESPİT GİBİ YAZMA: "belgede ... belirtiliyor", "belgede ... yer alıyor" biçimini kullan.
    "...olmuştur", "...yapılmıştır", "...haklıdır" yazma.
 6. ozet en çok 3 CÜMLE, tek paragraf. kaniti TEK CÜMLE.
-7. kaniti alanı "bu belge neyi kanıtlıyor" sorusunun cevabıdır ve yine belgeye dayanır;
-   belge bir şey kanıtlamıyorsa "Belge tek başına bir hususu kanıtlamıyor; içerik bilgisi taşıyor" yaz.
+7. kaniti = "bu belge hangi ÇEKİŞMELİ NOKTAYA dayanak oluyor" sorusunun cevabıdır.
+   Hangi olguyu, tarihi, tutarı, eksikliği veya teslim edilmemiş kaydı gösterdiğini
+   TEK cümlede yaz. Belgenin içeriğini TEKRAR ETME.
+   YASAK KALIPLAR: "bilgi yer almaktadır", "bilgileri içermektedir", "hakkında bilgi
+   vermektedir", "belgede şu bilgiler bulunmaktadır" ve benzeri içi boş cümleler.
+   Örnek biçim: "Ameliyat görüntü kayıtlarının hastanede bulunmadığını, hemşire gözlem
+   formlarının henüz teslim edilmediğini gösteriyor."
+   Belge çekişmeli bir noktaya dayanak oluşturmuyorsa bunu açıkça yaz:
+   "Belge çekişmeli bir noktaya dayanak oluşturmuyor; süreç yazışması niteliğinde."
 8. Belge metni anlamsız veya okunamaz durumdaysa ozet alanını BOŞ bırak.
 
 Çıktı YALNIZCA JSON: {"ozet":"en çok 3 cümlelik tarafsız özet","kaniti":"tek cümle"}`;
@@ -158,23 +221,31 @@ Bu belgeyi yukarıdaki kurallara göre özetle.`;
     if (!kaniti) elenme.push("'neyi kanıtlıyor' alanı boş");
     if (ozet.length > 900) ozet = ozet.slice(0, 900);
     if (kaniti.length > 400) kaniti = kaniti.slice(0, 400);
-    const yasakli = ["haksız", "hukuka aykırı", "ihlal", "kusur", "suç ", "geçersizdir", "borçludur"];
-    const kucuk = ozet.toLocaleLowerCase("tr-TR");
-    const bulunan = yasakli.filter((k) => kucuk.includes(k));
-    if (bulunan.length) elenme.push(`yasaklı ifade: ${bulunan.join(", ")}`);
+
+    // Hüküm denetimi: yalnız ajanın KENDİ nitelemesi elenir; aktarılan iddia serbesttir.
+    const hukumler = [...hukumCumleleri(ozet), ...hukumCumleleri(kaniti)];
+    if (hukumler.length) {
+      elenme.push(`ajanın kendi hükmü var — elenen cümle: "${hukumler[0].slice(0, 200)}"`);
+    }
+
+    // "Neyi kanıtlıyor" içi boş olmamalı: belgenin içeriğini tekrar eden kalıplar elenir.
+    const kanitKucuk = kaniti.toLocaleLowerCase("tr-TR");
+    const bosKalip = BOS_KALIPLAR.filter((k) => kanitKucuk.includes(k));
+    if (bosKalip.length) {
+      elenme.push(`'neyi kanıtlıyor' satırı içi boş kalıp taşıyor: "${bosKalip.join(", ")}"`);
+    }
 
     if (elenme.length) {
       const sebep = `Özet sunucu tarafında elendi (${elenme.join(" · ")})`;
-      const { error: eErr } = await admin.from("belge_ozetleri").insert({
-        case_id: (doc as any).case_id, document_id, ozet: null, kaniti: null,
-        durum: "elendi", sebep,
+      const { error: eErr } = await kayitYaz({
+        ozet: null, kaniti: null, durum: "elendi", sebep,
       });
       if (eErr) return json({ error: `Kayıt yazılamadı: ${eErr.message}` }, 500);
       return json({ durum: "elendi", sebep });
     }
 
-    const { error: yErr } = await admin.from("belge_ozetleri").insert({
-      case_id: (doc as any).case_id, document_id, ozet, kaniti, durum: "uretildi", sebep: null,
+    const { error: yErr } = await kayitYaz({
+      ozet, kaniti, durum: "uretildi", sebep: null,
     });
     if (yErr) return json({ error: `Kayıt yazılamadı: ${yErr.message}` }, 500);
 

@@ -2271,12 +2271,12 @@ function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection,
 
   // Özeti olmayan eski belgeler için elle tetikleme. Zaten özeti olan belge için
   // fonksiyon "atlandi" döner — tekrar üretilmez.
-  async function ozetCikar(documentId: string) {
+  async function ozetCikar(documentId: string, yenile = false) {
     setOzetBusy(documentId);
     setOzetHata(null);
     try {
       const { data, error } = await supabase.functions.invoke("belge-ozeti", {
-        body: { document_id: documentId },
+        body: { document_id: documentId, yenile },
       });
       if (error) {
         // Gerçek sebep .context gövdesindedir; mesaj sessizce yutulmaz.
@@ -2438,14 +2438,13 @@ function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection,
                   <FileText className="h-4 w-4 text-primary shrink-0" />
                   <span className="flex-1 truncate">{d.file_name}</span>
                   <span className="text-xs text-muted-foreground truncate max-w-[40%]">{tarafAdi(d.party_id)}</span>
-                  {!o && (
-                    <Button variant="ghost" size="sm" className="shrink-0"
-                      onClick={() => ozetCikar(d.id)} disabled={ozetBusy === d.id} title="Özet çıkar">
-                      {ozetBusy === d.id
-                        ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Çıkarılıyor…</>
-                        : <><Sparkles className="h-3 w-3 mr-1" /> Özet çıkar</>}
-                    </Button>
-                  )}
+                  <Button variant="ghost" size="sm" className="shrink-0"
+                    onClick={() => ozetCikar(d.id, !!o)} disabled={ozetBusy === d.id}
+                    title={o ? "Özeti yenile" : "Özet çıkar"}>
+                    {ozetBusy === d.id
+                      ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Çıkarılıyor…</>
+                      : <><Sparkles className="h-3 w-3 mr-1" /> {o ? "Özeti yenile" : "Özet çıkar"}</>}
+                  </Button>
                   <Button variant="ghost" size="sm" onClick={() => deleteDoc(d)} title="Sil"><Trash2 className="h-3 w-3" /></Button>
                 </div>
                 {/* Belge özeti — yalnız arabulucu yüzeyi. Kaynak: yalnız bu belgenin metni. */}

@@ -23,6 +23,16 @@ REDEPLOY GEREKLİ: belge-ozeti (YENİ) ve extract-document-text.
 AÇIK UÇ: Yalnız yeni yüklenen belgeler kendiliğinden özetlenir; mevcut 7 belge için
 listedeki "Özet çıkar" düğmesi tek tek kullanılacak (toplu üretim düğmesi yok).
 Sırada: SQL çalıştırma + iki fonksiyonun redeploy'u + canlı deneme.
+- [x] DÜZELTME 15.08 (canlı bulgudan): yasaklı ifade elemesi cümle bağlamına bakıyor.
+      İhtarname özeti "kusur" kelimesi yüzünden elenmişti; oysa kusuru ileri süren
+      TARAFTI. Artık hüküm kelimesi taşıyan cümle, aktarım kalıbı (ileri sürülmektedir ·
+      iddia edilmektedir · belirtilmektedir · talep edilmektedir · denilmektedir)
+      içeriyorsa serbest; içermiyorsa elenir ve sebepte ELENEN CÜMLE yazılır.
+- [x] DÜZELTME 15.08: "Neyi kanıtlıyor" satırı artık belgenin hangi ÇEKİŞMELİ NOKTAYA
+      dayanak olduğunu söylüyor (olgu · tarih · tutar · eksiklik); "bilgi yer almaktadır",
+      "bilgileri içermektedir" gibi içi boş kalıplar sunucuda eleniyor.
+- [x] Listedeki düğme: özeti olan belgede "Özeti yenile" (yenile:true → aynı kayıt
+      güncellenir), olmayanda "Özet çıkar".
 
 ## Nerede kaldık — 15.08.2026 (53) · UYUŞMAZLIK KONUSU "Girilmemiş." SORUNU
 TEŞHİS: Ekran `cases.issue_description`'dan okuyor (MediationEngine.tsx:1983 ·

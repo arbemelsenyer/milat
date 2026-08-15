@@ -90,3 +90,8 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
 - "Ekranda hiçbir şey olmuyor" belirtisinin DÖRT ayrı sebebi olabilir: commit push
   edilmemiş · Lovable senkronu geride · edge fonksiyon redeploy edilmemiş · veritabanı
   göçü çalıştırılmamış. Ekran testinden önce dördü sırayla doğrulanacak. (15.08)
+- Yasaklı kelime süzgeci cümle bağlamına bakmadan uygulanırsa doğru çıktıyı eler:
+  ihtarname özeti "kusur" kelimesi yüzünden elendi; oysa kusuru ileri süren TARAFTI.
+  Kural: yasak ajanın KENDİ hüküm cümlesine uygulanır, tarafın iddiasının aktarımına
+  uygulanmaz — denetim cümle cümle yapılır ve elenen cümle sebebe yazılır.
+  (15.08, belge-ozeti)

@@ -290,3 +290,15 @@ hiçbir yoldan görmez. Süreç ajanıyla doğrudan konuşmaz — iletişim ajan
 · TETİKLEME: extract-document-text metni yazdıktan sonra iç kapıdan (x-cron-secret)
   BEKLEMESİZ çağırır — bu çağrının hatası çıkarma hattını etkilemez. Özeti olmayan eski
   belgeler için Aşama 1 > Dosyadaki belgeler listesinde "Özet çıkar" düğmesi vardır.
+  · DÜZELTME 15.08 (canlı bulgu): Yasak listesi ajanın KENDİ nitelemesine uygulanır,
+    tarafın iddiasının AKTARILMASINA uygulanmaz. Denetim cümle cümledir: hüküm kelimesi
+    (haksız · hukuka aykırı · ihlal · kusur · suç · geçersiz · borçlu · sorumludur)
+    geçen cümle, aktarım kalıbı (ileri sürülmektedir · iddia edilmektedir ·
+    belirtilmektedir · talep edilmektedir · denilmektedir vb.) taşıyorsa SERBESTTİR;
+    taşımıyorsa elenir ve sebep satırında ELENEN CÜMLE yazılır.
+  · DÜZELTME 15.08: kaniti alanı belgenin hangi ÇEKİŞMELİ NOKTAYA dayanak olduğunu
+    (olgu · tarih · tutar · eksiklik) tek cümlede söyler; içeriği tekrar eden kalıplar
+    ("bilgi yer almaktadır", "bilgileri içermektedir" vb.) sunucuda elenir. Belge
+    çekişmeli bir noktaya dayanak değilse bu açıkça yazılır.
+  · yenile:true ile mevcut özet yeniden üretilir ve AYNI kayıt güncellenir (listede
+    "Özeti yenile" düğmesi); bayraksız çağrıda özeti olan belge "atlandi" döner.
