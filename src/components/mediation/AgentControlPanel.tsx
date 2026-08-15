@@ -565,7 +565,36 @@ const DURUM_ETIKET: Record<string, { label: string; tone: string }> = {
   atlandi: { label: "atlandı", tone: "text-muted-foreground bg-muted" },
   bekliyor: { label: "sırada", tone: "text-amber-700 bg-amber-500/10" },
   onay_bekliyor: { label: "onayınız bekleniyor", tone: "text-primary bg-primary/10" },
+  iz: { label: "denetim izi", tone: "text-sky-700 bg-sky-500/10" },
 };
+
+// Kör Teklif v2 (koşullu aralık / braketleme) denetim izi — yalnız arabulucuda.
+const BRAKET_IZ_ETIKET: Record<string, string> = {
+  braket_girildi: "Kabul aralığı girildi",
+  ortusme_bulundu: "Örtüşme bulundu",
+  bant_sorusu_gonderildi: "Bant sorusu gönderildi",
+  bant_sorusu_kabul: "Bant sorusu: düşünürüm",
+  bant_sorusu_ret: "Bant sorusu: reddedildi",
+  taahhut_kabul: "Koşullu taahhüt yürürlükte",
+  taahhut_dustu: "Koşullu taahhüt düştü",
+};
+
+type BraketIz = { id: string; olay: string; detay: any; created_at: string };
+
+function braketIzDetay(olay: string, d: any): string {
+  const para = String(d?.para_birimi ?? "TRY");
+  const tutar = (v: any) => (v === null || v === undefined ? "—" : `${Number(v).toLocaleString("tr-TR")} ${para}`);
+  if (olay === "braket_girildi") {
+    const aralik = `${tutar(d?.alt_sinir)} – ${tutar(d?.ust_sinir)}`;
+    const kosul = d?.kosul_bant_alt !== null && d?.kosul_bant_alt !== undefined
+      ? ` · koşullu bant ${tutar(d?.kosul_bant_alt)} – ${tutar(d?.kosul_bant_ust)}, iner: ${tutar(d?.kosullu_deger)}`
+      : "";
+    return `${aralik}${kosul}`;
+  }
+  if (olay === "ortusme_bulundu") return `Örtüşme bandı ${tutar(d?.bant_alt)} – ${tutar(d?.bant_ust)}`;
+  if (d?.bant_alt !== undefined) return `Bant ${tutar(d?.bant_alt)} – ${tutar(d?.bant_ust)}`;
+  return "";
+}
 
 type GorevRow = {
   id: string;
@@ -597,10 +626,11 @@ function AjanIsListesi({ caseId }: { caseId: string }) {
   const [ozelTaraf, setOzelTaraf] = useState<string>("");
   const [ozelBusy, setOzelBusy] = useState(false);
   const [ozelBilgi, setOzelBilgi] = useState<string | null>(null);
+  const [braketIz, setBraketIz] = useState<BraketIz[]>([]);
 
   async function yukle() {
     setYukleniyor(true);
-    const [g, s, p] = await Promise.all([
+    const [g, s, p, bi] = await Promise.all([
       supabase.from("ajan_gorevleri" as any)
         .select("id, gorev_tipi, durum, gerekce, sonuc, created_at, updated_at")
         .eq("case_id", caseId).order("updated_at", { ascending: false }).limit(60),
@@ -610,6 +640,9 @@ function AjanIsListesi({ caseId }: { caseId: string }) {
       supabase.from("case_parties")
         .select("id, full_name, company_name, first_name, last_name, party_type")
         .eq("case_id", caseId).order("created_at"),
+      (supabase.from("braket_denetim_izi" as any) as any)
+        .select("id, olay, detay, created_at")
+        .eq("case_id", caseId).order("created_at", { ascending: false }).limit(40),
     ]);
     // Okuma hatası yutulmaz: politika eksikse ekranda görünür.
     if (g.error) setHata(`Görev panosu okunamadı: ${g.error.message}`);
@@ -618,6 +651,7 @@ function AjanIsListesi({ caseId }: { caseId: string }) {
     const cikti = (s.data?.[0] as any)?.last_output;
     const liste = Array.isArray(cikti?.yapilmayanlar) ? cikti.yapilmayanlar : [];
     setYapilmayanlar(liste.filter((x: any) => x?.sebep).map((x: any) => ({ zaman: String(x.zaman ?? ""), sebep: String(x.sebep) })));
+    setBraketIz(((bi?.data ?? []) as any[]) as BraketIz[]);
     setTaraflar(((p.data ?? []) as any[]).map((x) => ({
       id: String(x.id),
       ad: String(x.full_name || x.company_name || `${x.first_name ?? ""} ${x.last_name ?? ""}`.trim() || "(isimsiz)"),
@@ -694,8 +728,17 @@ function AjanIsListesi({ caseId }: { caseId: string }) {
       durum: "yapilmadi",
       gorev: null as GorevRow | null,
     }));
-    return [...a, ...b].sort((x, y) => String(y.zaman).localeCompare(String(x.zaman))).slice(0, 60);
-  }, [gorevler, yapilmayanlar]);
+    // Kör Teklif v2 denetim izi: her adım zaman damgasıyla aynı listeye düşer.
+    const c = braketIz.map((z) => ({
+      key: `b-${z.id}`,
+      zaman: z.created_at,
+      baslik: BRAKET_IZ_ETIKET[z.olay] ?? z.olay,
+      detay: braketIzDetay(z.olay, z.detay),
+      durum: "iz",
+      gorev: null as GorevRow | null,
+    }));
+    return [...a, ...b, ...c].sort((x, y) => String(y.zaman).localeCompare(String(x.zaman))).slice(0, 80);
+  }, [gorevler, yapilmayanlar, braketIz]);
 
   return (
     <div className="mt-4 border-t pt-4 space-y-2">
