@@ -272,3 +272,21 @@ hiçbir yoldan görmez. Süreç ajanıyla doğrudan konuşmaz — iletişim ajan
   öneri elenir ve gerekçesi ekranda gösterilir.
 · YETKİ: yalnız görevli arabulucu, dosya sahibi veya yönetici çağırabilir; taraf çağıramaz.
 · HATA DAVRANIŞI: her ret/eleme gerekçesiyle birlikte ekrana yazılır, sessiz kalınmaz.
+
+[EKLEME — BELGE ÖZETİ AJANI (15.08, İBA 1.2)] ● KODDA (SQL + redeploy + canlı test bekliyor).
+· Ajan: belge-ozeti (edge function, verify_jwt=false; JWT veya x-cron-secret ile girilir).
+· GİRDİ SINIRI (bağlayıcı): YALNIZ o belgenin kendi metni (case_documents.extracted_text,
+  mevcut extract-document-text hattının çıktısı) ve dosya adı. Başka belge, taraf analizi,
+  ortak zemin raporu veya dosya verisi girdiye GİRMEZ.
+· ÇIKTI: {ozet (en çok 3 cümle), kaniti (tek cümle)} → belge_ozetleri tablosu.
+· GİZLİLİK: belge_ozetleri'nde tarafa SELECT politikası YOKTUR — özet yalnız arabulucu
+  ve yöneticiye açıktır, taraf ekranına (CaseRoom) hiçbir sürümde çıkmaz.
+· HALÜSİNASYON KAPISI: metin yoksa/okunamadıysa özet ÜRETİLMEZ, durum='metin_yok'
+  ("belge metni okunamadı") yazılır. Dil tarafsızdır: "belgede ... belirtiliyor".
+· SUNUCU TARAFI ELEME (m.12): özet 40 karakterden kısaysa · kaniti boşsa · yasaklı ifade
+  geçiyorsa (haksız · hukuka aykırı · ihlal · kusur · suç · geçersizdir · borçludur)
+  kayıt durum='elendi' + sebep olarak düşer, uydurma metin ekrana çıkmaz.
+· TEKRAR ÜRETİM YOK: document_id UNIQUE; özeti olan belge için "atlandi" döner.
+· TETİKLEME: extract-document-text metni yazdıktan sonra iç kapıdan (x-cron-secret)
+  BEKLEMESİZ çağırır — bu çağrının hatası çıkarma hattını etkilemez. Özeti olmayan eski
+  belgeler için Aşama 1 > Dosyadaki belgeler listesinde "Özet çıkar" düğmesi vardır.

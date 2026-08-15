@@ -118,3 +118,6 @@ verify_jwt = false
 
 [functions.dosya-ozeti-oner]
 verify_jwt = true
+
+[functions.belge-ozeti]
+verify_jwt = false

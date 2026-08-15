@@ -59,6 +59,8 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    // Belge özeti iç çağrısı için (yoksa özet tetiklenmez, çıkarma aynen sürer).
+    const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -131,6 +133,25 @@ Deno.serve(async (req) => {
           extracted_text: trimmed.slice(0, MAX_CHARS_PER_DOC),
           extraction_status: "tamam",
         }).eq("id", doc.id);
+        // Belge özeti (İBA 1.2): metin yazıldıktan sonra iç kapıdan tetiklenir.
+        // BEKLEMESİZ ve try/catch içinde — bu çağrının hatası çıkarma hattını
+        // hiçbir koşulda etkilemez, sonuç yine "tamam" döner.
+        try {
+          if (CRON_SECRET) {
+            fetch(`${supabaseUrl}/functions/v1/belge-ozeti`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-cron-secret": CRON_SECRET,
+                apikey: serviceKey,
+                Authorization: `Bearer ${serviceKey}`,
+              },
+              body: JSON.stringify({ document_id: doc.id }),
+            }).catch((e) => console.error(`[extract-document-text] belge-ozeti tetiklenemedi (${doc.id}): ${e?.message ?? e}`));
+          }
+        } catch (e: any) {
+          console.error(`[extract-document-text] belge-ozeti çağrısı kurulamadı: ${e?.message ?? e}`);
+        }
         results.push({ id: doc.id, status: "tamam" });
       } catch (e: any) {
         console.error(`[extract-document-text] belge ${doc.id} başarısız: ${e?.message ?? String(e)}`);

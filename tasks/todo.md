@@ -1,3 +1,29 @@
+## Nerede kaldık — 15.08.2026 (54) · BELGE ÖZETİ (İBA 1.2 / A1)
+- [x] Yeni edge fonksiyon: supabase/functions/belge-ozeti.
+      · Girdi sınırı: YALNIZ o belgenin kendi metni (case_documents.extracted_text) +
+        dosya adı. Başka belge, taraf analizi, ortak zemin raporu girdiye girmez.
+      · Çıktı: {ozet (en çok 3 cümle), kaniti (tek cümle)} → belge_ozetleri.
+      · Metin yoksa özet UYDURULMAZ: durum='metin_yok' ("belge metni okunamadı").
+      · Sunucu tarafı eleme: özet 40 karakterden kısaysa · kaniti boşsa · yasaklı ifade
+        varsa durum='elendi' + sebep. Dil tarafsız ("belgede ... belirtiliyor").
+      · document_id UNIQUE — özeti olan belge için tekrar üretilmez ("atlandi").
+      · Yetki: arabulucu / dosya sahibi / yönetici ya da iç çağrı (x-cron-secret).
+- [x] Tetikleme: extract-document-text metni yazdıktan sonra iç kapıdan BEKLEMESİZ
+      çağırıyor; bu çağrının hatası çıkarma hattını etkilemiyor (try/catch + fire&forget).
+- [x] Ekran (MediationEngine, Aşama 1 > Dosyadaki belgeler): her satırın altında özet +
+      "Neyi kanıtlıyor:" satırı; özeti olmayan belgede "Özet çıkar" düğmesi
+      ("Çıkarılıyor…"); hata kırmızı ve gerçek mesajla. Yükleme/listeleme/silme akışları
+      ve satır düzeni değişmedi.
+- [x] GİZLİLİK: belge_ozetleri'nde tarafa SELECT politikası YOK — özet taraf ekranına
+      (CaseRoom) hiçbir yoldan çıkmaz. CaseRoom'a dokunulmadı.
+tsc (tsconfig.app.json) temiz; iki edge fonksiyonun sözdizimi esbuild ile doğrulandı.
+CANLI TEST YOK.
+SQL GEREKLİ: supabase/migrations/20260815160000_belge_ozetleri.sql (kurucu çalıştıracak).
+REDEPLOY GEREKLİ: belge-ozeti (YENİ) ve extract-document-text.
+AÇIK UÇ: Yalnız yeni yüklenen belgeler kendiliğinden özetlenir; mevcut 7 belge için
+listedeki "Özet çıkar" düğmesi tek tek kullanılacak (toplu üretim düğmesi yok).
+Sırada: SQL çalıştırma + iki fonksiyonun redeploy'u + canlı deneme.
+
 ## Nerede kaldık — 15.08.2026 (53) · UYUŞMAZLIK KONUSU "Girilmemiş." SORUNU
 TEŞHİS: Ekran `cases.issue_description`'dan okuyor (MediationEngine.tsx:1983 ·
 CaseRoom.tsx:453). Bu sütunu HİÇBİR edge fonksiyonu yazmıyordu — sekiz fonksiyon yalnız

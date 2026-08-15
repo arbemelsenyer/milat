@@ -526,3 +526,14 @@ belge analiz sonucu okunmaz (issue_description taraf ekranında da görünüyor)
 yere kendiliğinden yazılmaz: arabulucu ekranında öneri olarak durur, "Onayla ve kaydet"
 ile yazılır; alan doluysa öneri hiç gösterilmez. Sunucu tarafı eleme: dayanak zorunlu,
 rakam yasak, hukuki niteleme ve kusur atfı süzgeci. REDEPLOY GEREKLİ: dosya-ozeti-oner.
+
+15.08 (BELGE ÖZETİ — İBA 1.2): Aşama 1 > Dosyadaki belgeler listesinde her belgenin
+altında tek paragraf özet (en çok 3 cümle) ve "Neyi kanıtlıyor" satırı. Yeni edge
+fonksiyon belge-ozeti, YALNIZ o belgenin kendi metninden üretir; başka belgeden, taraf
+analizinden veya ortak zemin raporundan bilgi taşımaz. Çıktı belge_ozetleri tablosuna
+yazılır ve tarafa hiçbir SELECT politikası verilmez — özet yalnız arabulucuda kalır.
+Metin okunamayan belgede özet uydurulmaz ("belge metni okunamadı"); dayanaksız veya
+hukuki niteleme içeren çıktı sunucu tarafında elenir. Üretim, mevcut extract-document-text
+hattının sonunda beklemesiz tetiklenir; özeti olmayan eski belgeler için listede "Özet
+çıkar" düğmesi vardır. SQL göçü bekliyor: 20260815160000_belge_ozetleri.sql.
+REDEPLOY GEREKLİ: belge-ozeti (YENİ) ve extract-document-text.

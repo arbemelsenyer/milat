@@ -158,3 +158,10 @@ arabulucunun kendi girdiği kayıttır.
   satırı → [Onayla ve kaydet] · [Düzenleyerek kaydet] · [Vazgeç]. Öneri hiçbir yere
   kaydedilmez; kaydı arabulucu yapar. Alan doluysa kutu HİÇ görünmez (elle girilen metin
   ezilmez). Kartın kendi düzeni, "Düzenle" düğmesi ve alt künye satırı değişmedi.
+● 15.08: AŞAMA 1 > BELGELER > "Dosyadaki belgeler" — her satırın altında belge özeti
+  (en çok 3 cümle) ve "Neyi kanıtlıyor:" satırı. Özeti olmayan belgede satırın sağında
+  "Özet çıkar" düğmesi çıkar; üretim sırasında "Çıkarılıyor…" yazar. Metin okunamadıysa
+  amber "Belge metni okunamadı — özet üretilmedi." satırı görünür, uydurma özet yazılmaz.
+  Hata olursa kırmızı gerçek mesaj listenin başında durur. Yükleme, listeleme ve silme
+  akışları ile satır düzeni (ikon · ad · taraf · sil) değişmedi. Bu blok YALNIZ arabulucu
+  ekranındadır; taraf ekranında (CaseRoom) yoktur.

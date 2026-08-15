@@ -2236,6 +2236,22 @@ function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection,
   const [uploading, setUploading] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
   const [secilenTaraf, setSecilenTaraf] = useState<string>(FAZ1_BELGE_TARAFSIZ);
+  // Belge özetleri (İBA 1.2) — YALNIZ arabulucu yüzeyi. belge_ozetleri tablosunda
+  // tarafa SELECT politikası yoktur; taraf ekranı bu veriyi hiç okuyamaz.
+  const [ozetler, setOzetler] = useState<Record<string, any>>({});
+  const [ozetBusy, setOzetBusy] = useState<string | null>(null);
+  const [ozetHata, setOzetHata] = useState<string | null>(null);
+
+  const loadOzetler = useCallback(async () => {
+    const { data, error } = await (supabase.from("belge_ozetleri" as any) as any)
+      .select("document_id, ozet, kaniti, durum, sebep")
+      .eq("case_id", caseRow.id);
+    if (error) { setOzetHata(`Belge özetleri okunamadı: ${trErr(error.message)}`); return; }
+    setOzetHata(null);
+    const harita: Record<string, any> = {};
+    for (const r of (Array.isArray(data) ? data : [])) harita[String((r as any).document_id)] = r;
+    setOzetler(harita);
+  }, [caseRow.id]);
 
   const loadDocs = useCallback(async () => {
     const { data, error } = await supabase
@@ -2251,6 +2267,43 @@ function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection,
   }, [caseRow.id, onCountChange]);
 
   useEffect(() => { loadDocs(); }, [loadDocs]);
+  useEffect(() => { loadOzetler(); }, [loadOzetler]);
+
+  // Özeti olmayan eski belgeler için elle tetikleme. Zaten özeti olan belge için
+  // fonksiyon "atlandi" döner — tekrar üretilmez.
+  async function ozetCikar(documentId: string) {
+    setOzetBusy(documentId);
+    setOzetHata(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("belge-ozeti", {
+        body: { document_id: documentId },
+      });
+      if (error) {
+        // Gerçek sebep .context gövdesindedir; mesaj sessizce yutulmaz.
+        let ham = String((error as any)?.message ?? "bilinmeyen hata");
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.text === "function") {
+          try {
+            const govde = await ctx.text();
+            if (govde) {
+              try {
+                const j = JSON.parse(govde);
+                ham = String(j?.error ?? j?.detay ?? govde);
+              } catch { ham = String(govde).slice(0, 400); }
+            }
+          } catch { /* gövde okunamadı */ }
+        }
+        throw new Error(ham);
+      }
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+      await loadOzetler();
+    } catch (e: any) {
+      console.error("[belge-ozeti] çağrı başarısız", e);
+      setOzetHata(`belge-ozeti çağrısı başarısız: ${trErr(e?.message ?? "bilinmeyen hata")}`);
+    } finally {
+      setOzetBusy(null);
+    }
+  }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -2368,18 +2421,51 @@ function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection,
         open={openSections.has("faz1-belgeler-liste")}
         onToggle={() => onToggleSection("faz1-belgeler-liste")}
       >
+        {ozetHata && (
+          <p className="text-sm text-destructive flex items-start gap-1.5 break-words mb-2">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" /><span>{ozetHata}</span>
+          </p>
+        )}
         {docs.length === 0 ? (
           <p className="text-sm text-muted-foreground italic">Bu dosyaya henüz belge yüklenmedi.</p>
         ) : (
           <ul className="divide-y">
-            {docs.map((d) => (
-              <li key={d.id} className="flex items-center gap-2 text-sm py-1.5">
-                <FileText className="h-4 w-4 text-primary shrink-0" />
-                <span className="flex-1 truncate">{d.file_name}</span>
-                <span className="text-xs text-muted-foreground truncate max-w-[40%]">{tarafAdi(d.party_id)}</span>
-                <Button variant="ghost" size="sm" onClick={() => deleteDoc(d)} title="Sil"><Trash2 className="h-3 w-3" /></Button>
+            {docs.map((d) => {
+              const o = ozetler[d.id];
+              return (
+              <li key={d.id} className="text-sm py-1.5 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary shrink-0" />
+                  <span className="flex-1 truncate">{d.file_name}</span>
+                  <span className="text-xs text-muted-foreground truncate max-w-[40%]">{tarafAdi(d.party_id)}</span>
+                  {!o && (
+                    <Button variant="ghost" size="sm" className="shrink-0"
+                      onClick={() => ozetCikar(d.id)} disabled={ozetBusy === d.id} title="Özet çıkar">
+                      {ozetBusy === d.id
+                        ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Çıkarılıyor…</>
+                        : <><Sparkles className="h-3 w-3 mr-1" /> Özet çıkar</>}
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={() => deleteDoc(d)} title="Sil"><Trash2 className="h-3 w-3" /></Button>
+                </div>
+                {/* Belge özeti — yalnız arabulucu yüzeyi. Kaynak: yalnız bu belgenin metni. */}
+                {o && o.durum === "uretildi" && (
+                  <div className="pl-6 space-y-1">
+                    <p className="text-xs text-muted-foreground leading-snug">{o.ozet}</p>
+                    <p className="text-xs">
+                      <span className="font-medium">Neyi kanıtlıyor:</span>{" "}
+                      <span className="text-muted-foreground">{o.kaniti}</span>
+                    </p>
+                  </div>
+                )}
+                {o && o.durum !== "uretildi" && (
+                  <p className="pl-6 text-xs text-amber-600 dark:text-amber-400">
+                    {o.durum === "metin_yok" ? "Belge metni okunamadı — özet üretilmedi." : (o.sebep ?? "Özet üretilmedi.")}
+                  </p>
+                )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </CockpitCollapsible>
