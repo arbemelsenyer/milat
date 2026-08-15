@@ -157,11 +157,17 @@ tsc (tsconfig.app.json) temiz.
         (rakam / taahhüt / kaynak taraf görünmüyor).
       · 'ret' cevabında taahhüt kendiliğinden düştü (kosul_durumu='dustu'), denetim
         izinde 3 kayıt.
-      · AÇIK KALAN: 'kabul' yolu (bandın iki tarafa açılması) canlıda test edilmedi.
-        Taraf ekranından gerçek cevap akışı da test edilmedi (cevap SQL ile verildi).
-      · AÇIK KALAN: Uyuşmazlık konusu kutusundaki "Yeni öneri getir" düğmesi alan
-        doluyken canlıda görünmüyor — kod 75f26f4'te var, Lovable senkronu geride
-        kaldığı için yayına girmedi.
+- [x] 'KABUL' YOLU DOĞRULANDI (15.08.2026): bant sorusu kabul edilince nöbetçi işledi,
+      kosul_durumu='kabul', denetim izi 5 kayda çıktı.
+- [x] TARAF EKRANINDAN GERÇEK CEVAP AKIŞI DOĞRULANDI (15.08.2026): taraf "Kabul Aralığım"
+      sekmesinde "Şu aralığı düşünür müsünüz: 120.000-150.000 TRY" kutusunu ve iki
+      düğmeyi gördü; "Düşünürüm" basıldı, braket_bant_cevapla RPC çalıştı, durum='kabul',
+      ekranda "Cevabınız alındı" onayı çıktı. Kutu metni kaynağı gizliyor.
+BRAKETLEME HATTI KAPANDI: veritabanı + ajan kolu + taraf ekranı, her iki cevap yolu
+(kabul/ret) canlıda doğrulandı.
+AÇIK KALAN (tek): Uyuşmazlık konusu kutusundaki "Yeni öneri getir" düğmesi alan doluyken
+canlıda görünmüyor — kod 75f26f4'te var, Lovable senkronu geride kaldığı için yayına
+girmedi.
 REDEPLOY GEREKLİ: ajan-nobetci (Lovable GitHub push'unu edge fonksiyonlara otomatik
 deploy ETMEZ).
 KARAR NOTU (kurucuya): Tarafa, koşullu taahhüdünün "düştüğü" yalnız nötr cümleyle
