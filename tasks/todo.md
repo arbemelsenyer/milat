@@ -41,9 +41,18 @@ alanların üstüne kuruldu; yeni veri kaynağı eklenmedi.
       başlık, nötr cümle ve "Dayanak: …". [Göstergeleri çıkar] / [Yenile], hata kırmızı.
 - [x] GİZLİLİK: guc_dengesi'nde tarafa SELECT politikası YOK; CaseRoom'a dokunulmadı.
 tsc (tsconfig.app.json) temiz; edge fonksiyon sözdizimi esbuild ile doğrulandı.
-CANLI TEST YOK.
-SQL GEREKLİ: supabase/migrations/20260815200000_guc_dengesi.sql (kurucu çalıştıracak).
-REDEPLOY GEREKLİ: guc-dengesi (YENİ). PUBLISH GEREKLİ (yeni katman).
+- [x] CANLIDA DOĞRULANDI (15.08.2026).
+      · Aşama 2'de ayrı katman; göç 20260815200000_guc_dengesi.sql çalıştırıldı;
+        guc-dengesi fonksiyonu yayına alındı; Publish yapıldı.
+      · Sağlık dosyasında 3 gösterge üretti (taraf niteliği · belge sayısı farkı ·
+        katılım düzeyi farkı), üçü de dayanaklı; etiket/psikoloji dili yok.
+      · GÜVENLİK ARA İŞİ: Lovable Publish'i iki critical bulgu yüzünden engelledi
+        (analyze-meeting-notes ve check-new-tariff kimlik doğrulamasız çağrılabiliyordu).
+        check-new-tariff verify_jwt=true yapıldı; Aralık/Ocak cron'ları Authorization +
+        apikey + x-cron-secret başlıklarıyla yeniden kuruldu (commit 97d24fe). Tarama
+        yeniden çalıştırılınca critical bulgu kalmadı.
+      · AÇIK KALAN: 3 warn bulgu duruyor; biri "arabulucular admin/ klasöründeki tüm
+        dosyaları okuyabiliyor" — kasıtlı mı, incelenecek.
 AÇIK UÇ: Oturuma fiilî katılım verisi yok — case_sessions.participants alanı güvenilir
 doldurulmuyor; katılım göstergesi şimdilik katılım durumu, beyan ve randevu cevabından
 hesaplanıyor. Oturum yoklaması eklenirse gösterge güçlenir.

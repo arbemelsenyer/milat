@@ -22,6 +22,13 @@ doğrulanacak. Doğrulamadan kurulum yapılmayacak.
 SİLİNEN: jobid 8 'ajan-nobetci-3dk' — 15.08'de mükerrer kuruldu, anahtarında boşluk
 vardı, aynı gün kaldırıldı.
 
+GÜNCELLEME 15.08 (güvenlik): jobid 5 'check-new-tariff-december' ve jobid 6
+'check-new-tariff-january' SİLİNDİ ve Authorization + apikey + x-cron-secret
+başlıklarıyla YENİDEN KURULDU (yeni jobid'ler; sıklıkları değişmedi — 0 9 1 12 * ve
+0 9 5 1 *). Sebep: check-new-tariff verify_jwt=true yapıldı, gateway artık JWT'siz
+isteği içeri almıyor. Yeni jobid'ler `SELECT jobid, jobname, schedule FROM cron.job;`
+ile doğrulanır.
+
 ## VERİTABANI AYARLARI
 
 - app.cron_secret: TANIMLI DEĞİL. Lovable SQL çalıştırıcısı ALTER DATABASE'e izin
@@ -35,6 +42,14 @@ vardı, aynı gün kaldırıldı.
 - 15.08: Kör Teklif v2 braket göçü elle çalıştırıldı (teklif_braketleri,
   braket_denetim_izi, braket_bant_sorulari + RLS politikaları + braket_izi_yaz
   tetikleyicisi + braket_bant_sorularim / braket_bant_cevapla fonksiyonları).
+- 15.08: 20260815160000_belge_ozetleri.sql elle çalıştırıldı (belge_ozetleri tablosu +
+  durum kısıtı + RLS; tarafa SELECT politikası yok).
+- 15.08: 20260815180000_olay_cizelgesi.sql elle çalıştırıldı (olay_cizelgesi tablosu +
+  kaynak tipi kısıtı + RLS; tarafa SELECT politikası yok).
+- 15.08: 20260815200000_guc_dengesi.sql elle çalıştırıldı (guc_dengesi tablosu +
+  gösterge tipi kısıtı + RLS; tarafa SELECT politikası yok).
+- 15.08: 20260815220000_cron_authorization_basligi.sql elle çalıştırıldı (check-new-tariff
+  cron işleri Authorization + apikey + x-cron-secret başlıklarıyla yeniden kuruldu).
 - (daha önce kurulanlar buraya eklenecek: mediator_reads_offers,
   mediator_writes_discovery, mediator_updates_discovery, ajan_gorevleri politikaları,
   taraf_musaitlik RLS)
@@ -49,9 +64,10 @@ Gün sonu belge komutuna dahildir.
   artık JWT'siz isteği içeri almıyor. Fonksiyonun kendi kapısı değişmedi
   (x-cron-secret VEYA admin JWT → 401/403).
 - BUNA BAĞLI: jobid 5 'check-new-tariff-december' ve jobid 6 'check-new-tariff-january'
-  cron işleri Authorization başlığı taşıyacak şekilde YENİDEN KURULMALIDIR —
-  supabase/migrations/20260815220000_cron_authorization_basligi.sql. Bu SQL deploy'dan
-  ÖNCE çalıştırılır; aksi hâlde Aralık/Ocak koşumu 401 alır.
+  cron işleri Authorization başlığı taşıyacak şekilde YENİDEN KURULDU (15.08, yeni
+  jobid'ler) — supabase/migrations/20260815220000_cron_authorization_basligi.sql.
+- Tarama yeniden çalıştırıldı: CRITICAL bulgu kalmadı. 3 warn bulgu duruyor; biri
+  "arabulucular admin/ klasöründeki tüm dosyaları okuyabiliyor" — kasıtlı mı, incelenecek.
 - analyze-meeting-notes: kodda değişiklik gerekmedi. verify_jwt zaten true ve fonksiyon
   Authorization + getUser + dosya kapsamlı yetki (arabulucu/sahip/admin) denetimini AI
   çağrısından önce yapıyor; yetkisizde 401/403 dönüyor.
