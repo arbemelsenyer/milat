@@ -74,3 +74,12 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   kullanıcı "hiçbir şey olmadı" görür. Her invoke çağrısında context gövdesi okunup
   KIRMIZI ve KALICI bir satıra, çağrılan fonksiyon adıyla birlikte yazılacak.
   (15.08, dosya-ozeti-oner "Öneri getir" düğmesi)
+- Bir görünüm fonksiyonu bileşenin GÖVDESİNDE tanımlanıp JSX elemanı olarak
+  (<PartyView />) çağrılırsa, her render'da bileşen TÜRÜ değişir; React ağacı söküp
+  yeniden kurar ve alt bileşenlerin yerel durumu (form alanları) silinir. Bu kalıp ya
+  dosya düzeyine taşınır ya da düz fonksiyon çağrısıyla ({PartyView()}) yerinde
+  üretilir. (15.08, CaseRoom "Kabul Aralığım" formu sıfırlanıyordu)
+- Kayıt sonrası tazeleme (yukle) form alanlarını koşulsuz doldurursa, kullanıcının
+  yazdığı değer başka bir işlem (bant sorusu cevabı gibi) tetiklendiğinde silinir.
+  Tazeleme çağrısı "formu da doldur" bayrağı almalı ve kullanıcı forma dokunduysa
+  alanların üstüne yazmamalıdır. (15.08, braket formu)

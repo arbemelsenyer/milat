@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AppNavbar } from "@/components/AppNavbar";
 import { Card } from "@/components/ui/card";
@@ -512,7 +512,13 @@ export default function CaseRoom() {
               commonGround={commonGround}
             />
 
-            {isMediator ? <MediatorView /> : <PartyView />}
+            {/* DÜZELTME (15.08): Bu iki görünüm CaseRoom'un GÖVDESİNDE tanımlıdır; JSX
+                elemanı olarak (<PartyView />) yazılınca her CaseRoom render'ında bileşen
+                TÜRÜ değişiyor, React ağacı söküp yeniden kuruyor ve alt bileşenlerin
+                yerel durumu (braket formundaki yazılan değerler) siliniyordu. Düz
+                fonksiyon çağrısı JSX'i yerinde üretir; yeniden mount olmaz.
+                İkisinde de hook YOKTUR — koşullu çağrı hook kuralını bozmaz. */}
+            {isMediator ? MediatorView() : PartyView()}
           </>
         )}
       </main>
@@ -896,11 +902,18 @@ type BantSorusu = {
   created_at: string;
 };
 
+// Türkçe sayı girişi: "100000", "100.000", "100.000,50" ve "100,50" kabul edilir.
+// Nokta binlik ayıracı, virgül ondalık ayıracıdır. Harf/işaret varsa GEÇERSİZdir.
+// Dönüş: null = alan boş · NaN = geçersiz giriş · sayı = geçerli.
 function braketSayi(s: string): number | null {
-  const t = s.trim();
+  const t = String(s ?? "").trim();
   if (!t) return null;
+  if (!/^[0-9.,]+$/.test(t)) return NaN;
   const n = Number(t.replace(/\./g, "").replace(",", "."));
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) ? n : NaN;
+}
+function braketGecersiz(s: string): boolean {
+  return Number.isNaN(braketSayi(s) as number);
 }
 function braketMetin(v: number | null | undefined): string {
   return v === null || v === undefined ? "" : String(v);
@@ -924,9 +937,13 @@ function BraketTarafBolumu({ caseId, partyId }: { caseId: string; partyId: strin
   const [cevaplanan, setCevaplanan] = useState<string | null>(null);
   const [hata, setHata] = useState<string | null>(null);
   const [bilgi, setBilgi] = useState<string | null>(null);
+  // Kullanıcı forma dokunduysa hiçbir yeniden çekme alanların üstüne YAZMAZ.
+  // Yalnız ilk yükleme ve BAŞARILI kayıt sonrası tazeleme alanları doldurur.
+  const dokunuldu = useRef(false);
 
-  async function yukle() {
-    setYukleniyor(true);
+  // formuTazele=false: yalnız bant soruları ve kayıtlı satır tazelenir; yazılan
+  // değerlere dokunulmaz (bant sorusu cevaplanınca form sıfırlanıyordu).
+  async function yukle(formuTazele: boolean) {
     const [b, s] = await Promise.all([
       (supabase.from("teklif_braketleri" as any) as any)
         .select("id, alt_sinir, ust_sinir, para_birimi, kosul_bant_alt, kosul_bant_ust, kosullu_deger, kosul_notu, kosul_durumu")
@@ -935,27 +952,45 @@ function BraketTarafBolumu({ caseId, partyId }: { caseId: string; partyId: strin
     ]);
     if (b.error) setHata(`Kabul aralığınız okunamadı: ${b.error.message}`);
     else {
-      setHata(null);
       const r = (b.data ?? null) as BraketRow | null;
       setMevcut(r);
-      setAlt(braketMetin(r?.alt_sinir));
-      setUst(braketMetin(r?.ust_sinir));
-      setKosulAlt(braketMetin(r?.kosul_bant_alt));
-      setKosulUst(braketMetin(r?.kosul_bant_ust));
-      setKosulDeger(braketMetin(r?.kosullu_deger));
-      setKosulNot(r?.kosul_notu ?? "");
+      if (formuTazele && !dokunuldu.current) {
+        setAlt(braketMetin(r?.alt_sinir));
+        setUst(braketMetin(r?.ust_sinir));
+        setKosulAlt(braketMetin(r?.kosul_bant_alt));
+        setKosulUst(braketMetin(r?.kosul_bant_ust));
+        setKosulDeger(braketMetin(r?.kosullu_deger));
+        setKosulNot(r?.kosul_notu ?? "");
+      }
     }
     if (!s?.error) setSorular(((s?.data ?? []) as any[]) as BantSorusu[]);
     setYukleniyor(false);
   }
 
-  useEffect(() => { yukle(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [caseId, partyId]);
+  useEffect(() => {
+    dokunuldu.current = false;
+    setYukleniyor(true);
+    yukle(true);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [caseId, partyId]);
 
   async function kaydet() {
+    setBilgi(null);
+    // Geçersiz giriş (harf/işaret) sessizce "boş" sayılmaz — kayıt engellenir.
+    const gecersizAlanlar = [
+      { ad: "Alt sınır", v: alt },
+      { ad: "Üst sınır", v: ust },
+      { ad: "Bant — alt", v: kosulAlt },
+      { ad: "Bant — üst", v: kosulUst },
+      { ad: "Ben de şuna inerim", v: kosulDeger },
+    ].filter((x) => braketGecersiz(x.v)).map((x) => x.ad);
+    if (gecersizAlanlar.length) {
+      setHata(`Yalnız rakam girin (binlik ayıracı nokta, kuruş için virgül): ${gecersizAlanlar.join(", ")}`);
+      return;
+    }
+
     const a = braketSayi(alt), u = braketSayi(ust);
     const ka = braketSayi(kosulAlt), ku = braketSayi(kosulUst), kd = braketSayi(kosulDeger);
-    if (alt.trim() && a === null) { setHata("Alt sınır sayı olmalı."); return; }
-    if (ust.trim() && u === null) { setHata("Üst sınır sayı olmalı."); return; }
     if (a !== null && u !== null && a > u) { setHata("Alt sınır, üst sınırdan büyük olamaz."); return; }
     const kosulVar = ka !== null || ku !== null || kd !== null;
     if (kosulVar && (ka === null || ku === null || kd === null)) {
@@ -988,12 +1023,13 @@ function BraketTarafBolumu({ caseId, partyId }: { caseId: string; partyId: strin
       kosul_durumu: durum,
     }, { onConflict: "case_id,party_id" });
     setKaydediliyor(false);
-    if (error) setHata(`Kaydedilemedi: ${error.message}`);
-    else {
-      setBilgi("Kaydedildi — bu bilgiler yalnız size ve arabulucuya görünür.");
-      toast({ title: "Kabul aralığınız kaydedildi" });
-      await yukle();
-    }
+    if (error) { setHata(`Kaydedilemedi: ${error.message}`); return; }
+    setHata(null);
+    setBilgi("Kaydedildi — bu bilgiler yalnız size ve arabulucuya görünür.");
+    toast({ title: "Kabul aralığınız kaydedildi" });
+    // Kayıt başarılı: artık kayıtlı değer geçerlidir, form ondan tazelenebilir.
+    dokunuldu.current = false;
+    await yukle(true);
   }
 
   async function bantCevapla(soruId: string, kabul: boolean) {
@@ -1006,11 +1042,14 @@ function BraketTarafBolumu({ caseId, partyId }: { caseId: string; partyId: strin
     if (error) { setHata(`Cevap kaydedilemedi: ${error.message}`); return; }
     if (data === "yetkisiz" || data === "bulunamadi") { setHata("Bu soru size ait değil."); return; }
     setBilgi(kabul ? "Cevabınız alındı: bu aralığı değerlendiriyorsunuz." : "Cevabınız alındı.");
-    await yukle();
+    // Form alanlarına DOKUNMA — yalnız soru listesi tazelenir.
+    await yukle(false);
   }
 
   const acikSorular = sorular.filter((s) => s.durum === "soruldu");
   const gecmisSorular = sorular.filter((s) => s.durum !== "soruldu");
+  // Herhangi bir sayı alanında harf/işaret varsa kayıt düğmesi kapalıdır.
+  const formGecersiz = [alt, ust, kosulAlt, kosulUst, kosulDeger].some(braketGecersiz);
 
   if (yukleniyor) {
     return <Card className="p-5 flex items-center gap-2 text-sm text-muted-foreground">
@@ -1062,14 +1101,24 @@ function BraketTarafBolumu({ caseId, partyId }: { caseId: string; partyId: strin
           ne koşullu taahhüdünüzü, ne de bunları girip girmediğinizi görebilir.
         </p>
 
+        <p className="text-[11px] text-muted-foreground">
+          Tutarları rakamla yazın: 100000 ya da 100.000 — kuruş için virgül (100.000,50).
+        </p>
+
         <div className="grid sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Alt sınır</Label>
-            <Input inputMode="decimal" value={alt} onChange={(e) => setAlt(e.target.value)} placeholder="Örn. 50000" />
+            <Input inputMode="decimal" value={alt} aria-invalid={braketGecersiz(alt)}
+              className={braketGecersiz(alt) ? "border-destructive" : undefined}
+              onChange={(e) => { dokunuldu.current = true; setAlt(e.target.value); }} placeholder="Örn. 50.000" />
+            {braketGecersiz(alt) && <p className="text-[11px] text-destructive">Yalnız rakam girin.</p>}
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Üst sınır</Label>
-            <Input inputMode="decimal" value={ust} onChange={(e) => setUst(e.target.value)} placeholder="Örn. 80000" />
+            <Input inputMode="decimal" value={ust} aria-invalid={braketGecersiz(ust)}
+              className={braketGecersiz(ust) ? "border-destructive" : undefined}
+              onChange={(e) => { dokunuldu.current = true; setUst(e.target.value); }} placeholder="Örn. 80.000" />
+            {braketGecersiz(ust) && <p className="text-[11px] text-destructive">Yalnız rakam girin.</p>}
           </div>
         </div>
 
@@ -1085,20 +1134,30 @@ function BraketTarafBolumu({ caseId, partyId }: { caseId: string; partyId: strin
           <div className="grid sm:grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Bant — alt</Label>
-              <Input inputMode="decimal" value={kosulAlt} onChange={(e) => setKosulAlt(e.target.value)} placeholder="Örn. 40000" />
+              <Input inputMode="decimal" value={kosulAlt} aria-invalid={braketGecersiz(kosulAlt)}
+                className={braketGecersiz(kosulAlt) ? "border-destructive" : undefined}
+                onChange={(e) => { dokunuldu.current = true; setKosulAlt(e.target.value); }} placeholder="Örn. 40.000" />
+              {braketGecersiz(kosulAlt) && <p className="text-[11px] text-destructive">Yalnız rakam girin.</p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Bant — üst</Label>
-              <Input inputMode="decimal" value={kosulUst} onChange={(e) => setKosulUst(e.target.value)} placeholder="Örn. 55000" />
+              <Input inputMode="decimal" value={kosulUst} aria-invalid={braketGecersiz(kosulUst)}
+                className={braketGecersiz(kosulUst) ? "border-destructive" : undefined}
+                onChange={(e) => { dokunuldu.current = true; setKosulUst(e.target.value); }} placeholder="Örn. 55.000" />
+              {braketGecersiz(kosulUst) && <p className="text-[11px] text-destructive">Yalnız rakam girin.</p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Ben de şuna inerim</Label>
-              <Input inputMode="decimal" value={kosulDeger} onChange={(e) => setKosulDeger(e.target.value)} placeholder="Örn. 45000" />
+              <Input inputMode="decimal" value={kosulDeger} aria-invalid={braketGecersiz(kosulDeger)}
+                className={braketGecersiz(kosulDeger) ? "border-destructive" : undefined}
+                onChange={(e) => { dokunuldu.current = true; setKosulDeger(e.target.value); }} placeholder="Örn. 45.000" />
+              {braketGecersiz(kosulDeger) && <p className="text-[11px] text-destructive">Yalnız rakam girin.</p>}
             </div>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Not (yalnız arabulucu görür)</Label>
-            <Textarea rows={2} value={kosulNot} onChange={(e) => setKosulNot(e.target.value)}
+            <Textarea rows={2} value={kosulNot}
+              onChange={(e) => { dokunuldu.current = true; setKosulNot(e.target.value); }}
               placeholder="Arabulucuya iletmek istediğiniz açıklama…" />
           </div>
           {mevcut && mevcut.kosul_durumu !== "yok" && (
@@ -1111,12 +1170,21 @@ function BraketTarafBolumu({ caseId, partyId }: { caseId: string; partyId: strin
           )}
         </div>
 
-        {hata && <p className="text-xs text-destructive">{hata}</p>}
-        {bilgi && <p className="text-xs text-emerald-700">{bilgi}</p>}
+        {/* Hata SESSİZ DÜŞMEZ: gerçek mesaj kırmızı ve kalıcı durur. */}
+        {hata && (
+          <p className="text-xs text-destructive flex items-start gap-1.5 break-words">
+            <X className="h-3.5 w-3.5 mt-0.5 shrink-0" /><span>{hata}</span>
+          </p>
+        )}
+        {bilgi && (
+          <p className="text-xs text-emerald-700 flex items-start gap-1.5">
+            <Check className="h-3.5 w-3.5 mt-0.5 shrink-0" /><span>{bilgi}</span>
+          </p>
+        )}
 
-        <Button onClick={kaydet} disabled={kaydediliyor}>
+        <Button onClick={kaydet} disabled={kaydediliyor || formGecersiz}>
           {kaydediliyor ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-          Kaydet
+          {kaydediliyor ? "Kaydediliyor…" : "Kaydet"}
         </Button>
       </Card>
 
