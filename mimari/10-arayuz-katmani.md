@@ -180,3 +180,11 @@ arabulucunun kendi girdiği kayıttır.
   ve gerçek mesajla. Dengesizlik yoksa tek satır "Belirgin bir dengesizlik göstergesi
   bulunmadı" görünür. Katman başlığında "N gösterge" sayacı ("yok" satırı sayılmaz).
   Mevcut katmanların düzeni değişmedi. Bu katman YALNIZ arabulucu ekranındadır.
+● 15.08: AŞAMA 2 (Taraf Analizi) — "USULE İLİŞKİN ENGELLER" ana katmanı eklendi; GÜÇ
+  DENGESİ'nin altında, TARAFLAR'ın üstünde durur. Her eksik bir satır: tip rozeti
+  (Vekaletname · Temsil yetkisi · Tebligat · Katılım · Süre · Kimlik/sıfat) + başlık +
+  eksiği söyleyen cümle + "Dayanak: …"; doğrulanmış bir mevzuat dayanağı varsa
+  "Mevzuat referansı: …" satırı eklenir (yalnız kayıtlı legal_basis'ten, yorumsuz).
+  Eksik yoksa "Usule ilişkin engel görünmüyor." yazar. Sağ üstte [Yenile]. Katman
+  başlığında "N eksik" / "eksik yok" sayacı. Hesap ekrandaki yüklü veriden türetilir;
+  yeni sorgu, yeni tablo ve AI çağrısı yoktur. Bu katman YALNIZ arabulucu ekranındadır.

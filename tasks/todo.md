@@ -1,3 +1,30 @@
+## Nerede kaldık — 15.08.2026 (58) · USULE İLİŞKİN ENGELLER (İBA 2.4 / B17)
+KEŞİF: Bu iş için mimaride ayrı başlık YOK, kodda yarım kalmış uygulama YOK
+("vekaletname / usule ilişkin / tebligat / usul_engel" araması mimari ve kodda boş
+döndü; yalnız pdfTemplates.ts'te vekaletname ŞABLONU var, denetim değil). ÇAKIŞMA
+RİSKİ olan tek yer süre takibi: cases.deadline_total / deadline_extended /
+extension_used + DeadlineCard zaten canlı — bu yüzden süre satırı o kayıttan yalnız
+OKUNUYOR, yeniden hesaplanmıyor. Kontrol için gereken alanların hepsi case_parties'te
+(vekil_ad_soyad · authorized_person · email · address · katilim_durumu · tc_kimlik ·
+tax_number · trade_registry_no) ve case_documents.file_name'de zaten vardı.
+- [x] Ekran: Aşama 2 > "USULE İLİŞKİN ENGELLER" katmanı (GÜÇ DENGESİ'nin altında,
+      TARAFLAR'ın üstünde) + sol menü satırı + "N eksik" / "eksik yok" sayacı.
+- [x] Altı kontrol: vekaletname yok · temsil/imza yetkilisi boş · tebligat adresi ya da
+      e-posta eksik/biçimsiz · katılım durumu belirsiz · yasal süre dolmuş veya dolmak
+      üzere (≤7 gün) · kimliği/sıfatını gösteren temel belge yok.
+- [x] Her satırda "Dayanak: …". Kanun yorumu YOK; "Mevzuat referansı" satırı yalnız
+      dosyada KAYITLI legal_basis varsa ve yorumsuz yazılıyor — madde numarası
+      uydurulmuyor (constitution m.2).
+- [x] Eksik yoksa "Usule ilişkin engel görünmüyor." Zorlama üretim yok.
+- [x] YENİ TABLO / EDGE FONKSİYON / AI ÇAĞRISI YOK: hesap ekranda zaten yüklü veriden
+      deterministik türetiliyor (parties + docs + caseRow). "Yenile" mevcut loadAll'ı
+      çağırıyor. Bu yüzden SQL ve redeploy gerekmiyor.
+tsc (tsconfig.app.json) temiz. CANLI TEST YOK. PUBLISH GEREKLİ (yeni katman).
+AÇIK UÇ: Kontroller belge ADI eşleşmesine dayanıyor (vekaletname · kimlik · sicil).
+Belge adı farklı yazılmışsa eksik görünebilir — belge türü etiketi eklenirse kesinleşir.
+AÇIK UÇ: Vekaletname dışındaki satırlarda mevzuat referansı boş kalıyor; doğrulanmış
+madde künyesi kaynağı (hukuk kural katmanı) bağlanana kadar uydurma yapılmayacak.
+
 ## Nerede kaldık — 15.08.2026 (57) · LOVABLE GÜVENLİK BULGULARI (Publish blokeri)
 İNCELEME SONUCU: İki fonksiyonda da istenen kapı kalıbı ZATEN vardı; kodda kapatılacak
 açık bulunamadı.

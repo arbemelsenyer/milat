@@ -359,3 +359,14 @@ hiçbir yoldan görmez. Süreç ajanıyla doğrudan konuşmaz — iletişim ajan
   sürümde çıkmaz, karşı tarafa sızmaz.
 · TEKRAR ÜRETİM YOK: kaydı olan dosyada "atlandi" döner; yenile:true ile eski satırlar
   silinip yeniden yazılır ("Yenile" düğmesi).
+
+[NOT — USULE İLİŞKİN ENGELLER (15.08, İBA 2.4 / B17)] ● KODDA (yalnız Publish bekliyor).
+· AJAN DEĞİLDİR: yeni edge fonksiyon, yeni tablo ve yeni AI çağrısı YOKTUR. Liste,
+  arabulucu ekranında zaten yüklü olan taraf/belge/dosya kayıtlarından deterministik
+  türetilir (src/pages/MediationEngine.tsx · UsulEngelleriPanel).
+· Bu yüzden ajan sözleşmesi gerekmez; çıktı üretimi yoktur, kayıt okuması vardır.
+· KANUN YORUMU YOK: satır yalnız eksiği söyler. Mevzuat referansı ancak dosyada
+  KAYITLI bir dayanak varsa (cases.legal_basis) ve yorumsuz yazılır; uydurma madde
+  numarası üretilmez (constitution m.2).
+· Süre satırı mevcut süre takibinden (deadline_total / deadline_extended / extension_used)
+  OKUNUR; yeniden hesaplanmaz — DeadlineCard ile çakışma olmaz.

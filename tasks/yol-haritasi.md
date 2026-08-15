@@ -559,3 +559,12 @@ Zekâ, eğitim, psikoloji, karakter değerlendirmesi ve "güçlü/zayıf taraf" 
 bir dengesizlik göstergesi bulunmadı" yazılır. Çıktı guc_dengesi tablosunda tutulur ve
 tarafa SELECT politikası verilmez.
 SQL göçü bekliyor: 20260815200000_guc_dengesi.sql. REDEPLOY GEREKLİ: guc-dengesi (YENİ).
+
+15.08 (USULE İLİŞKİN ENGELLER — İBA 2.4 / B17): Aşama 2'ye "USULE İLİŞKİN ENGELLER"
+katmanı eklendi. Altı kontrol: vekil var ama vekaletname yok · tüzel kişide temsil/imza
+yetkilisi boş · tebligat adresi veya e-posta eksik/biçimsiz · taraf davete cevap vermemiş ·
+yasal süre dolmuş veya dolmak üzere (mevcut süre takibinden OKUNUR) · kimliği/sıfatı
+gösteren temel belge yok. Her satırın dayanağı yazılır; kanun yorumu yapılmaz, mevzuat
+referansı yalnız kayıtlı legal_basis'ten ve yorumsuz eklenir. Eksik yoksa "usule ilişkin
+engel görünmüyor" yazar. YENİ TABLO, YENİ EDGE FONKSİYON VE YENİ AI ÇAĞRISI YOK —
+hesap ekranda yüklü veriden deterministik türetilir. SQL gerekmiyor; yalnız Publish.

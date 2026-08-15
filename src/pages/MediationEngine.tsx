@@ -3739,6 +3739,11 @@ const FAZ3_LAYERS = [
     label: "GÜÇ DENGESİ",
     hint: "Bu katman, taraflar arasındaki dengesizlik göstergelerini dayanağıyla birlikte işaret eder; kişilik değerlendirmesi değil, durum tespitidir.",
   },
+  {
+    id: "faz3-katman-usul",
+    label: "USULE İLİŞKİN ENGELLER",
+    hint: "Bu katman, süreci aksatabilecek usul eksiklerini dayanağıyla birlikte sayar; kanun yorumu içermez.",
+  },
 ];
 // Bölüm → kapsayan katman: sol menüden bölüme atlanınca önce katman açılır.
 const FAZ3_SECTION_LAYER: Record<string, string> = {
@@ -3776,6 +3781,7 @@ const FAZ3_MENU_ENTRIES: { id: string; label: string; kind: "layer" | "section";
     { id: "faz3-tur-tespiti", label: "Uyuşmazlık tür tespiti", kind: "section" },
     { id: FAZ3_LAYERS[3].id, label: FAZ3_LAYERS[3].label, kind: "layer", hint: FAZ3_LAYERS[3].hint },
     { id: FAZ3_LAYERS[4].id, label: FAZ3_LAYERS[4].label, kind: "layer", hint: FAZ3_LAYERS[4].hint },
+    { id: FAZ3_LAYERS[5].id, label: FAZ3_LAYERS[5].label, kind: "layer", hint: FAZ3_LAYERS[5].hint },
     { id: FAZ3_LAYERS[1].id, label: FAZ3_LAYERS[1].label, kind: "layer", hint: FAZ3_LAYERS[1].hint },
     { id: FAZ3_LAYERS[2].id, label: FAZ3_LAYERS[2].label, kind: "layer", hint: FAZ3_LAYERS[2].hint },
   ]);
@@ -3848,6 +3854,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
   const [cizelgeSayisi, setCizelgeSayisi] = useState(0);
   // Güç dengesi gösterge sayısı (katman başlığındaki sayaç için).
   const [gucSayisi, setGucSayisi] = useState(0);
+  // Usule ilişkin engel sayısı (katman başlığındaki sayaç için).
+  const [usulSayisi, setUsulSayisi] = useState(0);
   const toggleLayer = useCallback((id: string) => {
     setOpenLayers((prev) => {
       const next = new Set(prev);
@@ -4158,6 +4166,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
     "faz3-katman-ozet": "2 bölüm",
     "faz3-katman-cizelge": cizelgeSayisi > 0 ? `${cizelgeSayisi} olay` : "çıkarılmadı",
     "faz3-katman-guc": gucSayisi > 0 ? `${gucSayisi} gösterge` : "çıkarılmadı",
+    "faz3-katman-usul": usulSayisi > 0 ? `${usulSayisi} eksik` : "eksik yok",
     "faz3-katman-taraflar": `${parties.length} taraf`,
     "faz3-katman-belgeler": `${docs.length} belge`,
   };
@@ -4260,6 +4269,23 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
           onToggle={() => toggleLayer("faz3-katman-guc")}
         >
           <GucDengesiPanel caseId={caseRow.id} onCountChange={setGucSayisi} />
+        </Phase3Layer>
+
+        {/* ── USULE İLİŞKİN ENGELLER (İBA 2.4 / B17) — yalnız arabulucu ── */}
+        <Phase3Layer
+          layer={FAZ3_LAYERS[5]}
+          count={layerCounts["faz3-katman-usul"]}
+          boxClass={layerBoxClass}
+          open={openLayers.has("faz3-katman-usul")}
+          onToggle={() => toggleLayer("faz3-katman-usul")}
+        >
+          <UsulEngelleriPanel
+            caseRow={caseRow}
+            parties={parties}
+            docs={docs}
+            onReload={loadAll}
+            onCountChange={setUsulSayisi}
+          />
         </Phase3Layer>
 
         {/* ── 3. KATMAN — Taraflar ── */}
@@ -8051,6 +8077,212 @@ function OlayCizelgesiPanel({ caseId, onCountChange }: { caseId: string; onCount
             </li>
           ))}
         </ol>
+      )}
+    </div>
+  );
+}
+
+/* ====== USULE İLİŞKİN ENGELLER (İBA 2.4 · todo B17) — yalnız arabulucu ====== */
+// Süreci aksatabilecek usul eksiklerini SAYAR. Kanun yorumu YAPMAZ; yalnız eksiği
+// söyler ve elde doğrulanmış bir mevzuat dayanağı VARSA onu referans olarak yazar.
+// Hesap tamamen deterministiktir: ekranda zaten yüklü olan taraf, belge ve dosya
+// kayıtlarından türetilir — yeni AI çağrısı, yeni tablo ve yeni sorgu YOKTUR.
+// Süre bilgisi mevcut süre takibinden OKUNUR, yeniden hesaplanmaz.
+
+type UsulSatiri = {
+  key: string;
+  tip: string;
+  baslik: string;
+  aciklama: string;
+  dayanak: string;
+  referans?: string | null;
+};
+
+const USUL_TIP_ETIKET: Record<string, string> = {
+  vekalet: "Vekaletname",
+  temsil: "Temsil yetkisi",
+  teblig: "Tebligat",
+  katilim: "Katılım",
+  sure: "Süre",
+  kimlik: "Kimlik/sıfat",
+  yok: "Durum",
+};
+
+const EPOSTA_DESENI = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+// Belge adında arama — taraf belgesi ya da dosya geneli belgesi kabul edilir.
+function usulBelgeVar(docs: any[], partyId: string, desen: RegExp): boolean {
+  return docs.some((d) => {
+    const ad = String(d?.file_name ?? "");
+    if (!desen.test(ad)) return false;
+    return !d?.party_id || String(d.party_id) === String(partyId);
+  });
+}
+
+function usulEngelleriHesapla(caseRow: any, parties: any[], docs: any[]): UsulSatiri[] {
+  const satirlar: UsulSatiri[] = [];
+  const ad = (p: any) => `${partyDisplay(p)} (${roleLabel(p.party_role)})`;
+
+  for (const p of parties) {
+    const bireysel = String(p?.party_type ?? "") === "individual";
+
+    // 1) Vekil görünüyor ama vekaletname dosyada yok
+    const vekil = String(p?.vekil_ad_soyad ?? "").trim();
+    if (vekil && !usulBelgeVar(docs, p.id, /vekalet|vekâlet/i)) {
+      satirlar.push({
+        key: `vekalet-${p.id}`,
+        tip: "vekalet",
+        baslik: "Vekaletname dosyada görünmüyor",
+        aciklama: `${ad(p)} için vekil kaydı var (${vekil}) ancak dosyada adında "vekaletname" geçen bir belge yok.`,
+        dayanak: "Taraf kaydı: vekil alanı dolu · Dosya belge listesi: eşleşen belge bulunamadı.",
+      });
+    }
+
+    // 2) Tüzel kişi tarafta imza/temsil yetkilisi belli değil
+    if (!bireysel && !String(p?.authorized_person ?? "").trim()) {
+      satirlar.push({
+        key: `temsil-${p.id}`,
+        tip: "temsil",
+        baslik: "Temsil/imza yetkilisi belirtilmemiş",
+        aciklama: `${ad(p)} tüzel kişi olarak kayıtlı; yetkili kişi alanı boş.`,
+        dayanak: "Taraf kaydı: taraf türü tüzel kişi · yetkili kişi alanı boş.",
+      });
+    }
+
+    // 3) Tebligat adresi / e-posta eksik ya da geçersiz görünüyor
+    const eposta = String(p?.email ?? "").trim();
+    const adres = String(p?.address ?? "").trim();
+    const eksikler: string[] = [];
+    if (!eposta) eksikler.push("e-posta yok");
+    else if (!EPOSTA_DESENI.test(eposta)) eksikler.push(`e-posta biçimi geçersiz görünüyor (${eposta})`);
+    if (!adres) eksikler.push("tebligat adresi yok");
+    if (eksikler.length) {
+      satirlar.push({
+        key: `teblig-${p.id}`,
+        tip: "teblig",
+        baslik: "Tebligat bilgisi eksik",
+        aciklama: `${ad(p)}: ${eksikler.join(" · ")}.`,
+        dayanak: "Taraf kaydı: e-posta ve adres alanları.",
+      });
+    }
+
+    // 4) Davete cevap yok / katılım durumu belirsiz
+    const katilim = String(p?.katilim_durumu ?? "").trim() || "beklemede";
+    if (katilim === "beklemede") {
+      satirlar.push({
+        key: `katilim-${p.id}`,
+        tip: "katilim",
+        baslik: "Katılım durumu belirsiz",
+        aciklama: `${ad(p)} davete henüz cevap vermemiş; katılım durumu "beklemede".`,
+        dayanak: "Taraf kaydı: katılım durumu alanı.",
+      });
+    }
+
+    // 6) Kimliğini/sıfatını gösteren temel belge yok
+    if (bireysel) {
+      const tc = String(p?.tc_kimlik ?? "").trim();
+      if (!tc && !usulBelgeVar(docs, p.id, /kimlik|nüfus|nufus/i)) {
+        satirlar.push({
+          key: `kimlik-${p.id}`,
+          tip: "kimlik",
+          baslik: "Kimlik bilgisi ya da belgesi yok",
+          aciklama: `${ad(p)} için TC kimlik alanı boş ve dosyada kimlik belgesi görünmüyor.`,
+          dayanak: "Taraf kaydı: TC kimlik alanı boş · Dosya belge listesi: eşleşen belge bulunamadı.",
+        });
+      }
+    } else {
+      const vergi = String(p?.tax_number ?? "").trim();
+      const sicil = String(p?.trade_registry_no ?? "").trim();
+      if (!vergi && !sicil && !usulBelgeVar(docs, p.id, /sicil|imza sirkü|imza sirku|faaliyet belgesi/i)) {
+        satirlar.push({
+          key: `kimlik-${p.id}`,
+          tip: "kimlik",
+          baslik: "Tüzel kişi sıfatını gösteren kayıt yok",
+          aciklama: `${ad(p)} için vergi no ve ticaret sicil no boş; dosyada sicil/imza sirküleri belgesi görünmüyor.`,
+          dayanak: "Taraf kaydı: vergi no ve ticaret sicil no boş · Dosya belge listesi: eşleşen belge bulunamadı.",
+        });
+      }
+    }
+  }
+
+  // 5) Yasal süre — MEVCUT süre takibinden OKUNUR, yeniden hesaplanmaz.
+  const bitis = caseRow?.extension_used && caseRow?.deadline_extended
+    ? caseRow.deadline_extended
+    : caseRow?.deadline_total;
+  if (bitis) {
+    const kalan = Math.ceil((new Date(bitis).getTime() - Date.now()) / 86400000);
+    const referans = String(caseRow?.legal_basis ?? "").trim() || null;
+    if (kalan < 0) {
+      satirlar.push({
+        key: "sure",
+        tip: "sure",
+        baslik: "Yasal süre dolmuş görünüyor",
+        aciklama: `Kayıtlı bitiş tarihi ${new Date(bitis).toLocaleDateString("tr-TR")}; bu tarih geçmiş.`,
+        dayanak: "Dosya kaydı: süre takibi alanı (yeniden hesaplanmadı).",
+        referans,
+      });
+    } else if (kalan <= 7) {
+      satirlar.push({
+        key: "sure",
+        tip: "sure",
+        baslik: "Yasal süre dolmak üzere",
+        aciklama: `Kayıtlı bitiş tarihine ${kalan} gün kaldı (${new Date(bitis).toLocaleDateString("tr-TR")}).`,
+        dayanak: "Dosya kaydı: süre takibi alanı (yeniden hesaplanmadı).",
+        referans,
+      });
+    }
+  }
+
+  return satirlar;
+}
+
+function UsulEngelleriPanel({
+  caseRow, parties, docs, onReload, onCountChange,
+}: {
+  caseRow: any; parties: any[]; docs: any[];
+  onReload: () => void; onCountChange: (n: number) => void;
+}) {
+  const satirlar = useMemo(
+    () => usulEngelleriHesapla(caseRow, parties, docs),
+    [caseRow, parties, docs],
+  );
+  useEffect(() => { onCountChange(satirlar.length); }, [satirlar.length, onCountChange]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-xs text-muted-foreground leading-snug flex-1 min-w-[220px]">
+          Süreci aksatabilecek usul eksikleri, dayanaklarıyla birlikte. Bu liste kanun yorumu
+          içermez; yalnız eksiği sayar. Süre bilgisi mevcut süre takibinden okunur. Yalnız
+          size görünür.
+        </p>
+        <Button size="sm" variant="outline" onClick={onReload}>
+          <RefreshCw className="h-4 w-4 mr-1" /> Yenile
+        </Button>
+      </div>
+
+      {satirlar.length === 0 ? (
+        <p className="text-sm text-muted-foreground italic">
+          Usule ilişkin engel görünmüyor.
+        </p>
+      ) : (
+        <ul className="divide-y">
+          {satirlar.map((r) => (
+            <li key={r.key} className="py-2.5 space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  {USUL_TIP_ETIKET[r.tip] ?? r.tip}
+                </span>
+                <span className="text-sm font-medium">{r.baslik}</span>
+              </div>
+              <p className="text-sm text-muted-foreground leading-snug">{r.aciklama}</p>
+              <p className="text-[11px] text-muted-foreground">Dayanak: {r.dayanak}</p>
+              {r.referans && (
+                <p className="text-[11px] text-muted-foreground">Mevzuat referansı: {r.referans}</p>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
