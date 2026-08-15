@@ -548,3 +548,14 @@ gösteriliyor. Çizelge olay_cizelgesi tablosunda tutuluyor ve tarafa SELECT pol
 verilmiyor. Tekrar üretim yok; "Çizelgeyi yenile" düğmesi var. §9'un tam Olay Haritası
 şeması kurulmadı — bu, §5.2g'nin hafif kademesidir.
 SQL göçü bekliyor: 20260815180000_olay_cizelgesi.sql. REDEPLOY GEREKLİ: olay-cizelgesi (YENİ).
+
+15.08 (GÜÇ DENGESİ İŞARETİ — İBA 2.4): Aşama 2'ye "GÜÇ DENGESİ" katmanı eklendi. Yeni edge
+fonksiyon guc-dengesi, dosyanın mevcut kayıtlarından beş göstergeyi çıkarır: vekil durumu,
+taraf niteliği (tüzel/gerçek kişi), dosyaya sunulan belge sayısı farkı, sürece katılım
+düzeyi ve süreç bilgisi düzeyinde anlatım farkı. İlk dördü kodda deterministik hesaplanır;
+yalnız anlatım farkı tek model çağrısıyla üretilir. Her göstergenin dayanağı zorunludur.
+Zekâ, eğitim, psikoloji, karakter değerlendirmesi ve "güçlü/zayıf taraf" etiketi yasaktır —
+çıktıda geçerse gösterge sunucuda elenir. Ajan çözüm dayatmaz. Dengesizlik yoksa "belirgin
+bir dengesizlik göstergesi bulunmadı" yazılır. Çıktı guc_dengesi tablosunda tutulur ve
+tarafa SELECT politikası verilmez.
+SQL göçü bekliyor: 20260815200000_guc_dengesi.sql. REDEPLOY GEREKLİ: guc-dengesi (YENİ).

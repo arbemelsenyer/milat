@@ -3734,6 +3734,11 @@ const FAZ3_LAYERS = [
     label: "OLAY ZAMAN ÇİZELGESİ",
     hint: "Bu katman, dosyadaki bütün tarihleri tek çizelgede eskiden yeniye sıralar; her satır dayandığı belgeyi veya beyanı gösterir.",
   },
+  {
+    id: "faz3-katman-guc",
+    label: "GÜÇ DENGESİ",
+    hint: "Bu katman, taraflar arasındaki dengesizlik göstergelerini dayanağıyla birlikte işaret eder; kişilik değerlendirmesi değil, durum tespitidir.",
+  },
 ];
 // Bölüm → kapsayan katman: sol menüden bölüme atlanınca önce katman açılır.
 const FAZ3_SECTION_LAYER: Record<string, string> = {
@@ -3770,6 +3775,7 @@ const FAZ3_MENU_ENTRIES: { id: string; label: string; kind: "layer" | "section";
     { id: "faz3-uyusmazlik-konusu", label: "Uyuşmazlık konusu", kind: "section" },
     { id: "faz3-tur-tespiti", label: "Uyuşmazlık tür tespiti", kind: "section" },
     { id: FAZ3_LAYERS[3].id, label: FAZ3_LAYERS[3].label, kind: "layer", hint: FAZ3_LAYERS[3].hint },
+    { id: FAZ3_LAYERS[4].id, label: FAZ3_LAYERS[4].label, kind: "layer", hint: FAZ3_LAYERS[4].hint },
     { id: FAZ3_LAYERS[1].id, label: FAZ3_LAYERS[1].label, kind: "layer", hint: FAZ3_LAYERS[1].hint },
     { id: FAZ3_LAYERS[2].id, label: FAZ3_LAYERS[2].label, kind: "layer", hint: FAZ3_LAYERS[2].hint },
   ]);
@@ -3840,6 +3846,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
   const [openSections, setOpenSections] = useState<Set<string>>(() => new Set(["faz3-tur-tespiti"]));
   // Olay zaman çizelgesi satır sayısı (katman başlığındaki sayaç için).
   const [cizelgeSayisi, setCizelgeSayisi] = useState(0);
+  // Güç dengesi gösterge sayısı (katman başlığındaki sayaç için).
+  const [gucSayisi, setGucSayisi] = useState(0);
   const toggleLayer = useCallback((id: string) => {
     setOpenLayers((prev) => {
       const next = new Set(prev);
@@ -4149,6 +4157,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
   const layerCounts: Record<string, string> = {
     "faz3-katman-ozet": "2 bölüm",
     "faz3-katman-cizelge": cizelgeSayisi > 0 ? `${cizelgeSayisi} olay` : "çıkarılmadı",
+    "faz3-katman-guc": gucSayisi > 0 ? `${gucSayisi} gösterge` : "çıkarılmadı",
     "faz3-katman-taraflar": `${parties.length} taraf`,
     "faz3-katman-belgeler": `${docs.length} belge`,
   };
@@ -4240,6 +4249,17 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
           onToggle={() => toggleLayer("faz3-katman-cizelge")}
         >
           <OlayCizelgesiPanel caseId={caseRow.id} onCountChange={setCizelgeSayisi} />
+        </Phase3Layer>
+
+        {/* ── GÜÇ DENGESİ (İBA 2.4) — yalnız arabulucu ── */}
+        <Phase3Layer
+          layer={FAZ3_LAYERS[4]}
+          count={layerCounts["faz3-katman-guc"]}
+          boxClass={layerBoxClass}
+          open={openLayers.has("faz3-katman-guc")}
+          onToggle={() => toggleLayer("faz3-katman-guc")}
+        >
+          <GucDengesiPanel caseId={caseRow.id} onCountChange={setGucSayisi} />
         </Phase3Layer>
 
         {/* ── 3. KATMAN — Taraflar ── */}
@@ -8031,6 +8051,135 @@ function OlayCizelgesiPanel({ caseId, onCountChange }: { caseId: string; onCount
             </li>
           ))}
         </ol>
+      )}
+    </div>
+  );
+}
+
+/* ============ GÜÇ DENGESİ İŞARETİ (İBA 2.4) — yalnız arabulucu ============ */
+// guc_dengesi tablosunda tarafa SELECT politikası yoktur; bu panel taraf ekranında
+// (CaseRoom) hiçbir sürümde yoktur. Çıktı DURUM TESPİTİDİR — kişilik değerlendirmesi,
+// "güçlü/zayıf taraf" etiketi ve çözüm dayatması yasaktır (constitution m.2, §11).
+
+type GucSatiri = {
+  id: string;
+  gosterge_tipi: string;
+  baslik: string;
+  aciklama: string;
+  dayanak: string;
+  sira: number;
+};
+
+const GUC_TIP_ETIKET: Record<string, string> = {
+  vekil: "Vekil",
+  nitelik: "Taraf niteliği",
+  belge: "Belge",
+  katilim: "Katılım",
+  anlatim: "Anlatım",
+  yok: "Durum",
+};
+
+function GucDengesiPanel({ caseId, onCountChange }: { caseId: string; onCountChange: (n: number) => void }) {
+  const [satirlar, setSatirlar] = useState<GucSatiri[]>([]);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const [bilgi, setBilgi] = useState<string | null>(null);
+
+  const yukle = useCallback(async () => {
+    setYukleniyor(true);
+    const { data, error } = await (supabase.from("guc_dengesi" as any) as any)
+      .select("id, gosterge_tipi, baslik, aciklama, dayanak, sira")
+      .eq("case_id", caseId).order("sira");
+    setYukleniyor(false);
+    if (error) { setHata(`Güç dengesi okunamadı: ${trErr(error.message)}`); return; }
+    setHata(null);
+    const liste = (Array.isArray(data) ? data : []) as GucSatiri[];
+    setSatirlar(liste);
+    onCountChange(liste.filter((r) => r.gosterge_tipi !== "yok").length);
+  }, [caseId, onCountChange]);
+
+  useEffect(() => { yukle(); }, [yukle]);
+
+  async function cikar(yenile: boolean) {
+    setBusy(true);
+    setHata(null);
+    setBilgi(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("guc-dengesi", {
+        body: { case_id: caseId, yenile },
+      });
+      if (error) {
+        // Gerçek sebep .context gövdesindedir; sessizce yutulmaz.
+        let ham = String((error as any)?.message ?? "bilinmeyen hata");
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.text === "function") {
+          try {
+            const govde = await ctx.text();
+            if (govde) {
+              try { const j = JSON.parse(govde); ham = String(j?.error ?? j?.detay ?? govde); }
+              catch { ham = String(govde).slice(0, 400); }
+            }
+          } catch { /* gövde okunamadı */ }
+        }
+        throw new Error(ham);
+      }
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+      if ((data as any)?.atlandi) setBilgi(String((data as any).sebep ?? "Üretilmedi"));
+      await yukle();
+    } catch (e: any) {
+      console.error("[guc-dengesi] çağrı başarısız", e);
+      setHata(`guc-dengesi çağrısı başarısız: ${trErr(e?.message ?? "bilinmeyen hata")}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-xs text-muted-foreground leading-snug flex-1 min-w-[220px]">
+          Taraflar arasındaki dengesizlik göstergeleri, dayanaklarıyla birlikte. Bu bir durum
+          tespitidir — kişilik değerlendirmesi değildir ve ne yapılacağına karışmaz. Yalnız
+          size görünür.
+        </p>
+        <Button size="sm" variant="outline" onClick={() => cikar(satirlar.length > 0)} disabled={busy || yukleniyor}>
+          {busy
+            ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Çıkarılıyor…</>
+            : <><Sparkles className="h-4 w-4 mr-1" /> {satirlar.length > 0 ? "Yenile" : "Göstergeleri çıkar"}</>}
+        </Button>
+      </div>
+
+      {hata && (
+        <p className="text-sm text-destructive flex items-start gap-1.5 break-words">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" /><span>{hata}</span>
+        </p>
+      )}
+      {bilgi && <p className="text-xs text-amber-600 dark:text-amber-400">{bilgi}</p>}
+
+      {yukleniyor ? (
+        <p className="text-sm text-muted-foreground flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> Yükleniyor…
+        </p>
+      ) : satirlar.length === 0 ? (
+        <p className="text-sm text-muted-foreground italic">
+          Henüz çıkarılmadı. Taraflar ve belgeler girildikten sonra "Göstergeleri çıkar" düğmesini kullanın.
+        </p>
+      ) : (
+        <ul className="divide-y">
+          {satirlar.map((r) => (
+            <li key={r.id} className="py-2.5 space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  {GUC_TIP_ETIKET[r.gosterge_tipi] ?? r.gosterge_tipi}
+                </span>
+                <span className="text-sm font-medium">{r.baslik}</span>
+              </div>
+              <p className="text-sm text-muted-foreground leading-snug">{r.aciklama}</p>
+              <p className="text-[11px] text-muted-foreground">Dayanak: {r.dayanak}</p>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

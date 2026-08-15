@@ -124,3 +124,6 @@ verify_jwt = false
 
 [functions.olay-cizelgesi]
 verify_jwt = true
+
+[functions.guc-dengesi]
+verify_jwt = true

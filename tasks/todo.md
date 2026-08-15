@@ -1,3 +1,32 @@
+## Nerede kaldık — 15.08.2026 (56) · GÜÇ DENGESİ İŞARETİ (İBA 2.4 / B16)
+KEŞİF: Bu iş için mimaride ayrı bir başlık YOK ve kodda yarım kalmış uygulama YOK
+("güç dengesi/dengesizlik/asimetri" araması mimari, komut, constitution ve kodda boş
+döndü). Üstüne inşa edilecek taban veri modelinde hazırdı: case_parties'te
+vekil_ad_soyad · vekil_baro · vekil_sicil_no · party_type · katilim_durumu · statement,
+case_documents.party_id (taraf başına belge) ve randevu_teklifleri cevap kayıtları.
+Sınır kuralı da hazırdı: mimari/11 teşhis dili denetimi + constitution m.2. İş bu
+alanların üstüne kuruldu; yeni veri kaynağı eklenmedi.
+- [x] Yeni edge fonksiyon: supabase/functions/guc-dengesi.
+      · Yapısal göstergeler KODDA deterministik: vekil durumu · taraf niteliği ·
+        belge sayısı farkı (eşik: fark ≥ 3 ya da bir tarafta hiç belge yok) · katılım.
+      · Yalnız "anlatım farkı" tek model çağrısı — SÜREÇ BİLGİSİ düzeyiyle sınırlı.
+      · Her göstergede dayanak ZORUNLU; dayanaksız gösterge yazılmıyor.
+      · Yasak etiket süzgeci (zekâ · eğitim · psikoloji · karakter · kişilik ·
+        güçlü/zayıf taraf · mağdur · haklı) — geçerse gösterge sunucuda eleniyor.
+      · Dengesizlik yoksa tek satır: "Belirgin bir dengesizlik göstergesi bulunmadı".
+      · Ajan çözüm önermiyor; tekrar üretim yok, yenile:true ile yeniden yazılıyor.
+- [x] Ekran: Aşama 2 > "GÜÇ DENGESİ" katmanı (OLAY ZAMAN ÇİZELGESİ'nin altında,
+      TARAFLAR'ın üstünde) + sol menü satırı + "N gösterge" sayacı. Satırda tip rozeti,
+      başlık, nötr cümle ve "Dayanak: …". [Göstergeleri çıkar] / [Yenile], hata kırmızı.
+- [x] GİZLİLİK: guc_dengesi'nde tarafa SELECT politikası YOK; CaseRoom'a dokunulmadı.
+tsc (tsconfig.app.json) temiz; edge fonksiyon sözdizimi esbuild ile doğrulandı.
+CANLI TEST YOK.
+SQL GEREKLİ: supabase/migrations/20260815200000_guc_dengesi.sql (kurucu çalıştıracak).
+REDEPLOY GEREKLİ: guc-dengesi (YENİ). PUBLISH GEREKLİ (yeni katman).
+AÇIK UÇ: Oturuma fiilî katılım verisi yok — case_sessions.participants alanı güvenilir
+doldurulmuyor; katılım göstergesi şimdilik katılım durumu, beyan ve randevu cevabından
+hesaplanıyor. Oturum yoklaması eklenirse gösterge güçlenir.
+
 ## Nerede kaldık — 15.08.2026 (55) · OLAY ZAMAN ÇİZELGESİ (İBA 2.3 / B15 · mimari §5.2g)
 KEŞİF: mimari/05 §5.2g bu işi "hafif kademe" olarak zaten tanımlamış (Olay Haritası'nın
 öncüsü, mevcut çıkarma hattını kullanır, dayanaksız tarih giremez). mimari/09'daki tam

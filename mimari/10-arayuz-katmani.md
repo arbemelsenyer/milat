@@ -173,3 +173,10 @@ arabulucunun kendi girdiği kayıttır.
   düğmesi ("Çıkarılıyor…"), hata kırmızı ve gerçek mesajla. Katman başlığında "N olay"
   sayacı. Mevcut katmanların (DOSYA ÖZETİ · TARAFLAR · BELGELER VE ARAÇLAR) düzeni ve
   içeriği değişmedi. Bu katman YALNIZ arabulucu ekranındadır.
+● 15.08: AŞAMA 2 (Taraf Analizi) — "GÜÇ DENGESİ" ana katmanı eklendi; OLAY ZAMAN
+  ÇİZELGESİ'nin altında, TARAFLAR'ın üstünde durur. Her gösterge bir satır: tip rozeti
+  (Vekil · Taraf niteliği · Belge · Katılım · Anlatım) + başlık + nötr durum cümlesi +
+  "Dayanak: …" satırı. Sağ üstte [Göstergeleri çıkar] / [Yenile] düğmesi, hata kırmızı
+  ve gerçek mesajla. Dengesizlik yoksa tek satır "Belirgin bir dengesizlik göstergesi
+  bulunmadı" görünür. Katman başlığında "N gösterge" sayacı ("yok" satırı sayılmaz).
+  Mevcut katmanların düzeni değişmedi. Bu katman YALNIZ arabulucu ekranındadır.

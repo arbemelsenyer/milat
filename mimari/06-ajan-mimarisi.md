@@ -339,3 +339,23 @@ hiçbir yoldan görmez. Süreç ajanıyla doğrudan konuşmaz — iletişim ajan
     ilgisiz" olarak kayda düşer. (b) TARİH BİÇİMİ TEK: tarih_metni GG.AA.YYYY'ye
     normalize edilir (2026-08-13 → 13.08.2026); aralık "GG.AA.YYYY – GG.AA.YYYY"
     kalır; "yaklaşık Mart 2026" gibi belirsiz ifadeler AYNEN korunur.
+
+[EKLEME — GÜÇ DENGESİ İŞARETİ AJANI (15.08, İBA 2.4)] ● KODDA (SQL + redeploy bekliyor).
+· Ajan: guc-dengesi (edge function, verify_jwt=true) · Kimlik: durum tespiti asistanı.
+· GİRDİ: yalnız dosyanın MEVCUT kayıtları — case_parties (vekil alanları, taraf türü,
+  katılım durumu, kendi beyanı), case_documents (taraf başına belge sayımı) ve
+  randevu_teklifleri (cevap kayıtları). Yeni bağımsız zincir kurulmadı.
+· ÇIKTI: guc_dengesi satırları — gosterge_tipi (vekil|nitelik|belge|katilim|anlatim|yok)
+  · baslik · aciklama · dayanak. DAYANAK ZORUNLUDUR; dayanaksız gösterge yazılmaz.
+· YÖNTEM: yapısal göstergeler (vekil · nitelik · belge sayımı · katılım) KOD tarafından
+  deterministik üretilir, modele bırakılmaz. Yalnız "anlatım farkı" göstergesi tek bir
+  model çağrısıyla ve SÜREÇ BİLGİSİ DÜZEYİYLE sınırlı üretilir.
+· YASAK (m.2 · §11): zekâ, eğitim, kültür, psikoloji, karakter, kişilik değerlendirmesi;
+  "güçlü taraf / zayıf taraf / mağdur / haklı" etiketi; çözüm dayatması. Bu ifadelerden
+  biri çıktıda geçerse gösterge SUNUCUDA ELENİR ve loga sebebiyle düşer.
+· DENGESİZLİK YOKSA zorlama üretilmez: tek satır "Belirgin bir dengesizlik göstergesi
+  bulunmadı" yazılır (gosterge_tipi='yok').
+· GİZLİLİK: guc_dengesi'nde tarafa SELECT politikası YOKTUR; taraf ekranına hiçbir
+  sürümde çıkmaz, karşı tarafa sızmaz.
+· TEKRAR ÜRETİM YOK: kaydı olan dosyada "atlandi" döner; yenile:true ile eski satırlar
+  silinip yeniden yazılır ("Yenile" düğmesi).
