@@ -312,3 +312,22 @@ hiçbir yoldan görmez. Süreç ajanıyla doğrudan konuşmaz — iletişim ajan
         özet korunur, satıra "Bu belgenin hangi çekişmeli noktaya dayanak olduğu
         çıkarılamadı" yazılır ve sebep alanına "Kanıt satırı çıkarılamadı … — özet
         korundu" notu düşer. Onarım çağrısının hatası özeti etkilemez.
+
+[EKLEME — OLAY ZAMAN ÇİZELGESİ AJANI (15.08, İBA 2.3 · §5.2g)] ● KODDA (SQL + redeploy bekliyor).
+· Ajan: olay-cizelgesi (edge function, verify_jwt=true) · §5.2g'nin "hafif kademe"si;
+  tam Olay Haritası (§9, K2) geldiğinde bu çizelge onun görünümlerinden biri olur.
+· GİRDİ: mevcut belge metni çıkarma hattının çıktısı (case_documents.extracted_text),
+  taraf beyanları (case_parties.statement) ve dosya kaydı (application_date).
+  Yeni bağımsız zincir kurulmadı.
+· ÇIKTI: olay_cizelgesi satırları — tarih · tarih_metni · olay (tek cümle) · kaynak_tipi
+  (belge|beyan|kayit) · kaynak_document_id · kaynak_adi · kaynak_bolum · celiski_notu.
+· GİZLİLİK: olay_cizelgesi'nde tarafa SELECT politikası YOKTUR; çizelge yalnız
+  arabulucu/yöneticide kalır, taraf ekranına hiçbir sürümde çıkmaz.
+· HALÜSİNASYON KAPISI (m.2): kaynağı çözülemeyen satır SUNUCUDA ELENİR (belge kimliği
+  dosyanın belgelerinden biri değilse ya da "beyan" değilse satır atılır). Tahmini tarih
+  üretilmez; "yaklaşık/civarında" gibi ifadeler tarih_metni'ne aynen aktarılır, kesin
+  güne çevrilmez. Ajanın kendi hüküm cümlesi taşıyan satır elenir (aktarım kalıbı serbest).
+· ÇELİŞKİ: aynı olay iki kaynakta farklı tarihteyse TEK satır yazılır, celiski_notu'na
+  "Çelişki: X belgesi 14.03, Y belgesi 18.03 diyor" biçiminde not düşülür.
+· TEKRAR ÜRETİM YOK: çizelgesi olan dosyada "atlandi" döner; yenile:true ile eski satırlar
+  silinip yeniden yazılır ("Çizelgeyi yenile" düğmesi).

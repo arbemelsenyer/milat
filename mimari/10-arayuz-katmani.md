@@ -165,3 +165,11 @@ arabulucunun kendi girdiği kayıttır.
   Hata olursa kırmızı gerçek mesaj listenin başında durur. Yükleme, listeleme ve silme
   akışları ile satır düzeni (ikon · ad · taraf · sil) değişmedi. Bu blok YALNIZ arabulucu
   ekranındadır; taraf ekranında (CaseRoom) yoktur.
+● 15.08: AŞAMA 2 (Taraf Analizi) — "OLAY ZAMAN ÇİZELGESİ" ana katmanı eklendi; ekranda ve
+  sol dizinde DOSYA ÖZETİ'nin hemen altında, TARAFLAR'ın üstünde durur (numaralar liste
+  sırasından hesaplandığı için kendiliğinden kayar). İçerik: dikey şerit — her satırda
+  tarih · tek cümlelik olay · "Kaynak: <belge adı · bölüm>" ya da "<taraf> beyanı";
+  çelişki varsa amber tek satır not. Sağ üstte [Çizelgeyi çıkar] / [Çizelgeyi yenile]
+  düğmesi ("Çıkarılıyor…"), hata kırmızı ve gerçek mesajla. Katman başlığında "N olay"
+  sayacı. Mevcut katmanların (DOSYA ÖZETİ · TARAFLAR · BELGELER VE ARAÇLAR) düzeni ve
+  içeriği değişmedi. Bu katman YALNIZ arabulucu ekranındadır.

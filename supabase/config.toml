@@ -121,3 +121,6 @@ verify_jwt = true
 
 [functions.belge-ozeti]
 verify_jwt = false
+
+[functions.olay-cizelgesi]
+verify_jwt = true

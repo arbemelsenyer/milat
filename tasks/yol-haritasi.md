@@ -537,3 +537,14 @@ hukuki niteleme içeren çıktı sunucu tarafında elenir. Üretim, mevcut extra
 hattının sonunda beklemesiz tetiklenir; özeti olmayan eski belgeler için listede "Özet
 çıkar" düğmesi vardır. SQL göçü bekliyor: 20260815160000_belge_ozetleri.sql.
 REDEPLOY GEREKLİ: belge-ozeti (YENİ) ve extract-document-text.
+
+15.08 (OLAY ZAMAN ÇİZELGESİ — İBA 2.3 · mimari §5.2g): Aşama 2'ye "OLAY ZAMAN ÇİZELGESİ"
+katmanı eklendi. Yeni edge fonksiyon olay-cizelgesi, mevcut belge metni çıkarma hattının
+çıktısından, taraf beyanlarından ve dosya kaydından tarihleri toplayıp eskiden yeniye tek
+çizelgeye diziyor; her satır dayandığı belgeyi (bölüm/sayfa ile) veya beyanı gösteriyor.
+Kaynağı çözülemeyen satır sunucuda eleniyor, tahmini tarih üretilmiyor, "yaklaşık" gibi
+ifadeler aynen aktarılıyor, aynı olayın iki farklı tarihi tek satırda çelişki notuyla
+gösteriliyor. Çizelge olay_cizelgesi tablosunda tutuluyor ve tarafa SELECT politikası
+verilmiyor. Tekrar üretim yok; "Çizelgeyi yenile" düğmesi var. §9'un tam Olay Haritası
+şeması kurulmadı — bu, §5.2g'nin hafif kademesidir.
+SQL göçü bekliyor: 20260815180000_olay_cizelgesi.sql. REDEPLOY GEREKLİ: olay-cizelgesi (YENİ).

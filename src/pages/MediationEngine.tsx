@@ -3727,6 +3727,13 @@ const FAZ3_LAYERS = [
     label: "BELGELER VE ARAÇLAR",
     hint: "Bu katman, dosyadaki belgelerin metne çevrilmesi gibi hazırlık işlemlerini içerir.",
   },
+  // Dizinin SONUNA eklenir (mevcut FAZ3_LAYERS[0..2] indeksleri kaymasın diye);
+  // ekrandaki ve sol menüdeki yeri Dosya özeti'nin hemen altıdır.
+  {
+    id: "faz3-katman-cizelge",
+    label: "OLAY ZAMAN ÇİZELGESİ",
+    hint: "Bu katman, dosyadaki bütün tarihleri tek çizelgede eskiden yeniye sıralar; her satır dayandığı belgeyi veya beyanı gösterir.",
+  },
 ];
 // Bölüm → kapsayan katman: sol menüden bölüme atlanınca önce katman açılır.
 const FAZ3_SECTION_LAYER: Record<string, string> = {
@@ -3762,6 +3769,7 @@ const FAZ3_MENU_ENTRIES: { id: string; label: string; kind: "layer" | "section";
     { id: FAZ3_LAYERS[0].id, label: FAZ3_LAYERS[0].label, kind: "layer", hint: FAZ3_LAYERS[0].hint },
     { id: "faz3-uyusmazlik-konusu", label: "Uyuşmazlık konusu", kind: "section" },
     { id: "faz3-tur-tespiti", label: "Uyuşmazlık tür tespiti", kind: "section" },
+    { id: FAZ3_LAYERS[3].id, label: FAZ3_LAYERS[3].label, kind: "layer", hint: FAZ3_LAYERS[3].hint },
     { id: FAZ3_LAYERS[1].id, label: FAZ3_LAYERS[1].label, kind: "layer", hint: FAZ3_LAYERS[1].hint },
     { id: FAZ3_LAYERS[2].id, label: FAZ3_LAYERS[2].label, kind: "layer", hint: FAZ3_LAYERS[2].hint },
   ]);
@@ -3830,6 +3838,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
   );
   // Dosya özeti içinde yalnız tür tespiti açık gelir; uzun metin kapalı durur.
   const [openSections, setOpenSections] = useState<Set<string>>(() => new Set(["faz3-tur-tespiti"]));
+  // Olay zaman çizelgesi satır sayısı (katman başlığındaki sayaç için).
+  const [cizelgeSayisi, setCizelgeSayisi] = useState(0);
   const toggleLayer = useCallback((id: string) => {
     setOpenLayers((prev) => {
       const next = new Set(prev);
@@ -4138,6 +4148,7 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
   ];
   const layerCounts: Record<string, string> = {
     "faz3-katman-ozet": "2 bölüm",
+    "faz3-katman-cizelge": cizelgeSayisi > 0 ? `${cizelgeSayisi} olay` : "çıkarılmadı",
     "faz3-katman-taraflar": `${parties.length} taraf`,
     "faz3-katman-belgeler": `${docs.length} belge`,
   };
@@ -4218,6 +4229,17 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
             {/* Ana tür + alt uzmanlık menüleri ve AI önerisi düğmesi — bileşen aynen korunur. */}
             <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} bare />
           </CockpitCollapsible>
+        </Phase3Layer>
+
+        {/* ── OLAY ZAMAN ÇİZELGESİ (İBA 2.3 · mimari/05 §5.2g) — yalnız arabulucu ── */}
+        <Phase3Layer
+          layer={FAZ3_LAYERS[3]}
+          count={layerCounts["faz3-katman-cizelge"]}
+          boxClass={layerBoxClass}
+          open={openLayers.has("faz3-katman-cizelge")}
+          onToggle={() => toggleLayer("faz3-katman-cizelge")}
+        >
+          <OlayCizelgesiPanel caseId={caseRow.id} onCountChange={setCizelgeSayisi} />
         </Phase3Layer>
 
         {/* ── 3. KATMAN — Taraflar ── */}
@@ -7879,6 +7901,138 @@ function BlindBidPartyForm({ caseId, userId }: { caseId: string; userId: string 
         Kaydet
       </Button>
     </Card>
+  );
+}
+
+/* ====== OLAY ZAMAN ÇİZELGESİ (İBA 2.3 · mimari/05 §5.2g) — yalnız arabulucu ====== */
+// olay_cizelgesi tablosunda tarafa SELECT politikası yoktur; bu panel taraf
+// ekranında (CaseRoom) hiçbir sürümde yoktur. Kaynağı olmayan satır zaten
+// sunucuda elendiği için ekranda her satırın bir dayanağı vardır.
+
+type CizelgeSatiri = {
+  id: string;
+  tarih: string | null;
+  tarih_metni: string;
+  olay: string;
+  kaynak_tipi: string;
+  kaynak_adi: string | null;
+  kaynak_bolum: string | null;
+  celiski_notu: string | null;
+  sira: number;
+};
+
+function cizelgeKaynakMetni(r: CizelgeSatiri): string {
+  const ad = (r.kaynak_adi ?? "").trim();
+  if (r.kaynak_tipi === "beyan") return ad ? `${ad} beyanı` : "Tarafın beyanı";
+  if (r.kaynak_tipi === "kayit") return ad || "Dosya kaydı";
+  const bolum = (r.kaynak_bolum ?? "").trim();
+  return [ad || "Belge", bolum].filter(Boolean).join(" · ");
+}
+
+function OlayCizelgesiPanel({ caseId, onCountChange }: { caseId: string; onCountChange: (n: number) => void }) {
+  const [satirlar, setSatirlar] = useState<CizelgeSatiri[]>([]);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const [bilgi, setBilgi] = useState<string | null>(null);
+
+  const yukle = useCallback(async () => {
+    setYukleniyor(true);
+    const { data, error } = await (supabase.from("olay_cizelgesi" as any) as any)
+      .select("id, tarih, tarih_metni, olay, kaynak_tipi, kaynak_adi, kaynak_bolum, celiski_notu, sira")
+      .eq("case_id", caseId).order("sira");
+    setYukleniyor(false);
+    if (error) { setHata(`Çizelge okunamadı: ${trErr(error.message)}`); return; }
+    setHata(null);
+    const liste = (Array.isArray(data) ? data : []) as CizelgeSatiri[];
+    setSatirlar(liste);
+    onCountChange(liste.length);
+  }, [caseId, onCountChange]);
+
+  useEffect(() => { yukle(); }, [yukle]);
+
+  async function cikar(yenile: boolean) {
+    setBusy(true);
+    setHata(null);
+    setBilgi(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("olay-cizelgesi", {
+        body: { case_id: caseId, yenile },
+      });
+      if (error) {
+        // Gerçek sebep .context gövdesindedir; sessizce yutulmaz.
+        let ham = String((error as any)?.message ?? "bilinmeyen hata");
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.text === "function") {
+          try {
+            const govde = await ctx.text();
+            if (govde) {
+              try { const j = JSON.parse(govde); ham = String(j?.error ?? j?.detay ?? govde); }
+              catch { ham = String(govde).slice(0, 400); }
+            }
+          } catch { /* gövde okunamadı */ }
+        }
+        throw new Error(ham);
+      }
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+      if ((data as any)?.atlandi) setBilgi(String((data as any).sebep ?? "Çizelge üretilmedi"));
+      await yukle();
+    } catch (e: any) {
+      console.error("[olay-cizelgesi] çağrı başarısız", e);
+      setHata(`olay-cizelgesi çağrısı başarısız: ${trErr(e?.message ?? "bilinmeyen hata")}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-xs text-muted-foreground leading-snug flex-1 min-w-[220px]">
+          Dosyadaki bütün tarihler tek çizelgede, eskiden yeniye. Her satır dayandığı belgeyi
+          veya beyanı gösterir; kaynağı olmayan tarih çizelgeye girmez. Bu çizelge yalnız
+          size görünür.
+        </p>
+        <Button size="sm" variant="outline" onClick={() => cikar(satirlar.length > 0)} disabled={busy || yukleniyor}>
+          {busy
+            ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Çıkarılıyor…</>
+            : <><Sparkles className="h-4 w-4 mr-1" /> {satirlar.length > 0 ? "Çizelgeyi yenile" : "Çizelgeyi çıkar"}</>}
+        </Button>
+      </div>
+
+      {hata && (
+        <p className="text-sm text-destructive flex items-start gap-1.5 break-words">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" /><span>{hata}</span>
+        </p>
+      )}
+      {bilgi && <p className="text-xs text-amber-600 dark:text-amber-400">{bilgi}</p>}
+
+      {yukleniyor ? (
+        <p className="text-sm text-muted-foreground flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> Yükleniyor…
+        </p>
+      ) : satirlar.length === 0 ? (
+        <p className="text-sm text-muted-foreground italic">
+          Çizelge henüz çıkarılmadı. Belgeler yüklendikten sonra "Çizelgeyi çıkar" düğmesini kullanın.
+        </p>
+      ) : (
+        <ol className="relative border-l-2 border-border ml-2 space-y-4">
+          {satirlar.map((r) => (
+            <li key={r.id} className="ml-4">
+              <span className="absolute -left-[7px] mt-1.5 block h-3 w-3 rounded-full border-2 border-primary/50 bg-background" />
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium">{r.tarih_metni}</p>
+                <p className="text-sm text-muted-foreground leading-snug">{r.olay}</p>
+                <p className="text-[11px] text-muted-foreground">Kaynak: {cizelgeKaynakMetni(r)}</p>
+                {r.celiski_notu && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">{r.celiski_notu}</p>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }
 

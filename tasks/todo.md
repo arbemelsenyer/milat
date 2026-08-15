@@ -1,3 +1,30 @@
+## Nerede kaldık — 15.08.2026 (55) · OLAY ZAMAN ÇİZELGESİ (İBA 2.3 / B15 · mimari §5.2g)
+KEŞİF: mimari/05 §5.2g bu işi "hafif kademe" olarak zaten tanımlamış (Olay Haritası'nın
+öncüsü, mevcut çıkarma hattını kullanır, dayanaksız tarih giremez). mimari/09'daki tam
+şema (case_facts + case_fact_links) KODDA YOK. Kodda hazır tek parça
+src/components/CaseTimeline.tsx ve CaseDetail.tsx:158 — ama oradaki olaylar yalnız
+başvuru/atama/seans kayıtlarından geliyor, belge içeriğinden tarih yok, kaynak alanı yok.
+Bu iş o tabanın üstüne, §5.2g'nin hafif kademesi olarak kuruldu.
+- [x] Yeni edge fonksiyon: supabase/functions/olay-cizelgesi.
+      · Girdi: case_documents.extracted_text (mevcut hat) + case_parties.statement +
+        cases.application_date. Yeni bağımsız zincir kurulmadı.
+      · Kaynağı çözülemeyen satır SUNUCUDA ELENİR; tahmini tarih üretilmez;
+        "yaklaşık/civarında" aynen aktarılır (kesin güne çevrilmez).
+      · Aynı olay iki kaynakta farklı tarihteyse TEK satır + celiski_notu.
+      · Ajanın kendi hüküm cümlesi taşıyan satır elenir; aktarım kalıbı serbest.
+      · Tekrar üretim yok; yenile:true ile eski satırlar silinip yeniden yazılır.
+- [x] Ekran: Aşama 2 (Taraf Analizi) > "OLAY ZAMAN ÇİZELGESİ" katmanı — DOSYA ÖZETİ'nin
+      altında, TARAFLAR'ın üstünde. Dikey şerit; her satırda tarih · olay · "Kaynak: …",
+      çelişki varsa amber not. [Çizelgeyi çıkar] / [Çizelgeyi yenile], hata kırmızı.
+      YERLEŞİM KURUCU ONAYIYLA seçildi (Aşama 1 / Aşama 3 seçenekleri sunuldu).
+- [x] GİZLİLİK: olay_cizelgesi'nde tarafa SELECT politikası YOK; CaseRoom'a dokunulmadı.
+tsc (tsconfig.app.json) temiz; edge fonksiyon sözdizimi esbuild ile doğrulandı.
+CANLI TEST YOK.
+SQL GEREKLİ: supabase/migrations/20260815180000_olay_cizelgesi.sql (kurucu çalıştıracak).
+REDEPLOY GEREKLİ: olay-cizelgesi (YENİ). PUBLISH GEREKLİ (yeni katman).
+AÇIK UÇ: Çizelge kendiliğinden üretilmiyor — arabulucu düğmeye basar. Belge yüklenince
+otomatik tetikleme istenmedi; istenirse extract-document-text kolu eklenebilir.
+
 ## Nerede kaldık — 15.08.2026 (54) · BELGE ÖZETİ (İBA 1.2 / A1)
 - [x] Yeni edge fonksiyon: supabase/functions/belge-ozeti.
       · Girdi sınırı: YALNIZ o belgenin kendi metni (case_documents.extracted_text) +
