@@ -153,3 +153,8 @@ arabulucunun kendi girdiği kayıttır.
   aralık ve koşullu taahhüt kartı, örtüşme bandı ve yakınlık göstergesi (seyir yalnız
   arabulucuda). Braket denetim izi Ajan Paneli'ndeki "ne yaptı, ne yapmadı" listesinde
   "denetim izi" rozetiyle görünür.
+● 15.08: AŞAMA 1 > DOSYA ÖZETİ > "Uyuşmazlık konusu" — alan BOŞ ve düzenleme yetkisi
+  varsa kesikli çerçeveli "AI önerisi" kutusu çıkar: [Öneri getir] → metin + "Dayanak: …"
+  satırı → [Onayla ve kaydet] · [Düzenleyerek kaydet] · [Vazgeç]. Öneri hiçbir yere
+  kaydedilmez; kaydı arabulucu yapar. Alan doluysa kutu HİÇ görünmez (elle girilen metin
+  ezilmez). Kartın kendi düzeni, "Düzenle" düğmesi ve alt künye satırı değişmedi.

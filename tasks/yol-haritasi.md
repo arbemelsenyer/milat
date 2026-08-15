@@ -516,3 +516,13 @@ oturum dökümü analizi hem oturum sonrası hem Görüşme Notları aşamasınd
 ERTELENENLER: arabulucu ataması + çıkar çatışması taraması (sonra) · ayrı taraflılık
 denetimi (pilot sonrası) · eğitim amaçlı senaryo üretimi (sonra) · dil desteği/çeviri
 (kapsam dışı) · sicil/eğitim/sigorta takibi (istenmedi).
+
+15.08 (UYUŞMAZLIK KONUSU BOŞLUĞU KAPANDI): Aşama 1 > Dosya Özeti > "Uyuşmazlık konusu"
+alanı (cases.issue_description) hiçbir ajan tarafından doldurulmuyordu; boş kaldığında
+orchestrator-run classify adımını atlıyor ve zincir eksik koşuyordu. Yeni edge fonksiyon
+dosya-ozeti-oner, YALNIZ dosya başlığı, başvuru/talep alanları ve belgelerin adı+türünden
+2-4 cümlelik tarafsız metin ÖNERİR; taraf analizleri, ortak zemin raporu, belge içeriği ve
+belge analiz sonucu okunmaz (issue_description taraf ekranında da görünüyor). Metin hiçbir
+yere kendiliğinden yazılmaz: arabulucu ekranında öneri olarak durur, "Onayla ve kaydet"
+ile yazılır; alan doluysa öneri hiç gösterilmez. Sunucu tarafı eleme: dayanak zorunlu,
+rakam yasak, hukuki niteleme ve kusur atfı süzgeci. REDEPLOY GEREKLİ: dosya-ozeti-oner.

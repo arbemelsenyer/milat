@@ -250,3 +250,25 @@ hiçbir yoldan görmez. Süreç ajanıyla doğrudan konuşmaz — iletişim ajan
   bant_sorusu_gonderildi · bant_sorusu_kabul/ret · taahhut_kabul · taahhut_dustu.
 · Koşum özeti sayaçları: braket_girildi · ortusme_bulundu · bant_sorusu_gonderildi ·
   taahhut_dustu.
+
+[EKLEME — UYUŞMAZLIK KONUSU ÖNERİ AJANI (15.08)] ● KODDA (redeploy + canlı test bekliyor).
+· Ajan: dosya-ozeti-oner (edge function, verify_jwt=true) · Kimlik: künye yazım asistanı.
+· Neden: cases.issue_description'ı hiçbir ajan doldurmuyordu; boş kalınca orchestrator-run
+  classify adımını atlıyor (orchestrator-run/index.ts:226-229) ve Aşama 1'de alan
+  "Girilmemiş." görünüyordu.
+· GİRDİ SINIRI (bağlayıcı): yalnız cases.title · category · dispute_type_other ·
+  your_role · other_party_role · relationship · desired_outcome · attempted_resolution ·
+  timeline · additional_notes ve case_documents'ın DOSYA ADI + TÜRÜ.
+  OKUNMAZ: party_analyses · common_ground_reports · case_documents.analysis_result ·
+  case_documents.extracted_text · taraf beyanları · gizli kanal. Sebep: issue_description
+  taraf ekranında da görünür (CaseRoom.tsx:453) — kör veri delinemez.
+· ÇIKTI: {ozet, dayanak[]} — 2-4 cümle, "beyan ediliyor/belirtiliyor" dili.
+· YAZMA YETKİSİ YOK (can_write = false): fonksiyon hiçbir tabloya yazmaz. Metni
+  cases.issue_description'a yalnız arabulucu "Onayla ve kaydet" ile yazar (m.3).
+· KAPI: elle girilmiş metin varsa öneri hiç üretilmez (atlandi + sebep döner).
+· SUNUCU TARAFI ELEME (m.12): dayanak dizisi boşsa · metin 40 karakterden kısaysa ·
+  metinde RAKAM varsa · yasaklı ifade geçiyorsa (haksız · hukuka aykırı · ihlal · kusur ·
+  suç · tazminat hakkı · kanun · madde · yasa · mahkeme kararı · borçludur · yükümlüdür)
+  öneri elenir ve gerekçesi ekranda gösterilir.
+· YETKİ: yalnız görevli arabulucu, dosya sahibi veya yönetici çağırabilir; taraf çağıramaz.
+· HATA DAVRANIŞI: her ret/eleme gerekçesiyle birlikte ekrana yazılır, sessiz kalınmaz.

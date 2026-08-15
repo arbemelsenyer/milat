@@ -1,3 +1,31 @@
+## Nerede kaldık — 15.08.2026 (53) · UYUŞMAZLIK KONUSU "Girilmemiş." SORUNU
+TEŞHİS: Ekran `cases.issue_description`'dan okuyor (MediationEngine.tsx:1983 ·
+CaseRoom.tsx:453). Bu sütunu HİÇBİR edge fonksiyonu yazmıyordu — sekiz fonksiyon yalnız
+okuyor. Dahası orchestrator-run:226-229 boşsa classify adımını atlıyor; yani zincir bu
+alana bağımlı, onu üretmiyor.
+- [x] Yeni edge fonksiyon: supabase/functions/dosya-ozeti-oner.
+      · Kaynak sınırı: cases.title · category · dispute_type_other · your_role ·
+        other_party_role · relationship · desired_outcome · attempted_resolution ·
+        timeline · additional_notes + case_documents'ın ADI ve TÜRÜ.
+      · OKUNMAYAN: party_analyses · common_ground_reports · analysis_result ·
+        extracted_text · taraf beyanları (issue_description taraf ekranında görünüyor).
+      · Hiçbir tabloya YAZMAZ; çıktı {ozet, dayanak[]}.
+      · Sunucu tarafı eleme: dayanak boşsa · metin 40 karakterden kısaysa · metinde
+        RAKAM varsa · yasaklı ifade geçiyorsa öneri elenir, gerekçe ekrana yazılır.
+      · Yetki: arabulucu / dosya sahibi / yönetici. Taraf çağıramaz.
+- [x] Ekran (MediationEngine, Aşama 1 > Dosya Özeti): alan BOŞ + yetki varsa "AI önerisi"
+      kutusu — [Öneri getir] → metin + dayanak → [Onayla ve kaydet] ·
+      [Düzenleyerek kaydet] · [Vazgeç]. Alan doluysa kutu hiç çıkmaz.
+- [x] saveIssueDescription(metin?) imzası genişletildi; mevcut Düzenle penceresi
+      davranışı aynen korundu.
+tsc (tsconfig.app.json) temiz; edge fonksiyon sözdizimi esbuild ile doğrulandı.
+CANLI TEST YOK. SQL GEREKMEDİ (yeni tablo/sütun açılmadı).
+REDEPLOY GEREKLİ: dosya-ozeti-oner (YENİ — Lovable'dan deploy edilmeden çalışmaz).
+AÇIK UÇ: Öneri kalıcı değil — sayfa yenilenince kaybolur, tekrar "Öneri getir" gerekir.
+Kalıcı olması için cases'e yeni sütun gerekirdi; taraf da cases satırını okuduğu için
+onaysız metnin sızmaması adına bilinçli olarak sütun AÇILMADI.
+Sırada: dosya-ozeti-oner redeploy + 7 belgeli dosyada canlı deneme.
+
 ## İBA REHBERİ TARAMASI — KARARLAR (15.08.2026) · SALT EKLEME
 Kaynak: İBA arabuluculuk rehberi taraması. Aşağıdakiler KARAR'dır; hiçbiri henüz
 kodlanmadı. Numaralar rehber taramasının kendi numaralarıdır, değiştirilmez.
