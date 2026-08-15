@@ -287,6 +287,126 @@ export type Database = {
           },
         ]
       }
+      braket_bant_sorulari: {
+        Row: {
+          bant_alt: number
+          bant_ust: number
+          case_id: string
+          cevap_at: string | null
+          created_at: string
+          durum: string
+          hedef_party_id: string
+          id: string
+          islendi_at: string | null
+          kaynak_braket_id: string
+          para_birimi: string
+        }
+        Insert: {
+          bant_alt: number
+          bant_ust: number
+          case_id: string
+          cevap_at?: string | null
+          created_at?: string
+          durum?: string
+          hedef_party_id: string
+          id?: string
+          islendi_at?: string | null
+          kaynak_braket_id: string
+          para_birimi?: string
+        }
+        Update: {
+          bant_alt?: number
+          bant_ust?: number
+          case_id?: string
+          cevap_at?: string | null
+          created_at?: string
+          durum?: string
+          hedef_party_id?: string
+          id?: string
+          islendi_at?: string | null
+          kaynak_braket_id?: string
+          para_birimi?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "braket_bant_sorulari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "braket_bant_sorulari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "braket_bant_sorulari_hedef_party_id_fkey"
+            columns: ["hedef_party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "braket_bant_sorulari_kaynak_braket_id_fkey"
+            columns: ["kaynak_braket_id"]
+            isOneToOne: false
+            referencedRelation: "teklif_braketleri"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      braket_denetim_izi: {
+        Row: {
+          case_id: string
+          created_at: string
+          detay: Json
+          id: string
+          olay: string
+          party_id: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          detay?: Json
+          id?: string
+          olay: string
+          party_id?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          detay?: Json
+          id?: string
+          olay?: string
+          party_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "braket_denetim_izi_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "braket_denetim_izi_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "braket_denetim_izi_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_assignments: {
         Row: {
           assigned_at: string
@@ -2669,6 +2789,79 @@ export type Database = {
           },
         ]
       }
+      teklif_braketleri: {
+        Row: {
+          ajan_islendi_at: string | null
+          alt_sinir: number | null
+          case_id: string
+          created_at: string
+          id: string
+          kosul_bant_alt: number | null
+          kosul_bant_ust: number | null
+          kosul_durumu: string
+          kosul_notu: string | null
+          kosullu_deger: number | null
+          para_birimi: string
+          party_id: string
+          updated_at: string
+          ust_sinir: number | null
+        }
+        Insert: {
+          ajan_islendi_at?: string | null
+          alt_sinir?: number | null
+          case_id: string
+          created_at?: string
+          id?: string
+          kosul_bant_alt?: number | null
+          kosul_bant_ust?: number | null
+          kosul_durumu?: string
+          kosul_notu?: string | null
+          kosullu_deger?: number | null
+          para_birimi?: string
+          party_id: string
+          updated_at?: string
+          ust_sinir?: number | null
+        }
+        Update: {
+          ajan_islendi_at?: string | null
+          alt_sinir?: number | null
+          case_id?: string
+          created_at?: string
+          id?: string
+          kosul_bant_alt?: number | null
+          kosul_bant_ust?: number | null
+          kosul_durumu?: string
+          kosul_notu?: string | null
+          kosullu_deger?: number | null
+          para_birimi?: string
+          party_id?: string
+          updated_at?: string
+          ust_sinir?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teklif_braketleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "teklif_braketleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teklif_braketleri_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -2848,6 +3041,21 @@ export type Database = {
       }
     }
     Functions: {
+      braket_bant_cevapla: {
+        Args: { p_kabul: boolean; p_soru_id: string }
+        Returns: string
+      }
+      braket_bant_sorularim: {
+        Args: { p_case_id: string }
+        Returns: {
+          bant_alt: number
+          bant_ust: number
+          created_at: string
+          durum: string
+          id: string
+          para_birimi: string
+        }[]
+      }
       can_access_case: {
         Args: { _case_id: string; _user_id: string }
         Returns: boolean
