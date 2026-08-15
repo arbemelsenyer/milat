@@ -82,6 +82,7 @@ değişmediği işlerde (yalnız keşif, inceleme, rapor) bu adım atlanır.
 - HALÜSİNASYON YASAK: Veri yetersizse "Yeterli veri yok" de. Uydurma künye/atıf üretme
 - KIRINTI BIRAKMA: Yarım kalan hiçbir parça sessizce bırakılmaz — kaydet ve raporla
 - SQL migrasyonları her zaman idempotent yazılır; SQL kurucu tarafından Lovable Cloud > SQL'den çalıştırılır, Supabase Dashboard yok
+- Altyapı kurmadan önce tasks/kurulu-envanter.md okunacak ve canlıda cron.job sorgusuyla doğrulanacak; depoda görünmemesi "yok" demek değildir
 - Tek lockfile bun.lock'tur; npm install kullanılmaz, bun install kullanılır
 - Kök nedeni bul; geçici yama yapma
 

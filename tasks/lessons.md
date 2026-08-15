@@ -66,3 +66,6 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
 - pg_cron işleri anahtarı current_setting('app.cron_secret') ile okuyorsa, o ayar tanımlı
   değilse cron SESSİZCE 401 alır ve hiç çalışmamış gibi görünür. Yeni cron kurarken önce
   ayarın tanımlı olup olmadığı kontrol edilecek. (15.08, ajan-nobetci-3dk kurulumu)
+- Canlıda elle kurulan altyapı depoda görünmez. 15.08'de ajan-nobetci cron'u ikinci kez
+  kuruldu çünkü depoda tanım yoktu. Ders: depo "yok" diyorsa canlıya sorulacak.
+  (Kayıt yeri: tasks/kurulu-envanter.md)
