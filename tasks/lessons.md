@@ -63,3 +63,6 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   her migration'a kısıt genişletmesi dahil edilecek (mevcut türler korunarak); ayrıca
   nobetciDurumYaz gibi durum yazım fonksiyonlarında hata kontrolü yapılacak — şu an
   hata yutuluyor. (15.08, ajan-nobetci canlı doğrulaması)
+- pg_cron işleri anahtarı current_setting('app.cron_secret') ile okuyorsa, o ayar tanımlı
+  değilse cron SESSİZCE 401 alır ve hiç çalışmamış gibi görünür. Yeni cron kurarken önce
+  ayarın tanımlı olup olmadığı kontrol edilecek. (15.08, ajan-nobetci-3dk kurulumu)

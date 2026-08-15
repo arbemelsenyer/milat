@@ -155,8 +155,17 @@ tsc + build temiz; edge fonksiyonların sözdizimi esbuild ile doğrulandı.
         yapilmayanlar dizisi gerekçe ve zaman damgasıyla dolu.
       · Ajan Kontrol Paneli'ndeki "Ajan ne yaptı, ne yapmadı" listesi canlıda
         doğrulandı: yapılanlar ve atlananlar gerekçeleriyle görünüyor.
-      · AÇIK KALAN: ajan-nobetci için depoda tanımlı cron YOK; şu an yalnız elle
-        tetikleniyor. Otomatik koşum kararı verilmedi.
+- [x] OTOMATİK KOŞUM KURULDU (15.08.2026): pg_cron işi 'ajan-nobetci-3dk',
+      zamanlama */3 * * * * (3 dakikada bir, 7/24), jobid 8. Çağrı net.http_post ile
+      /functions/v1/ajan-nobetci adresine, yetki x-cron-secret başlığıyla. İlk otomatik
+      koşum canlıda doğrulandı (cron.job_run_details = succeeded).
+      · NOT: app.cron_secret veritabanı ayarı TANIMLI DEĞİL ve Lovable SQL çalıştırıcısı
+        ALTER DATABASE'e izin vermedi (Connection Error). Bu yüzden anahtar cron.job
+        komut metninde düz metin duruyor. Depodaki deadline-reminder-daily cronu anahtarı
+        current_setting('app.cron_secret') ile okuduğu için MUHTEMELEN SESSİZCE BOŞA
+        KOŞUYOR — ayrı iş olarak incelenecek.
+      · AÇIK KALAN: mesai dışı sessiz saat kuralı yok; nöbetçi gece de koşuyor ve iş
+        varsa e-posta gönderebilir.
 REDEPLOY GEREKLİ: ajan-nobetci, randevu-teklif.
 AÇIK UÇLAR:
 - ajan_gorevleri için arabulucu SELECT/UPDATE politikası doğrulanmadı; yoksa panelde
