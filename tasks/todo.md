@@ -17,12 +17,19 @@
 - [x] GİZLİLİK: belge_ozetleri'nde tarafa SELECT politikası YOK — özet taraf ekranına
       (CaseRoom) hiçbir yoldan çıkmaz. CaseRoom'a dokunulmadı.
 tsc (tsconfig.app.json) temiz; iki edge fonksiyonun sözdizimi esbuild ile doğrulandı.
-CANLI TEST YOK.
-SQL GEREKLİ: supabase/migrations/20260815160000_belge_ozetleri.sql (kurucu çalıştıracak).
-REDEPLOY GEREKLİ: belge-ozeti (YENİ) ve extract-document-text.
-AÇIK UÇ: Yalnız yeni yüklenen belgeler kendiliğinden özetlenir; mevcut 7 belge için
-listedeki "Özet çıkar" düğmesi tek tek kullanılacak (toplu üretim düğmesi yok).
-Sırada: SQL çalıştırma + iki fonksiyonun redeploy'u + canlı deneme.
+- [x] CANLIDA DOĞRULANDI (15.08.2026).
+      · Göç 20260815160000_belge_ozetleri.sql çalıştırıldı; belge-ozeti ve
+        extract-document-text yayına alındı, Publish yapıldı.
+      · 7 belgede test edildi: her belgenin altında özet + "Neyi kanıtlıyor" satırı
+        görünüyor, düğme "Özeti yenile".
+      · Eleme mantığı iki kez düzeltildi: (a) yasak ifade kuralı cümle bağlamına
+        çevrildi — aktarım kalıbı varsa iddia aktarılabilir, ajanın kendi hükmü elenir;
+        (b) kanıt satırındaki içi boş kalıp artık özeti silmiyor, ikinci çağrı yapılıyor,
+        o da zayıfsa özet korunup "çekişmeli nokta çıkarılamadı" yazılıyor.
+      · Kaynak sınırı: yalnız belgenin kendi metni. Gizlilik: belge_ozetleri'nde tarafa
+        SELECT politikası yok.
+AÇIK UÇ: Yalnız yeni yüklenen belgeler kendiliğinden özetlenir; eski belgelerde listedeki
+"Özet çıkar" düğmesi tek tek kullanılır (toplu üretim düğmesi yok).
 - [x] DÜZELTME 15.08 (canlı bulgudan): yasaklı ifade elemesi cümle bağlamına bakıyor.
       İhtarname özeti "kusur" kelimesi yüzünden elenmişti; oysa kusuru ileri süren
       TARAFTI. Artık hüküm kelimesi taşıyan cümle, aktarım kalıbı (ileri sürülmektedir ·
