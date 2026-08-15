@@ -1101,6 +1101,145 @@ async function ekOturumKararlariniIsle(admin: any, dosya: any): Promise<{ acilan
   return { acilan, sebepler };
 }
 
+// ── KÖR TEKLİF v2 — KOŞULLU ARALIK / BRAKETLEME (Tur C-2) ───────────────────
+// Ajan taraflara HİÇBİR rakam vermez. Yaptığı üç şey vardır:
+//  1) Braketler girildiğinde/değiştiğinde bunu kayda alır (denetim izi).
+//  2) İki taraf da tam aralık girdiyse örtüşmeyi hesaplar — sonuç YALNIZ arabulucuya
+//     görünen denetim izine yazılır, tarafa hiçbir yüzeyden dönmez.
+//  3) Koşullu taahhüt varsa karşı tarafa YALNIZ bandı sorar ("şu aralığı düşünür
+//     müsünüz?"); taahhüdün kendisi (inilecek tutar) sorunun içine girmez.
+// Karşı taraf reddederse taahhüt otomatik düşer; reddeden taraf, karşı tarafın inmeye
+// razı olduğunu hiçbir yüzeyden öğrenmez.
+type BraketOzet = {
+  braket_girildi: number;
+  ortusme_bulundu: number;
+  bant_sorusu_gonderildi: number;
+  taahhut_dustu: number;
+  sebepler: string[];
+};
+
+async function braketIziYaz(admin: any, caseId: string, partyId: string | null, olay: string, detay: any) {
+  const { error } = await admin.from("braket_denetim_izi").insert({
+    case_id: caseId, party_id: partyId, olay, detay,
+  });
+  if (error) console.error(`[ajan-nobetci] braket izi yazılamadı (${olay}): ${error.message}`);
+}
+
+async function braketKollari(admin: any, dosya: any, taraflar: any[]): Promise<BraketOzet> {
+  const ozet: BraketOzet = {
+    braket_girildi: 0, ortusme_bulundu: 0, bant_sorusu_gonderildi: 0, taahhut_dustu: 0, sebepler: [],
+  };
+
+  const { data: braketler, error } = await admin.from("teklif_braketleri")
+    .select("id, party_id, alt_sinir, ust_sinir, para_birimi, kosul_bant_alt, kosul_bant_ust, kosullu_deger, kosul_durumu, ajan_islendi_at, updated_at")
+    .eq("case_id", dosya.id).limit(20);
+  if (error) {
+    ozet.sebepler.push(`braket kolu çalışmadı: braketler okunamadı — ${error.message}`);
+    return ozet;
+  }
+  const liste = (braketler ?? []) as any[];
+  if (liste.length === 0) return ozet;
+
+  // 1) Yeni girilen / güncellenen braketler
+  for (const b of liste) {
+    const gorulmedi = !b.ajan_islendi_at || String(b.ajan_islendi_at) < String(b.updated_at);
+    if (!gorulmedi) continue;
+    const { error: uErr } = await admin.from("teklif_braketleri")
+      .update({ ajan_islendi_at: new Date().toISOString() }).eq("id", b.id);
+    if (uErr) { ozet.sebepler.push(`braket işaretlenemedi: ${uErr.message}`); continue; }
+    ozet.braket_girildi++;
+  }
+
+  // 2) Örtüşme — yalnız arabulucuya. Aynı bant için iz bir kez yazılır.
+  const tam = liste.filter((b) => b.alt_sinir !== null && b.ust_sinir !== null);
+  if (tam.length >= 2) {
+    const lower = Math.max(...tam.map((b) => Number(b.alt_sinir)));
+    const upper = Math.min(...tam.map((b) => Number(b.ust_sinir)));
+    const paraBirimi = String(tam[0]?.para_birimi ?? "TRY");
+    if (upper >= lower) {
+      const imza = `${lower}|${upper}|${tam.length}`;
+      const { data: varMi, error: iErr } = await admin.from("braket_denetim_izi")
+        .select("id").eq("case_id", dosya.id).eq("olay", "ortusme_bulundu")
+        .eq("detay->>imza", imza).limit(1);
+      if (iErr) ozet.sebepler.push(`örtüşme izi okunamadı: ${iErr.message}`);
+      else if (!varMi || varMi.length === 0) {
+        await braketIziYaz(admin, dosya.id, null, "ortusme_bulundu", {
+          imza, bant_alt: lower, bant_ust: upper, para_birimi: paraBirimi, taraf_sayisi: tam.length,
+        });
+        ozet.ortusme_bulundu++;
+      }
+    }
+  } else if (liste.length > 0) {
+    ozet.sebepler.push("örtüşme hesaplanmadı: her iki tarafın da tam aralığı girilmemiş");
+  }
+
+  // 3) Koşullu taahhütler → karşı tarafa bant sorusu
+  for (const b of liste) {
+    if (String(b.kosul_durumu ?? "yok") !== "aktif") continue;
+    if (b.kosul_bant_alt === null || b.kosul_bant_ust === null) {
+      ozet.sebepler.push("bant sorusu gönderilmedi: koşullu taahhütte bant eksik");
+      continue;
+    }
+    const hedefler = taraflar.filter((t: any) => String(t.id) !== String(b.party_id));
+    if (hedefler.length === 0) {
+      ozet.sebepler.push("bant sorusu gönderilmedi: dosyada karşı taraf yok");
+      continue;
+    }
+    const { data: acik, error: aErr } = await admin.from("braket_bant_sorulari")
+      .select("id").eq("kaynak_braket_id", b.id).eq("durum", "soruldu").limit(1);
+    if (aErr) { ozet.sebepler.push(`bant sorusu okunamadı: ${aErr.message}`); continue; }
+    if (acik && acik.length > 0) continue;
+
+    let yazilan = 0;
+    for (const h of hedefler) {
+      const { error: sErr } = await admin.from("braket_bant_sorulari").insert({
+        case_id: dosya.id,
+        hedef_party_id: h.id,
+        kaynak_braket_id: b.id,
+        bant_alt: b.kosul_bant_alt,
+        bant_ust: b.kosul_bant_ust,
+        para_birimi: b.para_birimi ?? "TRY",
+        durum: "soruldu",
+      });
+      if (sErr) { ozet.sebepler.push(`bant sorusu yazılamadı: ${sErr.message}`); continue; }
+      await braketIziYaz(admin, dosya.id, h.id, "bant_sorusu_gonderildi", {
+        bant_alt: b.kosul_bant_alt, bant_ust: b.kosul_bant_ust, para_birimi: b.para_birimi ?? "TRY",
+      });
+      yazilan++;
+      ozet.bant_sorusu_gonderildi++;
+    }
+    if (yazilan > 0) {
+      await admin.from("teklif_braketleri").update({ kosul_durumu: "soruldu" }).eq("id", b.id);
+    }
+  }
+
+  // 4) Cevapların işlenmesi — ret hâlinde taahhüt düşer, kaynağa bilgi sızmaz.
+  const { data: cevaplar, error: cErr } = await admin.from("braket_bant_sorulari")
+    .select("id, kaynak_braket_id, durum")
+    .eq("case_id", dosya.id).in("durum", ["kabul", "ret"]).is("islendi_at", null).limit(50);
+  if (cErr) {
+    ozet.sebepler.push(`bant cevapları okunamadı: ${cErr.message}`);
+    return ozet;
+  }
+  for (const c of (cevaplar ?? []) as any[]) {
+    const braket = liste.find((b) => String(b.id) === String(c.kaynak_braket_id));
+    const yeniDurum = c.durum === "ret" ? "dustu" : "kabul";
+    if (braket && String(braket.kosul_durumu) !== yeniDurum) {
+      const { error: uErr } = await admin.from("teklif_braketleri")
+        .update({ kosul_durumu: yeniDurum }).eq("id", c.kaynak_braket_id);
+      if (uErr) { ozet.sebepler.push(`taahhüt durumu yazılamadı: ${uErr.message}`); continue; }
+      await braketIziYaz(admin, dosya.id, braket.party_id,
+        yeniDurum === "dustu" ? "taahhut_dustu" : "taahhut_kabul",
+        { soru_id: c.id, bant_alt: braket.kosul_bant_alt, bant_ust: braket.kosul_bant_ust });
+      if (yeniDurum === "dustu") ozet.taahhut_dustu++;
+    }
+    await admin.from("braket_bant_sorulari")
+      .update({ islendi_at: new Date().toISOString() }).eq("id", c.id);
+  }
+
+  return ozet;
+}
+
 // 'ozel_oturum': arabulucunun ekrandan açtığı görev. Ajan YALNIZ o tarafa teklif
 // gönderir; seçeneklere ozel_oturum işareti konur ve randevu-teklif cevabı
 // işlerken oturumu session_type='private' olarak açar. Özel oturumun varlığı,
@@ -1424,6 +1563,11 @@ Deno.serve(async (req) => {
     let katilimCevabiIslendi = 0;
     let ekOturumSorusuAcildi = 0;
     let ozelOturumDaveti = 0;
+    // Tur C-2 — Kör Teklif v2 (koşullu aralık / braketleme) sayaçları
+    let braketGirildi = 0;
+    let ortusmeBulundu = 0;
+    let bantSorusuGonderildi = 0;
+    let taahhutDustu = 0;
     const hatalar: string[] = [];
 
     for (const dosya of (dosyalar ?? []) as any[]) {
@@ -1494,6 +1638,14 @@ Deno.serve(async (req) => {
 
         const eksikKol = await eksikBilgiGorevleriAc(admin, dosya, taraflar);
         eksikKol.sebepler.forEach(sebepEkle);
+
+        // ── TUR C-2: kör teklif v2 — koşullu aralık / braketleme ──
+        const braketKol = await braketKollari(admin, dosya, taraflar);
+        braketGirildi += braketKol.braket_girildi;
+        ortusmeBulundu += braketKol.ortusme_bulundu;
+        bantSorusuGonderildi += braketKol.bant_sorusu_gonderildi;
+        taahhutDustu += braketKol.taahhut_dustu;
+        braketKol.sebepler.forEach(sebepEkle);
 
         // YALNIZ durum='bekliyor' görevler yürütülür. 'onay_bekliyor' satırları
         // arabulucunundur — ajan bunlara hiçbir koşulda dokunmaz.
@@ -1638,6 +1790,10 @@ Deno.serve(async (req) => {
       katilim_cevabi_islendi: katilimCevabiIslendi,
       ek_oturum_sorusu_acildi: ekOturumSorusuAcildi,
       ozel_oturum_daveti: ozelOturumDaveti,
+      braket_girildi: braketGirildi,
+      ortusme_bulundu: ortusmeBulundu,
+      bant_sorusu_gonderildi: bantSorusuGonderildi,
+      taahhut_dustu: taahhutDustu,
       atlama_sebepleri: atlamaSebepleri,
       imza_adi: imzaAdi,
       hata: hatalar,
