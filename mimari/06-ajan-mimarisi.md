@@ -331,3 +331,11 @@ hiçbir yoldan görmez. Süreç ajanıyla doğrudan konuşmaz — iletişim ajan
   "Çelişki: X belgesi 14.03, Y belgesi 18.03 diyor" biçiminde not düşülür.
 · TEKRAR ÜRETİM YOK: çizelgesi olan dosyada "atlandi" döner; yenile:true ile eski satırlar
   silinip yeniden yazılır ("Çizelgeyi yenile" düğmesi).
+  · DÜZELTME 15.08 (canlı bulgu): (a) İLGİSİZ TARİH FİLTRESİ — çizelgeye yalnız
+    uyuşmazlığın OLAY ZİNCİRİNE ait tarihler girer (tıbbi/hukuki işlem, başvuru,
+    yazışma, ödeme, rapor, oturum, süre). Doğum tarihi, kimlik/nüfus cüzdanı, belgenin
+    kendi düzenlenme tarihi, matbu form/baskı/geçerlilik tarihi GİRMEZ; istemde
+    yasaklandı, sunucuda da kalıp taraması ile elenir ve sebebi "olay zinciriyle
+    ilgisiz" olarak kayda düşer. (b) TARİH BİÇİMİ TEK: tarih_metni GG.AA.YYYY'ye
+    normalize edilir (2026-08-13 → 13.08.2026); aralık "GG.AA.YYYY – GG.AA.YYYY"
+    kalır; "yaklaşık Mart 2026" gibi belirsiz ifadeler AYNEN korunur.

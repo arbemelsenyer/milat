@@ -24,6 +24,14 @@ SQL GEREKLİ: supabase/migrations/20260815180000_olay_cizelgesi.sql (kurucu çal
 REDEPLOY GEREKLİ: olay-cizelgesi (YENİ). PUBLISH GEREKLİ (yeni katman).
 AÇIK UÇ: Çizelge kendiliğinden üretilmiyor — arabulucu düğmeye basar. Belge yüklenince
 otomatik tetikleme istenmedi; istenirse extract-document-text kolu eklenebilir.
+- [x] DÜZELTME 15.08 (canlı bulgu): (a) İlgisiz tarihler çizelgeye girmiyor — "04.06.1978
+      hasta doğum tarihi" gibi künye/matbu tarihleri hem istemde yasaklandı hem sunucuda
+      kalıp taramasıyla eleniyor ("olay zinciriyle ilgisiz" sebebiyle). Çizelge yalnız
+      olay zinciri tarihlerini alıyor. (b) Tarih biçimi tek: tarih_metni GG.AA.YYYY'ye
+      normalize ediliyor (2026-08-13 → 13.08.2026), aralık "GG.AA.YYYY – GG.AA.YYYY",
+      belirsiz ifade ("yaklaşık Mart 2026") aynen korunuyor.
+      NOT: Üretilmiş çizelge kendiliğinden düzelmez — "Çizelgeyi yenile" basılınca eski
+      satırlar siliniyor ve yeniden üretiliyor (mükerrer satır kalmıyor).
 
 ## Nerede kaldık — 15.08.2026 (54) · BELGE ÖZETİ (İBA 1.2 / A1)
 - [x] Yeni edge fonksiyon: supabase/functions/belge-ozeti.

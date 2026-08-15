@@ -100,3 +100,7 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   Kural: sert eleme yalnız tarafsızlık/gizlilik ihlalinde (ajanın kendi hükmü) uygulanır;
   zayıf alan için hedefli tek bir yeniden deneme yapılır, tutmazsa o alan "çıkarılamadı"
   olarak işaretlenir, geri kalan çıktı korunur. (15.08, belge-ozeti)
+- Belgeden tarih toplayan ajan, "tarih" ile "olay" ayrımını kendiliğinden yapmıyor:
+  hastanın doğum tarihi çizelgenin ilk satırı olarak girdi. Kural: neyin olay
+  SAYILMAYACAĞI istemde tek tek sayılır ve sunucuda da elenir; ayrıca tarih biçimi
+  tek noktada normalize edilir, modele bırakılmaz. (15.08, olay-cizelgesi)

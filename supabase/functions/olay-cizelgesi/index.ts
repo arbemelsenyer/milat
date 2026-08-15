@@ -58,6 +58,51 @@ const TR_AYLAR: Record<string, number> = {
   "haziran": 6, "temmuz": 7, "ağustos": 8, "agustos": 8, "eylül": 9, "eylul": 9,
   "ekim": 10, "kasım": 11, "kasim": 11, "aralık": 12, "aralik": 12,
 };
+// Çizelge YALNIZ uyuşmazlığın olay zincirine ait tarihleri alır. Kişisel künye
+// bilgileri (doğum tarihi, kimlik/belge düzenlenme tarihi) ve matbu form tarihleri
+// olay değildir — istemde yasaklanır, burada da sunucuda elenir.
+const ILGISIZ_KALIPLAR = [
+  "doğum tarihi", "dogum tarihi", "doğum günü", "dogum gunu", "doğumlu", "dogumlu",
+  "nüfus cüzdan", "nufus cuzdan", "kimlik kart", "kimlik belgesi",
+  "t.c. kimlik", "tc kimlik", "kimlik numaras",
+  "belge düzenlenme tarihi", "belge duzenlenme tarihi",
+  "düzenlenme tarihi", "duzenlenme tarihi",
+  "matbu", "form tarihi", "baskı tarihi", "baski tarihi",
+  "geçerlilik tarihi", "gecerlilik tarihi", "son kullanma",
+];
+function ilgisizOlay(olay: string): string | null {
+  const k = olay.toLocaleLowerCase("tr-TR");
+  return ILGISIZ_KALIPLAR.find((x) => k.includes(x)) ?? null;
+}
+
+// Ekranda TEK BİÇİM: GG.AA.YYYY. Aralık "GG.AA.YYYY – GG.AA.YYYY" olarak kalır.
+// Belirsiz ifadeler ("yaklaşık Mart 2026") AYNEN korunur — biçime zorlanmaz.
+function ggAaYyyy(iso: string): string {
+  const [y, a, g] = iso.split("-");
+  return `${g}.${a}.${y}`;
+}
+function tarihBicimle(metin: string): string {
+  const t = temiz(metin);
+  if (!t) return t;
+  // Aralık: "–", "—" ya da boşluklu "-" / " ile " ayracı.
+  const ayrac = /\s+(?:–|—|-|ile|arası|arasında)\s+/i;
+  if (ayrac.test(t)) {
+    const parcalar = t.split(ayrac);
+    if (parcalar.length === 2) {
+      const a = isoTarih(parcalar[0]);
+      const b = isoTarih(parcalar[1]);
+      if (a && b && /^[\d.\-/\s]+$/.test(parcalar[0]) && /^[\d.\-/\s]+$/.test(parcalar[1])) {
+        return `${ggAaYyyy(a)} – ${ggAaYyyy(b)}`;
+      }
+    }
+    return t;
+  }
+  // Tek tarih: metnin TAMAMI tarihse biçimlendirilir; içinde açıklama varsa dokunulmaz.
+  const iso = isoTarih(t);
+  if (iso && /^[\d.\-/]+$/.test(t)) return ggAaYyyy(iso);
+  return t;
+}
+
 function isoTarih(metin: string): string | null {
   const t = temiz(metin);
   if (!t) return null;
@@ -187,6 +232,15 @@ MUTLAK KURALLAR:
    Aynı olay için iki ayrı satır açma.
 6. Aynı olayın tekrarını yazma. En çok ${MAX_SATIR} satır üret.
 7. Çizelgeye girecek olay yoksa satirlar dizisini BOŞ döndür; doldurmak için uydurma.
+8. ÇİZELGEYE YALNIZ UYUŞMAZLIĞIN OLAY ZİNCİRİNE AİT TARİHLER GİRER: tıbbi veya hukuki
+   işlem, başvuru, yazışma/ihtar, ödeme, rapor, oturum, süre başlangıcı-bitişi gibi.
+   ÇİZELGEYE GİRMEYECEKLER: doğum tarihi, kimlik/nüfus cüzdanı veya belgenin kendi
+   düzenlenme tarihi gibi kişisel künye bilgileri; matbu form tarihleri; belgenin
+   baskı/geçerlilik tarihi. Bir tarihin olay zincirine ait olduğundan emin değilsen
+   O SATIRI HİÇ YAZMA.
+9. tarih_metni biçimi: belgede kesin bir gün yazıyorsa GG.AA.YYYY yaz (ör. 13.08.2026).
+   Aralıksa "GG.AA.YYYY – GG.AA.YYYY" yaz. Belirsizse ("yaklaşık Mart 2026") olduğu
+   gibi bırak; kesin güne çevirme.
 
 Çıktı YALNIZCA JSON:
 {"satirlar":[{"tarih_metni":"belgede yazdığı gibi","olay":"tek cümle","kaynak_id":"BELGE #<id> veya beyan","kaynak_adi":"belge adı veya taraf adı","kaynak_bolum":"","celiski_notu":""}]}`;
@@ -233,6 +287,9 @@ Yukarıdaki kaynaklardaki tarihleri tek çizelgede topla.`;
       if (!tarihMetni || !olay) { elenen.push("tarih veya olay boş"); continue; }
       if (olay.length < 10) { elenen.push(`olay çok kısa: "${olay}"`); continue; }
       if (hukumKuruyor(olay)) { elenen.push(`ajanın kendi hükmü: "${olay.slice(0, 120)}"`); continue; }
+      // Uyuşmazlığın olay zincirine ait olmayan künye/matbu tarihleri çizelgeye girmez.
+      const ilgisiz = ilgisizOlay(olay);
+      if (ilgisiz) { elenen.push(`olay zinciriyle ilgisiz ("${ilgisiz}"): ${tarihMetni}`); continue; }
 
       // Kaynak çözümlemesi: belge kimliği tanınmıyorsa ve beyan da değilse satır ELENİR.
       const m = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i.exec(kaynakId);
@@ -243,7 +300,8 @@ Yukarıdaki kaynaklardaki tarihleri tek çizelgede topla.`;
       satirlar.push({
         case_id,
         tarih: isoTarih(tarihMetni),
-        tarih_metni: tarihMetni.slice(0, 200),
+        // Tek biçim: GG.AA.YYYY (aralıkta iki yan da). Belirsiz ifade aynen korunur.
+        tarih_metni: tarihBicimle(tarihMetni).slice(0, 200),
         olay: olay.slice(0, 500),
         kaynak_tipi: docId ? "belge" : "beyan",
         kaynak_document_id: docId,
@@ -260,7 +318,7 @@ Yukarıdaki kaynaklardaki tarihleri tek çizelgede topla.`;
       satirlar.push({
         case_id,
         tarih: basvuruIso,
-        tarih_metni: basvuruIso,
+        tarih_metni: ggAaYyyy(basvuruIso),
         olay: "Arabuluculuk başvurusu sisteme kaydedildi",
         kaynak_tipi: "kayit",
         kaynak_document_id: null,
