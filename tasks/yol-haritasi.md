@@ -470,3 +470,15 @@ tarafa tek kez arabulucu imzalı bilgilendirme + girişsiz katılım sayfası
 gerekli mi" sorusu; gerekli denirse randevu hattı yeniden başlıyor. Arabulucu Ajan
 Paneli'nden özel oturum (caucus) talep edebiliyor; davet yalnız o tarafa gidiyor ve
 oturum mevcut "private" tipiyle açılıyor. SQL göçü bekliyor: case_parties.katilim_*.
+
+15.08 (Tur C-2): KÖR TEKLİF v2 — KOŞULLU ARALIK / BRAKETLEME. Taraf, CaseRoom'daki
+"Kabul Aralığım" sekmesinden kendi alt-üst sınırını ve isterse koşullu taahhüdünü
+("karşı taraf şu bandın altına inerse ben de şuraya inerim") giriyor; girilen değerler
+yalnız o tarafa ve arabulucuya görünüyor. Nöbetçi iki tarafın aralığı çakışırsa
+örtüşme bandını YALNIZ arabulucunun gördüğü denetim izine yazıyor; karşı tarafa rakam
+verilmiyor, yalnız bant sorusu ("şu aralığı düşünür müsünüz?") gidiyor. Ret hâlinde
+taahhüt kendiliğinden düşüyor ve reddeden taraf, karşı tarafın inmeye razı olduğunu
+hiçbir yüzeyden öğrenmiyor. Yakınlık seyri yalnız arabulucuda. Her adım
+braket_denetim_izi'ne zaman damgasıyla düşüyor ve Ajan Paneli'nde görünüyor. Nöbetçi
+özetine dört sayaç eklendi: braket_girildi · ortusme_bulundu · bant_sorusu_gonderildi ·
+taahhut_dustu. SQL göçü bekliyor: 20260815120000_kor_teklif_v2_braket.sql.

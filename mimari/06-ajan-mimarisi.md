@@ -234,3 +234,19 @@ hiçbir yoldan görmez. Süreç ajanıyla doğrudan konuşmaz — iletişim ajan
   yüz yüze işaretli olmayan oturumlar için oda üretip tarafa arabulucu imzalı e-posta
   gönderir) ve analiz_baslat (otomatik akış açık, analiz sonucu yok, girdi varsa
   orchestrator-run'ı iç kapıdan tetikler). Tanınmayan görev tipine dokunulmaz.
+
+[EKLEME — KÖR TEKLİF v2 BRAKET KOLU (15.08, Tur C-2)] ● KODDA (SQL göçü + canlı test bekliyor).
+· Ajan: ajan-nobetci · Kimlik: nöbetçi · Yetki: service_role (kendi kolunda yalnız
+  teklif_braketleri, braket_bant_sorulari ve braket_denetim_izi tablolarına yazar).
+· Girdi: dosyanın braket satırları + taraf listesi. Çıktı: bant sorusu satırları,
+  taahhüt durum güncellemesi ve denetim izi kayıtları. Ajan taraflara rakam VERMEZ.
+· Kollar: (1) yeni/değişmiş braketin kayda alınması, (2) iki tarafın aralığı çakışıyorsa
+  örtüşme bandının yalnız arabulucunun gördüğü ize yazılması, (3) koşullu taahhüt varsa
+  karşı tarafa YALNIZ bandın sorulması, (4) ret cevabında taahhüdün otomatik düşmesi.
+· Gizlilik sınıfı: kör veri. Bant sorusu kaynağını taşımaz; taraf soruya yalnız
+  braket_bant_sorularim / braket_bant_cevapla RPC'leriyle erişir, tabloyu göremez.
+· Hata davranışı: okunamayan/yazılamayan her adımın sebebi yapilmayanlar listesine düşer.
+· Denetim kaydı: braket_denetim_izi (append-only) — braket_girildi · ortusme_bulundu ·
+  bant_sorusu_gonderildi · bant_sorusu_kabul/ret · taahhut_kabul · taahhut_dustu.
+· Koşum özeti sayaçları: braket_girildi · ortusme_bulundu · bant_sorusu_gonderildi ·
+  taahhut_dustu.

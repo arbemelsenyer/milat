@@ -369,6 +369,19 @@ inmeye razı olduğunu HİÇBİR yüzeyden öğrenemez — ret hâlinde bilgi s�
 girilmesi, bandın sorulması, kabul/ret, taahhüdün düşmesi) denetim izine yazılır. Teklif
 Yakınlık Göstergesi ile birlikte çalışır: yakınlık seyri yalnız arabulucuya görünür.
 
+DURUM 15.08 ● KODDA (canlı test ve SQL göçü bekliyor) — Tur C-2.
+· Tablolar: teklif_braketleri (taraf başına tek satır: alt/üst sınır + koşul bandı +
+  inilecek tutar + kosul_durumu) · braket_bant_sorulari (kaynağı taraftan gizli;
+  taraf yalnız braket_bant_sorularim / braket_bant_cevapla RPC'leriyle erişir) ·
+  braket_denetim_izi (append-only; yalnız arabulucu/yönetici okur).
+· Taraf yüzeyi: CaseRoom → "Kabul Aralığım" sekmesi. Bant sorusu kaynağını göstermez.
+· Arabulucu yüzeyi: Faz 4 → "Koşullu aralık (braket)" bölümü — örtüşme bandı,
+  koşullu taahhüt durumu ve yakınlık seyri (yalnız arabulucuda).
+· Ajan: ajan-nobetci braket kolu — braket kaydı, örtüşme hesabı, bant sorusunun
+  gönderilmesi, ret hâlinde taahhüdün otomatik düşmesi. Dönüş özeti sayaçları:
+  braket_girildi · ortusme_bulundu · bant_sorusu_gonderildi · taahhut_dustu.
+· Denetim izi Ajan Paneli'ndeki "ne yaptı, ne yapmadı" listesine karışır.
+
 [v0.36 KALICI ŞART — FAZ 3 TÜR TESPİTİ İKİ MENÜDÜR (değişmez)]
 Faz 3 uyuşmazlık tür tespitinde ANA TÜR ve ALT UZMANLIK olmak üzere İKİ menü zorunludur. Alt
 uzmanlık menüsü üç kez sehven silinip geri konmuştur; bir daha kaldırılamaz — düzen değişikliği,

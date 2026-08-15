@@ -145,3 +145,11 @@ arabulucunun kendi girdiği kayıttır.
   veritabanına yazılmaz. Bekleme "yazıyor…" ile, hata kırmızı tek satırla gösterilir.
   Kartın altında "yalnız senin dosyandaki bilgileri görür ve hukuki tavsiye vermez" notu
   durur. Arabulucu görünümünde bu kart yoktur.
+● 15.08: KÖR TEKLİF v2 — iki yeni yüzey (salt ekleme). TARAF: CaseRoom'da "Kabul
+  Aralığım" sekmesi — alt/üst sınır, isteğe bağlı koşullu taahhüt (bant alt · bant üst ·
+  inilecek tutar · arabulucuya not) ve varsa bant sorusu kartı ("Şu aralığı düşünür
+  müsünüz?" · Düşünürüm / Bu aralığı düşünmüyorum). Sorunun kimden geldiği yazılmaz.
+  ARABULUCU: Faz 4 rapor katmanında "Koşullu aralık (braket)" bölümü — taraf başına
+  aralık ve koşullu taahhüt kartı, örtüşme bandı ve yakınlık göstergesi (seyir yalnız
+  arabulucuda). Braket denetim izi Ajan Paneli'ndeki "ne yaptı, ne yapmadı" listesinde
+  "denetim izi" rozetiyle görünür.

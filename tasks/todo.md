@@ -1,3 +1,25 @@
+## Nerede kaldık — 15.08.2026 (52) · TUR C-2 KÖR TEKLİF v2 (koşullu aralık / braketleme)
+- [x] SQL göçü yazıldı (idempotent): supabase/migrations/20260815120000_kor_teklif_v2_braket.sql
+      — teklif_braketleri · braket_bant_sorulari · braket_denetim_izi + RLS + braket izi
+      tetikleyicisi + braket_bant_sorularim / braket_bant_cevapla RPC'leri.
+- [x] Taraf ekranı (CaseRoom, salt ekleme): "Kabul Aralığım" sekmesi — alt/üst sınır,
+      koşullu taahhüt (bant alt · bant üst · inilecek tutar · not), bant sorusu kartı.
+- [x] Ajan kolu (ajan-nobetci): braket kaydı · örtüşme hesabı (yalnız arabulucunun
+      gördüğü ize) · karşı tarafa yalnız bant sorusu · ret hâlinde taahhüdün düşmesi.
+- [x] Nöbetçi özetine dört sayaç: braket_girildi · ortusme_bulundu ·
+      bant_sorusu_gonderildi · taahhut_dustu.
+- [x] Arabulucu yüzeyi: Faz 4 "Koşullu aralık (braket)" bölümü — örtüşme bandı + yakınlık
+      göstergesi (yalnız arabulucuda). Denetim izi Ajan Paneli listesine karışıyor.
+tsc (tsconfig.app.json) temiz. CANLI TEST YOK.
+SQL GEREKLİ: 20260815120000_kor_teklif_v2_braket.sql kurucu tarafından çalıştırılacak.
+REDEPLOY GEREKLİ: ajan-nobetci (Lovable GitHub push'unu edge fonksiyonlara otomatik
+deploy ETMEZ).
+KARAR NOTU (kurucuya): Tarafa, koşullu taahhüdünün "düştüğü" yalnız nötr cümleyle
+("kapandı, dilerseniz yenisini girin") bildiriliyor; karşı tarafın cevabı hiçbir yüzeyde
+yazmıyor. Daha açık bir dil isteniyorsa söyleyin — kör veri gerekçesiyle dar tutuldu.
+Sırada: SQL çalıştırma + ajan-nobetci redeploy, ardından canlı test (iki taraf braket
+girer, koşullu taahhüt konur, karşı taraf reddeder → taahhüt düşer).
+
 ## Nerede kaldık — 14.08.2026 (51) · OTONOM AKIŞ (nöbetçi süreci yürütüyor)
 - [x] Randevu tetikleyicisi değişti: "son tarihe 3 gün" kuralı kaldırıldı; analiz
       zinciri bitince + planlı oturum yoksa + bekleyen teklif yoksa teklif HEMEN açılıyor.
