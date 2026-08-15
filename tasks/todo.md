@@ -1,3 +1,24 @@
+## Nerede kaldık — 15.08.2026 (57) · LOVABLE GÜVENLİK BULGULARI (Publish blokeri)
+İNCELEME SONUCU: İki fonksiyonda da istenen kapı kalıbı ZATEN vardı; kodda kapatılacak
+açık bulunamadı.
+- analyze-meeting-notes: Authorization yoksa 401 → getUser() geçersizse 401 → cases
+  satırından dosya kapsamlı yetki (assigned_mediator_id / user_id / admin) yoksa 403.
+  Hepsi AI çağrısından ÖNCE. config.toml'da verify_jwt zaten true. DEĞİŞİKLİK YAPILMADI;
+  bulgu büyük ihtimalle canlıdaki eski sürümden geliyor — redeploy gerekiyor.
+- check-new-tariff: x-cron-secret VEYA admin JWT (has_role) → 401/403. ajan-nobetci'nin
+  kopyaladığı kalıbın kaynağı bu fonksiyon. Kod değişmedi.
+- [x] config.toml: check-new-tariff verify_jwt false → TRUE (kurucu kararı).
+- [x] SQL yazıldı: 20260815220000_cron_authorization_basligi.sql — jobid 5 ve 6 cron
+      işlerini Authorization: Bearer <service_key> başlığıyla yeniden kurar.
+      SIRA ZORUNLU: önce bu SQL, sonra deploy. Aksi hâlde Aralık/Ocak koşumu 401 alır.
+- [x] tasks/kurulu-envanter.md'ye "GÜVENLİK AYARLARI" bölümü eklendi.
+ÇAĞIRANLAR (doğrulandı): analyze-meeting-notes ← MeetingNotesPanel.tsx:82 (kullanıcı
+JWT'si) · başka çağıran yok. check-new-tariff ← MevzuatAdmin.tsx:73 (admin JWT) +
+canlıdaki iki pg_cron işi (x-cron-secret).
+AÇIK UÇ: İki cron işinin canlıdaki mevcut command metnini göremedim (elle kurulmuşlar,
+depoda yok). SQL onları koşulsuz yeniden kuruyor; eski metin kaybolmasın diye SQL'in
+başında kayıt için SELECT var.
+
 ## Nerede kaldık — 15.08.2026 (56) · GÜÇ DENGESİ İŞARETİ (İBA 2.4 / B16)
 KEŞİF: Bu iş için mimaride ayrı bir başlık YOK ve kodda yarım kalmış uygulama YOK
 ("güç dengesi/dengesizlik/asimetri" araması mimari, komut, constitution ve kodda boş

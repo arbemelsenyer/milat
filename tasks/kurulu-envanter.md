@@ -43,3 +43,15 @@ vardı, aynı gün kaldırıldı.
 
 Canlıda elle bir şey kurulduğunda ya da değiştirildiğinde aynı gün bu dosyaya yazılır.
 Gün sonu belge komutuna dahildir.
+
+## GÜVENLİK AYARLARI (15.08.2026)
+- check-new-tariff: verify_jwt false → TRUE yapıldı (Lovable güvenlik bulgusu). Gateway
+  artık JWT'siz isteği içeri almıyor. Fonksiyonun kendi kapısı değişmedi
+  (x-cron-secret VEYA admin JWT → 401/403).
+- BUNA BAĞLI: jobid 5 'check-new-tariff-december' ve jobid 6 'check-new-tariff-january'
+  cron işleri Authorization başlığı taşıyacak şekilde YENİDEN KURULMALIDIR —
+  supabase/migrations/20260815220000_cron_authorization_basligi.sql. Bu SQL deploy'dan
+  ÖNCE çalıştırılır; aksi hâlde Aralık/Ocak koşumu 401 alır.
+- analyze-meeting-notes: kodda değişiklik gerekmedi. verify_jwt zaten true ve fonksiyon
+  Authorization + getUser + dosya kapsamlı yetki (arabulucu/sahip/admin) denetimini AI
+  çağrısından önce yapıyor; yetkisizde 401/403 dönüyor.
