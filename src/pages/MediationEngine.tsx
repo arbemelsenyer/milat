@@ -2455,6 +2455,10 @@ function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection,
                       <span className="font-medium">Neyi kanıtlıyor:</span>{" "}
                       <span className="text-muted-foreground">{o.kaniti}</span>
                     </p>
+                    {/* Özet üretildi ama kanıt satırı çıkarılamadıysa sebep sessiz kalmaz. */}
+                    {o.sebep && (
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400">{o.sebep}</p>
+                    )}
                   </div>
                 )}
                 {o && o.durum !== "uretildi" && (

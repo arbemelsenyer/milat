@@ -33,6 +33,13 @@ Sırada: SQL çalıştırma + iki fonksiyonun redeploy'u + canlı deneme.
       "bilgileri içermektedir" gibi içi boş kalıplar sunucuda eleniyor.
 - [x] Listedeki düğme: özeti olan belgede "Özeti yenile" (yenile:true → aynı kayıt
       güncellenir), olmayanda "Özet çıkar".
+- [x] DÜZELTME 15.08 (canlı bulgu — 5 no'lu iş göremezlik raporu): eleme iki sınıfa
+      ayrıldı. SERT ELEME yalnız (a) özet 40 karakterden kısaysa, (b) ajanın kendi hükmü
+      varsa uygulanır. Kanıt satırı zayıfsa artık ELEME YOK: model bir kez daha çağrılıp
+      yalnız o satırı yeniden yazması isteniyor; ikinci deneme de tutmazsa özet KORUNUYOR
+      ve satıra "Bu belgenin hangi çekişmeli noktaya dayanak olduğu çıkarılamadı" yazılıyor.
+      Ekranda sebep metni hangi kuralın çalıştığını ayırt ediyor ("ajanın kendi hükmü" ·
+      "Kanıt satırı çıkarılamadı … — özet korundu").
 
 ## Nerede kaldık — 15.08.2026 (53) · UYUŞMAZLIK KONUSU "Girilmemiş." SORUNU
 TEŞHİS: Ekran `cases.issue_description`'dan okuyor (MediationEngine.tsx:1983 ·

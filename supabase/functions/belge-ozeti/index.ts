@@ -215,41 +215,111 @@ Bu belgeyi yukarıdaki kurallara göre özetle.`;
     let ozet = temiz(parsed?.ozet);
     let kaniti = temiz(parsed?.kaniti);
 
-    // ── SUNUCU TARAFI ELEME (constitution m.12) ──
-    const elenme: string[] = [];
-    if (ozet.length < 40) elenme.push("özet çok kısa veya boş");
-    if (!kaniti) elenme.push("'neyi kanıtlıyor' alanı boş");
     if (ozet.length > 900) ozet = ozet.slice(0, 900);
     if (kaniti.length > 400) kaniti = kaniti.slice(0, 400);
 
-    // Hüküm denetimi: yalnız ajanın KENDİ nitelemesi elenir; aktarılan iddia serbesttir.
+    // ── 1) SERT ELEME: yalnız özetin kendisi kullanılamazsa ──────────────────
+    // Özet çok kısaysa ya da AJANIN KENDİ HÜKMÜ varsa kayıt elenir. Bu, gerçek
+    // tarafsızlık kuralıdır (constitution m.2/m.4) ve olduğu gibi kalır.
+    if (ozet.length < 40) {
+      const sebep = "Özet elendi: metin çok kısa veya boş";
+      const { error: eErr } = await kayitYaz({ ozet: null, kaniti: null, durum: "elendi", sebep });
+      if (eErr) return json({ error: `Kayıt yazılamadı: ${eErr.message}` }, 500);
+      return json({ durum: "elendi", sebep });
+    }
     const hukumler = [...hukumCumleleri(ozet), ...hukumCumleleri(kaniti)];
     if (hukumler.length) {
-      elenme.push(`ajanın kendi hükmü var — elenen cümle: "${hukumler[0].slice(0, 200)}"`);
-    }
-
-    // "Neyi kanıtlıyor" içi boş olmamalı: belgenin içeriğini tekrar eden kalıplar elenir.
-    const kanitKucuk = kaniti.toLocaleLowerCase("tr-TR");
-    const bosKalip = BOS_KALIPLAR.filter((k) => kanitKucuk.includes(k));
-    if (bosKalip.length) {
-      elenme.push(`'neyi kanıtlıyor' satırı içi boş kalıp taşıyor: "${bosKalip.join(", ")}"`);
-    }
-
-    if (elenme.length) {
-      const sebep = `Özet sunucu tarafında elendi (${elenme.join(" · ")})`;
-      const { error: eErr } = await kayitYaz({
-        ozet: null, kaniti: null, durum: "elendi", sebep,
-      });
+      const sebep = `Özet elendi: ajanın kendi hükmü — elenen cümle: "${hukumler[0].slice(0, 200)}"`;
+      const { error: eErr } = await kayitYaz({ ozet: null, kaniti: null, durum: "elendi", sebep });
       if (eErr) return json({ error: `Kayıt yazılamadı: ${eErr.message}` }, 500);
       return json({ durum: "elendi", sebep });
     }
 
+    // ── 2) KANIT SATIRI ONARIMI: özet ASLA bu yüzden silinmez ────────────────
+    // Satır boşsa veya içi boş kalıp taşıyorsa model BİR KEZ daha çağrılır ve
+    // yalnız bu satırı yeniden yazması istenir. İkinci deneme de tutmazsa özet
+    // korunur, satıra "çıkarılamadı" yazılır.
+    const kanitZayif = (v: string) => {
+      const t = temiz(v);
+      if (!t) return true;
+      const k = t.toLocaleLowerCase("tr-TR");
+      return BOS_KALIPLAR.some((b) => k.includes(b));
+    };
+
+    let kanitNotu: string | null = null;
+    if (kanitZayif(kaniti)) {
+      const ilkDeneme = kaniti;
+      const onarimSystem = `Sen bir arabuluculuk dosyasındaki belgeleri künyeleyen tarafsız bir asistansın.
+Sana bir belgenin metni ve o belge için yazılmış özet veriliyor. YALNIZCA "neyi kanıtlıyor"
+satırını yeniden yazacaksın.
+
+KURALLAR:
+1. TEK CÜMLE yaz. Belgenin hangi ÇEKİŞMELİ NOKTAYA dayanak olduğunu söyle: hangi olguyu,
+   tarihi, tutarı, süreyi, eksikliği veya teslim edilmemiş kaydı gösteriyor.
+2. Belgenin içeriğini TEKRAR ETME, özeti tekrar etme.
+3. ŞU KALIPLAR YASAKTIR ve cümlende geçemez: "bilgi yer almaktadır", "bilgiler yer
+   almaktadır", "bilgileri içermektedir", "bilgi içermektedir", "bilgilerini içermektedir",
+   "hakkında bilgi vermektedir", "bilgi vermektedir", "bilgi sunmaktadır".
+4. Kendi hukuki nitelemeni yapma ("haksızdır", "kusurludur", "hukuka aykırıdır" gibi
+   hüküm cümlesi kurma); tarafın iddiasını yalnız aktarım kalıbıyla yazabilirsin.
+5. Belgede AÇIKÇA yazmayan tarih, rakam veya olay ekleme.
+6. Belge çekişmeli bir noktaya dayanak oluşturmuyorsa bunu açıkça yaz.
+
+Örnek biçim: "Ameliyat görüntü kayıtlarının hastanede bulunmadığını, hemşire gözlem
+formlarının henüz teslim edilmediğini gösteriyor."
+
+Çıktı YALNIZCA JSON: {"kaniti":"tek cümle"}`;
+      const onarimUser = `BELGE ADI: ${dosyaAdi}
+
+BELGE METNİ (kısmi olabilir):
+${metin.slice(0, MAX_GIRDI)}
+
+ÖZET: ${ozet}
+
+ÖNCEKİ (YETERSİZ) KANIT SATIRI: ${ilkDeneme || "(boş)"}
+
+Bu satırı yukarıdaki kurallara göre yeniden yaz.`;
+      try {
+        const rRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              { role: "system", content: onarimSystem },
+              { role: "user", content: onarimUser },
+            ],
+            response_format: { type: "json_object" },
+          }),
+        });
+        if (rRes.ok) {
+          const rJson = await rRes.json();
+          let rParsed: any = {};
+          try { rParsed = JSON.parse(rJson?.choices?.[0]?.message?.content ?? "{}"); } catch { rParsed = {}; }
+          const yeni = temiz(rParsed?.kaniti).slice(0, 400);
+          // İkinci deneme de hüküm kuruyorsa kabul edilmez.
+          if (yeni && !kanitZayif(yeni) && hukumCumleleri(yeni).length === 0) {
+            kaniti = yeni;
+          }
+        } else {
+          console.error(`[belge-ozeti] kanıt onarımı HTTP ${rRes.status}`);
+        }
+      } catch (e: any) {
+        console.error(`[belge-ozeti] kanıt onarımı başarısız: ${e?.message ?? e}`);
+      }
+
+      if (kanitZayif(kaniti) || hukumCumleleri(kaniti).length > 0) {
+        kaniti = "Bu belgenin hangi çekişmeli noktaya dayanak olduğu çıkarılamadı";
+        kanitNotu = "Kanıt satırı çıkarılamadı (iki denemede de yeterli değildi) — özet korundu";
+      }
+    }
+
     const { error: yErr } = await kayitYaz({
-      ozet, kaniti, durum: "uretildi", sebep: null,
+      ozet, kaniti, durum: "uretildi", sebep: kanitNotu,
     });
     if (yErr) return json({ error: `Kayıt yazılamadı: ${yErr.message}` }, 500);
 
-    return json({ durum: "uretildi", ozet, kaniti });
+    return json({ durum: "uretildi", ozet, kaniti, not: kanitNotu });
   } catch (e: any) {
     console.error("[belge-ozeti] hata", e?.message ?? e);
     return json({ error: e?.message ?? "Bilinmeyen hata" }, 500);

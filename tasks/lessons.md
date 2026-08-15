@@ -95,3 +95,8 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   Kural: yasak ajanın KENDİ hüküm cümlesine uygulanır, tarafın iddiasının aktarımına
   uygulanmaz — denetim cümle cümle yapılır ve elenen cümle sebebe yazılır.
   (15.08, belge-ozeti)
+- Çıktının bir ALANI zayıf diye TÜM kayıt elenmemeli: belge özeti, kanıt satırındaki
+  "bilgi içerir" kalıbı yüzünden komple siliniyordu; iyi olan özet de gidiyordu.
+  Kural: sert eleme yalnız tarafsızlık/gizlilik ihlalinde (ajanın kendi hükmü) uygulanır;
+  zayıf alan için hedefli tek bir yeniden deneme yapılır, tutmazsa o alan "çıkarılamadı"
+  olarak işaretlenir, geri kalan çıktı korunur. (15.08, belge-ozeti)

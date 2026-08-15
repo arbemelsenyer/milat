@@ -302,3 +302,13 @@ hiçbir yoldan görmez. Süreç ajanıyla doğrudan konuşmaz — iletişim ajan
     çekişmeli bir noktaya dayanak değilse bu açıkça yazılır.
   · yenile:true ile mevcut özet yeniden üretilir ve AYNI kayıt güncellenir (listede
     "Özeti yenile" düğmesi); bayraksız çağrıda özeti olan belge "atlandi" döner.
+  · DÜZELTME 15.08 (canlı bulgu — iş göremezlik raporu): ELEME İKİ SINIFA AYRILDI.
+    (a) SERT ELEME (kayıt elenir, durum='elendi'): özet 40 karakterden kısaysa ya da
+        AJANIN KENDİ HÜKMÜ varsa. Sebep "Özet elendi: ajanın kendi hükmü — elenen
+        cümle: …" biçiminde yazılır.
+    (b) KANIT SATIRI ONARIMI (özet ASLA silinmez): kanıt satırı boşsa veya içi boş
+        kalıp taşıyorsa model BİR KEZ daha çağrılır ve yalnız o satırı yeniden yazması
+        istenir (yasak kalıplar istemde tek tek sayılır). İkinci deneme de tutmazsa
+        özet korunur, satıra "Bu belgenin hangi çekişmeli noktaya dayanak olduğu
+        çıkarılamadı" yazılır ve sebep alanına "Kanıt satırı çıkarılamadı … — özet
+        korundu" notu düşer. Onarım çağrısının hatası özeti etkilemez.
