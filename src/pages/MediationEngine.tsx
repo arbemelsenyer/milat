@@ -1823,6 +1823,9 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
 }) {
   const { user, isAdmin } = useAuth();
   const canEditIssue = caseRow.assigned_mediator_id === user?.id || caseRow.user_id === user?.id || isAdmin;
+  // Alan dolu mu — öneri kutusu her iki hâlde de görünür (tür tespiti kutusuyla aynı
+  // davranış); yalnız düğme etiketi ve "yerine geçer" uyarısı buna göre değişir.
+  const issueDolu = !!String(caseRow.issue_description ?? "").trim();
   const [editIssueOpen, setEditIssueOpen] = useState(false);
   const [issueDescDraft, setIssueDescDraft] = useState("");
   const [savingIssue, setSavingIssue] = useState(false);
@@ -1918,8 +1921,9 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
     setOzetHata(null);
     setOzetOneri(null);
     try {
+      // Alan doluyken de öneri istenebilir; fonksiyon yine hiçbir yere yazmaz.
       const { data, error } = await supabase.functions.invoke("dosya-ozeti-oner", {
-        body: { case_id: caseRow.id },
+        body: { case_id: caseRow.id, yenile: !!String(caseRow.issue_description ?? "").trim() },
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error(String((data as any).error));
@@ -2057,17 +2061,17 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
                   </div>
                   {/* AI ÖNERİSİ — yalnız alan BOŞKEN ve yalnız düzenleme yetkisi olana.
                       Öneri hiçbir yere yazılmaz; "Onayla ve kaydet" ile arabulucu yazar. */}
-                  {canEditIssue && !String(caseRow.issue_description ?? "").trim() && (
+                  {canEditIssue && (
                     <div className="mt-3 rounded-lg border border-dashed p-3 space-y-2">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="text-xs font-medium flex items-center gap-1.5">
-                          <Sparkles className="h-3.5 w-3.5 text-primary" /> AI önerisi
-                        </div>
+                      {/* Düğmenin yeri/boyutu/ikonu "Uyuşmazlık tür tespiti" kutusuyla
+                          aynı kalıptadır (satır içi başlık + sağda size="sm" outline). */}
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="text-sm font-semibold text-primary">AI önerisi</div>
                         {!ozetOneri && (
-                          <Button size="sm" variant="outline" className="h-7 text-xs"
-                            onClick={ozetOneriGetir} disabled={ozetBusy}>
-                            {ozetBusy ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
-                            {ozetBusy ? "Hazırlanıyor…" : "Öneri getir"}
+                          <Button size="sm" variant="outline" onClick={ozetOneriGetir} disabled={ozetBusy}>
+                            {ozetBusy
+                              ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Hazırlanıyor…</>
+                              : <><Sparkles className="h-4 w-4 mr-1" /> {issueDolu ? "Yeni öneri getir" : "Öneri getir"}</>}
                           </Button>
                         )}
                       </div>
@@ -2083,6 +2087,11 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
                             <div className="text-[11px] text-muted-foreground">
                               Dayanak: {ozetOneri.dayanak.join(" · ")}
                             </div>
+                          )}
+                          {issueDolu && (
+                            <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                              Onaylarsanız mevcut metnin yerine geçer.
+                            </p>
                           )}
                           <div className="flex gap-2 flex-wrap">
                             <Button size="sm" className="h-7 text-xs" onClick={ozetOneriKaydet} disabled={savingIssue}>

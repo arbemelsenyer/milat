@@ -59,6 +59,9 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const case_id = temiz((body as any)?.case_id);
+    // yenile=true: alan doluyken de öneri üretilir. Yazma yine YOK — metin ancak
+    // arabulucu "Onayla ve kaydet" derse mevcut metnin yerine geçer.
+    const yenile = (body as any)?.yenile === true;
     if (!case_id) return json({ error: "case_id gerekli" }, 400);
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -82,8 +85,11 @@ Deno.serve(async (req) => {
       || !!roleRow;
     if (!yetkili) return json({ error: "Bu dosya için yetkiniz yok" }, 403);
 
-    // Elle girilmiş metin ASLA ezilmez — öneri de üretilmez.
-    if (temiz((caseRow as any).issue_description)) {
+    // Mevcut metin ASLA ezilmez: bu fonksiyon hiçbir koşulda yazmaz. Alan doluyken
+    // öneri yalnız açık istek üzerine (yenile:true) üretilir; kaydetme kararı
+    // arabulucunundur. Mevcut metin AI'a girdi olarak da VERİLMEZ — kaynak sınırı
+    // yalnız başlık, başvuru/talep alanları ve belge adı+türüdür.
+    if (temiz((caseRow as any).issue_description) && !yenile) {
       return json({ atlandi: true, sebep: "Uyuşmazlık konusu zaten girilmiş — öneri üretilmedi" });
     }
 
