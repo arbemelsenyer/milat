@@ -147,8 +147,21 @@ DOLDURULMADAN kod yazılmaz.
       bant_sorusu_gonderildi · taahhut_dustu.
 - [x] Arabulucu yüzeyi: Faz 4 "Koşullu aralık (braket)" bölümü — örtüşme bandı + yakınlık
       göstergesi (yalnız arabulucuda). Denetim izi Ajan Paneli listesine karışıyor.
-tsc (tsconfig.app.json) temiz. CANLI TEST YOK.
-SQL GEREKLİ: 20260815120000_kor_teklif_v2_braket.sql kurucu tarafından çalıştırılacak.
+tsc (tsconfig.app.json) temiz.
+- [x] CANLIDA UÇTAN UCA DOĞRULANDI (15.08.2026).
+      · Göç 20260815120000_kor_teklif_v2_braket.sql canlıda çalıştırıldı (5 parçaya
+        bölünerek).
+      · Taraf 100.000-200.000 aralığı + koşullu taahhüt (120.000-150.000 bandında
+        150.000) girdi, kayıt tuttu.
+      · Nöbetçi işledi: braket 'soruldu', karşı tarafa yalnız bant sorusu açıldı
+        (rakam / taahhüt / kaynak taraf görünmüyor).
+      · 'ret' cevabında taahhüt kendiliğinden düştü (kosul_durumu='dustu'), denetim
+        izinde 3 kayıt.
+      · AÇIK KALAN: 'kabul' yolu (bandın iki tarafa açılması) canlıda test edilmedi.
+        Taraf ekranından gerçek cevap akışı da test edilmedi (cevap SQL ile verildi).
+      · AÇIK KALAN: Uyuşmazlık konusu kutusundaki "Yeni öneri getir" düğmesi alan
+        doluyken canlıda görünmüyor — kod 75f26f4'te var, Lovable senkronu geride
+        kaldığı için yayına girmedi.
 REDEPLOY GEREKLİ: ajan-nobetci (Lovable GitHub push'unu edge fonksiyonlara otomatik
 deploy ETMEZ).
 KARAR NOTU (kurucuya): Tarafa, koşullu taahhüdünün "düştüğü" yalnız nötr cümleyle

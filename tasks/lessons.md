@@ -83,3 +83,10 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   yazdığı değer başka bir işlem (bant sorusu cevabı gibi) tetiklendiğinde silinir.
   Tazeleme çağrısı "formu da doldur" bayrağı almalı ve kullanıcı forma dokunduysa
   alanların üstüne yazmamalıdır. (15.08, braket formu)
+- Lovable SQL çalıştırıcısı uzun göçleri ve $$ bloklarını "syntax error at end of input"
+  ile reddediyor. Çözüm: göçü parçalara böl, DO bloğu yerine
+  DROP CONSTRAINT IF EXISTS + ADD CONSTRAINT kullan, fonksiyonlarda $$ yerine
+  adlandırılmış etiket ($braket_izi$ gibi) kullan. (15.08, kör teklif v2 braket göçü)
+- "Ekranda hiçbir şey olmuyor" belirtisinin DÖRT ayrı sebebi olabilir: commit push
+  edilmemiş · Lovable senkronu geride · edge fonksiyon redeploy edilmemiş · veritabanı
+  göçü çalıştırılmamış. Ekran testinden önce dördü sırayla doğrulanacak. (15.08)

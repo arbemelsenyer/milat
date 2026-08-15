@@ -32,6 +32,9 @@ vardı, aynı gün kaldırıldı.
 
 - agent_states.agent_type CHECK kısıtı 15.08'de genişletildi: 'nobetci' eklendi
   (mevcut 14 tür korundu).
+- 15.08: Kör Teklif v2 braket göçü elle çalıştırıldı (teklif_braketleri,
+  braket_denetim_izi, braket_bant_sorulari + RLS politikaları + braket_izi_yaz
+  tetikleyicisi + braket_bant_sorularim / braket_bant_cevapla fonksiyonları).
 - (daha önce kurulanlar buraya eklenecek: mediator_reads_offers,
   mediator_writes_discovery, mediator_updates_discovery, ajan_gorevleri politikaları,
   taraf_musaitlik RLS)
