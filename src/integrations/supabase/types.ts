@@ -1644,6 +1644,54 @@ export type Database = {
         }
         Relationships: []
       }
+      guc_dengesi: {
+        Row: {
+          aciklama: string
+          baslik: string
+          case_id: string
+          created_at: string
+          dayanak: string
+          gosterge_tipi: string
+          id: string
+          sira: number
+        }
+        Insert: {
+          aciklama: string
+          baslik: string
+          case_id: string
+          created_at?: string
+          dayanak: string
+          gosterge_tipi: string
+          id?: string
+          sira?: number
+        }
+        Update: {
+          aciklama?: string
+          baslik?: string
+          case_id?: string
+          created_at?: string
+          dayanak?: string
+          gosterge_tipi?: string
+          id?: string
+          sira?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guc_dengesi_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "guc_dengesi_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_base_chunks: {
         Row: {
           alan: string | null
