@@ -229,6 +229,61 @@ export type Database = {
           },
         ]
       }
+      belge_ozetleri: {
+        Row: {
+          case_id: string
+          created_at: string
+          document_id: string
+          durum: string
+          id: string
+          kaniti: string | null
+          ozet: string | null
+          sebep: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          document_id: string
+          durum?: string
+          id?: string
+          kaniti?: string | null
+          ozet?: string | null
+          sebep?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          document_id?: string
+          durum?: string
+          id?: string
+          kaniti?: string | null
+          ozet?: string | null
+          sebep?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "belge_ozetleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "belge_ozetleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "belge_ozetleri_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: true
+            referencedRelation: "case_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blind_bids: {
         Row: {
           case_id: string
