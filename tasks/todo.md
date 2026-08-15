@@ -1,3 +1,112 @@
+## İBA REHBERİ TARAMASI — KARARLAR (15.08.2026) · SALT EKLEME
+Kaynak: İBA arabuluculuk rehberi taraması. Aşağıdakiler KARAR'dır; hiçbiri henüz
+kodlanmadı. Numaralar rehber taramasının kendi numaralarıdır, değiştirilmez.
+Kod yazılmadan önce her madde constitution m.1 (kör veri) ve m.2 (halüsinasyon yasağı)
+kontrol listesinden geçirilir; ajan içeren maddelerde mimari/06 ajan sözleşmesi
+DOLDURULMADAN kod yazılmaz.
+
+### A) GENEL
+- [ ] A1 · BELGE ÖZETİ — her belgeye tek paragraf özet + "neyi kanıtlıyor" satırı.
+      Yalnız arabulucu ekranında; tarafa gitmez.
+- [ ] A2 · KAYNAK KÜNYESİ KURALI (BAĞLAYICI) — her bulgunun yanında dayanağı yazar
+      (belge + bölüm/sayfa ya da tarihli beyan). Dayanaksız bulgu GÖSTERİLMEZ; kaynağı
+      olmayan değerlendirme "doğrulanmamış" etiketiyle ayrı durur.
+      İDDİA-TESPİT AYRIMI buna dahildir: her cümle kimin söylediğiyle başlar
+      ("hasta beyan ediyor…", "belgede yazıyor…", "iki taraf da kabul ediyor…").
+      Tek taraflı anlatı tespit gibi yazılamaz.
+- [ ] A3 · İÇTİHAT/MEVZUAT KAYNAĞI — serbest internet gezinme YOK. İki kaynak:
+      (a) yüklenen anonim içtihat özetleri, (b) resmî arşive anlık bağlanan ücretsiz
+      açık kaynak servisler (Yargıtay, Danıştay, AYM, Emsal, mevzuat). Alıntı
+      daire/esas/karar no + tarihle künyelenir; ulaşılamazsa "ulaşılamadı" denir,
+      UYDURULMAZ. Tarafa "emsal" değil "örnek karar" dili. Ücretli abonelik alınmayacak.
+- [ ] A4 · İLETİŞİMDEKİ DEĞİŞİM İŞARETİ — ton değişimi arabulucuya işaret edilir;
+      kişilik/psikoloji etiketi ve teşhis YASAK (constitution m.2).
+- [ ] A5 · İLETİŞİM TERCİHİ KATMANI — kanal (e-posta · uygulama içi · WhatsApp) +
+      sıklık (her adım · önemli adımlar · haftalık özet) + sessiz saatler.
+      Taraf ekranına uygulama içi bildirim eklenecek.
+- [ ] A6 · PWA + TELEFONLA GİRİŞ (SMS kodu; e-posta/şifre yok) — pilot için.
+      Mağaza uygulaması sonraya.
+- [ ] A7 · WHATSAPP İŞLETME HATTI (SONRAYA) — Meta Cloud API; ~0,0009 USD/bildirim,
+      aylık ücret yok; ayrı numara + işletme doğrulaması + onaylı şablon gerekir.
+      O zamana kadar "WhatsApp'ta aç" tek tık düğmesi.
+- [ ] A8 · OTURUM DÖKÜMÜ ANALİZİ — döküm ajan tarafından analiz edilir (tıkanma noktası,
+      rakamlanmamış talep, sonraki oturum soruları). AYNI ANALİZ Görüşme Notları
+      aşamasında da çalışır. Canlı dinleme ERTELENDİ.
+- [ ] A9 · SESSİZ CANLI KOKPİT — föy, kritik faktörler, hazır sorular, kalan süre,
+      tek tıkla not. Ajan dinlemez; ekran yalnız arabulucuya.
+- [ ] A10 · SEÇENEK SEPETİ — dosya türü ve asıl ihtiyaca göre çözüm seçenekleri, para
+      dışı olanlar dahil (taksit, hizmet karşılığı, özür, referans mektubu, gelecekteki
+      iş ilişkisi, gizlilik taahhüdü); her seçeneğin yanında hangi ihtiyacı karşıladığı
+      yazar. Yalnız arabulucuya.
+- [ ] A11 · KİŞİSİZ İSTATİSTİKTEN ÖĞRENME — dosya sayısı, tür, ortalama oturum, anlaşma
+      oranı, tıkanma aşaması → dönem sonu geri bildirimi.
+      DEĞİŞMEZ: dosya metni, taraf beyanı ve belge içeriği hiçbir havuza/eğitime ÇIKMAZ.
+- [ ] A12 · OTURUM ERTELEME TUTANAĞI şablonu + erteleme bildiriminin ajan tarafından
+      gönderilmesi.
+
+### B) ARABULUCU
+- [ ] B13 · ELVERİŞLİLİK KONTROLÜ — dosya açılışında arabuluculuğa elverişlilik taraması;
+      şüphede gerekçe + mevzuat maddesiyle uyarı verilir, YORUM YAPILMAZ.
+- [ ] B14 · USUL ÖNERİSİ — dosyanın koşullarına göre gerekçeli süreç önerisi (vekilsiz
+      tarafta uzun ilk oturum, akşam oturumu, önce özel oturum, uzman görüşü, yüz yüze,
+      tıkanmada düzen değişikliği). Karar arabulucuda (constitution m.3).
+- [ ] B15 · OLAY ZAMAN ÇİZELGESİ — tüm tarihler tek çizelgede; her satırın kaynağı yazılı.
+- [ ] B16 · GÜÇ DENGESİZLİĞİ İŞARETİ — vekilli/vekilsiz, kurumsal/birey, hukuk bilgisi
+      farkı. Etiketleme değil, durum tespiti.
+- [ ] B17 · USULE İLİŞKİN ENGEL LİSTESİ — vekaletname, imza yetkilisi, tebligat adresi,
+      süre. Kanun yorumu yok; eksik sayımı + madde referansı.
+- [ ] B18 · KAYIT PROTOKOLÜ (Resolution Institute uyarlaması) —
+      · Kayıtlı oturum daveti onay formuyla EN AZ 48 SAAT önce gider; süre dolmadan
+        kayıt açılmaz.
+      · TÜM katılımcılardan (vekil ve uzman dahil) yazılı onay; TEK İTİRAZ kaydı kapatır;
+        onaylar tutanağa işlenir.
+      · Kayıt YALNIZ MediPact oturum ekranından alınır; harici araç (Otter, Fireflies,
+        Zoom kaydı, telefonla ses alma) YASAK.
+      · SİLME: ses kaydı süreç bitiminden 24 SAAT sonra sunucudan ve YEDEKTEN kalıcı
+        silinir; döküm süreç sonuna kadar durur, son tutanakla birlikte silinir.
+- [ ] B19 · TEKLİF DEĞERLENDİRME — teklif talebin ne kadarını karşılıyor, kabulde ne
+      kazanılıyor / ne bırakılıyor. Yalnız arabulucuya.
+- [ ] B20 · TIKANMA ÇÖZÜCÜ — gerekçeli çıkış yolu önerileri (konuyu bölme, tek başlıkta
+      anlaşma, sıra değişikliği, özel oturum, uzman görüşü).
+- [ ] B21 · TASLAK DENETİMİ — anlaşma/tutanak imzadan önce taranır: belirsiz ödeme tarihi,
+      ölçüsüz ifade ("makul süre"), ad/unvan tutarsızlığı, feragat kapsamı, rakam-yazı
+      çelişkisi, eksik imza/tarih.
+- [ ] B22 · FATURA / SERBEST MESLEK MAKBUZU TAKİBİ — kim ödedi, kime makbuz kesildi,
+      bekleyen kim.
+
+### C) TARAF VE VEKİL
+- [ ] C23 · TARAFA OTURUM HAZIRLIK FÖYÜ — hangi başlıklar konuşulacak, hangi belge
+      getirilecek, hangi soruya hazırlık, tahmini süre.
+- [ ] C24 · HER TARAFA KENDİ AJANI — merkezî ajandan ve birbirinden bağımsız; iki tarafta
+      AYNI yetenek.
+      YAPAR: süreci anlatır · talepleri derler · eldeki belgelerle güçlü/zayıf yönleri
+      çıkarır (hangi talep belgeli, hangisi değil, nerede çelişki) · anlaşmama hâlini
+      kaynaklı rakamlarla gösterir (süre, harç, masraf = BATNA) · teklifin talebin yüzde
+      kaçını karşıladığını gösterir.
+      YAPMAZ: "kabul et / etme" · rakam önerisi · mahkeme sonucu tahmini · karşı taraf
+      hakkında yorum · vekil yerine geçme.
+      DUVAR: arabulucu taraf ajanının içeriğini GÖREMEZ; taraf ajanı merkezî analizlere
+      ERİŞEMEZ.
+      Zayıf yön dili tamamlayıcı kurulur ("şu belgeyi eklerseniz talebiniz dayanağına
+      kavuşur"). Ekranda sabit uyarı: "Bu asistan hukuki tavsiye vermez, tespit yapar."
+- [ ] C25 · "VERİLERİM" SAYFASI — taraf kendi verisini görür: ne toplandı, ne kadar
+      saklanacak, silme/düzeltme talebi düğmesi.
+- [ ] C26 · VEKİL EKRANI — pilotta YOK, sonraya (vekil taraf ajanını kullanır).
+
+### D) ETİK / KURUMSAL
+- [ ] D27 · YZ KULLANIM BEYANI — dosya açılışında bildirim + imzalı onay, tutanağa
+      işlenir: hangi işlerde YZ var, neyi yapmıyor, veri eğitime çıkmıyor, taraf ajanı
+      iki tarafa da eşit verildi.
+- [ ] D28 · "NE YAPAR / NE YAPMAZ" TANITIM EKRANI — arabulucunun ilk girişinde.
+- [ ] D29 · DENETİM İZİ — hangi çıktı ne zaman üretildi, kim onayladı, kim değiştirdi.
+
+### ERTELENENLER (karar: sonra)
+- Arabulucu ataması + çıkar çatışması taraması — sonra.
+- Ayrı taraflılık denetimi — pilot sonrası.
+- Eğitim amaçlı senaryo üretimi — sonra.
+- Dil desteği / çeviri — KAPSAM DIŞI.
+- Sicil / eğitim / sigorta takibi — İSTENMEDİ.
+
 ## Nerede kaldık — 15.08.2026 (52) · TUR C-2 KÖR TEKLİF v2 (koşullu aralık / braketleme)
 - [x] SQL göçü yazıldı (idempotent): supabase/migrations/20260815120000_kor_teklif_v2_braket.sql
       — teklif_braketleri · braket_bant_sorulari · braket_denetim_izi + RLS + braket izi

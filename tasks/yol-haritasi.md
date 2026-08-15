@@ -482,3 +482,37 @@ hiçbir yüzeyden öğrenmiyor. Yakınlık seyri yalnız arabulucuda. Her adım
 braket_denetim_izi'ne zaman damgasıyla düşüyor ve Ajan Paneli'nde görünüyor. Nöbetçi
 özetine dört sayaç eklendi: braket_girildi · ortusme_bulundu · bant_sorusu_gonderildi ·
 taahhut_dustu. SQL göçü bekliyor: 20260815120000_kor_teklif_v2_braket.sql.
+
+15.08 (İBA REHBERİ TARAMASI — KARAR KAYDI): Rehber taramasından çıkan 29 madde karara
+bağlandı ve tasks/todo.md'ye numaralı kalemler olarak yazıldı (A1-A12 genel, B13-B22
+arabulucu, C23-C26 taraf/vekil, D27-D29 etik/kurumsal). Hiçbiri henüz kodlanmadı;
+sıralama pilot ihtiyacına göre bu haritadan yürütülecek.
+
+BAĞLAYICI SAYILAN ÜÇ KURAL (kod yazılmadan geçerlidir):
+· KAYNAK KÜNYESİ (A2): her bulgu dayanağıyla (belge + bölüm/sayfa ya da tarihli beyan)
+  gösterilir; dayanaksız bulgu ekrana çıkmaz, kaynaksız değerlendirme "doğrulanmamış"
+  etiketiyle ayrı durur. İddia-tespit ayrımı: her cümle kimin söylediğiyle başlar,
+  tek taraflı anlatı tespit gibi yazılamaz. (constitution m.2 ile aynı hat.)
+· İÇTİHAT/MEVZUAT KAYNAĞI (A3): serbest internet gezinme YOK. Yalnız yüklenen anonim
+  içtihat özetleri ve resmî arşive anlık bağlanan ücretsiz açık kaynak servisler
+  (Yargıtay, Danıştay, AYM, Emsal, mevzuat). Künye (daire/esas/karar no + tarih)
+  zorunlu; ulaşılamayan kayıt için "ulaşılamadı" denir, uydurulmaz. Tarafa "emsal"
+  değil "örnek karar" dili. Ücretli abonelik alınmayacak.
+· KAYIT PROTOKOLÜ (B18): kayıtlı oturum daveti en az 48 saat önce onay formuyla gider;
+  tüm katılımcıların (vekil ve uzman dahil) yazılı onayı şarttır, tek itiraz kaydı
+  kapatır. Kayıt yalnız MediPact oturum ekranından alınır, harici kayıt aracı yasaktır.
+  Ses kaydı süreç bitiminden 24 saat sonra sunucudan ve yedekten kalıcı silinir; döküm
+  süreç sonuna kadar durur ve son tutanakla birlikte silinir. (constitution m.10.)
+
+TARAF AJANI DUVARI (C24): her tarafa aynı yetenekte kendi ajanı verilir; arabulucu taraf
+ajanının içeriğini göremez, taraf ajanı merkezî analizlere erişemez. Ajan kabul/ret
+tavsiyesi, rakam önerisi, mahkeme sonucu tahmini ve karşı taraf hakkında yorum yapmaz.
+
+PİLOT YÜZEY KARARLARI: PWA + telefonla giriş (SMS kodu, e-posta/şifre yok) pilotta;
+mağaza uygulaması sonraya. WhatsApp işletme hattı (Meta Cloud API) sonraya — o zamana
+kadar "WhatsApp'ta aç" tek tık düğmesi. Vekil ekranı pilotta yok. Canlı dinleme ertelendi;
+oturum dökümü analizi hem oturum sonrası hem Görüşme Notları aşamasında çalışacak.
+
+ERTELENENLER: arabulucu ataması + çıkar çatışması taraması (sonra) · ayrı taraflılık
+denetimi (pilot sonrası) · eğitim amaçlı senaryo üretimi (sonra) · dil desteği/çeviri
+(kapsam dışı) · sicil/eğitim/sigorta takibi (istenmedi).
