@@ -19,11 +19,20 @@ Bu iş o tabanın üstüne, §5.2g'nin hafif kademesi olarak kuruldu.
       YERLEŞİM KURUCU ONAYIYLA seçildi (Aşama 1 / Aşama 3 seçenekleri sunuldu).
 - [x] GİZLİLİK: olay_cizelgesi'nde tarafa SELECT politikası YOK; CaseRoom'a dokunulmadı.
 tsc (tsconfig.app.json) temiz; edge fonksiyon sözdizimi esbuild ile doğrulandı.
-CANLI TEST YOK.
-SQL GEREKLİ: supabase/migrations/20260815180000_olay_cizelgesi.sql (kurucu çalıştıracak).
-REDEPLOY GEREKLİ: olay-cizelgesi (YENİ). PUBLISH GEREKLİ (yeni katman).
+- [x] CANLIDA DOĞRULANDI (15.08.2026).
+      · Yeri: Aşama 2 — Taraf Analizi (kurucu kararı). Mimari §5.2g güncellendi;
+        kokpite ileride yalnız kısa şerit eklenecek (AÇIK MADDE).
+      · Göç 20260815180000_olay_cizelgesi.sql çalıştırıldı; olay-cizelgesi fonksiyonu
+        yayına alındı; Publish yapıldı.
+      · Sağlık dosyasında 15 satır üretti, her satır kaynaklı (belge adı + bölüm).
+      · Düzeltmeler: künye/matbu tarihler (doğum tarihi gibi) çizelgeye girmiyor;
+        tarih biçimi tek tip GG.AA.YYYY; "Çizelgeyi yenile" eski satırları silip
+        yeniden üretiyor.
+      · Arabuluculuk başvuru tarihi çizelgede kalıyor (yasal süreyi başlatan olay).
 AÇIK UÇ: Çizelge kendiliğinden üretilmiyor — arabulucu düğmeye basar. Belge yüklenince
 otomatik tetikleme istenmedi; istenirse extract-document-text kolu eklenebilir.
+AÇIK UÇ: Kokpite (Aşama 3) kısa kronoloji şeridi eklenmesi — §5.2g'nin "kokpite sunulur"
+cümlesinin karşılığı; henüz yapılmadı.
 - [x] DÜZELTME 15.08 (canlı bulgu): (a) İlgisiz tarihler çizelgeye girmiyor — "04.06.1978
       hasta doğum tarihi" gibi künye/matbu tarihleri hem istemde yasaklandı hem sunucuda
       kalıp taramasıyla eleniyor ("olay zinciriyle ilgisiz" sebebiyle). Çizelge yalnız
