@@ -58,3 +58,8 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   tsconfig.app.json` ile yapılır; vite build de tip denetlemez (esbuild yalnız
   tipleri siler), bu yüzden eksik import runtime'da patlar. (14.08, CaseRoom
   useMemo importu)
+- Yeni bir ajan türü eklenirken agent_states.agent_type CHECK kısıtı genişletilmezse,
+  ajan çalışsa bile durum yazımı SESSİZCE düşer ve panel boş görünür. Yeni ajan ekleyen
+  her migration'a kısıt genişletmesi dahil edilecek (mevcut türler korunarak); ayrıca
+  nobetciDurumYaz gibi durum yazım fonksiyonlarında hata kontrolü yapılacak — şu an
+  hata yutuluyor. (15.08, ajan-nobetci canlı doğrulaması)

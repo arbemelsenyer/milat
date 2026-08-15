@@ -144,7 +144,19 @@ girer, koşullu taahhüt konur, karşı taraf reddeder → taahhüt düşer).
 - [x] Ön koşul uyarıları: her çalıştırılamayan kolun sebebi zaman damgasıyla
       agent_states.last_output.yapilmayanlar'a yazılıyor.
 - [x] Ajan Paneli'ne "ajan ne yaptı, ne yapmadı" bölümü + onay düğmeleri.
-tsc + build temiz; edge fonksiyonların sözdizimi esbuild ile doğrulandı. CANLI TEST YOK.
+tsc + build temiz; edge fonksiyonların sözdizimi esbuild ile doğrulandı.
+- [x] ajan-nobetci CANLIDA DOĞRULANDI (15.08.2026).
+      · agent_states.agent_type CHECK kısıtı canlıda 'nobetci' değerini kabul etmiyordu;
+        kısıt mevcut 14 tür korunarak 'nobetci' eklenecek şekilde genişletildi
+        (Lovable > Cloud > SQL).
+      · ajan-nobetci elle tetiklendi (net.http_post, x-cron-secret), 200 döndü;
+        2 dosya tarandı, hata yok.
+      · agent_states'e dosya başına 'nobetci' satırı yazıldı; last_output içindeki
+        yapilmayanlar dizisi gerekçe ve zaman damgasıyla dolu.
+      · Ajan Kontrol Paneli'ndeki "Ajan ne yaptı, ne yapmadı" listesi canlıda
+        doğrulandı: yapılanlar ve atlananlar gerekçeleriyle görünüyor.
+      · AÇIK KALAN: ajan-nobetci için depoda tanımlı cron YOK; şu an yalnız elle
+        tetikleniyor. Otomatik koşum kararı verilmedi.
 REDEPLOY GEREKLİ: ajan-nobetci, randevu-teklif.
 AÇIK UÇLAR:
 - ajan_gorevleri için arabulucu SELECT/UPDATE politikası doğrulanmadı; yoksa panelde
