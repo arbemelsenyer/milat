@@ -20,7 +20,7 @@ import {
 import {
   Loader2, ShieldCheck, Lock, Sparkles, Upload, FileText, Users, Brain, Lightbulb,
   Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X, History, Filter, FileDown, MessageSquare, Bot,
-  Wallet, Pencil,
+  Wallet, Pencil, EyeOff,
 } from "lucide-react";
 import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
@@ -689,9 +689,16 @@ export default function CaseRoom() {
           <TabsTrigger value="experts" className={tabTriggerAccentClass}><Award className="h-4 w-4 mr-1" />Bilirkişi Onayı</TabsTrigger>
           <TabsTrigger value="payment" className={tabTriggerAccentClass}><Wallet className="h-4 w-4 mr-1" />Ödeme Bilgim</TabsTrigger>
           <TabsTrigger value="randevu" className={tabTriggerAccentClass}><Calendar className="h-4 w-4 mr-1" />Randevu Tercihlerim</TabsTrigger>
+          <TabsTrigger value="braket" className={tabTriggerAccentClass}><EyeOff className="h-4 w-4 mr-1" />Kabul Aralığım</TabsTrigger>
           <TabsTrigger value="ajanim" className={tabTriggerAccentClass}><Bot className="h-4 w-4 mr-1" />Ajanım</TabsTrigger>
           <TabsTrigger value="agents" className={tabTriggerAccentClass}><Bot className="h-4 w-4 mr-1" />AI Aktivitelerim</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="braket">
+          {myParty?.id
+            ? <BraketTarafBolumu caseId={caseId!} partyId={myParty.id} />
+            : <Card className="p-5"><p className="text-sm text-muted-foreground">Taraf kaydınız bulunamadı.</p></Card>}
+        </TabsContent>
 
         <TabsContent value="ajanim">
           {myParty?.id
@@ -861,6 +868,273 @@ export default function CaseRoom() {
       </>
     );
   }
+}
+
+/* ===================== KÖR TEKLİF v2 — KABUL ARALIĞI / BRAKET (taraf) ===================== */
+// Girilen değerler yalnız bu tarafa ve arabulucuya görünür (RLS: is_own_case_party +
+// is_case_mediator). Karşı taraf ne aralığı, ne koşullu taahhüdü, ne de bunların var
+// olduğunu hiçbir yüzeyden göremez. Bant sorusu kaynağını göstermez.
+
+type BraketRow = {
+  id: string;
+  alt_sinir: number | null;
+  ust_sinir: number | null;
+  para_birimi: string;
+  kosul_bant_alt: number | null;
+  kosul_bant_ust: number | null;
+  kosullu_deger: number | null;
+  kosul_notu: string | null;
+  kosul_durumu: string;
+};
+
+type BantSorusu = {
+  id: string;
+  bant_alt: number | null;
+  bant_ust: number | null;
+  para_birimi: string;
+  durum: string;
+  created_at: string;
+};
+
+function braketSayi(s: string): number | null {
+  const t = s.trim();
+  if (!t) return null;
+  const n = Number(t.replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+function braketMetin(v: number | null | undefined): string {
+  return v === null || v === undefined ? "" : String(v);
+}
+function braketTutar(v: number | null | undefined, para: string): string {
+  if (v === null || v === undefined) return "—";
+  return `${Number(v).toLocaleString("tr-TR")} ${para || "TRY"}`;
+}
+
+function BraketTarafBolumu({ caseId, partyId }: { caseId: string; partyId: string }) {
+  const [alt, setAlt] = useState("");
+  const [ust, setUst] = useState("");
+  const [kosulAlt, setKosulAlt] = useState("");
+  const [kosulUst, setKosulUst] = useState("");
+  const [kosulDeger, setKosulDeger] = useState("");
+  const [kosulNot, setKosulNot] = useState("");
+  const [mevcut, setMevcut] = useState<BraketRow | null>(null);
+  const [sorular, setSorular] = useState<BantSorusu[]>([]);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+  const [cevaplanan, setCevaplanan] = useState<string | null>(null);
+  const [hata, setHata] = useState<string | null>(null);
+  const [bilgi, setBilgi] = useState<string | null>(null);
+
+  async function yukle() {
+    setYukleniyor(true);
+    const [b, s] = await Promise.all([
+      (supabase.from("teklif_braketleri" as any) as any)
+        .select("id, alt_sinir, ust_sinir, para_birimi, kosul_bant_alt, kosul_bant_ust, kosullu_deger, kosul_notu, kosul_durumu")
+        .eq("case_id", caseId).eq("party_id", partyId).maybeSingle(),
+      (supabase.rpc as any)("braket_bant_sorularim", { p_case_id: caseId }),
+    ]);
+    if (b.error) setHata(`Kabul aralığınız okunamadı: ${b.error.message}`);
+    else {
+      setHata(null);
+      const r = (b.data ?? null) as BraketRow | null;
+      setMevcut(r);
+      setAlt(braketMetin(r?.alt_sinir));
+      setUst(braketMetin(r?.ust_sinir));
+      setKosulAlt(braketMetin(r?.kosul_bant_alt));
+      setKosulUst(braketMetin(r?.kosul_bant_ust));
+      setKosulDeger(braketMetin(r?.kosullu_deger));
+      setKosulNot(r?.kosul_notu ?? "");
+    }
+    if (!s?.error) setSorular(((s?.data ?? []) as any[]) as BantSorusu[]);
+    setYukleniyor(false);
+  }
+
+  useEffect(() => { yukle(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [caseId, partyId]);
+
+  async function kaydet() {
+    const a = braketSayi(alt), u = braketSayi(ust);
+    const ka = braketSayi(kosulAlt), ku = braketSayi(kosulUst), kd = braketSayi(kosulDeger);
+    if (alt.trim() && a === null) { setHata("Alt sınır sayı olmalı."); return; }
+    if (ust.trim() && u === null) { setHata("Üst sınır sayı olmalı."); return; }
+    if (a !== null && u !== null && a > u) { setHata("Alt sınır, üst sınırdan büyük olamaz."); return; }
+    const kosulVar = ka !== null || ku !== null || kd !== null;
+    if (kosulVar && (ka === null || ku === null || kd === null)) {
+      setHata("Koşullu taahhüt için üç alanın üçü de dolu olmalı: bant alt, bant üst ve ineceğiniz tutar.");
+      return;
+    }
+    if (ka !== null && ku !== null && ka > ku) { setHata("Koşul bandının altı, üstünden büyük olamaz."); return; }
+
+    // Koşul alanları değişmediyse mevcut durum korunur; değiştiyse taahhüt yeniden
+    // değerlendirilmek üzere 'aktif'e (veya kaldırıldıysa 'yok'a) döner.
+    const degisti =
+      (mevcut?.kosul_bant_alt ?? null) !== ka ||
+      (mevcut?.kosul_bant_ust ?? null) !== ku ||
+      (mevcut?.kosullu_deger ?? null) !== kd;
+    const durum = !degisti && mevcut ? mevcut.kosul_durumu : (kosulVar ? "aktif" : "yok");
+
+    setKaydediliyor(true);
+    setHata(null);
+    setBilgi(null);
+    const { error } = await (supabase.from("teklif_braketleri" as any) as any).upsert({
+      case_id: caseId,
+      party_id: partyId,
+      alt_sinir: a,
+      ust_sinir: u,
+      para_birimi: mevcut?.para_birimi || "TRY",
+      kosul_bant_alt: ka,
+      kosul_bant_ust: ku,
+      kosullu_deger: kd,
+      kosul_notu: kosulNot.trim() || null,
+      kosul_durumu: durum,
+    }, { onConflict: "case_id,party_id" });
+    setKaydediliyor(false);
+    if (error) setHata(`Kaydedilemedi: ${error.message}`);
+    else {
+      setBilgi("Kaydedildi — bu bilgiler yalnız size ve arabulucuya görünür.");
+      toast({ title: "Kabul aralığınız kaydedildi" });
+      await yukle();
+    }
+  }
+
+  async function bantCevapla(soruId: string, kabul: boolean) {
+    setCevaplanan(soruId);
+    setHata(null);
+    const { data, error } = await (supabase.rpc as any)("braket_bant_cevapla", {
+      p_soru_id: soruId, p_kabul: kabul,
+    });
+    setCevaplanan(null);
+    if (error) { setHata(`Cevap kaydedilemedi: ${error.message}`); return; }
+    if (data === "yetkisiz" || data === "bulunamadi") { setHata("Bu soru size ait değil."); return; }
+    setBilgi(kabul ? "Cevabınız alındı: bu aralığı değerlendiriyorsunuz." : "Cevabınız alındı.");
+    await yukle();
+  }
+
+  const acikSorular = sorular.filter((s) => s.durum === "soruldu");
+  const gecmisSorular = sorular.filter((s) => s.durum !== "soruldu");
+
+  if (yukleniyor) {
+    return <Card className="p-5 flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" /> Yükleniyor…
+    </Card>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Bant sorusu — kaynağı gösterilmez; yalnız aralık sorulur. */}
+      {acikSorular.length > 0 && (
+        <Card className="p-5 space-y-3 border-primary/40">
+          <h3 className="font-semibold text-sm">Değerlendirme sorusu</h3>
+          {acikSorular.map((s) => (
+            <div key={s.id} className="rounded-md border p-3 space-y-2">
+              <p className="text-sm">
+                Şu aralığı düşünür müsünüz:{" "}
+                <span className="font-semibold">
+                  {braketTutar(s.bant_alt, s.para_birimi)} – {braketTutar(s.bant_ust, s.para_birimi)}
+                </span>
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Bu soru sürecin yürütülmesi içindir; karşı tarafın rakamlarını içermez ve cevabınız
+                karşı tarafa gösterilmez.
+              </p>
+              <div className="flex gap-2">
+                <Button size="sm" disabled={cevaplanan === s.id} onClick={() => bantCevapla(s.id, true)}>
+                  {cevaplanan === s.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+                  Düşünürüm
+                </Button>
+                <Button size="sm" variant="outline" disabled={cevaplanan === s.id}
+                  onClick={() => bantCevapla(s.id, false)}>
+                  Bu aralığı düşünmüyorum
+                </Button>
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+
+      <Card className="p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <EyeOff className="h-4 w-4 text-primary" />
+          <h3 className="font-semibold">Kabul Aralığım</h3>
+        </div>
+        <p className="text-sm text-muted-foreground leading-snug">
+          <ShieldCheck className="inline h-3 w-3 mr-1" />
+          Buraya girdikleriniz yalnız size ve arabulucuya görünür. Karşı taraf ne aralığınızı,
+          ne koşullu taahhüdünüzü, ne de bunları girip girmediğinizi görebilir.
+        </p>
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Alt sınır</Label>
+            <Input inputMode="decimal" value={alt} onChange={(e) => setAlt(e.target.value)} placeholder="Örn. 50000" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Üst sınır</Label>
+            <Input inputMode="decimal" value={ust} onChange={(e) => setUst(e.target.value)} placeholder="Örn. 80000" />
+          </div>
+        </div>
+
+        <div className="rounded-md border p-3 space-y-3">
+          <div>
+            <div className="text-sm font-medium">Koşullu taahhüt (isteğe bağlı)</div>
+            <p className="text-[11px] text-muted-foreground">
+              "Karşı taraf şu bandın altına inerse ben de şu tutara inerim." Bu taahhüt karşı tarafa
+              gösterilmez; karşı tarafa yalnız bandı düşünüp düşünmeyeceği sorulur. Karşı taraf
+              düşünmediğini söylerse taahhüdünüz kendiliğinden kapanır.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Bant — alt</Label>
+              <Input inputMode="decimal" value={kosulAlt} onChange={(e) => setKosulAlt(e.target.value)} placeholder="Örn. 40000" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Bant — üst</Label>
+              <Input inputMode="decimal" value={kosulUst} onChange={(e) => setKosulUst(e.target.value)} placeholder="Örn. 55000" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Ben de şuna inerim</Label>
+              <Input inputMode="decimal" value={kosulDeger} onChange={(e) => setKosulDeger(e.target.value)} placeholder="Örn. 45000" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Not (yalnız arabulucu görür)</Label>
+            <Textarea rows={2} value={kosulNot} onChange={(e) => setKosulNot(e.target.value)}
+              placeholder="Arabulucuya iletmek istediğiniz açıklama…" />
+          </div>
+          {mevcut && mevcut.kosul_durumu !== "yok" && (
+            <p className="text-[11px] text-muted-foreground">
+              Durum:{" "}
+              {mevcut.kosul_durumu === "dustu"
+                ? "Koşullu taahhüdünüz kapandı — dilerseniz yenisini girebilirsiniz."
+                : "Koşullu taahhüdünüz arabulucuya iletildi."}
+            </p>
+          )}
+        </div>
+
+        {hata && <p className="text-xs text-destructive">{hata}</p>}
+        {bilgi && <p className="text-xs text-emerald-700">{bilgi}</p>}
+
+        <Button onClick={kaydet} disabled={kaydediliyor}>
+          {kaydediliyor ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+          Kaydet
+        </Button>
+      </Card>
+
+      {gecmisSorular.length > 0 && (
+        <Card className="p-5 space-y-2">
+          <h3 className="font-semibold text-sm">Cevapladığınız sorular</h3>
+          <ul className="text-xs text-muted-foreground space-y-1">
+            {gecmisSorular.map((s) => (
+              <li key={s.id}>
+                {braketTutar(s.bant_alt, s.para_birimi)} – {braketTutar(s.bant_ust, s.para_birimi)} ·{" "}
+                {s.durum === "kabul" ? "düşünürüm" : "düşünmüyorum"}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+    </div>
+  );
 }
 
 /* ===================== DOSYA ASİSTANIM (yalnız taraf görünümü) ===================== */
