@@ -1,4 +1,22 @@
+## Çalışma düzeni skill'leri (16.08.2026)
+Kurucunun hesabına iki skill kaydedildi (depoda değil, Claude hesabında durur):
+(a) medipact-calisma-duzeni — KABUL/RED açılışı, tek adım kuralı, zincir anlatma yasağı,
+komut öncesi üç kontrol (üründe var mı · zemin hazır mı · sonradan baştan yapılır mı),
+üründe var olanı ikinci kez yapmama kuralı (ad değil işlev aranır), İBA kalemlerinde
+"madde + amaç + karşılığımız" üçlüsü onaya sunulmadan komut verilmemesi, komutların
+zorunlu parçaları (FAST MOD + ayrıntılı koruma bloğu + üç satırlık özet), sıra kuralı
+SQL → redeploy → publish → Ctrl+Shift+R → tek kontrol.
+(b) emel-yazim-kurallari — AI dili yasağı, LinkedIn yazı kalıbı, unvan/eğitim şişirme
+yasağı, kaynakta olmayan detay yazma yasağı.
+
 ## Nerede kaldık — 16.08.2026 (79) · MAKBUZ TAKİBİ (İBA 2.7 / B22)
+- [x] KAPATILDI (16.08.2026) — Ayrı bölüm EKLENMEYECEK; ihtiyaç mevcut "Ödeme &
+      Muhasebe" paneliyle karşılanıyor (kenar çubuğu + Aşama 7). O panelde Ödeme Defteri
+      tablosu, Makbuz No sütunu, makbuz numarası yazmanın iki yolu (Ödendi işaretle +
+      Düzenle) ve makbuz taslağı PDF'i zaten vardı. 16.08'de kokpite eklenen mükerrer
+      "Makbuz takibi" bölümü geri alındı (f5494eb → 1aa6b96); yalnız iki fayda mevcut
+      panele taşındı: Ödeme Defteri başlığında "<n> ödeme · <m> makbuz bekliyor" özeti
+      ve ödenmiş ama makbuz numarası boş satırların vurgulanması. Canlıda doğrulandı.
 - [x] GERİ ALINDI (16.08.2026) — Kokpitteki ayrı "Makbuz takibi" bölümü MÜKERRERDİ,
       kaldırıldı (commit 1aa6b96). Üründe zaten Ödeme & Muhasebe paneli var: Ödeme
       Defteri tablosu, Makbuz No sütunu, "Ödendi işaretle" ile makbuz numarası yazma,
@@ -41,10 +59,10 @@ yok. İstenirse ayrı iş.
       künyelenir, doğrulanamazsa BOŞ bırakılır. Eğitim/uzmanlık modülleri atıf kaynağı
       olarak kullanılmaz; geçici madde ile normal madde ayrı ele alınır; bozuk (OCR
       kırığı) alıntı elenir.
-AÇIK NOT: usule ilişkin engel atıflarının son hâli (748d22c) canlıda henüz doğrulanmadı —
-nöbetçi yeni kodla koştuğunda atıfların yalnız kanun/yönetmelikten geldiği, yanlış madde
-numarası ve bozuk alıntı kalmadığı kontrol edilecek. Referans boş kalsa da eksik
-tespitleri gösterilmeye devam eder.
+ATIF DOĞRULAMASI TAMAMLANDI (16.08.2026, commit 3d53e7d) — Atıf kaynağı yalnız 6325
+sayılı Kanun ve yönetmeliği ile sınırlandı; İmar/Bankacılık gibi alakasız kanunlardan
+gelen atıflar elendi. Canlı kontrol: sağlık ve kira dosyalarında tüm atıflar arabuluculuk
+mevzuatından, alıntılar temiz, güvensiz madde numarası yazılmamış (boş bırakılmış).
 - [x] TUR KAYDI (16.08 akşamı). Bu bölümde iki düzeltme
       turu daha yapıldı, kaydı buraya düşüyor:
       · 71cad80 — madde referansı bilgi tabanındaki kanun metninden çekiliyor (kavram
