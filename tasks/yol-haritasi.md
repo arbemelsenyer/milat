@@ -661,3 +661,12 @@ duygu ve niyet değerlendirmesi yok; her işaret aynı tarafın iki tarihli metn
 cümlelik alıntıya dayanıyor; taraflar birbiriyle karşılaştırılmıyor; yalnız arabulucu
 görüyor. Yeni tablo, edge fonksiyon ve AI çağrısı YOK. SQL gerekmiyor; yalnız Publish.
 
+16.08 (İletişimde değişim kartı DAYANAK katmanına alındı): Kart kokpitin RAPOR
+katmanından DAYANAK katmanına, "İletişim ve asıl ihtiyaç" bölümünün hemen altına taşındı;
+ikisi aynı metinlerden beslendiği için yan yana duruyor. Sol dizindeki numaralandırma
+bölüm sırasından kendiliğinden hesaplandığı için sonraki başlıklar bir kayıyor; menüye
+bölüm ipucu satırı da eklendi. Kartın içeriği, kuralları ve gizlilik sınırı değişmedi
+(kişilik/teşhis dili yok, her işaret aynı tarafın iki tarihli metnine ve kısa alıntıya
+dayanıyor, taraflar karşılaştırılmıyor, yalnız arabulucu görüyor, veri yetersizken kart
+gizlenmiyor). SQL ve redeploy gerekmiyor; yalnız Publish.
+

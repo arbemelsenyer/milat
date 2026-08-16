@@ -7077,6 +7077,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     "kokpit-ic-tutarlilik": "Tarafın kendi beyanı ile kendi belgesi arasındaki uyumsuzluklar; iki dayanak yan yana gösterilir, hüküm kurulmaz.",
     "kokpit-rapora-girmeyenler": "Ajanın değerlendirip rapora almadığı hususlar; neden alınmadığı ve önerilen adımla birlikte.",
     "kokpit-iletisim": "Tarafın nasıl konuştuğundan çıkan izler: kaçınılan konu, tekrar eden tema, sertleşme noktası, hiç değinilmeyen alan, talep ile anlatı farkı.",
+    "kokpit-iletisim-degisim": "Aynı tarafın kendi tarihli metinlerinde dilin zaman içindeki değişimi: hangi konuda, hangi tarihten hangi tarihe, ne yönde — iki metinden alıntıyla.",
     "kokpit-uzlasma-zopa": "Anlaşma olasılığı ve tarafların kabul aralıklarının kesiştiği olası anlaşma bandı.",
     "kokpit-taraf-karsilastirma": "Dava yoluna gidilmesi hâlinde tarafları bekleyen risk ve ispat yükü değerlendirmesi.",
     "kokpit-resmi-karsilastirma": "Her tarafın elindeki güçlü dayanaklar ve açık kalan noktalar.",
@@ -7257,6 +7258,16 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
       ),
     });
   }
+
+  // İletişimde değişim (İBA 1.5 / A4) — "İletişim ve asıl ihtiyaç" bölümünün HEMEN
+  // ALTINDA, aynı DAYANAK katmanında: ikisi aynı metinlerden beslenir (biri asıl
+  // ihtiyacı, öteki o dilin zaman içindeki değişimini gösterir).
+  // KOŞULSUZ eklenir: veri yetersizken bölüm gizlenmez, kart kendi içinde
+  // "karşılaştırılacak yeterli tarihli metin yok" satırını yazar.
+  sectionDefs.push({
+    id: "kokpit-iletisim-degisim", layer: LAYER_EVIDENCE, title: "İletişimde değişim",
+    body: <IletisimDegisimPanel caseRow={caseRow} />,
+  });
 
   if (analyses.length > 0) {
     sectionDefs.push({
@@ -7545,12 +7556,6 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
   sectionDefs.push({
     id: "kokpit-secenek-sepeti", layer: LAYER_REPORTS, title: "Seçenek sepeti",
     body: <SecenekSepetiPanel caseRow={caseRow} />,
-  });
-
-  // İletişimde değişim (İBA 1.5 / A4) — seçenek sepetinin yanında.
-  sectionDefs.push({
-    id: "kokpit-iletisim-degisim", layer: LAYER_REPORTS, title: "İletişimde değişim",
-    body: <IletisimDegisimPanel caseRow={caseRow} />,
   });
 
   const layerOrder = [LAYER_TABLE, LAYER_EVIDENCE, LAYER_COCKPIT, LAYER_REPORTS];

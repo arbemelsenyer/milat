@@ -1,3 +1,23 @@
+## Nerede kaldık — 16.08.2026 (67) · İLETİŞİMDE DEĞİŞİM — DAYANAK KATMANINA ALINDI
+- [x] Kart kokpitte RAPOR katmanından DAYANAK KATMANI'na taşındı; "İletişim ve asıl
+      ihtiyaç" bölümünün HEMEN ALTINDA duruyor (aynı veriden beslendikleri için yan yana).
+- [x] Sol dizin numaralandırması KODDA otomatik: menü, sectionDefs sırasından katman +
+      bölüm olarak kuruluyor ve numberMenuEntries ile numaralanıyor — elle numara
+      yazılmadı, sonraki başlıklar kendiliğinden kaydı.
+- [x] Bölüm ipucu (SECTION_HINTS) eklendi; menüdeki diğer başlıklarla aynı düzen.
+- [x] Kart KOŞULSUZ ekleniyor: "İletişim ve asıl ihtiyaç" bölümü kayıt yoksa görünmüyor,
+      ama değişim kartı her hâlükârda çiziliyor ve veri yetersizse kendi içinde
+      "karşılaştırılacak yeterli tarihli metin yok" yazıyor.
+- [x] İçerik, kurallar ve gizlilik sınırı AYNEN: kişilik/teşhis dili yok · her işaret aynı
+      tarafın iki tarihli metnine ve kısa alıntıya dayanıyor · taraflar karşılaştırılmıyor ·
+      yalnız arabulucu görüyor (kokpit zaten mediator-only).
+- [x] RAPOR katmanındaki eski kayıt kaldırıldı; kalıntı yok. Yeni tablo/edge fonksiyon/AI
+      çağrısı yok → SQL gerekmiyor.
+tsc (tsconfig.app.json) temiz. CANLI TEST YOK.
+NOT: Kartın sol dizindeki numarası (3.3 gibi) DAYANAK katmanında o an görünen bölüm
+sayısına göre hesaplanır; iç tutarlılık ya da rapora girmeyenler bölümü yoksa numara
+kayar. Sıra doğru: her zaman "İletişim ve asıl ihtiyaç"ın hemen altındadır.
+
 ## Nerede kaldık — 16.08.2026 (66) · İLETİŞİMDE DEĞİŞİM — KOKPİTE TAŞINDI
 GÖRÜNMEME SEBEBİ (bulundu): Kart Aşama 2'de taraf kartının İÇİNE konmuştu; taraf satırı
 açılmadıkça (accordion kapalıyken) hiç çizilmiyordu. Görünen üç kart (olay çizelgesi, güç
