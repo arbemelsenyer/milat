@@ -47,6 +47,8 @@ import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 import { ProcessTrackerPanel } from "@/components/mediation/ProcessTrackerPanel";
 import { AgentControlPanel } from "@/components/mediation/AgentControlPanel";
 import { CaseQaPanel } from "@/components/mediation/CaseQaPanel";
+// Ücretli model çağrısı işareti — TEK tanım (bkz. UcretliIsaret.tsx).
+import { UcretliIsaret } from "@/components/mediation/UcretliIsaret";
 
 // Paylaşılan giriş animasyonu deseni — Dashboard.tsx'teki containerVariants/itemVariants ile aynı.
 const containerVariants = {
@@ -1183,6 +1185,7 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
                 : <><Sparkles className="h-3 w-3 mr-1" />AI Önerisi</>}
             </Button>
           </div>
+          <UcretliIsaret />
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Örn. Kira sözleşmesinden doğan uyuşmazlık" />
         </div>
         <div>
@@ -2361,6 +2364,7 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
                           </Button>
                         )}
                       </div>
+                      {!ozetOneri && <UcretliIsaret />}
                       <p className="text-[11px] text-muted-foreground leading-snug">
                         Öneri yalnız dosya başlığı, başvuru/talep alanları ve yüklü belgelerin adı ile
                         türünden üretilir; taraf analizleri ve belge içerikleri kullanılmaz. Metin
@@ -2731,6 +2735,7 @@ function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection,
                       ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Çıkarılıyor…</>
                       : <><Sparkles className="h-4 w-4 mr-1" /> {o ? "Özeti yenile" : "Özet çıkar"}</>}
                   </Button>
+                  <UcretliIsaret />
                   <Button variant="ghost" size="sm" onClick={() => deleteDoc(d)} title="Sil"><Trash2 className="h-3 w-3" /></Button>
                 </div>
                 {/* Belge özeti — yalnız arabulucu yüzeyi. Kaynak: yalnız bu belgenin metni. */}
@@ -2997,6 +3002,7 @@ function DeadlineCard({ caseRow, bare = false }: { caseRow: CaseRow; bare?: bool
                     : <><RefreshCw className="h-4 w-4 mr-1" /> {local.deadline_detected_at ? "Yeniden Tespit" : "Mahkeme Türünü Tespit Et"}</>}
             </Button>
           </div>
+          <UcretliIsaret />
 
           {!caseRow.dispute_type && (
             <p className="text-xs text-muted-foreground italic">
@@ -4744,6 +4750,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
                       </Button>
                     )}
                   </div>
+                  {/* Bu satırdaki dört düğme de model çağrısı tetikler. */}
+                  <UcretliIsaret />
                   {analysisError?.partyId === p.id && (
                     <div className="text-sm text-destructive flex items-center gap-1.5">
                       <AlertTriangle className="h-4 w-4" /> {analysisError.msg}
@@ -7498,6 +7506,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
           <Button size="sm" onClick={generateReport} disabled={!canReport || reportBusy}>
             {reportBusy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {reportStatus ?? "Rapor hazırlanıyor…"}</> : <><Sparkles className="h-4 w-4 mr-1" /> {report ? "Yeniden Üret" : "Rapor Üret"}</>}
           </Button>
+          <UcretliIsaret />
         </div>
         {reportBusy && reportAttempt > 1 && (
           <div className="text-sm text-muted-foreground flex items-center gap-2 mb-2">
@@ -7509,6 +7518,7 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
           <div className="text-sm text-destructive flex items-center gap-2 mb-2">
             <AlertTriangle className="h-4 w-4" /> {reportError}
             <Button size="sm" variant="outline" onClick={generateReport}><RefreshCw className="h-4 w-4 mr-1" />Tekrar Dene</Button>
+            <UcretliIsaret />
           </div>
         )}
         {report ? (
@@ -8382,6 +8392,7 @@ function OlayCizelgesiPanel({ caseId, onCountChange }: { caseId: string; onCount
             ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Çıkarılıyor…</>
             : <><Sparkles className="h-4 w-4 mr-1" /> {satirlar.length > 0 ? "Çizelgeyi yenile" : "Çizelgeyi çıkar"}</>}
         </Button>
+        <UcretliIsaret />
       </div>
 
       {hata && (
@@ -8718,6 +8729,7 @@ function GucDengesiPanel({ caseId, onCountChange }: { caseId: string; onCountCha
             ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Çıkarılıyor…</>
             : <><Sparkles className="h-4 w-4 mr-1" /> {satirlar.length > 0 ? "Yenile" : "Göstergeleri çıkar"}</>}
         </Button>
+        <UcretliIsaret />
       </div>
 
       {hata && (
@@ -10242,6 +10254,7 @@ function IletisimDegisimPanel({ caseRow }: { caseRow: CaseRow }) {
                         ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Çıkarılıyor…</>
                         : <><Sparkles className="h-4 w-4 mr-1" /> {ay ? "Yeniden çıkar" : "Ayrıntısını çıkar"}</>}
                     </Button>
+                    <UcretliIsaret ton="koyu" />
                   </div>
                 );
               })()}

@@ -1,3 +1,29 @@
+## Nerede kaldık — 16.08.2026 (72) · ÜCRETLİ ÇAĞRI İŞARETİ
+- [x] TEK TANIM: src/components/mediation/UcretliIsaret.tsx — küçük gri satır,
+      metin "Yapay zekâ çağrısı — her basış ücret oluşturur". Dosyada Türkçe yorum:
+      pilota çıkarken tek yerden kaldırılabilir/yumuşatılabilir. Koyu zeminli kokpit
+      kartları için ton="koyu" seçeneği var (yalnız renk).
+- [x] İşaret konan düğmeler (11 yer): kokpit "Ayrıntısını çıkar/Yeniden çıkar" ·
+      Ortak zemin "Rapor Üret/Yeniden Üret" · Ortak zemin hata kutusu "Tekrar Dene" ·
+      "Çizelgeyi çıkar/yenile" · "Göstergeleri çıkar/Yenile" · belge listesi
+      "Özet çıkar/Özeti yenile" · Ajan Paneli "Tüm Analizi Başlat" ve onun hata
+      kutusundaki "Tekrar Dene" (ikisinde özel metin: dört analizi birden koşturur).
+- [x] EK BULGULAR (kurucunun listesinde yoktu, model çağrısı tetiklediği için
+      işaretlendi): Uyuşmazlık konusu "Öneri getir / Yeni öneri getir"
+      (dosya-ozeti-oner) · Aşama 2 taraf kartındaki dört düğme "Analiz Başlat /
+      Yeniden Analiz Et · İç Tutarlılık Denetimi · İletişim Analizi · Tekrar Dene"
+      (tek satır işaret) · "Mahkeme Türünü Tespit Et / Yeniden Tespit"
+      (detect-legal-deadlines) · yeni başvuru formundaki "AI Önerisi"
+      (classify-dispute).
+- [x] BEDAVA düğmelere hiçbir şey eklenmedi: "Yenile" (Braket · Teklif değerlendirme ·
+      Tıkanma · Seçenek sepeti · İletişimde değişim sayım kolu · Usule ilişkin engeller),
+      "Tekrar Dene" (yalnız tablo okuyan hata kutuları), PDF/İndir düğmeleri.
+- [x] BELİRSİZ, DOKUNULMADI: "Metin çıkar" (extract-document-text) ve ücret hesabı
+      (calculate-mediation-fee) — model çağrısı yapıp yapmadıkları doğrulanmadı.
+- [x] Hiçbir düğmenin adı, işlevi, tıklama davranışı değişmedi; yalnız yanına/altına
+      bilgi satırı eklendi.
+tsc temiz. CANLI TEST YOK.
+
 ## Nerede kaldık — 16.08.2026 (71) · AJAN KONTROL PANELİ — BEŞ YENİ KOL BAĞLANDI
 - [x] Beş edge fonksiyona agent_states durum yazımı: belge-ozeti (belge_ozeti) ·
       olay-cizelgesi (olay_cizelgesi) · guc-dengesi (guc_dengesi) · iletisim-degisim

@@ -7,6 +7,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
+// Ücretli model çağrısı işareti — TEK tanım (bkz. UcretliIsaret.tsx).
+import { UcretliIsaret } from "@/components/mediation/UcretliIsaret";
 import {
   Activity,
   AlertTriangle,
@@ -400,6 +402,7 @@ export function AgentControlPanel({ caseId, isMediator }: { caseId: string; isMe
               <p className="text-xs text-muted-foreground mt-1">{missingReasons.join(" · ")}</p>
             )}
             {orchestratorRow && orchestratorRow.status === "running" && <OrchestratorProgress row={orchestratorRow} />}
+            <UcretliIsaret metin="Yapay zekâ çağrısı — dört analizi birden koşturur, her basış ücret oluşturur" />
           </div>
           <Button
             onClick={handleStartOrchestrator}
@@ -480,6 +483,7 @@ export function AgentControlPanel({ caseId, isMediator }: { caseId: string; isMe
               <RotateCcw className="h-3.5 w-3.5 mr-2" />
               Tekrar Dene
             </Button>
+            <UcretliIsaret metin="Yapay zekâ çağrısı — dört analizi birden koşturur, her basış ücret oluşturur" />
           </CardContent>
         </Card>
       )}
