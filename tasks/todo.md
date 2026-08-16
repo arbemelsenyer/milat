@@ -1,3 +1,26 @@
+## Nerede kaldık — 16.08.2026 (66) · İLETİŞİMDE DEĞİŞİM — KOKPİTE TAŞINDI
+GÖRÜNMEME SEBEBİ (bulundu): Kart Aşama 2'de taraf kartının İÇİNE konmuştu; taraf satırı
+açılmadıkça (accordion kapalıyken) hiç çizilmiyordu. Görünen üç kart (olay çizelgesi, güç
+dengesi, usule ilişkin engeller) ise Aşama 2'nin ÜST KATMANLARI. Veri yetersizliği sebep
+değildi — kod zaten "yeterli tarihli metin yok" satırını gösteriyordu.
+- [x] Kart kokpite (Aşama 3) taşındı: RAPOR katmanı > "İletişimde değişim", Tıkanma ve
+      Seçenek Sepeti kartlarının hemen ardında. Sol menüde kendiliğinden görünür.
+- [x] Artık DOSYA BAZINDA çalışıyor: her taraf için ayrı satır; sayfa açılınca
+      kendiliğinden yükleniyor, [Yenile] düğmesi diğer kokpit kartlarıyla aynı görünümde.
+- [x] Veri yetersizse kart GİZLENMİYOR: "Karşılaştırılacak yeterli tarihli metin yok —
+      N metin, M ayrı gün" satırıyla görünüyor.
+- [x] Aşama 2'de KALINTI YOK: taraf kartındaki çağrı ve yorumu kaldırıldı; ölçüm
+      yardımcıları kokpit panelinin yanına taşındı.
+- [x] KURALLAR AYNEN: kişilik/duygu/niyet değerlendirmesi yok · her işaret aynı tarafın
+      iki tarihli metnine ve birer cümlelik alıntıya dayanıyor · taraflar birbiriyle
+      karşılaştırılmıyor (her tarafın metni yalnız kendi listesine giriyor) · kokpit
+      yalnız arabulucuya çiziliyor.
+- [x] YENİ TABLO / SÜTUN / EDGE FONKSİYON / AI ÇAĞRISI YOK → SQL GEREKMİYOR.
+tsc (tsconfig.app.json) temiz. CANLI TEST YOK.
+AÇIK UÇ: Önceki turdaki açık uçlar duruyor — ölçüm kelime sayımıdır, yalnız en eski ile
+en yeni metin karşılaştırılır, taraf asistanı yazışmaları kaydedilmediği için ölçüme
+girmez, statement tek alan olduğu için beyanın eski hâli tutulmaz.
+
 ## Nerede kaldık — 16.08.2026 (65) · İLETİŞİMDE DEĞİŞİM İŞARETİ (İBA 1.5 · A4 ve 5)
 KEŞİF (tarihli metin var mı): VAR, iş durdurulmadı. party-communication-analysis çıktısı
 party_communication_analysis tablosunda (findings + discovery_questions JSONB, taraf başına

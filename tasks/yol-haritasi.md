@@ -651,3 +651,13 @@ birbiriyle karşılaştırılmıyor. İki farklı tarihli metin yoksa "değişim
 değişim yoksa "belirgin bir değişim görünmüyor" yazıyor. Yeni tablo, edge fonksiyon ve
 AI çağrısı YOK. SQL gerekmiyor; yalnız Publish.
 
+16.08 (DÜZELTME — İletişimde değişim kartı kokpite taşındı): Kart Aşama 2'de taraf
+kartının İÇİNDEYDİ; taraf satırı açılmadıkça hiç çizilmediği için canlıda görünmüyordu.
+Kokpite (Aşama 3), Tıkanma ve Seçenek Sepeti kartlarının yanına taşındı; her taraf için
+ayrı satır veriyor ve sayfa açılınca kendiliğinden yükleniyor. Veri yetersizse kart
+gizlenmiyor, "karşılaştırılacak yeterli tarihli metin yok — N metin, M ayrı gün"
+satırıyla görünüyor. Aşama 2'de kalıntı bırakılmadı. Kurallar aynen korundu: kişilik,
+duygu ve niyet değerlendirmesi yok; her işaret aynı tarafın iki tarihli metnine ve birer
+cümlelik alıntıya dayanıyor; taraflar birbiriyle karşılaştırılmıyor; yalnız arabulucu
+görüyor. Yeni tablo, edge fonksiyon ve AI çağrısı YOK. SQL gerekmiyor; yalnız Publish.
+

@@ -4749,9 +4749,6 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
                       <AlertTriangle className="h-4 w-4" /> {analysisError.msg}
                     </div>
                   )}
-                  {/* İletişimde değişim — mevcut İletişim Analizi düğmesinin yanında,
-                      YALNIZ arabulucuya. Tarafın kendi ekranında çizilmez. */}
-                  {isMediator && <IletisimDegisimKutusu caseId={caseRow.id} party={p} />}
 
                   {!a && analysing !== p.id && !analysisError && (
                     <div className="text-sm text-muted-foreground flex items-start gap-1.5">
@@ -4869,254 +4866,6 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
 
 // Faz 3 katman kutusu — Faz 4'teki katman başlığının birebir aynısı: ana başlık +
 // sağında sayaç + chevron, altında italik/ince açıklama; içerik katman açıkken görünür.
-/* ====== İLETİŞİMDE DEĞİŞİM (İBA 1.5 · todo A4/5) — yalnız arabulucu ============
-   AYNI TARAFIN kendi metinleri zaman içinde karşılaştırılır. Karşı tarafla
-   KARŞILAŞTIRMA YOKTUR; her taraf yalnız kendi metinlerine göre ölçülür.
-   Yöntem: İFADE SAYIMI (kodda, deterministik) — yeni AI çağrısı YOKTUR.
-   Kişilik değerlendirmesi, psikolojik teşhis ve duygu etiketi YASAK (constitution
-   m.2, mimari §11): çıktı yalnız "hangi ifade ailesi, hangi tarihli metinde kaç kez"
-   ve iki tarihli metinden birer cümlelik alıntıdır.
-   Kaynak metinler (hepsi tarihli): taraf beyanı (case_parties.statement + kayıt
-   tarihi) · o tarafa ait belgelerin çıkarılmış metni (case_documents.created_at) ·
-   keşif sorusu cevapları (case_discovery_questions.updated_at) · tarafın kendi
-   yazdığı mesajlar (messages.created_at, sender_id = tarafın kullanıcı kimliği).
-   Gizlilik: kutu yalnız arabulucuya çizilir; tarafa hiçbir yüzeyden gitmez. */
-
-type DegisimMetni = { tarih: string; etiket: string; metin: string };
-type DegisimIsareti = { baslik: string; yon: string; dayanak1: string; dayanak2: string };
-
-const DEGISIM_AILELERI: { anahtar: string; ad: string; ifadeler: string[] }[] = [
-  {
-    anahtar: "talep", ad: "kesin talep dili",
-    ifadeler: ["talep ediyorum", "talep etmekteyim", "talep ederim", "derhal", "aksi hâlde",
-      "aksi halde", "dava aç", "icra", "ihtar", "kabul etmiyorum", "son kez", "hukuki yollara",
-      "tazminat talep", "gereğini"],
-  },
-  {
-    anahtar: "cozum", ad: "çözüm dili",
-    ifadeler: ["uzlaş", "anlaş", "görüşelim", "çözüm", "orta yol", "esnek", "karşılıklı",
-      "müzakere", "birlikte", "makul bir çözüm", "mutabık"],
-  },
-  {
-    anahtar: "kosul", ad: "koşullu ifade",
-    ifadeler: ["şartıyla", "koşuluyla", "şu şartla", "kabul edilmesi hâlinde",
-      "kabul edilmesi halinde", "olması hâlinde", "olması halinde", "karşılığında"],
-  },
-  {
-    anahtar: "geri", ad: "geri çekilme ifadesi",
-    ifadeler: ["vazgeç", "geri çek", "talebimden", "artık istemiyorum", "feragat"],
-  },
-];
-
-const degTrKucuk = (s: string) => String(s ?? "").toLocaleLowerCase("tr").replace(/ı/g, "i");
-
-function degSay(metin: string, ifadeler: string[]): number {
-  const k = degTrKucuk(metin);
-  let toplam = 0;
-  for (const ifade of ifadeler) {
-    const a = degTrKucuk(ifade);
-    let i = k.indexOf(a);
-    while (i > -1) { toplam++; i = k.indexOf(a, i + a.length); }
-  }
-  return toplam;
-}
-
-function degRakamVarMi(metin: string): boolean {
-  return /\d[\d.]{2,}(?:,\d+)?\s*(?:tl|try|₺|lira)/i.test(metin) || /\b\d{4,}\b/.test(metin);
-}
-
-// Alıntı: aranan ifadenin geçtiği cümle, en çok bir cümle ve 140 karakter.
-function degAlinti(metin: string, ifadeler: string[]): string {
-  const k = degTrKucuk(metin);
-  let yer = -1;
-  for (const ifade of ifadeler) {
-    const i = k.indexOf(degTrKucuk(ifade));
-    if (i > -1 && (yer === -1 || i < yer)) yer = i;
-  }
-  const kaynak = yer === -1 ? metin : metin;
-  const bas = yer === -1 ? 0 : Math.max(kaynak.lastIndexOf(". ", yer), kaynak.lastIndexOf("\n", yer)) + 1;
-  const sonAday = [kaynak.indexOf(". ", Math.max(bas, yer === -1 ? 0 : yer)), kaynak.indexOf("\n", Math.max(bas, yer === -1 ? 0 : yer))]
-    .filter((x) => x > -1);
-  const son = sonAday.length ? Math.min(...sonAday) : kaynak.length;
-  const parca = kaynak.slice(bas, son).trim().replace(/\s+/g, " ");
-  return parca.length > 140 ? `${parca.slice(0, 137)}…` : parca;
-}
-
-// Rakam işareti için alıntı: tutarın geçtiği cümle (ifade listesi olmadığında
-// metnin ilk cümlesi alınıyordu, dayanak yanıltıcı oluyordu).
-function degAlintiRakam(metin: string): string {
-  const m = metin.match(/\d[\d.]{2,}(?:,\d+)?\s*(?:TL|TRY|₺|lira)?/i);
-  if (!m || m.index === undefined) return degAlinti(metin, []);
-  const bas = Math.max(metin.lastIndexOf(". ", m.index), metin.lastIndexOf("\n", m.index)) + 1;
-  const aday = [metin.indexOf(". ", m.index), metin.indexOf("\n", m.index)].filter((x) => x > -1);
-  const son = aday.length ? Math.min(...aday) : metin.length;
-  const parca = metin.slice(bas, son).trim().replace(/\s+/g, " ");
-  return parca.length > 140 ? `${parca.slice(0, 137)}…` : parca;
-}
-
-function degTarih(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "tarihsiz" : d.toLocaleDateString("tr-TR");
-}
-
-// İlk ve son metin karşılaştırılır; eşik: en az 2 geçiş farkı ya da yoktan var olma.
-function degisimIsaretleri(metinler: DegisimMetni[]): DegisimIsareti[] {
-  if (metinler.length < 2) return [];
-  const ilk = metinler[0];
-  const son = metinler[metinler.length - 1];
-  const isaretler: DegisimIsareti[] = [];
-  const sayim: Record<string, { ilk: number; son: number }> = {};
-  for (const aile of DEGISIM_AILELERI) {
-    sayim[aile.anahtar] = { ilk: degSay(ilk.metin, aile.ifadeler), son: degSay(son.metin, aile.ifadeler) };
-  }
-
-  const talepFark = sayim.talep.son - sayim.talep.ilk;
-  const cozumFark = sayim.cozum.son - sayim.cozum.ilk;
-
-  if (talepFark >= 2 && cozumFark <= 0) {
-    isaretler.push({
-      baslik: `Kesin talep dili arttı (${sayim.talep.ilk} → ${sayim.talep.son} geçiş), çözüm dili ${sayim.cozum.ilk} → ${sayim.cozum.son}.`,
-      yon: "talebin kesinleşmesi / dilin sertleşmesi yönünde",
-      dayanak1: `${degTarih(ilk.tarih)} · ${ilk.etiket}: “${degAlinti(ilk.metin, DEGISIM_AILELERI[1].ifadeler)}”`,
-      dayanak2: `${degTarih(son.tarih)} · ${son.etiket}: “${degAlinti(son.metin, DEGISIM_AILELERI[0].ifadeler)}”`,
-    });
-  }
-  if (cozumFark >= 2 && talepFark <= 0) {
-    isaretler.push({
-      baslik: `Çözüm dili arttı (${sayim.cozum.ilk} → ${sayim.cozum.son} geçiş), kesin talep dili ${sayim.talep.ilk} → ${sayim.talep.son}.`,
-      yon: "yumuşama yönünde",
-      dayanak1: `${degTarih(ilk.tarih)} · ${ilk.etiket}: “${degAlinti(ilk.metin, DEGISIM_AILELERI[0].ifadeler)}”`,
-      dayanak2: `${degTarih(son.tarih)} · ${son.etiket}: “${degAlinti(son.metin, DEGISIM_AILELERI[1].ifadeler)}”`,
-    });
-  }
-  if (sayim.kosul.son - sayim.kosul.ilk >= 2) {
-    isaretler.push({
-      baslik: `Koşullu ifadeler arttı (${sayim.kosul.ilk} → ${sayim.kosul.son} geçiş).`,
-      yon: "talebin koşula bağlanması yönünde",
-      dayanak1: `${degTarih(ilk.tarih)} · ${ilk.etiket}: “${degAlinti(ilk.metin, DEGISIM_AILELERI[2].ifadeler)}”`,
-      dayanak2: `${degTarih(son.tarih)} · ${son.etiket}: “${degAlinti(son.metin, DEGISIM_AILELERI[2].ifadeler)}”`,
-    });
-  }
-  if (sayim.geri.ilk === 0 && sayim.geri.son > 0) {
-    isaretler.push({
-      baslik: `Geri çekilme ifadesi ilk metinde yok, son metinde ${sayim.geri.son} kez geçiyor.`,
-      yon: "geri çekilme yönünde",
-      dayanak1: `${degTarih(ilk.tarih)} · ${ilk.etiket}: bu ifade geçmiyor`,
-      dayanak2: `${degTarih(son.tarih)} · ${son.etiket}: “${degAlinti(son.metin, DEGISIM_AILELERI[3].ifadeler)}”`,
-    });
-  }
-  if (!degRakamVarMi(ilk.metin) && degRakamVarMi(son.metin)) {
-    isaretler.push({
-      baslik: "İlk metinde rakam yok, son metinde tutar/rakam yazılmış.",
-      yon: "talebin rakamla netleşmesi yönünde",
-      dayanak1: `${degTarih(ilk.tarih)} · ${ilk.etiket}: rakam geçmiyor`,
-      dayanak2: `${degTarih(son.tarih)} · ${son.etiket}: “${degAlintiRakam(son.metin)}”`,
-    });
-  }
-  return isaretler;
-}
-
-function IletisimDegisimKutusu({ caseId, party }: { caseId: string; party: any }) {
-  const [metinler, setMetinler] = useState<DegisimMetni[] | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [hata, setHata] = useState<string | null>(null);
-
-  async function cikar() {
-    setBusy(true);
-    setHata(null);
-    try {
-      const [dok, kesif, msj] = await Promise.all([
-        supabase.from("case_documents").select("file_name, extracted_text, created_at")
-          .eq("case_id", caseId).eq("party_id", party.id),
-        supabase.from("case_discovery_questions").select("answer_text, updated_at")
-          .eq("case_id", caseId).eq("party_id", party.id),
-        party.user_id
-          ? supabase.from("messages").select("content, created_at").eq("case_id", caseId).eq("sender_id", party.user_id)
-          : Promise.resolve({ data: [], error: null } as any),
-      ]);
-      const eksik: string[] = [];
-      if (dok.error) eksik.push(`belgeler (${dok.error.message})`);
-      if (kesif.error) eksik.push(`keşif cevapları (${kesif.error.message})`);
-      if (msj.error) eksik.push(`mesajlar (${msj.error.message})`);
-      if (eksik.length) setHata(`Şu kaynaklar okunamadı: ${eksik.join(" · ")}`);
-
-      const toplanan: DegisimMetni[] = [];
-      const beyan = String(party.statement ?? "").trim();
-      if (beyan) toplanan.push({ tarih: party.created_at, etiket: "taraf beyanı", metin: beyan });
-      for (const d of ((dok.data ?? []) as any[])) {
-        const m = String(d.extracted_text ?? "").trim();
-        if (m.length > 80) toplanan.push({ tarih: d.created_at, etiket: d.file_name ?? "belge", metin: m });
-      }
-      for (const k of ((kesif.data ?? []) as any[])) {
-        const m = String(k.answer_text ?? "").trim();
-        if (m.length > 40) toplanan.push({ tarih: k.updated_at, etiket: "keşif sorusu cevabı", metin: m });
-      }
-      for (const m0 of ((msj.data ?? []) as any[])) {
-        const m = String(m0.content ?? "").trim();
-        if (m.length > 40) toplanan.push({ tarih: m0.created_at, etiket: "mesaj", metin: m });
-      }
-      toplanan.sort((a, b) => String(a.tarih).localeCompare(String(b.tarih)));
-      setMetinler(toplanan);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const isaretler = metinler ? degisimIsaretleri(metinler) : [];
-  const farkliGun = metinler
-    ? new Set(metinler.map((m) => String(m.tarih).slice(0, 10))).size
-    : 0;
-
-  return (
-    <div className="rounded border bg-muted/20 p-3 space-y-2">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="h-4 w-4 text-primary" />
-          <span className="text-xs font-semibold uppercase tracking-wide">İletişimde değişim</span>
-          {metinler && isaretler.length > 0 && (
-            <span className="text-[10px] px-2 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-800">
-              {isaretler.length} işaret
-            </span>
-          )}
-        </div>
-        <Button size="sm" variant="outline" className={KART_DUGME} onClick={cikar} disabled={busy}>
-          {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
-          {metinler ? "Yenile" : "Değişimi çıkar"}
-        </Button>
-      </div>
-
-      <p className="text-[11px] text-muted-foreground leading-snug">
-        Yalnız bu tarafın KENDİ metinleri, eskiden yeniye karşılaştırılır; karşı tarafla karşılaştırma yapılmaz.
-        Ölçüm ifade sayımına dayanır — kişilik, duygu ya da niyet değerlendirmesi yapılmaz. Yalnız size görünür.
-      </p>
-
-      {hata && <p className="text-[11px] text-destructive">{hata}</p>}
-
-      {metinler === null ? (
-        <p className="text-[11px] text-muted-foreground italic">Henüz çıkarılmadı.</p>
-      ) : metinler.length < 2 || farkliGun < 2 ? (
-        <p className="text-xs">
-          Karşılaştırma için en az iki FARKLI TARİHLİ metin gerekiyor; bu tarafta {metinler.length} metin,
-          {" "}{farkliGun} ayrı gün var. Değişim ölçülemedi.
-        </p>
-      ) : isaretler.length === 0 ? (
-        <p className="text-xs">Belirgin bir değişim görünmüyor.</p>
-      ) : (
-        <ul className="space-y-2">
-          {isaretler.map((i, k) => (
-            <li key={k} className="text-xs border-l-2 border-primary/40 pl-2 space-y-0.5">
-              <div className="font-medium">{i.baslik}</div>
-              <div className="text-muted-foreground">Yön: {i.yon}</div>
-              <div className="text-[11px] text-muted-foreground">Dayanak: {i.dayanak1}</div>
-              <div className="text-[11px] text-muted-foreground">Dayanak: {i.dayanak2}</div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
 function Phase3Layer({ layer, count, boxClass, open, onToggle, children }: {
   layer: { id: string; label: string; hint: string };
   count: string; boxClass: string; open: boolean; onToggle: () => void;
@@ -7798,6 +7547,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     body: <SecenekSepetiPanel caseRow={caseRow} />,
   });
 
+  // İletişimde değişim (İBA 1.5 / A4) — seçenek sepetinin yanında.
+  sectionDefs.push({
+    id: "kokpit-iletisim-degisim", layer: LAYER_REPORTS, title: "İletişimde değişim",
+    body: <IletisimDegisimPanel caseRow={caseRow} />,
+  });
+
   const layerOrder = [LAYER_TABLE, LAYER_EVIDENCE, LAYER_COCKPIT, LAYER_REPORTS];
   // Katman başlığının kendi çıpası (sol menüden katman adına tıklanınca oraya kayılır)
   // ve başlığın altındaki tek satır açıklama; aynı açıklama menüde tooltip olur.
@@ -10102,6 +9857,296 @@ function SecenekSepetiPanel({ caseRow }: { caseRow: CaseRow }) {
       {okunamayan.length > 0 && (
         <p className="text-[11px] text-destructive/90 leading-snug">
           Şu kaynaklar okunamadı, o kayıtlardan seçenek üretilmedi: {okunamayan.join(" · ")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ====== İLETİŞİMDE DEĞİŞİM (İBA 1.5 · todo A4/5) — yalnız arabulucu ============
+   AYNI TARAFIN kendi metinleri zaman içinde karşılaştırılır. Karşı tarafla
+   KARŞILAŞTIRMA YOKTUR; her taraf yalnız kendi metinlerine göre ölçülür.
+   Yöntem: İFADE SAYIMI (kodda, deterministik) — yeni AI çağrısı YOKTUR.
+   Kişilik değerlendirmesi, psikolojik teşhis ve duygu etiketi YASAK (constitution
+   m.2, mimari §11): çıktı yalnız "hangi ifade ailesi, hangi tarihli metinde kaç kez"
+   ve iki tarihli metinden birer cümlelik alıntıdır.
+   Kaynak metinler (hepsi tarihli): taraf beyanı (case_parties.statement + kayıt
+   tarihi) · o tarafa ait belgelerin çıkarılmış metni (case_documents.created_at) ·
+   keşif sorusu cevapları (case_discovery_questions.updated_at) · tarafın kendi
+   yazdığı mesajlar (messages.created_at, sender_id = tarafın kullanıcı kimliği).
+   Yeri (16.08 taşındı): KOKPİT (Aşama 3) — Tıkanma ve Seçenek Sepeti kartlarının
+   yanında. Önce Aşama 2'de taraf kartının içindeydi ve kart açılmadıkça hiç
+   çizilmiyordu; o yüzden canlıda görünmüyordu. Aşama 2'de kalıntı bırakılmadı.
+   Gizlilik: kokpit yalnız arabulucuya çizilir; tarafa hiçbir yüzeyden gitmez. */
+
+type DegisimMetni = { tarih: string; etiket: string; metin: string };
+type DegisimIsareti = { baslik: string; yon: string; dayanak1: string; dayanak2: string };
+
+const DEGISIM_AILELERI: { anahtar: string; ad: string; ifadeler: string[] }[] = [
+  {
+    anahtar: "talep", ad: "kesin talep dili",
+    ifadeler: ["talep ediyorum", "talep etmekteyim", "talep ederim", "derhal", "aksi hâlde",
+      "aksi halde", "dava aç", "icra", "ihtar", "kabul etmiyorum", "son kez", "hukuki yollara",
+      "tazminat talep", "gereğini"],
+  },
+  {
+    anahtar: "cozum", ad: "çözüm dili",
+    ifadeler: ["uzlaş", "anlaş", "görüşelim", "çözüm", "orta yol", "esnek", "karşılıklı",
+      "müzakere", "birlikte", "makul bir çözüm", "mutabık"],
+  },
+  {
+    anahtar: "kosul", ad: "koşullu ifade",
+    ifadeler: ["şartıyla", "koşuluyla", "şu şartla", "kabul edilmesi hâlinde",
+      "kabul edilmesi halinde", "olması hâlinde", "olması halinde", "karşılığında"],
+  },
+  {
+    anahtar: "geri", ad: "geri çekilme ifadesi",
+    ifadeler: ["vazgeç", "geri çek", "talebimden", "artık istemiyorum", "feragat"],
+  },
+];
+
+const degTrKucuk = (s: string) => String(s ?? "").toLocaleLowerCase("tr").replace(/ı/g, "i");
+
+function degSay(metin: string, ifadeler: string[]): number {
+  const k = degTrKucuk(metin);
+  let toplam = 0;
+  for (const ifade of ifadeler) {
+    const a = degTrKucuk(ifade);
+    let i = k.indexOf(a);
+    while (i > -1) { toplam++; i = k.indexOf(a, i + a.length); }
+  }
+  return toplam;
+}
+
+function degRakamVarMi(metin: string): boolean {
+  return /\d[\d.]{2,}(?:,\d+)?\s*(?:tl|try|₺|lira)/i.test(metin) || /\b\d{4,}\b/.test(metin);
+}
+
+// Alıntı: aranan ifadenin geçtiği cümle, en çok bir cümle ve 140 karakter.
+function degAlinti(metin: string, ifadeler: string[]): string {
+  const k = degTrKucuk(metin);
+  let yer = -1;
+  for (const ifade of ifadeler) {
+    const i = k.indexOf(degTrKucuk(ifade));
+    if (i > -1 && (yer === -1 || i < yer)) yer = i;
+  }
+  const kaynak = yer === -1 ? metin : metin;
+  const bas = yer === -1 ? 0 : Math.max(kaynak.lastIndexOf(". ", yer), kaynak.lastIndexOf("\n", yer)) + 1;
+  const sonAday = [kaynak.indexOf(". ", Math.max(bas, yer === -1 ? 0 : yer)), kaynak.indexOf("\n", Math.max(bas, yer === -1 ? 0 : yer))]
+    .filter((x) => x > -1);
+  const son = sonAday.length ? Math.min(...sonAday) : kaynak.length;
+  const parca = kaynak.slice(bas, son).trim().replace(/\s+/g, " ");
+  return parca.length > 140 ? `${parca.slice(0, 137)}…` : parca;
+}
+
+// Rakam işareti için alıntı: tutarın geçtiği cümle (ifade listesi olmadığında
+// metnin ilk cümlesi alınıyordu, dayanak yanıltıcı oluyordu).
+function degAlintiRakam(metin: string): string {
+  const m = metin.match(/\d[\d.]{2,}(?:,\d+)?\s*(?:TL|TRY|₺|lira)?/i);
+  if (!m || m.index === undefined) return degAlinti(metin, []);
+  const bas = Math.max(metin.lastIndexOf(". ", m.index), metin.lastIndexOf("\n", m.index)) + 1;
+  const aday = [metin.indexOf(". ", m.index), metin.indexOf("\n", m.index)].filter((x) => x > -1);
+  const son = aday.length ? Math.min(...aday) : metin.length;
+  const parca = metin.slice(bas, son).trim().replace(/\s+/g, " ");
+  return parca.length > 140 ? `${parca.slice(0, 137)}…` : parca;
+}
+
+function degTarih(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "tarihsiz" : d.toLocaleDateString("tr-TR");
+}
+
+// İlk ve son metin karşılaştırılır; eşik: en az 2 geçiş farkı ya da yoktan var olma.
+function degisimIsaretleri(metinler: DegisimMetni[]): DegisimIsareti[] {
+  if (metinler.length < 2) return [];
+  const ilk = metinler[0];
+  const son = metinler[metinler.length - 1];
+  const isaretler: DegisimIsareti[] = [];
+  const sayim: Record<string, { ilk: number; son: number }> = {};
+  for (const aile of DEGISIM_AILELERI) {
+    sayim[aile.anahtar] = { ilk: degSay(ilk.metin, aile.ifadeler), son: degSay(son.metin, aile.ifadeler) };
+  }
+
+  const talepFark = sayim.talep.son - sayim.talep.ilk;
+  const cozumFark = sayim.cozum.son - sayim.cozum.ilk;
+
+  if (talepFark >= 2 && cozumFark <= 0) {
+    isaretler.push({
+      baslik: `Kesin talep dili arttı (${sayim.talep.ilk} → ${sayim.talep.son} geçiş), çözüm dili ${sayim.cozum.ilk} → ${sayim.cozum.son}.`,
+      yon: "talebin kesinleşmesi / dilin sertleşmesi yönünde",
+      dayanak1: `${degTarih(ilk.tarih)} · ${ilk.etiket}: “${degAlinti(ilk.metin, DEGISIM_AILELERI[1].ifadeler)}”`,
+      dayanak2: `${degTarih(son.tarih)} · ${son.etiket}: “${degAlinti(son.metin, DEGISIM_AILELERI[0].ifadeler)}”`,
+    });
+  }
+  if (cozumFark >= 2 && talepFark <= 0) {
+    isaretler.push({
+      baslik: `Çözüm dili arttı (${sayim.cozum.ilk} → ${sayim.cozum.son} geçiş), kesin talep dili ${sayim.talep.ilk} → ${sayim.talep.son}.`,
+      yon: "yumuşama yönünde",
+      dayanak1: `${degTarih(ilk.tarih)} · ${ilk.etiket}: “${degAlinti(ilk.metin, DEGISIM_AILELERI[0].ifadeler)}”`,
+      dayanak2: `${degTarih(son.tarih)} · ${son.etiket}: “${degAlinti(son.metin, DEGISIM_AILELERI[1].ifadeler)}”`,
+    });
+  }
+  if (sayim.kosul.son - sayim.kosul.ilk >= 2) {
+    isaretler.push({
+      baslik: `Koşullu ifadeler arttı (${sayim.kosul.ilk} → ${sayim.kosul.son} geçiş).`,
+      yon: "talebin koşula bağlanması yönünde",
+      dayanak1: `${degTarih(ilk.tarih)} · ${ilk.etiket}: “${degAlinti(ilk.metin, DEGISIM_AILELERI[2].ifadeler)}”`,
+      dayanak2: `${degTarih(son.tarih)} · ${son.etiket}: “${degAlinti(son.metin, DEGISIM_AILELERI[2].ifadeler)}”`,
+    });
+  }
+  if (sayim.geri.ilk === 0 && sayim.geri.son > 0) {
+    isaretler.push({
+      baslik: `Geri çekilme ifadesi ilk metinde yok, son metinde ${sayim.geri.son} kez geçiyor.`,
+      yon: "geri çekilme yönünde",
+      dayanak1: `${degTarih(ilk.tarih)} · ${ilk.etiket}: bu ifade geçmiyor`,
+      dayanak2: `${degTarih(son.tarih)} · ${son.etiket}: “${degAlinti(son.metin, DEGISIM_AILELERI[3].ifadeler)}”`,
+    });
+  }
+  if (!degRakamVarMi(ilk.metin) && degRakamVarMi(son.metin)) {
+    isaretler.push({
+      baslik: "İlk metinde rakam yok, son metinde tutar/rakam yazılmış.",
+      yon: "talebin rakamla netleşmesi yönünde",
+      dayanak1: `${degTarih(ilk.tarih)} · ${ilk.etiket}: rakam geçmiyor`,
+      dayanak2: `${degTarih(son.tarih)} · ${son.etiket}: “${degAlintiRakam(son.metin)}”`,
+    });
+  }
+  return isaretler;
+}
+
+/* Kokpit paneli: her taraf için ayrı satır. Kart, veri yetersiz olsa da ÇİZİLİR —
+   "karşılaştırılacak yeterli tarihli metin yok" satırıyla görünür (16.08 bulgusu:
+   kutu Aşama 2'de taraf kartının içindeydi, kart açılmadıkça hiç çizilmiyordu). */
+function IletisimDegisimPanel({ caseRow }: { caseRow: CaseRow }) {
+  type DegisimSatiri = {
+    partyId: string;
+    ad: string;
+    metinSayisi: number;
+    farkliGun: number;
+    isaretler: DegisimIsareti[];
+  };
+  const [satirlar, setSatirlar] = useState<DegisimSatiri[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [okunamayan, setOkunamayan] = useState<string[]>([]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const eksik: string[] = [];
+    const p = await supabase.from("case_parties")
+      .select("id, user_id, party_role, first_name, last_name, company_name, statement, created_at")
+      .eq("case_id", caseRow.id).order("created_at");
+    if (p.error) eksik.push(`taraf kayıtları (${p.error.message})`);
+    const taraflar = Array.isArray(p.data) ? p.data : [];
+
+    const [dok, kesif, msj] = await Promise.all([
+      supabase.from("case_documents").select("file_name, extracted_text, created_at, party_id").eq("case_id", caseRow.id),
+      supabase.from("case_discovery_questions").select("answer_text, updated_at, party_id").eq("case_id", caseRow.id),
+      supabase.from("messages").select("content, created_at, sender_id").eq("case_id", caseRow.id),
+    ]);
+    if (dok.error) eksik.push(`belgeler (${dok.error.message})`);
+    if (kesif.error) eksik.push(`keşif cevapları (${kesif.error.message})`);
+    if (msj.error) eksik.push(`mesajlar (${msj.error.message})`);
+
+    const sonuc: DegisimSatiri[] = taraflar.map((t: any, i: number) => {
+      // YALNIZ bu tarafın kendi metinleri toplanır; karşı tarafın metni hiçbir
+      // koşulda bu listeye girmez (taraflar birbiriyle karşılaştırılmaz).
+      const metinler: DegisimMetni[] = [];
+      const beyan = String(t.statement ?? "").trim();
+      if (beyan) metinler.push({ tarih: t.created_at, etiket: "taraf beyanı", metin: beyan });
+      for (const d of ((dok.data ?? []) as any[])) {
+        if (String(d.party_id) !== String(t.id)) continue;
+        const m = String(d.extracted_text ?? "").trim();
+        if (m.length > 80) metinler.push({ tarih: d.created_at, etiket: d.file_name ?? "belge", metin: m });
+      }
+      for (const k of ((kesif.data ?? []) as any[])) {
+        if (String(k.party_id) !== String(t.id)) continue;
+        const m = String(k.answer_text ?? "").trim();
+        if (m.length > 40) metinler.push({ tarih: k.updated_at, etiket: "keşif sorusu cevabı", metin: m });
+      }
+      for (const m0 of ((msj.data ?? []) as any[])) {
+        if (!t.user_id || String(m0.sender_id) !== String(t.user_id)) continue;
+        const m = String(m0.content ?? "").trim();
+        if (m.length > 40) metinler.push({ tarih: m0.created_at, etiket: "mesaj", metin: m });
+      }
+      metinler.sort((a, b) => String(a.tarih).localeCompare(String(b.tarih)));
+      const farkliGun = new Set(metinler.map((m) => String(m.tarih).slice(0, 10))).size;
+      return {
+        partyId: t.id,
+        ad: `${blindBidPartyName(t, i)} (${roleLabel(t.party_role)})`,
+        metinSayisi: metinler.length,
+        farkliGun,
+        isaretler: farkliGun >= 2 ? degisimIsaretleri(metinler) : [],
+      };
+    });
+
+    setOkunamayan(eksik);
+    setSatirlar(sonuc);
+    setLoading(false);
+  }, [caseRow.id]);
+  useEffect(() => { load(); }, [load]);
+
+  const toplamIsaret = (satirlar ?? []).reduce((t, s) => t + s.isaretler.length, 0);
+
+  return (
+    <div className="rounded-2xl border border-sidebar-border bg-sidebar text-sidebar-foreground p-6 shadow-elegant space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="h-4 w-4 text-accent" />
+          <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">İletişimde Değişim</div>
+          {!loading && toplamIsaret > 0 && (
+            <Badge variant="outline" className="border-sidebar-border text-sidebar-foreground/80">
+              {toplamIsaret} işaret
+            </Badge>
+          )}
+        </div>
+        <Button size="sm" variant="outline" className={KOKPIT_DUGME} onClick={load} disabled={loading}>
+          <RefreshCw className="h-4 w-4 mr-1" /> Yenile
+        </Button>
+      </div>
+
+      <p className="text-xs text-sidebar-foreground/60 leading-snug">
+        Her taraf YALNIZ kendi metinleriyle, eskiden yeniye karşılaştırılır; taraflar birbiriyle
+        karşılaştırılmaz. Ölçüm ifade sayımına dayanır — kişilik, duygu ya da niyet değerlendirmesi
+        yapılmaz. Taraflara hiçbir yüzeyden gösterilmez.
+      </p>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-sidebar-foreground/70">
+          <Loader2 className="h-4 w-4 animate-spin" /> Tarihli metinler taranıyor…
+        </div>
+      ) : !satirlar || satirlar.length === 0 ? (
+        <p className="text-sm text-sidebar-foreground/70">Dosyada taraf kaydı yok.</p>
+      ) : (
+        <div className="space-y-3">
+          {satirlar.map((s) => (
+            <div key={s.partyId} className="rounded-xl border border-sidebar-border bg-sidebar-accent/20 p-4 space-y-2">
+              <div className="text-sm font-display font-bold">{s.ad}</div>
+              {s.farkliGun < 2 ? (
+                <p className="text-xs text-sidebar-foreground/70">
+                  Karşılaştırılacak yeterli tarihli metin yok — {s.metinSayisi} metin, {s.farkliGun} ayrı gün
+                  (en az iki farklı tarihli metin gerekir).
+                </p>
+              ) : s.isaretler.length === 0 ? (
+                <p className="text-xs text-sidebar-foreground/70">Belirgin bir değişim görünmüyor.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {s.isaretler.map((i, k) => (
+                    <li key={`${s.partyId}-${k}`} className="text-xs space-y-0.5">
+                      <div className="font-medium">{i.baslik}</div>
+                      <div className="text-sidebar-foreground/80">Yön: {i.yon}</div>
+                      <div className="text-[11px] text-sidebar-foreground/55 leading-snug">Dayanak: {i.dayanak1}</div>
+                      <div className="text-[11px] text-sidebar-foreground/55 leading-snug">Dayanak: {i.dayanak2}</div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {okunamayan.length > 0 && (
+        <p className="text-[11px] text-destructive/90 leading-snug">
+          Şu kaynaklar okunamadı, o metinler ölçüme girmedi: {okunamayan.join(" · ")}
         </p>
       )}
     </div>

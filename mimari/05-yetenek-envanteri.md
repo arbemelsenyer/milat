@@ -441,8 +441,10 @@ DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon
 İLETİŞİMDE DEĞİŞİM (İBA 1.5 / A4)
 DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon ve AI
 çağrısı YOKTUR; ölçüm ifade sayımıdır ve tamamen istemcide çalışır.
-· Yeri: Aşama 2 — Taraf Analizi, taraf kartında "İletişim Analizi" düğmesinin altında
-  "İletişimde değişim" kutusu ([Değişimi çıkar] / [Yenile]). YALNIZ arabulucuya çizilir.
+· Yeri (16.08 GÜNCELLENDİ): KOKPİT (Aşama 3) — "İletişimde değişim" kartı, Tıkanma ve
+  Seçenek Sepeti kartlarının yanında; her taraf için ayrı satır, [Yenile] düğmesi.
+  İlk konumu Aşama 2 taraf kartıydı; kart açılmadıkça çizilmediği için canlıda hiç
+  görünmedi, kokpite taşındı ve Aşama 2'de kalıntı bırakılmadı. YALNIZ arabulucu görür.
 · Kaynak (hepsi tarihli, hepsi AYNI TARAFIN kendi metni): taraf beyanı (statement +
   taraf kaydının tarihi) · o tarafa ait belgelerin çıkarılmış metni (created_at) ·
   keşif sorusu cevapları (updated_at) · tarafın kendi yazdığı mesajlar (created_at).
