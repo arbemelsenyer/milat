@@ -26,6 +26,7 @@ export type Database = {
           last_output: Json | null
           party_id: string | null
           status: string
+          tarafa_gorunur: boolean
           updated_at: string
         }
         Insert: {
@@ -39,6 +40,7 @@ export type Database = {
           last_output?: Json | null
           party_id?: string | null
           status?: string
+          tarafa_gorunur?: boolean
           updated_at?: string
         }
         Update: {
@@ -52,6 +54,7 @@ export type Database = {
           last_output?: Json | null
           party_id?: string | null
           status?: string
+          tarafa_gorunur?: boolean
           updated_at?: string
         }
         Relationships: [
