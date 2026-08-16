@@ -31,6 +31,7 @@ import CalendarPage from "./pages/CalendarPage";
 import CaseRedirect from "./pages/CaseRedirect";
 import RandevuCevap from "./pages/RandevuCevap";
 import KatilimCevap from "./pages/KatilimCevap";
+import YapayZekaBeyani from "./pages/YapayZekaBeyani";
 import AppLayout from "./components/AppLayout";
 import { HelmetProvider } from "react-helmet-async";
 
@@ -86,6 +87,8 @@ const App = () => (
               <Route path="/notification-settings" element={<NotificationSettings />} />
               <Route path="/privacy-tests" element={<PrivacyTests />} />
               <Route path="/health-check" element={<HealthCheck />} />
+              {/* Yapay zekâ ne yapar / ne yapmaz — bilgi ekranı; taraf ve arabulucu görür. */}
+              <Route path="/yapay-zeka" element={<YapayZekaBeyani />} />
             </Route>
 
             <Route path="/mediator" element={<RedirectToHub />} />

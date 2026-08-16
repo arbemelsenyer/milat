@@ -1,3 +1,17 @@
+## Nerede kaldık — 16.08.2026 (73) · YAPAY ZEKÂ NE YAPAR / NE YAPMAZ EKRANI
+- [x] Yeni sayfa: src/pages/YapayZekaBeyani.tsx — salt bilgi ekranı (veri okumaz,
+      yazmaz, model çağrısı yapmaz). Metin kurucunun verdiği hâliyle AYNEN kullanıldı;
+      madde eklenmedi, çıkarılmadı. Mevcut kart/tipografi bileşenleri kullanıldı, yeni
+      bağımlılık yok.
+- [x] Yönlendirme: App.tsx'e /yapay-zeka EKLENDİ (AppLayout içinde, /health-check
+      satırının ardına). Mevcut hiçbir route değiştirilmedi; hem taraf hem arabulucu
+      girişte görebilir.
+- [x] Bağlantı: sol menüde (AppSidebar) EN SONA "Bilgi" grubu içinde "Yapay zekâ ne
+      yapar" satırı. Mevcut menü öğeleri, grupları ve sıraları değiştirilmedi.
+tsc temiz. CANLI TEST YOK.
+AÇIK UÇ: Bağlantı yalnız sol menüde; giriş yapmadan görülen sayfalarda (Landing, Auth)
+ve e-postalarda bağlantı yok — istenirse ayrı iş.
+
 ## Nerede kaldık — 16.08.2026 (72) · ÜCRETLİ ÇAĞRI İŞARETİ
 - [x] TEK TANIM: src/components/mediation/UcretliIsaret.tsx — küçük gri satır,
       metin "Yapay zekâ çağrısı — her basış ücret oluşturur". Dosyada Türkçe yorum:

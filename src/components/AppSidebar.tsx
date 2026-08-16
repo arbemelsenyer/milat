@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, FolderOpen, Archive, Calendar, Shield, Workflow, BarChart3 } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Archive, Calendar, Shield, Workflow, BarChart3, Info } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -118,6 +118,28 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+
+        {/* Bilgi — yapay zekâ beyanı (İBA şeffaflık şartı). Mevcut gruplara
+            dokunulmadan EN SONA eklendi; taraf da arabulucu da görür. */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Bilgi</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/yapay-zeka")}
+                  className="border-l-2 border-l-transparent transition-colors hover:border-l-accent hover:text-accent data-[active=true]:border-l-accent"
+                >
+                  <NavLink to="/yapay-zeka" className="flex items-center gap-2">
+                    <Info className="h-4 w-4 shrink-0" />
+                    {!collapsed && <span>Yapay zekâ ne yapar</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
     </Sidebar>
   );
