@@ -7603,6 +7603,13 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     body: <SecenekSepetiPanel caseRow={caseRow} />,
   });
 
+  // Makbuz takibi (İBA 2.7) — RAPOR VE BELGELER katmanı. Ödeme defteri parayı,
+  // bu bölüm BELGE tarafını takip eder. Model çağrısı yok (maliyet işareti yok).
+  sectionDefs.push({
+    id: "kokpit-makbuz-takibi", layer: LAYER_REPORTS, title: "Makbuz takibi",
+    body: <MakbuzTakibiPanel caseRow={caseRow} />,
+  });
+
   const layerOrder = [LAYER_TABLE, LAYER_EVIDENCE, LAYER_COCKPIT, LAYER_REPORTS];
   // Katman başlığının kendi çıpası (sol menüden katman adına tıklanınca oraya kayılır)
   // ve başlığın altındaki tek satır açıklama; aynı açıklama menüde tooltip olur.
@@ -10620,6 +10627,172 @@ function UsulEngeliPanel({ caseRow }: { caseRow: CaseRow }) {
           ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Kontrol ediliyor…</>
           : <><RefreshCw className="h-4 w-4 mr-1" /> {kayit ? "Yeniden kontrol et" : "Kontrol et"}</>}
       </Button>
+    </div>
+  );
+}
+
+/* ====== MAKBUZ TAKİBİ (İBA 2.7) — yalnız arabulucu =========================
+   Mevcut case_payments kayıtlarını okur; yeni ödeme OLUŞTURMAZ, tutar/durum/tarih
+   DEĞİŞTİRMEZ. Yalnız receipt_no (makbuz numarası) alanını günceller — RLS'te
+   "Case mediator or admin can update payments" politikası bu güncellemeye izin
+   veriyor. Model çağrısı yoktur; bölüm ücretsizdir. */
+type MakbuzSatiri = {
+  id: string;
+  payer_label: string | null;
+  payer_party_id: string | null;
+  party_id: string | null;
+  kind: string | null;
+  description: string | null;
+  amount: number | null;
+  status: string | null;
+  paid_at: string | null;
+  payment_date: string | null;
+  receipt_no: string | null;
+};
+
+function makbuzTutar(v: number | null): string {
+  if (v === null || v === undefined) return "—";
+  try {
+    return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(v);
+  } catch {
+    return `${v} TL`;
+  }
+}
+
+function makbuzTarih(iso?: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("tr-TR");
+}
+
+function MakbuzTakibiPanel({ caseRow }: { caseRow: CaseRow }) {
+  const [satirlar, setSatirlar] = useState<MakbuzSatiri[]>([]);
+  const [adlar, setAdlar] = useState<Record<string, string>>({});
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [hata, setHata] = useState<string | null>(null);
+  const [taslak, setTaslak] = useState<Record<string, string>>({});
+  const [kaydediliyor, setKaydediliyor] = useState<string | null>(null);
+
+  const yukle = useCallback(async () => {
+    setYukleniyor(true);
+    setHata(null);
+    const [odemeler, taraflar] = await Promise.all([
+      supabase.from("case_payments")
+        .select("id, payer_label, payer_party_id, party_id, kind, description, amount, status, paid_at, payment_date, receipt_no")
+        .eq("case_id", caseRow.id).order("payment_date", { ascending: true }),
+      supabase.from("case_parties")
+        .select("id, first_name, last_name, company_name, party_role").eq("case_id", caseRow.id),
+    ]);
+    if (odemeler.error) setHata(`Ödeme kayıtları okunamadı: ${odemeler.error.message}`);
+    else setSatirlar((odemeler.data ?? []) as any);
+    const ad: Record<string, string> = {};
+    for (const [i, t] of ((taraflar.data ?? []) as any[]).entries()) ad[String(t.id)] = blindBidPartyName(t, i);
+    setAdlar(ad);
+    setYukleniyor(false);
+  }, [caseRow.id]);
+  useEffect(() => { yukle(); }, [yukle]);
+
+  async function makbuzKaydet(satir: MakbuzSatiri) {
+    const no = (taslak[satir.id] ?? "").trim();
+    if (!no) return;
+    setKaydediliyor(satir.id);
+    setHata(null);
+    // YALNIZ receipt_no güncellenir; başka hiçbir alana dokunulmaz.
+    const { error } = await supabase.from("case_payments")
+      .update({ receipt_no: no } as any).eq("id", satir.id);
+    if (error) setHata(`Makbuz numarası kaydedilemedi: ${error.message}`);
+    else {
+      setTaslak((o) => ({ ...o, [satir.id]: "" }));
+      await yukle();
+    }
+    setKaydediliyor(null);
+  }
+
+  const odendiMi = (s: MakbuzSatiri) => String(s.status ?? "") === "odendi" || !!s.paid_at;
+  const bekleyen = satirlar.filter((s) => odendiMi(s) && !String(s.receipt_no ?? "").trim()).length;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground leading-snug">
+        Ödeme defteri parayı takip eder; bu bölüm makbuz/fatura tarafını takip eder — kim ödedi,
+        makbuz kesildi mi, hangi satır bekliyor. Yeni ödeme kaydı oluşturmaz; yalnız makbuz
+        numarası yazılır.
+      </p>
+
+      {hata && (
+        <div className="text-sm rounded border border-destructive/40 bg-destructive/10 text-destructive p-3">
+          {hata}
+        </div>
+      )}
+
+      {yukleniyor ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Ödeme kayıtları okunuyor…
+        </div>
+      ) : satirlar.length === 0 ? (
+        <p className="text-sm">Bu dosyada henüz ödeme kaydı yok.</p>
+      ) : (
+        <>
+          <div className="text-sm font-medium">
+            {satirlar.length} ödeme · {bekleyen} makbuz bekliyor
+          </div>
+          <ul className="divide-y">
+            {satirlar.map((s) => {
+              const odendi = odendiMi(s);
+              const makbuz = String(s.receipt_no ?? "").trim();
+              const odeyen = String(s.payer_label ?? "").trim()
+                || adlar[String(s.payer_party_id ?? s.party_id ?? "")]
+                || "Ödeyen belirtilmemiş";
+              return (
+                <li key={s.id} className="py-2 space-y-1">
+                  <div className="flex items-start justify-between gap-3 flex-wrap text-sm">
+                    <div className="min-w-0">
+                      <div className="font-medium">{odeyen}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {makbuzTutar(s.amount)} · {makbuzTarih(s.payment_date ?? s.paid_at)} ·{" "}
+                        {odendi ? "ödendi" : "ödeme bekliyor"}
+                        {s.description ? ` · ${s.description}` : ""}
+                      </div>
+                    </div>
+                    {makbuz ? (
+                      <span className="text-xs px-2 py-0.5 rounded-full border border-emerald-300 bg-emerald-50 text-emerald-700 shrink-0">
+                        makbuz kesildi — {makbuz}
+                      </span>
+                    ) : odendi ? (
+                      <span className="text-xs px-2 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-800 font-medium shrink-0">
+                        MAKBUZ BEKLİYOR
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground shrink-0">ödeme yapılmadı</span>
+                    )}
+                  </div>
+                  {odendi && !makbuz && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Input
+                        value={taslak[s.id] ?? ""}
+                        onChange={(e) => setTaslak((o) => ({ ...o, [s.id]: e.target.value }))}
+                        placeholder="Makbuz / fatura no"
+                        className="h-8 text-xs max-w-[220px]"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className={KART_DUGME}
+                        disabled={kaydediliyor === s.id || !(taslak[s.id] ?? "").trim()}
+                        onClick={() => makbuzKaydet(s)}
+                      >
+                        {kaydediliyor === s.id
+                          ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Kaydediliyor…</>
+                          : "Kaydet"}
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

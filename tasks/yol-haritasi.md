@@ -732,3 +732,12 @@ bağlandı (koşum koşulu: en az bir taraf); ücretsiz olduğu için tur başı
 "Usule ilişkin engeller" bölümü açıldı; düğmede maliyet işareti yok.
 REDEPLOY GEREKLİ: usul-engeli (YENİ) · ajan-nobetci. SQL: kurucu tarafından çalıştırıldı.
 
+16.08 (MAKBUZ TAKİBİ — İBA 2.7 / B22): Kokpitin RAPOR VE BELGELER katmanına "Makbuz
+takibi" bölümü eklendi. Mevcut case_payments kayıtları ödeyen · tutar · tarih · durum
+olarak listeleniyor; receipt_no doluysa "makbuz kesildi", ödeme yapılmış ama numara
+boşsa vurgulu "MAKBUZ BEKLİYOR" yazıyor. Üstte "N ödeme · M makbuz bekliyor" özeti var.
+Bekleyen satırlarda küçük bir kutu ve Kaydet düğmesiyle yalnız receipt_no güncelleniyor
+(RLS'te arabulucu/admin UPDATE politikası mevcut); tutar, durum, tarih ve diğer alanlara
+dokunulmuyor, yeni ödeme oluşturulmuyor. Model çağrısı yok, maliyet işareti yok, nöbetçiye
+bağlanmadı. Yalnız arabulucu görüyor. SQL ve redeploy gerekmiyor; yalnız Publish.
+

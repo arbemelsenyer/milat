@@ -1,3 +1,26 @@
+## Nerede kaldık — 16.08.2026 (79) · MAKBUZ TAKİBİ (İBA 2.7 / B22)
+- [x] Ekran: kokpit > RAPOR VE BELGELER > "Makbuz takibi" (Seçenek sepetinin ardında).
+      Mevcut case_payments kayıtları listeleniyor: ödeyen (payer_label ya da taraf adı) ·
+      tutar · tarih · durum. Üstte tek satır özet: "N ödeme · M makbuz bekliyor".
+      Kayıt yoksa "Bu dosyada henüz ödeme kaydı yok".
+- [x] Makbuz durumu: receipt_no doluysa "makbuz kesildi — <no>"; ödeme yapılmış
+      (status='odendi' ya da paid_at dolu) ama receipt_no boşsa vurgulu "MAKBUZ
+      BEKLİYOR"; ödeme yapılmamışsa nötr "ödeme yapılmadı".
+- [x] MAKBUZ NUMARASI GİRİŞİ EKLENDİ — RLS kontrol edildi: case_payments üzerinde
+      "Case mediator or admin can update payments" (FOR UPDATE, is_case_mediator VEYA
+      admin) politikası VAR. Kutu yalnız "makbuz bekliyor" satırlarında çıkıyor ve
+      YALNIZ receipt_no güncelleniyor; başka alana dokunulmuyor, ödeme oluşturulmuyor,
+      silinmiyor. Hata olursa kırmızı satırda gerçek mesaj yazıyor.
+- [x] BEDAVA: model çağrısı yok, maliyet işareti konmadı. Yalnız arabulucu yüzeyinde;
+      tarafa gösterilmiyor, bildirim yok. Nöbetçiye BAĞLANMADI (analiz değil, ekranda
+      anlık liste) — OTOMATIK_KOLLAR'a eklenmedi.
+tsc temiz. CANLI TEST YOK. SQL YAZILMADI, göç dosyası açılmadı, tablo değişmedi.
+AÇIK UÇ: UPDATE politikası yalnız is_case_mediator (atanmış arabulucu) ve admin için
+açık; dosya sahibi ama atanmamış kullanıcıda kaydetme hata verir — hata ekranda görünür,
+gerekirse politika kurucu kararıyla genişletilir.
+AÇIK UÇ: Makbuz numarası serbest metindir; biçim doğrulaması ve mükerrer numara kontrolü
+yok. İstenirse ayrı iş.
+
 ## Nerede kaldık — 16.08.2026 (78) · USULE İLİŞKİN ENGEL KONTROL LİSTESİ (İBA 2.4)
 - [x] Yeni edge fonksiyon: supabase/functions/usul-engeli (config.toml verify_jwt=true).
       YAPAY ZEKÂ ÇAĞRISI YOK — hesap tamamen kodda, bedava kol.
