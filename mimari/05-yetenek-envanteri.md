@@ -420,6 +420,24 @@ DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon
 · Gizlilik: yalnız arabulucu yüzeyi; okunamayan kaynak olursa o başlıkta işaret
   üretilmez ve hangisinin okunamadığı ekranda yazar.
 
+SEÇENEK SEPETİ (İBA 1.9 / A10)
+DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon ve AI
+çağrısı YOKTUR; seçenekler mevcut analiz çıktılarıyla kodda eşleştirilir.
+· Yeri: kokpit → "Seçenek sepeti", Tıkanma ve çıkış yollarının yanında. "Yenile" var.
+· Katalog (11 seçenek, para dışı olanlar dahil): taksitlendirme · vade/ödeme takvimi ·
+  hizmet veya ayni karşılık · onarım-yenileme-eksiğin tamamlanması · özür/yüz kurtarma ·
+  referans mektubu · gelecekteki iş ilişkisi · gizlilik taahhüdü · kamuoyuna açıklama
+  yapmama · süreli deneme · üçüncü kişi güvencesi (kefil/teminat).
+· Eşleşme kaynakları: party_root_cause_analysis.kok_neden (asıl mesele · görünen talep) ·
+  party_analyses.analysis.party_position.interests · common_ground_reports.report
+  .common_interests · case_parties.statement. Her satırda kaynak ve kaydın KENDİ
+  cümlesinden alıntı yazılır; eşleşmeyen seçenek gösterilmez.
+· Sınır: liste sıralama değildir; "en iyisi budur" denmez, rakam önerilmez, tavsiye
+  verilmez. Hiç ihtiyaç kaydı yoksa "asıl ihtiyaç kaydı yok, seçenek üretilemedi" yazılır.
+· Gizlilik: yalnız arabulucu yüzeyi (kök neden ve taraf analizleri zaten mediator-only).
+· AÇIK MADDE: Dosya TÜRÜ tek başına seçenek tetiklemez — türden ihtiyaç çıkarmak
+  uydurma sayılacağı için yalnız kayıtlı ihtiyaç metinleri kullanılır.
+
 [v0.36 KALICI ŞART — FAZ 3 TÜR TESPİTİ İKİ MENÜDÜR (değişmez)]
 Faz 3 uyuşmazlık tür tespitinde ANA TÜR ve ALT UZMANLIK olmak üzere İKİ menü zorunludur. Alt
 uzmanlık menüsü üç kez sehven silinip geri konmuştur; bir daha kaldırılamaz — düzen değişikliği,

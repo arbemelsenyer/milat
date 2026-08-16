@@ -616,3 +616,14 @@ Uyuşmazlık Konusu (AI önerisi) ve belge listesindeki "Özet çıkar / Özeti 
 aynı bileşen, aynı boyut (sm · h-8 · text-xs) ve aynı ikon düzeni (h-4 w-4 mr-1).
 İşlev değişmedi; SQL ve redeploy gerekmiyor, yalnız Publish.
 
+16.08 (SEÇENEK SEPETİ — İBA 1.9 / A10): Kokpite, Tıkanma kartının yanına "Seçenek sepeti"
+kartı eklendi. On bir seçeneklik katalog (taksitlendirme, vade, hizmet/ayni karşılık,
+onarım-yenileme, özür, referans mektubu, gelecekteki iş ilişkisi, gizlilik taahhüdü,
+kamuoyuna açıklama yapmama, süreli deneme, üçüncü kişi güvencesi) dosyadaki KAYITLI
+ihtiyaç metinleriyle kodda eşleştiriliyor: kök neden analizi (asıl mesele · görünen talep),
+taraf analizi menfaatleri, ortak zemin raporunun ortak menfaatleri ve taraf beyanı. Her
+seçeneğin altında hangi kaydın hangi cümlesiyle eşleştiği yazıyor; eşleşmeyen seçenek
+gösterilmiyor, ihtiyaç kaydı hiç yoksa "asıl ihtiyaç kaydı yok, seçenek üretilemedi"
+yazıyor. Liste sıralama değil; tavsiye ve rakam önerisi yok. Yeni tablo, edge fonksiyon ve
+AI çağrısı YOK. SQL gerekmiyor; yalnız Publish.
+

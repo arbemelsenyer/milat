@@ -7541,6 +7541,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     body: <TikanmaCozucuPanel caseRow={caseRow} />,
   });
 
+  // Seçenek sepeti (İBA 1.9 / A10) — tıkanma kartının yanında.
+  sectionDefs.push({
+    id: "kokpit-secenek-sepeti", layer: LAYER_REPORTS, title: "Seçenek sepeti",
+    body: <SecenekSepetiPanel caseRow={caseRow} />,
+  });
+
   const layerOrder = [LAYER_TABLE, LAYER_EVIDENCE, LAYER_COCKPIT, LAYER_REPORTS];
   // Katman başlığının kendi çıpası (sol menüden katman adına tıklanınca oraya kayılır)
   // ve başlığın altındaki tek satır açıklama; aynı açıklama menüde tooltip olur.
@@ -9626,6 +9632,225 @@ function TikanmaCozucuPanel({ caseRow }: { caseRow: CaseRow }) {
       {okunamayan.length > 0 && (
         <p className="text-[11px] text-destructive/90 leading-snug">
           Şu kaynaklar okunamadı, o başlıklarda işaret üretilmedi: {okunamayan.join(" · ")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ============ SEÇENEK SEPETİ (İBA 1.9 / A10) — yalnız arabulucu ============
+   Kart, dosyada KAYITLI ihtiyaç metinlerinden yola çıkarak masaya konabilecek çözüm
+   seçeneklerini listeler. Yeni AI çağrısı YOK: eşleşme kodda, mevcut analiz
+   çıktıları üzerinde yapılır.
+   Kaynaklar (hepsi arabulucu yüzeyi): party_root_cause_analysis.kok_neden
+   (gorunen_talep · asil_mesele) · party_analyses.analysis.party_position.interests ·
+   common_ground_reports.report.common_interests · case_parties.statement (taraf beyanı).
+   Sınır: seçenekler SIRALANMAZ, "en iyisi budur" denmez, rakam önerilmez, tavsiye
+   verilmez — yalnız "şu seçenek şu kayıtlı ihtiyacı karşılar" denir. Eşleşen kayıt
+   yoksa seçenek GÖSTERİLMEZ; hiç ihtiyaç kaydı yoksa "asıl ihtiyaç kaydı yok" yazılır.
+   Kör veri (m.1): yalnız kokpitte çizilir; kök neden ve taraf analizleri zaten
+   arabulucuya özeldir, taraf ekranına hiçbir satırı çıkmaz. */
+
+type SecenekTanimi = {
+  id: string;
+  baslik: string;
+  karsilik: string;      // hangi ihtiyacı karşıladığı — sabit, nötr cümle
+  anahtarlar: string[];  // kayıtlı metinde aranan ifadeler (küçük harf, tr)
+};
+
+// Katalog SIRALAMA DEĞİLDİR; ekranda da böyle yazar.
+const SECENEK_KATALOGU: SecenekTanimi[] = [
+  { id: "taksit", baslik: "Taksitlendirme",
+    karsilik: "Ödeme gücü sınırlı olduğunu kayda geçiren tarafın yükünü zamana yayar.",
+    anahtarlar: ["taksit", "ödeme güçlüğü", "ödeyemi", "nakit", "likidite", "borç yükü", "maddi zorluk", "bütçe", "peşin ödeme"] },
+  { id: "vade", baslik: "Vade / ödeme takvimi",
+    karsilik: "Ödemenin ne zaman yapılacağı belirsizliğini takvime bağlar.",
+    anahtarlar: ["vade", "gecikme", "geç ödeme", "ödeme tarihi", "erteleme", "tahsilat"] },
+  { id: "ayni", baslik: "Hizmet veya ayni karşılık",
+    karsilik: "Karşılığın para dışında bir edimle verilmesini masaya koyar.",
+    anahtarlar: ["hizmet", "ayni", "mal teslim", "ürün", "malzeme", "tedarik", "iş yapma"] },
+  { id: "onarim", baslik: "Onarım / yenileme / eksiğin tamamlanması",
+    karsilik: "Ayıplı ya da eksik edimin giderilmesi ihtiyacını karşılar.",
+    anahtarlar: ["ayıp", "kusurlu", "hasar", "arıza", "eksik iş", "onarım", "tamir", "yenileme", "montaj", "iade"] },
+  { id: "ozur", baslik: "Özür / yüz kurtarma",
+    karsilik: "Parayla ölçülmeyen incinme ve itibar kaydını karşılar.",
+    anahtarlar: ["özür", "itibar", "saygı", "onur", "incin", "kırgın", "haksızlığa uğra", "güven kaybı", "aşağılan"] },
+  { id: "referans", baslik: "Referans mektubu / çalışma belgesi",
+    karsilik: "Sonraki iş ilişkisini kurmakta zorlanacağını kayda geçiren tarafın ihtiyacını karşılar.",
+    anahtarlar: ["referans", "bonservis", "çalışma belgesi", "iş bulma", "kariyer", "işten çıkar", "istifa"] },
+  { id: "iliski", baslik: "Gelecekteki iş ilişkisi / devam eden çalışma",
+    karsilik: "İlişkinin sürmesini önemsediği kayda geçen tarafın ihtiyacını karşılar.",
+    anahtarlar: ["iş ilişkisi", "ilişkinin devamı", "ortaklık", "müşteri", "tedarikçi", "uzun vadeli", "komşu", "birlikte çalış"] },
+  { id: "gizlilik", baslik: "Gizlilik taahhüdü",
+    karsilik: "Anlaşma içeriğinin ve dosya bilgisinin paylaşılmaması ihtiyacını karşılar.",
+    anahtarlar: ["gizlilik", "ticari sır", "sır", "mahrem", "kişisel veri", "duyulmas"] },
+  { id: "aciklamama", baslik: "Kamuoyuna açıklama yapmama",
+    karsilik: "Uyuşmazlığın dışarıya taşınmaması ihtiyacını karşılar.",
+    anahtarlar: ["basın", "sosyal medya", "kamuoyu", "şikayet sitesi", "paylaşım", "duyuru", "ifşa"] },
+  { id: "deneme", baslik: "Süreli deneme / kademeli uygulama",
+    karsilik: "Karşı tarafın edimini görmeden bağlanmak istemediği kaydını karşılar.",
+    anahtarlar: ["deneme", "pilot", "geçici", "kısa süreli", "gözlem", "test"] },
+  { id: "guvence", baslik: "Üçüncü kişi güvencesi (kefil / teminat)",
+    karsilik: "Ödemenin yapılmama riskini kayda geçiren tarafın ihtiyacını karşılar.",
+    anahtarlar: ["teminat", "kefil", "senet", "ipotek", "güvence", "garanti", "ödenmeme"] },
+];
+
+type SecenekKaynakMetni = { metin: string; kaynak: string };
+type SecenekEslesme = { kaynak: string; alinti: string };
+
+const trKucuk = (s: string) => String(s ?? "").toLocaleLowerCase("tr");
+
+// Eşleşen ifadeyi taşıyan cümleyi kısaltarak döndürür (uydurma yok: kaydın kendi metni).
+function secenekAlinti(metin: string, anahtar: string): string {
+  // Not: lookbehind (?<=) KULLANILMAZ — eski tarayıcıda regex sözdizimi hatası
+  // bütün paketi çökertir. Noktalama ayırıcı olarak tüketiliyor, alıntıya zararı yok.
+  const cumleler = String(metin).split(/[.!?;]\s+/);
+  const hedef = cumleler.find((c) => trKucuk(c).includes(anahtar)) ?? metin;
+  const t = hedef.trim().replace(/\s+/g, " ");
+  return t.length > 160 ? `${t.slice(0, 157)}…` : t;
+}
+
+function SecenekSepetiPanel({ caseRow }: { caseRow: CaseRow }) {
+  const [metinler, setMetinler] = useState<SecenekKaynakMetni[]>([]);
+  const [okunamayan, setOkunamayan] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const eksik: string[] = [];
+    const toplanan: SecenekKaynakMetni[] = [];
+
+    const p = await supabase.from("case_parties")
+      .select("id, party_role, first_name, last_name, company_name, statement")
+      .eq("case_id", caseRow.id).order("created_at");
+    if (p.error) eksik.push(`taraf kayıtları (${p.error.message})`);
+    const partyList = Array.isArray(p.data) ? p.data : [];
+    const adlar = new Map<string, string>(partyList.map((x: any, i: number) => [x.id, blindBidPartyName(x, i)]));
+
+    for (const t of partyList as any[]) {
+      const beyan = String(t.statement ?? "").trim();
+      if (beyan) toplanan.push({ metin: beyan, kaynak: `Taraf beyanı — ${adlar.get(t.id)}` });
+    }
+
+    const [rc, pa, cg] = await Promise.all([
+      supabase.from("party_root_cause_analysis").select("party_id, kok_neden, created_at")
+        .eq("case_id", caseRow.id).order("created_at", { ascending: false }),
+      supabase.from("party_analyses").select("party_id, analysis").eq("case_id", caseRow.id),
+      supabase.from("common_ground_reports").select("report, created_at")
+        .eq("case_id", caseRow.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    if (rc.error) eksik.push(`kök neden analizi (${rc.error.message})`);
+    if (pa.error) eksik.push(`taraf analizleri (${pa.error.message})`);
+    if (cg.error) eksik.push(`ortak zemin raporu (${cg.error.message})`);
+
+    const gorulenTaraf = new Set<string>();
+    for (const r of ((rc.data ?? []) as any[])) {
+      if (gorulenTaraf.has(String(r.party_id))) continue;   // taraf başına en yeni kayıt
+      gorulenTaraf.add(String(r.party_id));
+      const kn = r.kok_neden ?? {};
+      const ad = adlar.get(String(r.party_id)) ?? "Taraf";
+      const asil = String(kn.asil_mesele ?? "").trim();
+      const gorunen = String(kn.gorunen_talep ?? "").trim();
+      if (asil && asil !== "Yeterli veri yok") toplanan.push({ metin: asil, kaynak: `Kök neden analizi — ${ad} (asıl mesele)` });
+      if (gorunen) toplanan.push({ metin: gorunen, kaynak: `Kök neden analizi — ${ad} (görünen talep)` });
+    }
+
+    for (const a of ((pa.data ?? []) as any[])) {
+      const ad = adlar.get(String(a.party_id)) ?? "Taraf";
+      const ilgiler = (a.analysis as any)?.party_position?.interests;
+      if (Array.isArray(ilgiler)) {
+        for (const i of ilgiler) {
+          const m = String(i ?? "").trim();
+          if (m) toplanan.push({ metin: m, kaynak: `Taraf analizi — ${ad} (menfaatler)` });
+        }
+      }
+    }
+
+    const ortak = (cg.data as any)?.report?.common_interests;
+    if (Array.isArray(ortak)) {
+      for (const o of ortak) {
+        const m = String(o ?? "").trim();
+        if (m) toplanan.push({ metin: m, kaynak: "Ortak zemin raporu — ortak menfaatler" });
+      }
+    }
+
+    setMetinler(toplanan);
+    setOkunamayan(eksik);
+    setLoading(false);
+  }, [caseRow.id]);
+  useEffect(() => { load(); }, [load]);
+
+  // Eşleşme: her seçenek için, kayıtlı metinlerde geçen ifadeler. Eşleşme yoksa satır yok.
+  const secenekler = SECENEK_KATALOGU.map((s) => {
+    const eslesmeler: SecenekEslesme[] = [];
+    for (const m of metinler) {
+      const kucuk = trKucuk(m.metin);
+      const anahtar = s.anahtarlar.find((a) => kucuk.includes(a));
+      if (!anahtar) continue;
+      if (eslesmeler.some((e) => e.kaynak === m.kaynak)) continue;   // kaynak başına tek satır
+      eslesmeler.push({ kaynak: m.kaynak, alinti: secenekAlinti(m.metin, anahtar) });
+    }
+    return { tanim: s, eslesmeler };
+  }).filter((x) => x.eslesmeler.length > 0);
+
+  return (
+    <div className="rounded-2xl border border-sidebar-border bg-sidebar text-sidebar-foreground p-6 shadow-elegant space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Lightbulb className="h-4 w-4 text-accent" />
+          <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Seçenek Sepeti</div>
+          {!loading && secenekler.length > 0 && (
+            <Badge variant="outline" className="border-sidebar-border text-sidebar-foreground/80">
+              {secenekler.length} seçenek
+            </Badge>
+          )}
+        </div>
+        <Button size="sm" variant="outline" className={KOKPIT_DUGME} onClick={load} disabled={loading}>
+          <RefreshCw className="h-4 w-4 mr-1" /> Yenile
+        </Button>
+      </div>
+
+      <p className="text-xs text-sidebar-foreground/60 leading-snug">
+        Masaya konabilecek çözüm seçenekleri, dosyada KAYITLI ihtiyaç metinleriyle eşleştiği ölçüde listelenir.
+        Liste bir sıralama değildir; kart "en iyisi budur" demez, rakam önermez, tavsiye vermez. Taraflara
+        hiçbir yüzeyden gösterilmez.
+      </p>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-sidebar-foreground/70">
+          <Loader2 className="h-4 w-4 animate-spin" /> Kayıtlı ihtiyaçlar taranıyor…
+        </div>
+      ) : metinler.length === 0 ? (
+        <p className="text-sm text-sidebar-foreground/70">
+          Asıl ihtiyaç kaydı yok, seçenek üretilemedi. (Kök neden analizi, taraf analizi menfaatleri, ortak
+          zemin raporu ve taraf beyanı boş.)
+        </p>
+      ) : secenekler.length === 0 ? (
+        <p className="text-sm text-sidebar-foreground/70">
+          Kayıtlı ihtiyaç metinleri var ama katalogdaki seçeneklerle eşleşen bir ifade bulunmadı; zorlama
+          seçenek üretilmedi.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {secenekler.map(({ tanim, eslesmeler }) => (
+            <div key={tanim.id} className="rounded-xl border border-sidebar-border bg-sidebar-accent/20 p-4 space-y-2">
+              <div className="text-sm font-display font-bold">{tanim.baslik}</div>
+              <p className="text-xs text-sidebar-foreground/80">{tanim.karsilik}</p>
+              <ul className="space-y-1">
+                {eslesmeler.map((e, k) => (
+                  <li key={`${tanim.id}-${k}`} className="text-[11px] text-sidebar-foreground/55 leading-snug">
+                    Dayanak: {e.kaynak} — “{e.alinti}”
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {okunamayan.length > 0 && (
+        <p className="text-[11px] text-destructive/90 leading-snug">
+          Şu kaynaklar okunamadı, o kayıtlardan seçenek üretilmedi: {okunamayan.join(" · ")}
         </p>
       )}
     </div>

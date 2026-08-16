@@ -1,3 +1,39 @@
+## Nerede kaldık — 16.08.2026 (63) · SEÇENEK SEPETİ (İBA 1.9 / A10)
+KEŞİF (asıl ihtiyaç verisi nerede duruyor): DÖRT kayıt var, hepsi arabulucu yüzeyinde.
+(1) party_root_cause_analysis.kok_neden = {gorunen_talep · asil_mesele · dayanak ·
+guven_seviyesi} — party-confidential-analysis yazıyor, taraf başına tek satır, "Yeterli
+veri yok" değeri ayrıca işaretli. (2) party_analyses.analysis.party_position.interests[]
+— aynı ajanın menfaat listesi (yanında strengths/weaknesses/batna/watna). (3)
+common_ground_reports.report.common_interests[] — ortak menfaatler (ayrıca scenarios ve
+red_lines var, kullanılmadı). (4) case_parties.statement — tarafın kendi beyanı.
+RAKAMLANMIŞ ya da ETİKETLİ bir "ihtiyaç" tablosu YOK; hepsi serbest metin. Bu yüzden
+eşleştirme kodda, ifade taraması ile yapıldı.
+- [x] Ekran: kokpit (Aşama 3) > RAPOR katmanı > "Seçenek sepeti", Tıkanma ve çıkış
+      yollarının hemen ardında. Sol menüde kendiliğinden görünür. "Yenile" düğmesi
+      bugünkü diğer kartlarla aynı görünümde (KOKPIT_DUGME).
+- [x] 11 seçeneklik katalog, para dışı olanlar dahil: taksitlendirme · vade/ödeme takvimi ·
+      hizmet veya ayni karşılık · onarım-yenileme-eksiğin tamamlanması · özür/yüz kurtarma ·
+      referans mektubu · gelecekteki iş ilişkisi · gizlilik taahhüdü · kamuoyuna açıklama
+      yapmama · süreli deneme · üçüncü kişi güvencesi (kefil/teminat).
+- [x] Her seçenekte iki satır: (a) hangi ihtiyacı karşıladığı — sabit, nötr cümle;
+      (b) DAYANAK — hangi kayıt (kaynak adı + taraf adı) ve o kaydın KENDİ cümlesinden
+      alıntı. Eşleşmeyen seçenek hiç gösterilmiyor.
+- [x] Veri yoksa: "Asıl ihtiyaç kaydı yok, seçenek üretilemedi." Kayıt var ama eşleşme
+      yoksa ayrı cümle yazılıyor — zorlama seçenek üretilmiyor.
+- [x] SINIR: liste SIRALAMA DEĞİL (ekranda da yazıyor); "en iyisi budur" yok, rakam
+      önerisi yok, tavsiye yok. Yeni AI çağrısı YOK.
+- [x] GİZLİLİK: yalnız kokpitte çizilir; kök neden ve taraf analizleri zaten mediator-only,
+      taraf ekranına dokunulmadı.
+- [x] YENİ TABLO / SÜTUN / EDGE FONKSİYON YOK → SQL GEREKMİYOR.
+- [x] Bir kaynak okunamazsa kart düşmüyor; hangi kaynağın okunamadığı kırmızı satırda.
+tsc (tsconfig.app.json) temiz. CANLI TEST YOK.
+AÇIK UÇ: Dosya TÜRÜ tek başına seçenek tetiklemiyor (kira dosyası olması "onarım"
+seçeneğini açmıyor). Sebep: türden ihtiyaç çıkarmak uydurma olurdu; yalnız kayıtlı ihtiyaç
+metni tetikliyor. Kurucu isterse tür bazlı öneri ayrı karar olur.
+AÇIK UÇ: Eşleştirme ifade taramasıdır (anahtar kelime). Kayıt farklı sözcüklerle yazılmışsa
+seçenek çıkmaz; katalogdaki anahtarlar kod içinde tek yerde durur, genişletilebilir.
+AÇIK UÇ: Seçeneği tutanağa/anlaşma taslağına aktaran bir düğme YOK; kart yalnız gösterir.
+
 ## Nerede kaldık — 16.08.2026 (62) · DÜZELTME: KART DÜĞMELERİ GÖRÜNMÜYORDU
 SEBEP (bulundu): shadcn Button'un outline varyantı yalnız "border + bg-background" verir,
 YAZI RENGİ TANIMLAMAZ (src/components/ui/button.tsx:14). Koyu zeminli kokpit kartında
