@@ -29,7 +29,17 @@ her satırda dayanağı yazıldı.
 - [x] GİZLİLİK: panel yalnız kokpitte çizilir; kullandığı üç tabloda da tarafa SELECT
       politikası yok, taraf ekranına (CaseRoom) dokunulmadı.
 - [x] YENİ TABLO / SÜTUN / EDGE FONKSİYON YOK → SQL GEREKMİYOR.
-tsc (tsconfig.app.json) temiz. CANLI TEST YOK.
+- [x] CANLIDA DOĞRULANDI (16.08.2026).
+      · Yeri: kokpit (Aşama 3), Kör Teklif ve braket kartlarının yanı. Yeni tablo,
+        edge fonksiyon ve AI çağrısı gerekmedi.
+      · Kira dosyasında test: elle girilen 150.000 için karşılama %75, alınan/bırakılan
+        ayrımı, bandın içinde olduğu tespiti, her satırda dayanak — doğru hesapladı.
+        Tavsiye/öneri dili yok.
+      · Elle girilen tutar hiçbir tabloya yazılmıyor.
+      · AÇIK KALAN: rakamlandırılmış talep kalemi olmadığı için hesap tarafın Kabul
+        Aralığı üst sınırı üzerinden yapılıyor. Talep kalemleri rakamla kaydedilince
+        hesap kalem kalem yapılacak.
+tsc (tsconfig.app.json) temiz. CANLI TEST: 16.08'de yapıldı (yukarıdaki madde).
 AÇIK UÇ (en önemlisi): "Neyi alıyor / neyi bırakıyor" KALEM KALEM değil, tek tutar
 üzerinden hesaplanıyor — çünkü dosyada rakamlandırılmış talep kalemi kaydı yok. Kalem
 ayrımı isteniyorsa taraf başına talep kalemi (başlık + tutar + dayanak) kaydı gerekir;
