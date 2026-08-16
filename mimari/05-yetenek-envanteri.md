@@ -438,6 +438,26 @@ DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon
 · AÇIK MADDE: Dosya TÜRÜ tek başına seçenek tetiklemez — türden ihtiyaç çıkarmak
   uydurma sayılacağı için yalnız kayıtlı ihtiyaç metinleri kullanılır.
 
+ELVERİŞLİLİK KONTROLÜ (İBA 2.1 / B13)
+DURUM 16.08 ● KODDA (SQL ve canlı test bekliyor).
+· Yeri: kokpit (Aşama 3) > MASAYA OTURURKEN katmanı > "Elverişlilik kontrolü".
+  Kendiliğinden çalışmaz: yalnız arabulucu [Kontrol et] düğmesine basınca (ücretli
+  çağrı; maliyet işareti düğmenin altında).
+· KAYNAK YALNIZ BİLGİ TABANI: knowledge_base_chunks — 6325 sayılı Kanun · Yönetmelik ·
+  dosyanın türüne karşılık gelen uzmanlık modülü (eşleşme yoksa yalnız kanun ve
+  yönetmelik). Model kendi hukuk bilgisinden hüküm üretmez; internete çıkılmaz.
+· Her bulguda kaynak künyesi ZORUNLU: kaynak adı + madde/bölüm + birebir alıntı.
+  SUNUCU ELEMESİ: alanı eksik olan · hüküm cümlesi taşıyan ("elverişli değildir",
+  "geçersizdir" …) · alıntısı KAYNAK METİNDE BULUNAMAYAN bulgu elenir.
+· Durumlar: isaret_var · isaret_yok ("dikkat gerektiren bir işaret bulunamadı") ·
+  kaynak_yok ("bilgi tabanında dayanak bulunamadı — uyarı üretilmedi").
+· Dil: hüküm kurulmaz — "… bakımından değerlendirme gerekebilir; karar arabulucuya
+  aittir". Ajan karar vermez, hukuki yorum yapmaz.
+· Kayıt: elverislilik_kontrol tablosu (dosya başına tek satır); tarafa SELECT
+  politikası YOKTUR, uyarı tarafa hiçbir yüzeyden gitmez, bildirim gönderilmez.
+· agent_states'e 'elverislilik' tipiyle durum yazılır (running/completed/failed);
+  yazma hatası asıl işi bozmaz.
+
 İLETİŞİMDE DEĞİŞİM (İBA 1.5 / A4)
 DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon ve AI
 çağrısı YOKTUR; ölçüm ifade sayımıdır ve tamamen istemcide çalışır.

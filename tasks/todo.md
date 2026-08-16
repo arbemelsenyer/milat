@@ -1,3 +1,38 @@
+## Nerede kaldık — 16.08.2026 (75) · ELVERİŞLİLİK KONTROLÜ (İBA 2.1 / B13)
+- [x] Göç dosyası (ÇALIŞTIRILMADI): supabase/migrations/20260816200000_elverislilik.sql —
+      elverislilik_kontrol tablosu (case_id UNIQUE 'elverislilik_case_tekil', durum CHECK
+      'elverislilik_durum_chk': isaret_var/isaret_yok/kaynak_yok, bulgular jsonb) + RLS.
+      SELECT yalnız is_case_mediator VEYA is_case_owner_safe; admin ALL. TARAFA POLİTİKA YOK.
+      DO bloğu ve $$ yok, idempotent.
+- [x] Yeni edge fonksiyon: supabase/functions/elverislilik (config.toml verify_jwt=true).
+      · Yetki: arabulucu / dosya sahibi / yönetici; taraf çağırırsa 403.
+      · KAYNAK YALNIZ BİLGİ TABANI: knowledge_base_chunks'tan source_title ile
+        6325 Kanun + Yönetmelik + (tür eşleşirse) uzmanlık modülü çekilir; parçalar
+        elverişlilik anahtar ifadeleriyle (elverişli · tasarruf · kamu düzeni · dava şartı ·
+        aile içi şiddet · cebir/tehdit …) daraltılır. Eşleşen modül yoksa yalnız kanun
+        ve yönetmelik. Embedding/RAG çağrısı yok, internet yok.
+      · İstem: "yalnız verilen metinlere dayan, karşılığı yoksa boş dön".
+      · SUNUCU ELEMESİ: eksik alan · hüküm cümlesi ("elverişli değildir", "geçersizdir",
+        "yapılamaz" …) · ALINTI KAYNAK METİNDE BULUNAMAZSA bulgu elenir (harf katlamalı
+        üç şanslı doğrulama, bu dosyada kendi hâliyle yazıldı). Kalan bulgu yoksa
+        'isaret_yok'; hiç kaynak parçası yoksa 'kaynak_yok'.
+      · Kayıt: elverislilik_kontrol upsert (onConflict case_id) + agent_states'e
+        'elverislilik' tipiyle running/completed/failed (yazma hatası asıl işi bozmaz).
+- [x] Ekran: kokpit > MASAYA OTURURKEN > "Elverişlilik kontrolü" (Sıradaki 3 soru'nun
+      ardında). Kayıt yoksa "Henüz çalıştırılmadı" + [Kontrol et]; kayıt varsa bulgular
+      başlık · gerekçe · "Kaynak: ad · madde/bölüm" · birebir alıntı ile listelenir;
+      'isaret_yok' ve 'kaynak_yok' kendi cümlelerini yazar. Düğmenin altında maliyet
+      işareti. Yalnız arabulucu yüzeyinde; tarafa gitmez, bildirim/e-posta yok.
+      Dosya açılışında KENDİLİĞİNDEN ÇALIŞMAZ.
+tsc temiz; edge fonksiyon sözdizimi esbuild ile doğrulandı. CANLI TEST YOK.
+SQL GEREKLİ: 20260816200000_elverislilik.sql. REDEPLOY GEREKLİ: elverislilik (YENİ).
+SIRA: önce SQL, sonra redeploy/publish.
+AÇIK UÇ: Kaynak seçimi source_title kalıbıyla yapılıyor (ör. '%Aile Arabuluculuğu%').
+Bilgi tabanındaki kaynak adları farklıysa modül eşleşmez ve yalnız kanun+yönetmelik
+kullanılır — canlıda kaynak adları kontrol edilecek.
+AÇIK UÇ: Parça seçimi anahtar kelime taramasıdır (embedding kullanılmadı, maliyet ve
+sadelik için); ilgili hüküm başka sözcüklerle yazılıysa parça isteme girmeyebilir.
+
 ## Nerede kaldık — 16.08.2026 (74) · "VERİLERİM" SAYFASI (C25 · KVKK/İBA şeffaflık)
 KEŞİF: Kategoriler ve "kimler görebilir" bilgisi UYDURULMADI — depodaki gerçek RLS
 politikalarından okundu: case_parties (taraf yalnız user_id=auth.uid() satırı; arabulucu

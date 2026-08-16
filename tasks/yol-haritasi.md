@@ -696,3 +696,14 @@ SQL gerekmiyor (tablo değişikliği kurucu tarafından yapıldı).
 REDEPLOY GEREKLİ: belge-ozeti · olay-cizelgesi · guc-dengesi · iletisim-degisim ·
 dosya-ozeti-oner.
 
+16.08 (ELVERİŞLİLİK KONTROLÜ — İBA 2.1 / B13): Kokpitin MASAYA OTURURKEN katmanına
+"Elverişlilik kontrolü" bölümü eklendi; yalnız arabulucu [Kontrol et] düğmesine basınca
+çalışır (ücretli, maliyet işaretli). Yeni edge fonksiyon elverislilik, dosyanın konusunu,
+türünü ve taraf beyanlarını okuyup kaynak olarak YALNIZ bilgi tabanını kullanır: 6325
+sayılı Kanun, Yönetmelik ve türe karşılık gelen uzmanlık modülü. Her bulguda kaynak adı,
+madde/bölüm ve birebir alıntı zorunludur; alıntı kaynak metninde bulunamazsa bulgu
+sunucuda elenir, hüküm cümlesi taşıyan bulgu da elenir. Dayanak yoksa uyarı üretilmez
+(durum kaynak_yok). Ajan karar vermez; dil kalıbı "değerlendirme gerekebilir; karar
+arabulucuya aittir". Kayıt elverislilik_kontrol tablosunda, tarafa SELECT politikası yok.
+SQL göçü bekliyor: 20260816200000_elverislilik.sql. REDEPLOY GEREKLİ: elverislilik (YENİ).
+

@@ -7159,6 +7159,14 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     });
   }
 
+  // Elverişlilik kontrolü (İBA 2.1) — MASAYA OTURURKEN katmanı. KOŞULSUZ eklenir:
+  // kayıt yoksa "Henüz çalıştırılmadı" ve [Kontrol et] düğmesi görünür. Yalnız
+  // arabulucu yüzeyinde (kokpit) çizilir; taraf ekranında yoktur.
+  sectionDefs.push({
+    id: "kokpit-elverislilik", layer: LAYER_TABLE, title: "Elverişlilik kontrolü",
+    body: <ElverislilikPanel caseRow={caseRow} />,
+  });
+
   if (consistencyItems.length > 0) {
     sectionDefs.push({
       id: "kokpit-ic-tutarlilik", layer: LAYER_EVIDENCE, title: "İç tutarlılık",
@@ -10280,6 +10288,118 @@ function IletisimDegisimPanel({ caseRow }: { caseRow: CaseRow }) {
           Şu kaynaklar okunamadı, o metinler ölçüme girmedi: {okunamayan.join(" · ")}
         </p>
       )}
+    </div>
+  );
+}
+
+/* ====== ELVERİŞLİLİK KONTROLÜ (İBA 2.1) — yalnız arabulucu ==================
+   Ajan KARAR VERMEZ: dosyada elverişlilik bakımından dikkat gerektiren bir işaret
+   varsa kaynak künyesiyle bildirir. Kaynak YALNIZ bilgi tabanıdır; dayanak yoksa
+   uyarı üretilmez. Düğme ücretli model çağrısı tetikler, maliyet işareti altındadır.
+   Kendiliğinden çalışmaz — yalnız arabulucu basınca. */
+function ElverislilikPanel({ caseRow }: { caseRow: CaseRow }) {
+  const [kayit, setKayit] = useState<any | null>(null);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const yukle = useCallback(async () => {
+    setYukleniyor(true);
+    const { data, error } = await (supabase.from("elverislilik_kontrol" as any) as any)
+      .select("durum, bulgular, kaynaklar, updated_at").eq("case_id", caseRow.id).maybeSingle();
+    if (error) setHata(`Elverişlilik kaydı okunamadı: ${error.message}`);
+    else setKayit(data ?? null);
+    setYukleniyor(false);
+  }, [caseRow.id]);
+  useEffect(() => { yukle(); }, [yukle]);
+
+  async function kontrolEt() {
+    setBusy(true);
+    setHata(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("elverislilik", {
+        body: { case_id: caseRow.id },
+      });
+      if (error) {
+        // Gerçek sebep .context gövdesindedir; sessizce yutulmaz.
+        let ham = String((error as any)?.message ?? "bilinmeyen hata");
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.text === "function") {
+          try {
+            const govde = await ctx.text();
+            if (govde) {
+              try { const j = JSON.parse(govde); ham = String(j?.error ?? j?.sebep ?? govde); }
+              catch { ham = String(govde).slice(0, 400); }
+            }
+          } catch { /* gövde okunamadı */ }
+        }
+        throw new Error(ham);
+      }
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+      await yukle();
+    } catch (e: any) {
+      console.error("[elverislilik] çağrı başarısız", e);
+      setHata(`elverislilik çağrısı başarısız: ${trErr(e?.message ?? "bilinmeyen hata")}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const bulgular = Array.isArray(kayit?.bulgular) ? kayit.bulgular : [];
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground leading-snug">
+        Dosyada arabuluculuğa elverişlilik bakımından dikkat gerektiren bir işaret varsa kaynağıyla
+        birlikte gösterilir. Kaynak yalnız bilgi tabanındaki kanun, yönetmelik ve uzmanlık
+        modülleridir; dayanak bulunamazsa uyarı üretilmez. Karar arabulucuya aittir.
+      </p>
+
+      {hata && (
+        <div className="text-sm rounded border border-destructive/40 bg-destructive/10 text-destructive p-3">
+          {hata}
+        </div>
+      )}
+
+      {yukleniyor ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Kayıt okunuyor…
+        </div>
+      ) : !kayit ? (
+        <p className="text-sm text-muted-foreground italic">Henüz çalıştırılmadı.</p>
+      ) : kayit.durum === "kaynak_yok" ? (
+        <p className="text-sm">Bilgi tabanında dayanak bulunamadı — uyarı üretilmedi.</p>
+      ) : kayit.durum === "isaret_yok" || bulgular.length === 0 ? (
+        <p className="text-sm">Dikkat gerektiren bir işaret bulunamadı.</p>
+      ) : (
+        <ul className="space-y-3">
+          {bulgular.map((b: any, i: number) => (
+            <li key={i} className="text-sm border-l-2 border-amber-300 pl-3 space-y-0.5">
+              <div className="font-medium">{safeText(b?.baslik)}</div>
+              <div className="text-muted-foreground leading-snug">{safeText(b?.neden)}</div>
+              <div className="text-xs text-muted-foreground leading-snug">
+                Kaynak: {safeText(b?.kaynak_adi)}{b?.madde_bolum ? ` · ${safeText(b.madde_bolum)}` : ""}
+              </div>
+              <div className="text-xs italic text-muted-foreground leading-snug">“{safeText(b?.alinti)}”</div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {kayit?.kaynaklar && (
+        <p className="text-[11px] text-muted-foreground leading-snug">
+          Taranan kaynaklar: {String(kayit.kaynaklar)}
+        </p>
+      )}
+
+      <div className="space-y-1">
+        <Button size="sm" variant="outline" className={KART_DUGME} onClick={kontrolEt} disabled={busy}>
+          {busy
+            ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Kontrol ediliyor…</>
+            : <><ShieldCheck className="h-4 w-4 mr-1" /> {kayit ? "Yeniden kontrol et" : "Kontrol et"}</>}
+        </Button>
+        <UcretliIsaret />
+      </div>
     </div>
   );
 }
