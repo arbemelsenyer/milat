@@ -83,8 +83,9 @@ kaldırılması ayrı karar (sekme silme yasağı gereği dokunulmadı).
       çalıştı: sayım kolu + Ayrıntısını çıkar düğmesi + alıntı doğrulama + onarım turu
       (commit 0f77dcc). Kayıt iletisim_degisim tablosuna yazıldı, alıntılar kaynak
       künyeli.
-AÇIK NOT: sayım kolu "değişim görünmüyor" derken AI paragrafı değişim anlatabiliyor —
-iki kolun hükmü ekranda çelişebiliyor, görünüm düzeltmesi yapılacak.
+ÇÖZÜLDÜ (16.08.2026) — Hazır yapay zekâ paragrafı varken sayım kolunun çelişen hüküm
+cümlesi gizleniyor (commit 40fb1d3); paragraf yokken sayım kolu aynen konuşuyor. Canlıda
+doğrulandı: kartta yalnız paragraf + iki dayanak + ücret işaretli düğme görünüyor.
 AÇIK NOT: ilk metin olarak tarafın tutum beyanı değil en eski belge (ör. onam formu)
 seçilebiliyor; pilotta başvuru beyanı doluyken sorun olmayacak, izlenecek.
 - [x] DÜZELTME 16.08 (canlı bulgu — Serpil Karahan): "Alıntı kaynak metinde bulunamadı"
