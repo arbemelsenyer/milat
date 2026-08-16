@@ -52,7 +52,16 @@ sayılıyor.
       küçük sorgusunu yapıyor (tek alan).
 - [x] Bir kaynak okunamazsa kart komple düşmüyor: o başlıkta işaret üretilmiyor ve hangi
       kaynağın okunamadığı kırmızı satırda yazıyor.
-tsc (tsconfig.app.json) temiz. CANLI TEST YOK.
+- [x] CANLIDA DOĞRULANDI (16.08.2026).
+      · Yeri: kokpit (Aşama 3). Yeni tablo, edge fonksiyon ve AI çağrısı gerekmedi.
+      · Kira dosyasında 4 işaret üretti: cevapsız davet · 21 iptal kaydı · tarihi geçmiş
+        3 planlı oturum · süreye 5 gün. Her biri dayanaklı; her işaretin altında gerekçeli
+        çıkış yolları listelendi; karar/tavsiye dili yok.
+      · ÇIKAN EKSİK GİDERİLDİ: case_party_invites tablosuna arabulucu okuma politikası
+        eklendi (tablo case_party_id üzerinden bağlanıyor), böylece davet kayıtları
+        işaretlere girebiliyor. Politika elle çalıştırıldı — kayıt yeri
+        tasks/kurulu-envanter.md.
+tsc (tsconfig.app.json) temiz. CANLI TEST: 16.08'de yapıldı (yukarıdaki madde).
 AÇIK UÇ: Eşikler (3/5/3/10/15 gün) KOD İÇİNDE sabit ve ekranda yazılı; kurucu farklı gün
 isterse tek satırda değişir, ayar ekranı yok.
 AÇIK UÇ: "Ertelenen oturum" ayrı kayıt olmadığı için iptal kaydından sayılıyor; oturum

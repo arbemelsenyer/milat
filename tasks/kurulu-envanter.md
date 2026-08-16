@@ -50,6 +50,13 @@ ile doğrulanır.
   gösterge tipi kısıtı + RLS; tarafa SELECT politikası yok).
 - 15.08: 20260815220000_cron_authorization_basligi.sql elle çalıştırıldı (check-new-tariff
   cron işleri Authorization + apikey + x-cron-secret başlıklarıyla yeniden kuruldu).
+- 16.08: 20260816120000_kayit_protokolu.sql elle çalıştırıldı (kayit_onay_talepleri +
+  kayit_onaylari + oturum_kayitlari tabloları + RLS; oturum_kayitlari'nda tarafa SELECT
+  politikası yok, taraf yalnız kendi onay satırını görür ve yazar).
+- 16.08: case_party_invites üzerinde arabulucu/dosya sahibi SELECT politikası ve yönetici
+  tam yetki politikası kuruldu (tablo case_party_id üzerinden case_parties'e bağlanıyor).
+  Sebep: Tıkanma ve Çıkış Yolları kartı davet kayıtlarını okuyamıyordu; politika eklenince
+  "cevaplanmayan davet" işareti üretilebildi.
 - (daha önce kurulanlar buraya eklenecek: mediator_reads_offers,
   mediator_writes_discovery, mediator_updates_discovery, ajan_gorevleri politikaları,
   taraf_musaitlik RLS)
