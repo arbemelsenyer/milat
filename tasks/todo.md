@@ -26,7 +26,14 @@ eşleştirme kodda, ifade taraması ile yapıldı.
       taraf ekranına dokunulmadı.
 - [x] YENİ TABLO / SÜTUN / EDGE FONKSİYON YOK → SQL GEREKMİYOR.
 - [x] Bir kaynak okunamazsa kart düşmüyor; hangi kaynağın okunamadığı kırmızı satırda.
-tsc (tsconfig.app.json) temiz. CANLI TEST YOK.
+- [x] CANLIDA DOĞRULANDI (16.08.2026).
+      · Yeri: kokpit (Aşama 3), Tıkanma kartının yanı. Yeni tablo, edge fonksiyon ve
+        AI çağrısı gerekmedi.
+      · Kira dosyasında 4 seçenek üretti: vade/ödeme takvimi · onarım/eksiğin
+        tamamlanması · gelecekteki iş ilişkisi · üçüncü kişi güvencesi. Her biri kök neden
+        analizi, taraf analizi ya da ortak zemin raporundan alıntıyla dayanaklandırıldı.
+      · Sıralama, tavsiye ve rakam önerisi yok; yalnız arabulucuya görünüyor.
+tsc (tsconfig.app.json) temiz. CANLI TEST: 16.08'de yapıldı (yukarıdaki madde).
 AÇIK UÇ: Dosya TÜRÜ tek başına seçenek tetiklemiyor (kira dosyası olması "onarım"
 seçeneğini açmıyor). Sebep: türden ihtiyaç çıkarmak uydurma olurdu; yalnız kayıtlı ihtiyaç
 metni tetikliyor. Kurucu isterse tür bazlı öneri ayrı karar olur.
