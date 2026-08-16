@@ -382,6 +382,25 @@ DURUM 15.08 ● KODDA (canlı test ve SQL göçü bekliyor) — Tur C-2.
   braket_girildi · ortusme_bulundu · bant_sorusu_gonderildi · taahhut_dustu.
 · Denetim izi Ajan Paneli'ndeki "ne yaptı, ne yapmadı" listesine karışır.
 
+TEKLİF DEĞERLENDİRME (İBA 2.5 / B19)
+DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon ve AI
+çağrısı YOKTUR; hesap ekranda yüklü kayıtlardan deterministik türetilir.
+· Yeri: kokpit (arabulucu paneli) → Kör teklif ve Koşullu aralık bölümlerinin yanında
+  "Teklif değerlendirme".
+· Dört satır: karşılama oranı (rakam + yüzde) · kabul hâlinde alınan/bırakılan ·
+  tarafın kendi alt/üst sınırıyla ilişki (bandın içinde/altında/üstünde) · önceki
+  kayıtla karşılaştırma (talebe olan farkın ne kadar azaldığı/arttığı).
+· Kaynaklar: teklif_braketleri (üst sınır = kayıtlı talep, koşullu taahhüt = teklif) ·
+  blind_bids (üst tutar) · braket_denetim_izi (tutar seyri). Her satırda dayanak yazılır;
+  dayanaksız satır gösterilmez.
+· Sınır: kart hesap yapar, TAVSİYE VERMEZ — "kabul et/etme", rakam önerisi, mahkeme
+  sonucu tahmini, kusur atfı ve hukuki niteleme yoktur. Talep rakamlandırılmamışsa
+  "karşılaştırma yapılamadı" yazılır, tahmin üretilmez.
+· EKSİK VERİ (açık madde): Dosyada rakamlandırılmış TALEP KALEMİ kaydı yoktur; bu yüzden
+  "neyi alıyor / neyi bırakıyor" kalem kalem değil, tek tutar üzerinden hesaplanır.
+· Gizlilik: yalnız arabulucu yüzeyinde çizilir; kullandığı üç tabloda da tarafa SELECT
+  politikası yoktur.
+
 [v0.36 KALICI ŞART — FAZ 3 TÜR TESPİTİ İKİ MENÜDÜR (değişmez)]
 Faz 3 uyuşmazlık tür tespitinde ANA TÜR ve ALT UZMANLIK olmak üzere İKİ menü zorunludur. Alt
 uzmanlık menüsü üç kez sehven silinip geri konmuştur; bir daha kaldırılamaz — düzen değişikliği,

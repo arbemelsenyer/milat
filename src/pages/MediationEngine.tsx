@@ -7517,6 +7517,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     body: <BraketMediatorPanel caseId={caseRow.id} />,
   });
 
+  // Teklif değerlendirme (İBA 2.5) — kör teklif ve braket kartlarının hemen yanında.
+  sectionDefs.push({
+    id: "kokpit-teklif-degerlendirme", layer: LAYER_REPORTS, title: "Teklif değerlendirme",
+    body: <TeklifDegerlendirmePanel caseId={caseRow.id} />,
+  });
+
   const layerOrder = [LAYER_TABLE, LAYER_EVIDENCE, LAYER_COCKPIT, LAYER_REPORTS];
   // Katman başlığının kendi çıpası (sol menüden katman adına tıklanınca oraya kayılır)
   // ve başlığın altındaki tek satır açıklama; aynı açıklama menüde tooltip olur.
@@ -8929,6 +8935,371 @@ function BraketMediatorPanel({ caseId }: { caseId: string }) {
           </ul>
           <p className="text-[11px] text-sidebar-foreground/50">Bu seyir taraflara hiçbir yüzeyden gösterilmez.</p>
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ============ TEKLİF DEĞERLENDİRME (İBA 2.5) — yalnız arabulucu ============
+   Kart HESAP YAPAR, TAVSİYE VERMEZ: "kabul et / etme", rakam önerisi, mahkeme
+   sonucu tahmini, kusur atfı ve hukuki niteleme yoktur (constitution m.2, m.4).
+   Yeni AI çağrısı YOK — her satır dosyadaki kayıtlı rakamlardan deterministik
+   hesaplanır. Kaynaklar: teklif_braketleri (Kabul Aralığım) · blind_bids
+   (Kör Teklif) · braket_denetim_izi (kayıtlı tutarların zaman içindeki seyri).
+   Kör veri (m.1): panel yalnız kokpitte (arabulucu yüzeyi) çizilir; kullandığı
+   üç tabloda da tarafa SELECT politikası yoktur, taraf ekranına hiçbir satırı
+   çıkmaz. Dayanağı olmayan satır GÖSTERİLMEZ; rakam yoksa "rakamlandırılmadı"
+   yazılır, tahmin üretilmez. */
+
+type TeklifKaynak = {
+  anahtar: string;
+  etiket: string;
+  tutar: number;
+  dayanak: string;
+  paraBirimi: string;
+};
+
+function tdSayi(v: any): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+function tdTarih(iso?: string | null): string {
+  if (!iso) return "tarihsiz";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "tarihsiz" : d.toLocaleDateString("tr-TR");
+}
+function tdYuzde(pay: number, payda: number): string {
+  if (!Number.isFinite(payda) || payda === 0) return "—";
+  return `%${(pay / payda * 100).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`;
+}
+
+// Bir tarafın KAYITLI tutar seyri: braket izindeki kayıtlardan, o tarafın teklif
+// tutarı olarak okunabilecek değer (koşullu taahhüt varsa o, yoksa üst sınır).
+function tdTutarSeyri(iz: BraketIzRow[], partyId: string): { zaman: string; tutar: number; alan: string }[] {
+  return [...iz]
+    .filter((r) => r.olay === "braket_girildi" && String(r.party_id) === String(partyId))
+    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+    .map((r) => {
+      const kosullu = tdSayi(r.detay?.kosullu_deger);
+      const ust = tdSayi(r.detay?.ust_sinir);
+      const tutar = kosullu !== null ? kosullu : ust;
+      return tutar === null ? null : { zaman: r.created_at, tutar, alan: kosullu !== null ? "koşullu taahhüt" : "üst sınır" };
+    })
+    .filter(Boolean) as { zaman: string; tutar: number; alan: string }[];
+}
+
+function TeklifDegerlendirmePanel({ caseId }: { caseId: string }) {
+  const [parties, setParties] = useState<any[]>([]);
+  const [braketler, setBraketler] = useState<BraketMediatorRow[]>([]);
+  const [bids, setBids] = useState<BlindBidRow[]>([]);
+  const [iz, setIz] = useState<BraketIzRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [secilenParty, setSecilenParty] = useState<string>("");
+  const [kaynakAnahtar, setKaynakAnahtar] = useState<string>("");
+  const [elleTutar, setElleTutar] = useState<string>("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadErr(null);
+    try {
+      const [p, b, k, d] = await Promise.all([
+        supabase.from("case_parties").select("id, party_role, first_name, last_name, company_name").eq("case_id", caseId).order("created_at"),
+        (supabase.from("teklif_braketleri" as any) as any)
+          .select("id, party_id, alt_sinir, ust_sinir, para_birimi, kosul_bant_alt, kosul_bant_ust, kosullu_deger, kosul_notu, kosul_durumu, updated_at")
+          .eq("case_id", caseId),
+        supabase.from("blind_bids").select("party_id, min_amount, max_amount, currency, note").eq("case_id", caseId),
+        (supabase.from("braket_denetim_izi" as any) as any)
+          .select("id, party_id, olay, detay, created_at")
+          .eq("case_id", caseId).order("created_at", { ascending: false }).limit(80),
+      ]);
+      if (p.error) throw p.error;
+      if (b.error) throw b.error;
+      if (k.error) throw k.error;
+      if (d.error) throw d.error;
+      setParties(Array.isArray(p.data) ? p.data : []);
+      setBraketler(Array.isArray(b.data) ? (b.data as any) : []);
+      setBids(Array.isArray(k.data) ? (k.data as any) : []);
+      setIz(Array.isArray(d.data) ? (d.data as any) : []);
+    } catch (e: any) {
+      console.error("[TeklifDegerlendirmePanel] load failed", e);
+      setLoadErr(e?.message ?? "Bilinmeyen hata");
+    } finally {
+      setLoading(false);
+    }
+  }, [caseId]);
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return (
+    <Card className="p-6 flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" /> Teklif değerlendirme verileri yükleniyor…
+    </Card>
+  );
+  if (loadErr) return (
+    <Card className="p-6 space-y-3">
+      <div className="flex items-center gap-2 text-destructive font-semibold text-sm">
+        <AlertTriangle className="h-4 w-4" /> Teklif değerlendirme verileri yüklenemedi
+      </div>
+      <p className="text-xs text-muted-foreground break-words">{trErr(loadErr)}</p>
+      <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-3 w-3 mr-1" /> Tekrar Dene</Button>
+    </Card>
+  );
+
+  const adlar = new Map<string, string>(parties.map((p, i) => [p.id, blindBidPartyName(p, i)]));
+  const braketByParty = new Map(braketler.map((b) => [b.party_id, b]));
+  const bidByParty = new Map(bids.map((b) => [b.party_id, b]));
+
+  const hedefId = secilenParty || parties[0]?.id || "";
+  const hedef = parties.find((p) => p.id === hedefId) ?? null;
+  const hedefBraket = hedefId ? braketByParty.get(hedefId) ?? null : null;
+  const hedefBid = hedefId ? bidByParty.get(hedefId) ?? null : null;
+
+  // TALEP: tarafın KAYITLI üst tutarı. Kaynak sırası braket → kör teklif.
+  // Rakamlanmış talep kaydı yoksa hesap yapılmaz (tahmin üretilmez).
+  const talepTutar = tdSayi(hedefBraket?.ust_sinir) ?? tdSayi(hedefBid?.max_amount);
+  const talepDayanak = tdSayi(hedefBraket?.ust_sinir) !== null
+    ? `Kabul Aralığım kaydı — üst sınır (${tdTarih(hedefBraket?.updated_at)})`
+    : tdSayi(hedefBid?.max_amount) !== null
+      ? "Kör Teklif kaydı — üst tutar"
+      : null;
+  const paraBirimi = hedefBraket?.para_birimi || hedefBid?.currency || "TRY";
+
+  // TEKLİF adayları: karşı tarafların KAYITLI tutarları + arabulucunun elle girdiği tutar.
+  const kaynaklar: TeklifKaynak[] = [];
+  for (const k of parties) {
+    if (k.id === hedefId) continue;
+    const kb = braketByParty.get(k.id) ?? null;
+    const kbid = bidByParty.get(k.id) ?? null;
+    const ad = adlar.get(k.id) ?? "Karşı taraf";
+    const kosullu = tdSayi(kb?.kosullu_deger);
+    if (kosullu !== null && kb?.kosul_durumu !== "dustu") {
+      kaynaklar.push({
+        anahtar: `kosullu:${k.id}`, etiket: `${ad} — koşullu taahhüt`, tutar: kosullu,
+        dayanak: `${ad}: Kabul Aralığım — koşullu taahhüt tutarı (${tdTarih(kb?.updated_at)}, durum: ${BRAKET_KOSUL_ETIKET[kb?.kosul_durumu ?? "yok"] ?? kb?.kosul_durumu})`,
+        paraBirimi: kb?.para_birimi || paraBirimi,
+      });
+    }
+    const kust = tdSayi(kb?.ust_sinir);
+    if (kust !== null) {
+      kaynaklar.push({
+        anahtar: `ust:${k.id}`, etiket: `${ad} — kayıtlı üst tutar`, tutar: kust,
+        dayanak: `${ad}: Kabul Aralığım — üst sınır (${tdTarih(kb?.updated_at)})`,
+        paraBirimi: kb?.para_birimi || paraBirimi,
+      });
+    }
+    const kmax = tdSayi(kbid?.max_amount);
+    if (kmax !== null) {
+      kaynaklar.push({
+        anahtar: `kor:${k.id}`, etiket: `${ad} — kör teklif üst tutarı`, tutar: kmax,
+        dayanak: `${ad}: Kör Teklif kaydı — üst tutar`,
+        paraBirimi: kbid?.currency || paraBirimi,
+      });
+    }
+  }
+
+  const elleSayi = tdSayi(elleTutar.replace(/\./g, "").replace(/,/g, "."));
+  const seciliAnahtar = kaynakAnahtar || kaynaklar[0]?.anahtar || "elle";
+  const seciliKaynak: TeklifKaynak | null = seciliAnahtar === "elle"
+    ? (elleSayi === null ? null : {
+        anahtar: "elle", etiket: "Elle girilen teklif", tutar: elleSayi,
+        dayanak: "Arabulucunun elle girdiği tutar — dosyada kayıtlı değildir",
+        paraBirimi,
+      })
+    : kaynaklar.find((x) => x.anahtar === seciliAnahtar) ?? null;
+
+  // Teklifi veren tarafın kimliği (seyir hesabı için); elle girişte yoktur.
+  const kaynakPartyId = seciliAnahtar.includes(":") ? seciliAnahtar.split(":")[1] : null;
+  const seyir = kaynakPartyId ? tdTutarSeyri(iz, kaynakPartyId) : [];
+  const sonIki = seyir.slice(-2);
+
+  const satirKutu = "rounded-xl border border-sidebar-border bg-sidebar-accent/20 p-4 space-y-1";
+  const dayanakSatiri = (t: string) => (
+    <p className="text-[11px] text-sidebar-foreground/55 leading-snug">Dayanak: {t}</p>
+  );
+
+  return (
+    <div className="rounded-2xl border border-sidebar-border bg-sidebar text-sidebar-foreground p-6 shadow-elegant space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <EyeOff className="h-4 w-4 text-accent" />
+          <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Teklif Değerlendirme</div>
+        </div>
+        <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-3 w-3 mr-1" /> Yenile</Button>
+      </div>
+      <p className="text-xs text-sidebar-foreground/60 leading-snug">
+        Bu kart yalnız hesap yapar: teklifin kayıtlı talebi ne kadar karşıladığını, kabul hâlinde neyin alınıp
+        neyin bırakıldığını ve kayıtlı tutarların seyrini gösterir. Öneri, tavsiye ve rakam teklifi içermez;
+        taraflara hiçbir yüzeyden gösterilmez.
+      </p>
+
+      {parties.length < 2 ? (
+        <p className="text-xs text-sidebar-foreground/60 italic">Değerlendirme için dosyada en az iki taraf kaydı gerekir.</p>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-[0.14em] text-sidebar-foreground/60">Değerlendirilen taraf</Label>
+              <Select value={hedefId} onValueChange={(v) => { setSecilenParty(v); setKaynakAnahtar(""); }}>
+                <SelectTrigger className="bg-sidebar-accent/30 border-sidebar-border text-sidebar-foreground">
+                  <SelectValue placeholder="Taraf seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  {parties.map((p, i) => (
+                    <SelectItem key={p.id} value={p.id}>{blindBidPartyName(p, i)} ({roleLabel(p.party_role)})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-[0.14em] text-sidebar-foreground/60">Değerlendirilecek teklif</Label>
+              <Select value={seciliAnahtar} onValueChange={setKaynakAnahtar}>
+                <SelectTrigger className="bg-sidebar-accent/30 border-sidebar-border text-sidebar-foreground">
+                  <SelectValue placeholder="Teklif kaynağı" />
+                </SelectTrigger>
+                <SelectContent>
+                  {kaynaklar.map((k) => (
+                    <SelectItem key={k.anahtar} value={k.anahtar}>
+                      {k.etiket} — {formatBidAmount(k.tutar, k.paraBirimi)}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="elle">Elle tutar gir (kayda geçmez)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {seciliAnahtar === "elle" && (
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-[0.14em] text-sidebar-foreground/60">Masada söylenen teklif tutarı</Label>
+              <Input
+                value={elleTutar}
+                onChange={(e) => setElleTutar(e.target.value)}
+                placeholder="ör. 150000"
+                inputMode="decimal"
+                className="bg-sidebar-accent/30 border-sidebar-border text-sidebar-foreground max-w-xs"
+              />
+              <p className="text-[11px] text-sidebar-foreground/50">
+                Bu tutar hiçbir tabloya yazılmaz; sayfa yenilenince kaybolur.
+              </p>
+            </div>
+          )}
+
+          {/* 1) KARŞILAMA ORANI */}
+          {talepTutar === null || talepDayanak === null ? (
+            <div className={satirKutu}>
+              <div className="text-sm font-display font-bold">Karşılama oranı</div>
+              <p className="text-xs text-sidebar-foreground/70">
+                {hedef ? `${adlar.get(hedefId)} için ` : ""}talep rakamlandırılmadığı için karşılaştırma yapılamadı.
+              </p>
+              <p className="text-[11px] text-sidebar-foreground/50">
+                Rakam kaynağı: tarafın Kabul Aralığı (üst sınır) ya da Kör Teklif kaydı (üst tutar).
+              </p>
+            </div>
+          ) : seciliKaynak === null ? (
+            <div className={satirKutu}>
+              <div className="text-sm font-display font-bold">Karşılama oranı</div>
+              <p className="text-xs text-sidebar-foreground/70">
+                Değerlendirilecek teklif tutarı yok — karşı tarafın kayıtlı tutarı bulunmuyor, elle de tutar girilmedi.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className={satirKutu}>
+                <div className="text-sm font-display font-bold">Karşılama oranı</div>
+                <p className="text-sm">
+                  Teklif {formatBidAmount(seciliKaynak.tutar, seciliKaynak.paraBirimi)}; kayıtlı talep{" "}
+                  {formatBidAmount(talepTutar, paraBirimi)}. Karşılama:{" "}
+                  <span className="font-semibold">{tdYuzde(seciliKaynak.tutar, talepTutar)}</span>
+                </p>
+                {dayanakSatiri(`talep → ${talepDayanak} · teklif → ${seciliKaynak.dayanak}`)}
+              </div>
+
+              {/* 2) ALINAN / BIRAKILAN */}
+              <div className={satirKutu}>
+                <div className="text-sm font-display font-bold">Kabul edilirse</div>
+                <ul className="text-xs text-sidebar-foreground/80 space-y-1">
+                  <li>
+                    Alınan: <span className="font-semibold">{formatBidAmount(seciliKaynak.tutar, seciliKaynak.paraBirimi)}</span>{" "}
+                    ({tdYuzde(seciliKaynak.tutar, talepTutar)})
+                  </li>
+                  <li>
+                    Bırakılan:{" "}
+                    <span className="font-semibold">
+                      {formatBidAmount(Math.max(0, talepTutar - seciliKaynak.tutar), paraBirimi)}
+                    </span>{" "}
+                    ({tdYuzde(Math.max(0, talepTutar - seciliKaynak.tutar), talepTutar)})
+                  </li>
+                </ul>
+                {dayanakSatiri(`alınan → ${seciliKaynak.dayanak} · bırakılan → ${talepDayanak} ile teklif tutarının farkı`)}
+                <p className="text-[11px] text-sidebar-foreground/50 leading-snug">
+                  Dosyada rakamlandırılmış TALEP KALEMİ kaydı yok; hesap tek tutar üzerinden yapıldı. Kalem kalem
+                  ayrıştırma için talep kalemlerinin rakamla kaydedilmesi gerekir.
+                </p>
+              </div>
+
+              {/* 3) BRAKET İLİŞKİSİ */}
+              {tdSayi(hedefBraket?.alt_sinir) === null && tdSayi(hedefBraket?.ust_sinir) === null ? (
+                <div className={satirKutu}>
+                  <div className="text-sm font-display font-bold">Kendi alt/üst sınırıyla ilişkisi</div>
+                  <p className="text-xs text-sidebar-foreground/70">
+                    Bu taraf Kabul Aralığı (alt/üst sınır) girmemiş — bant karşılaştırması yapılamadı.
+                  </p>
+                </div>
+              ) : (
+                <div className={satirKutu}>
+                  <div className="text-sm font-display font-bold">Kendi alt/üst sınırıyla ilişkisi</div>
+                  <p className="text-sm">
+                    {(() => {
+                      const alt = tdSayi(hedefBraket?.alt_sinir);
+                      const ust = tdSayi(hedefBraket?.ust_sinir);
+                      const t = seciliKaynak.tutar;
+                      if (alt !== null && t < alt) return `Teklif, alt sınırın ${formatBidAmount(alt - t, paraBirimi)} altında.`;
+                      if (ust !== null && t > ust) return `Teklif, üst sınırın ${formatBidAmount(t - ust, paraBirimi)} üstünde.`;
+                      if (alt !== null && ust !== null) return "Teklif, tarafın kendi bandının içinde.";
+                      if (alt !== null) return `Teklif, alt sınırın (${formatBidAmount(alt, paraBirimi)}) üstünde.`;
+                      return `Teklif, üst sınırın (${formatBidAmount(ust, paraBirimi)}) altında.`;
+                    })()}
+                  </p>
+                  {dayanakSatiri(
+                    `${adlar.get(hedefId)}: Kabul Aralığım — alt ${formatBidAmount(tdSayi(hedefBraket?.alt_sinir), paraBirimi)} / üst ${formatBidAmount(tdSayi(hedefBraket?.ust_sinir), paraBirimi)} (${tdTarih(hedefBraket?.updated_at)})`,
+                  )}
+                </div>
+              )}
+
+              {/* 4) ÖNCEKİ TEKLİFLERLE KARŞILAŞTIRMA */}
+              <div className={satirKutu}>
+                <div className="text-sm font-display font-bold">Önceki tekliflerle karşılaştırma</div>
+                {kaynakPartyId === null ? (
+                  <p className="text-xs text-sidebar-foreground/70">
+                    Elle girilen tutar kayıtlı olmadığı için seyir karşılaştırması yapılamadı.
+                  </p>
+                ) : sonIki.length < 2 ? (
+                  <p className="text-xs text-sidebar-foreground/70">
+                    Karşılaştırılacak önceki kayıt yok — bu tarafın izinde tek tutar kaydı var.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm">
+                      {formatBidAmount(sonIki[0].tutar, paraBirimi)} ({tdTarih(sonIki[0].zaman)}) →{" "}
+                      {formatBidAmount(sonIki[1].tutar, paraBirimi)} ({tdTarih(sonIki[1].zaman)}).{" "}
+                      {(() => {
+                        const oncekiFark = Math.abs(talepTutar - sonIki[0].tutar);
+                        const simdikiFark = Math.abs(talepTutar - sonIki[1].tutar);
+                        if (simdikiFark < oncekiFark) return `Talep ile arasındaki fark ${formatBidAmount(oncekiFark - simdikiFark, paraBirimi)} azaldı (yaklaşma).`;
+                        if (simdikiFark > oncekiFark) return `Talep ile arasındaki fark ${formatBidAmount(simdikiFark - oncekiFark, paraBirimi)} arttı (uzaklaşma).`;
+                        return "Talep ile arasındaki fark değişmedi.";
+                      })()}
+                    </p>
+                    {dayanakSatiri(
+                      `${adlar.get(kaynakPartyId) ?? "karşı taraf"}: braket denetim izi — ${sonIki[0].alan} → ${sonIki[1].alan}; talep kaydı: ${talepDayanak}`,
+                    )}
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </>
       )}
     </div>
   );

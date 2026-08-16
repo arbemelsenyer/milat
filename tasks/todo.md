@@ -1,3 +1,46 @@
+## Nerede kaldık — 16.08.2026 (60) · TEKLİF DEĞERLENDİRME (İBA 2.5 / B19)
+KEŞİF: Bu iş için hazır YAPI VAR ama eksik. Kullanılabilir olanlar: teklif_braketleri
+(taraf başına alt_sinir · ust_sinir · kosul_bant_alt/ust · kosullu_deger · kosul_durumu),
+blind_bids (min_amount · max_amount · currency), braket_denetim_izi (append-only; her
+braket değişikliğinde alt/üst/koşullu tutarı ve zamanı yazıyor — "önceki tekliflerle
+karşılaştırma" bundan çıkıyor) ve arabulucu yüzeyindeki iki mevcut kart
+(BlindBidMediatorPanel · BraketMediatorPanel, kokpitin RAPOR katmanında).
+EKSİK OLAN: dosyada RAKAMLANDIRILMIŞ TALEP KAYDI YOK — ne talep kalemi tablosu var, ne
+de taraf başına talep tutarı sütunu (aranan: talep/demand/claim; case_fees.dispute_value
+ücret hesabı girdisi, taraf talebi değil). negotiation_rounds tablosu duruyor ama HİÇBİR
+ekran ona yazmıyor (kodda tek geçtiği yer dosya silme listesi). Bu yüzden "kayıtlı talep"
+tarafın KENDİ üst tutarından (braket üst sınırı → yoksa kör teklif üst tutarı) okundu ve
+her satırda dayanağı yazıldı.
+- [x] Ekran: kokpit (Aşama 3 — Arabulucu Paneli) > RAPOR katmanı > "Teklif değerlendirme"
+      bölümü, Kör teklif ve Koşullu aralık kartlarının hemen ardında. Sol menüde de
+      kendiliğinden görünür (sectionDefs listesinden türüyor).
+      NOT: Kurucu "Aşama 4" dedi; teklif/braket kartları KOD İÇİNDE Phase4Summary'de ama
+      EKRANDA Aşama 3'tür. "Mevcut teklif/braket kartlarının yanında" tarifine uyuldu.
+- [x] Dört satır, her biri dayanaklı: (1) karşılama oranı — teklif / kayıtlı talep,
+      rakam + yüzde · (2) kabul hâlinde alınan (teklif tutarı) ve bırakılan (talep − teklif),
+      rakam + yüzde · (3) tarafın kendi alt/üst sınırıyla ilişki: bandın içinde / alt
+      sınırın X altında / üst sınırın X üstünde · (4) önceki kayıtla karşılaştırma:
+      izdeki son iki tutar ve talebe olan farkın ne kadar azaldığı (yaklaşma) veya arttığı.
+- [x] Teklif kaynağı seçilebilir: karşı tarafın koşullu taahhüdü · kayıtlı üst tutarı ·
+      kör teklif üst tutarı · "elle tutar gir". Elle girilen tutar HİÇBİR TABLOYA YAZILMAZ
+      ve dayanağında "kayıtlı değildir" yazar; sayfa yenilenince kaybolur.
+- [x] SINIR: kart tavsiye vermiyor — "kabul et/etme", rakam önerisi, mahkeme sonucu
+      tahmini, kusur atfı ve hukuki niteleme yok. Yeni AI çağrısı YOK (hepsi kodda hesap).
+- [x] GİZLİLİK: panel yalnız kokpitte çizilir; kullandığı üç tabloda da tarafa SELECT
+      politikası yok, taraf ekranına (CaseRoom) dokunulmadı.
+- [x] YENİ TABLO / SÜTUN / EDGE FONKSİYON YOK → SQL GEREKMİYOR.
+tsc (tsconfig.app.json) temiz. CANLI TEST YOK.
+AÇIK UÇ (en önemlisi): "Neyi alıyor / neyi bırakıyor" KALEM KALEM değil, tek tutar
+üzerinden hesaplanıyor — çünkü dosyada rakamlandırılmış talep kalemi kaydı yok. Kalem
+ayrımı isteniyorsa taraf başına talep kalemi (başlık + tutar + dayanak) kaydı gerekir;
+bu yeni tablo demektir, açılmadı.
+AÇIK UÇ: "Talep" olarak tarafın kendi üst tutarı okunuyor. Taraf üst sınırını talebinden
+düşük girdiyse karşılama oranı olduğundan yüksek çıkar; dayanak satırı hangi kayıttan
+okunduğunu yazıyor ama bu ayrım kurucu kararı bekliyor.
+AÇIK UÇ: Masada sözlü verilen teklif kayda geçmiyor (elle giriş kalıcı değil). Teklif
+turlarının kaydı istenirse negotiation_rounds tablosu hazır duruyor ama hiçbir ekran
+yazmıyor; ayrı iş.
+
 ## Nerede kaldık — 16.08.2026 (59) · OTURUM KAYIT PROTOKOLÜ (İBA 1.8 / B18)
 KEŞİF: Kayıt onayı için kodda/mimaride hazır uygulama YOK ("kayit_onay · recording_consent
 · oturum_kaydi" araması kodda boş döndü; yalnız yol-haritasi.md'de karar metni var).

@@ -581,3 +581,15 @@ ses kaydı süreç bitiminden 24 saat sonra, döküm süreç sonunda silinir ve 
 yazılır. Yeni tablolar: kayit_onay_talepleri · kayit_onaylari · oturum_kayitlari
 (oturum_kayitlari'nda tarafa SELECT politikası YOK).
 SQL göçü bekliyor: 20260816120000_kayit_protokolu.sql. REDEPLOY GEREKLİ: ajan-nobetci.
+
+16.08 (TEKLİF DEĞERLENDİRME — İBA 2.5 / B19): Kokpite (arabulucu paneli), Kör teklif ve
+Koşullu aralık bölümlerinin yanına "Teklif değerlendirme" kartı eklendi. Arabulucu
+değerlendirilecek tarafı ve teklifi seçer; kart dört satır üretir: karşılama oranı
+(rakam + yüzde), kabul hâlinde alınan/bırakılan, tarafın kendi alt/üst sınırıyla ilişki,
+önceki kayıtla karşılaştırma (talebe olan farkın ne kadar azaldığı/arttığı). Her satırın
+dayanağı yazılır. Yeni tablo, yeni edge fonksiyon ve AI çağrısı YOK — hesap mevcut
+kayıtlardan (teklif_braketleri · blind_bids · braket_denetim_izi) deterministik yapılır.
+Kart tavsiye vermez; talep rakamlandırılmamışsa "karşılaştırma yapılamadı" yazar.
+Dosyada rakamlandırılmış talep KALEMİ kaydı olmadığı için alınan/bırakılan tek tutar
+üzerinden hesaplanıyor (açık madde). SQL gerekmiyor; yalnız Publish.
+
