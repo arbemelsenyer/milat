@@ -1,4 +1,23 @@
+## Nerede kaldık — 16.08.2026 (70) · SIRADAKİ İŞLER
+- [ ] (a) AJAN KONTROL PANELİ — bugün eklenen yeni kolların panele bağlanması +
+      agent_states görünürlük kuralı. SQL hazır, çalıştırılmayı bekliyor.
+- [ ] (b) YENİLE DÜĞMESİ ENVANTERİ — hangi kartta var, hangisinde yok, hepsi aynı
+      görünümde mi; eksik olanlara eklenmesi.
+- [ ] (c) mimari/10-arayuz-katmani.md DÜZELTMESİ — "Faz 4" → Aşama 3 ve braket
+      bölümünün katmanı. (NOT: bu düzeltme 16.08'de commit e842b8d ile yapıldı; belge
+      şimdi Aşama 3 diyor ve braketin yeri kokpitin RAPOR VE BELGELER katmanı olarak
+      yazılı. Kalem, kurucunun listesinde durduğu için kapatılmadı — kontrol edilip
+      işaretlenecek.)
+
 ## Nerede kaldık — 16.08.2026 (69) · İLETİŞİMDE DEĞİŞİM — YZ AYRINTI KOLU
+- [x] CANLIDA DOĞRULANDI (16.08.2026) — Serpil Karahan testinde karma model uçtan uca
+      çalıştı: sayım kolu + Ayrıntısını çıkar düğmesi + alıntı doğrulama + onarım turu
+      (commit 0f77dcc). Kayıt iletisim_degisim tablosuna yazıldı, alıntılar kaynak
+      künyeli.
+AÇIK NOT: sayım kolu "değişim görünmüyor" derken AI paragrafı değişim anlatabiliyor —
+iki kolun hükmü ekranda çelişebiliyor, görünüm düzeltmesi yapılacak.
+AÇIK NOT: ilk metin olarak tarafın tutum beyanı değil en eski belge (ör. onam formu)
+seçilebiliyor; pilotta başvuru beyanı doluyken sorun olmayacak, izlenecek.
 - [x] DÜZELTME 16.08 (canlı bulgu — Serpil Karahan): "Alıntı kaynak metinde bulunamadı"
       çıkıyordu; sebep uydurma alıntı değil, doğrulamanın fazla katı olmasıydı. YALNIZ
       supabase/functions/iletisim-degisim/index.ts değişti: (a) karşılaştırma
