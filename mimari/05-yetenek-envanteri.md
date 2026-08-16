@@ -438,6 +438,27 @@ DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon
 · AÇIK MADDE: Dosya TÜRÜ tek başına seçenek tetiklemez — türden ihtiyaç çıkarmak
   uydurma sayılacağı için yalnız kayıtlı ihtiyaç metinleri kullanılır.
 
+USUL ÖNERİSİ (İBA 2.2 / B14)
+DURUM 16.08 ● KODDA (SQL ve canlı test bekliyor).
+· Yeri: kokpit (Aşama 3) > MASAYA OTURURKEN katmanı > "Usul önerisi", Elverişlilik
+  kontrolünün hemen altında. Kendiliğinden çalışmaz; yalnız arabulucu [Öneri hazırla]
+  düğmesine basınca (ücretli çağrı, maliyet işareti düğmenin altında).
+· KOŞULLAR KODDA çıkarılır ve numaralanır: vekil durumu · taraf niteliği · bildirilen
+  müsait gün-saatler · dosya içi yazışmanın yoğunluğu · cevapsız randevu teklifi ·
+  iptal edilen oturum · reddedilen bant sorusu · uyuşmazlık türü/süreç türü · güç
+  dengesi göstergeleri (kayıt varsa).
+· KONU SINIRI: öneri yalnız sürecin BİÇİMİNE dair olabilir (oturum düzeni ve sırası,
+  süre/zaman, yüz yüze-çevrimiçi, uzman görüşü, vekilsiz tarafa süreç anlatımı).
+  İşin esasına dair öneri (kim haklı, ne teklif edilmeli, rakam) YASAK.
+· SUNUCU ELEMESİ: eksik alan · geçersiz koşul numarası · dayanağı koşul kaydıyla
+  eşleşmeyen · işin esasına giren · biçime bağlanmayan · aynı koşuldan ikinci öneri
+  elenir. EN FAZLA 4 öneri.
+· Her öneri üçlü taşır: oneri · dayanak (dosyadaki koşul) · gerekce. "Karar arabulucuya
+  aittir" cümlesi ekranda BİR KEZ yazılır, her satırda tekrarlanmaz.
+· Kayıt: usul_onerileri tablosu (dosya başına tek satır); tarafa SELECT politikası
+  YOKTUR, öneri tarafa gösterilmez, bildirim gönderilmez.
+· agent_states'e 'usul_onerisi' tipiyle durum yazılır; yazma hatası asıl işi bozmaz.
+
 ELVERİŞLİLİK KONTROLÜ (İBA 2.1 / B13)
 DURUM 16.08 ● KODDA (SQL ve canlı test bekliyor).
 · Yeri: kokpit (Aşama 3) > MASAYA OTURURKEN katmanı > "Elverişlilik kontrolü".

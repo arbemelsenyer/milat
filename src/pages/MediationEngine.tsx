@@ -7167,6 +7167,14 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     body: <ElverislilikPanel caseRow={caseRow} />,
   });
 
+  // Usul önerisi (İBA 2.2) — MASAYA OTURURKEN katmanı, Elverişlilik kontrolünün
+  // hemen ALTINDA. Koşulsuz eklenir; kayıt yoksa "Henüz çalıştırılmadı" görünür.
+  // Yalnız arabulucu yüzeyinde (kokpit); tarafa gitmez, kendiliğinden çalışmaz.
+  sectionDefs.push({
+    id: "kokpit-usul-onerisi", layer: LAYER_TABLE, title: "Usul önerisi",
+    body: <UsulOnerisiPanel caseRow={caseRow} />,
+  });
+
   if (consistencyItems.length > 0) {
     sectionDefs.push({
       id: "kokpit-ic-tutarlilik", layer: LAYER_EVIDENCE, title: "İç tutarlılık",
@@ -10397,6 +10405,109 @@ function ElverislilikPanel({ caseRow }: { caseRow: CaseRow }) {
           {busy
             ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Kontrol ediliyor…</>
             : <><ShieldCheck className="h-4 w-4 mr-1" /> {kayit ? "Yeniden kontrol et" : "Kontrol et"}</>}
+        </Button>
+        <UcretliIsaret />
+      </div>
+    </div>
+  );
+}
+
+/* ====== USUL ÖNERİSİ (İBA 2.2) — yalnız arabulucu =========================
+   Ajan sürecin BİÇİMİNE dair seçenek sunar; karar ve kurgu arabulucunundur.
+   Dayanağı dosya kaydında karşılığı olmayan öneri sunucuda elenir. Düğme ücretli
+   model çağrısı tetikler (maliyet işareti altındadır) ve kendiliğinden çalışmaz. */
+function UsulOnerisiPanel({ caseRow }: { caseRow: CaseRow }) {
+  const [kayit, setKayit] = useState<any | null>(null);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const yukle = useCallback(async () => {
+    setYukleniyor(true);
+    const { data, error } = await (supabase.from("usul_onerileri" as any) as any)
+      .select("durum, oneriler, updated_at").eq("case_id", caseRow.id).maybeSingle();
+    if (error) setHata(`Usul önerisi kaydı okunamadı: ${error.message}`);
+    else setKayit(data ?? null);
+    setYukleniyor(false);
+  }, [caseRow.id]);
+  useEffect(() => { yukle(); }, [yukle]);
+
+  async function hazirla() {
+    setBusy(true);
+    setHata(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("usul-onerisi", {
+        body: { case_id: caseRow.id },
+      });
+      if (error) {
+        // Gerçek sebep .context gövdesindedir; sessizce yutulmaz.
+        let ham = String((error as any)?.message ?? "bilinmeyen hata");
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.text === "function") {
+          try {
+            const govde = await ctx.text();
+            if (govde) {
+              try { const j = JSON.parse(govde); ham = String(j?.error ?? j?.sebep ?? govde); }
+              catch { ham = String(govde).slice(0, 400); }
+            }
+          } catch { /* gövde okunamadı */ }
+        }
+        throw new Error(ham);
+      }
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+      await yukle();
+    } catch (e: any) {
+      console.error("[usul-onerisi] çağrı başarısız", e);
+      setHata(`usul-onerisi çağrısı başarısız: ${trErr(e?.message ?? "bilinmeyen hata")}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const oneriler = Array.isArray(kayit?.oneriler) ? kayit.oneriler : [];
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground leading-snug">
+        Dosyanın koşullarına göre sürecin biçimine dair seçenekler — oturum düzeni, süre ve zaman,
+        yüz yüze/çevrimiçi tercihi, uzman görüşü, vekilsiz tarafa süreç anlatımı. İşin esasına dair
+        öneri üretilmez; dayanağı dosya kaydında karşılığı olmayan öneri gösterilmez.
+      </p>
+
+      {hata && (
+        <div className="text-sm rounded border border-destructive/40 bg-destructive/10 text-destructive p-3">
+          {hata}
+        </div>
+      )}
+
+      {yukleniyor ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Kayıt okunuyor…
+        </div>
+      ) : !kayit ? (
+        <p className="text-sm text-muted-foreground italic">Henüz çalıştırılmadı.</p>
+      ) : oneriler.length === 0 ? (
+        <p className="text-sm">Bu dosya için biçime dair bir öneri çıkmadı.</p>
+      ) : (
+        <>
+          <ul className="space-y-3">
+            {oneriler.map((o: any, i: number) => (
+              <li key={i} className="text-sm border-l-2 border-primary/40 pl-3 space-y-0.5">
+                <div className="font-medium">{safeText(o?.oneri)}</div>
+                <div className="text-xs text-muted-foreground leading-snug">Dayanak: {safeText(o?.dayanak)}</div>
+                <div className="text-xs text-muted-foreground leading-snug">Gerekçe: {safeText(o?.gerekce)}</div>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground">Karar arabulucuya aittir.</p>
+        </>
+      )}
+
+      <div className="space-y-1">
+        <Button size="sm" variant="outline" className={KART_DUGME} onClick={hazirla} disabled={busy}>
+          {busy
+            ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Hazırlanıyor…</>
+            : <><Sparkles className="h-4 w-4 mr-1" /> {kayit ? "Yeniden hazırla" : "Öneri hazırla"}</>}
         </Button>
         <UcretliIsaret />
       </div>

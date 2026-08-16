@@ -707,3 +707,16 @@ sunucuda elenir, hüküm cümlesi taşıyan bulgu da elenir. Dayanak yoksa uyar�
 arabulucuya aittir". Kayıt elverislilik_kontrol tablosunda, tarafa SELECT politikası yok.
 SQL göçü bekliyor: 20260816200000_elverislilik.sql. REDEPLOY GEREKLİ: elverislilik (YENİ).
 
+16.08 (USUL ÖNERİSİ — İBA 2.2 / B14): Kokpitin MASAYA OTURURKEN katmanına, Elverişlilik
+kontrolünün altına "Usul önerisi" bölümü eklendi; yalnız arabulucu [Öneri hazırla]
+düğmesine basınca çalışır (ücretli, maliyet işaretli). Yeni edge fonksiyon usul-onerisi,
+dosyanın koşullarını KODDA çıkarıp numaralar (vekil durumu, taraf niteliği, bildirilen
+müsaitlik, yazışma yoğunluğu, cevapsız randevu teklifi, iptal oturum, reddedilen bant
+sorusu, uyuşmazlık türü, güç dengesi göstergeleri) ve modelden yalnız bu koşullara
+dayanan, sürecin BİÇİMİNE dair öneri ister. Dayanağı koşul kaydıyla eşleşmeyen, işin
+esasına giren veya biçime bağlanmayan öneri sunucuda elenir; en fazla 4 öneri. Her
+öneride oneri + dayanak + gerekçe var; "karar arabulucuya aittir" ekranda bir kez yazıyor.
+Kayıt usul_onerileri tablosunda, tarafa SELECT politikası yok.
+SQL göçü bekliyor: 20260816220000_usul_onerisi.sql (tablo + RLS + agent_states izinli
+listesine 'usul_onerisi' — 22. ad). REDEPLOY GEREKLİ: usul-onerisi (YENİ).
+

@@ -1,3 +1,35 @@
+## Nerede kaldık — 16.08.2026 (76) · USUL ÖNERİSİ (İBA 2.2 / B14)
+- [x] Göç dosyası (ÇALIŞTIRILMADI): supabase/migrations/20260816220000_usul_onerisi.sql —
+      usul_onerileri tablosu (case_id UNIQUE 'usul_onerileri_case_tekil', durum CHECK
+      'usul_onerileri_durum_chk': oneri_var/oneri_yok, oneriler jsonb) + RLS (SELECT yalnız
+      arabulucu/dosya sahibi, admin ALL, TARAFA POLİTİKA YOK) + agent_states izinli
+      listesine 'usul_onerisi' (22. ad; mevcut 21 ad birebir korunarak DROP+ADD).
+- [x] Yeni edge fonksiyon: supabase/functions/usul-onerisi (config.toml verify_jwt=true).
+      · Yetki: arabulucu / dosya sahibi / yönetici; taraf 403.
+      · KOŞULLAR KODDA deterministik çıkarılır ve NUMARALANIR — tablo adları types.ts'ten
+        doğrulandı: case_parties (vekil_ad_soyad · party_type) · taraf_musaitlik
+        (gun/baslangic/bitis) · messages · randevu_teklifleri (durum='beklemede') ·
+        case_sessions (status='cancelled') · braket_bant_sorulari (durum='ret') ·
+        cases (dispute_type/subtype, mediation_type) · guc_dengesi. Tıkanma için ayrı
+        tablo YOK; işaretler bu kayıtlardan sayıldı.
+      · Model yalnız numaralı koşullara dayanabilir; her öneride kosul_no verir.
+      · SUNUCU ELEMESİ: eksik alan · geçersiz koşul numarası · dayanağı koşulun anahtar
+        ifadeleriyle eşleşmeyen · işin esasına giren (rakam/teklif/kusur/haklılık) ·
+        sürecin biçimine bağlanmayan · aynı koşuldan ikinci öneri elenir. EN FAZLA 4.
+      · "Karar arabulucuya aittir" ekranda BİR KEZ; her satırda tekrarlanmıyor.
+- [x] Ekran: kokpit > MASAYA OTURURKEN > "Usul önerisi", Elverişlilik kontrolünün ALTINDA.
+      Kayıt yoksa "Henüz çalıştırılmadı" + [Öneri hazırla]; kayıt varsa öneri · dayanak ·
+      gerekçe listesi + [Yeniden hazırla]; 'oneri_yok' ise "Bu dosya için biçime dair bir
+      öneri çıkmadı". Düğmenin altında maliyet işareti. Yalnız arabulucuya görünür;
+      tarafa gitmez, bildirim yok, kendiliğinden çalışmaz.
+tsc temiz; edge fonksiyon sözdizimi esbuild ile doğrulandı. CANLI TEST YOK.
+SQL GEREKLİ: 20260816220000_usul_onerisi.sql. REDEPLOY GEREKLİ: usul-onerisi (YENİ).
+SIRA: önce SQL (agent_states kısıtı da bu göçte), sonra redeploy/publish.
+AÇIK UÇ: agent_states izinli ad listesi göç dosyasında 22 ad olarak yeniden yazıldı;
+liste depodaki 11 addan + panelde kullanılan orchestrator/party_consistency/
+party_communication'dan + 15.08 ve 16.08'de eklenen adlardan türetildi. Canlıda başka
+bir ad varsa göç onu düşürür — çalıştırmadan önce mevcut kısıt bir kez okunmalı.
+
 ## Nerede kaldık — 16.08.2026 (75) · ELVERİŞLİLİK KONTROLÜ (İBA 2.1 / B13)
 - [x] CANLIDA DOĞRULANDI (16.08.2026) — İBA 2.1. Kokpit "Masaya otururken" katmanında,
       bilgi tabanı dayanaklı elverişlilik kontrolü çalışıyor (commit f6339f1 + bdb0606 +
