@@ -1,3 +1,45 @@
+## Nerede kaldık — 16.08.2026 (59) · OTURUM KAYIT PROTOKOLÜ (İBA 1.8 / B18)
+KEŞİF: Kayıt onayı için kodda/mimaride hazır uygulama YOK ("kayit_onay · recording_consent
+· oturum_kaydi" araması kodda boş döndü; yalnız yol-haritasi.md'de karar metni var).
+Örnek alınan kalıp CANLI: CaseRoom.tsx'teki YZ Beyanı kartı (yz_beyan_onaylari tablosu,
+metin_surumu + party_id ile tek satır onay, hata kartı kapatmıyor). Mimaride konu
+§12.5.9'da (saklama-imha-rıza rejimi) tanımlı ama ORADAKİ SÜRELER FARKLI: ses için
+"azami 7/30 gün", transkript için "5 yıl" yazıyor. 16.08 kurucu kararı bu iki satırı
+daraltıyor (ses 24 saat, döküm süreç sonu) — mimari/12'ye ekleme olarak işlendi.
+- [x] Taraf ekranı (CaseRoom): "Oturum Kaydı Onayı" kartı — YZ Beyanı kalıbı, sekmelerin
+      üstünde. KAPI DEĞİL (rıza hizmetin şartı değildir, m.10). Onay/ret kaydı,
+      "Kararımı değiştir" ile geri alma. Arabulucu onay formunu açmadıysa kart hiç çıkmaz.
+      Karşı tarafın kararı bu ekranda hiçbir yerde görünmez.
+- [x] Arabulucu ekranı (Aşama 4 — Oturumlar): "Kayıt protokolü" kartı — [Onay formunu aç
+      ve süreyi başlat], form açılışı + kalan süre (dakikada bir tazelenir), katılımcı
+      listesi (onay/ret/bekliyor), sayaç rozeti, "Kayıt açılabilir / açılamaz — sebep".
+      Oybirliği: taraf + vekil (case_parties.vekil_ad_soyad) + varsa uzman
+      (case_expert_assignments). Vekil/uzmanın girişi olmadığı için onaylarını arabulucu
+      kaydeder; DAYANAK alanı zorunlu (kayıtsız onay yazılmaz).
+- [x] Nöbetçi ajana silme kolu (kayitSilmeKollari): ses kaydı cases.closed_at + 24 saat
+      sonra (storage'dan da), döküm süreç bitince silinir; silme satıra zaman + notla
+      yazılır, sebepler "yapılmayanlar" listesine düşer. Dönüş özetine iki sayaç:
+      ses_kaydi_silindi · dokum_silindi. closed_at boşsa TAHMİNİ bitiş üretilmez, sebep
+      yazılır.
+- [x] KAYIT ALMA / DÖKÜM YAPILMADI (kurucu kararı: bu tur yalnız izin + silme altyapısı).
+- [x] m.11 SAPMASI (bilerek): Ekran uyarısında dış ürün adları (Otter/Fireflies/Zoom)
+      YAZILMADI; yasak "dış kayıt veya döküm uygulamaları, görüntülü görüşme aracının
+      kendi kayıt özelliği, telefonla ses alma" diye tarif edildi. Sebep: constitution
+      m.11 ürün yüzeyinde dış marka adını yasaklıyor ve constitution komuttan üstün.
+tsc (tsconfig.app.json) temiz; ajan-nobetci esbuild ile sözdizimi doğrulandı.
+CANLI TEST YOK. SQL GEREKLİ: 20260816120000_kayit_protokolu.sql (3 tablo).
+REDEPLOY GEREKLİ: ajan-nobetci. Publish: EVET (iki ekran değişti).
+SIRA ZORUNLU: önce SQL, sonra Publish/redeploy — tablolar yokken kartlar kırmızı hata
+satırı gösterir (kart açılır ama okuma başarısız olur).
+AÇIK UÇ: Onay formu açılınca taraflara E-POSTA GİTMİYOR; form yalnız taraf ekranında
+belirir. "48 saat önce gönderilir" kuralının bildirim ayağı istenirse ayrı iş.
+AÇIK UÇ: Onay değişikliğinin GEÇMİŞİ tutulmuyor — satır güncelleniyor, son karar ve
+zamanı duruyor. Geri alma izi ayrı tablo isterse söylenecek.
+AÇIK UÇ: Kayıt için ses kovası ('oturum-kayitlari') açılmadı; kayıt hattı kurulurken
+açılacak. Silme kolu dosya yolu doluysa kovadan da siler.
+AÇIK UÇ: Talep tek yönlü — formu iptal etme / süreyi yeniden başlatma düğmesi konmadı
+(kapsam dışı tutuldu, istenirse eklenir).
+
 ## Nerede kaldık — 15.08.2026 (58) · USULE İLİŞKİN ENGELLER (İBA 2.4 / B17)
 KEŞİF: Bu iş için mimaride ayrı başlık YOK, kodda yarım kalmış uygulama YOK
 ("vekaletname / usule ilişkin / tebligat / usul_engel" araması mimari ve kodda boş

@@ -1240,6 +1240,83 @@ async function braketKollari(admin: any, dosya: any, taraflar: any[]): Promise<B
   return ozet;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   KAYIT SİLME KOLU (İBA 1.8 / B18 · constitution m.10 süresiz saklama yasağı)
+   · Ses kaydı: süreç bitiminden 24 SAAT sonra kalıcı silinir (dosya + satır).
+   · Döküm: süreç sonuna kadar durur, süreç bitince silinir.
+   Silme AJANIN turunda otomatik yapılır ve kayda yazılır: satırdaki silinme
+   zamanı + silme notu, ayrıca "yapılmayanlar" listesine gerekçe düşer.
+   Kayıt/döküm hattı henüz kurulmadığı için tablo boşsa kol sessizce geçer.
+   ──────────────────────────────────────────────────────────────────────────── */
+const KAYIT_BUCKET = "oturum-kayitlari";
+
+async function kayitSilmeKollari(
+  admin: any, dosya: any,
+): Promise<{ ses_silindi: number; dokum_silindi: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  let sesSilindi = 0;
+  let dokumSilindi = 0;
+
+  const { data: kayitlar, error } = await admin.from("oturum_kayitlari")
+    .select("id, session_id, ses_dosya_yolu, dokum_metni, ses_silindi_at, dokum_silindi_at")
+    .eq("case_id", dosya.id)
+    .or("ses_silindi_at.is.null,dokum_silindi_at.is.null")
+    .limit(50);
+  if (error) {
+    sebepler.push(`kayıt silme kolu çalışmadı: kayıtlar okunamadı — ${error.message}`);
+    return { ses_silindi: 0, dokum_silindi: 0, sebepler };
+  }
+  const bekleyen = (kayitlar ?? []) as any[];
+  if (bekleyen.length === 0) return { ses_silindi: 0, dokum_silindi: 0, sebepler };
+
+  const kapali = dosya?.status === "agreed" || dosya?.status === "failed";
+  if (!kapali) {
+    sebepler.push(`kayıt silinmedi: süreç sürüyor (${bekleyen.length} kayıt bekliyor)`);
+    return { ses_silindi: 0, dokum_silindi: 0, sebepler };
+  }
+  const bitisIso = dosya?.closed_at ?? null;
+  const bitis = bitisIso ? new Date(String(bitisIso)).getTime() : NaN;
+  if (!Number.isFinite(bitis)) {
+    // Tahmini bitiş zamanı ÜRETİLMEZ; silme sayacı başlatılmaz, sebep kayda geçer.
+    sebepler.push("kayıt silinmedi: sürecin bitiş zamanı (closed_at) boş — 24 saat sayacı başlatılamadı");
+    return { ses_silindi: 0, dokum_silindi: 0, sebepler };
+  }
+  const simdi = Date.now();
+  const sesSilmeZamani = bitis + 24 * 3600 * 1000;
+
+  for (const k of bekleyen) {
+    // Döküm: süreç bittiğinde (son tutanakla birlikte) silinir.
+    if (!k.dokum_silindi_at) {
+      const { error: dErr } = await admin.from("oturum_kayitlari").update({
+        dokum_metni: null,
+        dokum_silindi_at: new Date().toISOString(),
+        dokum_silme_notu: `Döküm süreç sonunda silindi (süreç bitişi ${String(bitisIso)}).`,
+      }).eq("id", k.id);
+      if (dErr) sebepler.push(`döküm silinemedi (${k.id}): ${dErr.message}`);
+      else dokumSilindi++;
+    }
+    // Ses: süreç bitiminden 24 saat sonra.
+    if (!k.ses_silindi_at) {
+      if (simdi < sesSilmeZamani) {
+        sebepler.push(`ses kaydı silinmedi (${k.id}): süreç bitiminden 24 saat geçmedi`);
+        continue;
+      }
+      if (k.ses_dosya_yolu) {
+        const { error: sErr } = await admin.storage.from(KAYIT_BUCKET).remove([String(k.ses_dosya_yolu)]);
+        if (sErr) { sebepler.push(`ses dosyası silinemedi (${k.id}): ${sErr.message}`); continue; }
+      }
+      const { error: uErr } = await admin.from("oturum_kayitlari").update({
+        ses_dosya_yolu: null,
+        ses_silindi_at: new Date().toISOString(),
+        ses_silme_notu: `Ses kaydı süreç bitiminden 24 saat sonra kalıcı silindi (süreç bitişi ${String(bitisIso)}).`,
+      }).eq("id", k.id);
+      if (uErr) sebepler.push(`ses silme kaydı yazılamadı (${k.id}): ${uErr.message}`);
+      else sesSilindi++;
+    }
+  }
+  return { ses_silindi: sesSilindi, dokum_silindi: dokumSilindi, sebepler };
+}
+
 // 'ozel_oturum': arabulucunun ekrandan açtığı görev. Ajan YALNIZ o tarafa teklif
 // gönderir; seçeneklere ozel_oturum işareti konur ve randevu-teklif cevabı
 // işlerken oturumu session_type='private' olarak açar. Özel oturumun varlığı,
@@ -1531,7 +1608,7 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const { data: dosyalar, error: cErr } = await admin.from("cases")
-      .select("id, deadline_total, deadline_extended, extension_used, assigned_mediator_id, user_id, application_no, title, issue_description, current_phase, status")
+      .select("id, deadline_total, deadline_extended, extension_used, assigned_mediator_id, user_id, application_no, title, issue_description, current_phase, status, closed_at")
       .eq("otomatik_akis", true)
       .limit(500);
     if (cErr) return json({ error: cErr.message }, 500);
@@ -1568,6 +1645,9 @@ Deno.serve(async (req) => {
     let ortusmeBulundu = 0;
     let bantSorusuGonderildi = 0;
     let taahhutDustu = 0;
+    // Kayıt protokolü (B18) silme sayaçları
+    let sesKaydiSilindi = 0;
+    let dokumSilindi = 0;
     const hatalar: string[] = [];
 
     for (const dosya of (dosyalar ?? []) as any[]) {
@@ -1646,6 +1726,12 @@ Deno.serve(async (req) => {
         bantSorusuGonderildi += braketKol.bant_sorusu_gonderildi;
         taahhutDustu += braketKol.taahhut_dustu;
         braketKol.sebepler.forEach(sebepEkle);
+
+        // ── KAYIT SİLME (İBA 1.8 / B18): ses 24 saat sonra, döküm süreç sonunda ──
+        const silmeKol = await kayitSilmeKollari(admin, dosya);
+        sesKaydiSilindi += silmeKol.ses_silindi;
+        dokumSilindi += silmeKol.dokum_silindi;
+        silmeKol.sebepler.forEach(sebepEkle);
 
         // YALNIZ durum='bekliyor' görevler yürütülür. 'onay_bekliyor' satırları
         // arabulucunundur — ajan bunlara hiçbir koşulda dokunmaz.
@@ -1794,6 +1880,8 @@ Deno.serve(async (req) => {
       ortusme_bulundu: ortusmeBulundu,
       bant_sorusu_gonderildi: bantSorusuGonderildi,
       taahhut_dustu: taahhutDustu,
+      ses_kaydi_silindi: sesKaydiSilindi,
+      dokum_silindi: dokumSilindi,
       atlama_sebepleri: atlamaSebepleri,
       imza_adi: imzaAdi,
       hata: hatalar,

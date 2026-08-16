@@ -244,7 +244,28 @@ bir olay olarak kaydeder: kim, ne zaman, hangi oturum için, hangi metne onay ve
 Kişisel veriler bakımından veri sorumlusu arabulucudur; MediPact veri işleyen konumundadır. Ürün,
 arabulucunun aydınlatma ve rıza yükümlülüklerini yerine getirebileceği yüzeyleri ve kanıtı sağlar;
 yükümlülüğü üstlenmez. Aydınlatma metni ve oturum kaydı rıza ibaresinin hukuki metinleri kurucu
-tarafından yazılacaktır (§12.5.8). 12.6 Bilirkişi rolü ve erişim modeli Neden aytı bir rol: Bilirkişi havuzdan
+tarafından yazılacaktır (§12.5.8).
+
+[EKLEME 16.08.2026 — §12.5.9'a kayıt protokolü (İBA 1.8 / B18, kurucu kararı)]
+● İZİN KATMANI CANLI KOD: kayit_onay_talepleri (onay formu açılışı = 48 saat
+  sayacının başlangıcı) · kayit_onaylari (katılımcı başına onay/ret, oybirliği
+  ölçümü) · oturum_kayitlari (ses/döküm defteri + silme kaydı).
+  Kayıt ALMA ve DÖKÜM hattı bu turda yapılmadı (○ planlı).
+· 48 SAAT: kayıtlı oturum, onay formu açıldıktan 48 saat geçmeden planlanamaz;
+  kalan süre arabulucu ekranında (Aşama 4) görünür.
+· OYBİRLİĞİ: taraf · vekil · varsa uzman ayrı ayrı onaylar; bir ret kapıyı
+  kapatır. Taraf kendi ekranından, vekil ve uzman (girişleri olmadığı için)
+  arabulucu tarafından dayanağı yazılarak kaydedilir. Onay geri alınabilir.
+· TEK KAPI: kayıt yalnız MediPact oturum ekranından alınır; harici araç yasağı
+  hem taraf hem arabulucu ekranında yazılıdır (ürün adı verilmez — m.11).
+· SİLME (bu maddedeki eski süreleri DARALTIR): ses kaydı süreç bitiminden
+  24 saat sonra, döküm süreç sonunda silinir. Silme nöbetçi ajanın turunda
+  otomatik yapılır ve satıra silme zamanı + notuyla yazılır.
+  NOT: Yukarıdaki tabloda ses için "azami 7/30 gün", transkript için "5 yıl"
+  yazıyor; 16.08 kurucu kararı bu iki satırı daraltmıştır. Metin silinmedi,
+  yürürlükteki süre bu eklemedir.
+
+12.6 Bilirkişi rolü ve erişim modeli Neden aytı bir rol: Bilirkişi havuzdan
 seçiliyorsa, raporu da sistemin içinde üretmelidir; aksi hâlde havuz kâğıt üstünde kalır ve rapor,
 arabulucunun dışarıdan elle yüklediği bir eke dönüşür. Bilirkişi bu nedenle arabulucu ve tarafın yanına
 üçüncü kullanıcı tipidir — ama en dar yetkili olanıdır. Rol ve profil expert profiles user id, display name,

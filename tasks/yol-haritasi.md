@@ -568,3 +568,16 @@ gösteren temel belge yok. Her satırın dayanağı yazılır; kanun yorumu yap�
 referansı yalnız kayıtlı legal_basis'ten ve yorumsuz eklenir. Eksik yoksa "usule ilişkin
 engel görünmüyor" yazar. YENİ TABLO, YENİ EDGE FONKSİYON VE YENİ AI ÇAĞRISI YOK —
 hesap ekranda yüklü veriden deterministik türetilir. SQL gerekmiyor; yalnız Publish.
+
+16.08 (OTURUM KAYIT PROTOKOLÜ — İBA 1.8 / B18): Kaydın İZİN ve SİLME altyapısı kuruldu;
+kayıt alma ve döküm bu turda YAPILMADI. Taraf ekranına (CaseRoom) YZ Beyanı kalıbında
+"Oturum Kaydı Onayı" kartı eklendi — kapı değildir, onay vermemek süreci durdurmaz
+(constitution m.10); onay her an geri alınabilir. Arabulucu ekranına (Aşama 4 — Oturumlar)
+"Kayıt protokolü" kartı eklendi: kim onayladı, kim bekliyor, 48 saat doldu mu, kayıt
+açılabilir mi. Oybirliği taraf + vekil + varsa uzman üzerinden ölçülür; vekil ve uzmanın
+girişi olmadığı için onayları arabulucu dayanağını yazarak kaydeder. Tek kapı uyarısı iki
+ekranda da yazılıdır (dış ürün adı verilmeden — m.11). Nöbetçi ajana silme kolu eklendi:
+ses kaydı süreç bitiminden 24 saat sonra, döküm süreç sonunda silinir ve silme satıra
+yazılır. Yeni tablolar: kayit_onay_talepleri · kayit_onaylari · oturum_kayitlari
+(oturum_kayitlari'nda tarafa SELECT politikası YOK).
+SQL göçü bekliyor: 20260816120000_kayit_protokolu.sql. REDEPLOY GEREKLİ: ajan-nobetci.

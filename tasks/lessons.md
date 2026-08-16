@@ -104,3 +104,11 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   hastanın doğum tarihi çizelgenin ilk satırı olarak girdi. Kural: neyin olay
   SAYILMAYACAĞI istemde tek tek sayılır ve sunucuda da elenir; ayrıca tarih biçimi
   tek noktada normalize edilir, modele bırakılmaz. (15.08, olay-cizelgesi)
+- Sütun adı seçerken SQL anahtar kelimelerinden kaçınılır: 'not' sütunu her sorguda
+  tırnak ister ve PostgREST filtre sözdizimiyle karışır. Not/açıklama alanları
+  'dayanak', 'aciklama', 'silme_notu' gibi adlandırılır. (16.08, kayıt protokolü)
+- Kurucunun komutu ile constitution çelişirse constitution kazanır ve sapma RAPOR
+  EDİLİR: kayıt yasağı uyarısında istenen dış ürün adları (m.11 yasağı) yazılmadı,
+  yasak araç adı verilmeden tarif edildi. Sessizce uygulamak da, komutu birebir
+  uygulamak da yanlış olurdu. (16.08, kayıt protokolü)
+

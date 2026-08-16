@@ -687,6 +687,9 @@ export default function CaseRoom() {
   function PartyView() {
     return (
       <>
+      {/* Kayıt onayı: arabulucu onay formunu açtıysa görünür, açmadıysa hiç çıkmaz.
+          Sekmelerin ÜSTÜNDE durur ama kapı değildir — ekranın geri kalanı açık. */}
+      {myParty?.id && <div className="mb-4"><KayitOnayKarti caseId={caseId!} partyId={myParty.id} /></div>}
       <Tabs defaultValue="analysis">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="documents" className={tabTriggerAccentClass}><Upload className="h-4 w-4 mr-1" />Belgelerim</TabsTrigger>
@@ -1202,6 +1205,139 @@ function BraketTarafBolumu({ caseId, partyId }: { caseId: string; partyId: strin
         </Card>
       )}
     </div>
+  );
+}
+
+/* ============ OTURUM KAYDI ONAYI (İBA 1.8 / B18) — taraf ekranı ============
+   Kalıp: yukarıdaki YZ Beyanı kartı. TEK FARK: bu kart KAPI DEĞİLDİR — onay
+   vermemek süreci durdurmaz, yalnız kayıt açılmaz (constitution m.10: rıza
+   hizmetin şartı değildir, her an geri alınabilir).
+   Kör veri (m.1): kart yalnız tarafın KENDİ kararını gösterir; karşı tarafın
+   onay verip vermediği bu ekrana hiçbir yoldan yazılmaz.
+   Kayıt/döküm yalnız arabulucuya görünür; bu ekranda kayıt dinleme/okuma yoktur. */
+const KAYIT_ONAY_SURUMU = "v1";
+const KAYIT_ONAY_SAAT = 48;
+const KAYIT_ONAY_METNI = `Oturumun ses kaydının alınabilmesi için her katılımcının (taraflar, vekiller ve varsa uzman) ayrı ayrı yazılı onayı gerekir. Bir katılımcı bile onay vermezse kayıt alınmaz.
+
+· Kayıt yalnız MediPact oturum ekranından alınır. Harici araçlarla (dış kayıt veya döküm uygulamaları, görüntülü görüşme aracının kendi kayıt özelliği, telefonla ses alma) kayıt yapılamaz.
+· Kayıt ve dökümü yalnız arabulucu görür; karşı tarafa hiçbir ekrandan açılmaz.
+· Ses kaydı, süreç bitiminden 24 saat sonra kalıcı olarak silinir. Döküm süreç sonuna kadar durur ve son tutanakla birlikte silinir.
+· Kayıtlı oturum, bu form gönderildikten en erken 48 saat sonrası için planlanabilir.
+· Onay vermek zorunlu değildir: onay vermemeniz süreci durdurmaz, yalnız kayıt alınmaz. Verdiğiniz onayı istediğiniz zaman geri alabilirsiniz.
+· Kararınız (onay ya da ret) tutanağa işlenmek üzere kayda geçer.`;
+
+function kayitZamanMetni(iso?: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function KayitOnayKarti({ caseId, partyId }: { caseId: string; partyId: string }) {
+  const [talep, setTalep] = useState<any | null>(null);
+  const [karar, setKarar] = useState<any | null>(null);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const [degistir, setDegistir] = useState(false);
+
+  async function yukle() {
+    setHata(null);
+    const { data: t, error: tErr } = await (supabase.from("kayit_onay_talepleri" as any) as any)
+      .select("id, gonderim_zamani, metin_surumu")
+      .eq("case_id", caseId)
+      .is("iptal_zamani", null)
+      .order("gonderim_zamani", { ascending: false })
+      .limit(1);
+    if (tErr) {
+      setHata(`Kayıt onayı durumu okunamadı: ${tErr.message}`);
+      setYukleniyor(false);
+      return;
+    }
+    const talepRow = Array.isArray(t) && t.length > 0 ? t[0] : null;
+    setTalep(talepRow);
+    if (!talepRow) { setKarar(null); setYukleniyor(false); return; }
+    const { data: k, error: kErr } = await (supabase.from("kayit_onaylari" as any) as any)
+      .select("id, durum, karar_zamani")
+      .eq("talep_id", talepRow.id)
+      .eq("katilimci_anahtari", `taraf:${partyId}`)
+      .limit(1);
+    if (kErr) setHata(`Kararınız okunamadı: ${kErr.message}`);
+    else setKarar(Array.isArray(k) && k.length > 0 ? k[0] : null);
+    setYukleniyor(false);
+  }
+
+  useEffect(() => {
+    setYukleniyor(true);
+    yukle();
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [caseId, partyId]);
+
+  async function kararVer(durum: "onay" | "ret") {
+    if (!talep?.id || busy) return;
+    setBusy(true);
+    setHata(null);
+    const { error } = await (supabase.from("kayit_onaylari" as any) as any).upsert({
+      case_id: caseId,
+      talep_id: talep.id,
+      party_id: partyId,
+      katilimci_tipi: "taraf",
+      katilimci_anahtari: `taraf:${partyId}`,
+      durum,
+      karar_zamani: new Date().toISOString(),
+      metin_surumu: KAYIT_ONAY_SURUMU,
+    }, { onConflict: "talep_id,katilimci_anahtari" });
+    if (error) setHata(`Kaydedilemedi: ${error.message}`);
+    else { setDegistir(false); await yukle(); }
+    setBusy(false);
+  }
+
+  // Talep yoksa kart HİÇ çıkmaz: arabulucu onay formunu açmadan taraf ekranında
+  // kayıt konusu gündeme gelmez.
+  if (yukleniyor || (!talep && !hata)) return null;
+
+  const enErken = talep?.gonderim_zamani
+    ? new Date(new Date(talep.gonderim_zamani).getTime() + KAYIT_ONAY_SAAT * 3600 * 1000).toISOString()
+    : null;
+
+  return (
+    <Card className="p-6 space-y-4 border-primary/30">
+      <h2 className="text-lg font-semibold">Oturum Kaydı Onayı</h2>
+      <p className="text-sm whitespace-pre-line leading-relaxed">{KAYIT_ONAY_METNI}</p>
+      {enErken && (
+        <p className="text-xs text-muted-foreground">
+          Onay formu {kayitZamanMetni(talep?.gonderim_zamani)} tarihinde açıldı; kayıtlı oturum en erken{" "}
+          {kayitZamanMetni(enErken)} sonrası için planlanabilir.
+        </p>
+      )}
+      {hata && (
+        <div className="text-sm rounded border border-destructive/40 bg-destructive/10 text-destructive p-3">
+          {hata}
+        </div>
+      )}
+      {karar && !degistir ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge variant={karar.durum === "onay" ? "default" : "outline"}>
+            {karar.durum === "onay" ? "Kayda onay verdiniz" : "Kayda onay vermediniz"}
+          </Badge>
+          <span className="text-xs text-muted-foreground">{kayitZamanMetni(karar.karar_zamani)}</span>
+          <Button variant="ghost" size="sm" onClick={() => setDegistir(true)}>Kararımı değiştir</Button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => kararVer("onay")} disabled={busy || !talep}>
+            {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+            Kayda onay veriyorum
+          </Button>
+          <Button variant="outline" onClick={() => kararVer("ret")} disabled={busy || !talep}>
+            Onay vermiyorum
+          </Button>
+          {degistir && (
+            <Button variant="ghost" onClick={() => setDegistir(false)} disabled={busy}>Vazgeç</Button>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 

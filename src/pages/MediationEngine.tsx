@@ -1273,7 +1273,7 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance, 
         : <BlindBidPartyForm caseId={caseRow.id} userId={userId} />}
       <NextPhaseButton phase={phase} onAdvance={onAdvance} />
     </>;
-    case 4: return <><Phase5Sessions caseRow={caseRow} bumpPhase={bumpPhase} onAdvance={onAdvance} randevuTetik={randevuTetik} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 4: return <><Phase5Sessions caseRow={caseRow} bumpPhase={bumpPhase} onAdvance={onAdvance} randevuTetik={randevuTetik} isMediator={isMediator} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 5: return <><Phase7Expert caseRow={caseRow} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 6: return <><Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(7); onAdvance(7); }} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 7: return <Phase9Closing caseRow={caseRow} reload={reload} />;
@@ -1724,9 +1724,12 @@ function RandevuTeklifKarti({ caseRow, parties, tetik }: {
 
 // SessionScheduler needs case_parties for invite selection/presence — not lifted into
 // MediationEngine state elsewhere, so fetch it here the same way Phase2Parties does.
-function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik }: {
+function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik, isMediator = false }: {
   caseRow: CaseRow; bumpPhase: (n: number) => Promise<void>; onAdvance: (n: number) => void;
   randevuTetik?: { nonce: number } | null;
+  // Kayıt protokolü kartı YALNIZ arabulucuya çizilir (kör veri: katılımcıların
+  // onay/ret durumu tarafa hiçbir yüzeyden gösterilmez).
+  isMediator?: boolean;
 }) {
   const [parties, setParties] = useState<any[]>([]);
   const [sessions, setSessions] = useState<{ scheduled_at: string | null; status: string }[]>([]);
@@ -1795,6 +1798,11 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik }: {
       <motion.div variants={itemVariants}>
         <RandevuTeklifKarti caseRow={caseRow} parties={parties} tetik={randevuTetik} />
       </motion.div>
+      {isMediator && (
+        <motion.div variants={itemVariants}>
+          <KayitProtokoluKarti caseRow={caseRow} />
+        </motion.div>
+      )}
       <motion.div variants={itemVariants}>
         <SessionScheduler
           caseId={caseRow.id}
@@ -1806,6 +1814,284 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik }: {
       </motion.div>
     </motion.div>
     </div>
+  );
+}
+
+/* ============ KAYIT PROTOKOLÜ (İBA 1.8 / B18) — yalnız arabulucu ============
+   Bu kart kayıt ALMAZ; yalnız iznin durumunu gösterir (kayıt/döküm hattı ayrı
+   iştir). Dört kural ekranda birebir uygulanır:
+   · 48 SAAT: onay formu açıldıktan 48 saat geçmeden kayıt açılamaz.
+   · OYBİRLİĞİ: her katılımcı (taraf · vekil · varsa uzman) ayrı ayrı onaylar;
+     bir kişi bile onay vermezse kapı açılmaz. Onay ve retler kayda geçer.
+   · TEK KAPI: harici araçla kayıt yasağı ekranda yazılı durur.
+   · SİLME: ses 24 saat sonra, döküm süreç sonunda silinir (nöbetçi ajanın işi).
+   Vekil ve uzmanın uygulamada girişi olmadığı için onayları arabulucu ELLE
+   kaydeder; dayanağı (nasıl alındığı) zorunlu alandır — kayıtsız onay yazılmaz.
+   Not (constitution m.11): ekran metninde dış ürün adı kullanılmaz; yasak,
+   araç adı verilmeden tarif edilir. */
+const KAYIT_ONAY_SAAT = 48;
+const KAYIT_ONAY_SURUMU = "v1";
+const KAYIT_TEK_KAPI_UYARISI =
+  "Kayıt yalnız MediPact oturum ekranından alınır. Harici araçlarla (dış kayıt veya döküm " +
+  "uygulamaları, görüntülü görüşme aracının kendi kayıt özelliği, telefonla ses alma) kayıt yapılamaz.";
+
+type KayitKatilimci = {
+  anahtar: string;
+  tip: "taraf" | "vekil" | "uzman";
+  ad: string;
+  partyId: string | null;
+  elle: boolean; // true: girişi olmadığı için onayını arabulucu kaydeder
+};
+
+function kayitZaman(iso?: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function kalanSureMetni(hedefMs: number, simdiMs: number): string {
+  const fark = hedefMs - simdiMs;
+  if (fark <= 0) return "48 saat doldu";
+  const saat = Math.floor(fark / 3600000);
+  const dakika = Math.floor((fark % 3600000) / 60000);
+  return `Kalan süre: ${saat} saat ${dakika} dakika`;
+}
+
+function KayitProtokoluKarti({ caseRow }: { caseRow: CaseRow }) {
+  const [talep, setTalep] = useState<any | null>(null);
+  const [onaylar, setOnaylar] = useState<any[]>([]);
+  const [katilimcilar, setKatilimcilar] = useState<KayitKatilimci[]>([]);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [hata, setHata] = useState<string | null>(null);
+  const [dayanak, setDayanak] = useState("");
+  const [simdi, setSimdi] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setSimdi(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
+
+  async function yukle() {
+    setHata(null);
+    const [t, p, e] = await Promise.all([
+      (supabase.from("kayit_onay_talepleri" as any) as any)
+        .select("id, gonderim_zamani, metin_surumu")
+        .eq("case_id", caseRow.id).is("iptal_zamani", null)
+        .order("gonderim_zamani", { ascending: false }).limit(1),
+      supabase.from("case_parties")
+        .select("id, party_type, first_name, last_name, company_name, full_name, vekil_ad_soyad, party_role")
+        .eq("case_id", caseRow.id),
+      supabase.from("case_expert_assignments")
+        .select("id, status, experts:expert_id(full_name)")
+        .eq("case_id", caseRow.id),
+    ]);
+
+    if (t.error) { setHata(`Kayıt onay durumu okunamadı: ${t.error.message}`); setYukleniyor(false); return; }
+    const talepRow = Array.isArray(t.data) && t.data.length > 0 ? t.data[0] : null;
+    setTalep(talepRow);
+
+    const liste: KayitKatilimci[] = [];
+    for (const taraf of ((p.data ?? []) as any[])) {
+      liste.push({
+        anahtar: `taraf:${taraf.id}`, tip: "taraf", partyId: taraf.id, elle: false,
+        ad: `${partyDisplay(taraf)} (${roleLabel(taraf.party_role)})`,
+      });
+      const vekil = String(taraf.vekil_ad_soyad ?? "").trim();
+      if (vekil) {
+        liste.push({
+          anahtar: `vekil:${taraf.id}`, tip: "vekil", partyId: taraf.id, elle: true,
+          ad: `${vekil} — ${partyDisplay(taraf)} vekili`,
+        });
+      }
+    }
+    for (const atama of ((e.data ?? []) as any[])) {
+      if (["rejected", "cancelled", "removed"].includes(String(atama.status ?? ""))) continue;
+      const ad = (atama as any).experts?.full_name ?? "Dosyaya atanmış uzman";
+      liste.push({ anahtar: `uzman:${atama.id}`, tip: "uzman", partyId: null, elle: true, ad: `${ad} — uzman` });
+    }
+    if (p.error) setHata(`Taraflar okunamadı: ${p.error.message}`);
+    setKatilimcilar(liste);
+
+    if (talepRow) {
+      const { data: k, error: kErr } = await (supabase.from("kayit_onaylari" as any) as any)
+        .select("id, katilimci_anahtari, katilimci_tipi, durum, karar_zamani, dayanak")
+        .eq("talep_id", talepRow.id);
+      if (kErr) setHata(`Onaylar okunamadı: ${kErr.message}`);
+      else setOnaylar((k ?? []) as any[]);
+    } else {
+      setOnaylar([]);
+    }
+    setYukleniyor(false);
+  }
+
+  useEffect(() => {
+    setYukleniyor(true);
+    yukle();
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [caseRow.id]);
+
+  async function formuAc() {
+    if (busy) return;
+    setBusy("form");
+    setHata(null);
+    const { error } = await (supabase.from("kayit_onay_talepleri" as any) as any).insert({
+      case_id: caseRow.id,
+      gonderim_zamani: new Date().toISOString(),
+      metin_surumu: KAYIT_ONAY_SURUMU,
+    });
+    if (error) setHata(`Onay formu açılamadı: ${error.message}`);
+    else { toast({ title: "Onay formu açıldı", description: "48 saatlik süre başladı." }); await yukle(); }
+    setBusy(null);
+  }
+
+  async function elleKaydet(k: KayitKatilimci, durum: "onay" | "ret") {
+    if (!talep?.id || busy) return;
+    if (dayanak.trim().length < 3) { setHata("Önce yazılı onayın dayanağını yazın (ör. imzalı form, e-posta)."); return; }
+    setBusy(k.anahtar);
+    setHata(null);
+    const { error } = await (supabase.from("kayit_onaylari" as any) as any).upsert({
+      case_id: caseRow.id,
+      talep_id: talep.id,
+      party_id: k.partyId,
+      katilimci_tipi: k.tip,
+      katilimci_anahtari: k.anahtar,
+      katilimci_adi: k.ad,
+      durum,
+      karar_zamani: new Date().toISOString(),
+      metin_surumu: KAYIT_ONAY_SURUMU,
+      dayanak: dayanak.trim(),
+    }, { onConflict: "talep_id,katilimci_anahtari" });
+    if (error) setHata(`Kaydedilemedi: ${error.message}`);
+    else await yukle();
+    setBusy(null);
+  }
+
+  const kararMap = new Map<string, any>(onaylar.map((o) => [o.katilimci_anahtari, o]));
+  const onayVeren = katilimcilar.filter((k) => kararMap.get(k.anahtar)?.durum === "onay").length;
+  const retVeren = katilimcilar.filter((k) => kararMap.get(k.anahtar)?.durum === "ret").length;
+  const bekleyen = katilimcilar.length - onayVeren - retVeren;
+  const hedefMs = talep?.gonderim_zamani
+    ? new Date(talep.gonderim_zamani).getTime() + KAYIT_ONAY_SAAT * 3600000
+    : null;
+  const sureDoldu = hedefMs !== null && simdi >= hedefMs;
+  const acilabilir = !!talep && sureDoldu && katilimcilar.length > 0 && onayVeren === katilimcilar.length;
+  const engeller: string[] = [];
+  if (!talep) engeller.push("onay formu henüz açılmadı");
+  if (talep && !sureDoldu) engeller.push("48 saatlik süre dolmadı");
+  if (katilimcilar.length === 0) engeller.push("dosyada katılımcı kaydı yok");
+  if (retVeren > 0) engeller.push(`${retVeren} katılımcı onay vermedi`);
+  if (bekleyen > 0) engeller.push(`${bekleyen} katılımcı henüz cevap vermedi`);
+
+  return (
+    <Card className="p-6 space-y-4" id="faz4-kayit-protokolu">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h3 className="font-semibold">Kayıt protokolü</h3>
+          <p className="text-xs text-muted-foreground">
+            Oturum kaydı ancak tüm katılımcıların yazılı onayıyla ve onay formunun açılmasından 48 saat sonrası için planlanabilir.
+          </p>
+        </div>
+        {talep && (
+          <Badge variant="outline">
+            {onayVeren} onay · {retVeren} ret · {bekleyen} bekliyor
+          </Badge>
+        )}
+      </div>
+
+      <div className="text-xs rounded border bg-muted/40 p-3">{KAYIT_TEK_KAPI_UYARISI}</div>
+
+      {hata && (
+        <div className="text-sm rounded border border-destructive/40 bg-destructive/10 text-destructive p-3">{hata}</div>
+      )}
+
+      {yukleniyor ? (
+        <Loader2 className="h-5 w-5 animate-spin" />
+      ) : !talep ? (
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            Onay formu açılmadı. Form açıldığında taraf ekranında kayıt onay kartı görünür ve 48 saatlik süre başlar.
+          </p>
+          <Button onClick={formuAc} disabled={busy === "form"}>
+            {busy === "form" ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+            Onay formunu aç ve süreyi başlat
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="text-sm">
+            <span className="text-muted-foreground">Form açılışı:</span> {kayitZaman(talep.gonderim_zamani)} ·{" "}
+            <span className={sureDoldu ? "text-emerald-600" : "text-amber-600"}>
+              {kalanSureMetni(hedefMs ?? 0, simdi)}
+            </span>
+          </div>
+
+          <div className="divide-y rounded border">
+            {katilimcilar.length === 0 ? (
+              <p className="text-sm text-muted-foreground p-3">Dosyada kayıtlı katılımcı yok.</p>
+            ) : katilimcilar.map((k) => {
+              const karar = kararMap.get(k.anahtar);
+              return (
+                <div key={k.anahtar} className="flex items-center justify-between gap-3 p-3 flex-wrap">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">{k.ad}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {karar
+                        ? `${karar.durum === "onay" ? "Onay verdi" : "Onay vermedi"} · ${kayitZaman(karar.karar_zamani)}${karar.dayanak ? ` · ${karar.dayanak}` : ""}`
+                        : k.elle ? "Bekliyor — onayı arabulucu kaydeder" : "Bekliyor — kendi ekranından cevaplayacak"}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {karar?.durum === "onay" ? (
+                      <Badge className="gap-1"><CheckCircle2 className="h-3 w-3" /> Onay</Badge>
+                    ) : karar?.durum === "ret" ? (
+                      <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" /> Ret</Badge>
+                    ) : (
+                      <Badge variant="outline" className="gap-1"><Circle className="h-3 w-3" /> Bekliyor</Badge>
+                    )}
+                    {k.elle && (
+                      <>
+                        <Button size="sm" variant="outline" disabled={busy === k.anahtar} onClick={() => elleKaydet(k, "onay")}>
+                          Onay geldi
+                        </Button>
+                        <Button size="sm" variant="ghost" disabled={busy === k.anahtar} onClick={() => elleKaydet(k, "ret")}>
+                          Onay yok
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {katilimcilar.some((k) => k.elle) && (
+            <div className="space-y-1">
+              <Label className="text-xs">Elle kaydedilen onayın dayanağı (zorunlu)</Label>
+              <Input
+                value={dayanak}
+                onChange={(ev) => setDayanak(ev.target.value)}
+                placeholder="ör. 12.08 tarihli imzalı onay formu / e-posta"
+              />
+              <p className="text-xs text-muted-foreground">
+                Vekil ve uzmanın uygulamada girişi olmadığı için onayları buradan kaydedilir; dayanak tutanağa geçer.
+              </p>
+            </div>
+          )}
+
+          <div className={`text-sm rounded border p-3 ${acilabilir ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
+            {acilabilir
+              ? "Kayıt açılabilir: tüm katılımcılar onay verdi ve 48 saatlik süre doldu."
+              : `Kayıt açılamaz — ${engeller.join(" · ")}.`}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Kayıt alma ve döküm hattı ayrı iştir; bu ekranda yalnız izin durumu tutulur. Ses kaydı süreç bitiminden
+            24 saat sonra, döküm süreç sonunda nöbetçi ajanın turunda kalıcı olarak silinir.
+          </p>
+        </div>
+      )}
+    </Card>
   );
 }
 
