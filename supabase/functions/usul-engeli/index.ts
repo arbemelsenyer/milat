@@ -59,29 +59,24 @@ async function durumYaz(admin: any, caseId: string, patch: Record<string, unknow
    Madde numarası yakalanamazsa yalnız kaynak adı ve alıntı yazılır — numara ASLA
    tahmin edilmez. Kaynakta karşılık yoksa referans boş kalır, eksik satırı yine
    gösterilir. Bu bölüm model çağırmaz; kol ücretsiz kalır. */
-/* 16.08 DÜZELTME (canlı bulgu): atıf kaynağı olarak eğitim modülü kullanılmıştı
-   ("Uzman Arabuluculuk - Sağlık"). Artık referans YALNIZ MEVZUAT metninden alınır:
-   iki temel kaynak + adında "sayılı" geçen ve "Kanun"/"Yönetmelik" ile künyelenen
-   diğer mevzuat kayıtları. Uzmanlık/eğitim modülleri (Uzman Arabuluculuk - … ·
-   Aile Arabuluculuğu · ADB Yayını · Modül) atıf kaynağı DEĞİLDİR. */
+/* 16.08 DÜZELTME (canlı bulgu): atıf kaynağı olarak önce eğitim modülü
+   ("Uzman Arabuluculuk - Sağlık"), sonra alakasız kanunlar (İmar, Bankacılık)
+   kullanılmıştı. Kaynak listesi artık TAM AD ile YALNIZ bu ikisidir; genişletilmez. */
 const TEMEL_KAYNAKLAR = [
   "6325 Sayılı Hukuk Uyuşmazlıklarında Arabuluculuk Kanunu",
   "Hukuk Uyuşmazlıklarında Arabuluculuk Kanunu Yönetmeliği",
 ];
 
-const EGITIM_KAYNAK_ISARETLERI = [
-  "uzman arabuluculuk", "aile arabuluculuğu", "adb yayını", "adb yayini",
-  "modül", "modul", "eğitim", "egitim", "rehber", "el kitabı", "el kitabi",
-];
-
+/* 16.08 DARALTMA (canlı bulgu): süzgeç "adında sayılı + Kanunu geçen her kaynak"
+   olacak kadar genişti; tebligat eksikliğine 3194 sayılı İmar Kanunu, temsil
+   yetkisine 5411 sayılı Bankacılık Kanunu'ndan alakasız atıf geldi.
+   Atıf kaynağı yalnız arabuluculuk mevzuatıdır (6325 ve yönetmeliği); başka
+   kanunlara genişletilmez — 16.08'de İmar/Bankacılık Kanunu'ndan alakasız atıf
+   geldiği için daraltıldı. Bu iki kaynakta karşılık yoksa referans BOŞ kalır. */
 function mevzuatKaynagiMi(baslik: string): boolean {
   const ad = temiz(baslik);
   if (!ad) return false;
-  if (TEMEL_KAYNAKLAR.includes(ad)) return true;
-  const k = ad.toLocaleLowerCase("tr-TR");
-  if (EGITIM_KAYNAK_ISARETLERI.some((x) => k.includes(x))) return false;
-  const kanunMu = k.includes("kanun") || k.includes("yönetmel") || k.includes("yonetmel");
-  return k.includes("sayılı") || k.includes("sayili") ? kanunMu : false;
+  return TEMEL_KAYNAKLAR.includes(ad);
 }
 
 // Kavram aramaları — madde numarası DEĞİL, ifade aranır. Sıra önemlidir: ilk
@@ -174,8 +169,11 @@ function maddeBasligi(metin: string, indeks: number, alinti: string): string {
 // Kavram aramasıyla referans üretir. Bulunamazsa BOŞ döner.
 async function referansBul(admin: any, ifadeler: string[]): Promise<string> {
   for (const ifade of ifadeler) {
+    // Süzgeç SORGU DÜZEYİNDE de uygulanır: aksi hâlde 20 kayıtlık pencere alakasız
+    // kanunlarla dolup arabuluculuk mevzuatındaki parça hiç görünmeyebiliyordu.
     const { data, error } = await admin.from("knowledge_base_chunks")
       .select("source_title, chunk_text")
+      .in("source_title", TEMEL_KAYNAKLAR)
       .ilike("chunk_text", `%${ifade}%`)
       .limit(20);
     if (error) {
@@ -183,7 +181,7 @@ async function referansBul(admin: any, ifadeler: string[]): Promise<string> {
       continue;
     }
     for (const r of ((data ?? []) as any[])) {
-      // 1) Kaynak süzgeci: yalnız mevzuat. Eğitim/uzmanlık modülü atıf kaynağı değil.
+      // 1) Kaynak süzgeci (ikinci kapı): yalnız 6325 ve yönetmeliği.
       if (!mevzuatKaynagiMi(r.source_title)) continue;
       // 2) Parça ÖNCE onarılır; kırık kalırsa bu parça kullanılmaz.
       const metin = metniOnar(String(r.chunk_text ?? ""));
