@@ -1,4 +1,16 @@
 ## Nerede kaldık — 16.08.2026 (76) · USUL ÖNERİSİ (İBA 2.2 / B14)
+- [x] CANLIDA DOĞRULANDI (16.08.2026) — İBA 2.2. Kokpit "Masaya otururken" katmanında,
+      Elverişlilik kontrolünün altında çalışıyor (commit 2cbe289). Kurallar: öneri YALNIZ
+      sürecin biçimine dair (oturum düzeni, süre-zaman, yüz yüze/çevrimiçi, uzman görüşü,
+      vekilsiz tarafa süreç anlatımı); esasa dair öneri yasak · her öneri dayanak (dosya
+      kaydından somut veri) + gerekçe taşır, dayanağı doğrulanamayan öneri sunucuda
+      elenir · en fazla 4 öneri · "karar arabulucuya aittir" bir kez gösterilir · yalnız
+      arabulucuya görünür, ücretli düğme maliyet işaretli. Serpil testi: üç öneri
+      (vekilsiz taraf için başlangıç oturumu · güç dengesi göstergeleri nedeniyle özel
+      oturum · sağlık uyuşmazlığında uzman görüşü), üçü de gerçek dosya verisine dayalı.
+AÇIK NOT: usul önerisi gerekçelerinde duyguya yaklaşan ifade çıkabiliyor (test çıktısında
+"endişelerini paylaşabilmeleri"). Taraf etiketi değil, genel cümle — şimdilik kabul
+edildi; benzeri artarsa gerekçe dili de sıkılaştırılacak.
 - [x] Göç dosyası (ÇALIŞTIRILMADI): supabase/migrations/20260816220000_usul_onerisi.sql —
       usul_onerileri tablosu (case_id UNIQUE 'usul_onerileri_case_tekil', durum CHECK
       'usul_onerileri_durum_chk': oneri_var/oneri_yok, oneriler jsonb) + RLS (SELECT yalnız
@@ -23,7 +35,8 @@
       öneri çıkmadı". Düğmenin altında maliyet işareti. Yalnız arabulucuya görünür;
       tarafa gitmez, bildirim yok, kendiliğinden çalışmaz.
 tsc temiz; edge fonksiyon sözdizimi esbuild ile doğrulandı. CANLI TEST YOK.
-SQL GEREKLİ: 20260816220000_usul_onerisi.sql. REDEPLOY GEREKLİ: usul-onerisi (YENİ).
+SQL: 20260816220000_usul_onerisi.sql — 16.08'de ÇALIŞTIRILDI. REDEPLOY: usul-onerisi
+(YENİ) — 16.08'de yapıldı.
 SIRA: önce SQL (agent_states kısıtı da bu göçte), sonra redeploy/publish.
 AÇIK UÇ: agent_states izinli ad listesi göç dosyasında 22 ad olarak yeniden yazıldı;
 liste depodaki 11 addan + panelde kullanılan orchestrator/party_consistency/

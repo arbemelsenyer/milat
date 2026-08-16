@@ -75,6 +75,11 @@ ile doğrulanır.
   arabulucu/dosya sahibi, admin ALL, TARAFA POLİTİKA YOK.
 - 16.08: agent_states_agent_type_check kısıtı yeniden genişletildi — izinli listeye
   'elverislilik' eklendi (toplam 21 ad; mevcut adlar korundu).
+- 16.08: usul_onerileri tablosu kuruldu (case_id UNIQUE, durum CHECK
+  'oneri_var'/'oneri_yok', oneriler jsonb) + RLS açık; SELECT yalnız arabulucu/dosya
+  sahibi, admin ALL, TARAFA POLİTİKA YOK.
+- 16.08: agent_states_agent_type_check kısıtı genişletildi — izinli listeye
+  'usul_onerisi' eklendi (toplam 22 ad; mevcut adlar korundu).
 - (daha önce kurulanlar buraya eklenecek: mediator_reads_offers,
   mediator_writes_discovery, mediator_updates_discovery, ajan_gorevleri politikaları,
   taraf_musaitlik RLS)
