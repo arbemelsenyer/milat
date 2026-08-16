@@ -108,28 +108,54 @@ function hukumDili(metin: string): string | null {
 }
 
 /* ── BİLGİ TABANI KAYNAKLARI ────────────────────────────────────────────────
-   Temel kaynaklar her dosyada; uzmanlık modülü yalnız uyuşmazlık türü eşleşirse
-   eklenir. Eşleşme yoksa yalnız kanun ve yönetmelik kullanılır. */
-const TEMEL_KAYNAKLAR = ["%Arabuluculuk Kanunu%", "%Yönetmelik%"];
-
-const MODUL_ESLESME: { anahtarlar: string[]; kalip: string }[] = [
-  { anahtarlar: ["aile", "bosanma", "boşanma", "nafaka", "velayet"], kalip: "%Aile Arabuluculuğu%" },
-  { anahtarlar: ["is", "iş", "isci", "işçi", "kidem", "kıdem", "ihbar", "employment"], kalip: "%Uzman Arabuluculuk - İş%" },
-  { anahtarlar: ["saglik", "sağlık", "malpraktis", "hasta", "tibbi", "tıbbi"], kalip: "%Uzman Arabuluculuk - Sağlık%" },
-  { anahtarlar: ["tuketici", "tüketici"], kalip: "%Uzman Arabuluculuk - Tüketici%" },
-  { anahtarlar: ["ticari", "ticaret", "sirket", "şirket"], kalip: "%Ticaret%" },
-  { anahtarlar: ["sigorta"], kalip: "%Sigorta%" },
-  { anahtarlar: ["banka", "finans", "kredi"], kalip: "%Banka%" },
-  { anahtarlar: ["insaat", "inşaat", "yapi", "yapı", "kentsel"], kalip: "%İnşaat%" },
-  { anahtarlar: ["enerji", "maden"], kalip: "%Enerji%" },
-  { anahtarlar: ["fikri", "telif", "marka", "patent"], kalip: "%Fikri%" },
+   16.08 SIKILAŞTIRMA (canlı bulgu): kaynaklar BULANIK kalıpla ("%Yönetmelik%")
+   çekilince taranan listeye alakasız yönetmelikler (ör. Sınai Mülkiyet) karışıyordu.
+   Artık kaynak adları TAM AD ile seçilir; ada uymayan hiçbir kayıt isteme girmez.
+   Temel kaynaklar her dosyada; EK kaynaklar yalnız uyuşmazlık türü eşleşirse. */
+const TEMEL_KAYNAKLAR = [
+  "6325 Sayılı Hukuk Uyuşmazlıklarında Arabuluculuk Kanunu",
+  "Hukuk Uyuşmazlıklarında Arabuluculuk Kanunu Yönetmeliği",
 ];
 
-// Elverişlilik başlığıyla ilgili parçaları öne çeken anahtar ifadeler.
+const MODUL_ESLESME: { anahtarlar: string[]; baslik: string[] }[] = [
+  { anahtarlar: ["aile", "bosanma", "boşanma", "nafaka", "velayet"], baslik: ["Aile Arabuluculuğu"] },
+  { anahtarlar: ["is", "iş", "isci", "işçi", "kidem", "kıdem", "ihbar", "employment"], baslik: ["Uzman Arabuluculuk - İş"] },
+  { anahtarlar: ["saglik", "sağlık", "malpraktis", "hasta", "tibbi", "tıbbi"], baslik: ["Uzman Arabuluculuk - Sağlık"] },
+  {
+    anahtarlar: ["tuketici", "tüketici"],
+    baslik: ["6502 sayılı Tüketicinin Korunması Hakkında Kanun", "Uzman Arabuluculuk - Tüketici"],
+  },
+  {
+    anahtarlar: ["ticari", "ticaret", "sirket", "şirket"],
+    baslik: ["6102 sayılı Türk Ticaret Kanunu (Başlangıç ve Ticari İşletme)", "Uzman Arabuluculuk - Ticaret"],
+  },
+  { anahtarlar: ["sigorta"], baslik: ["Uzman Arabuluculuk - Sigorta Hukuku"] },
+  { anahtarlar: ["banka", "finans", "kredi"], baslik: ["Uzman Arabuluculuk - Banka ve Finans"] },
+  { anahtarlar: ["insaat", "inşaat", "yapi", "yapı", "kentsel"], baslik: ["Uzman Arabuluculuk - İnşaat"] },
+  { anahtarlar: ["enerji", "maden"], baslik: ["Uzman Arabuluculuk - Enerji ve Maden"] },
+  { anahtarlar: ["fikri", "telif", "marka", "patent"], baslik: ["Uzman Arabuluculuk - Fikri Mülkiyet"] },
+];
+
+// Elverişlilik başlığıyla ilgili parçalar + tür ölçütü (tacir/ticari iş/tüketici
+// işlemi) parçaları. Tür ölçütü ifadeleri 16.08'de eklendi: dosyanın türü
+// tartışmalıysa model ölçütü KANUN METNİNDEN okusun diye.
 const KONU_ANAHTARLARI = [
   "elverişli", "tasarruf", "kamu düzeni", "dava şartı", "aile içi şiddet",
   "cebir", "tehdit", "kamu düzenini", "iradi", "zorunlu arabuluculuk",
+  "tacir", "ticari iş", "ticari dava", "tüketici işlemi", "tüketici sayılır",
 ];
+
+// Künye: iç sıra numarası ("parça 0") EKRANA YAZILMAZ. Madde numarası
+// tespit edilebiliyorsa yazılır, edilemiyorsa yalnız kaynak adı kalır.
+function maddeKunyesi(maddeBolum: string, kaynakMetni: string): string {
+  const m1 = maddeBolum.match(/madde\s*\d+(\/\d+)?/i);
+  if (m1) return m1[0].toLocaleUpperCase("tr-TR");
+  const m2 = maddeBolum.match(/\bm\.\s*\d+(\/\d+)?/i);
+  if (m2) return m2[0];
+  const m3 = kaynakMetni.match(/MADDE\s*\d+/i);
+  if (m3) return m3[0].toLocaleUpperCase("tr-TR");
+  return "";
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -189,35 +215,44 @@ Deno.serve(async (req) => {
       .map((x, i) => `[TARAF BEYANI ${i + 1}]\n${x.slice(0, MAX_BEYAN)}`)
       .join("\n\n");
 
+    // 16.08: Belge özetleri de DOSYA METNİNE girer — uyarıyı tetikleyen somut
+    // ifade (dosya_isareti) bu metinde aranır; bulunamazsa bulgu elenir.
+    const { data: ozetler } = await admin.from("belge_ozetleri")
+      .select("ozet, kaniti, durum").eq("case_id", case_id).limit(30);
+    const ozetBlogu = ((ozetler ?? []) as any[])
+      .filter((o) => temiz(o.durum) === "uretildi")
+      .map((o, i) => `[BELGE ÖZETİ ${i + 1}] ${temiz(o.ozet)} ${temiz(o.kaniti)}`.trim())
+      .join("\n");
+
     const turMetni = [temiz((caseRow as any).dispute_type), temiz((caseRow as any).dispute_subtype)]
       .filter(Boolean).join(" ").toLocaleLowerCase("tr-TR");
 
-    // ── KAYNAK SEÇİMİ: kanun + yönetmelik + (varsa) uzmanlık modülü ─────────
-    const kalipler = [...TEMEL_KAYNAKLAR];
+    // ── KAYNAK SEÇİMİ: TAM AD ile kanun + yönetmelik + (varsa) tür kaynakları ──
+    const kaynakAdlari = [...TEMEL_KAYNAKLAR];
     const modul = MODUL_ESLESME.find((m) => m.anahtarlar.some((a) => turMetni.includes(a)));
-    if (modul) kalipler.push(modul.kalip);
+    if (modul) kaynakAdlari.push(...modul.baslik);
 
     type Parca = { no: number; kaynak: string; bolum: string; metin: string };
     const parcalar: Parca[] = [];
-    for (const kalip of kalipler) {
+    for (const ad of kaynakAdlari) {
       const { data: satirlar, error: kErr } = await admin.from("knowledge_base_chunks")
         .select("source_title, chunk_index, chunk_text, metadata")
-        .ilike("source_title", kalip)
+        .eq("source_title", ad)
         .or(KONU_ANAHTARLARI.map((a) => `chunk_text.ilike.%${a}%`).join(","))
         .limit(6);
       if (kErr) {
-        console.error(`[elverislilik] bilgi tabanı okunamadı (${kalip}): ${kErr.message}`);
+        console.error(`[elverislilik] bilgi tabanı okunamadı (${ad}): ${kErr.message}`);
         continue;
       }
       for (const r of ((satirlar ?? []) as any[])) {
         if (parcalar.length >= MAX_PARCA) break;
         const metin = temiz(r.chunk_text);
         if (metin.length < 80) continue;
-        const sayfa = (r.metadata as any)?.page ?? (r.metadata as any)?.madde ?? null;
+        const madde = maddeKunyesi("", metin);
         parcalar.push({
           no: parcalar.length + 1,
           kaynak: temiz(r.source_title) || "Bilgi tabanı kaydı",
-          bolum: sayfa ? `bölüm/sayfa ${sayfa}` : `parça ${r.chunk_index}`,
+          bolum: madde,   // boş olabilir; boşsa künyede yalnız kaynak adı yazılır
           metin: metin.slice(0, MAX_PARCA_METIN),
         });
       }
@@ -229,7 +264,7 @@ Deno.serve(async (req) => {
     if (parcalar.length === 0) {
       const bos = {
         case_id, durum: "kaynak_yok", bulgular: [],
-        kaynaklar: kalipler.join(" · "),
+        kaynaklar: kaynakAdlari.join(" · "),
         updated_at: new Date().toISOString(),
       };
       const { error: bErr } = await admin.from("elverislilik_kontrol")
@@ -248,27 +283,36 @@ MUTLAK KAYNAK KURALI: Yalnız sana verilen KAYNAK METİNLERE dayan. Kendi hukuk 
 
 MUTLAK DİL KURALI: Hüküm kurma. "Elverişli değildir", "yapılamaz", "geçersizdir" gibi cümleler YASAK. Kalıbın şudur: "... bakımından değerlendirme gerekebilir; karar arabulucuya aittir."
 
+DOSYA İŞARETİ ŞARTI (en önemli kural): Bir başlık için uyarı ancak DOSYA metninde o başlığa işaret eden SOMUT bir ifade varsa üretilir. "Dosyada buna dair işaret yok ama değerlendirilebilir", "bilgi bulunmamakla birlikte" tarzı bulgu ÜRETME — işaret yoksa o başlığı hiç yazma.
+
+TÜR ÖLÇÜTÜ: Dosyanın türü (tüketici/ticari) tartışmalıysa veya dosyadaki taraflar bu ayrımı etkiliyorsa, verilen KANUN METİNLERİNDEKİ ölçütleri uygula: ticari iş/tacir ölçütleri TTK metninden, tüketici işlemi tanımı 6502 metninden. Ölçütü uygularken hangi kanun cümlesine dayandığını kaynak_alinti olarak, dosyadaki hangi olguya uyguladığını dosya_isareti olarak ver. İlgili kanun metni verilmemişse bu değerlendirmeyi HİÇ yapma.
+
 Her işaret için:
 · baslik: kısa başlık (en çok 8 kelime).
 · neden: neden dikkat gerektiği — OLGU dili, tek cümle, dosyadaki hangi bilgiyle bağlantılı olduğunu söyler ve yukarıdaki kalıpla biter.
+· dosya_isareti: DOSYA metninden (konu, taraf beyanı, belge özeti) BİREBİR kopyalanmış en çok bir cümle — uyarıyı tetikleyen somut ifade. Tek karakterini değiştirme.
 · kaynak_adi: hangi KAYNAK METİNDEN geldiği (metnin başındaki kaynak adı, aynen).
-· madde_bolum: kaynak metinde belirtilen madde/bölüm bilgisi (verilen etiketten aynen).
-· alinti: o kaynak metinden BİREBİR kopyalanmış en çok bir cümle. Tek karakterini değiştirme.
+· madde_bolum: kaynak metinde geçen madde numarası (ör. "MADDE 1"). Yoksa boş bırak; sıra numarası uydurma.
+· kaynak_alinti: o kaynak metinden BİREBİR kopyalanmış en çok bir cümle. Tek karakterini değiştirme.
 
 Dikkat gerektiren bir işaret yoksa: {"bulgular":[]} döndür. Zorlama üretme.
 
-Çıktı YALNIZCA JSON: {"bulgular":[{"baslik":"","neden":"","kaynak_adi":"","madde_bolum":"","alinti":""}]}`;
+Çıktı YALNIZCA JSON: {"bulgular":[{"baslik":"","neden":"","dosya_isareti":"","kaynak_adi":"","madde_bolum":"","kaynak_alinti":""}]}`;
 
     const kaynakBlogu = parcalar
       .map((p) => `[KAYNAK ${p.no} — ${p.kaynak} · ${p.bolum}]\n${p.metin}`)
       .join("\n\n");
 
-    const userPrompt = `[DOSYA]\nBaşlık: ${temiz((caseRow as any).title) || "—"}\n`
+    // Dosya metni tek blokta: dosya_isareti alıntısı BU metinde aranacak.
+    const dosyaBlogu = `[DOSYA]\nBaşlık: ${temiz((caseRow as any).title) || "—"}\n`
       + `Uyuşmazlık konusu: ${temiz((caseRow as any).issue_description) || "—"}\n`
       + `Uyuşmazlık türü: ${temiz((caseRow as any).dispute_type) || "—"}`
       + `${temiz((caseRow as any).dispute_subtype) ? ` / ${temiz((caseRow as any).dispute_subtype)}` : ""}\n`
       + `Süreç türü: ${temiz((caseRow as any).mediation_type) || "—"}\n\n`
-      + `${beyanlar || "[TARAF BEYANI YOK]"}\n\n${kaynakBlogu}`;
+      + `${beyanlar || "[TARAF BEYANI YOK]"}\n\n`
+      + `${ozetBlogu || "[BELGE ÖZETİ YOK]"}`;
+
+    const userPrompt = `${dosyaBlogu}\n\n${kaynakBlogu}`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -304,10 +348,12 @@ Dikkat gerektiren bir işaret yoksa: {"bulgular":[]} döndür. Zorlama üretme.
       const neden = temiz(b?.neden);
       const kaynakAdi = temiz(b?.kaynak_adi);
       const maddeBolum = temiz(b?.madde_bolum);
-      const alinti = temiz(b?.alinti);
+      // Geriye dönük uyum: eski alan adı 'alinti' de kabul edilir.
+      const kaynakAlinti = temiz(b?.kaynak_alinti) || temiz(b?.alinti);
+      const dosyaIsareti = temiz(b?.dosya_isareti);
 
-      if (!baslik || neden.length < 20 || !alinti || !kaynakAdi) {
-        elenen.push(`${baslik || "başlıksız"}: eksik alan (dayanaksız bulgu yazılmaz)`);
+      if (!baslik || neden.length < 20 || !kaynakAlinti || !kaynakAdi || !dosyaIsareti) {
+        elenen.push(`${baslik || "başlıksız"}: eksik alan (dosya işareti ve kaynak alıntısı zorunlu)`);
         continue;
       }
       const hukum = hukumDili(`${baslik} ${neden}`);
@@ -315,18 +361,31 @@ Dikkat gerektiren bir işaret yoksa: {"bulgular":[]} döndür. Zorlama üretme.
         elenen.push(`${baslik}: hüküm cümlesi ("${hukum}")`);
         continue;
       }
-      // Alıntı, kaynak parçalarının HERHANGİ BİRİNDE geçmeli.
-      const eslesen = parcalar.find((p) => alintiKaynaktaVar(alinti, p.metin));
-      if (!eslesen) {
-        elenen.push(`${baslik}: alıntı kaynak metinde bulunamadı`);
+      // 16.08 SIKILAŞTIRMA: uyarıyı tetikleyen ifade DOSYA metninde gerçekten
+      // geçmeli. "Dosyada işaret yok ama değerlendirilebilir" tarzı içeriksiz
+      // uyarılar bu kapıdan geçemez.
+      if (!alintiKaynaktaVar(dosyaIsareti, dosyaBlogu)) {
+        elenen.push(`${baslik}: dosya işareti dosya metninde bulunamadı`);
         continue;
       }
+      // Kaynak alıntısı, kaynak parçalarının HERHANGİ BİRİNDE geçmeli.
+      const eslesen = parcalar.find((p) => alintiKaynaktaVar(kaynakAlinti, p.metin));
+      if (!eslesen) {
+        elenen.push(`${baslik}: kaynak alıntısı kaynak metinde bulunamadı`);
+        continue;
+      }
+      // Künye: madde tespit edilebiliyorsa yazılır; edilemiyorsa alan BOŞ kalır
+      // (iç sıra numarası "parça 0" ekrana yazılmaz).
+      const madde = maddeKunyesi(maddeBolum, eslesen.metin);
       bulgular.push({
         baslik: baslik.slice(0, 160),
         neden: neden.slice(0, 600),
+        dosya_isareti: dosyaIsareti.slice(0, 300),
         kaynak_adi: eslesen.kaynak,
-        madde_bolum: maddeBolum ? maddeBolum.slice(0, 120) : eslesen.bolum,
-        alinti: alinti.slice(0, 300),
+        madde_bolum: madde,
+        kaynak_alinti: kaynakAlinti.slice(0, 300),
+        // Ekranın eski alan adıyla da çalışması için aynı değer 'alinti'de de durur.
+        alinti: kaynakAlinti.slice(0, 300),
       });
     }
 
