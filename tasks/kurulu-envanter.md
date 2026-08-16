@@ -70,6 +70,11 @@ ile doğrulanır.
   UPDATE/INSERT politikalarına DOKUNULMADI.
 - 16.08: 20260816160000_iletisim_degisim.sql elle çalıştırıldı (iletisim_degisim tablosu
   + RLS; tarafa SELECT politikası yok).
+- 16.08: elverislilik_kontrol tablosu kuruldu (case_id UNIQUE, durum CHECK
+  'isaret_var'/'isaret_yok'/'kaynak_yok', bulgular jsonb) + RLS açık; SELECT yalnız
+  arabulucu/dosya sahibi, admin ALL, TARAFA POLİTİKA YOK.
+- 16.08: agent_states_agent_type_check kısıtı yeniden genişletildi — izinli listeye
+  'elverislilik' eklendi (toplam 21 ad; mevcut adlar korundu).
 - (daha önce kurulanlar buraya eklenecek: mediator_reads_offers,
   mediator_writes_discovery, mediator_updates_discovery, ajan_gorevleri politikaları,
   taraf_musaitlik RLS)

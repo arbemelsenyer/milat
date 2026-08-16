@@ -1,4 +1,14 @@
 ## Nerede kaldık — 16.08.2026 (75) · ELVERİŞLİLİK KONTROLÜ (İBA 2.1 / B13)
+- [x] CANLIDA DOĞRULANDI (16.08.2026) — İBA 2.1. Kokpit "Masaya otururken" katmanında,
+      bilgi tabanı dayanaklı elverişlilik kontrolü çalışıyor (commit f6339f1 + bdb0606 +
+      52de9ae). Kurallar: kaynak YALNIZ bilgi tabanı (6325 + yönetmelik + türe göre
+      kanun/uzmanlık modülü, tam ad eşleşmesi) · her bulguda dosya işareti (dosya
+      metninden birebir alıntı) + kaynak alıntısı, ikisi de sunucuda doğrulanır,
+      bulunamazsa elenir · KONU SINIRI: yalnız elverişlilik ve tür/rejim tespiti, esasa
+      ilişkin bulgu (kusur, onam, ispat) yasak ve sunucuda elenir · en fazla 3 bulgu ·
+      madde numaralı künye · hüküm dili yok, "karar arabulucuya aittir" · yalnız
+      arabulucuya görünür, ücretli düğme maliyet işaretli. Serpil testi: tek bulgu,
+      tüketici rejimi tespiti — konu dışı gürültü yok.
 - [x] Göç dosyası (ÇALIŞTIRILMADI): supabase/migrations/20260816200000_elverislilik.sql —
       elverislilik_kontrol tablosu (case_id UNIQUE 'elverislilik_case_tekil', durum CHECK
       'elverislilik_durum_chk': isaret_var/isaret_yok/kaynak_yok, bulgular jsonb) + RLS.
@@ -25,7 +35,8 @@
       işareti. Yalnız arabulucu yüzeyinde; tarafa gitmez, bildirim/e-posta yok.
       Dosya açılışında KENDİLİĞİNDEN ÇALIŞMAZ.
 tsc temiz; edge fonksiyon sözdizimi esbuild ile doğrulandı. CANLI TEST YOK.
-SQL GEREKLİ: 20260816200000_elverislilik.sql. REDEPLOY GEREKLİ: elverislilik (YENİ).
+SQL: 20260816200000_elverislilik.sql — 16.08'de ÇALIŞTIRILDI. REDEPLOY: elverislilik
+(YENİ) — 16.08'de yapıldı.
 SIRA: önce SQL, sonra redeploy/publish.
 AÇIK UÇ: Kaynak seçimi source_title kalıbıyla yapılıyor (ör. '%Aile Arabuluculuğu%').
 Bilgi tabanındaki kaynak adları farklıysa modül eşleşmez ve yalnız kanun+yönetmelik
