@@ -9887,25 +9887,25 @@ function SecenekSepetiPanel({ caseRow }: { caseRow: CaseRow }) {
 type DegisimMetni = { tarih: string; etiket: string; metin: string };
 type DegisimIsareti = { baslik: string; yon: string; dayanak1: string; dayanak2: string };
 
-const DEGISIM_AILELERI: { anahtar: string; ad: string; ifadeler: string[] }[] = [
+const DEGISIM_AILELERI: { anahtar: string; ifadeler: string[] }[] = [
   {
-    anahtar: "talep", ad: "kesin talep dili",
+    anahtar: "talep",
     ifadeler: ["talep ediyorum", "talep etmekteyim", "talep ederim", "derhal", "aksi hâlde",
       "aksi halde", "dava aç", "icra", "ihtar", "kabul etmiyorum", "son kez", "hukuki yollara",
       "tazminat talep", "gereğini"],
   },
   {
-    anahtar: "cozum", ad: "çözüm dili",
+    anahtar: "cozum",
     ifadeler: ["uzlaş", "anlaş", "görüşelim", "çözüm", "orta yol", "esnek", "karşılıklı",
       "müzakere", "birlikte", "makul bir çözüm", "mutabık"],
   },
   {
-    anahtar: "kosul", ad: "koşullu ifade",
+    anahtar: "kosul",
     ifadeler: ["şartıyla", "koşuluyla", "şu şartla", "kabul edilmesi hâlinde",
       "kabul edilmesi halinde", "olması hâlinde", "olması halinde", "karşılığında"],
   },
   {
-    anahtar: "geri", ad: "geri çekilme ifadesi",
+    anahtar: "geri",
     ifadeler: ["vazgeç", "geri çek", "talebimden", "artık istemiyorum", "feragat"],
   },
 ];

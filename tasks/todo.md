@@ -13,6 +13,11 @@
       yalnız arabulucu görüyor (kokpit zaten mediator-only).
 - [x] RAPOR katmanındaki eski kayıt kaldırıldı; kalıntı yok. Yeni tablo/edge fonksiyon/AI
       çağrısı yok → SQL gerekmiyor.
+- [x] AŞAMA 2 KALINTI DENETİMİ (16.08): bileşen çağrısı YOK · FAZ3_LAYERS ve
+      FAZ3_MENU_ENTRIES'te satır YOK (altı katman aynen: dosya özeti · olay çizelgesi ·
+      güç dengesi · usule ilişkin engeller · taraflar · belgeler) · sayaç YOK · eslint'te
+      kullanılmayan import/değişken uyarısı YOK. Tek ölü parça, ölçüm dizisindeki hiç
+      okunmayan 'ad' alanıydı; kaldırıldı.
 tsc (tsconfig.app.json) temiz. CANLI TEST YOK.
 NOT: Kartın sol dizindeki numarası (3.3 gibi) DAYANAK katmanında o an görünen bölüm
 sayısına göre hesaplanır; iç tutarlılık ya da rapora girmeyenler bölümü yoksa numara
