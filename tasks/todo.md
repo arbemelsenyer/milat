@@ -1,3 +1,36 @@
+## Nerede kaldık — 16.08.2026 GÜN SONU (81)
+
+16.08.2026 GÜN SONU — Bugün 13 kalem canlıya alındı ve doğrulandı: belge yükleme izni ·
+iletişimde değişim (karma model + alıntı onarımı + çelişki düzeltmesi) · ajan kontrol
+paneli ve ajan görünürlüğünün taraflara kapatılması · düğme envanteri ve 7 ücretli
+düğmeye maliyet işareti · mimari belge düzeltmesi · YZ ne yapar-ne yapmaz sayfası ·
+Verilerim sayfası · elverişlilik kontrolü · usul önerisi · KOLLARIN NÖBETÇİYE
+BAĞLANMASI (yedi kol otomatik koşuyor) · usule ilişkin engel listesi ve mevzuat
+atıfları · makbuz mükerrerliğinin geri alınması · oturum hazırlık föyü 1. tur. Ürün
+artık arabulucu düğmeye basmadan yedi analizi kendi başına yapıp kokpiti dolduruyor.
+
+### Oturum hazırlık föyü — durum
+1. TUR CANLIDA (16.08.2026, commit 23224d9 + e609cad + b7718b6) — İBA 3.1. Taraf-özel
+föy taslağı üretiliyor, kokpit RAPOR VE BELGELER katmanında arabulucu onayına düşüyor.
+TARAFA HENÜZ HİÇBİR ŞEY GİTMİYOR. Kurallar: yalnız o tarafın kendi verisi kullanılır ·
+hukuki tavsiye, tahmin, niteleme yok · hesap sorma yönlü soru yasak · ham veri ve taraf
+adı etiketi elenir · onaylanmış föyün üzerine ajan yazamaz. Bölümler: gündem · eksik
+belge · oturum bilgileri.
+KARAR (16.08): SORU BÖLÜMÜ KAPATILDI — model üç turda da dava/delil mantığına kaydı
+("hangi kanıtlara sahipsiniz", "neden teslim edilmedi"). Serbest soru üretimi yerine
+kurucunun yazacağı SABİT SORU HAVUZU kurulacak; ajan yalnız havuzdan seçecek. Kurucu
+bunun için DOJO adlı uygulamayı inceleyecek.
+2. TUR (bekliyor): onaylanan föyün e-postayla gönderilmesi + taraf ekranında "Oturum
+hazırlığım" bölümü.
+
+### Açık kalemler (16.08 gün sonu)
+- AÇIK: 24 saatlik oturum hatırlatma e-postası tamamen İngilizce ve mediator_requests
+  tablosunu okuyor (case_sessions değil) — muhtemelen hiç ateşlenmiyor. İncelenecek.
+- AÇIK: case_sessions.prep_notes_generated ve party_analyses.prep_notes kolonları
+  hiçbir kod tarafından yazılmıyor/okunmuyor — ölü alanlar, karar verilecek.
+- AÇIK: tarafın ekranında oturum/tarih gösteren hiçbir yüzey yok; taraf kendi oturum
+  tarihini yalnız e-postadan öğreniyor. Föy 2. turunda ele alınacak.
+
 ## Nerede kaldık — 16.08.2026 (80) · OTURUM HAZIRLIK FÖYÜ — 1. TUR (İBA 3.1 / C23)
 - [x] DÜZELTME 2 · 16.08 (canlı bulgu — Anadolu Sağlık Hizmetleri föyü): ilk eleme
       "karşı tarafın kusurunu araştıran soru" için kurulmuştu; bu kez sorular TARAFIN
