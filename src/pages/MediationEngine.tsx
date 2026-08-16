@@ -10197,7 +10197,14 @@ function IletisimDegisimPanel({ caseRow }: { caseRow: CaseRow }) {
           {satirlar.map((s) => (
             <div key={s.partyId} className="rounded-xl border border-sidebar-border bg-sidebar-accent/20 p-4 space-y-2">
               <div className="text-sm font-display font-bold">{s.ad}</div>
-              {s.farkliGun < 2 ? (
+              {/* 16.08 DÜZELTME: Bu tarafta durum='hazir' ayrıntı kaydı varsa SAYIM
+                  KOLUNUN HÜKÜM CÜMLESİ gizlenir — "Belirgin bir değişim görünmüyor."
+                  ile yapay zekâ paragrafı aynı anda ekranda durunca kart kendi kendiyle
+                  çelişiyordu. Hesap, eşikler ve düğmeler DEĞİŞMEDİ; yalnız bu cümlelerin
+                  görünme koşulu değişti. Kayıt yoksa ya da durumu 'degisim_yok'/'elendi'
+                  ise görünüm bugünküyle aynı kalır. */}
+              {ayrintilar[s.partyId]?.durum === "hazir" && ayrintilar[s.partyId]?.paragraf ? null
+              : s.farkliGun < 2 ? (
                 <p className="text-xs text-sidebar-foreground/70">
                   Karşılaştırılacak yeterli tarihli metin yok — {s.metinSayisi} metin, {s.farkliGun} ayrı gün
                   (en az iki farklı tarihli metin gerekir).
@@ -10222,8 +10229,9 @@ function IletisimDegisimPanel({ caseRow }: { caseRow: CaseRow }) {
               {s.farkliGun >= 2 && (() => {
                 const ay = ayrintilar[s.partyId];
                 const bekliyor = ayrintiBusy === s.partyId;
+                const hazir = ay?.durum === "hazir" && !!ay?.paragraf;
                 return (
-                  <div className="border-t border-sidebar-border/60 pt-2 space-y-1">
+                  <div className={hazir ? "space-y-1" : "border-t border-sidebar-border/60 pt-2 space-y-1"}>
                     {ay?.durum === "hazir" && ay?.paragraf ? (
                       <>
                         <div className="text-xs leading-snug">{ay.paragraf}</div>
