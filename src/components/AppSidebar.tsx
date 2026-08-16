@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, FolderOpen, Archive, Calendar, Shield, Workflow, BarChart3, Info } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Archive, Calendar, Shield, Workflow, BarChart3, Info, FileLock2 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -134,6 +134,19 @@ export function AppSidebar() {
                   <NavLink to="/yapay-zeka" className="flex items-center gap-2">
                     <Info className="h-4 w-4 shrink-0" />
                     {!collapsed && <span>Yapay zekâ ne yapar</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {/* Verilerim — mevcut öğelerin ARDINA eklendi, hiçbirinin yeri değişmedi. */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/verilerim")}
+                  className="border-l-2 border-l-transparent transition-colors hover:border-l-accent hover:text-accent data-[active=true]:border-l-accent"
+                >
+                  <NavLink to="/verilerim" className="flex items-center gap-2">
+                    <FileLock2 className="h-4 w-4 shrink-0" />
+                    {!collapsed && <span>Verilerim</span>}
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

@@ -32,6 +32,7 @@ import CaseRedirect from "./pages/CaseRedirect";
 import RandevuCevap from "./pages/RandevuCevap";
 import KatilimCevap from "./pages/KatilimCevap";
 import YapayZekaBeyani from "./pages/YapayZekaBeyani";
+import Verilerim from "./pages/Verilerim";
 import AppLayout from "./components/AppLayout";
 import { HelmetProvider } from "react-helmet-async";
 
@@ -89,6 +90,8 @@ const App = () => (
               <Route path="/health-check" element={<HealthCheck />} />
               {/* Yapay zekâ ne yapar / ne yapmaz — bilgi ekranı; taraf ve arabulucu görür. */}
               <Route path="/yapay-zeka" element={<YapayZekaBeyani />} />
+              {/* Verilerim — tarafın kendi verisinin kategori dökümü (salt görüntüleme). */}
+              <Route path="/verilerim" element={<Verilerim />} />
             </Route>
 
             <Route path="/mediator" element={<RedirectToHub />} />

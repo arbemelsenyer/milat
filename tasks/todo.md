@@ -1,3 +1,30 @@
+## Nerede kaldık — 16.08.2026 (74) · "VERİLERİM" SAYFASI (C25 · KVKK/İBA şeffaflık)
+KEŞİF: Kategoriler ve "kimler görebilir" bilgisi UYDURULMADI — depodaki gerçek RLS
+politikalarından okundu: case_parties (taraf yalnız user_id=auth.uid() satırı; arabulucu
+ve yönetici görür) · case_documents ("Party sees own uploads only": taraf YALNIZ kendi
+yüklediğini, arabulucu hepsini) · case_discovery_questions ("Party sees own discovery":
+user_id=auth.uid()) · messages (dosya KATILIMCILARI — arabulucu ve dosyadaki taraflar;
+tek istisna, ekranda da böyle yazıldı) · teklif_braketleri ve blind_bids (taraf kendi
+satırı + arabulucu) · case_payments ("Party can view own payment rows") · ajan_gorevleri
+("Party reads own agent tasks") · kayit_onaylari (16.08'de yazıldı: taraf kendi satırı +
+arabulucu). POLİTİKASI DEPODA GÖRÜNMEYENLER "belirsiz" yazıldı: yz_beyan_onaylari ·
+randevu_teklifleri · taraf_musaitlik.
+- [x] Yeni sayfa: src/pages/Verilerim.tsx — KATEGORİ düzeyinde döküm (satır dökümü YOK).
+      Her kategoride: ad · kayıt sayısı · kimler görebilir · saklama süresi.
+- [x] Giriş ve kapanış paragrafları kurucunun verdiği metinle AYNEN.
+- [x] Yönlendirme: App.tsx'e /verilerim EKLENDİ (mevcut route'lara dokunulmadan).
+      Sol menüde "Bilgi" grubunda, "Yapay zekâ ne yapar" satırının ARDINA eklendi.
+- [x] SAYFA YALNIZ GÖSTERİR: silme, düzenleme, dışa aktarma düğmesi YOK. Karşı tarafın
+      hiçbir kaydı, adı ya da sayısı ekrana gelmez; sayılar RLS'in izin verdiği kadardır.
+- [x] Yalnız arabulucuya açık analizler kategorisi sayı YERİNE "—" gösteriyor ve
+      "sayısı bu sayfadan okunamaz" notu taşıyor (yanıltıcı sıfır yazılmadı).
+tsc temiz. CANLI TEST YOK.
+AÇIK UÇ: Saklama süreleri parametre tablosundan değil, mimari §12.5.9 ve 16.08 kayıt
+protokolü kararından yazıldı; belge 5 yıl, mali kayıt 10 yıl, analiz 5 yıl, diğerleri
+"belirsiz". Saklama motoru kurulunca bu satırlar oradan okunmalı.
+AÇIK UÇ: Üç kategoride "kimler görebilir" belirsiz (yz_beyan_onaylari · randevu_teklifleri
+· taraf_musaitlik) — politikaları canlıda kurulmuş, depoda yok.
+
 ## Nerede kaldık — 16.08.2026 (73) · YAPAY ZEKÂ NE YAPAR / NE YAPMAZ EKRANI
 - [x] Yeni sayfa: src/pages/YapayZekaBeyani.tsx — salt bilgi ekranı (veri okumaz,
       yazmaz, model çağrısı yapmaz). Metin kurucunun verdiği hâliyle AYNEN kullanıldı;
