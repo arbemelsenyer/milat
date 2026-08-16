@@ -1,3 +1,43 @@
+## Nerede kaldık — 16.08.2026 (61) · TIKANMA ÇÖZÜCÜ (İBA 2.5 / B20)
+KEŞİF: Tıkanma göstergesi için AYRI KAYIT YOK; işaretler mevcut tablolardan türetildi.
+Bulunanlar: randevu_teklifleri (durum 'beklemede' → cevapsız teklif, created_at/cevap_zamani)
+· case_party_invites (case_party_id · invite_status · accepted_at · created_at — davetin
+GERÇEK gönderim zamanı burada; case_parties'te invite_sent_at YOK) + case_parties
+(invite_status · katilim_durumu) · case_sessions (status 'cancelled' = iptal; geçmiş tarihli
+'scheduled' = yapıldı işaretlenmemiş) · braket_bant_sorulari (durum 'ret'/'soruldu' + cevap_at)
+· teklif_braketleri.kosul_durumu ('dustu') · cases.updated_at (durgunluk) ve
+deadline_extended/deadline_total + extension_used (süre baskısı). KULLANILMAYANLAR:
+reschedule_requests mediator_requests'e bağlı (pazaryeri akışı, dosya oturumuyla ilişkisiz);
+negotiation_rounds boş; case_sessions'ta "erteleme" alanı yok, erteleme ancak iptal kaydından
+sayılıyor.
+- [x] Ekran: kokpit (Aşama 3) > RAPOR katmanı > "Tıkanma ve çıkış yolları", Teklif
+      değerlendirme kartının hemen ardında. Sol menüde kendiliğinden görünür. "Yenile" var.
+- [x] Yedi işaret, hepsi dayanaklı ve eşiği ekranda yazılı: cevapsız randevu teklifi
+      (3 gün) · cevaplanmayan davet/katılım (5 gün) · iptal edilen oturum (kaç kez +
+      tarihler) · tarihi geçtiği hâlde "planlandı" duran oturum · reddedilen bant sorusu
+      (kaç kez) · cevapsız bant sorusu (3 gün) · düşen koşullu taahhüt · dosya kaydının
+      güncellenmeme süresi (10 gün) · yasal süre bitimine kalan gün (15 gün).
+- [x] Her işaretin altında açık yollar + gerekçe: konuyu bölmek · tek başlıkta anlaşıp
+      gerisini ayırmak · sırayı değiştirmek · özel oturum · uzman görüşü · ek oturum ·
+      süre uzatımı (yalnız extension_used=false ise).
+- [x] DİL: "şu yol açık" kalıbı; karar/uygulama/tavsiye yok. Niyet okuma, suçlama, kişilik
+      yorumu yok — yalnız kaç gün, kaç kez. İşaret yoksa "tıkanma işareti görünmüyor".
+- [x] GİZLİLİK: yalnız kokpitte çizilir; taraf ekranına dokunulmadı.
+- [x] YENİ TABLO / SÜTUN / EDGE FONKSİYON / AI ÇAĞRISI YOK → SQL GEREKMİYOR.
+- [x] Ortak cases sorgusuna DOKUNULMADI: updated_at o sorguda seçilmediği için kart kendi
+      küçük sorgusunu yapıyor (tek alan).
+- [x] Bir kaynak okunamazsa kart komple düşmüyor: o başlıkta işaret üretilmiyor ve hangi
+      kaynağın okunamadığı kırmızı satırda yazıyor.
+tsc (tsconfig.app.json) temiz. CANLI TEST YOK.
+AÇIK UÇ: Eşikler (3/5/3/10/15 gün) KOD İÇİNDE sabit ve ekranda yazılı; kurucu farklı gün
+isterse tek satırda değişir, ayar ekranı yok.
+AÇIK UÇ: "Ertelenen oturum" ayrı kayıt olmadığı için iptal kaydından sayılıyor; oturum
+erteleme tutanağı (A12) yapılırsa işaret oradan beslenmeli.
+AÇIK UÇ: Bant sorusu ve braket kayıtları RLS'te yalnız is_case_mediator ile açık; dosyanın
+assigned_mediator_id'si boşsa bu iki başlıkta işaret hiç üretilmez (hata değil, boş döner).
+AÇIK UÇ: Kart yalnız işaret sayıyor; seçilen çıkış yolunu uygulayan bir düğme YOK
+(özel oturum ve ek oturum Ajan Paneli'nden elle açılıyor).
+
 ## Nerede kaldık — 16.08.2026 (60) · TEKLİF DEĞERLENDİRME (İBA 2.5 / B19)
 KEŞİF: Bu iş için hazır YAPI VAR ama eksik. Kullanılabilir olanlar: teklif_braketleri
 (taraf başına alt_sinir · ust_sinir · kosul_bant_alt/ust · kosullu_deger · kosul_durumu),

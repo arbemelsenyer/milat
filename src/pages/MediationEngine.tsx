@@ -7523,6 +7523,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     body: <TeklifDegerlendirmePanel caseId={caseRow.id} />,
   });
 
+  // Tıkanma ve çıkış yolları (İBA 2.5 / B20) — teklif kartlarının yanında.
+  sectionDefs.push({
+    id: "kokpit-tikanma", layer: LAYER_REPORTS, title: "Tıkanma ve çıkış yolları",
+    body: <TikanmaCozucuPanel caseRow={caseRow} />,
+  });
+
   const layerOrder = [LAYER_TABLE, LAYER_EVIDENCE, LAYER_COCKPIT, LAYER_REPORTS];
   // Katman başlığının kendi çıpası (sol menüden katman adına tıklanınca oraya kayılır)
   // ve başlığın altındaki tek satır açıklama; aynı açıklama menüde tooltip olur.
@@ -9300,6 +9306,313 @@ function TeklifDegerlendirmePanel({ caseId }: { caseId: string }) {
             </>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+/* ============ TIKANMA VE ÇIKIŞ YOLLARI (İBA 2.5 / B20) — yalnız arabulucu ============
+   Kart KARAR VERMEZ, UYGULAMAZ: yalnız dosyadaki kayıtlardan çıkan olguları sayar ve
+   açık olan yolları gerekçesiyle listeler ("şu yol açık" dili; "şunu yapmalısın" yok).
+   Niyet okuma, suçlama ve kişilik yorumu YASAK (constitution m.2 teşhis dili) — çıktı
+   yalnız kaç gün / kaç kez. Yeni AI çağrısı YOK; her işaret deterministik hesaplanır.
+   Kaynaklar: randevu_teklifleri · case_party_invites + case_parties.katilim_durumu ·
+   case_sessions · braket_bant_sorulari · teklif_braketleri.kosul_durumu · cases
+   (güncelleme zamanı ve yasal süre). Dayanağı olmayan işaret gösterilmez.
+   Kör veri (m.1): yalnız kokpitte çizilir; taraf ekranına hiçbir satırı çıkmaz. */
+
+type TikanmaCikis = { yol: string; gerekce: string };
+type TikanmaIsaret = { id: string; baslik: string; dayanak: string; cikislar: TikanmaCikis[] };
+
+// Eşikler ekranda da yazılıdır: arabulucu hangi kuralın çalıştığını görebilsin.
+const TIKANMA_ESIK = { teklif: 3, davet: 5, bantSorusu: 3, durgunluk: 10, sureBaskisi: 15 };
+
+function tcGunFarki(iso?: string | null): number | null {
+  if (!iso) return null;
+  const t = new Date(String(iso)).getTime();
+  if (!Number.isFinite(t)) return null;
+  return Math.floor((Date.now() - t) / 86400000);
+}
+function tcKalanGun(iso?: string | null): number | null {
+  if (!iso) return null;
+  const t = new Date(String(iso)).getTime();
+  if (!Number.isFinite(t)) return null;
+  return Math.ceil((t - Date.now()) / 86400000);
+}
+function tcTarih(iso?: string | null): string {
+  if (!iso) return "tarihsiz";
+  const d = new Date(String(iso));
+  return Number.isNaN(d.getTime()) ? "tarihsiz" : d.toLocaleDateString("tr-TR");
+}
+
+// Çıkış yolu metinleri tek yerde: dil hep "yol açık" kalıbında kurulur.
+const CIKIS = {
+  bol: "Konuyu bölmek",
+  tekBaslik: "Tek başlıkta anlaşıp gerisini ayırmak",
+  sira: "Görüşme sırasını değiştirmek",
+  ozel: "Özel oturuma geçmek",
+  uzman: "Uzman görüşü almak",
+  ekOturum: "Ek oturum planlamak",
+  sure: "Süre uzatımı",
+} as const;
+
+function TikanmaCozucuPanel({ caseRow }: { caseRow: CaseRow }) {
+  const [parties, setParties] = useState<any[]>([]);
+  const [davetler, setDavetler] = useState<any[]>([]);
+  const [teklifler, setTeklifler] = useState<any[]>([]);
+  const [oturumlar, setOturumlar] = useState<any[]>([]);
+  const [bantSorulari, setBantSorulari] = useState<any[]>([]);
+  const [braketler, setBraketler] = useState<any[]>([]);
+  const [okunamayan, setOkunamayan] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  // cases.updated_at ekranın ortak sorgusunda seçilmiyor; durgunluk işareti için
+  // bu panel kendi küçük sorgusunu yapar (ortak sorguya dokunulmadı).
+  const [dosyaGuncelleme, setDosyaGuncelleme] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const eksik: string[] = [];
+    const c = await supabase.from("cases").select("updated_at").eq("id", caseRow.id).maybeSingle();
+    if (c.error) eksik.push(`dosya güncelleme zamanı (${c.error.message})`);
+    setDosyaGuncelleme((c.data as any)?.updated_at ?? null);
+    const p = await supabase.from("case_parties")
+      .select("id, party_role, first_name, last_name, company_name, katilim_durumu, invite_status, created_at")
+      .eq("case_id", caseRow.id).order("created_at");
+    if (p.error) eksik.push(`taraf kayıtları (${p.error.message})`);
+    const partyList = Array.isArray(p.data) ? p.data : [];
+    setParties(partyList);
+
+    const partyIds = partyList.map((x: any) => x.id);
+    const [d, t, o, b, br] = await Promise.all([
+      partyIds.length
+        ? supabase.from("case_party_invites").select("case_party_id, invite_status, accepted_at, created_at").in("case_party_id", partyIds)
+        : Promise.resolve({ data: [], error: null } as any),
+      (supabase.from("randevu_teklifleri" as any) as any)
+        .select("id, party_id, durum, created_at, cevap_zamani").eq("case_id", caseRow.id),
+      supabase.from("case_sessions").select("id, status, scheduled_at, updated_at, session_type").eq("case_id", caseRow.id),
+      (supabase.from("braket_bant_sorulari" as any) as any)
+        .select("id, hedef_party_id, durum, created_at, cevap_at").eq("case_id", caseRow.id),
+      (supabase.from("teklif_braketleri" as any) as any)
+        .select("party_id, kosul_durumu, updated_at").eq("case_id", caseRow.id),
+    ]);
+    if (d.error) eksik.push(`davet kayıtları (${d.error.message})`);
+    if (t.error) eksik.push(`randevu teklifleri (${t.error.message})`);
+    if (o.error) eksik.push(`oturum kayıtları (${o.error.message})`);
+    if (b.error) eksik.push(`bant soruları (${b.error.message})`);
+    if (br.error) eksik.push(`koşullu aralık kayıtları (${br.error.message})`);
+    setDavetler(Array.isArray(d.data) ? d.data : []);
+    setTeklifler(Array.isArray(t.data) ? t.data : []);
+    setOturumlar(Array.isArray(o.data) ? o.data : []);
+    setBantSorulari(Array.isArray(b.data) ? b.data : []);
+    setBraketler(Array.isArray(br.data) ? br.data : []);
+    setOkunamayan(eksik);
+    setLoading(false);
+  }, [caseRow.id]);
+  useEffect(() => { load(); }, [load]);
+
+  const adlar = new Map<string, string>(parties.map((p, i) => [p.id, blindBidPartyName(p, i)]));
+  const isaretler: TikanmaIsaret[] = [];
+
+  // 1) Cevapsız randevu teklifi
+  for (const t of teklifler) {
+    if (String(t.durum) !== "beklemede") continue;
+    const gun = tcGunFarki(t.created_at);
+    if (gun === null || gun < TIKANMA_ESIK.teklif) continue;
+    const ad = adlar.get(String(t.party_id)) ?? "Taraf";
+    isaretler.push({
+      id: `teklif-${t.id}`,
+      baslik: `${ad}: randevu teklifi ${gun} gündür cevapsız.`,
+      dayanak: `Randevu teklifi kaydı — ${tcTarih(t.created_at)} tarihinde açıldı, cevap kaydı yok (eşik: ${TIKANMA_ESIK.teklif} gün).`,
+      cikislar: [
+        { yol: CIKIS.ozel, gerekce: "Tek tarafla yapılan görüşme, ortak takvim aranmadan planlanabilir." },
+        { yol: CIKIS.sira, gerekce: "Cevap veren tarafla başlanırsa süreç beklemeden ilerler." },
+      ],
+    });
+  }
+
+  // 2) Cevaplanmayan davet / katılım
+  const davetByParty = new Map<string, any>();
+  for (const dv of davetler) {
+    const k = String(dv.case_party_id);
+    const mevcut = davetByParty.get(k);
+    if (!mevcut || String(dv.created_at) > String(mevcut.created_at)) davetByParty.set(k, dv);
+  }
+  for (const p of parties) {
+    const katilim = String(p.katilim_durumu ?? "beklemede");
+    const kabul = String(p.invite_status) === "accepted";
+    if (kabul || katilim === "katiliyor" || katilim === "katilmiyor") continue;
+    const dv = davetByParty.get(String(p.id));
+    const kaynakZaman = dv?.created_at ?? p.created_at;
+    const gun = tcGunFarki(kaynakZaman);
+    if (gun === null || gun < TIKANMA_ESIK.davet) continue;
+    isaretler.push({
+      id: `davet-${p.id}`,
+      baslik: `${adlar.get(p.id)}: davete ${gun} gündür cevap kaydı yok.`,
+      dayanak: dv
+        ? `Davet kaydı — ${tcTarih(dv.created_at)}, kabul kaydı yok (durum: ${dv.invite_status}). Eşik: ${TIKANMA_ESIK.davet} gün.`
+        : `Davet kaydı bulunamadı; taraf kaydı ${tcTarih(p.created_at)} tarihli, katılım durumu "${katilim}". Eşik: ${TIKANMA_ESIK.davet} gün.`,
+      cikislar: [
+        { yol: CIKIS.ozel, gerekce: "Katılım kaydı olmayan tarafla ayrı temas, ortak oturumu beklemeden kurulabilir." },
+        { yol: CIKIS.sira, gerekce: "Kaydı tamam olan taraftan başlanırsa dosya beklemede kalmaz." },
+      ],
+    });
+  }
+
+  // 3) İptal edilen / geçmiş tarihli oturumlar
+  const iptal = oturumlar.filter((o) => String(o.status) === "cancelled");
+  if (iptal.length > 0) {
+    isaretler.push({
+      id: "oturum-iptal",
+      baslik: `Oturum ${iptal.length} kez iptal kaydı aldı.`,
+      dayanak: `Oturum kayıtları — iptal işaretli tarihler: ${iptal.map((o) => tcTarih(o.scheduled_at)).join(" · ")}.`,
+      cikislar: [
+        { yol: CIKIS.ekOturum, gerekce: "Takvim yeniden kurulmadan süreç ilerlemiyor." },
+        { yol: CIKIS.ozel, gerekce: "Ortak takvim tutmuyorsa taraflarla ayrı ayrı görüşme planlanabilir." },
+      ],
+    });
+  }
+  const gecmisPlanli = oturumlar.filter(
+    (o) => String(o.status) === "scheduled" && o.scheduled_at && new Date(String(o.scheduled_at)).getTime() < Date.now(),
+  );
+  if (gecmisPlanli.length > 0) {
+    isaretler.push({
+      id: "oturum-gecmis",
+      baslik: `${gecmisPlanli.length} oturumun tarihi geçti, kaydı hâlâ "planlandı".`,
+      dayanak: `Oturum kayıtları — geçmiş tarihli planlı oturum: ${gecmisPlanli.map((o) => tcTarih(o.scheduled_at)).join(" · ")}.`,
+      cikislar: [
+        { yol: CIKIS.ekOturum, gerekce: "Yapılan oturum işaretlenmedikçe sonraki adım açılmıyor." },
+        { yol: CIKIS.sira, gerekce: "Bekleyen başlık yerine hazır olan başlıkla devam edilebilir." },
+      ],
+    });
+  }
+
+  // 4) Bant sorusu: reddedilen ve cevapsız kalan
+  const retler = bantSorulari.filter((s) => String(s.durum) === "ret");
+  if (retler.length > 0) {
+    isaretler.push({
+      id: "bant-ret",
+      baslik: `Bant sorusu ${retler.length} kez reddedildi.`,
+      dayanak: `Bant sorusu kayıtları — ret cevabı tarihleri: ${retler.map((s) => tcTarih(s.cevap_at ?? s.created_at)).join(" · ")}.`,
+      cikislar: [
+        { yol: CIKIS.bol, gerekce: "Tek rakam üzerinde tıkanan konu, alt başlıklara ayrıldığında ayrı ayrı ele alınabilir." },
+        { yol: CIKIS.tekBaslik, gerekce: "Uzlaşılan başlık ayrı yazılırsa kalan başlık tek başına görüşülebilir." },
+        { yol: CIKIS.uzman, gerekce: "Rakamın dayanağı tartışmalıysa uzman görüşü ortak bir ölçü sağlar." },
+      ],
+    });
+  }
+  const cevapsizBant = bantSorulari.filter((s) => {
+    if (String(s.durum) !== "soruldu") return false;
+    const gun = tcGunFarki(s.created_at);
+    return gun !== null && gun >= TIKANMA_ESIK.bantSorusu;
+  });
+  if (cevapsizBant.length > 0) {
+    isaretler.push({
+      id: "bant-cevapsiz",
+      baslik: `${cevapsizBant.length} bant sorusu ${TIKANMA_ESIK.bantSorusu} günden uzun süredir cevapsız.`,
+      dayanak: `Bant sorusu kayıtları — soruluş tarihleri: ${cevapsizBant.map((s) => tcTarih(s.created_at)).join(" · ")}.`,
+      cikislar: [
+        { yol: CIKIS.ozel, gerekce: "Soru özel oturumda doğrudan ele alınabilir." },
+        { yol: CIKIS.ekOturum, gerekce: "Cevap oturumda alınırsa tur beklemeden kapanır." },
+      ],
+    });
+  }
+  const dusen = braketler.filter((b) => String(b.kosul_durumu) === "dustu");
+  if (dusen.length > 0) {
+    isaretler.push({
+      id: "braket-dustu",
+      baslik: `${dusen.length} koşullu taahhüt düştü.`,
+      dayanak: `Koşullu aralık kayıtları — durumu "düştü" olan taraf sayısı ${dusen.length}, son güncelleme ${tcTarih(dusen[0]?.updated_at)}.`,
+      cikislar: [
+        { yol: CIKIS.bol, gerekce: "Tek pakette çözülmeyen konu, parçalara ayrıldığında yeniden aralık girilebilir." },
+        { yol: CIKIS.uzman, gerekce: "Tutar farkı teknik bir ölçüye dayanıyorsa uzman görüşü ortak zemin sağlar." },
+      ],
+    });
+  }
+
+  // 5) Durgunluk: dosya kaydının son güncellemesi
+  const durgunGun = tcGunFarki(dosyaGuncelleme);
+  if (durgunGun !== null && durgunGun >= TIKANMA_ESIK.durgunluk) {
+    isaretler.push({
+      id: "durgunluk",
+      baslik: `Dosya kaydı ${durgunGun} gündür güncellenmedi (Aşama ${Math.min(7, Math.max(1, Number(caseRow.current_phase ?? 1) || 1))}).`,
+      dayanak: `Dosya kaydı — son güncelleme ${tcTarih(dosyaGuncelleme)} (eşik: ${TIKANMA_ESIK.durgunluk} gün).`,
+      cikislar: [
+        { yol: CIKIS.bol, gerekce: "Bütün başlıklar birlikte ilerlemiyorsa tek tek ele alınabilir." },
+        { yol: CIKIS.tekBaslik, gerekce: "Anlaşılan başlık ayrı kayda geçerse dosya kısmen de olsa ilerler." },
+        { yol: CIKIS.sira, gerekce: "Sıradaki adım beklemedeyse hazır olan adımla devam edilebilir." },
+      ],
+    });
+  }
+
+  // 6) Süre baskısı (yalnız yasal süre kayıtlıysa)
+  const sureBitis = (caseRow as any).deadline_extended ?? (caseRow as any).deadline_total ?? null;
+  const kalan = tcKalanGun(sureBitis);
+  if (kalan !== null && kalan <= TIKANMA_ESIK.sureBaskisi) {
+    const uzatmaKullanildi = !!(caseRow as any).extension_used;
+    isaretler.push({
+      id: "sure",
+      baslik: kalan >= 0
+        ? `Yasal sürenin bitimine ${kalan} gün kaldı.`
+        : `Yasal süre ${Math.abs(kalan)} gün önce doldu.`,
+      dayanak: `Dosya süre kaydı — bitiş ${tcTarih(sureBitis)}${uzatmaKullanildi ? " (uzatma kullanılmış)" : " (uzatma kullanılmamış)"}.`,
+      cikislar: [
+        ...(uzatmaKullanildi ? [] : [{ yol: CIKIS.sure, gerekce: "Süre uzatımı kaydı henüz kullanılmamış görünüyor." }]),
+        { yol: CIKIS.tekBaslik, gerekce: "Süre daralmışken uzlaşılan başlık ayrı yazılabilir." },
+        { yol: CIKIS.ekOturum, gerekce: "Kalan sürede oturum planı sıkıştırılabilir." },
+      ],
+    });
+  }
+
+  return (
+    <div className="rounded-2xl border border-sidebar-border bg-sidebar text-sidebar-foreground p-6 shadow-elegant space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-accent" />
+          <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Tıkanma ve Çıkış Yolları</div>
+          {!loading && isaretler.length > 0 && (
+            <Badge variant="outline" className="border-sidebar-border text-sidebar-foreground/80">
+              {isaretler.length} işaret
+            </Badge>
+          )}
+        </div>
+        <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+          <RefreshCw className="h-3 w-3 mr-1" /> Yenile
+        </Button>
+      </div>
+
+      <p className="text-xs text-sidebar-foreground/60 leading-snug">
+        Kart yalnız kayıtlardan çıkan olguları sayar ve açık olan yolları gerekçesiyle listeler; karar vermez,
+        uygulamaz, taraf hakkında yorum yapmaz. Taraflara hiçbir yüzeyden gösterilmez.
+      </p>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-sidebar-foreground/70">
+          <Loader2 className="h-4 w-4 animate-spin" /> Kayıtlar taranıyor…
+        </div>
+      ) : isaretler.length === 0 ? (
+        <p className="text-sm text-sidebar-foreground/70">Tıkanma işareti görünmüyor.</p>
+      ) : (
+        <div className="space-y-3">
+          {isaretler.map((i) => (
+            <div key={i.id} className="rounded-xl border border-sidebar-border bg-sidebar-accent/20 p-4 space-y-2">
+              <div className="text-sm font-display font-bold">{i.baslik}</div>
+              <p className="text-[11px] text-sidebar-foreground/55 leading-snug">Dayanak: {i.dayanak}</p>
+              <ul className="text-xs text-sidebar-foreground/80 space-y-1">
+                {i.cikislar.map((c, k) => (
+                  <li key={`${i.id}-${k}`}>
+                    <span className="font-semibold">{c.yol}</span> — bu yol açık: {c.gerekce}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {okunamayan.length > 0 && (
+        <p className="text-[11px] text-destructive/90 leading-snug">
+          Şu kaynaklar okunamadı, o başlıklarda işaret üretilmedi: {okunamayan.join(" · ")}
+        </p>
       )}
     </div>
   );

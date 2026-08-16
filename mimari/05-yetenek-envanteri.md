@@ -401,6 +401,25 @@ DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon
 · Gizlilik: yalnız arabulucu yüzeyinde çizilir; kullandığı üç tabloda da tarafa SELECT
   politikası yoktur.
 
+TIKANMA VE ÇIKIŞ YOLLARI (İBA 2.5 / B20)
+DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon ve AI
+çağrısı YOKTUR; işaretler mevcut kayıtlardan deterministik sayılır.
+· Yeri: kokpit → "Tıkanma ve çıkış yolları", teklif kartlarının yanında. "Yenile" düğmesi
+  kartın kendi sorgularını yeniden çalıştırır.
+· İşaretler (her biri dayanaklı, eşiği ekranda yazılı): cevapsız randevu teklifi (3 gün) ·
+  cevaplanmayan davet/katılım (5 gün, kaynak case_party_invites) · iptal edilen oturum ve
+  tarihi geçtiği hâlde "planlandı" duran oturum · reddedilen bant sorusu ve cevapsız bant
+  sorusu (3 gün) · düşen koşullu taahhüt · dosya kaydının güncellenmeme süresi (10 gün) ·
+  yasal süre bitimine kalan gün (15 gün).
+· Her işaretin altında açık yollar gerekçesiyle listelenir: konuyu bölmek · tek başlıkta
+  anlaşıp gerisini ayırmak · sırayı değiştirmek · özel oturuma geçmek · uzman görüşü almak ·
+  ek oturum planlamak · süre uzatımı.
+· Dil sınırı: "şu yol açık" kalıbı; karar, uygulama ve tavsiye yok. Taraf hakkında niyet
+  okuma, suçlama ve kişilik yorumu yasak — yalnız kaç gün / kaç kez. İşaret yoksa
+  "tıkanma işareti görünmüyor" yazılır.
+· Gizlilik: yalnız arabulucu yüzeyi; okunamayan kaynak olursa o başlıkta işaret
+  üretilmez ve hangisinin okunamadığı ekranda yazar.
+
 [v0.36 KALICI ŞART — FAZ 3 TÜR TESPİTİ İKİ MENÜDÜR (değişmez)]
 Faz 3 uyuşmazlık tür tespitinde ANA TÜR ve ALT UZMANLIK olmak üzere İKİ menü zorunludur. Alt
 uzmanlık menüsü üç kez sehven silinip geri konmuştur; bir daha kaldırılamaz — düzen değişikliği,

@@ -593,3 +593,15 @@ Kart tavsiye vermez; talep rakamlandırılmamışsa "karşılaştırma yapılama
 Dosyada rakamlandırılmış talep KALEMİ kaydı olmadığı için alınan/bırakılan tek tutar
 üzerinden hesaplanıyor (açık madde). SQL gerekmiyor; yalnız Publish.
 
+16.08 (TIKANMA ÇÖZÜCÜ — İBA 2.5 / B20): Kokpite, teklif kartlarının yanına "Tıkanma ve
+çıkış yolları" kartı eklendi. Yedi işaret dosyadaki kayıtlardan deterministik sayılıyor:
+cevapsız randevu teklifi (3 gün), cevaplanmayan davet/katılım (5 gün), iptal edilen oturum,
+tarihi geçtiği hâlde "planlandı" duran oturum, reddedilen ve cevapsız bant sorusu (3 gün),
+düşen koşullu taahhüt, dosya kaydının güncellenmeme süresi (10 gün) ve yasal süre bitimine
+kalan gün (15 gün). Her işaretin dayanağı (hangi kayıt, hangi tarih) ve altında açık olan
+yollar gerekçesiyle yazılıyor: konuyu bölmek, tek başlıkta anlaşıp gerisini ayırmak, sırayı
+değiştirmek, özel oturum, uzman görüşü, ek oturum, süre uzatımı. Dil "şu yol açık" kalıbında;
+karar, uygulama, tavsiye ve taraf hakkında yorum yok. İşaret yoksa "tıkanma işareti
+görünmüyor" yazıyor. Yeni tablo, edge fonksiyon ve AI çağrısı YOK; "Yenile" düğmesi var.
+SQL gerekmiyor; yalnız Publish.
+
