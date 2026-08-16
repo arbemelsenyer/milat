@@ -22,13 +22,23 @@ daraltıyor (ses 24 saat, döküm süreç sonu) — mimari/12'ye ekleme olarak i
       ses_kaydi_silindi · dokum_silindi. closed_at boşsa TAHMİNİ bitiş üretilmez, sebep
       yazılır.
 - [x] KAYIT ALMA / DÖKÜM YAPILMADI (kurucu kararı: bu tur yalnız izin + silme altyapısı).
+- [x] İZİN KATMANI CANLIDA DOĞRULANDI (16.08.2026).
+      · Göç 20260816120000_kayit_protokolu.sql çalıştırıldı (kayit_onay_talepleri ·
+        kayit_onaylari · oturum_kayitlari); ajan-nobetci yeniden yayına alındı;
+        Publish yapıldı.
+      · Arabulucu kartı: "Onay formunu aç ve süreyi başlat", onay/ret/bekleyen sayacı,
+        kalan 48 saat, tek kapı uyarısı — kira dosyasında doğrulandı.
+      · Taraf kartı: onay metni, 48 saat bilgisi, "Kayda onay verdiniz" ve "Kararımı
+        değiştir" (rıza geri alınabilir) — taraf hesabıyla doğrulandı.
+      · AÇIK KALAN: silme kolu (ses 24 saat sonra, döküm süreç sonunda) gerçek kayıt
+        olmadan test edilemedi; kayıt/döküm hattı yapılınca sınanacak.
 - [x] m.11 SAPMASI (bilerek): Ekran uyarısında dış ürün adları (Otter/Fireflies/Zoom)
       YAZILMADI; yasak "dış kayıt veya döküm uygulamaları, görüntülü görüşme aracının
       kendi kayıt özelliği, telefonla ses alma" diye tarif edildi. Sebep: constitution
       m.11 ürün yüzeyinde dış marka adını yasaklıyor ve constitution komuttan üstün.
 tsc (tsconfig.app.json) temiz; ajan-nobetci esbuild ile sözdizimi doğrulandı.
-CANLI TEST YOK. SQL GEREKLİ: 20260816120000_kayit_protokolu.sql (3 tablo).
-REDEPLOY GEREKLİ: ajan-nobetci. Publish: EVET (iki ekran değişti).
+SQL: 20260816120000_kayit_protokolu.sql (3 tablo) — 16.08'de ÇALIŞTIRILDI.
+REDEPLOY: ajan-nobetci — 16.08'de YAPILDI. Publish: 16.08'de YAPILDI (iki ekran).
 SIRA ZORUNLU: önce SQL, sonra Publish/redeploy — tablolar yokken kartlar kırmızı hata
 satırı gösterir (kart açılır ama okuma başarısız olur).
 AÇIK UÇ: Onay formu açılınca taraflara E-POSTA GİTMİYOR; form yalnız taraf ekranında
