@@ -9967,7 +9967,8 @@ function degAlintiRakam(metin: string): string {
   return parca.length > 140 ? `${parca.slice(0, 137)}…` : parca;
 }
 
-function degTarih(iso: string): string {
+function degTarih(iso: string | null | undefined): string {
+  if (!iso) return "tarihsiz";   // boş alan 01.01.1970 olarak yazılmasın
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? "tarihsiz" : d.toLocaleDateString("tr-TR");
 }
@@ -10043,6 +10044,12 @@ function IletisimDegisimPanel({ caseRow }: { caseRow: CaseRow }) {
   const [satirlar, setSatirlar] = useState<DegisimSatiri[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [okunamayan, setOkunamayan] = useState<string[]>([]);
+  // AYRINTI KOLU (16.08): sayım kolu bedava ve kendiliğinden çalışır; ayrıntı
+  // yalnız düğmeye basınca üretilir, iletisim_degisim tablosunda saklanır ve her
+  // açılışta yeniden ücret çıkmaz. "Yeniden çıkar" ile bilerek tazelenir.
+  const [ayrintilar, setAyrintilar] = useState<Record<string, any>>({});
+  const [ayrintiBusy, setAyrintiBusy] = useState<string | null>(null);
+  const [ayrintiHata, setAyrintiHata] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -10061,6 +10068,15 @@ function IletisimDegisimPanel({ caseRow }: { caseRow: CaseRow }) {
     if (dok.error) eksik.push(`belgeler (${dok.error.message})`);
     if (kesif.error) eksik.push(`keşif cevapları (${kesif.error.message})`);
     if (msj.error) eksik.push(`mesajlar (${msj.error.message})`);
+
+    // Kayıtlı ayrıntı paragrafları (varsa) — tablo yoksa kart yine çalışır.
+    const ay = await (supabase.from("iletisim_degisim" as any) as any)
+      .select("party_id, paragraf, alinti_ilk, alinti_son, tarih_ilk, tarih_son, kaynak_ilk, kaynak_son, durum, sebep, updated_at")
+      .eq("case_id", caseRow.id);
+    if (ay.error) eksik.push(`ayrıntı kayıtları (${ay.error.message})`);
+    const ayMap: Record<string, any> = {};
+    for (const r of ((ay.data ?? []) as any[])) ayMap[String(r.party_id)] = r;
+    setAyrintilar(ayMap);
 
     const sonuc: DegisimSatiri[] = taraflar.map((t: any, i: number) => {
       // YALNIZ bu tarafın kendi metinleri toplanır; karşı tarafın metni hiçbir
@@ -10099,6 +10115,39 @@ function IletisimDegisimPanel({ caseRow }: { caseRow: CaseRow }) {
     setLoading(false);
   }, [caseRow.id]);
   useEffect(() => { load(); }, [load]);
+
+  async function ayrintiCikar(partyId: string, yenile: boolean) {
+    setAyrintiBusy(partyId);
+    setAyrintiHata(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("iletisim-degisim", {
+        body: { case_id: caseRow.id, party_id: partyId, yenile },
+      });
+      if (error) {
+        // Gerçek sebep .context gövdesindedir; sessizce yutulmaz.
+        let ham = String((error as any)?.message ?? "bilinmeyen hata");
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.text === "function") {
+          try {
+            const govde = await ctx.text();
+            if (govde) {
+              try { const j = JSON.parse(govde); ham = String(j?.error ?? j?.sebep ?? govde); }
+              catch { ham = String(govde).slice(0, 400); }
+            }
+          } catch { /* gövde okunamadı */ }
+        }
+        throw new Error(ham);
+      }
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+      if ((data as any)?.yetersiz) setAyrintiHata(String((data as any).sebep ?? "Yeterli tarihli metin yok"));
+      await load();
+    } catch (e: any) {
+      console.error("[iletisim-degisim] çağrı başarısız", e);
+      setAyrintiHata(`iletisim-degisim çağrısı başarısız: ${trErr(e?.message ?? "bilinmeyen hata")}`);
+    } finally {
+      setAyrintiBusy(null);
+    }
+  }
 
   const toplamIsaret = (satirlar ?? []).reduce((t, s) => t + s.isaretler.length, 0);
 
@@ -10155,9 +10204,54 @@ function IletisimDegisimPanel({ caseRow }: { caseRow: CaseRow }) {
                   ))}
                 </ul>
               )}
+
+              {/* AYRINTI KOLU — yalnız iki farklı tarihli metin varsa. Sayım kolu
+                  yukarıda aynen durur; bu bölüm onun ALTINA eklenir. */}
+              {s.farkliGun >= 2 && (() => {
+                const ay = ayrintilar[s.partyId];
+                const bekliyor = ayrintiBusy === s.partyId;
+                return (
+                  <div className="border-t border-sidebar-border/60 pt-2 space-y-1">
+                    {ay?.durum === "hazir" && ay?.paragraf ? (
+                      <>
+                        <div className="text-xs leading-snug">{ay.paragraf}</div>
+                        <div className="text-[11px] text-sidebar-foreground/55 leading-snug">
+                          Dayanak: {degTarih(ay.tarih_ilk)} · {ay.kaynak_ilk}: “{ay.alinti_ilk}”
+                        </div>
+                        <div className="text-[11px] text-sidebar-foreground/55 leading-snug">
+                          Dayanak: {degTarih(ay.tarih_son)} · {ay.kaynak_son}: “{ay.alinti_son}”
+                        </div>
+                      </>
+                    ) : ay?.durum === "degisim_yok" ? (
+                      <div className="text-[11px] text-sidebar-foreground/70">
+                        Ayrıntı çıkarıldı: iki metin arasında belirgin bir değişim bildirilmedi.
+                      </div>
+                    ) : ay?.durum === "elendi" ? (
+                      <div className="text-[11px] text-sidebar-foreground/70">
+                        Ayrıntı yazılmadı — {ay.sebep}
+                      </div>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={KOKPIT_DUGME}
+                      disabled={bekliyor}
+                      onClick={() => ayrintiCikar(s.partyId, !!ay)}
+                    >
+                      {bekliyor
+                        ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Çıkarılıyor…</>
+                        : <><Sparkles className="h-4 w-4 mr-1" /> {ay ? "Yeniden çıkar" : "Ayrıntısını çıkar"}</>}
+                    </Button>
+                  </div>
+                );
+              })()}
             </div>
           ))}
         </div>
+      )}
+
+      {ayrintiHata && (
+        <p className="text-[11px] text-destructive/90 leading-snug">{ayrintiHata}</p>
       )}
 
       {okunamayan.length > 0 && (

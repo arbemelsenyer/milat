@@ -670,3 +670,15 @@ bölüm ipucu satırı da eklendi. Kartın içeriği, kuralları ve gizlilik sı
 dayanıyor, taraflar karşılaştırılmıyor, yalnız arabulucu görüyor, veri yetersizken kart
 gizlenmiyor). SQL ve redeploy gerekmiyor; yalnız Publish.
 
+16.08 (İLETİŞİMDE DEĞİŞİM — AYRINTI KOLU, kurucu onayı): Karta yapay zekâ kolu eklendi.
+Sayım kolu ve "Yenile" düğmesi aynen duruyor (bedava, kendiliğinden). İki farklı tarihli
+metni olan tarafın satırında [Ayrıntısını çıkar] düğmesi çıkıyor; yeni edge fonksiyon
+iletisim-degisim, o tarafın en eski ve en yeni metnini tek model çağrısıyla karşılaştırıp
+değişimi tek paragrafta olgu diliyle yazıyor ve iki tarihten birer cümlelik alıntıyı
+dayanak koyuyor. Sunucu tarafı eleme: duygu/kişilik/niyet ifadesi, alıntısız çıktı ve
+KAYNAK METİNDE BULUNMAYAN alıntı elenir; sebep kaydedilir. Paragraf iletisim_degisim
+tablosunda saklanıyor (taraf başına tek satır), böylece her açılışta yeniden ücret
+çıkmıyor; [Yeniden çıkar] ile tazeleniyor. İki farklı tarihli metin yoksa düğme hiç
+görünmüyor. SQL göçü bekliyor: 20260816160000_iletisim_degisim.sql.
+REDEPLOY GEREKLİ: iletisim-degisim (YENİ).
+

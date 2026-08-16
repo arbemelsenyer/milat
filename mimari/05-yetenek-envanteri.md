@@ -460,6 +460,16 @@ DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon
   birer cümlelik alıntı. Değişim yoksa "belirgin bir değişim görünmüyor".
 · ÇİZGİ (değişmez): kişilik değerlendirmesi, psikolojik teşhis ve duygu etiketi
   YASAK; iki taraf birbiriyle KARŞILAŞTIRILMAZ; taraf ekranına hiçbir yüzeyden gitmez.
+· AYRINTI KOLU (16.08 EKLEME, kurucu onayı) ● KODDA: sayım kolu bedava ve kendiliğinden
+  çalışmaya devam eder; iki farklı tarihli metin varsa satırın altında [Ayrıntısını çıkar]
+  düğmesi çıkar. Yeni edge fonksiyon iletisim-degisim, o tarafın EN ESKİ ve EN YENİ
+  metnini tek model çağrısıyla karşılaştırır ve değişimi tek paragrafta OLGU diliyle
+  yazar; iki tarihten birer cümlelik alıntı dayanak olur.
+  SUNUCU TARAFI ELEME: duygu/kişilik/niyet ifadesi geçerse · alıntı gelmezse · alıntı
+  KAYNAK METİNDE BULUNAMAZSA paragraf yazılmaz, sebep kaydedilir (uydurma alıntı kapısı).
+  Çıktı iletisim_degisim tablosunda saklanır (taraf başına tek satır) — her açılışta
+  yeniden ücret çıkmaz; [Yeniden çıkar] ile bilerek tazelenir. İki farklı tarihli metin
+  yoksa düğme hiç görünmez, dürüst satır aynen kalır. Tarafa SELECT politikası YOKTUR.
 
 TASLAK DENETİMİ (İBA 2.6 / B21)
 DURUM 16.08 (aynı gün güncellendi) ○ BEKLEMEDE — kutu ekrandan KALDIRILDI (yorum satırına

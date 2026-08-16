@@ -127,3 +127,6 @@ verify_jwt = true
 
 [functions.guc-dengesi]
 verify_jwt = true
+
+[functions.iletisim-degisim]
+verify_jwt = true

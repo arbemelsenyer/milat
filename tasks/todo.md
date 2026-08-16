@@ -1,3 +1,33 @@
+## Nerede kaldık — 16.08.2026 (69) · İLETİŞİMDE DEĞİŞİM — YZ AYRINTI KOLU
+- [x] Sayım kolu ve [Yenile] düğmesi AYNEN duruyor (bedava, kart açılınca kendiliğinden
+      çalışıyor). Ayrıntı kolu onun ALTINA eklendi; hiçbir satır kaldırılmadı.
+- [x] Yeni edge fonksiyon: supabase/functions/iletisim-degisim.
+      · Girdi: yalnız O TARAFIN kendi tarihli metinleri (beyan · kendi belgeleri ·
+        keşif cevapları · kendi mesajları); karşı tarafın metni girdiye GİRMEZ.
+      · En eski ve en yeni metin karşılaştırılır; tek model çağrısı, tek paragraf.
+      · Çıktı: {paragraf, alinti_ilk, alinti_son} — iki tarihten birer cümlelik alıntı.
+      · SUNUCU TARAFI ELEME: duygu/kişilik/niyet ifadesi (sinirli · kaygılı · agresif ·
+        oyalıyor · kötü niyetli · manipülat… listesi) · alıntı yoksa · ALINTI KAYNAK
+        METİNDE BULUNAMAZSA paragraf yazılmaz, durum='elendi' + sebep kaydedilir.
+      · Değişim yoksa durum='degisim_yok'; zorlama paragraf üretilmez.
+      · Yetki: arabulucu / dosya sahibi / yönetici. Taraf çağıramaz (config.toml
+        verify_jwt = true).
+- [x] Ekran: iki farklı tarihli metni olan tarafta [Ayrıntısını çıkar]; kayıt varsa
+      [Yeniden çıkar]. Paragraf + iki dayanak satırı kartta görünüyor. İki farklı tarihli
+      metin yoksa düğme HİÇ görünmüyor, bugünkü dürüst satır aynen kalıyor.
+- [x] Kayıt: iletisim_degisim tablosu (taraf başına TEK satır, party_id UNIQUE) — her
+      açılışta yeniden model çağrısı (ücret) çıkmıyor.
+- [x] Hata: invoke hatasında error.context gövdesi okunup KIRMIZI ve KALICI satıra
+      fonksiyon adıyla yazılıyor (15.08 dersi).
+tsc temiz; edge fonksiyon sözdizimi esbuild ile doğrulandı. CANLI TEST YOK.
+SQL GEREKLİ: supabase/migrations/20260816160000_iletisim_degisim.sql (1 tablo + RLS;
+tarafa SELECT politikası yok). SIRA: önce SQL, sonra redeploy/publish.
+REDEPLOY GEREKLİ: iletisim-degisim (YENİ — deploy edilmeden çalışmaz).
+AÇIK UÇ: Ayrıntı yalnız EN ESKİ ve EN YENİ metni karşılaştırır; aradaki metinler
+paragrafa girmez (sayım kolu da öyle çalışıyor).
+AÇIK UÇ: Alıntı doğrulaması sadeleştirilmiş metin üzerinde yapılır; model alıntıyı
+özetlerse eleme devreye girer ve paragraf yazılmaz — bu bilinçli olarak katı bırakıldı.
+
 ## Nerede kaldık — 16.08.2026 (68) · DÜZELTME: "İLETİŞİM VE ASIL İHTİYAÇ" BÖLÜMÜ
 TEŞHİS: Bölüm SİLİNMEDİ, yeri de alınmadı — kod aynen duruyor (sectionDefs id
 "kokpit-iletisim", DAYANAK katmanı). Bölüm 16.08'e kadar KOŞULLUYDU:
