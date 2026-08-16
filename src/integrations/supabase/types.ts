@@ -1692,6 +1692,128 @@ export type Database = {
           },
         ]
       }
+      kayit_onay_talepleri: {
+        Row: {
+          case_id: string
+          created_at: string
+          gonderen_user_id: string | null
+          gonderim_zamani: string
+          id: string
+          iptal_zamani: string | null
+          metin_surumu: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          gonderen_user_id?: string | null
+          gonderim_zamani?: string
+          id?: string
+          iptal_zamani?: string | null
+          metin_surumu?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          gonderen_user_id?: string | null
+          gonderim_zamani?: string
+          id?: string
+          iptal_zamani?: string | null
+          metin_surumu?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kayit_onay_talepleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "kayit_onay_talepleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kayit_onaylari: {
+        Row: {
+          case_id: string
+          created_at: string
+          dayanak: string | null
+          durum: string
+          id: string
+          karar_zamani: string
+          katilimci_adi: string | null
+          katilimci_anahtari: string
+          katilimci_tipi: string
+          kaydeden_user_id: string | null
+          metin_surumu: string
+          party_id: string | null
+          talep_id: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          dayanak?: string | null
+          durum: string
+          id?: string
+          karar_zamani?: string
+          katilimci_adi?: string | null
+          katilimci_anahtari: string
+          katilimci_tipi: string
+          kaydeden_user_id?: string | null
+          metin_surumu?: string
+          party_id?: string | null
+          talep_id: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          dayanak?: string | null
+          durum?: string
+          id?: string
+          karar_zamani?: string
+          katilimci_adi?: string | null
+          katilimci_anahtari?: string
+          katilimci_tipi?: string
+          kaydeden_user_id?: string | null
+          metin_surumu?: string
+          party_id?: string | null
+          talep_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kayit_onaylari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "kayit_onaylari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kayit_onaylari_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kayit_onaylari_talep_id_fkey"
+            columns: ["talep_id"]
+            isOneToOne: false
+            referencedRelation: "kayit_onay_talepleri"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_base_chunks: {
         Row: {
           alan: string | null
@@ -2404,6 +2526,77 @@ export type Database = {
             columns: ["kaynak_document_id"]
             isOneToOne: false
             referencedRelation: "case_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oturum_kayitlari: {
+        Row: {
+          case_id: string
+          created_at: string
+          dokum_metni: string | null
+          dokum_silindi_at: string | null
+          dokum_silme_notu: string | null
+          id: string
+          ses_dosya_yolu: string | null
+          ses_silindi_at: string | null
+          ses_silme_notu: string | null
+          session_id: string | null
+          talep_id: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          dokum_metni?: string | null
+          dokum_silindi_at?: string | null
+          dokum_silme_notu?: string | null
+          id?: string
+          ses_dosya_yolu?: string | null
+          ses_silindi_at?: string | null
+          ses_silme_notu?: string | null
+          session_id?: string | null
+          talep_id?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          dokum_metni?: string | null
+          dokum_silindi_at?: string | null
+          dokum_silme_notu?: string | null
+          id?: string
+          ses_dosya_yolu?: string | null
+          ses_silindi_at?: string | null
+          ses_silme_notu?: string | null
+          session_id?: string | null
+          talep_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oturum_kayitlari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "oturum_kayitlari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oturum_kayitlari_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "case_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oturum_kayitlari_talep_id_fkey"
+            columns: ["talep_id"]
+            isOneToOne: false
+            referencedRelation: "kayit_onay_talepleri"
             referencedColumns: ["id"]
           },
         ]
