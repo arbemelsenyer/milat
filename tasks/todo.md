@@ -849,6 +849,8 @@ DOLDURULMADAN kod yazılmaz.
       DEĞİŞMEZ: dosya metni, taraf beyanı ve belge içeriği hiçbir havuza/eğitime ÇIKMAZ.
 - [ ] A12 · OTURUM ERTELEME TUTANAĞI şablonu + erteleme bildiriminin ajan tarafından
       gönderilmesi.
+      BEKLİYOR — tutanak şablonları yüklenmeden yapılamaz (taslak denetimi ile aynı
+      önkoşul). Şablonlar geldiğinde ikisi birlikte ele alınacak.
 
 ### B) ARABULUCU
 - [ ] B13 · ELVERİŞLİLİK KONTROLÜ — dosya açılışında arabuluculuğa elverişlilik taraması;
@@ -905,6 +907,15 @@ DOLDURULMADAN kod yazılmaz.
       iki tarafa da eşit verildi.
 - [ ] D28 · "NE YAPAR / NE YAPMAZ" TANITIM EKRANI — arabulucunun ilk girişinde.
 - [ ] D29 · DENETİM İZİ — hangi çıktı ne zaman üretildi, kim onayladı, kim değiştirdi.
+      ERTELENDİ (16.08.2026) — Şimdi yapılmayacak; PİLOT DIŞARI AÇILMADAN ÖNCE kurulacak.
+      Gerekçe: kayıt, itiraz veya denetim hâlinde işe yarar; pilotta dosyalar kurucunun
+      kendi dosyaları olduğu için karşılığını ancak ürün dışarıya açıldığında verir.
+      TASARIM KARARI: dağınık biçimde her düğmeye ayrı kayıt satırı eklenmeyecek; TEK
+      KAYIT KAPISI kurulacak — üründeki her onay, düzenleme ve ret aynı kapıdan geçip
+      otomatik deftere yazacak, böylece sonradan eklenen özellikler de kendiliğinden
+      kaydedilecek. Hâlihazırda ajan tarafı yazılıyor (ajan görevleri, braket denetim izi,
+      nöbetçi gerekçeleri); eksik olan İNSAN tarafı: arabulucunun taslak düzenlemeleri,
+      öneri kabul/retleri, belge onayları.
 
 ### ERTELENENLER (karar: sonra)
 - Arabulucu ataması + çıkar çatışması taraması — sonra.
