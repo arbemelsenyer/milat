@@ -173,6 +173,21 @@ AÇIK UÇ: Parça seçimi anahtar kelime taramasıdır (embedding kullanılmadı
 sadelik için); ilgili hüküm başka sözcüklerle yazılıysa parça isteme girmeyebilir.
 
 ## Nerede kaldık — 16.08.2026 (74) · "VERİLERİM" SAYFASI (C25 · KVKK/İBA şeffaflık)
+- [x] CANLIDA DOĞRULANDI (16.08.2026) — İBA 3.4 / KVKK ilgili kişi hakları.
+      /verilerim adresinde, sol menüde bağlantılı (commit 67c5691). Taraf kendi verisini
+      KATEGORİ düzeyinde görüyor: her kategoride kaç kayıt var, kimler görebilir, ne
+      kadar saklanıyor. Salt görüntüleme — silme/dışa aktarma düğmesi YOK. 14 kategori
+      listeleniyor; karşı tarafın verisi hiçbir şekilde görünmüyor.
+AÇIK KALEM: SAKLAMA SÜRELERİ KARARA BAĞLANACAK — 14 veri kategorisinin 10'unda saklama
+süresi "belirsiz" görünüyor (yalnız belgeler 5 yıl, mali kayıt 10 yıl tanımlı). Kurucu
+mevzuata göre süreleri belirleyecek, sabit tabloya yazılacak, sayfa kendiliğinden dolacak.
+Süresi tanımsız kategoriler: taraf kaydı · beyan · keşif soru-cevapları · dosya içi
+mesajlar · kabul aralığı (braket) · kör teklif · ajan görev kayıtları · YZ kullanım onayı ·
+oturum kaydı onayı · randevu teklifleri · müsaitlik bildirimleri.
+AÇIK KALEM: ÜÇ TABLONUN ERİŞİM POLİTİKASI DOĞRULANAMADI — YZ kullanım bilgilendirmesi
+onayı · randevu teklifleri ve cevapları · bildirilen müsait gün-saatler. Verilerim sayfası
+bunlar için "kimin görebildiği doğrulanamadı" diyor; RLS politikası eksik veya farklı
+kurgulanmış olabilir, güvenlik tarafında incelenecek.
 KEŞİF: Kategoriler ve "kimler görebilir" bilgisi UYDURULMADI — depodaki gerçek RLS
 politikalarından okundu: case_parties (taraf yalnız user_id=auth.uid() satırı; arabulucu
 ve yönetici görür) · case_documents ("Party sees own uploads only": taraf YALNIZ kendi
@@ -200,6 +215,15 @@ AÇIK UÇ: Üç kategoride "kimler görebilir" belirsiz (yz_beyan_onaylari · ra
 · taraf_musaitlik) — politikaları canlıda kurulmuş, depoda yok.
 
 ## Nerede kaldık — 16.08.2026 (73) · YAPAY ZEKÂ NE YAPAR / NE YAPMAZ EKRANI
+- [x] CANLIDA DOĞRULANDI (16.08.2026) — İBA üçüncü bölüm (şeffaflık). /yapay-zeka
+      adresinde "Bu platformda yapay zekâ ne yapar, ne yapmaz" sayfası yayında, sol
+      menüde bağlantısı var (commit ef91548). İçerik ilke düzeyinde yazıldı (özellik
+      listesi değil), böylece yeni kol eklendikçe güncellenmesi gerekmiyor. YAPMAZ
+      listesi: karar vermez · hukuki tavsiye vermez · kişilik/duygu/niyet
+      değerlendirmesi yapmaz · dayanaksız bulgu göstermez · bir tarafın verisini karşı
+      tarafa göstermez · veriyi model eğitimine aktarmaz · arabulucunun yerine süreci
+      yönetmez. NOT: dosya açılışında imzalı onay olarak alınması ayrı bir iş, henüz
+      yapılmadı.
 - [x] Yeni sayfa: src/pages/YapayZekaBeyani.tsx — salt bilgi ekranı (veri okumaz,
       yazmaz, model çağrısı yapmaz). Metin kurucunun verdiği hâliyle AYNEN kullanıldı;
       madde eklenmedi, çıkarılmadı. Mevcut kart/tipografi bileşenleri kullanıldı, yeni

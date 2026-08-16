@@ -90,6 +90,9 @@ ile doğrulanır.
 - 16.08: usul_engelleri tablosu kuruldu (case_id UNIQUE, durum 'engel_var'/'engel_yok',
   engeller jsonb) + RLS; SELECT yalnız arabulucu/dosya sahibi, admin ALL, TARAFA
   POLİTİKA YOK. agent_states izinli listesine 'usul_engeli' eklendi.
+- 16.08: case_documents tablosuna "Yonetici belge yukler" INSERT politikası eklendi:
+  uploaded_by = auth.uid() AND has_role(auth.uid(),'admin'). Sebep: admin hesabı taraf
+  dosyalarına belge yükleyemiyordu.
 - (daha önce kurulanlar buraya eklenecek: mediator_reads_offers,
   mediator_writes_discovery, mediator_updates_discovery, ajan_gorevleri politikaları,
   taraf_musaitlik RLS)
