@@ -94,16 +94,24 @@ Deno.serve(async (req) => {
     const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
+    const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 
+    // İç çağrı kapısı: nöbetçi ajan bu fonksiyonu x-cron-secret ile çağırabilir;
+    // dışarıdan gelen isteklerde kullanıcı yetkisi aranır. Anahtar tanımsız ya da
+    // boşsa kapı KAPALIDIR (güvenli taraf). Kalıp guc-dengesi/belge-ozeti ile aynıdır.
+    const isCron = !!CRON_SECRET && req.headers.get("x-cron-secret") === CRON_SECRET;
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return json({ error: "Oturum doğrulanamadı" }, 401);
+    if (!isCron && !authHeader) return json({ error: "Oturum doğrulanamadı" }, 401);
 
-    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData?.user) return json({ error: "Oturum doğrulanamadı" }, 401);
-    const userId = userData.user.id;
+    let userId = "";
+    if (!isCron) {
+      const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+        global: { headers: { Authorization: authHeader! } },
+      });
+      const { data: userData, error: userErr } = await userClient.auth.getUser();
+      if (userErr || !userData?.user) return json({ error: "Oturum doğrulanamadı" }, 401);
+      userId = userData.user.id;
+    }
 
     const body = await req.json().catch(() => ({}));
     const case_id = temiz((body as any)?.case_id);
@@ -118,12 +126,15 @@ Deno.serve(async (req) => {
     if (!caseRow) return json({ error: "Dosya bulunamadı" }, 404);
 
     // Yetki: yalnız görevli arabulucu, dosya sahibi veya yönetici. Taraf çağıramaz.
-    const { data: roleRow } = await admin.from("user_roles")
-      .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
-    const yetkili = (caseRow as any).assigned_mediator_id === userId
-      || (caseRow as any).user_id === userId
-      || !!roleRow;
-    if (!yetkili) return json({ error: "Bu dosya için yetkiniz yok" }, 403);
+    // İç çağrıda (nöbetçi) kullanıcı yoktur; bu blok atlanır.
+    if (!isCron) {
+      const { data: roleRow } = await admin.from("user_roles")
+        .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+      const yetkili = (caseRow as any).assigned_mediator_id === userId
+        || (caseRow as any).user_id === userId
+        || !!roleRow;
+      if (!yetkili) return json({ error: "Bu dosya için yetkiniz yok" }, 403);
+    }
 
     durumAdmin = admin;
     durumCaseId = case_id;
