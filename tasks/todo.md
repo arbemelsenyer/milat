@@ -1,3 +1,42 @@
+## Nerede kaldık — 16.08.2026 (78) · USULE İLİŞKİN ENGEL KONTROL LİSTESİ (İBA 2.4)
+- [x] Yeni edge fonksiyon: supabase/functions/usul-engeli (config.toml verify_jwt=true).
+      YAPAY ZEKÂ ÇAĞRISI YOK — hesap tamamen kodda, bedava kol.
+      · Yetki: guc-dengesi/elverislilik kalıbı — x-cron-secret iç çağrı kapısı + dış
+        çağrıda arabulucu/dosya sahibi/yönetici; taraf 403.
+      · Dört başlık (alan adları types.ts ve Aşama 2 panelinden doğrulandı):
+        (a) VEKALETNAME — case_parties.vekil_ad_soyad dolu ama adında "vekaletname"
+        geçen belge yoksa eksik; vekil yoksa satır yazılmaz.
+        (b) TÜZEL KİŞİDE TEMSİL/İMZA YETKİLİSİ — party_type='corporate' ve
+        authorized_person boşsa "belgeden kontrol edilmeli" notu; belge içeriğine
+        BAKILMAZ, model çağrılmaz.
+        (c) TEBLİGATA ESAS İLETİŞİM — address/email/gsm-phone boş ya da e-posta biçimi
+        geçersizse hangi alanın boş olduğu yazılır.
+        (d) SÜRE — deadline_extended ?? deadline_total varsa kalan gün hesaplanır;
+        15 günden az kaldıysa (veya dolmuşsa) kalan/geçen gün sayısıyla yazılır.
+        Süre kaydı yoksa satır yazılmaz.
+      · Her satır: baslik · tespit (hangi tarafta hangi alan) · referans. Referans
+        DOĞRULANMADIĞI için şimdilik BOŞ bırakılıyor — uydurma madde numarası yazılmıyor.
+      · Hiç eksik yoksa durum 'engel_yok'. Upsert onConflict case_id; agent_states'e
+        'usul_engeli' durumu (try/catch).
+- [x] Nöbetçiye bağlandı (doğuştan otomatik): OTOMATIK_KOLLAR'a "usul-engeli" eklendi,
+      icKapi true. Koşum koşulu: en az bir taraf kayıtlı. Girdi imzası: taraf sayısı +
+      en son taraf kaydı zamanı + dava şartı son tarihi + boş alan parmak izi
+      (case_parties'te updated_at kolonu YOK, bu yüzden alan doldurulunca imza değişsin
+      diye eksik alan sayısı imzaya katıldı).
+- [x] ÜCRETSİZ KOL: tur başına 3 ücretli çağrı sınırına DAHİL DEĞİL (kol tanımında
+      ucretsiz:true; bütçe düşülmüyor). Diğer kolların sınırı ve adil sıralama aynen.
+- [x] Ekran: kokpit > MASAYA OTURURKEN > "Usule ilişkin engeller", Usul önerisinin
+      ALTINDA. Kayıt yoksa "Henüz kontrol edilmedi" · 'engel_yok' ise "Usule ilişkin
+      eksik görünmüyor" · 'engel_var' ise satırlar (başlık · tespit · varsa referans).
+      [Kontrol et] / [Yeniden kontrol et] düğmesi var, MALİYET İŞARETİ YOK (ücretsiz).
+      Yalnız arabulucuya görünür; tarafa gitmez, bildirim yok.
+tsc temiz; usul-engeli ve ajan-nobetci esbuild ile doğrulandı. CANLI TEST YOK.
+SQL YAZILMADI (tablo kurucu tarafından kuruldu). REDEPLOY GEREKLİ: usul-engeli (YENİ) ·
+ajan-nobetci.
+AÇIK UÇ: Referans alanı boş — doğrulanmış madde künyesi kaynağı (hukuk kural katmanı)
+bağlanınca doldurulacak. Aşama 2'deki mevcut "USULE İLİŞKİN ENGELLER" katmanı ayrı ve
+istemci tarafında çalışmaya devam ediyor; bu kol kokpit karşılığıdır.
+
 ## Nerede kaldık — 16.08.2026 (77) · KOLLARI NÖBETÇİYE BAĞLAMA (OTOMATİK KOŞUM)
 - [x] CANLIDA DOĞRULANDI (16.08.2026) — Yedi kol (elverislilik, belge-ozeti,
       olay-cizelgesi, guc-dengesi, usul-onerisi, iletisim-degisim, dosya-ozeti-oner)

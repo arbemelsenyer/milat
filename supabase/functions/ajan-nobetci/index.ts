@@ -1612,7 +1612,9 @@ type Butce = { kalan: number };
 // YEDİ kolun tamamı nöbetçiden çalıştırılabiliyor. Bir fonksiyondan kapı
 // kaldırılırsa buradaki bayrak false yapılır — kol o zaman kokpitteki düğmeyle
 // çalışmaya devam eder.
-const OTOMATIK_KOLLAR: { kol: string; fonksiyon: string; icKapi: boolean }[] = [
+// ucretsiz=true olan kol model çağırmaz (hesap koddadır); tur başına 3 ücretli
+// çağrı sınırına DAHİL DEĞİLDİR.
+const OTOMATIK_KOLLAR: { kol: string; fonksiyon: string; icKapi: boolean; ucretsiz?: boolean }[] = [
   { kol: "elverislilik", fonksiyon: "elverislilik", icKapi: true },
   { kol: "belge-ozeti", fonksiyon: "belge-ozeti", icKapi: true },
   { kol: "olay-cizelgesi", fonksiyon: "olay-cizelgesi", icKapi: true },
@@ -1620,6 +1622,8 @@ const OTOMATIK_KOLLAR: { kol: string; fonksiyon: string; icKapi: boolean }[] = [
   { kol: "usul-onerisi", fonksiyon: "usul-onerisi", icKapi: true },
   { kol: "iletisim-degisim", fonksiyon: "iletisim-degisim", icKapi: true },
   { kol: "dosya-ozeti-oner", fonksiyon: "dosya-ozeti-oner", icKapi: true },
+  // Usule ilişkin engel kontrolü: yapay zekâ çağrısı YOK, tamamı koddan hesaplanır.
+  { kol: "usul-engeli", fonksiyon: "usul-engeli", icKapi: true, ucretsiz: true },
 ];
 
 async function kosumIziOku(admin: any, caseId: string): Promise<Record<string, any>> {
@@ -1686,7 +1690,9 @@ async function otomatikKosumKollari(admin: any, dosya: any, butce: Butce): Promi
 
   // ── Koşum koşullarının dayandığı kayıtlar (tek seferde okunur) ──────────
   const [taraflarRes, belgelerRes, orkestratorRes] = await Promise.all([
-    admin.from("case_parties").select("id, user_id, statement, created_at").eq("case_id", caseId).limit(30),
+    admin.from("case_parties")
+      .select("id, user_id, statement, created_at, email, address, vekil_ad_soyad")
+      .eq("case_id", caseId).limit(30),
     admin.from("case_documents").select("id, party_id, extraction_status, created_at").eq("case_id", caseId).limit(200),
     admin.from("agent_states").select("status, updated_at")
       .eq("case_id", caseId).eq("agent_type", "orchestrator").eq("status", "completed").limit(1),
@@ -1701,6 +1707,13 @@ async function otomatikKosumKollari(admin: any, dosya: any, butce: Butce): Promi
     .sort()
     .slice(-1)[0] ?? "-";
   const beyanli = taraflar.filter((t) => String(t.statement ?? "").trim().length > 40).length;
+  // usul-engeli kolunun imzası için: en son taraf kaydı, süre ve boş alan sayısı.
+  const enSonTaraf = taraflar.map((t) => String(t.created_at ?? "")).sort().slice(-1)[0] ?? "-";
+  const sureImzasi = String(dosya?.deadline_extended ?? dosya?.deadline_total ?? "-");
+  const eksikAlanSayisi = taraflar.reduce((sayi, t) => sayi
+    + (String(t.email ?? "").trim() ? 0 : 1)
+    + (String(t.address ?? "").trim() ? 0 : 1)
+    + (String(t.vekil_ad_soyad ?? "").trim() ? 1 : 0), 0);
   const konuUzunluk = String(dosya?.issue_description ?? "").trim().length;
 
   const izi = await kosumIziOku(admin, caseId);
@@ -1737,6 +1750,16 @@ async function otomatikKosumKollari(admin: any, dosya: any, butce: Butce): Promi
       sebep: "en az iki taraf kaydı yok",
       govde: { case_id: caseId },
     },
+    "usul-engeli": {
+      // Koşum koşulu: en az bir taraf kayıtlı. İmza: taraf sayısı + en son taraf
+      // kaydının zamanı + dava şartı son tarihi + eksik alan parmak izi
+      // (case_parties'te updated_at kolonu yok; alan doldurulunca imza değişsin diye
+      // boş alan sayısı imzaya katılır).
+      uygun: taraflar.length >= 1,
+      imza: `taraf:${taraflar.length}|son:${enSonTaraf}|sure:${sureImzasi}|eksik:${eksikAlanSayisi}`,
+      sebep: "taraf kaydı yok",
+      govde: { case_id: caseId },
+    },
     "dosya-ozeti-oner": {
       uygun: !!orkestratorTamam,
       imza: `orch:${String(orkestratorTamam?.updated_at ?? "-")}|konu:${konuUzunluk}`,
@@ -1765,12 +1788,14 @@ async function otomatikKosumKollari(admin: any, dosya: any, butce: Butce): Promi
       }
       continue;
     }
-    if (butce.kalan <= 0) {
-      ozet.sebepler.push(`otomatik koşum (${tanim.kol}): tur sınırı doldu — sonraki turda koşulacak`);
-      continue;
+    // ÜCRETSİZ kol (model çağırmaz) tur sınırından muaftır; bütçe düşülmez.
+    if (!tanim.ucretsiz) {
+      if (butce.kalan <= 0) {
+        ozet.sebepler.push(`otomatik koşum (${tanim.kol}): tur sınırı doldu — sonraki turda koşulacak`);
+        continue;
+      }
+      butce.kalan--;
     }
-
-    butce.kalan--;
     const r = await icFonksiyonCagir(tanim.fonksiyon, d.govde);
     if (r.ok) {
       await kosumIziYaz(admin, caseId, tanim.kol, d.imza, "kosuldu", r.sebep);

@@ -87,6 +87,9 @@ ile doğrulanır.
 - 16.08: İki kez ELLE BAKIM — iç çağrı kapısı düzeltildikten sonra ajan_kosum_izi'nde
   durum='atlandi' satırları silindi ki nöbetçi kolları yeniden denesin. Bu bakım,
   bayrak/kapı uyumsuzluğu giderildiği için bundan sonra gerekmeyecek.
+- 16.08: usul_engelleri tablosu kuruldu (case_id UNIQUE, durum 'engel_var'/'engel_yok',
+  engeller jsonb) + RLS; SELECT yalnız arabulucu/dosya sahibi, admin ALL, TARAFA
+  POLİTİKA YOK. agent_states izinli listesine 'usul_engeli' eklendi.
 - (daha önce kurulanlar buraya eklenecek: mediator_reads_offers,
   mediator_writes_discovery, mediator_updates_discovery, ajan_gorevleri politikaları,
   taraf_musaitlik RLS)

@@ -7175,6 +7175,14 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     body: <UsulOnerisiPanel caseRow={caseRow} />,
   });
 
+  // Usule ilişkin engeller (İBA 2.4) — MASAYA OTURURKEN katmanı, Usul önerisinin
+  // hemen ALTINDA. Hesap koddadır (model çağrısı yok), bu yüzden düğmede maliyet
+  // işareti YOKTUR. Yalnız arabulucu yüzeyinde çizilir.
+  sectionDefs.push({
+    id: "kokpit-usul-engeli", layer: LAYER_TABLE, title: "Usule ilişkin engeller",
+    body: <UsulEngeliPanel caseRow={caseRow} />,
+  });
+
   if (consistencyItems.length > 0) {
     sectionDefs.push({
       id: "kokpit-ic-tutarlilik", layer: LAYER_EVIDENCE, title: "İç tutarlılık",
@@ -10511,6 +10519,107 @@ function UsulOnerisiPanel({ caseRow }: { caseRow: CaseRow }) {
         </Button>
         <UcretliIsaret />
       </div>
+    </div>
+  );
+}
+
+/* ====== USULE İLİŞKİN ENGELLER (İBA 2.4) — yalnız arabulucu ================
+   Ajan kanun yorumu YAPMAZ, EKSİK SAYAR. Hesap tamamen sunucuda kodla yapılır;
+   model çağrısı yoktur — bu yüzden düğmenin altında maliyet işareti YOKTUR.
+   Referans alanı boş gelebilir: doğrulanmamış madde numarası yazılmaz. */
+function UsulEngeliPanel({ caseRow }: { caseRow: CaseRow }) {
+  const [kayit, setKayit] = useState<any | null>(null);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const yukle = useCallback(async () => {
+    setYukleniyor(true);
+    const { data, error } = await (supabase.from("usul_engelleri" as any) as any)
+      .select("durum, engeller, updated_at").eq("case_id", caseRow.id).maybeSingle();
+    if (error) setHata(`Usul engeli kaydı okunamadı: ${error.message}`);
+    else setKayit(data ?? null);
+    setYukleniyor(false);
+  }, [caseRow.id]);
+  useEffect(() => { yukle(); }, [yukle]);
+
+  async function kontrolEt() {
+    setBusy(true);
+    setHata(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("usul-engeli", {
+        body: { case_id: caseRow.id },
+      });
+      if (error) {
+        // Gerçek sebep .context gövdesindedir; sessizce yutulmaz.
+        let ham = String((error as any)?.message ?? "bilinmeyen hata");
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.text === "function") {
+          try {
+            const govde = await ctx.text();
+            if (govde) {
+              try { const j = JSON.parse(govde); ham = String(j?.error ?? j?.sebep ?? govde); }
+              catch { ham = String(govde).slice(0, 400); }
+            }
+          } catch { /* gövde okunamadı */ }
+        }
+        throw new Error(ham);
+      }
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+      await yukle();
+    } catch (e: any) {
+      console.error("[usul-engeli] çağrı başarısız", e);
+      setHata(`usul-engeli çağrısı başarısız: ${trErr(e?.message ?? "bilinmeyen hata")}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const engeller = Array.isArray(kayit?.engeller) ? kayit.engeller : [];
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground leading-snug">
+        Süreci aksatabilecek usul eksikleri — vekaletname, tüzel kişide temsil/imza yetkilisi,
+        tebligata esas iletişim bilgisi ve yasal süre. Liste kanun yorumu içermez; yalnız hangi
+        tarafta hangi alanın boş olduğunu sayar.
+      </p>
+
+      {hata && (
+        <div className="text-sm rounded border border-destructive/40 bg-destructive/10 text-destructive p-3">
+          {hata}
+        </div>
+      )}
+
+      {yukleniyor ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Kayıt okunuyor…
+        </div>
+      ) : !kayit ? (
+        <p className="text-sm text-muted-foreground italic">Henüz kontrol edilmedi.</p>
+      ) : engeller.length === 0 ? (
+        <p className="text-sm">Usule ilişkin eksik görünmüyor.</p>
+      ) : (
+        <ul className="space-y-3">
+          {engeller.map((e: any, i: number) => (
+            <li key={i} className="text-sm border-l-2 border-amber-300 pl-3 space-y-0.5">
+              <div className="font-medium">{safeText(e?.baslik)}</div>
+              <div className="text-muted-foreground leading-snug">{safeText(e?.tespit)}</div>
+              {safeText(e?.referans) && (
+                <div className="text-xs text-muted-foreground leading-snug">
+                  Mevzuat referansı: {safeText(e.referans)}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Button size="sm" variant="outline" className={KART_DUGME} onClick={kontrolEt} disabled={busy}>
+        {busy
+          ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Kontrol ediliyor…</>
+          : <><RefreshCw className="h-4 w-4 mr-1" /> {kayit ? "Yeniden kontrol et" : "Kontrol et"}</>}
+      </Button>
     </div>
   );
 }

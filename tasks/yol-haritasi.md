@@ -720,3 +720,15 @@ Kayıt usul_onerileri tablosunda, tarafa SELECT politikası yok.
 SQL göçü bekliyor: 20260816220000_usul_onerisi.sql (tablo + RLS + agent_states izinli
 listesine 'usul_onerisi' — 22. ad). REDEPLOY GEREKLİ: usul-onerisi (YENİ).
 
+16.08 (USULE İLİŞKİN ENGEL KONTROL LİSTESİ — İBA 2.4, kokpit kolu): Yeni edge fonksiyon
+usul-engeli — yapay zekâ çağrısı YOK, hesap tamamen kodda. Dört başlık taranıyor:
+vekaletname (vekil kaydı varken belge yoksa), tüzel kişide temsil/imza yetkilisi,
+tebligata esas iletişim bilgisi (adres/e-posta/telefon) ve yasal süre (15 günden az
+kaldıysa kalan gün). Her satırda başlık, tespit ve referans alanı var; referans
+doğrulanmadığı için boş bırakılıyor, uydurma madde yazılmıyor. Sonuç usul_engelleri
+tablosuna yazılıyor (tarafa politika yok). Nöbetçiye doğuştan otomatik kol olarak
+bağlandı (koşum koşulu: en az bir taraf); ücretsiz olduğu için tur başına 3 ücretli
+çağrı sınırına dahil değil. Kokpitin MASAYA OTURURKEN katmanında, Usul önerisinin altında
+"Usule ilişkin engeller" bölümü açıldı; düğmede maliyet işareti yok.
+REDEPLOY GEREKLİ: usul-engeli (YENİ) · ajan-nobetci. SQL: kurucu tarafından çalıştırıldı.
+
