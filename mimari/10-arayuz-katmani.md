@@ -4,7 +4,7 @@ bitince sonuç kartı; son söz arabulucuda. 4. Her Al kartı: Açıkla - Düzel
 kullanılmaz). 5. Güven rozeti: Yüksek/Orta/Düşük, risk renklerinden ayrı. 6. Manuel herzaman kazanır. 7.
 Görsel kimlik: MİLAT navy-altın paleti, kart derinlik sistemi e.
 
-[v0.36 EKLEME — KATMANLI KATLANIR EKRAN DÜZENİ (05–11.08)] 8. Uzun ekranlar katman düzenine
+[v0.36 EKLEME — KATMANLI KATLANIR EKRAN DÜZENİ (05–11.08)] (16.08.2026 düzeltildi: aşama numaralaması ve braket katmanı koda göre eşitlendi) 8. Uzun ekranlar katman düzenine
 geçti: üstte katlanmayan durum şeridi, altında tıklanabilir katlanır katman başlıkları (ana
 başlık + sayaç + tek satır italik açıklama), katman içinde bölüm satırları. Kutu içinde kutu yok,
 iki yazı boyu, renk yalnız rozetlerde, emoji yok, ince gri ayraçlar.
@@ -17,19 +17,19 @@ iki yazı boyu, renk yalnız rozetlerde, emoji yok, ince gri ayraçlar.
     başlıklar 1..n, alt maddeler bağlı olduğu başlığın numarasını alır (2.1, 2.2 …).
     Numaralar liste sırasından hesaplanır, yalnız sol menüdedir; sayfadaki başlıklar
     numarasızdır. Büyük harf Türkçe kuralına göre (ŞİMDİ NE YAPMALISIN).
-  ● 13.08: Faz 3 sol menüsüne aynı bölüm dizini geldi (1. DOSYA ÖZETİ · 1.1 Uyuşmazlık
+  ● 13.08: Aşama 2 — Taraf Analizi (o günkü adıyla Faz 3) sol menüsüne aynı bölüm dizini geldi (1. DOSYA ÖZETİ · 1.1 Uyuşmazlık
     konusu · 1.2 Uyuşmazlık tür tespiti · 2. TARAFLAR · 3. BELGELER VE ARAÇLAR);
-    numaralandırma ve çizim Faz 4 ile tek kopyadır (numberMenuEntries).
+    numaralandırma ve çizim Aşama 3 (kokpit) ile tek kopyadır (numberMenuEntries).
   ● 13.08: Ana katman başlıkları hem sol dizinde hem sayfada BÜYÜK HARF (Türkçe İ ile,
     doğrudan yazılı); alt bölüm başlıkları küçük harf kaldı.
   ● 13.08: Kelime birliği — kullanıcıya görünen her yerde "Aşama" (üst şeritler
     "AŞAMA N — …"); üst şeritle tekrarlanan sayfa içi aşama başlıkları kaldırıldı
-    (açıklama cümleleri kaldı); Aşama 4 durum şeridinde "Sıradaki aşama: N".
+    (açıklama cümleleri kaldı); Aşama 3 (kokpit) durum şeridinde "Sıradaki aşama: N".
 · Aşama 2 — Taraf Analizi (14.08'e kadar "Faz 3"): aynı düzene geçti — üç katman: Dosya özeti (uyuşmazlık konusu metni
   varsayılan kapalı · uyuşmazlık tür tespiti varsayılan açık) · Taraflar (kartlar tek satır özet,
   tıklayınca detay ve analiz düğmeleri) · Belgeler ve araçlar (metin çıkarma). Sol menüde
   "3. Taraf Analizi" altında girintili katman satırları.
-9. KALICI: Faz 3 tür tespiti iki menüdür (ana tür + alt uzmanlık) — hiçbir düzen değişikliğinde
+9. KALICI: Aşama 2 (Taraf Analizi) tür tespiti iki menüdür (ana tür + alt uzmanlık) — hiçbir düzen değişikliğinde
    kaldırılamaz (§5 v0.36 kalıcı şart).
 
 [EKLEME — KAYIT ONAY PANELİ (13.08)] ● CANLI. 10. Kayıt "kontrol et → düzelt → onayla"
@@ -60,14 +60,14 @@ arabulucunun kendi girdiği kayıttır.
 ● 13.08: Girişsiz randevu cevap sayfası (/randevu/:token) — menü, giriş ve başka bağlantı yok;
   tek seçenekte "Toplantınız … için planlandı" + [Uygun]/[Uymuyor], çok seçenekte "Uygun saate
   dokunun" + saat düğmeleri + küçük "Hiçbiri uymuyor". Cevap sonrası yalnız "Teşekkürler,
-  kaydedildi."; geçersiz veya cevaplanmış token "Bu bağlantının süresi dolmuş." Aşama 5'te
+  kaydedildi."; geçersiz veya cevaplanmış token "Bu bağlantının süresi dolmuş." Aşama 4'te (Toplantı)
   "Randevu ayarla" kartı: taraf seçilir, sistemin seçtiği saatler kart olarak gösterilir,
   [Oluştur ve linki al] ile link üretilir ([Kopyala] · [WhatsApp'ta aç]); [Düzenle] saatleri
   değiştirmenin tek yoludur, ayrı manuel saat seçme ekranı yoktur.
 ● 13.08: Kokpitteki "ŞİMDİ NE YAPMALISIN" kartında oturum planlamayı öneren maddede
-  "Randevu ayarla" eylem düğmesi var; düğme Aşama 5'teki mevcut randevu akışını tetikler
+  "Randevu ayarla" eylem düğmesi var; düğme Aşama 4'teki (Toplantı) mevcut randevu akışını tetikler
   (tek taraflı dosyada taraf otomatik seçilir ve saat önerisi istenir, çok taraflıda
-  kullanıcı Aşama 5'teki bölümde tarafı kendisi seçer). Diğer maddelerde düğme çıkmaz.
+  kullanıcı Aşama 4'teki (Toplantı) bölümde tarafı kendisi seçer). Diğer maddelerde düğme çıkmaz.
 ● 13.08: "ŞİMDİ NE YAPMALISIN" kartına keşif sorusu kolu — tarafa iletilmemiş sıradaki
   soru madde olarak çıkar (taraf adı + önizleme), [Soruyu gönder] soruyu yalnız o tarafın
   kendi kanalına (case_discovery_questions, party_id) yazar; taraf kendi ekranındaki
@@ -85,7 +85,7 @@ arabulucunun kendi girdiği kayıttır.
   hiçbir yüzeyden açılmaz. Okuma/yazma hataları ekranda gösterilir.
 ● 13.08: Aşama geçişinde ana alan artık bekletilmiyor — AnimatePresence mode="wait"
   kaldırıldı; yeni aşama, eskisinin çıkış animasyonunu beklemeden mount olur (sol menüden
-  Aşama 4'e geçişteki boş sayfa bu yüzden oluşuyordu). Kokpit brifingindeki "Kritik
+  Aşama 3'e (kokpit) geçişteki boş sayfa bu yüzden oluşuyordu). Kokpit brifingindeki "Kritik
   Faktörler" birleştirmesi güçlendirildi: aynı maddenin farklı ifadeleri ve genişletilmiş
   hâlleri tek satıra iner, kaynak etiketleri korunur.
 ● 13.08: Taraf dosyaya ilk girişinde "Yapay Zekâ Kullanım Bilgilendirmesi" kartı çıkar;
@@ -93,7 +93,7 @@ arabulucunun kendi girdiği kayıttır.
   metin_surumu) yazılır ve bir daha sorulmaz; metin sürümü değişirse onay yeniden istenir.
   Kart yalnız taraf girişinde görünür, arabulucu/admin ekranlarında çıkmaz. Kayıt hatası
   ekranda gösterilir, kart kapanmaz.
-● 13.08: Aşama 5 üst şeridindeki "Planlanan Oturum" sayacı yalnız GELECEKTEKİ planlı
+● 13.08: Aşama 4 (Toplantı) üst şeridindeki "Planlanan Oturum" sayacı yalnız GELECEKTEKİ planlı
   (scheduled) oturumları sayar; taslak ve geçmiş kayıtlar sayaca girmez.
 ● 14.08 ● CANLI (kod): GİRİŞSİZ KATILIM TEYİDİ SAYFASI (/katilim/:token) — menü, giriş
   ve başka bağlantı yok; tarafın adı, dosya künyesi (no + konu), arabulucunun adı ve
@@ -149,7 +149,7 @@ arabulucunun kendi girdiği kayıttır.
   Aralığım" sekmesi — alt/üst sınır, isteğe bağlı koşullu taahhüt (bant alt · bant üst ·
   inilecek tutar · arabulucuya not) ve varsa bant sorusu kartı ("Şu aralığı düşünür
   müsünüz?" · Düşünürüm / Bu aralığı düşünmüyorum). Sorunun kimden geldiği yazılmaz.
-  ARABULUCU: Aşama 3 (kokpit) RAPOR VE BELGELER katmanında "Koşullu aralık (braket)" bölümü — taraf başına
+  ARABULUCU: Aşama 3 (kokpit) RAPOR VE BELGELER katmanında "Koşullu aralık (braket)" bölümü (16.08.2026 düzeltildi: aşama numaralaması ve braket katmanı koda göre eşitlendi) — taraf başına
   aralık ve koşullu taahhüt kartı, örtüşme bandı ve yakınlık göstergesi (seyir yalnız
   arabulucuda). Braket denetim izi Ajan Paneli'ndeki "ne yaptı, ne yapmadı" listesinde
   "denetim izi" rozetiyle görünür.
@@ -207,4 +207,12 @@ arabulucunun kendi girdiği kayıttır.
   — Dördü de YALNIZ arabulucu yüzeyindedir; taraf ekranına hiçbir yüzeyden çıkmaz.
 · Sol dizindeki numaralar liste sırasından hesaplanır (numberMenuEntries): bir bölüm
   eklenip çıkarıldığında numaralar kendiliğinden kayar, elle numara yazılmaz.
+
+[DÜZELTME 16.08.2026 — İKİNCİ TUR] (16.08.2026 düzeltildi: aşama numaralaması ve braket katmanı koda göre eşitlendi)
+· Yukarıdaki 13.08 tarihli kayıtlarda geçen aşama numaraları BUGÜNKÜ modele çevrildi
+  (eski 3 → 2 Taraf Analizi · eski 4 → 3 Arabulucu Paneli/kokpit · eski 5 → 4 Toplantı).
+  Hiçbir kayıt silinmedi, yalnız numara ve parantez içi ad düzeltildi.
+· BRAKET KATMANI KODDAN DOĞRULANDI: MediationEngine.tsx içinde sectionDefs id
+  "kokpit-braket" kaydı layer = LAYER_REPORTS ("RAPOR VE BELGELER"). Belgedeki katman
+  adı bu kayıtla eşitlendi.
 
