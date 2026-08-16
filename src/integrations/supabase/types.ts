@@ -3367,6 +3367,48 @@ export type Database = {
         }
         Relationships: []
       }
+      usul_onerileri: {
+        Row: {
+          case_id: string
+          created_at: string
+          durum: string
+          id: string
+          oneriler: Json
+          updated_at: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          durum?: string
+          id?: string
+          oneriler?: Json
+          updated_at?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          durum?: string
+          id?: string
+          oneriler?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usul_onerileri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: true
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "usul_onerileri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: true
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       yz_beyan_onaylari: {
         Row: {
           case_id: string
