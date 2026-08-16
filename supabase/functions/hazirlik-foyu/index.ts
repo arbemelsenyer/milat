@@ -5,9 +5,15 @@
 //
 // KÖR VERİ (constitution m.1 — en sıkı kural): Föy TEK BİR TARAF için kurulur ve
 // yalnız O TARAFIN verisi kullanılır — kendi beyanı, kendi belgeleri ve özetleri,
-// kendi cevaplanmamış keşif soruları, dosyanın genel konusu ve oturum bilgisi.
+// dosyanın genel konusu ve oturum bilgisi.
 // Karşı tarafın beyanı, belgesi, analizi, teklifi, kabul aralığı ve gizli notu
 // girdiye HİÇBİR KOŞULDA girmez.
+//
+// BÖLÜMLER: "Oturumda konuşulacak başlıklar" · "Yanınızda bulundurmanız iyi olur"
+// · "Oturum bilgileri". "Cevabını hazırlamanız iyi olur" bölümü 16.08.2026'da
+// KAPATILDI: serbest soru üretimi dava/delil mantığına kayıyordu. İleride
+// kurucunun yazacağı sabit soru havuzundan seçimle yeniden açılacak; ilgili kod
+// silinmedi, yorum içinde bekliyor.
 //
 // DİL SINIRI: sade Türkçe; hukuki tavsiye, sonuç tahmini, "kabul edin/etmeyin",
 // rakam önerisi, karşı taraf hakkında yorum ve duygu/kişilik/niyet etiketi YASAK.
@@ -293,12 +299,18 @@ Deno.serve(async (req) => {
       .map((o) => `${temiz(o.ozet)} ${temiz(o.kaniti)}`.trim())
       .join("\n");
 
+    /* Soru bölümü 16.08.2026'da kapatıldı: serbest üretim dava/delil mantığına
+       kayıyordu. İleride kurucunun yazacağı sabit soru havuzundan seçimle yeniden
+       açılacak (bkz. DOJO incelemesi). Kod SİLİNMEDİ; havuz gelince bu okuma ve
+       aşağıdaki (c) bloğu yorumdan çıkarılarak geri açılır.
+
     const { data: sorular } = await admin.from("case_discovery_questions")
       .select("question_text, answer_text").eq("case_id", case_id).eq("party_id", party_id).limit(30);
     const cevapsizSorular = ((sorular ?? []) as any[])
       .filter((q) => !temiz(q.answer_text))
       .map((q) => temiz(q.question_text))
       .filter(Boolean);
+    */
 
     // Yüklenmiş belge adları: "eksik belgeler" bölümünde bunlar TEKRAR YAZILMAZ.
     const yuklenmisAdlar = ((belgeler ?? []) as any[])
@@ -436,10 +448,14 @@ ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tar
       }
     }
 
-    /* ── (c) Cevaplanmamış keşif soruları — KODDAN, ama SORU SINIRINDAN GEÇEREK.
-       16.08: bu sorular başka bir ajan tarafından üretiliyor; tarafsızlık sınırını
-       aşan soru (karşı tarafın kusurunu araştıran, tez kurduran, duygu sorgulayan)
-       föye ALINMAZ. Kararsız kalınan soru elenir. */
+    /* ── (c) KAPALI — "Cevabını hazırlamanız iyi olur" bölümü ARTIK ÜRETİLMEZ ──
+       Soru bölümü 16.08.2026'da kapatıldı: serbest üretim dava/delil mantığına
+       kayıyordu. İleride kurucunun yazacağı sabit soru havuzundan seçimle yeniden
+       açılacak (bkz. DOJO incelemesi). Kod SİLİNMEDİ; havuz gelince bu blok ve
+       yukarıdaki keşif sorusu okuması yorumdan çıkarılarak geri açılır.
+       Not: buradaki eleme süzgeçleri (soruYasakMi / soruYonYasakMi /
+       hukukiNitelemeVarMi) başlık ve eksik belge bölümlerinde HÂLÂ kullanılır.
+
     const guvenliSorular = cevapsizSorular
       .map((q) => makineEtiketiniKirp(q))
       .filter((q) => {
@@ -457,6 +473,7 @@ ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tar
         maddeler: guvenliSorular.slice(0, 8).map((q) => q.slice(0, 300)),
       });
     }
+    ── (c) KAPALI bloğun sonu ───────────────────────────────────────────────── */
 
     // ── (d) Oturum bilgileri — KODDAN, kayıttan ────────────────────────────
     const oturumMaddeleri: string[] = [];
