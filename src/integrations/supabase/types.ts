@@ -232,6 +232,54 @@ export type Database = {
           },
         ]
       }
+      ajan_kosum_izi: {
+        Row: {
+          case_id: string
+          created_at: string
+          durum: string
+          girdi_imzasi: string
+          id: string
+          kol: string
+          kosum_zamani: string
+          sebep: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          durum?: string
+          girdi_imzasi?: string
+          id?: string
+          kol: string
+          kosum_zamani?: string
+          sebep?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          durum?: string
+          girdi_imzasi?: string
+          id?: string
+          kol?: string
+          kosum_zamani?: string
+          sebep?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ajan_kosum_izi_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "ajan_kosum_izi_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       belge_ozetleri: {
         Row: {
           case_id: string
