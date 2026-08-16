@@ -12,6 +12,7 @@
         belirsizliği · boş bırakılmış şablon alanı · eksik imza/tarih alanı · aynı
         hükmün iki yerde farklı yazılması. Ajan metni değiştirmez, yalnız gösterir;
         hukuki geçerlilik yorumu yasak.
+      · Kutu 16.08'de ekrandan kaldırıldı; şablon yüklemesinden sonra geri açılacak.
 
 DURDURULDU (16.08) — AMA KOD ZATEN YAZILMIŞTI, GERİ ALINMADI (kurucu talimatı).
 Commit 7dab606 ile depoya girdi ve push edildi. Dokunulan dosyalar:

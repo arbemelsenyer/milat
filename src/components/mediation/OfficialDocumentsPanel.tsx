@@ -10,8 +10,13 @@ import { Card } from "@/components/ui/card";
 import { Loader2, FileText, FileType, FileCode2, Download, AlertTriangle, CheckCircle2, XCircle, Eye, History } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { downloadOfficialPdf, downloadOfficialDocx, downloadOfficialUdf, officialTitle } from "@/lib/official-documents";
-// Taslak denetimi SALT OKUR: üretim/kaydetme akışına dokunmaz, yalnız ekrandaki metni alır.
-import { TaslakDenetimi } from "@/components/mediation/TaslakDenetimi";
+// TASLAK DENETİMİ — 16.08.2026'da EKRANDAN KALDIRILDI (kurucu kararı).
+// Sebep: tutanak/anlaşma şablonları yüklenmeden denetim gerçek bir kontrol yapamıyor;
+// kutu "denetimde eksiklik görünmüyor" yazıp yanlış güven veriyordu.
+// Kod SİLİNMEDİ: bileşen src/components/mediation/TaslakDenetimi.tsx'te duruyor.
+// GERİ AÇMAK İÇİN: aşağıdaki import satırının ve taslak metninin altındaki
+// <TaslakDenetimi …/> çağrısının yorum işaretlerini kaldırmak yeter.
+// import { TaslakDenetimi } from "@/components/mediation/TaslakDenetimi";
 
 interface Props {
   caseRow: any;
@@ -566,8 +571,10 @@ ${paragraphElems.join("\n")}
                         Onayla
                       </Button>
                     </div>
-                    {/* Taslağın hemen altında denetim kutusu — metni okur, değiştirmez. */}
-                    <TaslakDenetimi caseId={caseRow?.id} metin={doc.filled_text} />
+                    {/* Taslak denetimi kutusu 16.08.2026'da kaldırıldı (şablonlar
+                        yüklendikten sonra geri açılacak). Geri açmak için bu satırın ve
+                        yukarıdaki import satırının yorumunu kaldırın: */}
+                    {/* <TaslakDenetimi caseId={caseRow?.id} metin={doc.filled_text} /> */}
                   </div>
                 )}
               </li>

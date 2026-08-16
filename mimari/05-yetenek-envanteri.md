@@ -439,8 +439,13 @@ DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon
   uydurma sayılacağı için yalnız kayıtlı ihtiyaç metinleri kullanılır.
 
 TASLAK DENETİMİ (İBA 2.6 / B21)
-DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon ve AI
-çağrısı YOKTUR; denetim kalıp taramasıdır ve tamamen istemcide çalışır.
+DURUM 16.08 (aynı gün güncellendi) ○ BEKLEMEDE — kutu ekrandan KALDIRILDI (yorum satırına
+alındı), iş tutanak/anlaşma şablonlarının yüklenmesine bağlandı. Sebep: şablon olmadan
+denetim gerçek bir kontrol yapamıyor, "eksiklik görünmüyor" yazıp yanlış güven veriyor.
+Bileşen dosyası (TaslakDenetimi.tsx) depoda duruyor; iki yorum satırı açılınca geri gelir.
+Aşağıdaki tanım, şablonlar geldiğinde uygulanacak KARAR metnidir.
+· Kod yazıldı ama yayında değil — yeni tablo, yeni edge fonksiyon ve AI çağrısı YOKTUR;
+  denetim kalıp taramasıdır ve tamamen istemcide çalışır.
 · Yeri: belgenin üretildiği ekran (Aşama 7 — Belgeler & Kapanış), üretilen taslak
   metninin hemen altında "Taslak denetimi" kutusu + [Denetle] düğmesi. Ayrı dosya:
   src/components/mediation/TaslakDenetimi.tsx — BELGE ÜRETİM HATTINA DOKUNULMADI
