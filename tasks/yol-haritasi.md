@@ -627,3 +627,15 @@ gösterilmiyor, ihtiyaç kaydı hiç yoksa "asıl ihtiyaç kaydı yok, seçenek 
 yazıyor. Liste sıralama değil; tavsiye ve rakam önerisi yok. Yeni tablo, edge fonksiyon ve
 AI çağrısı YOK. SQL gerekmiyor; yalnız Publish.
 
+16.08 (TASLAK DENETİMİ — İBA 2.6 / B21): Belgenin üretildiği ekranda, taslak metninin
+hemen altına "Taslak denetimi" kutusu ve [Denetle] düğmesi eklendi. Sekiz kontrol kalıpla
+yapılıyor: belirsiz ödeme/edim tarihi, ölçüsüz ifade, taraf adı/unvan tutarsızlığı
+(dosya kaydıyla karşılaştırma), rakam ile yazıyla yazılan tutarın çelişmesi, feragat/ibra
+kapsamının belirsizliği, boş bırakılmış alan, imza ve tarih alanının eksikliği, aynı hükmün
+iki yerde farklı yazılması. Her bulguda tip, satır ve metinden tek cümlelik alıntı var;
+bulgu yoksa "denetimde eksiklik görünmüyor" yazıyor. Ajan metni DEĞİŞTİRMİYOR, hukuki
+geçerlilik yorumu yapmıyor, yalnız arabulucuya görünüyor. BELGE ÜRETİM HATTINA
+DOKUNULMADI: denetim ayrı dosyada (TaslakDenetimi.tsx), OfficialDocumentsPanel'e yalnız
+import + tek satır çağrı eklendi. Yeni tablo, edge fonksiyon ve AI çağrısı YOK.
+SQL gerekmiyor; yalnız Publish.
+

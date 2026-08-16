@@ -1,3 +1,47 @@
+## Nerede kaldık — 16.08.2026 (64) · TASLAK DENETİMİ (İBA 2.6 / B21)
+KEŞİF (belge üretimi nerede duruyor): Üretim edge fonksiyonu
+supabase/functions/generate-official-document; ekran tarafı
+src/components/mediation/OfficialDocumentsPanel.tsx (Aşama 7 — Belgeler & Kapanış içinde,
+MediationEngine.tsx:11074'ten çağrılıyor; taraf ekranındaki OfficialDocsPanel AYRI ve
+yalnız pdfTemplates.ts şablonlarını indiriyor). ÜRETİLEN METİN: fonksiyondan dönen
+filled_text, ekranda generatedDocs[kind].filled_text state'inde duruyor ve düzenlenebilir
+Textarea'da gösteriliyor; kalıcı kayıt agreement_documents satırının metadata JSONB'sinde
+(sürüm sürüm, status taslak/onaylandi). Yani denetim için okunacak metin ZATEN ekranda —
+üretim hattına dokunmadan yalnız o metni girdi almak yetti.
+- [x] Yeni dosya: src/components/mediation/TaslakDenetimi.tsx (salt okur, metni
+      DEĞİŞTİRMEZ). OfficialDocumentsPanel'e yalnız iki satır eklendi: import + taslak
+      Textarea'sının altına <TaslakDenetimi .../> çağrısı. Üretim, kaydetme, onaylama,
+      sürüm ve indirme akışlarına DOKUNULMADI.
+- [x] Sekiz kontrol, her biri ayrı satır + konum (satır no) + metinden TEK CÜMLE alıntı:
+      belirsiz ödeme/edim tarihi ("en kısa sürede" vb.) · ölçüsüz ifade ("makul süre",
+      "uygun tutar", "gerekli hâllerde" vb.) · taraf adı/unvan tutarsızlığı (dosya
+      kaydındaki ad belgede aranıyor; hiç geçmiyorsa ya da yalnız bir parçası geçiyorsa
+      bulgu) · rakam–yazı çelişkisi (Türkçe sayı sözcüğü çözümleyicisi: "yüz elli bin"
+      → 150000, parantezin HEMEN önündeki rakamla karşılaştırılıyor) · feragat/ibra
+      kapsamının belirsizliği (cümlede kapsam işareti yoksa) · boş alan / doldurulmamış
+      şablon yeri ("...", "[ ]", "XXX", "___", "{{" vb.) · imza ve tarih alanının
+      eksikliği · aynı hükmün iki yerde farklı yazılması (cümle benzerliği ≥ %70 ama
+      birebir aynı değil).
+- [x] SINIR: metin değiştirilmiyor, düzeltme arabulucuda. Hukuki geçerlilik yorumu yok
+      ("geçersizdir" denmiyor); yalnız belirsizlik/eksiklik/çelişki gösteriliyor.
+      Bulgu yoksa "Denetimde eksiklik görünmüyor." Yalnız arabulucu ekranında.
+- [x] YENİ TABLO / SÜTUN / EDGE FONKSİYON / AI ÇAĞRISI YOK → SQL GEREKMİYOR.
+- [x] MANTIK TESTİ (canlı değil, düğüm/esbuild ile saf fonksiyon koşturuldu): bozuk
+      taslakta sekiz bulgunun sekizi de doğru satırla çıktı; temiz taslakta sıfır bulgu.
+      Test sırasında iki tuzak yakalanıp düzeltildi: (a) binlik ayıracı "150.000" cümle
+      sonu sayılıp alıntı "000 TL (…" diye kesiliyordu — cümle sonu artık ardından boşluk
+      gelen nokta · (b) Türkçe küçültmede ASCII "IMZA" → "ımza" olduğu için imza kontrolü
+      yanlış bulgu veriyordu — karşılaştırmada "ı" harfleri "i" sayılıyor.
+tsc (tsconfig.app.json) temiz. CANLI TEST YOK.
+AÇIK UÇ: Ad kontrolü tek yönlü — dosya kaydındaki ad belgede aranıyor. Belgede geçen ama
+kayıtta olmayan bir ad tespit edilmiyor (isim tanıma gerekir, yapılmadı).
+AÇIK UÇ: Rakam–yazı karşılaştırması yalnız parantez içi yazımda ve rakam parantezin hemen
+önündeyse çalışıyor; "150.000 TL yani yüz elli bin lira" gibi serbest yazımda çalışmaz.
+AÇIK UÇ: Denetim sonucu HİÇBİR YERE KAYDEDİLMİYOR (ekranda kalır, sayfa yenilenince
+gider). Kayıt istenirse yeni sütun/tablo gerekir — açılmadı.
+AÇIK UÇ: Bu denetim, mimarideki ANLAŞMA BELGESİ DENETÇİSİ'nin (mevzuat/içtihat dayanaklı
+kural taraması) yerine geçmez; onun önündeki hafif kademedir.
+
 ## Nerede kaldık — 16.08.2026 (63) · SEÇENEK SEPETİ (İBA 1.9 / A10)
 KEŞİF (asıl ihtiyaç verisi nerede duruyor): DÖRT kayıt var, hepsi arabulucu yüzeyinde.
 (1) party_root_cause_analysis.kok_neden = {gorunen_talep · asil_mesele · dayanak ·

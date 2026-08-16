@@ -438,6 +438,26 @@ DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon
 · AÇIK MADDE: Dosya TÜRÜ tek başına seçenek tetiklemez — türden ihtiyaç çıkarmak
   uydurma sayılacağı için yalnız kayıtlı ihtiyaç metinleri kullanılır.
 
+TASLAK DENETİMİ (İBA 2.6 / B21)
+DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon ve AI
+çağrısı YOKTUR; denetim kalıp taramasıdır ve tamamen istemcide çalışır.
+· Yeri: belgenin üretildiği ekran (Aşama 7 — Belgeler & Kapanış), üretilen taslak
+  metninin hemen altında "Taslak denetimi" kutusu + [Denetle] düğmesi. Ayrı dosya:
+  src/components/mediation/TaslakDenetimi.tsx — BELGE ÜRETİM HATTINA DOKUNULMADI
+  (OfficialDocumentsPanel'e yalnız import + tek satır çağrı eklendi).
+· Sekiz kontrol: belirsiz ödeme/edim tarihi · ölçüsüz ifade · taraf adı/unvan
+  tutarsızlığı (dosya kaydıyla karşılaştırma) · rakam ile yazıyla yazılan tutarın
+  çelişmesi (Türkçe sayı sözcüğü çözümleyicisi) · feragat/ibra kapsamının
+  belirsizliği · boş bırakılmış alan / doldurulmamış şablon yeri · imza ve tarih
+  alanının eksikliği · aynı hükmün iki yerde farklı yazılması.
+· Her bulguda tip · konum (satır) · metinden tek cümlelik alıntı ve neyin belirsiz/
+  eksik/çelişkili göründüğü yazılır. Bulgu yoksa "denetimde eksiklik görünmüyor".
+· Sınır: ajan METNİ DEĞİŞTİRMEZ, düzeltmeyi arabulucu uygular (m.3). Hukuki geçerlilik
+  yorumu YASAK — "geçersizdir" denmez (m.5). Yalnız arabulucu görür.
+· NOT: Bu, mimarideki ANLAŞMA BELGESİ DENETÇİSİ'nin (dayanağı gösterilen kural
+  taraması) yerine geçmez; onun önündeki hafif kademedir — kalıpla bulunabilenleri
+  bulur, kural/mevzuat dayanağı iddia etmez.
+
 [v0.36 KALICI ŞART — FAZ 3 TÜR TESPİTİ İKİ MENÜDÜR (değişmez)]
 Faz 3 uyuşmazlık tür tespitinde ANA TÜR ve ALT UZMANLIK olmak üzere İKİ menü zorunludur. Alt
 uzmanlık menüsü üç kez sehven silinip geri konmuştur; bir daha kaldırılamaz — düzen değişikliği,

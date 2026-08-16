@@ -10,6 +10,8 @@ import { Card } from "@/components/ui/card";
 import { Loader2, FileText, FileType, FileCode2, Download, AlertTriangle, CheckCircle2, XCircle, Eye, History } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { downloadOfficialPdf, downloadOfficialDocx, downloadOfficialUdf, officialTitle } from "@/lib/official-documents";
+// Taslak denetimi SALT OKUR: üretim/kaydetme akışına dokunmaz, yalnız ekrandaki metni alır.
+import { TaslakDenetimi } from "@/components/mediation/TaslakDenetimi";
 
 interface Props {
   caseRow: any;
@@ -564,6 +566,8 @@ ${paragraphElems.join("\n")}
                         Onayla
                       </Button>
                     </div>
+                    {/* Taslağın hemen altında denetim kutusu — metni okur, değiştirmez. */}
+                    <TaslakDenetimi caseId={caseRow?.id} metin={doc.filled_text} />
                   </div>
                 )}
               </li>
