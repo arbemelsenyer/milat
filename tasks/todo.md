@@ -1,3 +1,25 @@
+## Nerede kaldık — 16.08.2026 (68) · DÜZELTME: "İLETİŞİM VE ASIL İHTİYAÇ" BÖLÜMÜ
+TEŞHİS: Bölüm SİLİNMEDİ, yeri de alınmadı — kod aynen duruyor (sectionDefs id
+"kokpit-iletisim", DAYANAK katmanı). Bölüm 16.08'e kadar KOŞULLUYDU:
+`if (communicationItems.length > 0 || communication.length > 0)`. Dosyada
+party_communication_analysis kaydı yoksa bölüm hiç çizilmiyordu; kokpitte sessizce
+kayboluyor gibi görünüyor. Yeni "İletişimde değişim" kartı onun yerine GEÇMEDİ; ayrı
+bir kayıt olarak hemen altına eklenmişti (git ile doğrulandı: communicationItems satırlarına
+en son ebe45c5'te dokunulmuş, bugünkü commit'ler o bloğa girmemiş).
+- [x] Koşul kaldırıldı; bölüm artık HER ZAMAN çiziliyor ve ÜÇ DURUM ayrımı ekranda
+      yazılı: (1) iz var → izler listelenir, sayaç "N iz" · (2) kayıt var, iz yok →
+      "incelendi — bulgu yok" · (3) hiç kayıt yok → "analiz çalıştırılmadı" ve satırda
+      "Aşama 2'deki taraf kartında 'İletişim Analizi' düğmesiyle başlatılır" yazıyor.
+      Böylece "incelenmemiş olmak" ile "bulgu çıkmamış olmak" ayrımı korunuyor.
+- [x] İçerik, düğmeler ve PDF çıktısı eski hâliyle duruyor; PDF'e yalnız üçüncü durumun
+      tek satırlık karşılığı eklendi.
+- [x] Sıra: İletişim ve asıl ihtiyaç → hemen altında İletişimde değişim → diğer bölümler.
+- [x] Katman başlığındaki "N bölüm" sayacı sectionDefs listesinden hesaplanıyor; bölüm
+      geri geldiği için sayı kendiliğinden düzeliyor (elle sayı yazılmadı).
+tsc temiz, eslint'te yeni uyarı yok. CANLI TEST YOK.
+AÇIK UÇ: Üçüncü durumda bölümün görünmesi 16.08 kararıdır; eski davranış (kayıt yoksa
+bölümü hiç çizmemek) istenirse tek satırlık koşul geri konur.
+
 ## Nerede kaldık — 16.08.2026 (67) · İLETİŞİMDE DEĞİŞİM — DAYANAK KATMANINA ALINDI
 - [x] Kart kokpitte RAPOR katmanından DAYANAK KATMANI'na taşındı; "İletişim ve asıl
       ihtiyaç" bölümünün HEMEN ALTINDA duruyor (aynı veriden beslendikleri için yan yana).

@@ -7215,15 +7215,21 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     });
   }
 
-  // İletişim izleri: kayıt hiç yoksa bölüm görünmez (analiz atlanmış/çalışmamış demektir).
-  // Kayıt var ama doğrulanmış iz yoksa bölüm "incelendi, bulgu yok" özetiyle durur —
-  // incelenmemiş olmakla bulgu çıkmamış olmak aynı şey değil.
-  if (communicationItems.length > 0 || communication.length > 0) {
+  // İletişim izleri — ÜÇ DURUM (16.08): (1) iz var → izler listelenir · (2) kayıt var,
+  // iz yok → "incelendi, bulgu yok" · (3) hiç kayıt yok → "analiz çalıştırılmadı".
+  // 16.08'e kadar üçüncü durumda bölüm HİÇ ÇİZİLMİYORDU; kokpitte bölüm sessizce
+  // kayboluyordu. Ayrım korundu (incelenmemiş olmak ile bulgu çıkmamış olmak aynı şey
+  // değildir) ama artık ekranda yazılı duruyor.
+  {
     sectionDefs.push({
       id: "kokpit-iletisim", layer: LAYER_EVIDENCE, title: "İletişim ve asıl ihtiyaç",
-      summary: communicationItems.length > 0 ? `${communicationItems.length} iz` : "incelendi — bulgu yok",
+      summary: communicationItems.length > 0
+        ? `${communicationItems.length} iz`
+        : communication.length > 0 ? "incelendi — bulgu yok" : "analiz çalıştırılmadı",
       pdf: { confidential: true, html: () => communicationItems.length === 0
-        ? `<p class="muted">Analiz çalıştı ancak doğrulanabilir bir iz bulunamadı.</p>`
+        ? (communication.length > 0
+            ? `<p class="muted">Analiz çalıştı ancak doğrulanabilir bir iz bulunamadı.</p>`
+            : `<p class="muted">İletişim analizi bu dosyada çalıştırılmadı.</p>`)
         : communicationItems.map((it) => {
             const f = it.finding ?? {};
             const taraf = it.party_id ? (worklogPartyNameById[it.party_id] ?? "") : "";
@@ -7249,9 +7255,14 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
                 />
               ))}
             </div>
-          ) : (
+          ) : communication.length > 0 ? (
             <p className="text-sm text-muted-foreground italic">
               Analiz çalıştı ancak doğrulanabilir bir iz bulunamadı.
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground italic">
+              İletişim analizi bu dosyada çalıştırılmadı — Aşama 2'deki taraf kartında
+              "İletişim Analizi" düğmesiyle başlatılır.
             </p>
           )}
         </>
