@@ -57,6 +57,19 @@ ile doğrulanır.
   tam yetki politikası kuruldu (tablo case_party_id üzerinden case_parties'e bağlanıyor).
   Sebep: Tıkanma ve Çıkış Yolları kartı davet kayıtlarını okuyamıyordu; politika eklenince
   "cevaplanmayan davet" işareti üretilebildi.
+- 16.08: agent_states_agent_type_check kısıtı genişletildi — izinli listeye
+  belge_ozeti · olay_cizelgesi · guc_dengesi · iletisim_degisim · dosya_ozeti eklendi
+  (toplam 20 ad; mevcut adlar korundu).
+- 16.08: agent_states tablosuna tarafa_gorunur boolean NOT NULL DEFAULT false kolonu
+  eklendi. Açıklama: yalnız TARAFIN KENDİ ajanı için true yazılır; karşı tarafa hiçbir
+  koşulda açılmaz.
+- 16.08: "Case participants can view agent states" SELECT politikası KALDIRILDI; yerine
+  "Ajan durumu: arabulucu hepsini, taraf yalniz kendi isaretlisini gorur" politikası
+  kuruldu — is_case_mediator VEYA (tarafa_gorunur = true VE is_own_case_party).
+  Sonuç: taraflar hiçbir ajan satırı göremez; yeni ajan tipleri doğuştan kapalıdır.
+  UPDATE/INSERT politikalarına DOKUNULMADI.
+- 16.08: 20260816160000_iletisim_degisim.sql elle çalıştırıldı (iletisim_degisim tablosu
+  + RLS; tarafa SELECT politikası yok).
 - (daha önce kurulanlar buraya eklenecek: mediator_reads_offers,
   mediator_writes_discovery, mediator_updates_discovery, ajan_gorevleri politikaları,
   taraf_musaitlik RLS)

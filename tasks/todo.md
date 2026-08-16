@@ -16,7 +16,14 @@
 - [x] Taraf ekranı: isMediator=false iken bileşen null dönüyor; boş "AI Aktivitelerim"
       kutusu artık çizilmiyor. Erken dönüş tüm hook'lardan SONRA — hook sırası bozulmadı.
       Arabulucu görünümüne dokunulmadı.
-tsc temiz; beş edge fonksiyonun sözdizimi esbuild ile doğrulandı. CANLI TEST YOK.
+- [x] CANLIDA DOĞRULANDI (16.08.2026) — Beş yeni kol (belge_ozeti, olay_cizelgesi,
+      guc_dengesi, iletisim_degisim, dosya_ozeti) agent_states'e durum yazıyor
+      (commit 9f8f893); panelde Türkçe adları tanımlı; taraf ekranındaki boş
+      "AI Aktivitelerim" kutusu kaldırıldı. Görünürlük kuralı: ajan durum satırlarını
+      yalnız arabulucu görür; tarafa_gorunur hanesi (varsayılan hayır) ileride "her
+      tarafa kendi ajanı" işi için hazır. Arabulucu ekranında panel canlıda kontrol
+      edildi, bozulma yok.
+tsc temiz; beş edge fonksiyonun sözdizimi esbuild ile doğrulandı.
 REDEPLOY GEREKLİ: belge-ozeti · olay-cizelgesi · guc-dengesi · iletisim-degisim ·
 dosya-ozeti-oner. SQL gerekmiyor (tablo/kolon/politika kurucu tarafından yapıldı).
 AÇIK UÇ: CaseRoom'daki "AI Aktivitelerim" SEKMESİ duruyor, içi artık boş. Sekmenin
