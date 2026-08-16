@@ -1624,6 +1624,9 @@ const OTOMATIK_KOLLAR: { kol: string; fonksiyon: string; icKapi: boolean; ucrets
   { kol: "dosya-ozeti-oner", fonksiyon: "dosya-ozeti-oner", icKapi: true },
   // Usule ilişkin engel kontrolü: yapay zekâ çağrısı YOK, tamamı koddan hesaplanır.
   { kol: "usul-engeli", fonksiyon: "usul-engeli", icKapi: true, ucretsiz: true },
+  // Oturum hazırlık föyü: TARAF BAZLI ve ÜCRETLİ (model çağırır) — aşağıda ayrıca
+  // ele alınır, tur başına 3 ücretli çağrı sınırına DAHİLDİR.
+  { kol: "hazirlik-foyu", fonksiyon: "hazirlik-foyu", icKapi: true },
 ];
 
 async function kosumIziOku(admin: any, caseId: string): Promise<Record<string, any>> {
@@ -1769,8 +1772,8 @@ async function otomatikKosumKollari(admin: any, dosya: any, butce: Butce): Promi
   };
 
   for (const tanim of OTOMATIK_KOLLAR) {
-    // iletisim-degisim taraf bazlıdır; aşağıda ayrıca ele alınır.
-    if (tanim.kol === "iletisim-degisim") continue;
+    // iletisim-degisim ve hazirlik-foyu taraf bazlıdır; aşağıda ayrıca ele alınır.
+    if (tanim.kol === "iletisim-degisim" || tanim.kol === "hazirlik-foyu") continue;
     const d = kolDurumu[tanim.kol];
     if (!d) continue;
     if (!d.uygun) continue;   // koşul sağlanmıyor: sessiz geçilir, iz yazılmaz
@@ -1872,6 +1875,74 @@ async function otomatikKosumKollari(admin: any, dosya: any, butce: Butce): Promi
       ozet.hata++;
       ozet.sebepler.push(`otomatik koşum başarısız (${kolAdi}): ${sebep}`);
     }
+  }
+
+  /* ── OTURUM HAZIRLIK FÖYÜ (İBA 3.1) — TARAF BAZLI, ÜCRETLİ ───────────────
+     Koşum koşulu: dosyada iptal olmayan, GELECEK TARİHLİ planlanmış bir oturum var
+     VE o oturum-taraf çifti için föy satırı yok. Her taraf için AYRI çağrı yapılır
+     (kör veri: her föy yalnız kendi tarafının verisiyle kurulur).
+     Girdi imzası: session_id + oturum zamanı + tarafın belge ve cevapsız soru sayısı.
+     TARAFA HİÇBİR ŞEY GÖNDERİLMEZ; föy 'taslak' olarak açılır, arabulucu onaylar. */
+  const foyTanim = OTOMATIK_KOLLAR.find((k) => k.kol === "hazirlik-foyu")!;
+  try {
+    const { data: oturumlar } = await admin.from("case_sessions")
+      .select("id, scheduled_at, status").eq("case_id", caseId).limit(30);
+    const simdi = Date.now();
+    const planli = ((oturumlar ?? []) as any[])
+      .filter((o) => String(o.status ?? "") !== "cancelled")
+      .filter((o) => o.scheduled_at && new Date(String(o.scheduled_at)).getTime() > simdi)
+      .sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)))[0] ?? null;
+
+    if (planli && taraflar.length > 0) {
+      const { data: mevcutFoyler } = await admin.from("oturum_hazirlik_foyleri")
+        .select("party_id, durum").eq("session_id", planli.id).limit(30);
+      const foyluTaraflar = new Set(((mevcutFoyler ?? []) as any[]).map((f) => String(f.party_id)));
+
+      for (const t of taraflar) {
+        if (foyluTaraflar.has(String(t.id))) continue;   // föy zaten var
+        const kolAdi = `hazirlik-foyu:${planli.id}:${t.id}`;
+        const belgeSayisi = belgeler.filter((d) => String(d.party_id) === String(t.id)).length;
+        const { count: cevapsizSayisi } = await admin.from("case_discovery_questions")
+          .select("id", { count: "exact", head: true })
+          .eq("case_id", caseId).eq("party_id", t.id).is("answer_text", null);
+        const imza = `oturum:${planli.id}|zaman:${String(planli.scheduled_at)}|belge:${belgeSayisi}|soru:${cevapsizSayisi ?? 0}`;
+        const eski = izi[kolAdi];
+        if (eski && String(eski.girdi_imzasi) === imza && String(eski.durum) !== "hata") continue;
+
+        if (!foyTanim.icKapi) {
+          ozet.sebepler.push(`otomatik koşum atlandı (${kolAdi}): iç çağrı bayrağı kapalı`);
+          continue;
+        }
+        if (butce.kalan <= 0) {
+          ozet.sebepler.push(`otomatik koşum (${kolAdi}): tur sınırı doldu — sonraki turda koşulacak`);
+          continue;
+        }
+        butce.kalan--;
+        const r = await icFonksiyonCagir(foyTanim.fonksiyon, {
+          case_id: caseId, session_id: planli.id, party_id: t.id,
+        });
+        if (r.ok) {
+          await kosumIziYaz(admin, caseId, kolAdi, imza, "kosuldu", r.sebep);
+          ozet.kosuldu++;
+          await gorevAc(
+            admin, caseId, "otomatik_analiz", `[oto:${kolAdi}]`,
+            "oturum hazırlık föyü taslağı hazırlandı (tarafa gönderilmedi)",
+            { durum: "yapildi" },
+          );
+        } else {
+          const sayac = hataSayaci(String(eski?.sebep ?? "")) + 1;
+          const durum = sayac >= 3 ? "atlandi" : "hata";
+          const sebep = durum === "atlandi"
+            ? `hata 3/3 — üç kez başarısız, kol beklemeye alındı: ${r.sebep}`
+            : `hata ${sayac}/3: ${r.sebep}`;
+          await kosumIziYaz(admin, caseId, kolAdi, imza, durum, sebep);
+          ozet.hata++;
+          ozet.sebepler.push(`otomatik koşum başarısız (${kolAdi}): ${sebep}`);
+        }
+      }
+    }
+  } catch (e: any) {
+    console.error(`[ajan-nobetci] hazırlık föyü kolu çalışmadı (${caseId}): ${e?.message ?? e}`);
   }
 
   // ── KARAR NOKTASI: elverişlilik işareti varsa arabulucuya onay görevi ────

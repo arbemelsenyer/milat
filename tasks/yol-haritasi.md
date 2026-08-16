@@ -741,3 +741,15 @@ Bekleyen satırlarda küçük bir kutu ve Kaydet düğmesiyle yalnız receipt_no
 dokunulmuyor, yeni ödeme oluşturulmuyor. Model çağrısı yok, maliyet işareti yok, nöbetçiye
 bağlanmadı. Yalnız arabulucu görüyor. SQL ve redeploy gerekmiyor; yalnız Publish.
 
+16.08 (OTURUM HAZIRLIK FÖYÜ — İBA 3.1, 1. TUR): Yeni edge fonksiyon hazirlik-foyu, her
+taraf için AYRI föy hazırlıyor; girdiye yalnız o tarafın kendi verisi giriyor. Bölümler:
+oturumda konuşulacak başlıklar ve yanında bulundurması iyi olacak belgeler (model),
+cevabını hazırlaması iyi olacak sorular ve oturum bilgileri (koddan). Yasak dil ve
+dosyada karşılığı olmayan madde sunucuda eleniyor; sonda sabit "hazırlık amaçlıdır"
+cümlesi var. Föy 'taslak' olarak açılıyor, arabulucu kokpitte düzenleyip onaylıyor;
+onaylı föyü ajan bir daha değiştiremiyor. Nöbetçiye ücretli otomatik kol olarak bağlandı
+(koşul: gelecek tarihli planlı oturum var ve o oturum-taraf çifti için föy yok).
+Kokpitin RAPOR VE BELGELER katmanına "Oturum hazırlık föyleri" bölümü eklendi.
+BU TURDA TARAFA HİÇBİR ŞEY GÖNDERİLMEDİ; gönderim 2. turda.
+REDEPLOY GEREKLİ: hazirlik-foyu (YENİ) · ajan-nobetci. SQL: kurucu tarafından çalıştırıldı.
+

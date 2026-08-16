@@ -1,3 +1,46 @@
+## Nerede kaldık — 16.08.2026 (80) · OTURUM HAZIRLIK FÖYÜ — 1. TUR (İBA 3.1 / C23)
+BU TURDA TARAFA HİÇBİR ŞEY GİTMEDİ. E-posta ve taraf ekranı sonraki turda.
+- [x] Yeni edge fonksiyon: supabase/functions/hazirlik-foyu (config.toml verify_jwt=true).
+      · Girdi {case_id, session_id, party_id}; yetki elverislilik/usul-onerisi kalıbı —
+        x-cron-secret iç kapı + dışarıda arabulucu/dosya sahibi/yönetici, taraf 403.
+      · KÖR VERİ: föy TEK TARAF için kurulur; girdiye YALNIZ o tarafın beyanı, kendi
+        belgeleri ve belge özetleri, kendi cevaplanmamış keşif soruları, dosyanın genel
+        konusu ve oturum kaydı girer. Karşı tarafın beyanı/belgesi/analizi/teklifi
+        hiçbir koşulda girmez.
+      · Bölümler LİSTE olarak yazılıyor (ileride bölüm eklenebilsin): (a) "Oturumda
+        konuşulacak başlıklar" ve (b) "Yanınızda bulundurmanız iyi olur" MODEL üretir;
+        (c) "Cevabını hazırlamanız iyi olur" cevapsız keşif sorularından KODDAN;
+        (d) "Oturum bilgileri" oturum kaydından KODDAN. Sonda sabit cümle:
+        "Bu föy hazırlık amaçlıdır; arabulucunuz tarafından gözden geçirilmiştir."
+      · SUNUCU ELEMESİ: yasak dil (tavsiye · sonuç tahmini · kabul edin/etmeyin · rakam ·
+        karşı taraf yorumu · duygu/kişilik/niyet) taşıyan madde elenir; maddede geçen
+        anlamlı sözcük tarafın kendi metinlerinde yoksa madde elenir (uydurma kapısı).
+        Madde kalmazsa bölüm yazılmaz; hiçbir bölüm kalmazsa satır yine 'taslak' açılır.
+      · ONAYLI FÖYE DOKUNULMAZ: durumu 'onaylandi'/'gonderildi' olan satır yeniden
+        üretilmez. Upsert onConflict "session_id,party_id"; agent_states'e
+        'hazirlik_foyu' durumu (try/catch).
+- [x] Nöbetçiye bağlandı: OTOMATIK_KOLLAR'a "hazirlik-foyu" (icKapi true, ÜCRETLİ —
+      tur başına 3 çağrı sınırına DAHİL). Koşum koşulu: dosyada iptal olmayan GELECEK
+      TARİHLİ planlı oturum var VE o oturum-taraf çifti için föy satırı yok; her taraf
+      için ayrı çağrı. Girdi imzası: session_id + oturum zamanı + tarafın belge sayısı +
+      cevapsız soru sayısı.
+- [x] Ekran: kokpit > RAPOR VE BELGELER > "Oturum hazırlık föyleri". Planlı oturum yoksa
+      "Planlanmış oturum yok — föy oturum planlandığında hazırlanır." Her taraf için ayrı
+      kart: ad · durum rozeti (taslak/onaylandı/gönderildi) · düzenlenebilir metin alanı
+      ("## " başlık, altındaki satırlar madde) · [Kaydet] · [Onayla] · yalnız taslakken
+      [Föy hazırla / Yeniden hazırla] + maliyet işareti. GÖNDERME DÜĞMESİ YOK; onaylı
+      föyün altında "Gönderim sonraki adımda açılacak." Yalnız arabulucuya görünür.
+- [x] CaseRoom.tsx'e DOKUNULMADI; taraf ekranı, e-posta ve bildirim yok.
+tsc temiz; hazirlik-foyu ve ajan-nobetci esbuild ile doğrulandı. CANLI TEST YOK.
+SQL YAZILMADI (tablo kurucu tarafından kuruldu).
+REDEPLOY GEREKLİ: hazirlik-foyu (YENİ) · ajan-nobetci.
+AÇIK UÇ: 2. TUR — tarafa gönderim (durum 'gonderildi', gönderim zamanı, taraf ekranında
+görünürlük ve e-posta) henüz yapılmadı.
+AÇIK UÇ: Föy yalnız EN YAKIN planlı oturum için hazırlanıyor; birden çok gelecek oturum
+varsa sonrakiler için föy açılmıyor.
+AÇIK UÇ: case_sessions.prep_notes_generated ve party_analyses.prep_notes alanlarına
+dokunulmadı (kullanılmıyorlar, ayrı iş).
+
 ## Çalışma düzeni skill'leri (16.08.2026)
 Kurucunun hesabına iki skill kaydedildi (depoda değil, Claude hesabında durur):
 (a) medipact-calisma-duzeni — KABUL/RED açılışı, tek adım kuralı, zincir anlatma yasağı,

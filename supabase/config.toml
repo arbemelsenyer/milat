@@ -139,3 +139,6 @@ verify_jwt = true
 
 [functions.usul-engeli]
 verify_jwt = true
+
+[functions.hazirlik-foyu]
+verify_jwt = true

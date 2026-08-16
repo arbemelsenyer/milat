@@ -7603,6 +7603,13 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     body: <SecenekSepetiPanel caseRow={caseRow} />,
   });
 
+  // Oturum hazırlık föyleri (İBA 3.1) — RAPOR VE BELGELER katmanı. 1. tur: yalnız
+  // hazırlama ve onaylama; tarafa gönderim YOK (sonraki turda açılacak).
+  sectionDefs.push({
+    id: "kokpit-hazirlik-foyu", layer: LAYER_REPORTS, title: "Oturum hazırlık föyleri",
+    body: <HazirlikFoyuPanel caseRow={caseRow} />,
+  });
+
   const layerOrder = [LAYER_TABLE, LAYER_EVIDENCE, LAYER_COCKPIT, LAYER_REPORTS];
   // Katman başlığının kendi çıpası (sol menüden katman adına tıklanınca oraya kayılır)
   // ve başlığın altındaki tek satır açıklama; aynı açıklama menüde tooltip olur.
@@ -10620,6 +10627,263 @@ function UsulEngeliPanel({ caseRow }: { caseRow: CaseRow }) {
           ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Kontrol ediliyor…</>
           : <><RefreshCw className="h-4 w-4 mr-1" /> {kayit ? "Yeniden kontrol et" : "Kontrol et"}</>}
       </Button>
+    </div>
+  );
+}
+
+/* ====== OTURUM HAZIRLIK FÖYLERİ (İBA 3.1) — yalnız arabulucu ===============
+   1. TUR: föy YALNIZ hazırlanır ve onaylanır; TARAFA HİÇBİR ŞEY GÖNDERİLMEZ.
+   Gönderim düğmesi bilerek konulmadı — sonraki turda açılacak.
+   Onaylanan föyü ajan değiştiremez (fonksiyon 'onaylandi'/'gonderildi' satırın
+   üzerine yazmaz). Düzenleme ve onay yalnız arabulucudadır (constitution m.3). */
+type FoyBolum = { baslik: string; maddeler: string[] };
+type FoySatiri = {
+  id: string;
+  session_id: string;
+  party_id: string;
+  bolumler: FoyBolum[] | null;
+  durum: string;
+  onay_zamani: string | null;
+  gonderim_zamani: string | null;
+};
+
+const FOY_DURUM_ETIKET: Record<string, string> = {
+  taslak: "taslak",
+  onaylandi: "onaylandı",
+  gonderildi: "gönderildi",
+  iptal: "iptal",
+};
+
+function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
+  const [oturum, setOturum] = useState<any | null>(null);
+  const [taraflar, setTaraflar] = useState<any[]>([]);
+  const [foyler, setFoyler] = useState<Record<string, FoySatiri>>({});
+  const [taslak, setTaslak] = useState<Record<string, string>>({});
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const yukle = useCallback(async () => {
+    setYukleniyor(true);
+    setHata(null);
+    const [ot, tf] = await Promise.all([
+      supabase.from("case_sessions")
+        .select("id, scheduled_at, status, meeting_type, session_type")
+        .eq("case_id", caseRow.id).order("scheduled_at", { ascending: true }),
+      supabase.from("case_parties")
+        .select("id, first_name, last_name, company_name, party_role")
+        .eq("case_id", caseRow.id).order("created_at"),
+    ]);
+    if (ot.error) setHata(`Oturumlar okunamadı: ${ot.error.message}`);
+    const simdi = Date.now();
+    const planli = ((ot.data ?? []) as any[])
+      .filter((o) => String(o.status ?? "") !== "cancelled")
+      .filter((o) => o.scheduled_at && new Date(String(o.scheduled_at)).getTime() > simdi)[0] ?? null;
+    setOturum(planli);
+    setTaraflar((tf.data ?? []) as any[]);
+
+    if (planli) {
+      const { data: fy, error: fErr } = await (supabase.from("oturum_hazirlik_foyleri" as any) as any)
+        .select("id, session_id, party_id, bolumler, durum, onay_zamani, gonderim_zamani")
+        .eq("session_id", planli.id);
+      if (fErr) setHata(`Föyler okunamadı: ${fErr.message}`);
+      const harita: Record<string, FoySatiri> = {};
+      for (const f of ((fy ?? []) as any[])) harita[String(f.party_id)] = f as FoySatiri;
+      setFoyler(harita);
+    } else {
+      setFoyler({});
+    }
+    setYukleniyor(false);
+  }, [caseRow.id]);
+  useEffect(() => { yukle(); }, [yukle]);
+
+  // Bölümler metne çevrilir: "## Başlık" satırı + altında maddeler.
+  function foyMetni(f: FoySatiri): string {
+    const b = Array.isArray(f.bolumler) ? f.bolumler : [];
+    return b.map((x) => [x.baslik ? `## ${x.baslik}` : "##", ...(x.maddeler ?? [])].join("\n")).join("\n\n");
+  }
+  function metniBolumlereCevir(metin: string): FoyBolum[] {
+    const bloklar = metin.split(/\n\s*\n/);
+    const sonuc: FoyBolum[] = [];
+    for (const blok of bloklar) {
+      const satirlar = blok.split("\n").map((x) => x.trim()).filter(Boolean);
+      if (satirlar.length === 0) continue;
+      const ilk = satirlar[0];
+      if (ilk.startsWith("##")) {
+        sonuc.push({ baslik: ilk.replace(/^##\s*/, ""), maddeler: satirlar.slice(1) });
+      } else {
+        sonuc.push({ baslik: "", maddeler: satirlar });
+      }
+    }
+    return sonuc;
+  }
+
+  async function foyKaydet(partyId: string) {
+    const f = foyler[partyId];
+    if (!f) return;
+    setBusy(`kaydet:${partyId}`);
+    setHata(null);
+    const { error } = await (supabase.from("oturum_hazirlik_foyleri" as any) as any)
+      .update({ bolumler: metniBolumlereCevir(taslak[partyId] ?? foyMetni(f)) })
+      .eq("id", f.id);
+    if (error) setHata(`Föy kaydedilemedi: ${error.message}`);
+    else { setTaslak((o) => ({ ...o, [partyId]: "" })); await yukle(); }
+    setBusy(null);
+  }
+
+  async function foyOnayla(partyId: string) {
+    const f = foyler[partyId];
+    if (!f) return;
+    setBusy(`onay:${partyId}`);
+    setHata(null);
+    const { data: kullanici } = await supabase.auth.getUser();
+    const govde: Record<string, unknown> = {
+      durum: "onaylandi",
+      onay_zamani: new Date().toISOString(),
+      onaylayan_user_id: kullanici?.user?.id ?? null,
+    };
+    // Düzenleme yapıldıysa onayla birlikte kaydedilir.
+    if ((taslak[partyId] ?? "").trim()) govde.bolumler = metniBolumlereCevir(taslak[partyId]);
+    const { error } = await (supabase.from("oturum_hazirlik_foyleri" as any) as any)
+      .update(govde).eq("id", f.id);
+    if (error) setHata(`Föy onaylanamadı: ${error.message}`);
+    else { setTaslak((o) => ({ ...o, [partyId]: "" })); await yukle(); }
+    setBusy(null);
+  }
+
+  async function foyHazirla(partyId: string) {
+    if (!oturum) return;
+    setBusy(`hazirla:${partyId}`);
+    setHata(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("hazirlik-foyu", {
+        body: { case_id: caseRow.id, session_id: oturum.id, party_id: partyId },
+      });
+      if (error) {
+        // Gerçek sebep .context gövdesindedir; sessizce yutulmaz.
+        let ham = String((error as any)?.message ?? "bilinmeyen hata");
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.text === "function") {
+          try {
+            const govde = await ctx.text();
+            if (govde) {
+              try { const j = JSON.parse(govde); ham = String(j?.error ?? j?.sebep ?? govde); }
+              catch { ham = String(govde).slice(0, 400); }
+            }
+          } catch { /* gövde okunamadı */ }
+        }
+        throw new Error(ham);
+      }
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+      await yukle();
+    } catch (e: any) {
+      console.error("[hazirlik-foyu] çağrı başarısız", e);
+      setHata(`hazirlik-foyu çağrısı başarısız: ${trErr(e?.message ?? "bilinmeyen hata")}`);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground leading-snug">
+        Her taraf için AYRI föy hazırlanır ve yalnız o tarafın kendi verisi kullanılır; karşı tarafın
+        beyanı, belgesi ve analizi föye girmez. Föy hukuki tavsiye içermez, sonuç tahmini yapmaz.
+        Bu adımda tarafa hiçbir şey gönderilmez — metni siz onaylarsınız.
+      </p>
+
+      {hata && (
+        <div className="text-sm rounded border border-destructive/40 bg-destructive/10 text-destructive p-3">
+          {hata}
+        </div>
+      )}
+
+      {yukleniyor ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Föyler okunuyor…
+        </div>
+      ) : !oturum ? (
+        <p className="text-sm">Planlanmış oturum yok — föy oturum planlandığında hazırlanır.</p>
+      ) : (
+        <div className="space-y-4">
+          <div className="text-xs text-muted-foreground">
+            Oturum: {new Date(String(oturum.scheduled_at)).toLocaleString("tr-TR")}
+          </div>
+          {taraflar.map((t, i) => {
+            const f = foyler[String(t.id)];
+            const durum = String(f?.durum ?? "");
+            const kilitli = durum === "onaylandi" || durum === "gonderildi";
+            const metin = taslak[String(t.id)] ?? (f ? foyMetni(f) : "");
+            return (
+              <div key={t.id} className="border rounded p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="font-medium text-sm">
+                    {blindBidPartyName(t, i)} <span className="text-muted-foreground font-normal">({roleLabel(t.party_role)})</span>
+                  </div>
+                  {f ? (
+                    <Badge variant={kilitli ? "default" : "outline"}>{FOY_DURUM_ETIKET[durum] ?? durum}</Badge>
+                  ) : (
+                    <Badge variant="outline">föy yok</Badge>
+                  )}
+                </div>
+
+                {!f ? (
+                  <p className="text-sm text-muted-foreground italic">
+                    Bu taraf için föy henüz hazırlanmadı.
+                  </p>
+                ) : (
+                  <>
+                    <Textarea
+                      rows={10}
+                      className="text-xs font-mono"
+                      value={metin}
+                      disabled={kilitli}
+                      onChange={(e) => setTaslak((o) => ({ ...o, [String(t.id)]: e.target.value }))}
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      "## " ile başlayan satır bölüm başlığıdır; altındaki her satır bir maddedir.
+                    </p>
+                  </>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {f && !kilitli && (
+                    <>
+                      <Button size="sm" variant="secondary" className={KART_DUGME}
+                        disabled={busy === `kaydet:${t.id}`} onClick={() => foyKaydet(String(t.id))}>
+                        {busy === `kaydet:${t.id}` ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                        Kaydet
+                      </Button>
+                      <Button size="sm" className={KART_DUGME}
+                        disabled={busy === `onay:${t.id}`} onClick={() => foyOnayla(String(t.id))}>
+                        {busy === `onay:${t.id}`
+                          ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          : <CheckCircle2 className="h-4 w-4 mr-1" />}
+                        Onayla
+                      </Button>
+                    </>
+                  )}
+                  {(!f || durum === "taslak") && (
+                    <div className="space-y-1">
+                      <Button size="sm" variant="outline" className={KART_DUGME}
+                        disabled={busy === `hazirla:${t.id}`} onClick={() => foyHazirla(String(t.id))}>
+                        {busy === `hazirla:${t.id}`
+                          ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Hazırlanıyor…</>
+                          : <><Sparkles className="h-4 w-4 mr-1" /> {f ? "Yeniden hazırla" : "Föy hazırla"}</>}
+                      </Button>
+                      <UcretliIsaret />
+                    </div>
+                  )}
+                </div>
+
+                {kilitli && (
+                  <p className="text-[11px] text-muted-foreground">Gönderim sonraki adımda açılacak.</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
