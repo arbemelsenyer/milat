@@ -34,10 +34,38 @@ function temiz(v: unknown): string {
 }
 
 // Karşılaştırma için sadeleştirme: küçük harf (tr), noktalama ve fazla boşluk atılır.
+//
+// 16.08 GENİŞLETME (canlı bulgu — Serpil Karahan dosyası): alıntı gerçekte metinde
+// geçtiği hâlde "kaynakta bulunamadı" deniyordu. Sebep uydurma alıntı DEĞİL,
+// karşılaştırmanın fazla katı olmasıydı:
+//  · PDF'ten çıkan metinde Türkçe harfler bozuk gelebiliyor (ş/s, ı/i, ğ/g …),
+//    model ise düzgün yazıyor → aynı cümle iki farklı dizgi oluyor. Bu yüzden
+//    karşılaştırmada Türkçe harfler ASCII karşılığına KATLANIR.
+//  · Madde işaretleri, tire/uzun tire, eğik çizgi, üç nokta ve alt çizgi iki metinde
+//    farklı yerlerde duruyor → boşluğa çevrilir.
+//  · PDF satır sonlarında kelime tirelenmiş olabiliyor ("öde-\nnecek") → satır sonu
+//    tiresi ve ardındaki satır başı birleştirilir.
+//  · Satır sonları boşluğa çevrilir; model tek satır yazıyor, kaynak çok satırlı.
+// BU SADELEŞTİRME YALNIZ KARŞILAŞTIRMA İÇİNDİR. Ekranda gösterilen ve tabloya yazılan
+// alıntı HER ZAMAN modelin verdiği ORİJİNAL metindir; sadeleştirilmiş hâli kaydedilmez.
 function sade(metin: string): string {
   return temiz(metin)
+    // satır sonu tirelemesi: "öde-\nnecek" → "ödenecek"
+    .replace(/[-‐‑]\s*\r?\n\s*/g, "")
+    // tüm satır sonları boşluk
+    .replace(/\r?\n/g, " ")
     .toLocaleLowerCase("tr-TR")
+    // Türkçe harf katlaması (küçültme sonrası: yalnız küçük harfler kalır ama
+    // büyük harf karşılıkları da güvenlik için listede tutuluyor)
+    .replace(/[şŞ]/g, "s")
+    .replace(/[ıİiI]/g, "i")
+    .replace(/[ğĞ]/g, "g")
+    .replace(/[çÇ]/g, "c")
+    .replace(/[öÖ]/g, "o")
+    .replace(/[üÜ]/g, "u")
     .replace(/[""''`.,;:!?()\[\]{}""]/g, " ")
+    // üç nokta · tire · uzun tire · eğik çizgi · alt çizgi · yıldız
+    .replace(/[…\-‐‑‒–—/_*]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -66,14 +94,22 @@ function tekCumle(metin: string): string {
   return parca.length > 200 ? `${parca.slice(0, 197)}…` : parca;
 }
 
-// Alıntının kaynak metinde gerçekten geçip geçmediği: sadeleştirilmiş karşılaştırma,
-// önce tam alıntı, tutmazsa ilk 40 karakter (model kırpma/noktalama değiştirebiliyor).
+// Alıntının kaynak metinde gerçekten geçip geçmediği: sadeleştirilmiş karşılaştırma.
+// ÜÇ ŞANS (16.08): (1) tam alıntı · (2) ilk 40 karakter · (3) alıntının ORTASINDAN
+// alınan 40 karakter. Üçüncüsü şu yüzden var: model cümlenin başına madde numarası
+// ya da başlık parçası ekleyip ("3. Kiracı, …") baştaki 40 karakteri kaydırabiliyor;
+// cümlenin ortası ise kaynakla birebir kalıyor.
 function alintiKaynaktaVar(alinti: string, kaynak: string): boolean {
   const a = sade(alinti);
   const k = sade(kaynak);
   if (a.length < 10) return false;
   if (k.includes(a)) return true;
-  return k.includes(a.slice(0, 40));
+  if (k.includes(a.slice(0, 40))) return true;
+  if (a.length >= 60) {
+    const bas = Math.max(0, Math.floor(a.length / 2) - 20);
+    return k.includes(a.slice(bas, bas + 40));
+  }
+  return false;
 }
 
 function trGun(iso: string): string {
@@ -226,8 +262,8 @@ var=true ise:
 
     const varMi = parsed?.var === true;
     const paragraf = temiz(parsed?.paragraf);
-    const alintiIlk = tekCumle(temiz(parsed?.alinti_ilk));
-    const alintiSon = tekCumle(temiz(parsed?.alinti_son));
+    let alintiIlk = tekCumle(temiz(parsed?.alinti_ilk));
+    let alintiSon = tekCumle(temiz(parsed?.alinti_son));
 
     // ── SUNUCU TARAFI ELEME ─────────────────────────────────────────────────
     let durum = "hazir";
@@ -243,9 +279,82 @@ var=true ise:
       } else if (!alintiIlk || !alintiSon) {
         durum = "elendi";
         sebep = "İki tarihli metinden birer alıntı gelmedi; dayanaksız paragraf yazılmaz.";
-      } else if (!alintiKaynaktaVar(alintiIlk, ilk.metin) || !alintiKaynaktaVar(alintiSon, son.metin)) {
-        durum = "elendi";
-        sebep = "Alıntı kaynak metinde bulunamadı; uydurma alıntı kaydedilmez.";
+      } else {
+        // ── ONARIM TURU (16.08) ───────────────────────────────────────────
+        // Paragraf temiz, yalnız ALINTI kaynakta bulunamıyorsa kayıt hemen
+        // elenmez: model BİR KEZ daha çağrılır ve YALNIZ alıntılar istenir
+        // (paragraf yeniden yazdırılmaz). Amaç, doğru bulguyu kopyalama
+        // hatası yüzünden kaybetmemek.
+        // MALİYET: bu İKİNCİ ücretli çağrıdır — yalnız doğrulama düştüğünde
+        // çalışır; ilk çağrı temiz geçtiyse hiç çalışmaz. Tur EN FAZLA BİR kez
+        // yapılır, döngü kurulmaz.
+        let ilkTamam = alintiKaynaktaVar(alintiIlk, ilk.metin);
+        let sonTamam = alintiKaynaktaVar(alintiSon, son.metin);
+
+        if (!ilkTamam || !sonTamam) {
+          const eksikler = [!ilkTamam ? "BİRİNCİ" : "", !sonTamam ? "İKİNCİ" : ""]
+            .filter(Boolean).join(" ve ");
+          console.error(`[iletisim-degisim] onarım turu: ${eksikler} metnin alıntısı bulunamadı`);
+          const onarimSystem = `Sen bir metinden ALINTI ÇIKARAN yardımcısın. Yorum yapmazsın, paragraf yazmazsın.
+
+GÖREV: Aşağıdaki iki metinden BİRER cümle seç ve BİREBİR KOPYALA. Önceki denemede ${eksikler} metnin alıntısı kaynakta bulunamadı.
+
+KURALLAR:
+1. Cümleyi metinden AYNEN kopyala; tek karakterini bile değiştirme, kısaltma, düzeltme, birleştirme.
+2. Madde numarası, başlık ya da senin eklediğin hiçbir sözcük alıntıya girmesin.
+3. Her alıntı EN ÇOK BİR cümledir ve kendi metninden gelir: alinti_ilk BİRİNCİ metinden, alinti_son İKİNCİ metinden.
+4. Duygu, kişilik, niyet ve psikolojik durum hakkında hiçbir şey yazma; zaten yalnız alıntı vereceksin.
+5. Uygun cümle bulamazsan o alanı boş bırak; uydurma.
+
+Çıktı YALNIZCA JSON: {"alinti_ilk":"","alinti_son":""}`;
+          try {
+            const onarimRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                model: "google/gemini-2.5-flash",
+                messages: [
+                  { role: "system", content: onarimSystem },
+                  { role: "user", content: userPrompt },
+                ],
+                response_format: { type: "json_object" },
+              }),
+            });
+            if (onarimRes.ok) {
+              const onarimJson = await onarimRes.json();
+              let op: any = {};
+              try { op = JSON.parse(onarimJson?.choices?.[0]?.message?.content ?? "{}"); } catch { op = {}; }
+              const yeniIlk = tekCumle(temiz(op?.alinti_ilk));
+              const yeniSon = tekCumle(temiz(op?.alinti_son));
+              if (!ilkTamam && yeniIlk && alintiKaynaktaVar(yeniIlk, ilk.metin)) {
+                alintiIlk = yeniIlk;
+                ilkTamam = true;
+              }
+              if (!sonTamam && yeniSon && alintiKaynaktaVar(yeniSon, son.metin)) {
+                alintiSon = yeniSon;
+                sonTamam = true;
+              }
+              // Onarım turundan gelen alıntılar da yasak ifade süzgecinden geçer.
+              const etiket2 = yasakIfade(`${alintiIlk} ${alintiSon}`);
+              if (etiket2) {
+                durum = "elendi";
+                sebep = `Onarım turundaki alıntıda yasaklı ifade geçti ("${etiket2}").`;
+              }
+            } else {
+              console.error(`[iletisim-degisim] onarım turu HTTP ${onarimRes.status}`);
+            }
+          } catch (e: any) {
+            console.error(`[iletisim-degisim] onarım turu başarısız: ${e?.message ?? e}`);
+          }
+        }
+
+        if (durum === "hazir" && (!ilkTamam || !sonTamam)) {
+          const eksik = !ilkTamam && !sonTamam
+            ? "her iki metnin de"
+            : !ilkTamam ? "BİRİNCİ (eski) metnin" : "İKİNCİ (yeni) metnin";
+          durum = "elendi";
+          sebep = `Alıntı kaynak metinde bulunamadı — ${eksik} alıntısı doğrulanamadı (onarım turu da tutmadı).`;
+        }
       }
     }
 

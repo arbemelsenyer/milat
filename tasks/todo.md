@@ -1,4 +1,20 @@
 ## Nerede kaldık — 16.08.2026 (69) · İLETİŞİMDE DEĞİŞİM — YZ AYRINTI KOLU
+- [x] DÜZELTME 16.08 (canlı bulgu — Serpil Karahan): "Alıntı kaynak metinde bulunamadı"
+      çıkıyordu; sebep uydurma alıntı değil, doğrulamanın fazla katı olmasıydı. YALNIZ
+      supabase/functions/iletisim-degisim/index.ts değişti: (a) karşılaştırma
+      sadeleştirmesine Türkçe harf katlaması (ş→s · ı/İ→i · ğ→g · ç→c · ö→o · ü→u),
+      satır sonu tirelemesi birleştirme, satır sonu → boşluk ve üç nokta/tire/eğik
+      çizgi/alt çizgi/yıldız temizliği eklendi — bu YALNIZ karşılaştırma içindir,
+      kaydedilen alıntı orijinal hâliyle duruyor; (b) doğrulamaya üçüncü şans:
+      tam alıntı → ilk 40 karakter → alıntının ORTASINDAN 40 karakter (madde numarası
+      eklenen alıntılar için); (c) ONARIM TURU: alıntı doğrulanamazsa model BİR KEZ
+      daha çağrılıp yalnız alıntılar isteniyor (paragraf yeniden yazılmıyor), gelen
+      alıntı doğrulamayı geçerse kayıt 'hazir'; geçmezse 'elendi' kalıyor ve sebepte
+      hangi metnin (birinci/ikinci) alıntısının tutmadığı yazıyor. Onarım turu ikinci
+      ücretli çağrıdır: yalnız doğrulama düşünce çalışır, en fazla bir kez.
+      Node ile denendi: bozuk Türkçe kaynak · satır sonu tirelemesi · madde numaralı
+      alıntı artık eşleşiyor; uydurma alıntı hâlâ eleniyor.
+      REDEPLOY GEREKLİ: iletisim-degisim. SQL gerekmiyor, ön yüz değişmedi.
 - [x] Sayım kolu ve [Yenile] düğmesi AYNEN duruyor (bedava, kart açılınca kendiliğinden
       çalışıyor). Ayrıntı kolu onun ALTINA eklendi; hiçbir satır kaldırılmadı.
 - [x] Yeni edge fonksiyon: supabase/functions/iletisim-degisim.

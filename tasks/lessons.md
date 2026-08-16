@@ -116,4 +116,11 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   kutu gibi görünür; yazı ancak hover'da belirir. Koyu zeminde düğmeye renk açıkça
   verilir (KOKPIT_DUGME sabiti). Yeni kart eklerken düğme NORMAL hâlde görülerek
   doğrulanır, hover'a bakılmaz. (16.08, Teklif Değerlendirme "Yenile")
+- Alıntı doğrulaması (model çıktısı metinde gerçekten geçiyor mu) HARF KATLAMASI olmadan
+  yapılmaz: PDF'ten çıkan metinde Türkçe harfler bozuk gelip model düzgün yazınca aynı
+  cümle iki farklı dizgi oluyor ve doğru bulgu "uydurma alıntı" diye eleniyor. Kural:
+  karşılaştırmada ş/ı/ğ/ç/ö/ü katlanır, satır sonu tirelemesi birleştirilir, satır sonu
+  boşluğa çevrilir; sadeleştirme YALNIZ karşılaştırma içindir, kaydedilen metin
+  orijinal kalır. Tutmazsa tek seferlik onarım turu (yalnız alıntı isteyen ikinci çağrı)
+  yapılır. (16.08, iletisim-degisim)
 
