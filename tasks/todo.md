@@ -29,7 +29,23 @@ AÇIK UÇ: Makbuz numarası serbest metindir; biçim doğrulaması ve mükerrer 
 yok. İstenirse ayrı iş.
 
 ## Nerede kaldık — 16.08.2026 (78) · USULE İLİŞKİN ENGEL KONTROL LİSTESİ (İBA 2.4)
-- [ ] CANLI DOĞRULAMA BEKLİYOR (16.08 akşamı itibarıyla). Bu bölümde iki düzeltme
+- [x] CANLIDA DOĞRULANDI (16.08.2026) — İBA 2.4. Kokpit "Masaya otururken" katmanında,
+      Usul önerisinin altında; nöbetçiye ÜCRETSİZ otomatik kol olarak bağlı (commit
+      07938ed + 71cad80 + 748d22c). Model çağrısı YOK, tamamı koddan hesaplanıyor. Dört
+      başlık taranıyor: vekaletname dosyada var mı · tüzel kişide temsil/imza yetkilisi
+      kayıtlı mı · tebligata esas iletişim bilgisi (adres/telefon) dolu mu · dava şartı
+      son tarihine 15 günden az kaldı mı. Canlı sonuç: sağlık dosyasında 3 eksik, kira
+      dosyasında 4 eksik (son tarihe 4 gün kaldığı uyarısı dahil) — hepsi doğru.
+      MEVZUAT ATIFI KURALI: madde referansı koda sabit yazılmaz; her seferinde bilgi
+      tabanındaki kanun/yönetmelik metninden kavram aramasıyla çekilir, birebir alıntıyla
+      künyelenir, doğrulanamazsa BOŞ bırakılır. Eğitim/uzmanlık modülleri atıf kaynağı
+      olarak kullanılmaz; geçici madde ile normal madde ayrı ele alınır; bozuk (OCR
+      kırığı) alıntı elenir.
+AÇIK NOT: usule ilişkin engel atıflarının son hâli (748d22c) canlıda henüz doğrulanmadı —
+nöbetçi yeni kodla koştuğunda atıfların yalnız kanun/yönetmelikten geldiği, yanlış madde
+numarası ve bozuk alıntı kalmadığı kontrol edilecek. Referans boş kalsa da eksik
+tespitleri gösterilmeye devam eder.
+- [x] TUR KAYDI (16.08 akşamı). Bu bölümde iki düzeltme
       turu daha yapıldı, kaydı buraya düşüyor:
       · 71cad80 — madde referansı bilgi tabanındaki kanun metninden çekiliyor (kavram
         araması, birebir alıntı; koda sabit madde numarası yazılmadı).

@@ -89,7 +89,8 @@ ile doğrulanır.
   bayrak/kapı uyumsuzluğu giderildiği için bundan sonra gerekmeyecek.
 - 16.08: usul_engelleri tablosu kuruldu (case_id UNIQUE, durum 'engel_var'/'engel_yok',
   engeller jsonb) + RLS; SELECT yalnız arabulucu/dosya sahibi, admin ALL, TARAFA
-  POLİTİKA YOK. agent_states izinli listesine 'usul_engeli' eklendi.
+  POLİTİKA YOK. agent_states izinli listesine 'usul_engeli' eklendi
+  (agent_states_agent_type_check kısıtı 23 ada genişletildi; mevcut adlar korundu).
 - 16.08: case_documents tablosuna "Yonetici belge yukler" INSERT politikası eklendi:
   uploaded_by = auth.uid() AND has_role(auth.uid(),'admin'). Sebep: admin hesabı taraf
   dosyalarına belge yükleyemiyordu.

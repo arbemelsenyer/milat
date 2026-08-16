@@ -139,4 +139,9 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   (79 numaralı makbuz kalemi bölüm kaldırıldığı hâlde "eklendi" yazılı kaldı).
   Kural: kod turu belge güncellemesine izin vermiyorsa, cevabın sonunda "şu kaydı
   düşmek gerekiyor" diye HATIRLATILACAK ve bir sonraki turda ilk iş o kayıt yazılacak.
+- DERS (16.08.2026) — EKRANA BÖLÜM EKLEMEDEN ÖNCE ÜRÜNDE VAR MI DİYE KODA BAKILACAK.
+  "Makbuz takibi" bölümü kokpite eklendi; oysa "Ödeme & Muhasebe" panelinde Ödeme
+  Defteri, Makbuz No sütunu, makbuz numarası yazmanın iki yolu ve makbuz taslağı PDF'i
+  zaten vardı. Kart adı farklı olduğu için yok sanıldı. Kural: AD DEĞİL İŞLEV aranacak;
+  yeni bölüm komutundan önce ilgili tabloyu kullanan tüm ekranlar taranacak.
 
