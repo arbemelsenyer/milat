@@ -111,4 +111,9 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   EDİLİR: kayıt yasağı uyarısında istenen dış ürün adları (m.11 yasağı) yazılmadı,
   yasak araç adı verilmeden tarif edildi. Sessizce uygulamak da, komutu birebir
   uygulamak da yanlış olurdu. (16.08, kayıt protokolü)
+- shadcn Button'un outline varyantı YAZI RENGİ TANIMLAMAZ (yalnız border + bg-background).
+  Koyu zeminli kartta (bg-sidebar) düğme, kartın açık renkli yazısını miras alıp beyaz
+  kutu gibi görünür; yazı ancak hover'da belirir. Koyu zeminde düğmeye renk açıkça
+  verilir (KOKPIT_DUGME sabiti). Yeni kart eklerken düğme NORMAL hâlde görülerek
+  doğrulanır, hover'a bakılmaz. (16.08, Teklif Değerlendirme "Yenile")
 

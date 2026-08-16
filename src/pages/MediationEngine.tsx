@@ -2354,7 +2354,7 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="text-sm font-semibold text-primary">AI önerisi</div>
                         {!ozetOneri && (
-                          <Button size="sm" variant="outline" onClick={ozetOneriGetir} disabled={ozetBusy}>
+                          <Button size="sm" variant="outline" className={KART_DUGME} onClick={ozetOneriGetir} disabled={ozetBusy}>
                             {ozetBusy
                               ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Hazırlanıyor…</>
                               : <><Sparkles className="h-4 w-4 mr-1" /> {issueDolu ? "Yeni öneri getir" : "Öneri getir"}</>}
@@ -2724,12 +2724,12 @@ function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection,
                   <FileText className="h-4 w-4 text-primary shrink-0" />
                   <span className="flex-1 truncate">{d.file_name}</span>
                   <span className="text-xs text-muted-foreground truncate max-w-[40%]">{tarafAdi(d.party_id)}</span>
-                  <Button variant="ghost" size="sm" className="shrink-0"
+                  <Button variant="outline" size="sm" className={`shrink-0 ${KART_DUGME}`}
                     onClick={() => ozetCikar(d.id, !!o)} disabled={ozetBusy === d.id}
                     title={o ? "Özeti yenile" : "Özet çıkar"}>
                     {ozetBusy === d.id
-                      ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Çıkarılıyor…</>
-                      : <><Sparkles className="h-3 w-3 mr-1" /> {o ? "Özeti yenile" : "Özet çıkar"}</>}
+                      ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Çıkarılıyor…</>
+                      : <><Sparkles className="h-4 w-4 mr-1" /> {o ? "Özeti yenile" : "Özet çıkar"}</>}
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => deleteDoc(d)} title="Sil"><Trash2 className="h-3 w-3" /></Button>
                 </div>
@@ -4036,6 +4036,18 @@ const FAZ3_SECTION_LAYER: Record<string, string> = {
   "faz3-uyusmazlik-konusu": "faz3-katman-ozet",
   "faz3-tur-tespiti": "faz3-katman-ozet",
 };
+
+// ── Kart başlığındaki eylem düğmeleri: TEK GÖRÜNÜM ────────────────────────────
+// Hepsi aynı bileşen (Button), aynı boyut (size="sm" + h-8/text-xs) ve aynı ikon
+// düzeni (h-4 w-4 mr-1) kullanır.
+// KOYU ZEMİN NOTU (16.08 canlı bulgu): outline varyantı yalnız kenarlık ve
+// bg-background verir, YAZI RENGİ TANIMLAMAZ. Koyu kokpit kartında (bg-sidebar)
+// yazı, kartın açık renkli metnini miras alıyordu; düğme beyaz bir kutu gibi
+// görünüyor, yazı ancak hover'da beliriyordu. Koyu zeminde renkler açıkça verilir.
+const KART_DUGME = "h-8 text-xs";
+const KOKPIT_DUGME =
+  "h-8 text-xs border-sidebar-border bg-sidebar-accent/40 text-sidebar-foreground " +
+  "hover:bg-accent hover:text-accent-foreground";
 
 // ── Sol menü numaralandırması — Faz 3 ve Faz 4 ORTAK (tek kopya) ──────────────
 // Bölüm başlıkları 1..n, alt maddeler bağlı olduğu başlığın numarasını alır
@@ -8337,7 +8349,7 @@ function OlayCizelgesiPanel({ caseId, onCountChange }: { caseId: string; onCount
           veya beyanı gösterir; kaynağı olmayan tarih çizelgeye girmez. Bu çizelge yalnız
           size görünür.
         </p>
-        <Button size="sm" variant="outline" onClick={() => cikar(satirlar.length > 0)} disabled={busy || yukleniyor}>
+        <Button size="sm" variant="outline" className={KART_DUGME} onClick={() => cikar(satirlar.length > 0)} disabled={busy || yukleniyor}>
           {busy
             ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Çıkarılıyor…</>
             : <><Sparkles className="h-4 w-4 mr-1" /> {satirlar.length > 0 ? "Çizelgeyi yenile" : "Çizelgeyi çıkar"}</>}
@@ -8554,7 +8566,7 @@ function UsulEngelleriPanel({
           içermez; yalnız eksiği sayar. Süre bilgisi mevcut süre takibinden okunur. Yalnız
           size görünür.
         </p>
-        <Button size="sm" variant="outline" onClick={onReload}>
+        <Button size="sm" variant="outline" className={KART_DUGME} onClick={onReload}>
           <RefreshCw className="h-4 w-4 mr-1" /> Yenile
         </Button>
       </div>
@@ -8673,7 +8685,7 @@ function GucDengesiPanel({ caseId, onCountChange }: { caseId: string; onCountCha
           tespitidir — kişilik değerlendirmesi değildir ve ne yapılacağına karışmaz. Yalnız
           size görünür.
         </p>
-        <Button size="sm" variant="outline" onClick={() => cikar(satirlar.length > 0)} disabled={busy || yukleniyor}>
+        <Button size="sm" variant="outline" className={KART_DUGME} onClick={() => cikar(satirlar.length > 0)} disabled={busy || yukleniyor}>
           {busy
             ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Çıkarılıyor…</>
             : <><Sparkles className="h-4 w-4 mr-1" /> {satirlar.length > 0 ? "Yenile" : "Göstergeleri çıkar"}</>}
@@ -8846,8 +8858,8 @@ function BraketMediatorPanel({ caseId }: { caseId: string }) {
           <EyeOff className="h-4 w-4 text-accent" />
           <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Koşullu Aralık (Braket)</div>
         </div>
-        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={load}>
-          <RefreshCw className="h-3 w-3 mr-1" /> Yenile
+        <Button size="sm" variant="outline" className={KOKPIT_DUGME} onClick={load}>
+          <RefreshCw className="h-4 w-4 mr-1" /> Yenile
         </Button>
       </div>
       <p className="text-xs text-sidebar-foreground/60 leading-snug">
@@ -9131,7 +9143,9 @@ function TeklifDegerlendirmePanel({ caseId }: { caseId: string }) {
           <EyeOff className="h-4 w-4 text-accent" />
           <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold">Teklif Değerlendirme</div>
         </div>
-        <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-3 w-3 mr-1" /> Yenile</Button>
+        <Button size="sm" variant="outline" className={KOKPIT_DUGME} onClick={load}>
+          <RefreshCw className="h-4 w-4 mr-1" /> Yenile
+        </Button>
       </div>
       <p className="text-xs text-sidebar-foreground/60 leading-snug">
         Bu kart yalnız hesap yapar: teklifin kayıtlı talebi ne kadar karşıladığını, kabul hâlinde neyin alınıp
@@ -9575,8 +9589,8 @@ function TikanmaCozucuPanel({ caseRow }: { caseRow: CaseRow }) {
             </Badge>
           )}
         </div>
-        <Button size="sm" variant="outline" onClick={load} disabled={loading}>
-          <RefreshCw className="h-3 w-3 mr-1" /> Yenile
+        <Button size="sm" variant="outline" className={KOKPIT_DUGME} onClick={load} disabled={loading}>
+          <RefreshCw className="h-4 w-4 mr-1" /> Yenile
         </Button>
       </div>
 

@@ -605,3 +605,14 @@ karar, uygulama, tavsiye ve taraf hakkında yorum yok. İşaret yoksa "tıkanma 
 görünmüyor" yazıyor. Yeni tablo, edge fonksiyon ve AI çağrısı YOK; "Yenile" düğmesi var.
 SQL gerekmiyor; yalnız Publish.
 
+16.08 (DÜZELTME — kart düğmeleri görünmüyordu): Kokpitteki koyu zeminli kartlarda
+(Teklif değerlendirme · Tıkanma ve çıkış yolları · Koşullu aralık) "Yenile" düğmesi normal
+hâlde okunmuyordu: shadcn outline varyantı yazı rengi tanımlamıyor, düğme kartın açık
+renkli yazısını miras alıp beyaz kutu gibi görünüyordu. İki ortak sabit tanımlandı —
+KART_DUGME (açık zeminli kartlar) ve KOKPIT_DUGME (koyu kokpit kartları; kenarlık, zemin
+ve yazı rengi açıkça verilir, hover'da yalnız vurgu değişir). Aynı görünüm bugün eklenen
+diğer kartlara da uygulandı: Olay Zaman Çizelgesi, Güç Dengesi, Usule İlişkin Engeller,
+Uyuşmazlık Konusu (AI önerisi) ve belge listesindeki "Özet çıkar / Özeti yenile". Hepsi
+aynı bileşen, aynı boyut (sm · h-8 · text-xs) ve aynı ikon düzeni (h-4 w-4 mr-1).
+İşlev değişmedi; SQL ve redeploy gerekmiyor, yalnız Publish.
+

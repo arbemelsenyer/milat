@@ -1,3 +1,27 @@
+## Nerede kaldık — 16.08.2026 (62) · DÜZELTME: KART DÜĞMELERİ GÖRÜNMÜYORDU
+SEBEP (bulundu): shadcn Button'un outline varyantı yalnız "border + bg-background" verir,
+YAZI RENGİ TANIMLAMAZ (src/components/ui/button.tsx:14). Koyu zeminli kokpit kartında
+(bg-sidebar text-sidebar-foreground) düğme, kartın açık renkli yazısını miras alıyordu:
+açık zemin üstünde açık yazı = beyaz boş kutu. Hover'da bg-accent + hover:text-accent-
+foreground devreye girdiği için yazı ancak o zaman beliriyordu. Kurucunun tarifi birebir bu.
+- [x] İki ortak sabit: KART_DUGME (açık zeminli kartlar: h-8 · text-xs) ve KOKPIT_DUGME
+      (koyu kokpit kartları: kenarlık + zemin + YAZI RENGİ açıkça verilir, hover'da yalnız
+      vurgu değişir). Modül düzeyinde tek kopya.
+- [x] Düzeltilenler (koyu zemin): Teklif değerlendirme "Yenile" · Tıkanma ve çıkış yolları
+      "Yenile" · Koşullu aralık (braket) "Yenile" (bu sonuncusu ghost varyantındaydı;
+      görünüyordu ama komşularından farklıydı, aynı görünüme getirildi).
+- [x] Aynı görünüme getirilenler (açık zemin, işlev değişmedi): Olay Zaman Çizelgesi ·
+      Güç Dengesi · Usule İlişkin Engeller · Uyuşmazlık Konusu (AI önerisi) · belge
+      listesindeki "Özet çıkar / Özeti yenile" (ghost → outline).
+- [x] Hepsi aynı bileşen (Button), aynı boyut (size="sm" + h-8 + text-xs) ve aynı ikon
+      düzeni (h-4 w-4 mr-1).
+- [x] DOKUNULMAYAN: hata ekranlarındaki "Tekrar Dene" düğmeleri (açık zeminli Card içinde,
+      normal hâlde okunuyor) ve Aşama 2 üstündeki "Yenile" (default varyant). Kurucunun
+      listesinde yoktu, görünürlük sorunu da yok.
+tsc (tsconfig.app.json) temiz. CANLI TEST YOK (Publish sonrası bakılacak).
+AÇIK UÇ: Aynı tuzak koyu zeminli YENİ kartlarda tekrar edebilir; kural lessons.md'ye
+yazıldı — koyu zeminde düğme rengi açıkça verilecek, düğme NORMAL hâlde doğrulanacak.
+
 ## Nerede kaldık — 16.08.2026 (61) · TIKANMA ÇÖZÜCÜ (İBA 2.5 / B20)
 KEŞİF: Tıkanma göstergesi için AYRI KAYIT YOK; işaretler mevcut tablolardan türetildi.
 Bulunanlar: randevu_teklifleri (durum 'beklemede' → cevapsız teklif, created_at/cevap_zamani)
