@@ -1692,6 +1692,79 @@ export type Database = {
           },
         ]
       }
+      iletisim_degisim: {
+        Row: {
+          alinti_ilk: string
+          alinti_son: string
+          case_id: string
+          created_at: string
+          durum: string
+          id: string
+          kaynak_ilk: string | null
+          kaynak_son: string | null
+          paragraf: string
+          party_id: string
+          sebep: string | null
+          tarih_ilk: string | null
+          tarih_son: string | null
+          updated_at: string
+        }
+        Insert: {
+          alinti_ilk?: string
+          alinti_son?: string
+          case_id: string
+          created_at?: string
+          durum?: string
+          id?: string
+          kaynak_ilk?: string | null
+          kaynak_son?: string | null
+          paragraf?: string
+          party_id: string
+          sebep?: string | null
+          tarih_ilk?: string | null
+          tarih_son?: string | null
+          updated_at?: string
+        }
+        Update: {
+          alinti_ilk?: string
+          alinti_son?: string
+          case_id?: string
+          created_at?: string
+          durum?: string
+          id?: string
+          kaynak_ilk?: string | null
+          kaynak_son?: string | null
+          paragraf?: string
+          party_id?: string
+          sebep?: string | null
+          tarih_ilk?: string | null
+          tarih_son?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iletisim_degisim_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "iletisim_degisim_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iletisim_degisim_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: true
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kayit_onay_talepleri: {
         Row: {
           case_id: string
