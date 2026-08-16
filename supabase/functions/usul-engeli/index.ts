@@ -59,24 +59,30 @@ async function durumYaz(admin: any, caseId: string, patch: Record<string, unknow
    Madde numarası yakalanamazsa yalnız kaynak adı ve alıntı yazılır — numara ASLA
    tahmin edilmez. Kaynakta karşılık yoksa referans boş kalır, eksik satırı yine
    gösterilir. Bu bölüm model çağırmaz; kol ücretsiz kalır. */
+/* 16.08 DÜZELTME (canlı bulgu): atıf kaynağı olarak eğitim modülü kullanılmıştı
+   ("Uzman Arabuluculuk - Sağlık"). Artık referans YALNIZ MEVZUAT metninden alınır:
+   iki temel kaynak + adında "sayılı" geçen ve "Kanun"/"Yönetmelik" ile künyelenen
+   diğer mevzuat kayıtları. Uzmanlık/eğitim modülleri (Uzman Arabuluculuk - … ·
+   Aile Arabuluculuğu · ADB Yayını · Modül) atıf kaynağı DEĞİLDİR. */
 const TEMEL_KAYNAKLAR = [
   "6325 Sayılı Hukuk Uyuşmazlıklarında Arabuluculuk Kanunu",
   "Hukuk Uyuşmazlıklarında Arabuluculuk Kanunu Yönetmeliği",
 ];
 
-// Uyuşmazlık türüne karşılık gelen uzmanlık modülü (varsa) aramaya eklenir.
-const MODUL_ESLESME: { anahtarlar: string[]; baslik: string[] }[] = [
-  { anahtarlar: ["aile", "bosanma", "boşanma", "nafaka", "velayet"], baslik: ["Aile Arabuluculuğu"] },
-  { anahtarlar: ["is", "iş", "isci", "işçi", "kidem", "kıdem"], baslik: ["Uzman Arabuluculuk - İş"] },
-  { anahtarlar: ["saglik", "sağlık", "malpraktis", "hasta", "tibbi", "tıbbi"], baslik: ["Uzman Arabuluculuk - Sağlık"] },
-  { anahtarlar: ["tuketici", "tüketici"], baslik: ["Uzman Arabuluculuk - Tüketici"] },
-  { anahtarlar: ["ticari", "ticaret", "sirket", "şirket"], baslik: ["Uzman Arabuluculuk - Ticaret"] },
-  { anahtarlar: ["sigorta"], baslik: ["Uzman Arabuluculuk - Sigorta Hukuku"] },
-  { anahtarlar: ["banka", "finans", "kredi"], baslik: ["Uzman Arabuluculuk - Banka ve Finans"] },
-  { anahtarlar: ["insaat", "inşaat", "yapi", "yapı"], baslik: ["Uzman Arabuluculuk - İnşaat"] },
-  { anahtarlar: ["enerji", "maden"], baslik: ["Uzman Arabuluculuk - Enerji ve Maden"] },
-  { anahtarlar: ["fikri", "telif", "marka", "patent"], baslik: ["Uzman Arabuluculuk - Fikri Mülkiyet"] },
+const EGITIM_KAYNAK_ISARETLERI = [
+  "uzman arabuluculuk", "aile arabuluculuğu", "adb yayını", "adb yayini",
+  "modül", "modul", "eğitim", "egitim", "rehber", "el kitabı", "el kitabi",
 ];
+
+function mevzuatKaynagiMi(baslik: string): boolean {
+  const ad = temiz(baslik);
+  if (!ad) return false;
+  if (TEMEL_KAYNAKLAR.includes(ad)) return true;
+  const k = ad.toLocaleLowerCase("tr-TR");
+  if (EGITIM_KAYNAK_ISARETLERI.some((x) => k.includes(x))) return false;
+  const kanunMu = k.includes("kanun") || k.includes("yönetmel") || k.includes("yonetmel");
+  return k.includes("sayılı") || k.includes("sayili") ? kanunMu : false;
+}
 
 // Kavram aramaları — madde numarası DEĞİL, ifade aranır. Sıra önemlidir: ilk
 // eşleşen kullanılır, hiçbiri tutmazsa referans boş kalır.
@@ -90,6 +96,26 @@ const IFADELER_TEBLIGAT = [
 const IFADELER_SURE = [
   "dava şartı", "dava şartıdır", "süresi içinde sonuçland", "başvuru tarihinden itibaren",
 ];
+
+/* 16.08 DÜZELTME (canlı bulgu): ekrana "taraflar biz - zat" gibi kelimesi bölünmüş
+   alıntı çıkmıştı (PDF metin çıkarma kırığı). Parça ÖNCE onarılır: satır sonu
+   tiresi ve harf-boşluk-tire-boşluk-harf birleştirilir, fazla boşluk toplanır.
+   Onarımdan sonra hâlâ kırık görünüyorsa (yalnız başına duran tek harfler) o parça
+   KULLANILMAZ, aynı kavram için başka parça denenir. */
+function metniOnar(metin: string): string {
+  return temiz(metin)
+    .replace(/([\p{L}])\s*[-‐‑]\s*\r?\n\s*([\p{L}])/gu, "$1$2")
+    .replace(/([\p{L}])\s+[-‐‑]\s+([\p{L}])/gu, "$1$2")
+    .replace(/\r?\n/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+// Onarımdan sonra hâlâ kırık mı? Yalnız başına duran tek harf sayısına bakılır.
+function metinKirikMi(metin: string): boolean {
+  const tekHarfler = metin.match(/(?<=\s)[\p{L}](?=\s)/gu) ?? [];
+  return tekHarfler.length > 2;
+}
 
 // Alıntının kaynak parçada gerçekten geçtiğini doğrular (sadeleştirilmiş karşılaştırma).
 function sadeKarsilastir(metin: string): string {
@@ -120,36 +146,56 @@ function cumleAl(metin: string, indeks: number): string {
   return parca.length > 200 ? `${parca.slice(0, 197)}…` : parca;
 }
 
-// Eşleşmeden ÖNCE gelen en yakın "MADDE <n>" başlığı; yoksa boş.
-function maddeBasligi(metin: string, indeks: number): string {
+/* 16.08 DÜZELTME (canlı bulgu): süre satırında "MADDE 3" yazılmıştı ama alıntı
+   GEÇİCİ MADDE 3'ten geliyordu. Artık başlık türü de yakalanır: GEÇİCİ MADDE ve
+   EK MADDE ayrı yazılır, asla düz "MADDE" sayılmaz. Alıntının İÇİNDE başka bir
+   madde başlığı varsa numara GÜVENSİZ sayılır ve hiç yazılmaz. */
+const MADDE_DESENI = /(GEÇİCİ\s+MADDE|GECICI\s+MADDE|EK\s+MADDE|MADDE)\s*(\d+(?:\s*\/\s*[A-ZÇĞİÖŞÜ])?)/gi;
+
+function basligiBicimle(tur: string, no: string): string {
+  const t = tur.toLocaleUpperCase("tr-TR").replace(/\s+/g, " ").trim();
+  const duzeltilmis = t.startsWith("GEC") || t.startsWith("GEÇ")
+    ? "GEÇİCİ MADDE"
+    : t.startsWith("EK") ? "EK MADDE" : "MADDE";
+  return `${duzeltilmis} ${String(no).replace(/\s+/g, "")}`;
+}
+
+// Eşleşmeden ÖNCE gelen en yakın madde başlığı; güvensizse boş döner.
+function maddeBasligi(metin: string, indeks: number, alinti: string): string {
   const onceki = metin.slice(0, indeks);
-  // "MADDE 18/A" gibi harfli maddeler de olduğu gibi yakalanır.
-  const eslesmeler = [...onceki.matchAll(/MADDE\s*(\d+(?:\s*\/\s*[A-ZÇĞİÖŞÜ])?)/gi)];
+  const eslesmeler = [...onceki.matchAll(MADDE_DESENI)];
   if (eslesmeler.length === 0) return "";
+  // Alıntı bir madde başlığı içeriyorsa hangi maddeye ait olduğu belirsizdir.
+  if (new RegExp(MADDE_DESENI.source, "i").test(alinti)) return "";
   const son = eslesmeler[eslesmeler.length - 1];
-  return `MADDE ${String(son[1]).replace(/\s+/g, "")}`;
+  return basligiBicimle(String(son[1]), String(son[2]));
 }
 
 // Kavram aramasıyla referans üretir. Bulunamazsa BOŞ döner.
-async function referansBul(admin: any, kaynakAdlari: string[], ifadeler: string[]): Promise<string> {
+async function referansBul(admin: any, ifadeler: string[]): Promise<string> {
   for (const ifade of ifadeler) {
     const { data, error } = await admin.from("knowledge_base_chunks")
       .select("source_title, chunk_text")
-      .in("source_title", kaynakAdlari)
       .ilike("chunk_text", `%${ifade}%`)
-      .limit(3);
+      .limit(20);
     if (error) {
       console.error(`[usul-engeli] bilgi tabanı okunamadı (${ifade}): ${error.message}`);
       continue;
     }
     for (const r of ((data ?? []) as any[])) {
-      const metin = temiz(r.chunk_text);
+      // 1) Kaynak süzgeci: yalnız mevzuat. Eğitim/uzmanlık modülü atıf kaynağı değil.
+      if (!mevzuatKaynagiMi(r.source_title)) continue;
+      // 2) Parça ÖNCE onarılır; kırık kalırsa bu parça kullanılmaz.
+      const metin = metniOnar(String(r.chunk_text ?? ""));
+      if (!metin || metinKirikMi(metin)) continue;
       const indeks = metin.toLocaleLowerCase("tr-TR").indexOf(ifade.toLocaleLowerCase("tr-TR"));
       if (indeks < 0) continue;
       const alinti = cumleAl(metin, indeks);
-      // Doğrulama: alıntı kaynak parçada birebir geçmiyorsa referans yazılmaz.
+      if (!alinti || metinKirikMi(alinti)) continue;
+      // 3) Doğrulama: alıntı (onarılmış) parçada birebir geçmeli.
       if (!sadeKarsilastir(metin).includes(sadeKarsilastir(alinti))) continue;
-      const madde = maddeBasligi(metin, indeks);
+      // 4) Madde numarası güvenli değilse hiç yazılmaz — yalnız kaynak adı + alıntı.
+      const madde = maddeBasligi(metin, indeks, alinti);
       const kaynak = temiz(r.source_title) || "Bilgi tabanı kaydı";
       return madde
         ? `${kaynak} ${madde} — “${alinti}”`
@@ -244,19 +290,16 @@ Deno.serve(async (req) => {
       .select("file_name, party_id").eq("case_id", case_id).limit(200);
     const belgeler = (docsRaw ?? []) as any[];
 
-    // Referans kaynakları: temel iki metin + (tür eşleşirse) uzmanlık modülü.
-    const turMetni = [temiz((caseRow as any).dispute_type), temiz((caseRow as any).dispute_subtype)]
-      .filter(Boolean).join(" ").toLocaleLowerCase("tr-TR");
-    const kaynakAdlari = [...TEMEL_KAYNAKLAR];
-    const modul = MODUL_ESLESME.find((m) => m.anahtarlar.some((a) => turMetni.includes(a)));
-    if (modul) kaynakAdlari.push(...modul.baslik);
-
     // Her başlık için referans BİR KEZ aranır (satır sayısı kadar sorgu yapılmaz).
+    // Kaynak süzgeci sorgunun İÇİNDE değil, sonucun üstünde çalışır: yalnız mevzuat
+    // kayıtları kabul edilir (bkz. mevzuatKaynagiMi).
     const [refTemsil, refTebligat, refSure] = await Promise.all([
-      referansBul(admin, kaynakAdlari, IFADELER_TEMSIL),
-      referansBul(admin, kaynakAdlari, IFADELER_TEBLIGAT),
-      referansBul(admin, kaynakAdlari, IFADELER_SURE),
+      referansBul(admin, IFADELER_TEMSIL),
+      referansBul(admin, IFADELER_TEBLIGAT),
+      referansBul(admin, IFADELER_SURE),
     ]);
+    // Kaç başlıkta güvenli referans bulunamadığı dönüş özetinde görünür.
+    const referansBos = [refTemsil, refTebligat, refSure].filter((x) => !x).length;
 
     type Engel = { baslik: string; tespit: string; referans: string };
     const engeller: Engel[] = [];
@@ -331,9 +374,12 @@ Deno.serve(async (req) => {
 
     await durumYaz(durumAdmin, durumCaseId, {
       status: "completed", error_message: null,
-      last_output: { sonuc: durum, engel: engeller.length, taraf: taraflar.length },
+      last_output: {
+        sonuc: durum, engel: engeller.length, taraf: taraflar.length,
+        referans_bos: referansBos,
+      },
     });
-    return json({ durum, engel: engeller.length });
+    return json({ durum, engel: engeller.length, referans_bos: referansBos });
   } catch (e: any) {
     console.error("[usul-engeli] hata", e?.message ?? e);
     await durumYaz(durumAdmin, durumCaseId, {
