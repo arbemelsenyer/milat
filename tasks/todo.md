@@ -22,7 +22,16 @@
       (calculate-mediation-fee) — model çağrısı yapıp yapmadıkları doğrulanmadı.
 - [x] Hiçbir düğmenin adı, işlevi, tıklama davranışı değişmedi; yalnız yanına/altına
       bilgi satırı eklendi.
-tsc temiz. CANLI TEST YOK.
+- [x] CANLIDA DOĞRULANDI (16.08.2026) — Kokpit kart envanteri çıkarıldı (salt okuma).
+      Ücretli model çağrısı tetikleyen 7 düğmeye tek tanımdan gelen maliyet işareti
+      eklendi: "Yapay zekâ çağrısı — her basış ücret oluşturur" (commit e5a0617).
+      İşaret tek bileşende tanımlı; pilota çıkarken tek komutla kaldırılabilir/
+      yumuşatılabilir. Bedava düğmelere işaret konmadı. Karar: yenile düğmesi olmayan
+      kartlara düğme EKLENMEYECEK — hepsi tek kaynaktan besleniyor, kaynak yenilenince
+      tazeleniyorlar.
+AÇIK NOT: düğme adlandırması tutarsız (üret/çıkar/yenile/tekrar dene karışık) —
+pilottan önce tek standartla toplanacak, şimdilik dokunulmadı.
+tsc temiz.
 
 ## Nerede kaldık — 16.08.2026 (71) · AJAN KONTROL PANELİ — BEŞ YENİ KOL BAĞLANDI
 - [x] Beş edge fonksiyona agent_states durum yazımı: belge-ozeti (belge_ozeti) ·
@@ -59,8 +68,10 @@ kaldırılması ayrı karar (sekme silme yasağı gereği dokunulmadı).
 - [x] (a) AJAN KONTROL PANELİ — bugün eklenen yeni kolların panele bağlanması +
       agent_states görünürlük kuralı. SQL hazır, çalıştırılmayı bekliyor.
       (16.08'de yapıldı — bkz. oturum 71; redeploy bekliyor.)
-- [ ] (b) YENİLE DÜĞMESİ ENVANTERİ — hangi kartta var, hangisinde yok, hepsi aynı
+- [x] (b) YENİLE DÜĞMESİ ENVANTERİ — hangi kartta var, hangisinde yok, hepsi aynı
       görünümde mi; eksik olanlara eklenmesi.
+      (16.08'de yapıldı — bkz. oturum 72: envanter çıkarıldı, ücretli düğmelere maliyet
+      işareti kondu, yenile düğmesi olmayan kartlara düğme eklenmemesine karar verildi.)
 - [ ] (c) mimari/10-arayuz-katmani.md DÜZELTMESİ — "Faz 4" → Aşama 3 ve braket
       bölümünün katmanı. (NOT: bu düzeltme 16.08'de commit e842b8d ile yapıldı; belge
       şimdi Aşama 3 diyor ve braketin yeri kokpitin RAPOR VE BELGELER katmanı olarak
