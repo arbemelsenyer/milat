@@ -128,4 +128,15 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   hiç gönderilmemişti. Teşhis bir tur boşa gitti. Kural: hata gerekçesi her zaman
   sunucudan dönen GERÇEK durum kodunu ve hata metnini taşısın; "denenmedi" ile
   "reddedildi" asla aynı cümleyle yazılmasın. (775f66e ile düzeltildi.)
+- DERS (16.08.2026) — MÜKERRER ÖZELLİK KONTROLÜ ZORUNLU. "Makbuz takibi" kokpite yeni
+  bölüm olarak eklendi; oysa üründe zaten Ödeme & Muhasebe paneli (Ödeme Defteri,
+  Makbuz No sütunu, makbuz numarası yazma, ücret hesabı, makbuz taslağı PDF) vardı.
+  Bir tur boşa gitti, sonra geri alındı (1aa6b96). Kural: yeni bölüm/kart/sayfa
+  yazmadan ÖNCE aynı işi yapan mevcut yüzey aranacak (ekran adı, tablo adı ve alan
+  adıyla grep) ve keşif paragrafında "mükerrer değil, çünkü …" diye yazılacak.
+- DERS (16.08.2026) — KAYIT RİTÜELİ ATLANMAZ. Kurucu bazı turlarda "yalnız şu dosyaya
+  dokun" dediğinde belge güncellemesi turun dışında kalıyor ve iş kayıtsız kalıyor
+  (79 numaralı makbuz kalemi bölüm kaldırıldığı hâlde "eklendi" yazılı kaldı).
+  Kural: kod turu belge güncellemesine izin vermiyorsa, cevabın sonunda "şu kaydı
+  düşmek gerekiyor" diye HATIRLATILACAK ve bir sonraki turda ilk iş o kayıt yazılacak.
 

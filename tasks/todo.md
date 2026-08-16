@@ -1,4 +1,11 @@
 ## Nerede kaldık — 16.08.2026 (79) · MAKBUZ TAKİBİ (İBA 2.7 / B22)
+- [x] GERİ ALINDI (16.08.2026) — Kokpitteki ayrı "Makbuz takibi" bölümü MÜKERRERDİ,
+      kaldırıldı (commit 1aa6b96). Üründe zaten Ödeme & Muhasebe paneli var: Ödeme
+      Defteri tablosu, Makbuz No sütunu, "Ödendi işaretle" ile makbuz numarası yazma,
+      ücret hesabı ve makbuz taslağı PDF'i. İki fayda mevcut panele taşındı: defter
+      başlığında "N ödeme · M makbuz bekliyor" özeti ve ödenmiş ama numarası boş
+      satırlarda "makbuz bekliyor" rozeti. AŞAĞIDAKİ SATIRLAR o turun kaydıdır;
+      bölümün kendisi artık YOK.
 - [x] Ekran: kokpit > RAPOR VE BELGELER > "Makbuz takibi" (Seçenek sepetinin ardında).
       Mevcut case_payments kayıtları listeleniyor: ödeyen (payer_label ya da taraf adı) ·
       tutar · tarih · durum. Üstte tek satır özet: "N ödeme · M makbuz bekliyor".
@@ -22,6 +29,16 @@ AÇIK UÇ: Makbuz numarası serbest metindir; biçim doğrulaması ve mükerrer 
 yok. İstenirse ayrı iş.
 
 ## Nerede kaldık — 16.08.2026 (78) · USULE İLİŞKİN ENGEL KONTROL LİSTESİ (İBA 2.4)
+- [ ] CANLI DOĞRULAMA BEKLİYOR (16.08 akşamı itibarıyla). Bu bölümde iki düzeltme
+      turu daha yapıldı, kaydı buraya düşüyor:
+      · 71cad80 — madde referansı bilgi tabanındaki kanun metninden çekiliyor (kavram
+        araması, birebir alıntı; koda sabit madde numarası yazılmadı).
+      · 748d22c — üç canlı kusur giderildi: GEÇİCİ MADDE ile MADDE karışması, eğitim
+        modülünün (Uzman Arabuluculuk - …) atıf kaynağı olarak kullanılması ve bozuk
+        (kelimesi bölünmüş) alıntı. Referans güvensizse madde numarası hiç yazılmıyor.
+      · Dönüş özetine referans_bos sayacı eklendi; ilk koşumda kaç başlıkta güvenli
+        referans bulunamadığı oradan görülecek.
+      REDEPLOY BEKLİYOR: usul-engeli · ajan-nobetci.
 - [x] Yeni edge fonksiyon: supabase/functions/usul-engeli (config.toml verify_jwt=true).
       YAPAY ZEKÂ ÇAĞRISI YOK — hesap tamamen kodda, bedava kol.
       · Yetki: guc-dengesi/elverislilik kalıbı — x-cron-secret iç çağrı kapısı + dış
