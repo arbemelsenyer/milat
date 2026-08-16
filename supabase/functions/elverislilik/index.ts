@@ -96,6 +96,38 @@ function alintiKaynaktaVar(alinti: string, kaynak: string): boolean {
   return false;
 }
 
+/* ── KONU SINIRI (16.08, canlı bulgu) ────────────────────────────────────────
+   Model konu dışına çıkıyordu: son testte dört bulgunun üçü İŞİN ESASINA ilişkindi
+   (onam formunda riskin açıklanması, belgelerin teslim edilmemesi, taleplerin
+   değişmesi). Bu kartın işi esası değerlendirmek DEĞİL; tek soru şudur: uyuşmazlık
+   arabuluculuğa elverişli mi ve hangi kanuni rejime girer?
+   Sunucu tarafı karşılığı iki kapıdır:
+   1) Bulgu, elverişlilik/rejim eksenine BAĞLANMALIDIR (aşağıdaki bağlantı ifadeleri).
+   2) İşin esasına ait bir ifade taşıyıp BAŞLIĞINDA rejim bağlantısı kurmuyorsa elenir.
+   Kararsız kalınan yerde bulgu ELENİR — az uyarı, çok uyarıdan iyidir. */
+const REJIM_BAGLANTISI = [
+  "elverişli", "elverisli", "serbestçe tasarruf", "serbestce tasarruf", "tasarruf edebil",
+  "kamu düzeni", "kamu duzeni", "dava şartı", "dava sarti", "zorunlu arabuluculuk",
+  "arabuluculuğa kapalı", "arabuluculuga kapali", "arabuluculuk kapsamı", "arabuluculuk kapsami",
+  "tüketici", "tuketici", "ticari", "tacir", "iş uyuşmazlığı", "is uyusmazligi",
+  "işçilik", "iscilik", "aile içi şiddet", "aile ici siddet", "uyuşmazlık türü",
+  "uyusmazlik turu", "hukuki rejim", "kanuni rejim", "görev", "kapsam",
+];
+
+// İşin esasına ait tipik başlıklar — bu kartın konusu değildir.
+const ESAS_ISARETLERI = [
+  "onam", "aydınlatılmış", "aydinlatilmis", "kusur", "sorumluluk", "ispat", "delil",
+  "teslim edilmedi", "teslim edilmemiş", "teslim edilmemis", "belge eksikliği",
+  "belge eksikligi", "talebin değişmesi", "talebin degismesi", "talep değişikliği",
+  "talep degisikligi", "tazminat miktarı", "tazminat miktari", "malpraktis",
+  "sürecin seyri", "surecin seyri", "hizmet kusuru", "zarar miktarı", "zarar miktari",
+];
+
+function icerir(metin: string, liste: string[]): string | null {
+  const k = metin.toLocaleLowerCase("tr-TR");
+  return liste.find((x) => k.includes(x)) ?? null;
+}
+
 // Hüküm dili süzgeci: ajan "elverişli değildir" diyemez.
 const HUKUM_KALIPLARI = [
   "elverişli değildir", "elverisli degildir", "elverişli olmadığı", "arabuluculuğa uygun değildir",
@@ -285,6 +317,11 @@ MUTLAK DİL KURALI: Hüküm kurma. "Elverişli değildir", "yapılamaz", "geçer
 
 DOSYA İŞARETİ ŞARTI (en önemli kural): Bir başlık için uyarı ancak DOSYA metninde o başlığa işaret eden SOMUT bir ifade varsa üretilir. "Dosyada buna dair işaret yok ama değerlendirilebilir", "bilgi bulunmamakla birlikte" tarzı bulgu ÜRETME — işaret yoksa o başlığı hiç yazma.
 
+KONU SINIRI (bu kartın sınırı): Bir bulgu YALNIZ şu soruya dair olabilir: bu uyuşmazlık arabuluculuğa elverişli mi ve hangi kanuni rejime girer?
+İZİNLİ KONULAR: (a) tarafların üzerinde serbestçe tasarruf edebileceği bir konu olup olmadığı; (b) kanunen arabuluculuğa kapalı bir alan işareti (aile içi şiddet iddiası gibi — yalnız dosyada somut işaret varsa); (c) uyuşmazlığın türü/rejimi (tüketici mi, ticari mi, iş mi — dava şartı kapsamı buna bağlıysa).
+YASAK KONULAR: işin esasına ilişkin her şey — kusur, sorumluluk, aydınlatılmış onamın yeterliliği, ispat, belge eksikliği, tarafların taleplerinin değişmesi, sürecin seyri. Bu konularda bulgu ÜRETME; bu kartın işi esası değerlendirmek değildir.
+SAYI SINIRI: en fazla 3 bulgu. Aynı kanun maddesine dayanan birden fazla bulgu varsa yalnız EN SOMUT olanı yaz.
+
 TÜR ÖLÇÜTÜ: Dosyanın türü (tüketici/ticari) tartışmalıysa veya dosyadaki taraflar bu ayrımı etkiliyorsa, verilen KANUN METİNLERİNDEKİ ölçütleri uygula: ticari iş/tacir ölçütleri TTK metninden, tüketici işlemi tanımı 6502 metninden. Ölçütü uygularken hangi kanun cümlesine dayandığını kaynak_alinti olarak, dosyadaki hangi olguya uyguladığını dosya_isareti olarak ver. İlgili kanun metni verilmemişse bu değerlendirmeyi HİÇ yapma.
 
 Her işaret için:
@@ -361,6 +398,19 @@ Dikkat gerektiren bir işaret yoksa: {"bulgular":[]} döndür. Zorlama üretme.
         elenen.push(`${baslik}: hüküm cümlesi ("${hukum}")`);
         continue;
       }
+      // KONU SINIRI — 1. kapı: bulgu elverişlilik/rejim eksenine bağlanmalı.
+      const bagIfade = icerir(`${baslik} ${neden}`, REJIM_BAGLANTISI);
+      if (!bagIfade) {
+        elenen.push(`${baslik}: konu dışı — elverişlilik/rejim bağlantısı kurulmamış`);
+        continue;
+      }
+      // KONU SINIRI — 2. kapı: işin esasına ait ifade taşıyıp BAŞLIĞINDA rejim
+      // bağlantısı kurmayan bulgu elenir (kararsızlıkta elemek esastır).
+      const esasIfade = icerir(`${baslik} ${neden}`, ESAS_ISARETLERI);
+      if (esasIfade && !icerir(baslik, REJIM_BAGLANTISI)) {
+        elenen.push(`${baslik}: işin esasına ilişkin ("${esasIfade}") — bu kartın konusu değil`);
+        continue;
+      }
       // 16.08 SIKILAŞTIRMA: uyarıyı tetikleyen ifade DOSYA metninde gerçekten
       // geçmeli. "Dosyada işaret yok ama değerlendirilebilir" tarzı içeriksiz
       // uyarılar bu kapıdan geçemez.
@@ -389,11 +439,29 @@ Dikkat gerektiren bir işaret yoksa: {"bulgular":[]} döndür. Zorlama üretme.
       });
     }
 
-    const durum = bulgular.length > 0 ? "isaret_var" : "isaret_yok";
+    // KONU SINIRI — 3. kapı: aynı kaynak+maddeye dayanan bulgulardan yalnız EN
+    // SOMUT olanı (dosya işareti en uzun olan) kalır; ardından en fazla 3 bulgu.
+    const maddeyeGore = new Map<string, any>();
+    for (const b of bulgular) {
+      const anahtar = `${b.kaynak_adi}|${b.madde_bolum || "-"}`;
+      const eski = maddeyeGore.get(anahtar);
+      if (!eski || String(b.dosya_isareti).length > String(eski.dosya_isareti).length) {
+        if (eski) elenen.push(`${eski.baslik}: aynı maddede daha somut bulgu var`);
+        maddeyeGore.set(anahtar, b);
+      } else {
+        elenen.push(`${b.baslik}: aynı maddede daha somut bulgu var`);
+      }
+    }
+    const seciliBulgular = [...maddeyeGore.values()].slice(0, 3);
+    if (maddeyeGore.size > 3) {
+      elenen.push(`${maddeyeGore.size - 3} bulgu sayı sınırında (en fazla 3) elendi`);
+    }
+
+    const durum = seciliBulgular.length > 0 ? "isaret_var" : "isaret_yok";
     const satir = {
       case_id,
       durum,
-      bulgular,
+      bulgular: seciliBulgular,
       kaynaklar: kaynakOzeti.slice(0, 500),
       updated_at: new Date().toISOString(),
     };
@@ -406,9 +474,9 @@ Dikkat gerektiren bir işaret yoksa: {"bulgular":[]} döndür. Zorlama üretme.
 
     await durumYaz(durumAdmin, durumCaseId, {
       status: "completed", error_message: null,
-      last_output: { sonuc: durum, bulgu: bulgular.length, elenen: elenen.slice(0, 5) },
+      last_output: { sonuc: durum, bulgu: seciliBulgular.length, elenen: elenen.slice(0, 5) },
     });
-    return json({ durum, bulgu: bulgular.length, elenen: elenen.slice(0, 5) });
+    return json({ durum, bulgu: seciliBulgular.length, elenen: elenen.slice(0, 5) });
   } catch (e: any) {
     console.error("[elverislilik] hata", e?.message ?? e);
     await durumYaz(durumAdmin, durumCaseId, {
