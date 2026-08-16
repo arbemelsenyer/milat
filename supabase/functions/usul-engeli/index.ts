@@ -50,6 +50,115 @@ async function durumYaz(admin: any, caseId: string, patch: Record<string, unknow
   }
 }
 
+/* ── MADDE REFERANSI (16.08) ──────────────────────────────────────────────────
+   Madde referansı bilgi tabanındaki kanun metninden çekilir; koda sabit madde
+   numarası yazılmaz (kanun değişirse yanlış kalır). Arama madde numarasıyla değil
+   KAVRAMLA yapılır: her başlık için ayırt edici ifadeler sırayla denenir, ilk
+   eşleşen parçadan referans üretilir.
+   Doğrulama: alıntı, çekildiği parçada birebir geçmiyorsa referans BOŞ bırakılır.
+   Madde numarası yakalanamazsa yalnız kaynak adı ve alıntı yazılır — numara ASLA
+   tahmin edilmez. Kaynakta karşılık yoksa referans boş kalır, eksik satırı yine
+   gösterilir. Bu bölüm model çağırmaz; kol ücretsiz kalır. */
+const TEMEL_KAYNAKLAR = [
+  "6325 Sayılı Hukuk Uyuşmazlıklarında Arabuluculuk Kanunu",
+  "Hukuk Uyuşmazlıklarında Arabuluculuk Kanunu Yönetmeliği",
+];
+
+// Uyuşmazlık türüne karşılık gelen uzmanlık modülü (varsa) aramaya eklenir.
+const MODUL_ESLESME: { anahtarlar: string[]; baslik: string[] }[] = [
+  { anahtarlar: ["aile", "bosanma", "boşanma", "nafaka", "velayet"], baslik: ["Aile Arabuluculuğu"] },
+  { anahtarlar: ["is", "iş", "isci", "işçi", "kidem", "kıdem"], baslik: ["Uzman Arabuluculuk - İş"] },
+  { anahtarlar: ["saglik", "sağlık", "malpraktis", "hasta", "tibbi", "tıbbi"], baslik: ["Uzman Arabuluculuk - Sağlık"] },
+  { anahtarlar: ["tuketici", "tüketici"], baslik: ["Uzman Arabuluculuk - Tüketici"] },
+  { anahtarlar: ["ticari", "ticaret", "sirket", "şirket"], baslik: ["Uzman Arabuluculuk - Ticaret"] },
+  { anahtarlar: ["sigorta"], baslik: ["Uzman Arabuluculuk - Sigorta Hukuku"] },
+  { anahtarlar: ["banka", "finans", "kredi"], baslik: ["Uzman Arabuluculuk - Banka ve Finans"] },
+  { anahtarlar: ["insaat", "inşaat", "yapi", "yapı"], baslik: ["Uzman Arabuluculuk - İnşaat"] },
+  { anahtarlar: ["enerji", "maden"], baslik: ["Uzman Arabuluculuk - Enerji ve Maden"] },
+  { anahtarlar: ["fikri", "telif", "marka", "patent"], baslik: ["Uzman Arabuluculuk - Fikri Mülkiyet"] },
+];
+
+// Kavram aramaları — madde numarası DEĞİL, ifade aranır. Sıra önemlidir: ilk
+// eşleşen kullanılır, hiçbiri tutmazsa referans boş kalır.
+const IFADELER_TEMSIL = [
+  "kanuni temsilcileri veya avukatları", "kanunî temsilcileri veya avukatları",
+  "avukatları", "kanuni temsilci", "kanunî temsilci", "vekâletname", "vekaletname", "temsilci",
+];
+const IFADELER_TEBLIGAT = [
+  "iletişim vasıtası", "davet", "bildirim", "tebligat", "elektronik posta",
+];
+const IFADELER_SURE = [
+  "dava şartı", "dava şartıdır", "süresi içinde sonuçland", "başvuru tarihinden itibaren",
+];
+
+// Alıntının kaynak parçada gerçekten geçtiğini doğrular (sadeleştirilmiş karşılaştırma).
+function sadeKarsilastir(metin: string): string {
+  return temiz(metin)
+    .replace(/[-‐‑]\s*\r?\n\s*/g, "")
+    .replace(/\r?\n/g, " ")
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[şŞ]/g, "s").replace(/[ıİiI]/g, "i").replace(/[ğĞ]/g, "g")
+    .replace(/[çÇ]/g, "c").replace(/[öÖ]/g, "o").replace(/[üÜ]/g, "u")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Eşleşmenin geçtiği CÜMLE — en çok bir cümle, 200 karakter.
+function cumleAl(metin: string, indeks: number): string {
+  let bas = 0;
+  for (let i = indeks; i >= 1; i--) {
+    const c = metin[i - 1];
+    if ((c === "." || c === "\n") && /\s/.test(metin[i] ?? " ")) { bas = i; break; }
+  }
+  let son = metin.length;
+  for (let i = indeks; i < metin.length; i++) {
+    const c = metin[i];
+    if ((c === "." || c === "\n") && /\s|$/.test(metin[i + 1] ?? " ")) { son = i + 1; break; }
+  }
+  const parca = metin.slice(bas, son).trim().replace(/\s+/g, " ");
+  return parca.length > 200 ? `${parca.slice(0, 197)}…` : parca;
+}
+
+// Eşleşmeden ÖNCE gelen en yakın "MADDE <n>" başlığı; yoksa boş.
+function maddeBasligi(metin: string, indeks: number): string {
+  const onceki = metin.slice(0, indeks);
+  // "MADDE 18/A" gibi harfli maddeler de olduğu gibi yakalanır.
+  const eslesmeler = [...onceki.matchAll(/MADDE\s*(\d+(?:\s*\/\s*[A-ZÇĞİÖŞÜ])?)/gi)];
+  if (eslesmeler.length === 0) return "";
+  const son = eslesmeler[eslesmeler.length - 1];
+  return `MADDE ${String(son[1]).replace(/\s+/g, "")}`;
+}
+
+// Kavram aramasıyla referans üretir. Bulunamazsa BOŞ döner.
+async function referansBul(admin: any, kaynakAdlari: string[], ifadeler: string[]): Promise<string> {
+  for (const ifade of ifadeler) {
+    const { data, error } = await admin.from("knowledge_base_chunks")
+      .select("source_title, chunk_text")
+      .in("source_title", kaynakAdlari)
+      .ilike("chunk_text", `%${ifade}%`)
+      .limit(3);
+    if (error) {
+      console.error(`[usul-engeli] bilgi tabanı okunamadı (${ifade}): ${error.message}`);
+      continue;
+    }
+    for (const r of ((data ?? []) as any[])) {
+      const metin = temiz(r.chunk_text);
+      const indeks = metin.toLocaleLowerCase("tr-TR").indexOf(ifade.toLocaleLowerCase("tr-TR"));
+      if (indeks < 0) continue;
+      const alinti = cumleAl(metin, indeks);
+      // Doğrulama: alıntı kaynak parçada birebir geçmiyorsa referans yazılmaz.
+      if (!sadeKarsilastir(metin).includes(sadeKarsilastir(alinti))) continue;
+      const madde = maddeBasligi(metin, indeks);
+      const kaynak = temiz(r.source_title) || "Bilgi tabanı kaydı";
+      return madde
+        ? `${kaynak} ${madde} — “${alinti}”`
+        : `${kaynak} — “${alinti}”`;
+    }
+  }
+  return "";
+}
+
 function tarafAdi(p: any): string {
   const ad = temiz(p?.company_name)
     || `${temiz(p?.first_name)} ${temiz(p?.last_name)}`.trim()
@@ -105,7 +214,7 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const { data: caseRow, error: cErr } = await admin.from("cases")
-      .select("id, user_id, assigned_mediator_id, mediation_type, deadline_total, deadline_extended")
+      .select("id, user_id, assigned_mediator_id, mediation_type, deadline_total, deadline_extended, dispute_type, dispute_subtype")
       .eq("id", case_id).maybeSingle();
     if (cErr) return json({ error: cErr.message }, 500);
     if (!caseRow) return json({ error: "Dosya bulunamadı" }, 404);
@@ -135,6 +244,20 @@ Deno.serve(async (req) => {
       .select("file_name, party_id").eq("case_id", case_id).limit(200);
     const belgeler = (docsRaw ?? []) as any[];
 
+    // Referans kaynakları: temel iki metin + (tür eşleşirse) uzmanlık modülü.
+    const turMetni = [temiz((caseRow as any).dispute_type), temiz((caseRow as any).dispute_subtype)]
+      .filter(Boolean).join(" ").toLocaleLowerCase("tr-TR");
+    const kaynakAdlari = [...TEMEL_KAYNAKLAR];
+    const modul = MODUL_ESLESME.find((m) => m.anahtarlar.some((a) => turMetni.includes(a)));
+    if (modul) kaynakAdlari.push(...modul.baslik);
+
+    // Her başlık için referans BİR KEZ aranır (satır sayısı kadar sorgu yapılmaz).
+    const [refTemsil, refTebligat, refSure] = await Promise.all([
+      referansBul(admin, kaynakAdlari, IFADELER_TEMSIL),
+      referansBul(admin, kaynakAdlari, IFADELER_TEBLIGAT),
+      referansBul(admin, kaynakAdlari, IFADELER_SURE),
+    ]);
+
     type Engel = { baslik: string; tespit: string; referans: string };
     const engeller: Engel[] = [];
 
@@ -148,7 +271,7 @@ Deno.serve(async (req) => {
         engeller.push({
           baslik: "Vekaletname dosyada görünmüyor",
           tespit: `${ad} için vekil kaydı var (${vekil}); dosyada adında "vekaletname" geçen belge bulunmuyor.`,
-          referans: "",
+          referans: refTemsil,
         });
       }
 
@@ -157,7 +280,7 @@ Deno.serve(async (req) => {
         engeller.push({
           baslik: "Temsil/imza yetkilisi kayıtlı değil",
           tespit: `${ad} tüzel kişi olarak kayıtlı; yetkili kişi alanı boş — yetki belgeden kontrol edilmeli.`,
-          referans: "",
+          referans: refTemsil,
         });
       }
 
@@ -174,7 +297,7 @@ Deno.serve(async (req) => {
         engeller.push({
           baslik: "Tebligata esas iletişim bilgisi eksik",
           tespit: `${ad}: ${eksikler.join(" · ")}.`,
-          referans: "",
+          referans: refTebligat,
         });
       }
     }
@@ -192,7 +315,7 @@ Deno.serve(async (req) => {
             tespit: kalan >= 0
               ? `Dosya süre kaydındaki son tarih ${tarihMetni}; bugüne ${kalan} gün kaldı (eşik: ${SURE_ESIGI_GUN} gün).`
               : `Dosya süre kaydındaki son tarih ${tarihMetni}; süre ${Math.abs(kalan)} gün önce dolmuş görünüyor.`,
-            referans: "",
+            referans: refSure,
           });
         }
       }
