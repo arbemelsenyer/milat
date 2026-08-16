@@ -1605,16 +1605,21 @@ const OTOMATIK_TUR_SINIRI = 3;
 
 type Butce = { kalan: number };
 
-// icKapi=false olan fonksiyonlar bugün iç çağrı (x-cron-secret) kabul etmiyor;
-// koda dokunulmadığı için nöbetçiden çalıştırılamıyorlar.
+// icKapi: fonksiyonun x-cron-secret ile iç çağrı kabul edip etmediği.
+// 16.08 (commit 700c9c2): elverislilik · usul-onerisi · iletisim-degisim ·
+// dosya-ozeti-oner fonksiyonlarına da iç çağrı kapısı eklendi ve yayına alındı;
+// dördü de kaynaklarında `const isCron = ... x-cron-secret ...` taşıyor. Böylece
+// YEDİ kolun tamamı nöbetçiden çalıştırılabiliyor. Bir fonksiyondan kapı
+// kaldırılırsa buradaki bayrak false yapılır — kol o zaman kokpitteki düğmeyle
+// çalışmaya devam eder.
 const OTOMATIK_KOLLAR: { kol: string; fonksiyon: string; icKapi: boolean }[] = [
-  { kol: "elverislilik", fonksiyon: "elverislilik", icKapi: false },
+  { kol: "elverislilik", fonksiyon: "elverislilik", icKapi: true },
   { kol: "belge-ozeti", fonksiyon: "belge-ozeti", icKapi: true },
   { kol: "olay-cizelgesi", fonksiyon: "olay-cizelgesi", icKapi: true },
   { kol: "guc-dengesi", fonksiyon: "guc-dengesi", icKapi: true },
-  { kol: "usul-onerisi", fonksiyon: "usul-onerisi", icKapi: false },
-  { kol: "iletisim-degisim", fonksiyon: "iletisim-degisim", icKapi: false },
-  { kol: "dosya-ozeti-oner", fonksiyon: "dosya-ozeti-oner", icKapi: false },
+  { kol: "usul-onerisi", fonksiyon: "usul-onerisi", icKapi: true },
+  { kol: "iletisim-degisim", fonksiyon: "iletisim-degisim", icKapi: true },
+  { kol: "dosya-ozeti-oner", fonksiyon: "dosya-ozeti-oner", icKapi: true },
 ];
 
 async function kosumIziOku(admin: any, caseId: string): Promise<Record<string, any>> {
@@ -1659,7 +1664,14 @@ async function icFonksiyonCagir(fonksiyon: string, govde: unknown): Promise<{ ok
       body: JSON.stringify(govde),
     });
     const metinGovde = await res.text();
-    if (!res.ok) return { ok: false, sebep: `HTTP ${res.status}: ${metinGovde.slice(0, 200)}` };
+    if (!res.ok) {
+      // GERÇEK ret ile "hiç denenmedi" karışmasın: durum kodu ve sunucudan dönen
+      // kısa metin olduğu gibi yazılır; 401/403 ayrıca etiketlenir.
+      const kapiNotu = res.status === 401 || res.status === 403
+        ? " (iç çağrı reddedildi — kapı/anahtar kontrolü)"
+        : "";
+      return { ok: false, sebep: `HTTP ${res.status}${kapiNotu}: ${metinGovde.slice(0, 200)}` };
+    }
     return { ok: true, sebep: metinGovde.slice(0, 200) };
   } catch (e: any) {
     return { ok: false, sebep: e?.message ?? "bilinmeyen hata" };
@@ -1746,7 +1758,7 @@ async function otomatikKosumKollari(admin: any, dosya: any, butce: Butce): Promi
     }
     if (!tanim.icKapi) {
       if (!eski || String(eski.durum) !== "atlandi" || String(eski.girdi_imzasi) !== d.imza) {
-        const sebep = `${tanim.fonksiyon} iç çağrı kapısı (x-cron-secret) kabul etmiyor — nöbetçiden çalıştırılamıyor, kokpitteki düğmeyle çalışır`;
+        const sebep = `${tanim.fonksiyon} için iç çağrı bayrağı KAPALI (icKapi=false) — nöbetçi istek göndermedi, kol kokpitteki düğmeyle çalışır`;
         await kosumIziYaz(admin, caseId, tanim.kol, d.imza, "atlandi", sebep);
         ozet.atlandi++;
         ozet.sebepler.push(`otomatik koşum atlandı (${tanim.kol}): ${sebep}`);
@@ -1804,7 +1816,7 @@ async function otomatikKosumKollari(admin: any, dosya: any, butce: Butce): Promi
 
     if (!idTanim.icKapi) {
       if (!eski || String(eski.durum) !== "atlandi" || String(eski.girdi_imzasi) !== imza) {
-        const sebep = "iletisim-degisim iç çağrı kapısı (x-cron-secret) kabul etmiyor — nöbetçiden çalıştırılamıyor, kokpitteki düğmeyle çalışır";
+        const sebep = "iletisim-degisim için iç çağrı bayrağı KAPALI (icKapi=false) — nöbetçi istek göndermedi, kol kokpitteki düğmeyle çalışır";
         await kosumIziYaz(admin, caseId, kolAdi, imza, "atlandi", sebep);
         ozet.atlandi++;
         ozet.sebepler.push(`otomatik koşum atlandı (${kolAdi}): ${sebep}`);
