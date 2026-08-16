@@ -639,3 +639,15 @@ DOKUNULMADI: denetim ayrı dosyada (TaslakDenetimi.tsx), OfficialDocumentsPanel'
 import + tek satır çağrı eklendi. Yeni tablo, edge fonksiyon ve AI çağrısı YOK.
 SQL gerekmiyor; yalnız Publish.
 
+16.08 (İLETİŞİMDE DEĞİŞİM — İBA 1.5 / A4): Aşama 2 taraf kartına, İletişim Analizi
+düğmesinin altına "İletişimde değişim" kutusu eklendi (yalnız arabulucu). Aynı tarafın
+kendi tarihli metinleri (taraf beyanı · o tarafa ait belgelerin çıkarılmış metni · keşif
+sorusu cevapları · tarafın yazdığı mesajlar) eskiden yeniye karşılaştırılıyor. Dört ifade
+ailesi (kesin talep dili · çözüm dili · koşullu ifade · geri çekilme) ve rakam varlığı
+sayılıyor; işaretin yönü talebin kesinleşmesi, yumuşama, koşula bağlanma, geri çekilme ya
+da rakamla netleşme olarak yazılıyor ve İKİ tarihli metinden birer cümlelik alıntı
+dayanak olarak veriliyor. Kişilik, duygu ve niyet değerlendirmesi yok; iki taraf
+birbiriyle karşılaştırılmıyor. İki farklı tarihli metin yoksa "değişim ölçülemedi",
+değişim yoksa "belirgin bir değişim görünmüyor" yazıyor. Yeni tablo, edge fonksiyon ve
+AI çağrısı YOK. SQL gerekmiyor; yalnız Publish.
+

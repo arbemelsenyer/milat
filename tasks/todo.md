@@ -1,3 +1,43 @@
+## Nerede kaldık — 16.08.2026 (65) · İLETİŞİMDE DEĞİŞİM İŞARETİ (İBA 1.5 · A4 ve 5)
+KEŞİF (tarihli metin var mı): VAR, iş durdurulmadı. party-communication-analysis çıktısı
+party_communication_analysis tablosunda (findings + discovery_questions JSONB, taraf başına
+tek satır) duruyor ve TEK ANLIK fotoğraftır — zaman serisi yoktur, bu yüzden değişim ondan
+okunamaz. Tarafın TARİHLİ metinleri dört yerde: (1) case_parties.statement — tek alan,
+tarihi taraf kaydının created_at'i; (2) case_documents.extracted_text + created_at +
+party_id — taraf başına belgeler (ihtarname, cevap yazısı vb.); (3)
+case_discovery_questions.answer_text + updated_at + party_id; (4) messages.content +
+created_at + sender_id (taraf kendi kullanıcı kimliğiyle yazıyor; CaseDetail ve
+MediatorDashboard ekranlarından). TARİHSİZ/OLMAYAN: taraf asistanı sohbeti hiçbir tabloya
+yazılmıyor (CaseRoom'da yalnız bileşen state'inde), e-posta gövdeleri saklanmıyor.
+- [x] Ekran: Aşama 2 > taraf kartı > "İletişim Analizi" düğmesinin altında "İletişimde
+      değişim" kutusu; [Değişimi çıkar] / [Yenile] düğmesi bugünkü kartlarla aynı görünüm.
+      YALNIZ arabulucuya çizilir (isMediator kapısı) — taraf kendi ekranında göremez.
+- [x] Ölçüm KODDA, deterministik (yeni AI çağrısı YOK): dört ifade ailesi — kesin talep
+      dili · çözüm dili · koşullu ifade · geri çekilme — ve rakam varlığı. En ESKİ metin
+      ile en YENİ metin karşılaştırılıyor; eşik en az 2 geçiş farkı ya da yoktan var olma.
+- [x] Çıktı: "Kesin talep dili arttı (0 → 6 geçiş), çözüm dili 5 → 0" biçiminde sayım +
+      yön (talebin kesinleşmesi / yumuşama / koşula bağlanma / geri çekilme / rakamla
+      netleşme) + İKİ tarihli metinden birer cümlelik alıntı.
+- [x] ÇİZGİ: kişilik, duygu, niyet ve teşhis kelimesi hiç kullanılmıyor; iki taraf
+      birbiriyle KARŞILAŞTIRILMIYOR (her taraf yalnız kendi metinleriyle ölçülüyor).
+      İki farklı tarihli metin yoksa "değişim ölçülemedi", değişim yoksa "belirgin bir
+      değişim görünmüyor" yazıyor.
+- [x] YENİ TABLO / SÜTUN / EDGE FONKSİYON YOK → SQL GEREKMİYOR. Mevcut analiz zinciri
+      bozulmadı; party-communication-analysis'e dokunulmadı.
+- [x] MANTIK TESTİ (canlı değil, esbuild+node ile saf fonksiyon): çözüm dilinden ihtarname
+      diline geçen örnekte iki işaret doğru çıktı (talep dili 0→4, rakamla netleşme),
+      dayanak alıntıları doğru cümleyi gösterdi; değişmeyen örnekte sıfır işaret; tek
+      metinde sıfır işaret.
+tsc (tsconfig.app.json) temiz. CANLI TEST YOK.
+AÇIK UÇ: Ölçüm KELİME SAYIMIDIR. Aynı anlamı başka sözcüklerle kuran metinde işaret
+çıkmaz; ifade listeleri kod içinde tek yerde durur, genişletilebilir.
+AÇIK UÇ: Yalnız EN ESKİ ile EN YENİ metin karşılaştırılıyor; aradaki dalgalanma (önce
+sertleşip sonra yumuşama) görünmüyor. Ara kademeler istenirse ayrı iş.
+AÇIK UÇ: Taraf asistanı yazışmaları kaydedilmediği için ölçüme giremiyor; kaydedilmesi
+ayrı karar (kör veri açısından da ayrıca değerlendirilmeli).
+AÇIK UÇ: statement tek alan olduğu için "başvuru metni" tek tarihle temsil ediliyor;
+taraf beyanını sonradan değiştirirse eski hâli kayıtta kalmıyor.
+
 ## Nerede kaldık — 16.08.2026 (64) · TASLAK DENETİMİ (İBA 2.6 / B21)
 
 - [ ] TASLAK DENETİMİ — ŞABLON YÜKLEMESİNE BAĞLANDI (16.08.2026 kararı). Tutanak ve

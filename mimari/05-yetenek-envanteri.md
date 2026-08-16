@@ -438,6 +438,24 @@ DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon
 · AÇIK MADDE: Dosya TÜRÜ tek başına seçenek tetiklemez — türden ihtiyaç çıkarmak
   uydurma sayılacağı için yalnız kayıtlı ihtiyaç metinleri kullanılır.
 
+İLETİŞİMDE DEĞİŞİM (İBA 1.5 / A4)
+DURUM 16.08 ● KODDA (canlı test bekliyor) — yeni tablo, yeni edge fonksiyon ve AI
+çağrısı YOKTUR; ölçüm ifade sayımıdır ve tamamen istemcide çalışır.
+· Yeri: Aşama 2 — Taraf Analizi, taraf kartında "İletişim Analizi" düğmesinin altında
+  "İletişimde değişim" kutusu ([Değişimi çıkar] / [Yenile]). YALNIZ arabulucuya çizilir.
+· Kaynak (hepsi tarihli, hepsi AYNI TARAFIN kendi metni): taraf beyanı (statement +
+  taraf kaydının tarihi) · o tarafa ait belgelerin çıkarılmış metni (created_at) ·
+  keşif sorusu cevapları (updated_at) · tarafın kendi yazdığı mesajlar (created_at).
+· Ölçüm: dört ifade ailesi (kesin talep dili · çözüm dili · koşullu ifade · geri
+  çekilme) ile rakam varlığı; en eski metin ile en yeni metin karşılaştırılır. Eşik:
+  en az 2 geçiş farkı ya da yoktan var olma. İki farklı tarihli metin yoksa
+  "değişim ölçülemedi" yazılır.
+· Çıktı: hangi ifade ailesi hangi tarihte kaç kez + yön (talebin kesinleşmesi /
+  yumuşama / koşula bağlanma / geri çekilme / rakamla netleşme) + İKİ tarihli metinden
+  birer cümlelik alıntı. Değişim yoksa "belirgin bir değişim görünmüyor".
+· ÇİZGİ (değişmez): kişilik değerlendirmesi, psikolojik teşhis ve duygu etiketi
+  YASAK; iki taraf birbiriyle KARŞILAŞTIRILMAZ; taraf ekranına hiçbir yüzeyden gitmez.
+
 TASLAK DENETİMİ (İBA 2.6 / B21)
 DURUM 16.08 (aynı gün güncellendi) ○ BEKLEMEDE — kutu ekrandan KALDIRILDI (yorum satırına
 alındı), iş tutanak/anlaşma şablonlarının yüklenmesine bağlandı. Sebep: şablon olmadan
