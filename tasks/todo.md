@@ -668,8 +668,14 @@ tsc (tsconfig.app.json) temiz; edge fonksiyon sözdizimi esbuild ile doğruland�
       · Arabuluculuk başvuru tarihi çizelgede kalıyor (yasal süreyi başlatan olay).
 AÇIK UÇ: Çizelge kendiliğinden üretilmiyor — arabulucu düğmeye basar. Belge yüklenince
 otomatik tetikleme istenmedi; istenirse extract-document-text kolu eklenebilir.
-AÇIK UÇ: Kokpite (Aşama 3) kısa kronoloji şeridi eklenmesi — §5.2g'nin "kokpite sunulur"
-cümlesinin karşılığı; henüz yapılmadı.
+KAPATILDI (16.08.2026) — Ayrı bir kronoloji şeridi EKLENMEYECEK. Karar ve gerekçe:
+İBA'nın "dosyanın seyrini hızlı kavrama" ihtiyacı mevcut yapılarla karşılanıyor —
+uyuşmazlığın kendi geçmişi olay çizelgesi kartında (belge künyeli, doğum tarihi gibi
+ilgisiz veriler elenmiş hâlde), arabuluculuk sürecinin seyri süreç takip çizelgesinde.
+İki zaman eksenini tek şeritte karıştırmak arabulucuyu yanıltır; ikinci görünüm ekran
+kalabalığı olur. Süreç takip çizelgesine eklenecek gerçek bir eksik çıkarsa o gün ayrıca
+ele alınacak. (Eski kayıt: kokpite kısa kronoloji şeridi — §5.2g'nin "kokpite sunulur"
+cümlesinin karşılığı olarak açık uç tutuluyordu.)
 - [x] DÜZELTME 15.08 (canlı bulgu): (a) İlgisiz tarihler çizelgeye girmiyor — "04.06.1978
       hasta doğum tarihi" gibi künye/matbu tarihleri hem istemde yasaklandı hem sunucuda
       kalıp taramasıyla eleniyor ("olay zinciriyle ilgisiz" sebebiyle). Çizelge yalnız
