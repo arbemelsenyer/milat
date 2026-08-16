@@ -1,4 +1,30 @@
 ## Nerede kaldık — 16.08.2026 (64) · TASLAK DENETİMİ (İBA 2.6 / B21)
+
+- [ ] TASLAK DENETİMİ — ŞABLON YÜKLEMESİNE BAĞLANDI (16.08.2026 kararı). Tutanak ve
+      anlaşma belgesi şablonları (Adım B) yüklenmeden yapılmayacak; denetim kalıpları
+      şablonlara göre kurulacak.
+      · Sebep: denetlenecek gerçek metin yok; şablonlar gelince kalıplar zaten
+        değişecek, iki kez iş çıkar.
+      · Sıra: (1) tutanak şablonlarının yüklenmesi, (2) taslak denetimi.
+      · Denetimde aranacaklar (karar verilmiş, şablonlar gelince uygulanacak):
+        belirsiz ödeme/edim tarihi · ölçüsüz ifade (makul süre, uygun tutar) · taraf
+        adı-unvan tutarsızlığı · rakam ile yazının çelişmesi · feragat/ibra kapsamının
+        belirsizliği · boş bırakılmış şablon alanı · eksik imza/tarih alanı · aynı
+        hükmün iki yerde farklı yazılması. Ajan metni değiştirmez, yalnız gösterir;
+        hukuki geçerlilik yorumu yasak.
+
+DURDURULDU (16.08) — AMA KOD ZATEN YAZILMIŞTI, GERİ ALINMADI (kurucu talimatı).
+Commit 7dab606 ile depoya girdi ve push edildi. Dokunulan dosyalar:
+  · YENİ: src/components/mediation/TaslakDenetimi.tsx (392 satır — denetim mantığı,
+    salt okur, metni değiştirmez).
+  · src/components/mediation/OfficialDocumentsPanel.tsx — 4 satır: import + taslak
+    metninin altına <TaslakDenetimi .../> çağrısı. BELGE ÜRETİM/KAYDETME/ONAYLAMA/
+    İNDİRME akışlarına dokunulmadı.
+  · Belge dosyaları: mimari/05-yetenek-envanteri.md, tasks/yol-haritasi.md, tasks/todo.md.
+UYARI: Kod depoda durduğu için, bir sonraki Publish'te denetim kutusu belge ekranında
+GÖRÜNÜR olacak. İstenmiyorsa tek satırlık çağrının kaldırılması yeter (kurucu kararı).
+Aşağıdaki satırlar o turda yapılanların kaydıdır; iş şablonlar gelince yeniden ele alınacak.
+
 KEŞİF (belge üretimi nerede duruyor): Üretim edge fonksiyonu
 supabase/functions/generate-official-document; ekran tarafı
 src/components/mediation/OfficialDocumentsPanel.tsx (Aşama 7 — Belgeler & Kapanış içinde,
