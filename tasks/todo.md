@@ -1,3 +1,24 @@
+## Nerede kaldık — 16.08.2026 (77) · KOLLARI NÖBETÇİYE BAĞLAMA (OTOMATİK KOŞUM)
+- [x] CANLIDA DOĞRULANDI (16.08.2026) — Yedi kol (elverislilik, belge-ozeti,
+      olay-cizelgesi, guc-dengesi, usul-onerisi, iletisim-degisim, dosya-ozeti-oner)
+      artık nöbetçi ajan tarafından kendiliğinden koşuyor; arabulucunun düğmeye
+      basmasına gerek yok, kokpiti dolu buluyor (commit 575d09b + 700c9c2 + 775f66e).
+      Kurallar: her kolun kendi koşum koşulu var · GİRDİ İMZASI ile mükerrer koşum
+      engeli (aynı veriyle ikinci kez koşmaz) · tur başına en fazla 3 ücretli çağrı,
+      adil sıralama · koşum defteri public.ajan_kosum_izi · elverişlilik 'isaret_var'
+      verirse ajan_gorevleri'ne 'onay_bekliyor' satırı düşer. Kokpitteki düğmeler kaldı,
+      artık "yeniden çalıştır" işlevi görüyor. Canlı defter kaydı: elverişlilik 1 bulgu ·
+      usul önerisi 4 öneri · iletişimde değişim paragraf hazır · dosya özeti ve belge
+      özeti "zaten var" diyerek boşuna çağrı yapmadı.
+AÇIK NOT: aynı dosyada arka arkaya koşumlarda model her seferinde birebir aynı sonucu
+vermiyor (elverişlilik 15:18'de "işaret yok", 15:21'de "işaret var 1 bulgu"; usul önerisi
+3 ve 4 öneri). Eleme kuralları çalıştığı için dayanaksız bulgu ekrana çıkmıyor, ancak
+kararlılık tam değil — izlenecek.
+AÇIK NOT: 16.08'de iki kez yaşandı — nöbetçideki OTOMATİK_KOLLAR listesindeki "icKapi"
+bayrağı gerçeği yansıtmadığı için kollar hiç denenmeden "atlandı" yazıldı. Ders:
+nöbetçiye yeni kol bağlarken hem fonksiyonun iç çağrı kapısı hem de nöbetçideki bayrak
+birlikte kontrol edilecek.
+
 ## Nerede kaldık — 16.08.2026 (76) · USUL ÖNERİSİ (İBA 2.2 / B14)
 - [x] CANLIDA DOĞRULANDI (16.08.2026) — İBA 2.2. Kokpit "Masaya otururken" katmanında,
       Elverişlilik kontrolünün altında çalışıyor (commit 2cbe289). Kurallar: öneri YALNIZ

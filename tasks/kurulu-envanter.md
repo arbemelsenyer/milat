@@ -80,6 +80,13 @@ ile doğrulanır.
   sahibi, admin ALL, TARAFA POLİTİKA YOK.
 - 16.08: agent_states_agent_type_check kısıtı genişletildi — izinli listeye
   'usul_onerisi' eklendi (toplam 22 ad; mevcut adlar korundu).
+- 16.08: ajan_kosum_izi tablosu kuruldu (case_id + kol UNIQUE, girdi_imzasi, durum
+  CHECK 'kosuldu'/'hata'/'atlandi', sebep, kosum_zamani); RLS açık, SELECT yalnız
+  arabulucu/dosya sahibi, admin ALL, TARAFA POLİTİKA YOK. Nöbetçinin otomatik koşum
+  defteridir.
+- 16.08: İki kez ELLE BAKIM — iç çağrı kapısı düzeltildikten sonra ajan_kosum_izi'nde
+  durum='atlandi' satırları silindi ki nöbetçi kolları yeniden denesin. Bu bakım,
+  bayrak/kapı uyumsuzluğu giderildiği için bundan sonra gerekmeyecek.
 - (daha önce kurulanlar buraya eklenecek: mediator_reads_offers,
   mediator_writes_discovery, mediator_updates_discovery, ajan_gorevleri politikaları,
   taraf_musaitlik RLS)

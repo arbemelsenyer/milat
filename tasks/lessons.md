@@ -123,4 +123,9 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   boşluğa çevrilir; sadeleştirme YALNIZ karşılaştırma içindir, kaydedilen metin
   orijinal kalır. Tutmazsa tek seferlik onarım turu (yalnız alıntı isteyen ikinci çağrı)
   yapılır. (16.08, iletisim-degisim)
+- DERS (16.08.2026) — Sabit metinli hata gerekçesi yanıltır. Nöbetçi, denenmemiş bir
+  çağrı için "iç çağrı kapısı kabul etmiyor" diye SABİT metin yazıyordu; gerçekte istek
+  hiç gönderilmemişti. Teşhis bir tur boşa gitti. Kural: hata gerekçesi her zaman
+  sunucudan dönen GERÇEK durum kodunu ve hata metnini taşısın; "denenmedi" ile
+  "reddedildi" asla aynı cümleyle yazılmasın. (775f66e ile düzeltildi.)
 
