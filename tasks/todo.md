@@ -1,4 +1,27 @@
 ## Nerede kaldık — 16.08.2026 (80) · OTURUM HAZIRLIK FÖYÜ — 1. TUR (İBA 3.1 / C23)
+- [x] DÜZELTME 16.08 (canlı bulgu — Serpil Karahan föyü): dört kusur giderildi.
+      · TARAFSIZLIK: sorular tarafın hukuki tezini kurmaya yaklaşıyordu ("okuma
+        fırsatınız oldu mu", "riskler size ne kadar açıklandı"). SORU SINIRI eklendi:
+        izinli olan yalnız tarafın KENDİ talebini/beklentisini/belgesini netleştiren
+        sorular; karşı tarafın kusurunu-ihmalini-yükümlülüğünü araştıran, tez kurduran
+        (edilgen "açıklandı/anlatıldı/bildirildi/imzalatıldı" kalıpları dahil),
+        yönlendiren ve duygu sorgulayan sorular sunucuda ELENİR. Kural hem isteme hem
+        koda yazıldı; cevapsız KEŞİF SORULARI da bu süzgeçten geçiyor (başka ajanın
+        ürettiği soru föye ham girmiyor). Kararsızlıkta eleme esas.
+      · BELGE BÖLÜMÜ TERSİNE ÇEVRİLDİ: artık tarafın YÜKLEDİĞİ belgeler sayılmıyor;
+        EKSİK olanlar isteniyor — tarafın kendi anlatımında adı geçen ama yüklenmemiş
+        belgeler + arabulucunun/ajanın daha önce istediği ama gelmemiş bilgi-belge
+        (ajan_gorevleri: taraf_eksik_bilgi · soru_gonder, yalnız o tarafın satırları).
+        Yüklenmiş belge adıyla eşleşen madde ve dosya adı/uzantı içeren madde eleniyor;
+        eksik yoksa bölüm hiç yazılmıyor.
+      · HAM VERİ: "Katılım biçimi: main" gibi veritabanı kodu artık föye yazılmıyor;
+        tanınan kodlar insan diline çevriliyor (çevrimiçi / yüz yüze), tanınmayan kod
+        varsa satır HİÇ yazılmıyor.
+      · KAPANIŞ CÜMLESİ artık başlıksız bölüm olarak yazılmıyor; veriden çıkarıldı
+        (ekranda alt not olarak gösterilmesi ön yüz işi, bu turda ön yüze dokunulmadı).
+      Node ile denendi: üç canlı sorulu örnek elendi, tarafın kendi talebini netleştiren
+      sorular geçti; "main" kodu boş döndü; dosya adı tespiti çalıştı.
+      REDEPLOY GEREKLİ: hazirlik-foyu.
 BU TURDA TARAFA HİÇBİR ŞEY GİTMEDİ. E-posta ve taraf ekranı sonraki turda.
 - [x] Yeni edge fonksiyon: supabase/functions/hazirlik-foyu (config.toml verify_jwt=true).
       · Girdi {case_id, session_id, party_id}; yetki elverislilik/usul-onerisi kalıbı —

@@ -80,6 +80,59 @@ function yasakIfade(metin: string): string | null {
   return YASAK_IFADELER.find((x) => k.includes(x)) ?? null;
 }
 
+/* SORU SINIRI (16.08 canlı bulgu) — Serpil Karahan föyünde sorular tarafın hukuki
+   tezini kurmaya yaklaşmıştı ("formu okuma fırsatınız oldu mu", "riskler size ne
+   kadar açıklandı"). Bunlar karşı tarafın kusurunu araştıran sorulardır ve
+   arabulucunun tarafsızlığını zedeler.
+   İZİNLİ: tarafın KENDİ talebini, beklentisini, belgesini netleştiren sorular.
+   YASAK: karşı tarafın kusuru/ihmali/yükümlülüğü/niyeti · tarafa hukuki tez
+   kurduran ("size açıklandı mı", "bilgilendirildiniz mi") · yönlendiren · duygu
+   sorgulayan sorular. Kararsız kalınan soru ELENİR (az soru, riskli sorudan iyidir). */
+const SORU_YASAK_KALIPLARI = [
+  // karşı tarafın kusuru / yükümlülüğü
+  // Edilgen çatı: "…açıklandı / anlatıldı / bildirildi / alındı" kalıpları karşı
+  // tarafın ne yapıp yapmadığını araştırır; hepsi elenir (kararsızlıkta eleme).
+  "açıkland", "aciklan", "anlatıld", "anlatild", "izah edil", "bildirild",
+  "bilgilendir", "bilgi verildi", "onay alınd", "onay alind", "rıza alınd",
+  "riza alind", "imzalatıld", "imzalatild", "gösterild", "gosterild",
+  "haklarınız anlatıl", "haklariniz anlatil", "uyarıldınız", "uyarildiniz",
+  "izin verildi mi", "fırsatınız oldu", "firsatiniz oldu", "imkânınız oldu",
+  "imkaniniz oldu", "sorgulama fırsat", "okuma fırsat",
+  "ihmal", "kusur", "hata yapıl", "hata yapil", "yükümlülüğünü", "yukumlulugunu",
+  "gerekeni yaptı", "gerekeni yapti", "yeterince", "yeterli miydi", "gereği gibi",
+  "usulüne uygun mu", "usulune uygun mu", "kim sorumlu", "sorumlusu kim",
+  // duygu sorgulama
+  "ne hissettiniz", "hissediyorsunuz", "stresin", "endişen", "endisen",
+  "kaygın", "kaygin", "üzüldünüz", "uzuldunuz", "rahatsız oldunuz",
+  // yönlendirme
+  "değil mi?", "degil mi?", "katılıyor musunuz", "katiliyor musunuz",
+  "haklı olduğunuzu", "hakli oldugunuzu",
+];
+function soruYasakMi(metin: string): string | null {
+  const k = metin.toLocaleLowerCase("tr-TR");
+  return SORU_YASAK_KALIPLARI.find((x) => k.includes(x)) ?? null;
+}
+
+/* HAM VERİ TEMİZLİĞİ (16.08 canlı bulgu): föye "Katılım biçimi: main" yazılmıştı —
+   veritabanı kodu tarafın göreceği metne sızdı. Tanınmayan kod ASLA yazılmaz. */
+const KATILIM_BICIMI: Record<string, string> = {
+  online: "çevrimiçi",
+  cevrimici: "çevrimiçi",
+  video: "çevrimiçi",
+  yuz_yuze: "yüz yüze",
+  yuzyuze: "yüz yüze",
+  fiziksel: "yüz yüze",
+  ofis: "yüz yüze",
+};
+function katilimBicimiMetni(kod: string): string {
+  return KATILIM_BICIMI[temiz(kod).toLocaleLowerCase("tr-TR")] ?? "";
+}
+
+// Dosya adı/uzantı föy metnine girmez (taraf için anlamsız).
+function dosyaAdiIceriyorMu(metin: string): boolean {
+  return /\.(pdf|docx?|xlsx?|png|jpe?g|txt)\b/i.test(metin) || /[\w-]+_[\w-]+\./.test(metin);
+}
+
 /* DOSYA KARŞILIĞI: maddede geçen anlamlı bir sözcük (≥5 harf) tarafın kendi
    metinlerinde geçmiyorsa madde ELENİR — model dosyada olmayan madde uyduramaz. */
 function dosyadaKarsiligiVar(madde: string, korpus: string): boolean {
@@ -207,6 +260,20 @@ Deno.serve(async (req) => {
       .map((q) => temiz(q.question_text))
       .filter(Boolean);
 
+    // Yüklenmiş belge adları: "eksik belgeler" bölümünde bunlar TEKRAR YAZILMAZ.
+    const yuklenmisAdlar = ((belgeler ?? []) as any[])
+      .map((d) => temiz(d.file_name)).filter(Boolean);
+
+    /* Arabulucunun/ajanın daha önce istediği ama gelmeyen bilgi-belge: taraf ajanı
+       panosundaki kendi satırları. Yalnız BU TARAFA yönelik kayıtlar okunur. */
+    const { data: istekler } = await admin.from("ajan_gorevleri")
+      .select("gorev_tipi, gerekce, sonuc, durum")
+      .eq("case_id", case_id).eq("hedef_party_id", party_id)
+      .in("gorev_tipi", ["taraf_eksik_bilgi", "soru_gonder"]).limit(20);
+    const istenenler = ((istekler ?? []) as any[])
+      .map((g) => `${temiz(g.gerekce)} ${temiz(g.sonuc)}`.trim())
+      .filter((x) => x.length > 10);
+
     const beyan = temiz((taraf as any).statement);
     const konu = temiz((caseRow as any).issue_description);
     const korpus = [konu, beyan, ozetBlogu, ((belgeler ?? []) as any[]).map((d) => temiz(d.file_name)).join(" ")]
@@ -227,16 +294,19 @@ MUTLAK SINIRLAR:
 4. Duygu, kişilik ve niyet değerlendirmesi yapma.
 5. Sade Türkçe yaz, hukuk jargonu kullanma. Her madde tek cümle olsun.
 
-İki bölüm üret:
-· "Oturumda konuşulacak başlıklar": dosyanın konusundan ve bu tarafın kendi anlatımından çıkan, oturumda ele alınması beklenen başlıklar (en çok 6 madde).
-· "Yanınızda bulundurmanız iyi olur": bu tarafın anlatımında ya da belgelerinde geçen, oturumda işine yarayacak belgeler (en çok 5 madde). Böyle bir belge görünmüyorsa listeyi BOŞ bırak.
+SORU VE BAŞLIK SINIRI: Yalnız tarafın KENDİ talebini, beklentisini ve kendi belgesini netleştiren başlıklar yaz. Karşı tarafın kusurunu, ihmalini, yükümlülüğünü ya da niyetini araştıran; tarafa hukuki tez kurduran ("size açıklandı mı", "bilgilendirildiniz mi"); yönlendiren ya da duygu sorgulayan ("ne hissettiniz") başlık YAZMA.
 
-Çıktı YALNIZCA JSON: {"basliklar":[""],"belgeler":[""]}`;
+İki bölüm üret:
+· "Oturumda konuşulacak başlıklar": dosyanın konusundan ve bu tarafın kendi anlatımından çıkan, oturumda ele alınması beklenen başlıklar (en çok 6 madde). Örnek çerçeve: talebin kalemleri, hangi başlığın önce çözülmesi, para dışı beklenti, olayların tarih sırası.
+· "EKSİK BELGELER": tarafın anlatımında ya da dosyada ADI GEÇEN ama HENÜZ YÜKLENMEMİŞ belgeler (en çok 5 madde). Sana "zaten yüklenmiş belgeler" listesi veriliyor; ORADA OLAN HİÇBİR BELGEYİ YAZMA. Dosya adı yazma; insan diliyle yaz ("ameliyat görüntü kayıtları", "hemşire gözlem formları"). Eksik görünmüyorsa listeyi BOŞ bırak.
+
+Çıktı YALNIZCA JSON: {"basliklar":[""],"eksik_belgeler":[""]}`;
 
       const userPrompt = `[DOSYA KONUSU]\n${konu || "—"}\n\n`
         + `[TARAFIN KENDİ ANLATIMI]\n${beyan.slice(0, MAX_METIN) || "—"}\n\n`
-        + `[TARAFIN KENDİ BELGELERİ]\n${((belgeler ?? []) as any[]).map((d) => temiz(d.file_name)).join(" · ") || "—"}\n\n`
-        + `[TARAFIN BELGE ÖZETLERİ]\n${ozetBlogu.slice(0, MAX_METIN) || "—"}`;
+        + `[ZATEN YÜKLENMİŞ BELGELER — BUNLARI YAZMA]\n${yuklenmisAdlar.join(" · ") || "—"}\n\n`
+        + `[TARAFIN BELGE ÖZETLERİ]\n${ozetBlogu.slice(0, MAX_METIN) || "—"}\n\n`
+        + `[ARABULUCUNUN DAHA ÖNCE İSTEDİĞİ AMA GELMEYEN BİLGİ/BELGE]\n${istenenler.join("\n") || "—"}`;
 
       try {
         const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -273,10 +343,42 @@ MUTLAK SINIRLAR:
             return kalan;
           };
 
-          const basliklar = suz(parsed?.basliklar, "başlık").slice(0, 6);
-          const belgeMaddeleri = suz(parsed?.belgeler, "belge").slice(0, 5);
+          // Başlıklar: yasak dil + dosya karşılığı + SORU SINIRI süzgecinden geçer.
+          const basliklar = suz(parsed?.basliklar, "başlık")
+            .filter((m) => {
+              const y = soruYasakMi(m);
+              if (y) { elenen.push(`başlık: tarafsızlık sınırı ("${y}")`); return false; }
+              return true;
+            })
+            .slice(0, 6);
+
+          /* Eksik belgeler: ZATEN YÜKLENMİŞ belge tekrar yazılmaz, dosya adı/uzantı
+             içeren madde elenir. Not: bu bölümde "dosyada karşılığı olsun" kuralı
+             gevşetilir — istenen belge tanımı gereği dosyada YOKTUR; bunun yerine
+             tarafın anlatımında ya da arabulucunun isteklerinde karşılığı aranır. */
+          const eksikKorpus = [beyan, istenenler.join("\n")].filter(Boolean).join("\n");
+          const eksikBelgeler = (Array.isArray(parsed?.eksik_belgeler) ? parsed.eksik_belgeler : [])
+            .map((m: unknown) => temiz(m))
+            .filter((m: string) => {
+              if (m.length < 8) return false;
+              const y = yasakIfade(m) ?? soruYasakMi(m);
+              if (y) { elenen.push(`eksik belge: yasak dil ("${y}")`); return false; }
+              if (dosyaAdiIceriyorMu(m)) { elenen.push("eksik belge: dosya adı yazılmış"); return false; }
+              if (yuklenmisAdlar.some((ad) => sade(m).includes(sade(ad)) || sade(ad).includes(sade(m)))) {
+                elenen.push("eksik belge: zaten yüklenmiş");
+                return false;
+              }
+              if (eksikKorpus.trim().length > 0 && !dosyadaKarsiligiVar(m, eksikKorpus)) {
+                elenen.push("eksik belge: anlatımda ya da istek kaydında karşılığı yok");
+                return false;
+              }
+              return true;
+            })
+            .slice(0, 5)
+            .map((m: string) => m.slice(0, 300));
+
           if (basliklar.length > 0) bolumler.push({ baslik: "Oturumda konuşulacak başlıklar", maddeler: basliklar });
-          if (belgeMaddeleri.length > 0) bolumler.push({ baslik: "Yanınızda bulundurmanız iyi olur", maddeler: belgeMaddeleri });
+          if (eksikBelgeler.length > 0) bolumler.push({ baslik: "Yanınızda bulundurmanız iyi olur", maddeler: eksikBelgeler });
         } else {
           console.error(`[hazirlik-foyu] HTTP ${aiRes.status}`);
         }
@@ -285,11 +387,19 @@ MUTLAK SINIRLAR:
       }
     }
 
-    // ── (c) Cevaplanmamış keşif soruları — KODDAN, birebir ─────────────────
-    if (cevapsizSorular.length > 0) {
+    /* ── (c) Cevaplanmamış keşif soruları — KODDAN, ama SORU SINIRINDAN GEÇEREK.
+       16.08: bu sorular başka bir ajan tarafından üretiliyor; tarafsızlık sınırını
+       aşan soru (karşı tarafın kusurunu araştıran, tez kurduran, duygu sorgulayan)
+       föye ALINMAZ. Kararsız kalınan soru elenir. */
+    const guvenliSorular = cevapsizSorular.filter((q) => {
+      const y = soruYasakMi(q) ?? yasakIfade(q);
+      if (y) { elenen.push(`keşif sorusu elendi: tarafsızlık sınırı ("${y}")`); return false; }
+      return true;
+    });
+    if (guvenliSorular.length > 0) {
       bolumler.push({
         baslik: "Cevabını hazırlamanız iyi olur",
-        maddeler: cevapsizSorular.slice(0, 8).map((q) => q.slice(0, 300)),
+        maddeler: guvenliSorular.slice(0, 8).map((q) => q.slice(0, 300)),
       });
     }
 
@@ -301,10 +411,9 @@ MUTLAK SINIRLAR:
       oturumMaddeleri.push(`Tarih: ${tarih}`);
       oturumMaddeleri.push(`Saat: ${saat}`);
     }
-    const bicim = temiz((oturum as any).meeting_type);
-    if (bicim) {
-      oturumMaddeleri.push(`Katılım biçimi: ${bicim === "online" || bicim === "cevrimici" ? "çevrimiçi" : bicim === "ozel" ? "özel görüşme" : bicim}`);
-    }
+    // Tanınmayan kod ASLA yazılmaz (ör. "main" gibi iç değerler föye sızmasın).
+    const bicimMetni = katilimBicimiMetni(temiz((oturum as any).meeting_type));
+    if (bicimMetni) oturumMaddeleri.push(`Katılım biçimi: ${bicimMetni}`);
     if (temiz((oturum as any).video_link)) {
       oturumMaddeleri.push("Görüşme bağlantısı oturum davetinde paylaşılır.");
     }
@@ -312,9 +421,10 @@ MUTLAK SINIRLAR:
       bolumler.push({ baslik: "Oturum bilgileri", maddeler: oturumMaddeleri });
     }
 
-    // Kapanış cümlesi her föyde sabittir.
-    bolumler.push({ baslik: "", maddeler: [KAPANIS_CUMLESI] });
-
+    /* 16.08: Kapanış cümlesi ARTIK BÖLÜM OLARAK YAZILMIYOR — başlıksız boş bölüm
+       gibi görünüyordu. Metin sabit olduğu için ekranda alt not olarak gösterilmesi
+       ön yüz işidir; veriden çıkarıldı. (Sabit metin aşağıda dursun ki gerektiğinde
+       tek yerden okunabilsin.) */
     const dolu = bolumler.filter((b) => b.baslik && b.maddeler.length > 0).length > 0;
     const satir = {
       case_id, session_id, party_id,
