@@ -145,6 +145,28 @@ const AGENT_TYPE_META: Record<string, { label: string; icon: any; color: string;
   mediator: { label: "Arabulucu Ajan", icon: Scale, color: "text-emerald-600" },
   validator: { label: "Doğrulama Ajanı", icon: ShieldCheck, color: "text-amber-600" },
   orchestrator: { label: "Tüm Analiz (Orkestratör)", icon: Sparkles, color: "text-primary" },
+  // 16.08 EKLEME — beş yeni ajan kolu. İkon ve renkler dosyada zaten kullanılanlardan
+  // seçildi; yeni ikon importu ya da yeni renk eklenmedi.
+  belge_ozeti: {
+    label: "Belge Özeti", icon: FileSearch, color: "text-cyan-600",
+    description: "Her belgeye tek paragraf özet ve 'neyi kanıtlıyor' satırı çıkarır",
+  },
+  olay_cizelgesi: {
+    label: "Olay Zaman Çizelgesi", icon: CalendarClock, color: "text-rose-600",
+    description: "Dosyadaki tarihleri kaynağıyla birlikte tek çizelgede sıralar",
+  },
+  guc_dengesi: {
+    label: "Güç Dengesi Göstergeleri", icon: Scale, color: "text-indigo-600",
+    description: "Taraflar arasındaki dengesizlik göstergelerini dayanağıyla işaret eder",
+  },
+  iletisim_degisim: {
+    label: "İletişimde Değişim", icon: MessageSquare, color: "text-purple-600",
+    description: "Aynı tarafın kendi metinlerinde dilin zaman içindeki değişimini gösterir",
+  },
+  dosya_ozeti: {
+    label: "Dosya Özeti Önerisi", icon: Lightbulb, color: "text-amber-600",
+    description: "Uyuşmazlık konusu boşken dayanaklı metin önerir; kaydı arabulucu yapar",
+  },
 };
 
 function formatRelativeTime(iso: string): string {
@@ -350,6 +372,12 @@ export function AgentControlPanel({ caseId, isMediator }: { caseId: string; isMe
       setInvoking(false);
     }
   };
+
+  // 16.08: Taraf hesabı agent_states'ten veri alamıyor (politika gereği yalnız
+  // arabulucu; tarafa_gorunur=true satırlar istisna). Boş "AI Aktivitelerim" kutusu
+  // yerine bileşen tarafta HİÇ çizilmez. Erken dönüş tüm hook çağrılarından SONRADIR,
+  // hook sırası bozulmaz. Arabulucu görünümü değişmedi.
+  if (!isMediator) return null;
 
   return (
     <div className="space-y-4">

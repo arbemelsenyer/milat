@@ -682,3 +682,17 @@ tablosunda saklanıyor (taraf başına tek satır), böylece her açılışta ye
 görünmüyor. SQL göçü bekliyor: 20260816160000_iletisim_degisim.sql.
 REDEPLOY GEREKLİ: iletisim-degisim (YENİ).
 
+16.08 (AJAN KONTROL PANELİ — beş yeni kol bağlandı): belge-ozeti · olay-cizelgesi ·
+guc-dengesi · iletisim-degisim · dosya-ozeti-oner fonksiyonlarına agent_states durum
+yazımı eklendi (running / completed / failed + error_message). agent_type değerleri
+belge_ozeti · olay_cizelgesi · guc_dengesi · iletisim_degisim · dosya_ozeti; taraf bazlı
+çalışan iletisim-degisim satırı party_id ile yazılıyor, diğerleri dosya geneli (null).
+Aynı case_id + agent_type (+party_id) için tek satır güncelleniyor, koşum başına yeni
+satır birikmiyor; tarafa_gorunur alanına dokunulmuyor. Durum yazımı asıl işi bozmuyor:
+her yazma try/catch içinde, hata yutulup yalnız konsola loglanıyor. Panelde
+AGENT_TYPE_META'ya beş kayıt eklendi (mevcut ikon ve renklerden). Taraf hesabında panel
+artık hiç çizilmiyor (isMediator=false → null), boş "AI Aktivitelerim" kutusu kalktı.
+SQL gerekmiyor (tablo değişikliği kurucu tarafından yapıldı).
+REDEPLOY GEREKLİ: belge-ozeti · olay-cizelgesi · guc-dengesi · iletisim-degisim ·
+dosya-ozeti-oner.
+

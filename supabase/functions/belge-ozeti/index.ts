@@ -68,8 +68,40 @@ const BOS_KALIPLAR = [
   "bilgilerini içer", "hakkında bilgi", "bilgi vermekte", "bilgi sunmakta",
 ];
 
+/* ── AJAN DURUM YAZIMI (Ajan Kontrol Paneli) ─────────────────────────────────
+   Panel bu satırlardan beslenir. KRİTİK: durum yazımı asıl işi ASLA bozmaz —
+   her yazma try/catch içindedir, hata yutulur ve yalnız konsola loglanır.
+   Aynı case_id + agent_type (+ party_id) için TEK satır güncellenir; her koşumda
+   yeni satır birikmez. tarafa_gorunur alanına DOKUNULMAZ (varsayılan false). */
+const AGENT_TYPE = "belge_ozeti";
+async function durumYaz(
+  admin: any, caseId: string, partyId: string | null, patch: Record<string, unknown>,
+) {
+  if (!admin || !caseId) return;
+  try {
+    let sorgu = admin.from("agent_states").select("id")
+      .eq("case_id", caseId).eq("agent_type", AGENT_TYPE);
+    sorgu = partyId ? sorgu.eq("party_id", partyId) : sorgu.is("party_id", null);
+    const { data: mevcutSatir } = await sorgu.maybeSingle();
+    const govde = { ...patch, updated_at: new Date().toISOString() };
+    if (mevcutSatir?.id) {
+      await admin.from("agent_states").update(govde).eq("id", mevcutSatir.id);
+    } else {
+      await admin.from("agent_states")
+        .insert({ case_id: caseId, agent_type: AGENT_TYPE, party_id: partyId, ...govde });
+    }
+  } catch (e: any) {
+    console.error(`[${AGENT_TYPE}] durum yazılamadı: ${e?.message ?? e}`);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // Hata dalında da durum yazılabilmesi için asıl iş içinde doldurulur.
+  let durumAdmin: any = null;
+  let durumCaseId = "";
+  let durumPartyId: string | null = null;
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -122,12 +154,17 @@ Deno.serve(async (req) => {
       if (!yetkili) return json({ error: "Bu belge için yetkiniz yok" }, 403);
     }
 
+    durumAdmin = admin;
+    durumCaseId = String((doc as any).case_id ?? "");
+    await durumYaz(durumAdmin, durumCaseId, null, { status: "running", error_message: null });
+
     // Zaten özeti olan belge için TEKRAR ÜRETİLMEZ — yalnız açık istekle (yenile:true)
     // yeniden üretilir ve aynı kayıt güncellenir.
     const { data: varOlan } = await admin.from("belge_ozetleri")
       .select("id, durum").eq("document_id", document_id).maybeSingle();
     const mevcutId = (varOlan as any)?.id ?? null;
     if (mevcutId && !yenile) {
+      await durumYaz(durumAdmin, durumCaseId, null, { status: "completed", error_message: null, last_output: { sonuc: "atlandi", sebep: "özet zaten var" } });
       return json({ atlandi: true, sebep: "Bu belgenin özeti zaten var", durum: (varOlan as any).durum });
     }
 
@@ -152,6 +189,7 @@ Deno.serve(async (req) => {
         ozet: null, kaniti: null, durum: "metin_yok", sebep: durumSebep,
       });
       if (iErr) return json({ error: `Kayıt yazılamadı: ${iErr.message}` }, 500);
+      await durumYaz(durumAdmin, durumCaseId, null, { status: "completed", error_message: null, last_output: { sonuc: "metin_yok", sebep: durumSebep } });
       return json({ durum: "metin_yok", sebep: durumSebep });
     }
 
@@ -225,6 +263,7 @@ Bu belgeyi yukarıdaki kurallara göre özetle.`;
       const sebep = "Özet elendi: metin çok kısa veya boş";
       const { error: eErr } = await kayitYaz({ ozet: null, kaniti: null, durum: "elendi", sebep });
       if (eErr) return json({ error: `Kayıt yazılamadı: ${eErr.message}` }, 500);
+      await durumYaz(durumAdmin, durumCaseId, null, { status: "completed", error_message: null, last_output: { sonuc: "elendi", sebep } });
       return json({ durum: "elendi", sebep });
     }
     const hukumler = [...hukumCumleleri(ozet), ...hukumCumleleri(kaniti)];
@@ -232,6 +271,7 @@ Bu belgeyi yukarıdaki kurallara göre özetle.`;
       const sebep = `Özet elendi: ajanın kendi hükmü — elenen cümle: "${hukumler[0].slice(0, 200)}"`;
       const { error: eErr } = await kayitYaz({ ozet: null, kaniti: null, durum: "elendi", sebep });
       if (eErr) return json({ error: `Kayıt yazılamadı: ${eErr.message}` }, 500);
+      await durumYaz(durumAdmin, durumCaseId, null, { status: "completed", error_message: null, last_output: { sonuc: "elendi", sebep } });
       return json({ durum: "elendi", sebep });
     }
 
@@ -319,9 +359,11 @@ Bu satırı yukarıdaki kurallara göre yeniden yaz.`;
     });
     if (yErr) return json({ error: `Kayıt yazılamadı: ${yErr.message}` }, 500);
 
+    await durumYaz(durumAdmin, durumCaseId, null, { status: "completed", error_message: null, last_output: { sonuc: "uretildi" } });
     return json({ durum: "uretildi", ozet, kaniti, not: kanitNotu });
   } catch (e: any) {
     console.error("[belge-ozeti] hata", e?.message ?? e);
+    await durumYaz(durumAdmin, durumCaseId, durumPartyId, { status: "failed", error_message: String(e?.message ?? "Bilinmeyen hata").slice(0, 500) });
     return json({ error: e?.message ?? "Bilinmeyen hata" }, 500);
   }
 });

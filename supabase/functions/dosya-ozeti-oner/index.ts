@@ -38,8 +38,40 @@ function belgeTuru(fileName: string, mime: string): string {
   return ext ? ext.toUpperCase() : "bilinmeyen tür";
 }
 
+/* ── AJAN DURUM YAZIMI (Ajan Kontrol Paneli) ─────────────────────────────────
+   Panel bu satırlardan beslenir. KRİTİK: durum yazımı asıl işi ASLA bozmaz —
+   her yazma try/catch içindedir, hata yutulur ve yalnız konsola loglanır.
+   Aynı case_id + agent_type (+ party_id) için TEK satır güncellenir; her koşumda
+   yeni satır birikmez. tarafa_gorunur alanına DOKUNULMAZ (varsayılan false). */
+const AGENT_TYPE = "dosya_ozeti";
+async function durumYaz(
+  admin: any, caseId: string, partyId: string | null, patch: Record<string, unknown>,
+) {
+  if (!admin || !caseId) return;
+  try {
+    let sorgu = admin.from("agent_states").select("id")
+      .eq("case_id", caseId).eq("agent_type", AGENT_TYPE);
+    sorgu = partyId ? sorgu.eq("party_id", partyId) : sorgu.is("party_id", null);
+    const { data: mevcutSatir } = await sorgu.maybeSingle();
+    const govde = { ...patch, updated_at: new Date().toISOString() };
+    if (mevcutSatir?.id) {
+      await admin.from("agent_states").update(govde).eq("id", mevcutSatir.id);
+    } else {
+      await admin.from("agent_states")
+        .insert({ case_id: caseId, agent_type: AGENT_TYPE, party_id: partyId, ...govde });
+    }
+  } catch (e: any) {
+    console.error(`[${AGENT_TYPE}] durum yazılamadı: ${e?.message ?? e}`);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // Hata dalında da durum yazılabilmesi için asıl iş içinde doldurulur.
+  let durumAdmin: any = null;
+  let durumCaseId = "";
+  let durumPartyId: string | null = null;
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -85,11 +117,16 @@ Deno.serve(async (req) => {
       || !!roleRow;
     if (!yetkili) return json({ error: "Bu dosya için yetkiniz yok" }, 403);
 
+    durumAdmin = admin;
+    durumCaseId = case_id;
+    await durumYaz(durumAdmin, durumCaseId, null, { status: "running", error_message: null });
+
     // Mevcut metin ASLA ezilmez: bu fonksiyon hiçbir koşulda yazmaz. Alan doluyken
     // öneri yalnız açık istek üzerine (yenile:true) üretilir; kaydetme kararı
     // arabulucunundur. Mevcut metin AI'a girdi olarak da VERİLMEZ — kaynak sınırı
     // yalnız başlık, başvuru/talep alanları ve belge adı+türüdür.
     if (temiz((caseRow as any).issue_description) && !yenile) {
+      await durumYaz(durumAdmin, durumCaseId, null, { status: "completed", error_message: null, last_output: { sonuc: "atlandi", sebep: "konu zaten girilmiş" } });
       return json({ atlandi: true, sebep: "Uyuşmazlık konusu zaten girilmiş — öneri üretilmedi" });
     }
 
@@ -118,6 +155,7 @@ Deno.serve(async (req) => {
 
     // Dayanaksız öneri üretilmez (constitution m.2): hiç kaynak yoksa dur.
     if (alanlar.length === 0 && belgeler.length === 0) {
+      await durumYaz(durumAdmin, durumCaseId, null, { status: "completed", error_message: null, last_output: { sonuc: "atlandi", sebep: "yeterli veri yok" } });
       return json({
         atlandi: true,
         sebep: "Yeterli veri yok: dosya başlığı, başvuru alanları ve yüklü belge bulunamadı",
@@ -193,15 +231,18 @@ Bu bilgilerden 2-4 cümlelik tarafsız uyuşmazlık konusu metni üret.`;
     if (bulunan.length) elenme.push(`yasaklı ifade: ${bulunan.join(", ")}`);
 
     if (elenme.length) {
+      await durumYaz(durumAdmin, durumCaseId, null, { status: "completed", error_message: null, last_output: { sonuc: "elendi", sebep: "öneri sunucuda elendi" } });
       return json({
         atlandi: true,
         sebep: `Öneri sunucu tarafında elendi (${elenme.join(" · ")}) — metni elle yazın`,
       });
     }
 
+    await durumYaz(durumAdmin, durumCaseId, null, { status: "completed", error_message: null, last_output: { sonuc: "oneri_uretildi" } });
     return json({ ozet, dayanak });
   } catch (e: any) {
     console.error("[dosya-ozeti-oner] hata", e?.message ?? e);
+    await durumYaz(durumAdmin, durumCaseId, durumPartyId, { status: "failed", error_message: String(e?.message ?? "Bilinmeyen hata").slice(0, 500) });
     return json({ error: e?.message ?? "Bilinmeyen hata" }, 500);
   }
 });

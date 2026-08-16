@@ -1,6 +1,31 @@
+## Nerede kaldık — 16.08.2026 (71) · AJAN KONTROL PANELİ — BEŞ YENİ KOL BAĞLANDI
+- [x] Beş edge fonksiyona agent_states durum yazımı: belge-ozeti (belge_ozeti) ·
+      olay-cizelgesi (olay_cizelgesi) · guc-dengesi (guc_dengesi) · iletisim-degisim
+      (iletisim_degisim, TARAF BAZLI → party_id dolu) · dosya-ozeti-oner (dosya_ozeti).
+      Başlarken 'running', normal bitişlerde (üretildi · atlandı · yetersiz · elendi)
+      'completed' + last_output.sonuc, hata dalında 'failed' + error_message.
+- [x] Upsert kalıbı nöbetçidekiyle aynı: aynı case_id + agent_type (+party_id) için TEK
+      satır güncelleniyor; her koşumda yeni satır birikmiyor. tarafa_gorunur alanına
+      DOKUNULMADI.
+- [x] KRİTİK KURAL: durum yazımı asıl işi bozmuyor — her yazma try/catch içinde, hata
+      yutuluyor ve yalnız konsola loglanıyor; hata dalında da yazabilmek için admin/case
+      kimliği try dışına taşındı (yalnız değişken tanımı, iş mantığı değişmedi).
+- [x] AgentControlPanel > AGENT_TYPE_META'ya beş kayıt eklendi (Belge Özeti · Olay Zaman
+      Çizelgesi · Güç Dengesi Göstergeleri · İletişimde Değişim · Dosya Özeti Önerisi).
+      İkon ve renkler dosyada zaten kullanılanlardan seçildi, yeni import yok.
+- [x] Taraf ekranı: isMediator=false iken bileşen null dönüyor; boş "AI Aktivitelerim"
+      kutusu artık çizilmiyor. Erken dönüş tüm hook'lardan SONRA — hook sırası bozulmadı.
+      Arabulucu görünümüne dokunulmadı.
+tsc temiz; beş edge fonksiyonun sözdizimi esbuild ile doğrulandı. CANLI TEST YOK.
+REDEPLOY GEREKLİ: belge-ozeti · olay-cizelgesi · guc-dengesi · iletisim-degisim ·
+dosya-ozeti-oner. SQL gerekmiyor (tablo/kolon/politika kurucu tarafından yapıldı).
+AÇIK UÇ: CaseRoom'daki "AI Aktivitelerim" SEKMESİ duruyor, içi artık boş. Sekmenin
+kaldırılması ayrı karar (sekme silme yasağı gereği dokunulmadı).
+
 ## Nerede kaldık — 16.08.2026 (70) · SIRADAKİ İŞLER
-- [ ] (a) AJAN KONTROL PANELİ — bugün eklenen yeni kolların panele bağlanması +
+- [x] (a) AJAN KONTROL PANELİ — bugün eklenen yeni kolların panele bağlanması +
       agent_states görünürlük kuralı. SQL hazır, çalıştırılmayı bekliyor.
+      (16.08'de yapıldı — bkz. oturum 71; redeploy bekliyor.)
 - [ ] (b) YENİLE DÜĞMESİ ENVANTERİ — hangi kartta var, hangisinde yok, hepsi aynı
       görünümde mi; eksik olanlara eklenmesi.
 - [ ] (c) mimari/10-arayuz-katmani.md DÜZELTMESİ — "Faz 4" → Aşama 3 ve braket

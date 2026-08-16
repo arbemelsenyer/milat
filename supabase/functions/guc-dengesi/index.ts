@@ -61,8 +61,40 @@ function rolEtiketi(p: any): string {
   return ROL_ETIKET[r] ?? (r || "taraf");
 }
 
+/* ── AJAN DURUM YAZIMI (Ajan Kontrol Paneli) ─────────────────────────────────
+   Panel bu satırlardan beslenir. KRİTİK: durum yazımı asıl işi ASLA bozmaz —
+   her yazma try/catch içindedir, hata yutulur ve yalnız konsola loglanır.
+   Aynı case_id + agent_type (+ party_id) için TEK satır güncellenir; her koşumda
+   yeni satır birikmez. tarafa_gorunur alanına DOKUNULMAZ (varsayılan false). */
+const AGENT_TYPE = "guc_dengesi";
+async function durumYaz(
+  admin: any, caseId: string, partyId: string | null, patch: Record<string, unknown>,
+) {
+  if (!admin || !caseId) return;
+  try {
+    let sorgu = admin.from("agent_states").select("id")
+      .eq("case_id", caseId).eq("agent_type", AGENT_TYPE);
+    sorgu = partyId ? sorgu.eq("party_id", partyId) : sorgu.is("party_id", null);
+    const { data: mevcutSatir } = await sorgu.maybeSingle();
+    const govde = { ...patch, updated_at: new Date().toISOString() };
+    if (mevcutSatir?.id) {
+      await admin.from("agent_states").update(govde).eq("id", mevcutSatir.id);
+    } else {
+      await admin.from("agent_states")
+        .insert({ case_id: caseId, agent_type: AGENT_TYPE, party_id: partyId, ...govde });
+    }
+  } catch (e: any) {
+    console.error(`[${AGENT_TYPE}] durum yazılamadı: ${e?.message ?? e}`);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // Hata dalında da durum yazılabilmesi için asıl iş içinde doldurulur.
+  let durumAdmin: any = null;
+  let durumCaseId = "";
+  let durumPartyId: string | null = null;
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -107,9 +139,14 @@ Deno.serve(async (req) => {
       if (!yetkili) return json({ error: "Bu dosya için yetkiniz yok" }, 403);
     }
 
+    durumAdmin = admin;
+    durumCaseId = case_id;
+    await durumYaz(durumAdmin, durumCaseId, null, { status: "running", error_message: null });
+
     const { count: mevcut } = await admin.from("guc_dengesi")
       .select("id", { count: "exact", head: true }).eq("case_id", case_id);
     if ((mevcut ?? 0) > 0 && !yenile) {
+      await durumYaz(durumAdmin, durumCaseId, null, { status: "completed", error_message: null, last_output: { sonuc: "atlandi", sebep: "gösterge zaten var" } });
       return json({ atlandi: true, sebep: "Bu dosyanın güç dengesi işareti zaten var", satir: mevcut });
     }
 
@@ -119,6 +156,7 @@ Deno.serve(async (req) => {
     if (pErr) return json({ error: pErr.message }, 500);
     const taraflar = (partiesRaw ?? []) as any[];
     if (taraflar.length < 2) {
+      await durumYaz(durumAdmin, durumCaseId, null, { status: "completed", error_message: null, last_output: { sonuc: "atlandi", sebep: "en az iki taraf gerekir" } });
       return json({ atlandi: true, sebep: "Karşılaştırma için en az iki taraf gerekir" });
     }
 
@@ -289,9 +327,11 @@ var=true ise:
     const { error: yErr } = await admin.from("guc_dengesi").insert(satirlar);
     if (yErr) return json({ error: `Kayıt yazılamadı: ${yErr.message}` }, 500);
 
+    await durumYaz(durumAdmin, durumCaseId, null, { status: "completed", error_message: null, last_output: { sonuc: "uretildi", gosterge: gosterge.length } });
     return json({ satir: satirlar.length, gosterge: gosterge.length });
   } catch (e: any) {
     console.error("[guc-dengesi] hata", e?.message ?? e);
+    await durumYaz(durumAdmin, durumCaseId, durumPartyId, { status: "failed", error_message: String(e?.message ?? "Bilinmeyen hata").slice(0, 500) });
     return json({ error: e?.message ?? "Bilinmeyen hata" }, 500);
   }
 });
