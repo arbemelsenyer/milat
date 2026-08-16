@@ -590,6 +590,9 @@ const GOREV_ETIKET: Record<string, string> = {
   taraf_eksik_bilgi: "Belge/bilgi isteği",
   taraf_alternatif_saat: "Alternatif saat önerisi",
   ozel_oturum: "Özel oturum daveti",
+  // 16.08 EKLEME — nöbetçinin otomatik koşum kolları (yalnız ekleme).
+  otomatik_analiz: "Otomatik analiz",
+  elverislilik_isareti: "Elverişlilik işareti",
 };
 
 const DURUM_ETIKET: Record<string, { label: string; tone: string }> = {

@@ -1587,6 +1587,276 @@ async function nobetciDurumYaz(admin: any, caseId: string, patch: Record<string,
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   OTOMATİK KOŞUM (16.08) — analiz kolları arabulucu düğmeye basmadan çalışır.
+   Kural seti:
+   · Her kolun KOŞUM KOŞULU vardır; koşul sağlanmıyorsa çağrı yapılmaz.
+   · MÜKERRER KOŞUM ENGELİ: kolun beslendiği veriden bir GİRDİ İMZASI çıkarılır ve
+     ajan_kosum_izi'ne yazılır. İmza aynıysa yeniden koşulmaz (maliyet kuralı).
+   · TUR SINIRI: nöbetçi tek turda EN FAZLA 3 ücretli çağrı yapar (tüm dosyalar
+     toplamında). Sınır dolunca kalanlar "sonraki turda koşulacak" diye yazılır.
+   · Hata üç kez üst üste olursa kol o dosya için 'atlandi' işaretlenir.
+   · Her başarılı koşum ajan_gorevleri'ne 'otomatik_analiz' satırı düşer.
+   · İÇ KAPI: yalnız x-cron-secret kabul eden fonksiyonlar nöbetçiden çağrılabilir.
+     Kabul etmeyen fonksiyonlar (elverislilik · usul-onerisi · iletisim-degisim ·
+     dosya-ozeti-oner) 'atlandi' yazılır ve sebebi kayda geçer — sessiz hata yok.
+   ──────────────────────────────────────────────────────────────────────────── */
+const OTOMATIK_TUR_SINIRI = 3;
+
+type Butce = { kalan: number };
+
+// icKapi=false olan fonksiyonlar bugün iç çağrı (x-cron-secret) kabul etmiyor;
+// koda dokunulmadığı için nöbetçiden çalıştırılamıyorlar.
+const OTOMATIK_KOLLAR: { kol: string; fonksiyon: string; icKapi: boolean }[] = [
+  { kol: "elverislilik", fonksiyon: "elverislilik", icKapi: false },
+  { kol: "belge-ozeti", fonksiyon: "belge-ozeti", icKapi: true },
+  { kol: "olay-cizelgesi", fonksiyon: "olay-cizelgesi", icKapi: true },
+  { kol: "guc-dengesi", fonksiyon: "guc-dengesi", icKapi: true },
+  { kol: "usul-onerisi", fonksiyon: "usul-onerisi", icKapi: false },
+  { kol: "iletisim-degisim", fonksiyon: "iletisim-degisim", icKapi: false },
+  { kol: "dosya-ozeti-oner", fonksiyon: "dosya-ozeti-oner", icKapi: false },
+];
+
+async function kosumIziOku(admin: any, caseId: string): Promise<Record<string, any>> {
+  const { data, error } = await admin.from("ajan_kosum_izi")
+    .select("kol, girdi_imzasi, durum, sebep, kosum_zamani").eq("case_id", caseId).limit(100);
+  if (error) {
+    console.error(`[ajan-nobetci] koşum izi okunamadı (${caseId}): ${error.message}`);
+    return {};
+  }
+  const harita: Record<string, any> = {};
+  for (const r of ((data ?? []) as any[])) harita[String(r.kol)] = r;
+  return harita;
+}
+
+async function kosumIziYaz(
+  admin: any, caseId: string, kol: string, imza: string, durum: string, sebep: string,
+) {
+  const { error } = await admin.from("ajan_kosum_izi").upsert({
+    case_id: caseId, kol, girdi_imzasi: imza, durum,
+    sebep: sebep.slice(0, 500), kosum_zamani: new Date().toISOString(),
+  }, { onConflict: "case_id,kol" });
+  if (error) console.error(`[ajan-nobetci] koşum izi yazılamadı (${caseId}/${kol}): ${error.message}`);
+}
+
+// Önceki sebep metnindeki hata sayacı ("hata 2/3") okunur; yoksa 0.
+function hataSayaci(sebep: string): number {
+  const m = String(sebep ?? "").match(/hata (\d+)\/3/);
+  return m ? Number(m[1]) : 0;
+}
+
+async function icFonksiyonCagir(fonksiyon: string, govde: unknown): Promise<{ ok: boolean; sebep: string }> {
+  if (!CRON_SECRET) return { ok: false, sebep: "CRON_SECRET tanımlı değil, iç çağrı yapılamadı" };
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/${fonksiyon}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-cron-secret": CRON_SECRET,
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+      },
+      body: JSON.stringify(govde),
+    });
+    const metinGovde = await res.text();
+    if (!res.ok) return { ok: false, sebep: `HTTP ${res.status}: ${metinGovde.slice(0, 200)}` };
+    return { ok: true, sebep: metinGovde.slice(0, 200) };
+  } catch (e: any) {
+    return { ok: false, sebep: e?.message ?? "bilinmeyen hata" };
+  }
+}
+
+type OtomatikOzet = { kosuldu: number; atlandi: number; hata: number; sebepler: string[] };
+
+async function otomatikKosumKollari(admin: any, dosya: any, butce: Butce): Promise<OtomatikOzet> {
+  const ozet: OtomatikOzet = { kosuldu: 0, atlandi: 0, hata: 0, sebepler: [] };
+  const caseId = String(dosya.id);
+
+  // ── Koşum koşullarının dayandığı kayıtlar (tek seferde okunur) ──────────
+  const [taraflarRes, belgelerRes, orkestratorRes] = await Promise.all([
+    admin.from("case_parties").select("id, user_id, statement, created_at").eq("case_id", caseId).limit(30),
+    admin.from("case_documents").select("id, party_id, extraction_status, created_at").eq("case_id", caseId).limit(200),
+    admin.from("agent_states").select("status, updated_at")
+      .eq("case_id", caseId).eq("agent_type", "orchestrator").eq("status", "completed").limit(1),
+  ]);
+  const taraflar = (taraflarRes.data ?? []) as any[];
+  const belgeler = (belgelerRes.data ?? []) as any[];
+  const metinliBelgeler = belgeler.filter((d) => String(d.extraction_status ?? "") === "tamam");
+  const orkestratorTamam = ((orkestratorRes.data ?? []) as any[])[0] ?? null;
+
+  const enSonBelge = metinliBelgeler
+    .map((d) => String(d.created_at ?? ""))
+    .sort()
+    .slice(-1)[0] ?? "-";
+  const beyanli = taraflar.filter((t) => String(t.statement ?? "").trim().length > 40).length;
+  const konuUzunluk = String(dosya?.issue_description ?? "").trim().length;
+
+  const izi = await kosumIziOku(admin, caseId);
+
+  // Kol tanımları: koşum koşulu + girdi imzası (imza aynıysa yeniden koşulmaz).
+  const kolDurumu: Record<string, { uygun: boolean; imza: string; sebep: string; govde: any }> = {
+    "elverislilik": {
+      uygun: konuUzunluk > 0 && taraflar.length >= 1,
+      imza: `konu:${konuUzunluk}|taraf:${taraflar.length}`,
+      sebep: "uyuşmazlık konusu boş ya da taraf kaydı yok",
+      govde: { case_id: caseId },
+    },
+    "belge-ozeti": {
+      uygun: metinliBelgeler.length >= 1,
+      imza: `belge:${metinliBelgeler.length}|son:${enSonBelge}`,
+      sebep: "metni çıkarılmış belge yok",
+      govde: { document_id: metinliBelgeler[0]?.id },
+    },
+    "olay-cizelgesi": {
+      uygun: metinliBelgeler.length >= 1,
+      imza: `belge:${metinliBelgeler.length}|son:${enSonBelge}`,
+      sebep: "metni çıkarılmış belge yok",
+      govde: { case_id: caseId, yenile: true },
+    },
+    "guc-dengesi": {
+      uygun: taraflar.length >= 2,
+      imza: `taraf:${taraflar.length}|beyan:${beyanli}|belge:${belgeler.length}`,
+      sebep: "en az iki taraf kaydı yok",
+      govde: { case_id: caseId, yenile: true },
+    },
+    "usul-onerisi": {
+      uygun: taraflar.length >= 2,
+      imza: `taraf:${taraflar.length}|beyan:${beyanli}|belge:${belgeler.length}`,
+      sebep: "en az iki taraf kaydı yok",
+      govde: { case_id: caseId },
+    },
+    "dosya-ozeti-oner": {
+      uygun: !!orkestratorTamam,
+      imza: `orch:${String(orkestratorTamam?.updated_at ?? "-")}|konu:${konuUzunluk}`,
+      sebep: "orkestratör analizi tamamlanmadı",
+      govde: { case_id: caseId },
+    },
+  };
+
+  for (const tanim of OTOMATIK_KOLLAR) {
+    // iletisim-degisim taraf bazlıdır; aşağıda ayrıca ele alınır.
+    if (tanim.kol === "iletisim-degisim") continue;
+    const d = kolDurumu[tanim.kol];
+    if (!d) continue;
+    if (!d.uygun) continue;   // koşul sağlanmıyor: sessiz geçilir, iz yazılmaz
+
+    const eski = izi[tanim.kol];
+    if (eski && String(eski.girdi_imzasi) === d.imza && String(eski.durum) !== "hata") {
+      continue;   // aynı girdi: yeniden koşulmaz (maliyet kuralı)
+    }
+    if (!tanim.icKapi) {
+      if (!eski || String(eski.durum) !== "atlandi" || String(eski.girdi_imzasi) !== d.imza) {
+        const sebep = `${tanim.fonksiyon} iç çağrı kapısı (x-cron-secret) kabul etmiyor — nöbetçiden çalıştırılamıyor, kokpitteki düğmeyle çalışır`;
+        await kosumIziYaz(admin, caseId, tanim.kol, d.imza, "atlandi", sebep);
+        ozet.atlandi++;
+        ozet.sebepler.push(`otomatik koşum atlandı (${tanim.kol}): ${sebep}`);
+      }
+      continue;
+    }
+    if (butce.kalan <= 0) {
+      ozet.sebepler.push(`otomatik koşum (${tanim.kol}): tur sınırı doldu — sonraki turda koşulacak`);
+      continue;
+    }
+
+    butce.kalan--;
+    const r = await icFonksiyonCagir(tanim.fonksiyon, d.govde);
+    if (r.ok) {
+      await kosumIziYaz(admin, caseId, tanim.kol, d.imza, "kosuldu", r.sebep);
+      ozet.kosuldu++;
+      await gorevAc(
+        admin, caseId, "otomatik_analiz", `[oto:${tanim.kol}]`,
+        `${tanim.kol} kolu nöbetçi tarafından çalıştırıldı`,
+        { durum: "yapildi" },
+      );
+    } else {
+      const sayac = hataSayaci(String(eski?.sebep ?? "")) + 1;
+      const durum = sayac >= 3 ? "atlandi" : "hata";
+      const sebep = durum === "atlandi"
+        ? `hata 3/3 — üç kez başarısız, kol beklemeye alındı: ${r.sebep}`
+        : `hata ${sayac}/3: ${r.sebep}`;
+      await kosumIziYaz(admin, caseId, tanim.kol, d.imza, durum, sebep);
+      ozet.hata++;
+      ozet.sebepler.push(`otomatik koşum başarısız (${tanim.kol}): ${sebep}`);
+    }
+  }
+
+  // ── iletisim-degisim: TARAF BAZLI kol ───────────────────────────────────
+  // Koşum koşulu: o tarafın en az İKİ FARKLI TARİHLİ metni olmalı.
+  const idTanim = OTOMATIK_KOLLAR.find((k) => k.kol === "iletisim-degisim")!;
+  for (const t of taraflar) {
+    const tarihler = new Set<string>();
+    if (String(t.statement ?? "").trim().length > 40) tarihler.add(String(t.created_at ?? "").slice(0, 10));
+    for (const d of belgeler) {
+      if (String(d.party_id) === String(t.id)) tarihler.add(String(d.created_at ?? "").slice(0, 10));
+    }
+    if (t.user_id) {
+      const { data: msj } = await admin.from("messages")
+        .select("created_at").eq("case_id", caseId).eq("sender_id", t.user_id).limit(50);
+      for (const m of ((msj ?? []) as any[])) tarihler.add(String(m.created_at ?? "").slice(0, 10));
+    }
+    tarihler.delete("");
+    if (tarihler.size < 2) continue;
+
+    const kolAdi = `iletisim-degisim:${t.id}`;
+    const imza = `gun:${tarihler.size}|son:${[...tarihler].sort().slice(-1)[0]}`;
+    const eski = izi[kolAdi];
+    if (eski && String(eski.girdi_imzasi) === imza && String(eski.durum) !== "hata") continue;
+
+    if (!idTanim.icKapi) {
+      if (!eski || String(eski.durum) !== "atlandi" || String(eski.girdi_imzasi) !== imza) {
+        const sebep = "iletisim-degisim iç çağrı kapısı (x-cron-secret) kabul etmiyor — nöbetçiden çalıştırılamıyor, kokpitteki düğmeyle çalışır";
+        await kosumIziYaz(admin, caseId, kolAdi, imza, "atlandi", sebep);
+        ozet.atlandi++;
+        ozet.sebepler.push(`otomatik koşum atlandı (${kolAdi}): ${sebep}`);
+      }
+      continue;
+    }
+    if (butce.kalan <= 0) {
+      ozet.sebepler.push(`otomatik koşum (${kolAdi}): tur sınırı doldu — sonraki turda koşulacak`);
+      continue;
+    }
+    butce.kalan--;
+    const r = await icFonksiyonCagir(idTanim.fonksiyon, { case_id: caseId, party_id: t.id, yenile: true });
+    if (r.ok) {
+      await kosumIziYaz(admin, caseId, kolAdi, imza, "kosuldu", r.sebep);
+      ozet.kosuldu++;
+      await gorevAc(
+        admin, caseId, "otomatik_analiz", `[oto:${kolAdi}]`,
+        `${kolAdi} kolu nöbetçi tarafından çalıştırıldı`,
+        { durum: "yapildi" },
+      );
+    } else {
+      const sayac = hataSayaci(String(eski?.sebep ?? "")) + 1;
+      const durum = sayac >= 3 ? "atlandi" : "hata";
+      const sebep = durum === "atlandi"
+        ? `hata 3/3 — üç kez başarısız, kol beklemeye alındı: ${r.sebep}`
+        : `hata ${sayac}/3: ${r.sebep}`;
+      await kosumIziYaz(admin, caseId, kolAdi, imza, durum, sebep);
+      ozet.hata++;
+      ozet.sebepler.push(`otomatik koşum başarısız (${kolAdi}): ${sebep}`);
+    }
+  }
+
+  // ── KARAR NOKTASI: elverişlilik işareti varsa arabulucuya onay görevi ────
+  // Ajan karar vermez; yalnız "inceleyin" der. Aynı dosyada ikinci satır açılmaz.
+  try {
+    const { data: elv } = await admin.from("elverislilik_kontrol")
+      .select("durum").eq("case_id", caseId).maybeSingle();
+    if (elv && String((elv as any).durum) === "isaret_var") {
+      const r = await gorevAc(
+        admin, caseId, "elverislilik_isareti", "[onay:elverislilik]",
+        "Dosyada elverişlilik bakımından dikkat gerektiren işaret var — kokpitte inceleyin",
+        { durum: "onay_bekliyor" },
+      );
+      if (r.acildi) ozet.sebepler.push("elverişlilik işareti arabulucu onayına yazıldı");
+    }
+  } catch (e: any) {
+    console.error(`[ajan-nobetci] elverişlilik işareti okunamadı (${caseId}): ${e?.message ?? e}`);
+  }
+
+  return ozet;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -1648,9 +1918,33 @@ Deno.serve(async (req) => {
     // Kayıt protokolü (B18) silme sayaçları
     let sesKaydiSilindi = 0;
     let dokumSilindi = 0;
+    // Otomatik koşum (16.08) sayaçları ve TUR BAŞINA harcama bütçesi.
+    let otomatikKosuldu = 0;
+    let otomatikAtlandi = 0;
+    let otomatikHata = 0;
+    const otomatikButce: Butce = { kalan: OTOMATIK_TUR_SINIRI };
     const hatalar: string[] = [];
 
-    for (const dosya of (dosyalar ?? []) as any[]) {
+    // ADİL SIRA (16.08): otomatik koşum bütçesi hep aynı dosyaya gitmesin diye
+    // dosyalar, en son otomatik koşum zamanına göre sıralanır — hiç koşulmamış
+    // dosya başa gelir. Diğer kolların mantığı değişmez, yalnız işlem sırası.
+    const dosyaListesi = [...((dosyalar ?? []) as any[])];
+    try {
+      const { data: izSatirlari } = await admin.from("ajan_kosum_izi")
+        .select("case_id, kosum_zamani").limit(2000);
+      const sonKosum: Record<string, string> = {};
+      for (const r of ((izSatirlari ?? []) as any[])) {
+        const k = String(r.case_id);
+        const z = String(r.kosum_zamani ?? "");
+        if (!sonKosum[k] || z > sonKosum[k]) sonKosum[k] = z;
+      }
+      dosyaListesi.sort((a, b) =>
+        (sonKosum[String(a.id)] ?? "").localeCompare(sonKosum[String(b.id)] ?? ""));
+    } catch (e: any) {
+      console.error(`[ajan-nobetci] koşum sırası kurulamadı: ${e?.message ?? e}`);
+    }
+
+    for (const dosya of dosyaListesi) {
       // Bir dosyadaki hata diğer dosyaları durdurmaz.
       let buDosyaYapilan = 0;
       // Ön koşul uyarıları: ajan bir kolu çalıştıramadıysa SESSİZ KALMAZ — sebebi
@@ -1732,6 +2026,13 @@ Deno.serve(async (req) => {
         sesKaydiSilindi += silmeKol.ses_silindi;
         dokumSilindi += silmeKol.dokum_silindi;
         silmeKol.sebepler.forEach(sebepEkle);
+
+        // ── OTOMATİK KOŞUM (16.08): analiz kolları düğmesiz çalışır ──
+        const otoKol = await otomatikKosumKollari(admin, dosya, otomatikButce);
+        otomatikKosuldu += otoKol.kosuldu;
+        otomatikAtlandi += otoKol.atlandi;
+        otomatikHata += otoKol.hata;
+        otoKol.sebepler.forEach(sebepEkle);
 
         // YALNIZ durum='bekliyor' görevler yürütülür. 'onay_bekliyor' satırları
         // arabulucunundur — ajan bunlara hiçbir koşulda dokunmaz.
@@ -1882,6 +2183,10 @@ Deno.serve(async (req) => {
       taahhut_dustu: taahhutDustu,
       ses_kaydi_silindi: sesKaydiSilindi,
       dokum_silindi: dokumSilindi,
+      otomatik_kosuldu: otomatikKosuldu,
+      otomatik_atlandi: otomatikAtlandi,
+      otomatik_hata: otomatikHata,
+      otomatik_butce_kalan: otomatikButce.kalan,
       atlama_sebepleri: atlamaSebepleri,
       imza_adi: imzaAdi,
       hata: hatalar,
