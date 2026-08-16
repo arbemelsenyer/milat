@@ -2699,6 +2699,77 @@ export type Database = {
           },
         ]
       }
+      oturum_hazirlik_foyleri: {
+        Row: {
+          bolumler: Json
+          case_id: string
+          created_at: string
+          durum: string
+          gonderim_zamani: string | null
+          id: string
+          onay_zamani: string | null
+          onaylayan_user_id: string | null
+          party_id: string
+          session_id: string
+          updated_at: string
+        }
+        Insert: {
+          bolumler?: Json
+          case_id: string
+          created_at?: string
+          durum?: string
+          gonderim_zamani?: string | null
+          id?: string
+          onay_zamani?: string | null
+          onaylayan_user_id?: string | null
+          party_id: string
+          session_id: string
+          updated_at?: string
+        }
+        Update: {
+          bolumler?: Json
+          case_id?: string
+          created_at?: string
+          durum?: string
+          gonderim_zamani?: string | null
+          id?: string
+          onay_zamani?: string | null
+          onaylayan_user_id?: string | null
+          party_id?: string
+          session_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oturum_hazirlik_foyleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "oturum_hazirlik_foyleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oturum_hazirlik_foyleri_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oturum_hazirlik_foyleri_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "case_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       oturum_kayitlari: {
         Row: {
           case_id: string
