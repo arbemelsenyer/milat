@@ -1509,6 +1509,51 @@ export type Database = {
         }
         Relationships: []
       }
+      elverislilik_kontrol: {
+        Row: {
+          bulgular: Json
+          case_id: string
+          created_at: string
+          durum: string
+          id: string
+          kaynaklar: string | null
+          updated_at: string
+        }
+        Insert: {
+          bulgular?: Json
+          case_id: string
+          created_at?: string
+          durum?: string
+          id?: string
+          kaynaklar?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bulgular?: Json
+          case_id?: string
+          created_at?: string
+          durum?: string
+          id?: string
+          kaynaklar?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "elverislilik_kontrol_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: true
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "elverislilik_kontrol_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: true
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expert_assignment_logs: {
         Row: {
           action: string
