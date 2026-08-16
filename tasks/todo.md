@@ -13,6 +13,14 @@
       yalnız arabulucu görüyor (kokpit zaten mediator-only).
 - [x] RAPOR katmanındaki eski kayıt kaldırıldı; kalıntı yok. Yeni tablo/edge fonksiyon/AI
       çağrısı yok → SQL gerekmiyor.
+- [x] CANLIDA DOĞRULANDI (16.08.2026).
+      · Yeri: kokpit (Aşama 3) DAYANAK katmanı, "İletişim ve Asıl İhtiyaç"ın hemen altı,
+        sol dizinde 3.3. Önce Aşama 2'ye konmuştu, kurucunun kararıyla taşındı.
+      · Ölçüm ifade sayımına dayanır; kişilik, duygu ve niyet değerlendirmesi yok; her
+        taraf yalnız kendi metinleriyle karşılaştırılır.
+      · Veri yetersizken kart gizlenmiyor, kaç metin ve kaç ayrı gün olduğunu yazıyor
+        (sağlık dosyasında doğrulandı).
+      · Yeni tablo, edge fonksiyon ve AI çağrısı gerekmedi.
 - [x] AŞAMA 2 KALINTI DENETİMİ (16.08): bileşen çağrısı YOK · FAZ3_LAYERS ve
       FAZ3_MENU_ENTRIES'te satır YOK (altı katman aynen: dosya özeti · olay çizelgesi ·
       güç dengesi · usule ilişkin engeller · taraflar · belgeler) · sayaç YOK · eslint'te

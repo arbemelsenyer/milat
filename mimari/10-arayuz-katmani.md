@@ -8,7 +8,7 @@ Görsel kimlik: MİLAT navy-altın paleti, kart derinlik sistemi e.
 geçti: üstte katlanmayan durum şeridi, altında tıklanabilir katlanır katman başlıkları (ana
 başlık + sayaç + tek satır italik açıklama), katman içinde bölüm satırları. Kutu içinde kutu yok,
 iki yazı boyu, renk yalnız rozetlerde, emoji yok, ince gri ayraçlar.
-· Faz 4 — Arabulucu Paneli: dört katman — Masaya otururken · Dayanak katmanı · Kokpit · Rapor ve
+· Aşama 3 — Arabulucu Paneli / kokpit (14.08'e kadar "Faz 4"): dört katman — Masaya otururken · Dayanak katmanı · Kokpit · Rapor ve
   belgeler. Sol menüde iki kademeli gruplama (katman başlığı + altında bölümler); tıklanınca
   ilgili katman/bölüm açılır ve oraya kaydırılır. Bölüm bazlı PDF düğmeleri ve katman başlığında
   "Rapor oluştur" seçim penceresi. Rapor çıktısında "Uzlaşma tahmini" paylaşılabilir kalem,
@@ -25,7 +25,7 @@ iki yazı boyu, renk yalnız rozetlerde, emoji yok, ince gri ayraçlar.
   ● 13.08: Kelime birliği — kullanıcıya görünen her yerde "Aşama" (üst şeritler
     "AŞAMA N — …"); üst şeritle tekrarlanan sayfa içi aşama başlıkları kaldırıldı
     (açıklama cümleleri kaldı); Aşama 4 durum şeridinde "Sıradaki aşama: N".
-· Faz 3 — Taraf Analizi: aynı düzene geçti — üç katman: Dosya özeti (uyuşmazlık konusu metni
+· Aşama 2 — Taraf Analizi (14.08'e kadar "Faz 3"): aynı düzene geçti — üç katman: Dosya özeti (uyuşmazlık konusu metni
   varsayılan kapalı · uyuşmazlık tür tespiti varsayılan açık) · Taraflar (kartlar tek satır özet,
   tıklayınca detay ve analiz düğmeleri) · Belgeler ve araçlar (metin çıkarma). Sol menüde
   "3. Taraf Analizi" altında girintili katman satırları.
@@ -149,7 +149,7 @@ arabulucunun kendi girdiği kayıttır.
   Aralığım" sekmesi — alt/üst sınır, isteğe bağlı koşullu taahhüt (bant alt · bant üst ·
   inilecek tutar · arabulucuya not) ve varsa bant sorusu kartı ("Şu aralığı düşünür
   müsünüz?" · Düşünürüm / Bu aralığı düşünmüyorum). Sorunun kimden geldiği yazılmaz.
-  ARABULUCU: Faz 4 rapor katmanında "Koşullu aralık (braket)" bölümü — taraf başına
+  ARABULUCU: Aşama 3 (kokpit) RAPOR VE BELGELER katmanında "Koşullu aralık (braket)" bölümü — taraf başına
   aralık ve koşullu taahhüt kartı, örtüşme bandı ve yakınlık göstergesi (seyir yalnız
   arabulucuda). Braket denetim izi Ajan Paneli'ndeki "ne yaptı, ne yapmadı" listesinde
   "denetim izi" rozetiyle görünür.
@@ -188,3 +188,23 @@ arabulucunun kendi girdiği kayıttır.
   Eksik yoksa "Usule ilişkin engel görünmüyor." yazar. Sağ üstte [Yenile]. Katman
   başlığında "N eksik" / "eksik yok" sayacı. Hesap ekrandaki yüklü veriden türetilir;
   yeni sorgu, yeni tablo ve AI çağrısı yoktur. Bu katman YALNIZ arabulucu ekranındadır.
+
+[DÜZELTME 16.08 — AŞAMA NUMARALARI ve KART YERLERİ]
+· Bu bölümdeki eski "Faz 4" adı KOKPİTİ (Arabulucu Paneli) anlatır ve 14.08'de aşama
+  sayısı 8'den 7'ye indiğinde AŞAMA 3 olmuştur. Aynı biçimde eski "Faz 3" = AŞAMA 2
+  (Taraf Analizi), eski "Faz 5" = AŞAMA 4 (Toplantı). Yukarıdaki eski satırlarda geçen
+  numaralar bu eşlemeyle okunur; metin silinmedi.
+· BRAKET BÖLÜMÜNÜN GERÇEK YERİ (koddan doğrulandı): kokpitin RAPOR VE BELGELER katmanı
+  (sectionDefs id "kokpit-braket", layer LAYER_REPORTS). Belgedeki "rapor katmanı" ifadesi
+  doğruydu, yanlış olan yalnız aşama numarasıydı; düzeltildi.
+· 16.08'de eklenen kartların yeri:
+  — Kokpit > DAYANAK KATMANI > "İletişimde değişim" (sol dizinde 3.3), "İletişim ve asıl
+    ihtiyaç" bölümünün hemen altında. Aynı tarafın kendi tarihli metinlerindeki dil
+    değişimini gösterir; kişilik/duygu/niyet değerlendirmesi yoktur, taraflar birbiriyle
+    karşılaştırılmaz, veri yetersizken kart gizlenmez.
+  — Kokpit > RAPOR VE BELGELER katmanı: "Teklif değerlendirme" · "Tıkanma ve çıkış yolları"
+    · "Seçenek sepeti" (Kör teklif ve Koşullu aralık bölümlerinin ardında, bu sırayla).
+  — Dördü de YALNIZ arabulucu yüzeyindedir; taraf ekranına hiçbir yüzeyden çıkmaz.
+· Sol dizindeki numaralar liste sırasından hesaplanır (numberMenuEntries): bir bölüm
+  eklenip çıkarıldığında numaralar kendiliğinden kayar, elle numara yazılmaz.
+
