@@ -1,4 +1,23 @@
 ## Nerede kaldık — 16.08.2026 (80) · OTURUM HAZIRLIK FÖYÜ — 1. TUR (İBA 3.1 / C23)
+- [x] DÜZELTME 2 · 16.08 (canlı bulgu — Anadolu Sağlık Hizmetleri föyü): ilk eleme
+      "karşı tarafın kusurunu araştıran soru" için kurulmuştu; bu kez sorular TARAFIN
+      KENDİSİNİ hesap vermeye zorladı ve süzgeçten geçti. Üç kural eklendi:
+      · SORU YÖNÜ (isim değil YÖN esas): hiçbir madde kimseyi — ne bu tarafı ne karşı
+        tarafı — savunmaya, gerekçe göstermeye, hesap vermeye çağıramaz. Elenen kalıplar:
+        "neden/niçin/niye" · "yasal dayanağı / hukuki dayanağı / dayanağı nedir" ·
+        "ne anlama gel" · "gerekçesi nedir / gerekçelendir" · "iddia edilen / iddia
+        ettiği / öne sürülen" · "yapılmış mıdır / edilmiş midir / mı yapıldı" ·
+        "teslim edilmem / verilmem / yerine getirilm" · "savun / hesap ver".
+      · HUKUKİ NİTELEME YASAĞI: kusur · ihmal · sorumluluk · malpraktis · haksız fiil ·
+        tazminat hakkı · ihlal · kast · taksir · illiyet geçen madde elenir; olgu dili
+        kullanılır.
+      · MAKİNE ETİKETİ: madde sonundaki "(Taraf Adı)" gibi parantez etiketi kırpılır —
+        föy zaten o tarafa aittir.
+      Üç kural hem isteme hem sunucuya yazıldı ve model çıktısına, eksik belge
+      maddelerine ve cevapsız keşif sorularına birlikte uygulanıyor. Kararsızlıkta
+      eleme esas. Node ile denendi: canlıdaki dört sorunlu madde elendi (yön, iddia,
+      niteleme), tarafın kendi talebini netleştiren beş soru geçti, etiket kırpıldı.
+      REDEPLOY GEREKLİ: hazirlik-foyu.
 - [x] DÜZELTME 16.08 (canlı bulgu — Serpil Karahan föyü): dört kusur giderildi.
       · TARAFSIZLIK: sorular tarafın hukuki tezini kurmaya yaklaşıyordu ("okuma
         fırsatınız oldu mu", "riskler size ne kadar açıklandı"). SORU SINIRI eklendi:

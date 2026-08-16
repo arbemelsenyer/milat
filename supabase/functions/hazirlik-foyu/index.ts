@@ -113,6 +113,46 @@ function soruYasakMi(metin: string): string | null {
   return SORU_YASAK_KALIPLARI.find((x) => k.includes(x)) ?? null;
 }
 
+/* SORU YÖNÜ KURALI (16.08 ikinci canlı bulgu — Anadolu Sağlık Hizmetleri föyü):
+   İlk eleme "karşı tarafın kusurunu araştıran soru" için kurulmuştu; bu kez sorular
+   TARAFIN KENDİSİNİ hesap vermeye zorladı ve süzgeçten geçti ("… neden ilk etapta
+   teslim edilmemiştir?", "yasal dayanağı nedir?", "ne anlama gelmektedir?").
+   Kural artık İSİM değil YÖN üzerinedir: soru KİMSEYİ — ne tarafın kendisini ne
+   karşı tarafı — savunmaya, gerekçe göstermeye, hesap vermeye çağıramaz.
+   Kararsız kalınan soru ELENİR. */
+const SORU_YON_KALIPLARI = [
+  "neden", "niçin", "nicin", "niye",
+  "yasal dayanağı", "yasal dayanagi", "hukuki dayanağı", "hukuki dayanagi",
+  "dayanağı nedir", "dayanagi nedir", "ne anlama gel", "izah ed",
+  "gerekçesi nedir", "gerekcesi nedir", "gerekçelendir", "gerekcelendir",
+  "iddia edilen", "iddia ettiği", "iddia ettigi", "öne sürülen", "one surulen",
+  "yapılmış mıdır", "yapilmis midir", "edilmiş midir", "edilmis midir",
+  "mı yapıldı", "mi yapildi", "teslim edilmem", "verilmem", "yerine getirilm",
+  "savun", "hesap ver",
+];
+function soruYonYasakMi(metin: string): string | null {
+  const k = metin.toLocaleLowerCase("tr-TR");
+  return SORU_YON_KALIPLARI.find((x) => k.includes(x)) ?? null;
+}
+
+/* HUKUKİ NİTELEME YASAĞI: föy metninde niteleme kelimesi kullanılmaz; olgu dili
+   esastır ("tedavi sonrası ortaya çıkan durum", "talep edilen tutar"). */
+const HUKUKI_NITELEME = [
+  "kusur", "ihmal", "sorumluluk", "sorumlu tut", "malpraktis", "haksız fiil",
+  "haksiz fiil", "tazminat hakkı", "tazminat hakki", "hukuka aykırı", "hukuka aykiri",
+  "ihlal", "zarar sorumlus", "kast", "taksir", "illiyet",
+];
+function hukukiNitelemeVarMi(metin: string): string | null {
+  const k = metin.toLocaleLowerCase("tr-TR");
+  return HUKUKI_NITELEME.find((x) => k.includes(x)) ?? null;
+}
+
+/* MAKİNE ETİKETİ: madde sonuna "(Özel Vita Hastanesi)" gibi taraf etiketi
+   yazılıyordu. Föy zaten o tarafa aittir; sondaki parantez etiketi kırpılır. */
+function makineEtiketiniKirp(metin: string): string {
+  return temiz(metin).replace(/\s*\([^()]{2,60}\)\s*$/u, "").trim();
+}
+
 /* HAM VERİ TEMİZLİĞİ (16.08 canlı bulgu): föye "Katılım biçimi: main" yazılmıştı —
    veritabanı kodu tarafın göreceği metne sızdı. Tanınmayan kod ASLA yazılmaz. */
 const KATILIM_BICIMI: Record<string, string> = {
@@ -294,7 +334,10 @@ MUTLAK SINIRLAR:
 4. Duygu, kişilik ve niyet değerlendirmesi yapma.
 5. Sade Türkçe yaz, hukuk jargonu kullanma. Her madde tek cümle olsun.
 
-SORU VE BAŞLIK SINIRI: Yalnız tarafın KENDİ talebini, beklentisini ve kendi belgesini netleştiren başlıklar yaz. Karşı tarafın kusurunu, ihmalini, yükümlülüğünü ya da niyetini araştıran; tarafa hukuki tez kurduran ("size açıklandı mı", "bilgilendirildiniz mi"); yönlendiren ya da duygu sorgulayan ("ne hissettiniz") başlık YAZMA.
+SORU YÖNÜ (en önemli kural): Hiçbir madde KİMSEYİ — ne bu tarafı ne karşı tarafı — savunmaya, gerekçe göstermeye ya da hesap vermeye çağırmaz. "Neden …", "yasal dayanağı nedir", "ne anlama gelmektedir", "… neden teslim edilmemiştir", "iddia edilen …" gibi maddeler YAZILMAZ.
+İZİNLİ ÇERÇEVE: yalnız bu tarafın KENDİ talebini, beklentisini, önceliğini ve elindeki bilgiyi netleştiren maddeler — "sizin için hangi başlık önce çözülmeli", "talebinizin kalemleri neler", "hangi gideri hangi belgeyle gösteriyorsunuz", "para dışında bir beklentiniz var mı", "hangi belge ne zaman hazır olabilir", "oturuma kim katılacak ve yetkisi ne".
+HUKUKİ NİTELEME YASAĞI: kusur, ihmal, sorumluluk, malpraktis, haksız fiil, tazminat hakkı, ihlal gibi niteleme kelimeleri KULLANMA. Olgu dili kullan ("tedavi sonrası ortaya çıkan durum", "talep edilen tutar").
+ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tarafa aittir.
 
 İki bölüm üret:
 · "Oturumda konuşulacak başlıklar": dosyanın konusundan ve bu tarafın kendi anlatımından çıkan, oturumda ele alınması beklenen başlıklar (en çok 6 madde). Örnek çerçeve: talebin kalemleri, hangi başlığın önce çözülmesi, para dışı beklenti, olayların tarih sırası.
@@ -330,10 +373,12 @@ SORU VE BAŞLIK SINIRI: Yalnız tarafın KENDİ talebini, beklentisini ve kendi 
             const ham = Array.isArray(liste) ? liste : [];
             const kalan: string[] = [];
             for (const m of ham) {
-              const madde = temiz(m);
+              const madde = makineEtiketiniKirp(temiz(m));
               if (madde.length < 10) continue;
               const yasak = yasakIfade(madde);
               if (yasak) { elenen.push(`${etiket}: yasak dil ("${yasak}")`); continue; }
+              const niteleme = hukukiNitelemeVarMi(madde);
+              if (niteleme) { elenen.push(`${etiket}: hukuki niteleme ("${niteleme}")`); continue; }
               if (!dosyadaKarsiligiVar(madde, korpus)) {
                 elenen.push(`${etiket}: dosyada karşılığı bulunamadı`);
                 continue;
@@ -348,6 +393,8 @@ SORU VE BAŞLIK SINIRI: Yalnız tarafın KENDİ talebini, beklentisini ve kendi 
             .filter((m) => {
               const y = soruYasakMi(m);
               if (y) { elenen.push(`başlık: tarafsızlık sınırı ("${y}")`); return false; }
+              const yon = soruYonYasakMi(m);
+              if (yon) { elenen.push(`başlık: yön sınırı — hesap sorma ("${yon}")`); return false; }
               return true;
             })
             .slice(0, 6);
@@ -358,11 +405,13 @@ SORU VE BAŞLIK SINIRI: Yalnız tarafın KENDİ talebini, beklentisini ve kendi 
              tarafın anlatımında ya da arabulucunun isteklerinde karşılığı aranır. */
           const eksikKorpus = [beyan, istenenler.join("\n")].filter(Boolean).join("\n");
           const eksikBelgeler = (Array.isArray(parsed?.eksik_belgeler) ? parsed.eksik_belgeler : [])
-            .map((m: unknown) => temiz(m))
+            .map((m: unknown) => makineEtiketiniKirp(temiz(m)))
             .filter((m: string) => {
               if (m.length < 8) return false;
-              const y = yasakIfade(m) ?? soruYasakMi(m);
-              if (y) { elenen.push(`eksik belge: yasak dil ("${y}")`); return false; }
+              const y = yasakIfade(m) ?? soruYasakMi(m) ?? soruYonYasakMi(m);
+              if (y) { elenen.push(`eksik belge: yasak dil/yön ("${y}")`); return false; }
+              const n = hukukiNitelemeVarMi(m);
+              if (n) { elenen.push(`eksik belge: hukuki niteleme ("${n}")`); return false; }
               if (dosyaAdiIceriyorMu(m)) { elenen.push("eksik belge: dosya adı yazılmış"); return false; }
               if (yuklenmisAdlar.some((ad) => sade(m).includes(sade(ad)) || sade(ad).includes(sade(m)))) {
                 elenen.push("eksik belge: zaten yüklenmiş");
@@ -391,11 +440,17 @@ SORU VE BAŞLIK SINIRI: Yalnız tarafın KENDİ talebini, beklentisini ve kendi 
        16.08: bu sorular başka bir ajan tarafından üretiliyor; tarafsızlık sınırını
        aşan soru (karşı tarafın kusurunu araştıran, tez kurduran, duygu sorgulayan)
        föye ALINMAZ. Kararsız kalınan soru elenir. */
-    const guvenliSorular = cevapsizSorular.filter((q) => {
-      const y = soruYasakMi(q) ?? yasakIfade(q);
-      if (y) { elenen.push(`keşif sorusu elendi: tarafsızlık sınırı ("${y}")`); return false; }
-      return true;
-    });
+    const guvenliSorular = cevapsizSorular
+      .map((q) => makineEtiketiniKirp(q))
+      .filter((q) => {
+        const y = soruYasakMi(q) ?? yasakIfade(q);
+        if (y) { elenen.push(`keşif sorusu elendi: tarafsızlık sınırı ("${y}")`); return false; }
+        const yon = soruYonYasakMi(q);
+        if (yon) { elenen.push(`keşif sorusu elendi: yön sınırı — hesap sorma ("${yon}")`); return false; }
+        const n = hukukiNitelemeVarMi(q);
+        if (n) { elenen.push(`keşif sorusu elendi: hukuki niteleme ("${n}")`); return false; }
+        return true;
+      });
     if (guvenliSorular.length > 0) {
       bolumler.push({
         baslik: "Cevabını hazırlamanız iyi olur",
