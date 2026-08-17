@@ -15,6 +15,14 @@
 // kurucunun yazacağı sabit soru havuzundan seçimle yeniden açılacak; ilgili kod
 // silinmedi, yorum içinde bekliyor.
 //
+// GÜNDEM KODA ALINDI (16.08 kurucu kararı): Gündem başlıkları ARTIK MODELE
+// YAZDIRILMIYOR. Sebep: beş turda süzgeç kovalandı, model her turda yeni bir soru
+// kalıbı üretti ("…talebiniz nelerdir", "…hangi ayları kapsar", "…beklentiniz
+// nasıldır"). Bu kolun işi dosyada NE OLDUĞUNU göstermek; cümle üretmesi
+// gerekmiyor. Başlıklar artık o tarafa ait verilerden SABİT KALIPLARLA kurulur
+// (bkz. GUNDEM_KALIPLARI). Model çağrısı yalnız eksik belge tespiti için kalmıştır;
+// o kaynak da boşsa fonksiyon hiç model çağırmaz — gündem üretimi ücretsizdir.
+//
 // GÜNDEM BİÇİMİ (16.08 canlı bulgu): "Oturumda konuşulacak başlıklar" bölümündeki
 // her madde konuşulacak konunun ADIDIR — kısa isim öbeği. Soru olamaz; soru
 // biçimindeki madde sunucuda ELENİR. Gündem hiç kurulamazsa föy boş bırakılmaz:
@@ -239,7 +247,8 @@ function gundemBasligiKur(ham: string): string | null {
   const k = m.toLocaleLowerCase("tr-TR");
   if (GUNDEM_YUKLEM_SONU.test(k)) return null;
   if (gundemSoruMu(m)) return null;
-  if (m.length < 10) return null;
+  // Alt sınır 5: kod kalıplarında "Nafaka" gibi tek sözcüklü meşru başlıklar var.
+  if (m.length < 5) return null;
 
   // 6) ilk harf büyür, madde kırpılır
   m = m.charAt(0).toLocaleUpperCase("tr-TR") + m.slice(1);
@@ -265,6 +274,120 @@ function yedekGundem(korpus: string): string[] {
   maddeler.push("Oturumda öncelikli ele alınacak başlıkların belirlenmesi");
   maddeler.push("Beklentiler ve para dışı çözüm seçenekleri");
   return maddeler.slice(0, 4);
+}
+
+/* ══ GÜNDEM: KOD KALIPLARI ════════════════════════════════════════════════════
+   Başlıklar modelden değil, tarafa ait verideki anahtar sözcüklerden kurulur.
+   `ipuclari` sade() ile katlanmış biçimde yazılır (ş→s, ı/i→i, ğ→g, ç→c, ö→o,
+   ü→u); metin de sade() ile karşılaştırılır. Başlıklar isim öbeğidir: soru
+   değil, ikinci kişi hitabı yok, hukuki niteleme yok, rakam yok. */
+type GundemKalibi = { ipuclari: string[]; baslik: string };
+
+// (1) Talep/konu kalıpları — dosya konusu, uyuşmazlık türü ve tarafın kendi beyanı.
+const GUNDEM_KALIPLARI: GundemKalibi[] = [
+  { ipuclari: ["odenmeyen kira", "kira bedeli", "kira alacag", "kira borc", "kira odenme"], baslik: "Ödenmeyen kira bedeli alacağı" },
+  { ipuclari: ["ortak gider", "aidat", "yonetim gideri"], baslik: "Ortak gider alacağı" },
+  { ipuclari: ["gecikme faizi", "temerrut faizi", "faiz"], baslik: "Gecikme faizi" },
+  { ipuclari: ["kira artis", "artis orani", "zam orani", "kira zam"], baslik: "Kira artış oranı" },
+  { ipuclari: ["tahliye", "mecurun teslim", "tasinmazin teslim"], baslik: "Taşınmazın tahliyesi ve teslim zamanı" },
+  { ipuclari: ["depozito", "guvence bedeli"], baslik: "Depozitonun iadesi" },
+  { ipuclari: ["tedavi gider", "tedavi masraf", "hastane masraf", "ilac gider", "ameliyat gider"], baslik: "Tedavi giderleri" },
+  { ipuclari: ["gelir kayb", "kazanc kayb", "is gucu", "calisamad", "maas kayb"], baslik: "Gelir kaybı" },
+  { ipuclari: ["bakim gider", "refakat", "yardim ihtiyaci"], baslik: "Bakım ve refakat giderleri" },
+  { ipuclari: ["yol gider", "ulasim gider", "konaklama"], baslik: "Yol ve konaklama giderleri" },
+  { ipuclari: ["aydinlatilmis onam", "onam formu", "bilgilendirme formu"], baslik: "Aydınlatılmış onam sürecine ilişkin görüşler" },
+  { ipuclari: ["kidem", "ihbar tazminat", "fazla mesai", "yillik izin", "ucret alacag", "asgari gecim"], baslik: "İşçilik alacakları" },
+  { ipuclari: ["ise iade", "isten cikar", "is akdinin fesh", "fesih"], baslik: "İş sözleşmesinin sona ermesi" },
+  { ipuclari: ["cari hesap", "mal teslim", "siparis", "irsaliye"], baslik: "Ticari alacak ve fatura kayıtları" },
+  { ipuclari: ["ayipli", "iade talep", "degisim talep", "garanti"], baslik: "Ayıplı mal veya hizmet ve iade talebi" },
+  { ipuclari: ["nafaka"], baslik: "Nafaka" },
+  { ipuclari: ["velayet", "kisisel iliski"], baslik: "Çocukla kişisel ilişki düzeni" },
+  { ipuclari: ["mal paylas", "katki payi", "edinilmis mal"], baslik: "Mal paylaşımı" },
+  { ipuclari: ["teslim tarih", "termin", "sure asim"], baslik: "Teslim ve gecikme süreleri" },
+  { ipuclari: ["taksit", "vade", "odeme plan", "senet"], baslik: "Ödeme biçimi ve zamanlaması" },
+];
+
+// (2) Belge TÜRÜ kalıpları — belge ADI föye girmez, yalnız konusu başlığa döner.
+const BELGE_TURU_KALIPLARI: GundemKalibi[] = [
+  { ipuclari: ["sozlesme", "kontrat", "protokol"], baslik: "Sözleşme hükümlerinin ele alınması" },
+  { ipuclari: ["fatura", "makbuz", "dekont", "ekstre", "banka"], baslik: "Ödeme ve fatura kayıtlarının incelenmesi" },
+  { ipuclari: ["epikriz", "tahlil", "tetkik", "recete", "ameliyat", "hasta dosya"], baslik: "Sağlık kayıtlarının ele alınması" },
+  { ipuclari: ["bilirkisi", "hesap raporu"], baslik: "Hesap raporunun ele alınması" },
+  { ipuclari: ["ihtarname", "tebligat", "yazisma"], baslik: "İhtarname ve yazışmalar" },
+  { ipuclari: ["bordro", "puantaj", "hizmet dokum", "sgk"], baslik: "Çalışma ve ücret kayıtları" },
+];
+
+/* HER DOSYADA ÇALIŞAN ASGARİ GÜNDEM: veriden hiçbir başlık çıkmazsa bunlar
+   yazılır. Föy asla boş kalmaz. */
+const ASGARI_GUNDEM = [
+  "Uyuşmazlık konusunun ele alınması",
+  "Tarafların beklentileri",
+  "Oturumda kimin yer alacağı ve karar yetkisi",
+];
+// Her föyde yer alan usul başlığı (veri başlığı bulunsa da eklenir).
+const USUL_BASLIGI = "Oturumda kimin yer alacağı ve karar yetkisi";
+
+/* GÜNDEMİ KUR: yalnız BU TARAFA ait veriden. `korpus` = dosya konusu + uyuşmazlık
+   türü + tarafın kendi beyanı + kendi belge özetleri. `belgeAdlari` = yalnız bu
+   tarafın belgeleri. `braketVar` = bu tarafın kabul aralığı kaydının VARLIĞI;
+   rakam okunmaz, yazılmaz. Karşı tarafın hiçbir alanı bu fonksiyona girmez. */
+function gundemKur(kaynaklar: { korpus: string; belgeAdlari: string; braketVar: boolean }): {
+  basliklar: string[];
+  izler: string[];
+} {
+  const metin = sade(kaynaklar.korpus);
+  const belgeMetni = sade(kaynaklar.belgeAdlari);
+  const izler: string[] = [];
+  const veriBasliklari: string[] = [];
+
+  const ekle = (baslik: string, iz: string) => {
+    if (!veriBasliklari.includes(baslik)) { veriBasliklari.push(baslik); izler.push(iz); }
+  };
+
+  for (const k of GUNDEM_KALIPLARI) {
+    if (k.ipuclari.some((i) => metin.includes(i))) ekle(k.baslik, `konu/beyan → ${k.baslik}`);
+  }
+  for (const k of BELGE_TURU_KALIPLARI) {
+    if (k.ipuclari.some((i) => belgeMetni.includes(i))) ekle(k.baslik, `belge türü → ${k.baslik}`);
+  }
+  // Kabul aralığı kaydı varsa yalnız ödeme başlığı çıkar; hiçbir rakam yazılmaz.
+  if (kaynaklar.braketVar) ekle("Ödeme biçimi ve zamanlaması", "kabul aralığı kaydı var → ödeme başlığı");
+
+  const ham = veriBasliklari.length > 0 ? [...veriBasliklari, USUL_BASLIGI] : [...ASGARI_GUNDEM];
+  if (veriBasliklari.length === 0) izler.push("veriden başlık çıkmadı → asgari usul gündemi");
+
+  /* Son süzgeç: her başlık TEK KAPI'dan geçer (soru eki, soru kalıbı, ikinci kişi
+     eki temizlenir; temizlenemeyen atılır) ve yasak dil / hukuki niteleme
+     denetiminden geçer. Kalıplar elle yazılmış olsa da denetim atlanmaz. */
+  const temizBasliklar: string[] = [];
+  for (const h of ham) {
+    const b = gundemBasligiKur(h);
+    if (!b) continue;
+    if (yasakIfade(b) || hukukiNitelemeVarMi(b) || soruYasakMi(b) || soruYonYasakMi(b)) continue;
+    if (!temizBasliklar.includes(b)) temizBasliklar.push(b);
+  }
+  return { basliklar: temizBasliklar.slice(0, 6), izler };
+}
+
+/* EKSİK BELGE SOMUTLUK SÜZGECİ (16.08 canlı bulgu): föye "Tarafınızın kendi
+   belgesi" gibi içi boş satırlar yazıldı. Eksik belge bölümü YALNIZ somut bir
+   belge adı/konusu varsa yazılır; genel ifade üretilmez. */
+const BELGE_GENEL_IFADELER = [
+  "tarafinizin kendi", "tarafin kendi", "kendi belgesi", "kendi belgeleri",
+  "ilgili belgeler", "gerekli belgeler", "diger belgeler", "destekleyici belge",
+  "ek belgeler", "tum belgeler", "varsa belge", "belge ve kayitlar",
+  "her turlu belge", "sair belge", "muhtelif belge", "cesitli belge",
+  "gerekli evrak", "ilgili evrak", "diger evrak", "tum evrak",
+];
+const BELGE_JENERIK_SOZCUK = new Set([
+  "belge", "belgeler", "belgesi", "belgeleri", "belgelerin", "evrak", "evraklar",
+  "kayit", "kayitlar", "kayitlari", "dokuman", "dosya", "suret", "kopya", "orijinal", "asil",
+]);
+function belgeSomutMu(m: string): boolean {
+  const k = sade(m);
+  if (BELGE_GENEL_IFADELER.some((g) => k.includes(sade(g)))) return false;
+  const anlamli = k.split(" ").filter((w) => w.length >= 4 && !BELGE_JENERIK_SOZCUK.has(w));
+  return anlamli.length >= 2 || (anlamli.length === 1 && anlamli[0].length >= 6);
 }
 
 /* MAKİNE ETİKETİ: madde sonuna "(Özel Vita Hastanesi)" gibi taraf etiketi
@@ -353,7 +476,11 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const { data: caseRow, error: cErr } = await admin.from("cases")
-      .select("id, user_id, assigned_mediator_id, title, issue_description")
+      /* dispute_type / dispute_subtype / dispute_type_other / category yalnız
+         ANAHTAR SÖZCÜK KAYNAĞI olarak okunur — ham kod föye YAZILMAZ.
+         desired_outcome ve priorities BİLEREK okunmaz: bunlar başvuranın kendi
+         talebi/önceliğidir, karşı tarafın föyüne girerse kör veri ilkesi kırılır. */
+      .select("id, user_id, assigned_mediator_id, title, issue_description, dispute_type, dispute_subtype, dispute_type_other, category")
       .eq("id", case_id).maybeSingle();
     if (cErr) return json({ error: cErr.message }, 500);
     if (!caseRow) return json({ error: "Dosya bulunamadı" }, 404);
@@ -440,40 +567,66 @@ Deno.serve(async (req) => {
       .map((g) => `${temiz(g.gerekce)} ${temiz(g.sonuc)}`.trim())
       .filter((x) => x.length > 10);
 
+    /* Bu tarafın kabul aralığı kaydının VARLIĞI — yalnız `id` okunur, hiçbir
+       rakam (alt_sinir/ust_sinir/kosullu_deger) okunmaz ve föye yazılmaz.
+       Karşı tarafın braketi sorguya party_id ile kapatılmıştır. */
+    const { data: braketler } = await admin.from("teklif_braketleri")
+      .select("id").eq("case_id", case_id).eq("party_id", party_id).limit(1);
+    const braketVar = ((braketler ?? []) as any[]).length > 0;
+
     const beyan = temiz((taraf as any).statement);
     const konu = temiz((caseRow as any).issue_description);
-    const korpus = [konu, beyan, ozetBlogu, ((belgeler ?? []) as any[]).map((d) => temiz(d.file_name)).join(" ")]
-      .filter(Boolean).join("\n");
+    // Uyuşmazlık türü alanları: yalnız kalıp eşleştirme için, ham hâlleri yazılmaz.
+    const turMetni = [
+      temiz((caseRow as any).dispute_type), temiz((caseRow as any).dispute_subtype),
+      temiz((caseRow as any).dispute_type_other), temiz((caseRow as any).category),
+      temiz((caseRow as any).title),
+    ].filter(Boolean).join(" ");
+    const belgeAdlari = ((belgeler ?? []) as any[]).map((d) => temiz(d.file_name)).join(" ");
+    const korpus = [konu, turMetni, beyan, ozetBlogu, belgeAdlari].filter(Boolean).join("\n");
 
     type Bolum = { baslik: string; maddeler: string[] };
     const bolumler: Bolum[] = [];
     const elenen: string[] = [];
 
-    // ── (a) ve (b): model üretir, sunucu eler ───────────────────────────────
-    if (apiKey && korpus.trim().length > 40) {
-      const systemPrompt = `Sen bir arabuluculuk dosyasında TARAFA VERİLECEK HAZIRLIK FÖYÜNÜ yazan yardımcısın. Föyü okuyacak kişi hukukçu değildir.
+    /* ── (a) GÜNDEM — KODDAN KURULUR, MODEL KULLANILMAZ ─────────────────────
+       Kaynaklar: dosya konusu + uyuşmazlık türü + tarafın kendi beyanı + kendi
+       belge özetleri (kalıp eşleştirme), kendi belgelerinin türü, kendi kabul
+       aralığı kaydının varlığı. En az 2, en çok 6 başlık; tekrar yazılmaz. */
+    const { basliklar: gundemBasliklari, izler: gundemIzleri } = gundemKur({
+      korpus, belgeAdlari, braketVar,
+    });
+    if (gundemBasliklari.length > 0) {
+      bolumler.push({ baslik: "Oturumda konuşulacak başlıklar", maddeler: gundemBasliklari });
+    }
+
+    /* ── (b) EKSİK BELGELER — MODELİN KALAN TEK İŞİ ─────────────────────────
+       MALİYET: gündem koda alındığı için artık ücretsizdir. Model YALNIZ "tarafın
+       anlatımında adı geçen ama henüz yüklenmemiş belge" çıkarımı için çağrılır.
+       ÇAĞRI KOŞULU: anahtar tanımlı VE çıkarım yapılacak kaynak dolu — tarafın
+       kendi anlatımı ya da arabulucunun daha önce istediği bilgi/belge kaydı,
+       toplam 40 karakterden uzun. Bu kaynaklar boşsa HİÇ ÇAĞRI YAPILMAZ (boş
+       girdiden belge adı uydurulmasın ve boşuna jeton harcanmasın). */
+    const eksikKorpus = [beyan, istenenler.join("\n")].filter(Boolean).join("\n");
+    const modelGerekli = !!apiKey && eksikKorpus.trim().length > 40;
+    if (modelGerekli) {
+      const systemPrompt = `Sen bir arabuluculuk dosyasında TARAFA VERİLECEK HAZIRLIK FÖYÜNÜN "eksik belgeler" bölümünü yazan yardımcısın. Föyü okuyacak kişi hukukçu değildir.
 
 MUTLAK SINIRLAR:
 1. Yalnız sana verilen DOSYA METİNLERİNE dayan. Karşılığı olmayan hiçbir madde yazma.
-2. Hukuki tavsiye verme, sonuç tahmin etme, "kabul edin/etmeyin" deme, rakam önerme.
+2. Hukuki tavsiye verme, sonuç tahmin etme, rakam önerme, soru sorma.
 3. Karşı taraf hakkında yorum yapma; karşı tarafın verisi sana zaten verilmedi.
 4. Duygu, kişilik ve niyet değerlendirmesi yapma.
-5. Sade Türkçe yaz, hukuk jargonu kullanma. Her madde tek cümle olsun.
+5. Hukuki niteleme kullanma (kusur, ihmal, sorumluluk, malpraktis, haksız fiil, tazminat hakkı, ihlal). Olgu dili kullan.
+6. Gündem başlığı ÜRETME — gündem bu fonksiyonda koddan kurulur, senden istenmiyor.
 
-SORU YÖNÜ (en önemli kural): Hiçbir madde KİMSEYİ — ne bu tarafı ne karşı tarafı — savunmaya, gerekçe göstermeye ya da hesap vermeye çağırmaz. "Neden …", "yasal dayanağı nedir", "ne anlama gelmektedir", "… neden teslim edilmemiştir", "iddia edilen …" gibi maddeler YAZILMAZ.
-İZİNLİ ÇERÇEVE: yalnız bu tarafın KENDİ talebini, beklentisini, önceliğini ve elindeki bilgiyi netleştiren KONU ADLARI — "talebin kalemleri ve tutarı", "önce çözülmesi istenen başlık", "para dışı beklentiler", "giderleri gösteren belgeler", "belgelerin hazır olma zamanı", "oturuma katılacak kişiler ve yetki durumu".
-HUKUKİ NİTELEME YASAĞI (GÜNDEM BAŞLIKLARINDA DA GEÇERLİDİR): kusur, ihmal, sorumluluk, malpraktis, haksız fiil, tazminat hakkı, ihlal gibi niteleme kelimeleri KULLANMA. Konunun kendisini yazabilirsin ("aydınlatılmış onam sürecine ilişkin görüşler") ama değerlendirme ya da suçlama dili kurma. Olgu dili kullan ("tedavi sonrası ortaya çıkan durum", "talep edilen tutar").
-ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tarafa aittir.
+TEK GÖREV — "EKSİK BELGELER": tarafın anlatımında ya da arabulucunun isteklerinde ADI GEÇEN ama HENÜZ YÜKLENMEMİŞ belgeler (en çok 5 madde).
+· Sana "zaten yüklenmiş belgeler" listesi veriliyor; ORADA OLAN HİÇBİR BELGEYİ YAZMA.
+· Dosya adı ve uzantı yazma; insan diliyle belgenin KONUSUNU yaz ("ameliyat görüntü kayıtları", "hemşire gözlem formları", "kira sözleşmesi").
+· SOMUT OL: "tarafınızın kendi belgesi", "ilgili belgeler", "gerekli evraklar" gibi içi boş ifadeler YAZILMAZ. Somut bir belge adı/konusu yoksa listeyi BOŞ bırak.
+· Emin değilsen yazma. Boş liste, uydurma maddeden iyidir.
 
-İki bölüm üret:
-· "Oturumda konuşulacak başlıklar": dosyanın konusundan ve bu tarafın kendi anlatımından çıkan, oturumda ele alınması beklenen başlıklar (en çok 6 madde).
-  GÜNDEM MADDESİ BAŞLIKTIR, SORU DEĞİLDİR. Her madde konuşulacak konunun ADIDIR: kısa isim öbeği yaz. Cümle kurma, soru sorma. Soru işareti kullanma; "nedir / nelerdir / mıdır / mı / mi / mu / mü" ile bitirme; "hangi / ne / neden / nasıl / kim / kaç / nerede" ile başlama.
-  DOĞRU BİÇİM: "Tedavi giderlerinin kalemleri ve toplam tutarı" · "Gelir kaybı talebinin dayanağı ve süresi" · "Ödeme biçimi ve zamanlaması".
-  YANLIŞ BİÇİM: "Hangi başlıklar öncelikli olarak konuşulmalı?" · "Tedavi giderlerinin kalemleri ve toplam tutarı nedir?" · "Gelir kaybı ile ilgili bilginiz nedir?"
-  Örnek çerçeve: talebin kalemleri, önce çözülmesi istenen başlık, para dışı beklenti, olayların tarih sırası.
-· "EKSİK BELGELER": tarafın anlatımında ya da dosyada ADI GEÇEN ama HENÜZ YÜKLENMEMİŞ belgeler (en çok 5 madde). Sana "zaten yüklenmiş belgeler" listesi veriliyor; ORADA OLAN HİÇBİR BELGEYİ YAZMA. Dosya adı yazma; insan diliyle yaz ("ameliyat görüntü kayıtları", "hemşire gözlem formları"). Eksik görünmüyorsa listeyi BOŞ bırak.
-
-Çıktı YALNIZCA JSON: {"basliklar":[""],"eksik_belgeler":[""]}`;
+Çıktı YALNIZCA JSON: {"eksik_belgeler":[""]}`;
 
       const userPrompt = `[DOSYA KONUSU]\n${konu || "—"}\n\n`
         + `[TARAFIN KENDİ ANLATIMI]\n${beyan.slice(0, MAX_METIN) || "—"}\n\n`
@@ -499,50 +652,12 @@ ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tar
           let parsed: any = {};
           try { parsed = JSON.parse(aiJson?.choices?.[0]?.message?.content ?? "{}"); } catch { parsed = {}; }
 
-          const suz = (liste: unknown, etiket: string): string[] => {
-            const ham = Array.isArray(liste) ? liste : [];
-            const kalan: string[] = [];
-            for (const m of ham) {
-              const madde = makineEtiketiniKirp(temiz(m));
-              if (madde.length < 10) continue;
-              const yasak = yasakIfade(madde);
-              if (yasak) { elenen.push(`${etiket}: yasak dil ("${yasak}")`); continue; }
-              const niteleme = hukukiNitelemeVarMi(madde);
-              if (niteleme) { elenen.push(`${etiket}: hukuki niteleme ("${niteleme}")`); continue; }
-              if (!dosyadaKarsiligiVar(madde, korpus)) {
-                elenen.push(`${etiket}: dosyada karşılığı bulunamadı`);
-                continue;
-              }
-              kalan.push(madde.slice(0, 300));
-            }
-            return kalan;
-          };
-
-          /* Başlıklar: yasak dil + dosya karşılığı süzgecinden geçer, sonra TEK
-             KAPI'dan (gundemBasligiKur) çevrilir — soru biçimi başlığa döner,
-             dönmezse elenir. Tarafsızlık ve yön sınırları ÇEVRİLMİŞ metne
-             uygulanır ki kapının ürettiği son hâl de denetlensin. */
-          const basliklar = suz(parsed?.basliklar, "başlık")
-            .map((m) => {
-              const baslik = gundemBasligiKur(m);
-              if (!baslik) elenen.push("başlık: soru biçimi başlığa çevrilemedi");
-              return baslik;
-            })
-            .filter((m): m is string => !!m)
-            .filter((m) => {
-              const y = soruYasakMi(m);
-              if (y) { elenen.push(`başlık: tarafsızlık sınırı ("${y}")`); return false; }
-              const yon = soruYonYasakMi(m);
-              if (yon) { elenen.push(`başlık: yön sınırı — hesap sorma ("${yon}")`); return false; }
-              return true;
-            })
-            .slice(0, 6);
-
-          /* Eksik belgeler: ZATEN YÜKLENMİŞ belge tekrar yazılmaz, dosya adı/uzantı
-             içeren madde elenir. Not: bu bölümde "dosyada karşılığı olsun" kuralı
-             gevşetilir — istenen belge tanımı gereği dosyada YOKTUR; bunun yerine
-             tarafın anlatımında ya da arabulucunun isteklerinde karşılığı aranır. */
-          const eksikKorpus = [beyan, istenenler.join("\n")].filter(Boolean).join("\n");
+          /* Model artık başlık üretmiyor; gelirse de OKUNMAZ (gündem koddan gelir).
+             Eksik belgeler: ZATEN YÜKLENMİŞ belge tekrar yazılmaz, dosya adı/uzantı
+             içeren madde elenir, içi boş genel ifade elenir. Not: bu bölümde
+             "dosyada karşılığı olsun" kuralı gevşetilir — istenen belge tanımı
+             gereği dosyada YOKTUR; bunun yerine tarafın anlatımında ya da
+             arabulucunun isteklerinde karşılığı aranır. */
           const eksikBelgeler = (Array.isArray(parsed?.eksik_belgeler) ? parsed.eksik_belgeler : [])
             .map((m: unknown) => makineEtiketiniKirp(temiz(m)))
             .filter((m: string) => {
@@ -552,6 +667,7 @@ ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tar
               const n = hukukiNitelemeVarMi(m);
               if (n) { elenen.push(`eksik belge: hukuki niteleme ("${n}")`); return false; }
               if (dosyaAdiIceriyorMu(m)) { elenen.push("eksik belge: dosya adı yazılmış"); return false; }
+              if (!belgeSomutMu(m)) { elenen.push("eksik belge: somut belge adı/konusu yok"); return false; }
               if (yuklenmisAdlar.some((ad) => sade(m).includes(sade(ad)) || sade(ad).includes(sade(m)))) {
                 elenen.push("eksik belge: zaten yüklenmiş");
                 return false;
@@ -565,7 +681,7 @@ ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tar
             .slice(0, 5)
             .map((m: string) => m.slice(0, 300));
 
-          if (basliklar.length > 0) bolumler.push({ baslik: "Oturumda konuşulacak başlıklar", maddeler: basliklar });
+          // Somut eksik yoksa bölüm HİÇ yazılmaz (içi boş satır föye girmesin).
           if (eksikBelgeler.length > 0) bolumler.push({ baslik: "Yanınızda bulundurmanız iyi olur", maddeler: eksikBelgeler });
         } else {
           console.error(`[hazirlik-foyu] HTTP ${aiRes.status}`);
@@ -602,11 +718,12 @@ ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tar
     }
     ── (c) KAPALI bloğun sonu ───────────────────────────────────────────────── */
 
-    /* ── BOŞ FÖY KORUMASI ───────────────────────────────────────────────────
-       Bir tarafa yalnız tarih-saat taşıyan föy gitmemeli. Model hiç başlık
-       üretemediyse (ya da hepsi elendiyse), tarafın KENDİ anlatımı ve dosyanın
-       konusu üzerinden en az 2 usul gündemi kurulur. Karşı tarafın verisi bu
-       yola da girmez — yedek gündem yalnız `korpus` üzerinden türer. */
+    /* ── BOŞ FÖY KORUMASI (İKİNCİ AĞ) ───────────────────────────────────────
+       Gündem artık koddan kuruluyor ve ASGARI_GUNDEM tabanı var; bu yol
+       pratikte devreye girmez. Yine de KALDIRILMADI: gundemKur hiçbir başlık
+       döndüremezse (ör. bütün başlıklar süzgeçte düşerse) tarafın KENDİ anlatımı
+       ve dosyanın konusu üzerinden en az 2 usul gündemi kurulur. Karşı tarafın
+       verisi bu yola da girmez — yedek gündem yalnız `korpus` üzerinden türer. */
     let yedekGundemKullanildi = false;
     const gundemBolumu = bolumler.find((b) => b.baslik === "Oturumda konuşulacak başlıklar");
     if (!gundemBolumu || gundemBolumu.maddeler.length === 0) {
@@ -691,7 +808,10 @@ ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tar
       last_output: {
         sonuc: dolu ? "taslak_hazir" : "bos_taslak",
         bolum: bolumler.length,
-        gundem: gundemVar ? (yedekGundemKullanildi ? "yedek" : "model") : "yok",
+        gundem: gundemVar ? (yedekGundemKullanildi ? "yedek" : "kod") : "yok",
+        gundem_sayisi: gundemBasliklari.length,
+        gundem_izleri: gundemIzleri.slice(0, 6),
+        model_cagrisi: modelGerekli ? "eksik_belge" : "yapilmadi",
         elenen: elenen.slice(0, 5),
       },
     });
@@ -699,7 +819,9 @@ ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tar
       durum: "taslak",
       bolum: bolumler.length,
       bos: !dolu,
-      gundem: gundemVar ? (yedekGundemKullanildi ? "yedek" : "model") : "yok",
+      gundem: gundemVar ? (yedekGundemKullanildi ? "yedek" : "kod") : "yok",
+      gundem_sayisi: gundemBasliklari.length,
+      model_cagrisi: modelGerekli ? "eksik_belge" : "yapilmadi",
       elenen: elenen.slice(0, 5),
     });
   } catch (e: any) {
