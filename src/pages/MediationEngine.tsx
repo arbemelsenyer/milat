@@ -807,6 +807,7 @@ export default function MediationEngine() {
                 : p.id === 1 ? FAZ1_MENU_ENTRIES
                 : p.id === 2 ? FAZ3_MENU_ENTRIES
                 : p.id === 3 ? cockpitSections
+                : p.id === 4 ? FAZ4_MENU_ENTRIES
                 : [];
               return (
                 <div key={p.id}>
@@ -1276,7 +1277,7 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance, 
         : <BlindBidPartyForm caseId={caseRow.id} userId={userId} />}
       <NextPhaseButton phase={phase} onAdvance={onAdvance} />
     </>;
-    case 4: return <><Phase5Sessions caseRow={caseRow} bumpPhase={bumpPhase} onAdvance={onAdvance} randevuTetik={randevuTetik} isMediator={isMediator} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 4: return <><Phase5Sessions caseRow={caseRow} bumpPhase={bumpPhase} onAdvance={onAdvance} randevuTetik={randevuTetik} isMediator={isMediator} jump={cockpitJump} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 5: return <><Phase7Expert caseRow={caseRow} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 6: return <><Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(7); onAdvance(7); }} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
     case 7: return <Phase9Closing caseRow={caseRow} reload={reload} />;
@@ -1727,12 +1728,21 @@ function RandevuTeklifKarti({ caseRow, parties, tetik }: {
 
 // SessionScheduler needs case_parties for invite selection/presence — not lifted into
 // MediationEngine state elsewhere, so fetch it here the same way Phase2Parties does.
-function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik, isMediator = false }: {
+// Faz 4 sol dizini: tek girdi — oturum hazırlık föyleri. Numaralandırma kalıbı
+// FAZ1/FAZ3 ile aynıdır; katman girdisi olmadığı için etiket numarasız kalır.
+const FAZ4_MENU_ENTRIES: { id: string; label: string; kind: "layer" | "section"; hint?: string }[] =
+  numberMenuEntries([
+    { id: "faz4-hazirlik-foyu", label: "Oturum hazırlık föyleri", kind: "section" },
+  ]);
+
+function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik, isMediator = false, jump }: {
   caseRow: CaseRow; bumpPhase: (n: number) => Promise<void>; onAdvance: (n: number) => void;
   randevuTetik?: { nonce: number } | null;
   // Kayıt protokolü kartı YALNIZ arabulucuya çizilir (kör veri: katılımcıların
   // onay/ret durumu tarafa hiçbir yüzeyden gösterilmez).
   isMediator?: boolean;
+  // Sol menüden gelen "şu bölüme kay" isteği; nonce her tıklamada artar.
+  jump?: { id: string; nonce: number } | null;
 }) {
   const [parties, setParties] = useState<any[]>([]);
   const [sessions, setSessions] = useState<{ scheduled_at: string | null; status: string }[]>([]);
@@ -1752,6 +1762,16 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik, isMediato
       .order("scheduled_at", { ascending: true })
       .then(({ data }) => setSessions(data ?? []));
   }, [caseRow.id]);
+
+  // Sol menüden gelen istek: bölüme kaydır. Faz 1/3 ile aynı kalıp; yalnız
+  // "faz4-" ile başlayan istekler işlenir.
+  useEffect(() => {
+    if (!jump?.id || !jump.id.startsWith("faz4-")) return;
+    const t = setTimeout(() => {
+      document.getElementById(jump.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+    return () => clearTimeout(t);
+  }, [jump?.id, jump?.nonce]);
 
   const plannedSessions = sessions.filter((s) => s.status !== "cancelled");
   const nextSession = plannedSessions.find((s) => s.scheduled_at && new Date(s.scheduled_at).getTime() > Date.now());
@@ -1785,6 +1805,19 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik, isMediato
         ]}
       />
     <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+      {/* Oturum hazırlık föyleri — oturum bu aşamada planlandığı için föy de burada
+          hazırlanır. Kokpitteki (Aşama 3) kopya YERİNDE DURUYOR; bu ek bir giriştir.
+          Yalnız arabulucu görür. */}
+      {isMediator && (
+        <motion.div variants={itemVariants}>
+          <Card id="faz4-hazirlik-foyu" className="p-6 space-y-3 scroll-mt-24">
+            <div>
+              <h3 className="text-lg font-semibold">Oturum hazırlık föyleri</h3>
+            </div>
+            <HazirlikFoyuPanel caseRow={caseRow} />
+          </Card>
+        </motion.div>
+      )}
       <motion.div variants={itemVariants}>
         <Card className="p-6 space-y-2">
           <p className="text-xs text-muted-foreground">Sonraki adım: Taraflarla görüşme planlayın</p>
