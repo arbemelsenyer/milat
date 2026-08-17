@@ -94,6 +94,16 @@ ile doğrulanır.
 - 16.08: case_documents tablosuna "Yonetici belge yukler" INSERT politikası eklendi:
   uploaded_by = auth.uid() AND has_role(auth.uid(),'admin'). Sebep: admin hesabı taraf
   dosyalarına belge yükleyemiyordu.
+- 16.08: oturum_hazirlik_foyleri tablosu kuruldu (case_id · session_id · party_id ·
+  bolumler jsonb · durum CHECK 'taslak'/'onaylandi'/'gonderildi'/'iptal' ·
+  onaylayan_user_id · onay_zamani · gonderim_zamani; UNIQUE (session_id, party_id);
+  idx_foy_case indeksi) + RLS açık. Politikalar: "Arabulucu foyleri yonetir" (FOR ALL —
+  is_case_mediator VEYA is_case_owner_safe) · "Taraf yalniz gonderilmis kendi foyunu
+  gorur" (FOR SELECT — durum='gonderildi' VE is_own_case_party) · "Yonetici foy tam"
+  (FOR ALL — admin). NOT: tarafa yalnız GÖNDERİLMİŞ kendi föyü görünür; taslak ve
+  onaylı föyler tarafa kapalıdır.
+- 16.08: agent_states_agent_type_check kısıtı genişletildi — izinli listeye
+  'hazirlik_foyu' eklendi (toplam 24 ad; mevcut adlar korundu).
 - (daha önce kurulanlar buraya eklenecek: mediator_reads_offers,
   mediator_writes_discovery, mediator_updates_discovery, ajan_gorevleri politikaları,
   taraf_musaitlik RLS)
