@@ -8109,7 +8109,13 @@ function formatBidAmount(v: number | null, currency: string): string {
 }
 
 function blindBidPartyName(p: any, i: number): string {
-  return p.company_name || `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || `Taraf ${i + 1}`;
+  // AD TEMİZLİĞİ (17.08): veritabanındaki ad alanları sondaki/baştaki boşluğu
+  // taşıyabiliyor; birleştirince araya çift boşluk giriyordu ("Nurten  ÇOBANOĞLU").
+  // .trim() yalnız uçları kırptığı için yetmiyor — art arda gelen boşluklar tek
+  // boşluğa indirilir, sonra uçlar kırpılır.
+  const ad = (p.company_name || `${p.first_name ?? ""} ${p.last_name ?? ""}`)
+    .replace(/\s+/g, " ").trim();
+  return ad || `Taraf ${i + 1}`;
 }
 
 type BlindBidRow = {
