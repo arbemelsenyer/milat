@@ -15,6 +15,12 @@
 // kurucunun yazacağı sabit soru havuzundan seçimle yeniden açılacak; ilgili kod
 // silinmedi, yorum içinde bekliyor.
 //
+// GÜNDEM BİÇİMİ (16.08 canlı bulgu): "Oturumda konuşulacak başlıklar" bölümündeki
+// her madde konuşulacak konunun ADIDIR — kısa isim öbeği. Soru olamaz; soru
+// biçimindeki madde sunucuda ELENİR. Gündem hiç kurulamazsa föy boş bırakılmaz:
+// dosyanın konusu ve tarafın kendi anlatımından usul gündemi kurulur; o da
+// olmazsa taslağa arabulucuya görünür bir "neden boş kaldı" notu yazılır.
+//
 // DİL SINIRI: sade Türkçe; hukuki tavsiye, sonuç tahmini, "kabul edin/etmeyin",
 // rakam önerisi, karşı taraf hakkında yorum ve duygu/kişilik/niyet etiketi YASAK.
 // Dosyada karşılığı olmayan madde sunucuda ELENİR.
@@ -151,6 +157,46 @@ const HUKUKI_NITELEME = [
 function hukukiNitelemeVarMi(metin: string): string | null {
   const k = metin.toLocaleLowerCase("tr-TR");
   return HUKUKI_NITELEME.find((x) => k.includes(x)) ?? null;
+}
+
+/* GÜNDEM MADDESİ BAŞLIKTIR, SORU DEĞİLDİR (16.08 üçüncü canlı bulgu):
+   Soru bölümü kapatılınca model soruları GÜNDEME taşıdı — "Hangi başlıklar
+   öncelikli olarak konuşulmalı?", "… kalemleri ve toplam tutarı nedir?",
+   "… ile ilgili bilginiz nedir?". Gündem maddesi, oturumda konuşulacak konunun
+   ADIDIR: kısa isim öbeği. Soru işareti taşıyan, soru ekiyle biten ya da soru
+   kalıbıyla başlayan madde ELENİR. Kararsızlıkta eleme. */
+const GUNDEM_SORU_BASI =
+  /^(ne|neden|niçin|nicin|niye|nasıl|nasil|hangi|hangisi|kim|kimler|kimin|kaç|kac|nerede|nereden|nereye|mı|mi|mu|mü)(\s|$)/;
+const GUNDEM_SORU_SONU =
+  /(^|\s)(nedir|nelerdir|kimdir|neresidir|kaçtır|kactir|midir|mıdır|midir|mudur|müdür|mudur|mı|mi|mu|mü|mıdır|musunuz|müsünüz|mısınız|misiniz|mıyım|miyim)\s*[.?!…]*$/;
+function gundemSoruMu(metin: string): string | null {
+  const m = temiz(metin);
+  if (m.includes("?")) return "soru işareti";
+  const k = m.toLocaleLowerCase("tr-TR");
+  if (GUNDEM_SORU_SONU.test(k)) return "soru ekiyle bitiyor";
+  if (GUNDEM_SORU_BASI.test(k)) return "soru kalıbıyla başlıyor";
+  return null;
+}
+
+/* BOŞ FÖY OLMASIN (16.08 dördüncü canlı bulgu — Anadolu Sağlık Hizmetleri föyünde
+   gündem HİÇ üretilmedi, tarafa yalnız tarih-saat kaldı). Model hiçbir başlık
+   üretemediğinde, dosyanın konusu ve tarafın KENDİ anlatımındaki anahtar sözcüklere
+   göre en az 2 usul gündemi kurulur. Bunlar konu ADIDIR; suçlama, hukuki niteleme
+   ya da hesap sorma taşımaz. Dosya karşılığı kuralı burada aranmaz: maddeler
+   modelden değil, korpustaki anahtar sözcükten türer. */
+function yedekGundem(korpus: string): string[] {
+  const k = sade(korpus);
+  const gecer = (...ipuclari: string[]) => ipuclari.some((i) => k.includes(i));
+  const maddeler: string[] = [];
+  if (gecer("tutar", "odeme", "para", "fatura", "gider", "masraf", "ucret", "bedel", "kayb"))
+    maddeler.push("Talep edilen tutarın kalemleri ve hesaplanma biçimi");
+  if (gecer("belge", "rapor", "epikriz", "kayit", "form", "recete", "tahlil", "fatura"))
+    maddeler.push("Eksik belgelerin tamamlanması ve zamanlaması");
+  if (gecer("tedavi", "ameliyat", "hasta", "klinik", "muayene", "saglik", "islem"))
+    maddeler.push("Sürecin tarih sırası ve ilgili kayıtlar");
+  maddeler.push("Oturumda öncelikli ele alınacak başlıkların belirlenmesi");
+  maddeler.push("Beklentiler ve para dışı çözüm seçenekleri");
+  return maddeler.slice(0, 4);
 }
 
 /* MAKİNE ETİKETİ: madde sonuna "(Özel Vita Hastanesi)" gibi taraf etiketi
@@ -347,12 +393,16 @@ MUTLAK SINIRLAR:
 5. Sade Türkçe yaz, hukuk jargonu kullanma. Her madde tek cümle olsun.
 
 SORU YÖNÜ (en önemli kural): Hiçbir madde KİMSEYİ — ne bu tarafı ne karşı tarafı — savunmaya, gerekçe göstermeye ya da hesap vermeye çağırmaz. "Neden …", "yasal dayanağı nedir", "ne anlama gelmektedir", "… neden teslim edilmemiştir", "iddia edilen …" gibi maddeler YAZILMAZ.
-İZİNLİ ÇERÇEVE: yalnız bu tarafın KENDİ talebini, beklentisini, önceliğini ve elindeki bilgiyi netleştiren maddeler — "sizin için hangi başlık önce çözülmeli", "talebinizin kalemleri neler", "hangi gideri hangi belgeyle gösteriyorsunuz", "para dışında bir beklentiniz var mı", "hangi belge ne zaman hazır olabilir", "oturuma kim katılacak ve yetkisi ne".
-HUKUKİ NİTELEME YASAĞI: kusur, ihmal, sorumluluk, malpraktis, haksız fiil, tazminat hakkı, ihlal gibi niteleme kelimeleri KULLANMA. Olgu dili kullan ("tedavi sonrası ortaya çıkan durum", "talep edilen tutar").
+İZİNLİ ÇERÇEVE: yalnız bu tarafın KENDİ talebini, beklentisini, önceliğini ve elindeki bilgiyi netleştiren KONU ADLARI — "talebin kalemleri ve tutarı", "önce çözülmesi istenen başlık", "para dışı beklentiler", "giderleri gösteren belgeler", "belgelerin hazır olma zamanı", "oturuma katılacak kişiler ve yetki durumu".
+HUKUKİ NİTELEME YASAĞI (GÜNDEM BAŞLIKLARINDA DA GEÇERLİDİR): kusur, ihmal, sorumluluk, malpraktis, haksız fiil, tazminat hakkı, ihlal gibi niteleme kelimeleri KULLANMA. Konunun kendisini yazabilirsin ("aydınlatılmış onam sürecine ilişkin görüşler") ama değerlendirme ya da suçlama dili kurma. Olgu dili kullan ("tedavi sonrası ortaya çıkan durum", "talep edilen tutar").
 ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tarafa aittir.
 
 İki bölüm üret:
-· "Oturumda konuşulacak başlıklar": dosyanın konusundan ve bu tarafın kendi anlatımından çıkan, oturumda ele alınması beklenen başlıklar (en çok 6 madde). Örnek çerçeve: talebin kalemleri, hangi başlığın önce çözülmesi, para dışı beklenti, olayların tarih sırası.
+· "Oturumda konuşulacak başlıklar": dosyanın konusundan ve bu tarafın kendi anlatımından çıkan, oturumda ele alınması beklenen başlıklar (en çok 6 madde).
+  GÜNDEM MADDESİ BAŞLIKTIR, SORU DEĞİLDİR. Her madde konuşulacak konunun ADIDIR: kısa isim öbeği yaz. Cümle kurma, soru sorma. Soru işareti kullanma; "nedir / nelerdir / mıdır / mı / mi / mu / mü" ile bitirme; "hangi / ne / neden / nasıl / kim / kaç / nerede" ile başlama.
+  DOĞRU BİÇİM: "Tedavi giderlerinin kalemleri ve toplam tutarı" · "Gelir kaybı talebinin dayanağı ve süresi" · "Ödeme biçimi ve zamanlaması".
+  YANLIŞ BİÇİM: "Hangi başlıklar öncelikli olarak konuşulmalı?" · "Tedavi giderlerinin kalemleri ve toplam tutarı nedir?" · "Gelir kaybı ile ilgili bilginiz nedir?"
+  Örnek çerçeve: talebin kalemleri, önce çözülmesi istenen başlık, para dışı beklenti, olayların tarih sırası.
 · "EKSİK BELGELER": tarafın anlatımında ya da dosyada ADI GEÇEN ama HENÜZ YÜKLENMEMİŞ belgeler (en çok 5 madde). Sana "zaten yüklenmiş belgeler" listesi veriliyor; ORADA OLAN HİÇBİR BELGEYİ YAZMA. Dosya adı yazma; insan diliyle yaz ("ameliyat görüntü kayıtları", "hemşire gözlem formları"). Eksik görünmüyorsa listeyi BOŞ bırak.
 
 Çıktı YALNIZCA JSON: {"basliklar":[""],"eksik_belgeler":[""]}`;
@@ -400,9 +450,13 @@ ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tar
             return kalan;
           };
 
-          // Başlıklar: yasak dil + dosya karşılığı + SORU SINIRI süzgecinden geçer.
+          /* Başlıklar: yasak dil + dosya karşılığı + SORU SINIRI + BAŞLIK BİÇİMİ
+             süzgecinden geçer. Biçim süzgeci en başta çalışır: soru şeklindeki
+             madde gündeme hiç girmez. */
           const basliklar = suz(parsed?.basliklar, "başlık")
             .filter((m) => {
+              const bicimHatasi = gundemSoruMu(m);
+              if (bicimHatasi) { elenen.push(`başlık: gündem maddesi soru olamaz (${bicimHatasi})`); return false; }
               const y = soruYasakMi(m);
               if (y) { elenen.push(`başlık: tarafsızlık sınırı ("${y}")`); return false; }
               const yon = soruYonYasakMi(m);
@@ -475,6 +529,48 @@ ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tar
     }
     ── (c) KAPALI bloğun sonu ───────────────────────────────────────────────── */
 
+    /* ── BOŞ FÖY KORUMASI ───────────────────────────────────────────────────
+       Bir tarafa yalnız tarih-saat taşıyan föy gitmemeli. Model hiç başlık
+       üretemediyse (ya da hepsi elendiyse), tarafın KENDİ anlatımı ve dosyanın
+       konusu üzerinden en az 2 usul gündemi kurulur. Karşı tarafın verisi bu
+       yola da girmez — yedek gündem yalnız `korpus` üzerinden türer. */
+    let yedekGundemKullanildi = false;
+    const gundemBolumu = bolumler.find((b) => b.baslik === "Oturumda konuşulacak başlıklar");
+    if (!gundemBolumu || gundemBolumu.maddeler.length === 0) {
+      const yedek = korpus.trim().length > 0
+        ? yedekGundem(korpus).filter((m) => !yasakIfade(m) && !hukukiNitelemeVarMi(m) && !gundemSoruMu(m))
+        : [];
+      if (yedek.length >= 2) {
+        yedekGundemKullanildi = true;
+        elenen.push("gündem: model çıktısı boş kaldı, dosya konusundan usul gündemi kuruldu");
+        if (gundemBolumu) gundemBolumu.maddeler = yedek;
+        else bolumler.unshift({ baslik: "Oturumda konuşulacak başlıklar", maddeler: yedek });
+      }
+    }
+
+    /* Yine de hiç gündem çıkmadıysa föy 'taslak' kalır ve NEDEN boş kaldığı
+       arabulucunun göreceği bir not olarak yazılır (hangi kaynakta veri yok).
+       Bu not tarafa gönderilmeden önce arabulucu tarafından kaldırılmalıdır. */
+    const gundemVar = bolumler.some(
+      (b) => b.baslik === "Oturumda konuşulacak başlıklar" && b.maddeler.length > 0,
+    );
+    if (!gundemVar) {
+      const eksikKaynaklar = [
+        konu ? null : "dosya konusu boş",
+        beyan ? null : "tarafın kendi anlatımı boş",
+        ozetBlogu ? null : "belge özeti yok",
+        yuklenmisAdlar.length ? null : "yüklenmiş belge yok",
+        istenenler.length ? null : "arabulucu istek kaydı yok",
+      ].filter(Boolean) as string[];
+      bolumler.push({
+        baslik: "Arabulucu notu — gündem üretilemedi",
+        maddeler: [
+          `Gündem kurulamadı. Veri bulunamayan kaynaklar: ${eksikKaynaklar.join(" · ") || "model çıktısı boş"}.`,
+          "Bu not tarafa gönderilmeden önce kaldırılmalı; föy elle tamamlanmalıdır.",
+        ],
+      });
+    }
+
     // ── (d) Oturum bilgileri — KODDAN, kayıttan ────────────────────────────
     const oturumMaddeleri: string[] = [];
     const zaman = temiz((oturum as any).scheduled_at);
@@ -513,12 +609,18 @@ ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tar
 
     await durumYaz(durumAdmin, durumCaseId, durumPartyId, {
       status: "completed", error_message: null,
-      last_output: { sonuc: dolu ? "taslak_hazir" : "bos_taslak", bolum: bolumler.length, elenen: elenen.slice(0, 5) },
+      last_output: {
+        sonuc: dolu ? "taslak_hazir" : "bos_taslak",
+        bolum: bolumler.length,
+        gundem: gundemVar ? (yedekGundemKullanildi ? "yedek" : "model") : "yok",
+        elenen: elenen.slice(0, 5),
+      },
     });
     return json({
       durum: "taslak",
       bolum: bolumler.length,
       bos: !dolu,
+      gundem: gundemVar ? (yedekGundemKullanildi ? "yedek" : "model") : "yok",
       elenen: elenen.slice(0, 5),
     });
   } catch (e: any) {
