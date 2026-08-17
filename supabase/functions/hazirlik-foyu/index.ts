@@ -159,16 +159,26 @@ function hukukiNitelemeVarMi(metin: string): string | null {
   return HUKUKI_NITELEME.find((x) => k.includes(x)) ?? null;
 }
 
-/* GÜNDEM MADDESİ BAŞLIKTIR, SORU DEĞİLDİR (16.08 üçüncü canlı bulgu):
-   Soru bölümü kapatılınca model soruları GÜNDEME taşıdı — "Hangi başlıklar
-   öncelikli olarak konuşulmalı?", "… kalemleri ve toplam tutarı nedir?",
-   "… ile ilgili bilginiz nedir?". Gündem maddesi, oturumda konuşulacak konunun
-   ADIDIR: kısa isim öbeği. Soru işareti taşıyan, soru ekiyle biten ya da soru
-   kalıbıyla başlayan madde ELENİR. Kararsızlıkta eleme. */
+/* ══ GÜNDEM BAŞLIĞI TEK KAPI ═════════════════════════════════════════════════
+   16.08 üçüncü canlı bulgu: soru bölümü kapatılınca model soruları GÜNDEME
+   taşıdı. 16.08 beşinci canlı bulgu: kural konuldu ama YALNIZ model yolunda
+   çalışıyordu — yedek (fallback) gündem ve kısaltma adımı süzgeci atlıyordu,
+   canlıda hâlâ "Uğradığınız gelir kaybının ayrıntıları nelerdir?" gibi maddeler
+   çıktı. Bundan sonra gündem maddesi üreten HER yol `gundemBasligiKur`
+   kapısından geçer; başka yerde biçim düzeltmesi yapılmaz.
+
+   Kapı ELEMEZ, ÇEVİRİR: soru işareti ve soru eki düşürülür, ikinci kişi hitabı
+   nesnelleştirilir ("uğradığınız gelir kaybınız" → "gelir kaybı"). Geriye isim
+   öbeği kalmıyorsa (madde hâlâ cümle/soru ise) o zaman elenir. */
+
 const GUNDEM_SORU_BASI =
-  /^(ne|neden|niçin|nicin|niye|nasıl|nasil|hangi|hangisi|kim|kimler|kimin|kaç|kac|nerede|nereden|nereye|mı|mi|mu|mü)(\s|$)/;
+  /^(ne zaman|ne kadar|ne|neden|niçin|nicin|niye|nasıl|nasil|hangi|hangisi|kim|kimler|kimin|kaç|kac|nerede|nereden|nereye|mı|mi|mu|mü)(\s|$)/i;
 const GUNDEM_SORU_SONU =
-  /(^|\s)(nedir|nelerdir|kimdir|neresidir|kaçtır|kactir|midir|mıdır|midir|mudur|müdür|mudur|mı|mi|mu|mü|mıdır|musunuz|müsünüz|mısınız|misiniz|mıyım|miyim)\s*[.?!…]*$/;
+  /(^|\s)(nedir|nelerdir|kimdir|kimlerdir|neresidir|kaçtır|kactir|midir|mıdır|mudur|müdür|mı|mi|mu|mü|musunuz|müsünüz|mısınız|misiniz|mıyım|miyim)\s*[.?!…]*$/i;
+// Çekimli yüklem: madde isim öbeği değil, cümledir → çevrilemez.
+const GUNDEM_YUKLEM_SONU =
+  /(malıdır|melidir|malı|meli|acaktır|ecektir|acak|ecek|ıyor|iyor|uyor|üyor|mıştır|miştir|muştur|müştür|mıştı|mişti|ılır|ilir|ulur|ülür)\s*$/i;
+
 function gundemSoruMu(metin: string): string | null {
   const m = temiz(metin);
   if (m.includes("?")) return "soru işareti";
@@ -176,6 +186,64 @@ function gundemSoruMu(metin: string): string | null {
   if (GUNDEM_SORU_SONU.test(k)) return "soru ekiyle bitiyor";
   if (GUNDEM_SORU_BASI.test(k)) return "soru kalıbıyla başlıyor";
   return null;
+}
+
+/* İKİNCİ KİŞİ HİTABI — yalnız GÜNDEM başlıklarında uygulanır. "masraflarınızın"
+   → "masraflarının", "talebiniz" → "talebi", baştaki "uğradığınız/yaşadığınız"
+   gibi 2. kişi sıfat-fiilleri tümüyle düşer. Oturum bilgileri ve eksik belge
+   bölümlerine DOKUNULMAZ (orada "yanınızda bulundurun" dili doğrudur). */
+const IYELIK_DEVAM: Record<string, string> = { "ınız": "ın", "iniz": "in", "unuz": "un", "ünüz": "ün" };
+const IYELIK_SON: Record<string, string> = { "ınız": "ı", "iniz": "i", "unuz": "u", "ünüz": "ü" };
+function ikinciKisiTemizle(metin: string): string {
+  let m = temiz(metin);
+  /* Kalıp eşlemesi önce çalışır: "sizin adınıza" → "taraf adına". Genel ek
+     kuralına bırakılırsa "adınıza" → "adına" olup başındaki "sizin" tek başına
+     kalıyor ve cümle bozuluyordu. */
+  m = m.replace(/(?<![\p{L}])(sizin\s+)?adınıza(?![\p{L}])/giu, "taraf adına");
+  m = m.replace(/^(sizin|size|siz)\s+/iu, "");
+  // baştaki "uğradığınız / yaşadığınız / talep ettiğiniz" → düşer
+  m = m.replace(/^\S*(dığınız|diğiniz|duğunuz|düğünüz|tığınız|tiğiniz|tuğunuz|tüğünüz)\s+/iu, "");
+  // ek devam ediyorsa iyelik tekilleşir, kelime sonundaysa 3. kişiye döner
+  m = m.replace(/(ınız|iniz|unuz|ünüz)(?=[a-zçğıöşü])/gu, (e) => IYELIK_DEVAM[e] ?? e);
+  m = m.replace(/(ınız|iniz|unuz|ünüz)(?![a-zçğıöşü])/gu, (e) => IYELIK_SON[e] ?? e);
+  return m.replace(/\s+/g, " ").trim();
+}
+
+/* TEK KAPI: gündem maddesi üreten her yol burayı çağırır. Çevrilemeyen madde
+   için null döner (çağıran taraf eler ve sebebini `elenen` listesine yazar). */
+function gundemBasligiKur(ham: string): string | null {
+  let m = makineEtiketiniKirp(temiz(ham));
+  if (!m) return null;
+
+  // 1) soru işareti ve sondaki noktalama düşer
+  m = m.replace(/[?？]/g, " ").replace(/\s+/g, " ").trim();
+  m = m.replace(/[.!…]+\s*$/u, "").trim();
+
+  // 2) sondaki soru ekleri düşer (üst üste gelebilir: "… nedir ?")
+  for (let i = 0; i < 3; i++) {
+    const yeni = m.replace(GUNDEM_SORU_SONU, "").replace(/\s+/g, " ").trim();
+    if (yeni === m) break;
+    m = yeni;
+  }
+
+  // 3) ikinci kişi hitabı nesnelleşir
+  m = ikinciKisiTemizle(m);
+
+  // 4) baştaki soru kelimesi düşer ("Hangi belgeler …" → "belgeler …")
+  const bas = m.toLocaleLowerCase("tr-TR").match(GUNDEM_SORU_BASI);
+  if (bas) m = m.slice(bas[0].length).trim();
+
+  if (!m) return null;
+
+  // 5) geriye cümle ya da hâlâ soru kalıyorsa çevrilemez → elenir
+  const k = m.toLocaleLowerCase("tr-TR");
+  if (GUNDEM_YUKLEM_SONU.test(k)) return null;
+  if (gundemSoruMu(m)) return null;
+  if (m.length < 10) return null;
+
+  // 6) ilk harf büyür, madde kırpılır
+  m = m.charAt(0).toLocaleUpperCase("tr-TR") + m.slice(1);
+  return m.slice(0, 300);
 }
 
 /* BOŞ FÖY OLMASIN (16.08 dördüncü canlı bulgu — Anadolu Sağlık Hizmetleri föyünde
@@ -450,13 +518,18 @@ ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tar
             return kalan;
           };
 
-          /* Başlıklar: yasak dil + dosya karşılığı + SORU SINIRI + BAŞLIK BİÇİMİ
-             süzgecinden geçer. Biçim süzgeci en başta çalışır: soru şeklindeki
-             madde gündeme hiç girmez. */
+          /* Başlıklar: yasak dil + dosya karşılığı süzgecinden geçer, sonra TEK
+             KAPI'dan (gundemBasligiKur) çevrilir — soru biçimi başlığa döner,
+             dönmezse elenir. Tarafsızlık ve yön sınırları ÇEVRİLMİŞ metne
+             uygulanır ki kapının ürettiği son hâl de denetlensin. */
           const basliklar = suz(parsed?.basliklar, "başlık")
+            .map((m) => {
+              const baslik = gundemBasligiKur(m);
+              if (!baslik) elenen.push("başlık: soru biçimi başlığa çevrilemedi");
+              return baslik;
+            })
+            .filter((m): m is string => !!m)
             .filter((m) => {
-              const bicimHatasi = gundemSoruMu(m);
-              if (bicimHatasi) { elenen.push(`başlık: gündem maddesi soru olamaz (${bicimHatasi})`); return false; }
               const y = soruYasakMi(m);
               if (y) { elenen.push(`başlık: tarafsızlık sınırı ("${y}")`); return false; }
               const yon = soruYonYasakMi(m);
@@ -537,8 +610,14 @@ ETİKET YASAĞI: madde sonuna "(Taraf Adı)" gibi etiket yazma; föy zaten o tar
     let yedekGundemKullanildi = false;
     const gundemBolumu = bolumler.find((b) => b.baslik === "Oturumda konuşulacak başlıklar");
     if (!gundemBolumu || gundemBolumu.maddeler.length === 0) {
+      /* Yedek maddeler de TEK KAPI'dan geçer — elle yazılmış olsalar bile biçim
+         denetimi tek yerden yapılsın (16.08 beşinci bulgu: bu yol süzgeci
+         atlıyordu). */
       const yedek = korpus.trim().length > 0
-        ? yedekGundem(korpus).filter((m) => !yasakIfade(m) && !hukukiNitelemeVarMi(m) && !gundemSoruMu(m))
+        ? yedekGundem(korpus)
+          .map((m) => gundemBasligiKur(m))
+          .filter((m): m is string => !!m)
+          .filter((m) => !yasakIfade(m) && !hukukiNitelemeVarMi(m))
         : [];
       if (yedek.length >= 2) {
         yedekGundemKullanildi = true;
