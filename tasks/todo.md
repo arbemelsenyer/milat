@@ -1,3 +1,45 @@
+### Z RAPORU — 17.08.2026 (gün kapandı)
+Kurucu 18.08'de çalışmayacak; 19.08'de devam edilecek.
+
+BUGÜN CANLIYA ALINAN
+- Hazırlık föyü kendi bölümü olarak Aşama 4'ün en üstüne taşındı + solda kendi menü
+  girdisi (faz4-hazirlik-foyu). Kokpitteki kopya yerinde kaldı. (adfcfe5)
+- Föy paneli oturumu kademeli buluyor: gelecek → geçmişteki en son → tarihsiz taslak.
+  Oturum tarihi geçince föyler kaybolmuyor.
+- Föy metin kuralları: saat Türkiye saatiyle yazılıyor (FOY_SAAT_DILIMI) · gündem
+  başlıkları tek tip · tutum bildiren madde eleniyor · belge bölümü her föyde var ·
+  ad boşlukları temizleniyor. (b22ce0e)
+- Föy artık tamamen ücretsiz — model çağrısı kaldırıldı, gündem ve belge listesi
+  koddan kuruluyor.
+- Kararlar ve dersler belgelere işlendi. (e07efad, 52b16c3)
+
+GÜNÜN ASIL BULGUSU
+Commit'ler GitHub'a push edilmemişti. Kod doğruydu, redeploy da yapılmıştı; Lovable eski
+dosyayı gördüğü için redeploy eski sürümü yayına alıyordu. `git push origin main`
+(72dc7f0..b22ce0e) sonrası düzeldi. Aynı hata 15.08'de de yaşandı.
+
+YARIM KALAN — 19.08'İN İLK İŞİ
+- hazirlik-foyu redeploy edildi ama föy "Yeniden hazırla" ile yeniden üretilip saatin
+  10:00 göründüğü DOĞRULANMADI. İlk iş bu.
+
+AÇIK KALEMLER
+- Föy düğmesinin yanındaki maliyet işareti (UcretliIsaret) duruyor, oysa föy ücretsiz —
+  yanlış bilgi veriyor.
+- Föy soru bölümü kapalı; sabit soru havuzu bekliyor. Kurucu DOJO adlı yapay zekâ
+  uygulamasına bakacak (HATIRLATILACAK).
+
+İBA DURUMU: 16 bitti · 8 kaldı · 4 ertelendi
+Kalanlar: föy 2. tur (e-posta + taraf ekranı) · iletişim tercihi katmanı · YZ kullanım
+beyanı imzalı onay · her tarafa kendi ajanı · kişisiz istatistik · oturum erteleme
+tutanağı ve bildirimi · denetim izi · oturum dökümü analizi + sessiz canlı kokpit.
+Ertelenenler: taslak denetimi (şablon bekliyor) · vekil ekranı · arabulucu ataması ve
+çıkar çatışması taraması · ayrı taraflılık denetimi (pilot sonrası).
+
+SIRADAKİ İŞ (kurucu onaylı): Föy 2. tur — tek komutta üç parça: onaylanan föyün
+e-postayla tarafa gitmesi (arabulucu "Gönder"e basınca, kendiliğinden değil) + taraf
+ekranında "Oturum hazırlığım" bölümü (tarafın oturum tarihini görememesi sorununu da
+çözer) + maliyet işaretinin kaldırılması.
+
 ## Nerede kaldık — 17.08.2026 (82) · OTURUM HAZIRLIK FÖYÜ — AŞAMA 4'E TAŞINDI
 
 BİTTİ (17.08): Oturum hazırlık föyü 1. tur canlıda (İBA 3.1). Föy kendi bölümü olarak
