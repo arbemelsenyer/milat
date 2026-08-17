@@ -10676,9 +10676,15 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
     ]);
     if (ot.error) setHata(`Oturumlar okunamadı: ${ot.error.message}`);
     const simdi = Date.now();
-    const planli = ((ot.data ?? []) as any[])
-      .filter((o) => String(o.status ?? "") !== "cancelled")
-      .filter((o) => o.scheduled_at && new Date(String(o.scheduled_at)).getTime() > simdi)[0] ?? null;
+    const uygun = ((ot.data ?? []) as any[])
+      .filter((o) => String(o.status ?? "") !== "cancelled");
+    const planli =
+      uygun.filter((o) => o.scheduled_at && new Date(String(o.scheduled_at)).getTime() > simdi)[0]
+      ?? [...uygun]
+          .filter((o) => o.scheduled_at)
+          .sort((a, b) => new Date(String(b.scheduled_at)).getTime() - new Date(String(a.scheduled_at)).getTime())[0]
+      ?? uygun[0]
+      ?? null;
     setOturum(planli);
     setTaraflar((tf.data ?? []) as any[]);
 
@@ -10807,7 +10813,9 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
       ) : (
         <div className="space-y-4">
           <div className="text-xs text-muted-foreground">
-            Oturum: {new Date(String(oturum.scheduled_at)).toLocaleString("tr-TR")}
+            Oturum: {oturum.scheduled_at
+              ? new Date(String(oturum.scheduled_at)).toLocaleString("tr-TR")
+              : "tarih henüz girilmedi (taslak oturum)"}
           </div>
           {taraflar.map((t, i) => {
             const f = foyler[String(t.id)];
