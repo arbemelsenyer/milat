@@ -144,4 +144,14 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   Defteri, Makbuz No sütunu, makbuz numarası yazmanın iki yolu ve makbuz taslağı PDF'i
   zaten vardı. Kart adı farklı olduğu için yok sanıldı. Kural: AD DEĞİL İŞLEV aranacak;
   yeni bölüm komutundan önce ilgili tabloyu kullanan tüm ekranlar taranacak.
+- DERS (17.08.2026) — CLAUDE CODE'UN "YAPTIM" DEMESİ YETMEZ. 3a0f9b5 commitinde
+  kademeli oturum seçimi istendi, commit geldi ama değişiklik dosyaya YAZILMAMIŞTI;
+  ancak adfcfe5'te girdi. Ders: bir değişikliğin dosyada gerçekten durduğu, tahminle
+  değil OKUNARAK doğrulanır (kurucunun bilgisayarındaki C:\Users\ASUS\milat klasöründen
+  dosya okunabilir). Üç satırlık özetin "değişen" satırı istenen değişikliklerin
+  HEPSİNİ saymıyorsa eksik olan doğrulanmadan publish'e geçilmez.
+- DERS (17.08.2026) — EKRANDA BULUNAMAYAN BÖLÜMÜN İLK ŞÜPHELİSİ AŞAMA. Föy düğmeleri
+  "yok" diye üç tur arandı; sebep kodda değildi — bölüm Aşama 3'e kayıtlıydı, dosya ise
+  Aşama 4'te duruyordu, bileşen hiç çizilmiyordu. Ders: "bölüm görünmüyor" denince önce
+  dosyanın current_phase'i ile bölümün kayıtlı olduğu aşama karşılaştırılır.
 

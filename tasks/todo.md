@@ -1,3 +1,20 @@
+## Nerede kaldık — 17.08.2026 (82) · OTURUM HAZIRLIK FÖYÜ — AŞAMA 4'E TAŞINDI
+
+BİTTİ (17.08): Oturum hazırlık föyü 1. tur canlıda (İBA 3.1). Föy kendi bölümü olarak
+Aşama 4 (Toplantı) ekranının en üstünde + sol menüde kendi girdisi (çapa:
+faz4-hazirlik-foyu). Kokpitteki (Aşama 3, RAPOR VE BELGELER) kopya yerinde bırakıldı.
+Föy paneli oturumu kademeli buluyor: gelecekteki en yakın oturum → yoksa geçmişteki en
+son oturum → yoksa tarihi girilmemiş taslak oturum. Commit adfcfe5, publish yapıldı,
+düğmeler (Kaydet · Onayla · Yeniden hazırla) canlıda doğrulandı.
+Föyün üç bölümü: Oturum bilgileri · Oturumda konuşulacak başlıklar (gündem koddan
+kuruluyor) · Yanınızda bulundurmanız iyi olur. 1. turda tarafa gönderim YOK.
+
+SIRADAKİ (föy 2. tur): onaylanan föyün e-postayla tarafa gitmesi + taraf ekranında
+"Oturum hazırlığım" bölümü (tarafın oturum tarihini görememesi sorununu da çözecek).
+
+AÇIK KALEM (değişmedi): föy soru bölümü kapalı — sabit soru havuzu kurulacak, kurucu
+DOJO uygulamasına bakacak.
+
 ## Nerede kaldık — 16.08.2026 GÜN SONU (81)
 
 16.08.2026 GÜN SONU — Bugün 13 kalem canlıya alındı ve doğrulandı: belge yükleme izni ·

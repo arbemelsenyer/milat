@@ -104,6 +104,12 @@ ile doğrulanır.
   onaylı föyler tarafa kapalıdır.
 - 16.08: agent_states_agent_type_check kısıtı genişletildi — izinli listeye
   'hazirlik_foyu' eklendi (toplam 24 ad; mevcut adlar korundu).
+- 17.08: Oturum hazırlık föyleri: iki yerde görünür — (1) Aşama 4 Toplantı ekranı, en
+  üst, id="faz4-hazirlik-foyu", sol menüde kendi girdisi; (2) Aşama 3 kokpit, RAPOR VE
+  BELGELER katmanı, id="kokpit-hazirlik-foyu". İkisi de aynı bileşen: HazirlikFoyuPanel
+  (src/pages/MediationEngine.tsx). Tablo: oturum_hazirlik_foyleri (UNIQUE
+  session_id+party_id). Edge fonksiyon: hazirlik-foyu. Durumlar: taslak / onaylandi /
+  gonderildi / iptal — onaylandi ve gonderildi KİLİTLİ (düğme çıkmaz).
 - (daha önce kurulanlar buraya eklenecek: mediator_reads_offers,
   mediator_writes_discovery, mediator_updates_discovery, ajan_gorevleri politikaları,
   taraf_musaitlik RLS)

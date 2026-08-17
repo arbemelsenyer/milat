@@ -216,3 +216,27 @@ arabulucunun kendi girdiği kayıttır.
   "kokpit-braket" kaydı layer = LAYER_REPORTS ("RAPOR VE BELGELER"). Belgedeki katman
   adı bu kayıtla eşitlendi.
 
+
+[EKLEME 17.08.2026 — OTURUM HAZIRLIK FÖYÜ (İBA 3.1)]
+· Föy İKİ YERDE görünür, ikisi de AYNI bileşendir (HazirlikFoyuPanel,
+  src/pages/MediationEngine.tsx) ve yalnız arabulucu yüzeyindedir:
+  — Aşama 4 (Toplantı) ekranının EN ÜSTÜ, çapa id="faz4-hazirlik-foyu"; sol dizinde
+    kendi girdisi vardır ("Oturum hazırlık föyleri"). Oturum bu aşamada planlandığı
+    için föyün asıl yeri burasıdır.
+  — Aşama 3 (Arabulucu Paneli / kokpit) > RAPOR VE BELGELER katmanı, çapa
+    id="kokpit-hazirlik-foyu". İlk turda kurulan bu kayıt YERİNDE BIRAKILDI; ikinci
+    bir giriş noktasıdır, kopya değil çift çıpadır.
+· KADEMELİ OTURUM SEÇİMİ (17.08 canlı bulgu): panel önce gelecekteki en yakın oturumu
+  arar; yoksa geçmişteki en son oturumu; o da yoksa tarihi henüz girilmemiş taslak
+  oturumu alır. İptal edilmiş (cancelled) oturumlar hiçbir kademeye girmez. Sebep:
+  eski davranış yalnız gelecek tarihli oturumu arıyordu; oturum tarihi geçtiğinde ya da
+  scheduled_at boş bir taslak satırda "Planlanmış oturum yok" deyip veritabanında HAZIR
+  olan taslak föyleri de gizliyordu. Tarihi girilmemiş oturumda ekranda "tarih henüz
+  girilmedi (taslak oturum)" yazar; "Invalid Date" basılmaz.
+· Föyün bölümleri: "Oturum bilgileri" · "Oturumda konuşulacak başlıklar" (gündem koddan
+  kurulur, modele yazdırılmaz) · "Yanınızda bulundurmanız iyi olur". Soru bölümü
+  16.08'de kapatıldı ve kapalıdır.
+· Durumlar: taslak / onaylandi / gonderildi / iptal. onaylandi ve gonderildi KİLİTLİDİR
+  — o satırda düzenleme düğmesi çıkmaz, ajan da üzerine yazmaz.
+· 1. turda tarafa GÖNDERİM YOKTUR; gönderim ve taraf ekranındaki "Oturum hazırlığım"
+  bölümü 2. tura bırakılmıştır.
