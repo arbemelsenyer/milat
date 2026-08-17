@@ -9,8 +9,12 @@ düğmeler (Kaydet · Onayla · Yeniden hazırla) canlıda doğrulandı.
 Föyün üç bölümü: Oturum bilgileri · Oturumda konuşulacak başlıklar (gündem koddan
 kuruluyor) · Yanınızda bulundurmanız iyi olur. 1. turda tarafa gönderim YOK.
 
-SIRADAKİ (föy 2. tur): onaylanan föyün e-postayla tarafa gitmesi + taraf ekranında
-"Oturum hazırlığım" bölümü (tarafın oturum tarihini görememesi sorununu da çözecek).
+AÇIK KALEM (17.08): Kokpitteki ve Aşama 4'teki föy düğmesinin yanında maliyet işareti
+(UcretliIsaret) duruyor, oysa föy artık ücretsiz. Föy 2. turunda kaldırılacak.
+
+SIRADAKİ: Föy 2. tur — onaylanan föyün e-postayla tarafa gitmesi + taraf ekranında
+"Oturum hazırlığım" bölümü (tarafın oturum tarihini görememesi sorununu da çözer) +
+maliyet işaretinin kaldırılması.
 
 AÇIK KALEM (değişmedi): föy soru bölümü kapalı — sabit soru havuzu kurulacak, kurucu
 DOJO uygulamasına bakacak.

@@ -110,6 +110,16 @@ ile doğrulanır.
   (src/pages/MediationEngine.tsx). Tablo: oturum_hazirlik_foyleri (UNIQUE
   session_id+party_id). Edge fonksiyon: hazirlik-foyu. Durumlar: taslak / onaylandi /
   gonderildi / iptal — onaylandi ve gonderildi KİLİTLİ (düğme çıkmaz).
+- 17.08: hazirlik-foyu edge fonksiyonu ARTIK HİÇ ÜCRETLİ ÇAĞRI YAPMIYOR (b22ce0e).
+  Model çağrısı tümüyle kaldırıldı. Gündem başlıkları koddan kuruluyor
+  (GUNDEM_KALIPLARI · BELGE_TURU_KALIPLARI · ASGARI_GUNDEM); "Yanınızda bulundurmanız
+  iyi olur" bölümü tarafın kendi yüklediği belgelerin gerçek adını listeliyor, belge
+  yoksa bilgilendirici tek satır yazılıyor (BELGE_YOK_SATIRI).
+- 17.08: Saat dilimi — FOY_SAAT_DILIMI = "Europe/Istanbul"; scheduled_at UTC saklanır,
+  föye Türkiye saatiyle yazılır (elle saat farkı yok, yaz/kış saati Intl'e bırakıldı).
+- 17.08: Gündem süzgeçleri — gundemBasligiKur (tek kapı) · gundemSoruMu · gundemTutumMu
+  (tarafın tutumunu tespit eden madde elenir) · GUNDEM_YUKLEM_SONU (kapsar/içerir/
+  nasıldır dahil) · bosluklariTekle (ad ve madde boşluk temizliği).
 - (daha önce kurulanlar buraya eklenecek: mediator_reads_offers,
   mediator_writes_discovery, mediator_updates_discovery, ajan_gorevleri politikaları,
   taraf_musaitlik RLS)

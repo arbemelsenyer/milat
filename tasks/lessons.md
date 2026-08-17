@@ -1,6 +1,21 @@
 # tasks/lessons.md — Öğrenilen Dersler
 Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
 
+- DERS (17.08.2026) — "REDEPLOY ETTİM AMA DEĞİŞMEDİ" TEŞHİSİNİN İLK ADIMI PUSH
+  KONTROLÜDÜR. Hazırlık föyünün saat ve gündem düzeltmeleri redeploy edildikten sonra
+  da eski çıktı verdi. Kod doğruydu, redeploy da yapılmıştı. Sebep: commit'ler GitHub'a
+  PUSH EDİLMEMİŞTİ; Lovable eski dosyayı görüyor, redeploy eski sürümü yayına alıyordu.
+  `git push origin main` (72dc7f0..b22ce0e, 51 nesne) sonrası Lovable yeni kodu gördü ve
+  redeploy gerçek değişikliği yayınladı.
+  KESİN TEŞHİS YOLU: Lovable'ın gördüğü dosya ile yerel dosya karşılaştırılır; farklıysa
+  sorun push'tadır. Tahmin edilmez.
+  NOT: Aynı hata 15.08'de de yaşandı. Bundan sonra "değişiklik canlıda görünmüyor"
+  denince sıra: (1) push edildi mi, (2) Lovable dosyayı görüyor mu, (3) redeploy yapıldı
+  mı, (4) publish yapıldı mı, (5) sert yenileme.
+- DERS (17.08.2026) — İŞ KALEMİNDE EN FAZLA İKİ DÜZELTME TURU. Föy metni beş turda
+  düzeltildi; her tur publish + test döngüsü açtı ve asıl işlere sıra gelmedi. Kural:
+  üçüncü tura kalan kusur "açık kalem" olarak yazılır, sıradaki işe geçilir.
+
 - ÇALIŞAN KRİTİK YOL REFAKTÖR EDİLMEZ: UDF refaktörü canlıda belge indirmeyi kırdı. Temizlik/zarafet gerekçesiyle çalışan koda dokunma
 - REDEPLOY UNUTULMAZ: supabase/functions'a dokunan push sonrası Lovable otomatik deploy etmez — her seferinde kurucuya redeploy hatırlat
 - PAKET YASAK: Belge üretimine dokunan değişiklik tek başına gider, başka işle birleştirilmez
