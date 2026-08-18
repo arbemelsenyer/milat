@@ -175,3 +175,16 @@ Gün sonu belge komutuna dahildir.
   gönderir; iletişim tercihi süzgecinden ("belge_talebi", FAIL-OPEN) geçer.
   Taraf yüzeyi: CaseRoom > "Oturum hazırlığım" sekmesi (salt okuma).
   İLK DEPLOY GEREKİR — Lovable'da redeploy edilmeden canlıda yoktur.
+
+[GÜN SONU 18.08.2026 — CANLIDA KURULU OLANLAR]
+- Tablo: public.iletisim_tercihleri — CANLIDA. UNIQUE party_id; 3 RLS politikası.
+  Taraf kendi satırını yazar, görevli arabulucu yalnız okur.
+- Tablo: public.gundem_kalem_havuzu — CANLIDA ama ŞU AN BOŞ (0 kalem). İlk türetme
+  hiçbir kategoride tetiklenmedi; havuz boş olduğu sürece föy gündemi YEDEK yoldan
+  (GUNDEM_KALIPLARI / BELGE_TURU_KALIPLARI / ASGARI_GUNDEM) kuruluyor.
+- Edge fonksiyon: hazirlik-foyu-gonder — CANLIDA (19.08 01:02 canlı test geçti,
+  iki föy de tarafına gönderildi).
+- gonderilsinMi (iletişim tercihi) süzgeci BULUNAN YEDİ FONKSİYON: ajan-nobetci ·
+  cancel-meeting-invite · randevu-teklif · send-meeting-invite ·
+  send-reschedule-notification · send-session-notification · send-session-reminders.
+  (hazirlik-foyu-gonder de aynı süzgeci taşır; yedili liste 1. turun kapsamıdır.)

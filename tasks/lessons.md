@@ -196,3 +196,21 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   duruşmayı kaçırırdı; sessiz kalan hata en pahalı hata türüdür. Kural: bir süzgeç
   kullanıcıya ulaşan bildirimi kesiyorsa varsayılanı DAİMA "gönder" olur ve bu, kodda
   yorumla işaretlenir.
+- DERS (18.08.2026) — LOVABLE'IN "PUBLISH"İ EDGE FONKSİYONU DEPLOY ETMEZ. deploy_project
+  YALNIZ ön yüzü yayınlar; supabase/functions altındaki kod ayrı deploy ister. Yeni bir
+  fonksiyon GitHub'a push edilmekle canlıya girmez — Lovable sohbetinden ayrıca deploy
+  edilmelidir. Kural: fonksiyon dokunulan her turda "publish" ile "redeploy" AYRI iki
+  satır olarak raporlanır; canlı test, fonksiyonun deploy edildiği doğrulanmadan
+  başlatılmaz. (17.08'deki "push edilmemiş commit" dersinin kardeşi: orada kaynak eski
+  kalmıştı, burada yayın kolu hiç çalışmıyor.)
+- DERS (18.08.2026) — "EKRANDA YOK" DEMEDEN ÖNCE HANGİ ROLLE BAKILDIĞI DOĞRULANIR.
+  Arabulucu yüzeyindeki bir bölüm canlıda aranırken taraf hesabıyla bakıldı; ekran
+  doğru çalıştığı hâlde dört tur kod arandı. Kural: bir yüzey görünmüyorsa ilk soru
+  "kod yanlış mı" değil, "bu ekranı hangi rol görür ve şu an hangi rolle bakıyorum"
+  sorusudur; rol doğrulanmadan kodda değişiklik aranmaz.
+- DERS (18.08.2026) — EKRAN METNİ KODA SÖZ VERİYORSA KOD DOĞRULANIR. Sessiz saat
+  açıklaması "ertesi ilk uygun saate bırakılır" diyordu; süzgeç ise bildirimi kuyruğa
+  almayıp atlıyordu. Yanlış taahhüt taraf nezdinde arabulucuyu bağlar — ürün metni
+  hukuki beyan gibi okunur. Kural: davranış vaat eden her cümle (gönderilir, ertelenir,
+  saklanır, silinir) yazıldığı turda kodla karşılaştırılır; karşılığı yoksa cümle
+  gerçeğe göre yazılır, kod cümleye uydurulmaz.

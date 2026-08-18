@@ -599,3 +599,20 @@ arasında hiç almayacağını KENDİ belirler. Tercih taraf düzeyindedir
 · KÖR VERİ (m.1): tercih yalnız o tarafa ve görevli arabulucuya açıktır. Karşı tarafın
   tercihi hiçbir ekrandan, rapordan veya sorgudan görünmez. Arabulucu tercihi yalnız
   GÖRÜR; değiştiremez — bildirim tercihi tarafın kendi kararıdır.
+
+
+[EKLEME 19.08.2026 — DURUM GÜNCELLEMESİ: İBA 1.5 ve İBA 3.3 CANLIDA]
+● CANLI · İBA 1.5 — İLETİŞİM TERCİHİ KATMANI (1. tur). Yukarıdaki 18.08 kaydı canlıda
+  doğrulandı: taraf ekranı yazıyor/okuyor, yedi gönderim yolu ortak gonderilsinMi
+  süzgecinden geçiyor, süzgeç FAIL-OPEN. Sessiz saat açıklaması gerçek davranışla
+  hizalandı (erteleme vaadi kaldırıldı; kuyruk hâlâ kurulmadı, 2. turda).
+  NOT: Bu satır TERCİH KATMANI içindir. Aynı İBA numarasını taşıyan "İLETİŞİMDE
+  DEĞİŞİM (İBA 1.5 / A4)" analiz kolu AYRI yetenektir; onun durumu değişmedi,
+  "● KODDA (canlı test bekliyor)" olarak duruyor.
+● CANLI · İBA 3.3 — OTURUM HAZIRLIK FÖYÜ 2. TUR (gönderim + taraf ekranı).
+  Onaylanan föy, arabulucunun Gönder düğmesiyle yalnız kendi tarafına e-postayla
+  gidiyor (hazirlik-foyu-gonder); taraf "Oturum hazırlığım" sekmesinden aynı metni
+  ve oturumun tarih-saatini görüyor. 19.08 01:02 canlı testinde iki föy de gönderildi.
+  Kokpitteki mükerrer föy kaydı kaldırıldı; föyün tek yeri Aşama 4'ün en üstü.
+  EKSİK (açık kalem): gönderimin TESLİM KAYDI yok — servis dönüş kimliği ve teslim
+  durumu hiçbir yere yazılmıyor; İBA denetim izi maddesiyle aynı iştir.

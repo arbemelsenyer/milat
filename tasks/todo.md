@@ -1,3 +1,27 @@
+### Z RAPORU — 18.08.2026 (gün kapandı)
+
+## Nerede kaldık — 18.08.2026 (87) · GÜN SONU
+
+BİTTİ (canlıda):
+- [x] Föy gündemi bilgi tabanına bağlandı — gundem_kalem_havuzu (c8e3b5c9)
+- [x] İletişim tercihi katmanı İBA 1.5 1. tur — taraf ekranı + yedi fonksiyonda ortak
+      gonderilsinMi süzgeci, fail-open (7176d5af)
+- [x] Sessiz saat açıklaması gerçek davranışla hizalandı (8b981674)
+- [x] Föy 2. tur İBA 3.3 — hazirlik-foyu-gonder + "Oturum hazırlığım" sekmesi
+      (ad57757). Canlı test 19.08 01:02'de geçti, iki föy de gönderildi.
+- [x] Kokpitteki mükerrer föy kaydı kaldırıldı (5a87fc3)
+
+SIRADAKİ İŞ: föy gönderiminde teslim kaydı + ajan-nobetci doğrulaması +
+"Onayla ve gönder" tek düğme.
+
+AÇIK KALEMLER (18.08 sonu):
+- Föy gönderiminde teslim kaydı yok (servis dönüş kimliği ve teslim durumu hiçbir yere
+  yazılmıyor) — İBA denetim izi maddesiyle aynı iş.
+- gundem_kalem_havuzu boş, ilk türetme tetiklenmedi.
+- Föy soru bölümü için sabit soru havuzu (DOJO incelemesi kurucuda).
+- Saklama süreleri 10 kategoride belirsiz.
+- Lovable'da 2 güvenlik bulgusu ve "Build unsuccessful" uyarıları incelenmedi.
+
 ### Z RAPORU — 17.08.2026 (gün kapandı)
 Kurucu 18.08'de çalışmayacak; 19.08'de devam edilecek.
 
