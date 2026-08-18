@@ -252,3 +252,21 @@ arabulucunun kendi girdiği kayıttır.
   "İletişim tercihi: yalnız önemli adımlarda (sessiz: 22:00–08:00)". Tercih kaydı
   yoksa satır HİÇ ÇİZİLMEZ (boş etiket gösterilmez).
 · Arabuluculuk yüzeyinde bu tercihi değiştiren hiçbir denetim yoktur ve eklenmeyecektir.
+
+
+[EKLEME 18.08.2026 — FÖY GÖNDERİMİ VE "OTURUM HAZIRLIĞIM" (İBA 3.1, 2. tur)]
+● CANLI. Yukarıdaki 17.08 kaydının son maddesi ("1. turda tarafa GÖNDERİM YOKTUR")
+  bu turda karşılandı; o satır tarihsel kayıt olarak yerinde bırakıldı.
+· ARABULUCU YÜZEYİ: HazirlikFoyuPanel'e DÖRDÜNCÜ düğme eklendi — "Gönder".
+  Kaydet · Onayla · Yeniden hazırla üçlüsüne DOKUNULMADI, sırası bozulmadı; Gönder
+  onların yanına eklendi. Düğme YALNIZ durum='onaylandi' iken çıkar; taslakta
+  görünmez, gönderildikten sonra yerini "Gönderildi — <tarih saat>" satırı alır.
+  Panelin giriş cümlesindeki "Bu adımda tarafa hiçbir şey gönderilmez" ifadesi
+  gerçeğe uyduruldu: gönderim arabulucunun elidir, kendiliğinden olmaz.
+· TARAF YÜZEYİ: CaseRoom > taraf görünümü > yeni "Oturum hazırlığım" sekmesi,
+  mevcut sekmelerin SONUNA eklendi; hiçbiri taşınmadı, adlandırılmadı, silinmedi.
+  Salt okumadır — düğme, alan, kaydetme yoktur. Oturumun tarihi VE saati
+  (Europe/Istanbul) föyün üç bölümüyle birlikte görünür; bu, tarafın oturum
+  tarihini görememesi sorununu da kapatır. Föy yoksa sakin boş durum yazar.
+· GİZLİLİK: taraf yalnız kendi gönderilmiş föyünü görür (RLS + sorguda aynı iki
+  şart). Karşı tarafın föyü, adı, beyanı ya da belgesi bu ekrana girmez.

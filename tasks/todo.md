@@ -40,6 +40,30 @@ e-postayla tarafa gitmesi (arabulucu "Gönder"e basınca, kendiliğinden değil)
 ekranında "Oturum hazırlığım" bölümü (tarafın oturum tarihini görememesi sorununu da
 çözer) + maliyet işaretinin kaldırılması.
 
+## Nerede kaldık — 18.08.2026 (85) · OTURUM HAZIRLIK FÖYÜ — 2. TUR (GÖNDERİM + TARAF EKRANI)
+
+BİTTİ (18.08):
+- [x] Yeni edge fonksiyon `hazirlik-foyu-gonder`: onaylanan föyü YALNIZ kendi tarafına
+      e-postayla gönderiyor (cc/bcc yok), metni üretmiyor — `bolumler` alanı birebir
+      gidiyor. 'onaylandi' değilse göndermiyor; 'gonderildi' ise ikinci kez göndermiyor.
+      Yetki: dosyanın görevli arabulucusu (ve yönetici), değilse 403.
+- [x] Gönderim ortak iletişim tercihi süzgecinden geçiyor (tür "belge_talebi"),
+      FAIL-OPEN korundu. Süzgeç "gönderme" derse durum DEĞİŞMİYOR, sebep dönüyor.
+- [x] Başarılı gönderimde durum='gonderildi', gonderim_zamani=now().
+- [x] Arabulucu paneline dördüncü düğme "Gönder" (yalnız durum='onaylandi' iken).
+      Kaydet · Onayla · Yeniden hazırla üçlüsüne dokunulmadı. Gönderilmiş föyde
+      düğme yerine "Gönderildi — <tarih saat>" yazıyor.
+- [x] Panelin yanlış giriş cümlesi ("tarafa hiçbir şey gönderilmez") düzeltildi.
+- [x] Taraf ekranına "Oturum hazırlığım" sekmesi (salt okuma): oturum tarihi VE saati
+      (Europe/Istanbul) + föyün bölümleri. Föy yoksa sakin boş durum.
+
+YAPILMADI (bilerek): sessiz saat erteleme kuyruğu · haftalık özet e-postası ·
+föy soru bölümü (sabit soru havuzu bekliyor) · maliyet işaretinin kaldırılması.
+
+SIRADA (19.08'in ilk işi): Lovable'da `hazirlik-foyu-gonder` İLK DEPLOY (yeni fonksiyon,
+GitHub push'u kendiliğinden deploy ETMEZ) + publish; sonra canlı test — föy onayla,
+Gönder'e bas, tarafın gelen kutusunu ve taraf ekranındaki sekmeyi doğrula.
+
 ## Nerede kaldık — 18.08.2026 (84) · İLETİŞİM TERCİHİ KATMANI (İBA 1.5) — 1. TUR
 
 BİTTİ (18.08): Taraf, süreçle ilgili bildirimleri hangi sıklıkta alacağını ve sessiz

@@ -703,6 +703,7 @@ export default function CaseRoom() {
           <TabsTrigger value="braket" className={tabTriggerAccentClass}><EyeOff className="h-4 w-4 mr-1" />Kabul Aralığım</TabsTrigger>
           <TabsTrigger value="ajanim" className={tabTriggerAccentClass}><Bot className="h-4 w-4 mr-1" />Ajanım</TabsTrigger>
           <TabsTrigger value="agents" className={tabTriggerAccentClass}><Bot className="h-4 w-4 mr-1" />AI Aktivitelerim</TabsTrigger>
+          <TabsTrigger value="hazirligim" className={tabTriggerAccentClass}><FileText className="h-4 w-4 mr-1" />Oturum hazırlığım</TabsTrigger>
         </TabsList>
 
         <TabsContent value="braket">
@@ -726,6 +727,12 @@ export default function CaseRoom() {
         <TabsContent value="iletisim">
           {myParty?.id
             ? <IletisimTercihlerim caseId={caseId!} partyId={myParty.id} />
+            : <Card className="p-5"><p className="text-sm text-muted-foreground">Taraf kaydınız bulunamadı.</p></Card>}
+        </TabsContent>
+
+        <TabsContent value="hazirligim">
+          {myParty?.id
+            ? <OturumHazirligim caseId={caseId!} partyId={myParty.id} />
             : <Card className="p-5"><p className="text-sm text-muted-foreground">Taraf kaydınız bulunamadı.</p></Card>}
         </TabsContent>
 
@@ -1861,6 +1868,136 @@ function IletisimTercihlerim({ caseId, partyId }: { caseId: string; partyId: str
             </p>
           </div>
         </>
+      )}
+    </Card>
+  );
+}
+
+/* ====== OTURUM HAZIRLIĞIM (İBA 3.1 — 2. tur) · yalnız taraf, SALT OKUMA ======
+   Taraf burada yalnız KENDİ föyünü görür. RLS ("Taraf yalniz gonderilmis kendi
+   foyunu gorur") zaten durum='gonderildi' + kendi party_id'si dışına çıkmaya izin
+   vermez; sorguda da aynı iki şart ayrıca yazılıdır (savunma iki katmanda).
+   Karşı tarafın föyü, adı, beyanı ve belgesi bu ekrana HİÇBİR YOLDAN girmez.
+   Bu ekranda değiştirilebilir hiçbir alan yoktur — düğme, kutu, kaydetme yok. */
+type HazirlikBolum = { baslik?: string | null; maddeler?: unknown };
+
+function OturumHazirligim({ caseId, partyId }: { caseId: string; partyId: string }) {
+  const [foy, setFoy] = useState<any | null>(null);
+  const [oturumZamani, setOturumZamani] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [hata, setHata] = useState<string | null>(null);
+
+  useEffect(() => {
+    let iptal = false;
+    (async () => {
+      setLoading(true);
+      setHata(null);
+      const { data, error } = await (supabase.from("oturum_hazirlik_foyleri" as any) as any)
+        .select("id, session_id, bolumler, durum, gonderim_zamani")
+        .eq("case_id", caseId)
+        .eq("party_id", partyId)
+        .eq("durum", "gonderildi")
+        .order("gonderim_zamani", { ascending: false })
+        .limit(1);
+      if (iptal) return;
+      if (error) {
+        setHata(`Hazırlık föyü okunamadı: ${error.message}`);
+        setFoy(null);
+        setLoading(false);
+        return;
+      }
+      const satir = Array.isArray(data) && data.length ? data[0] : null;
+      setFoy(satir);
+      if (satir?.session_id) {
+        const { data: ot } = await supabase.from("case_sessions")
+          .select("scheduled_at").eq("id", String(satir.session_id)).maybeSingle();
+        if (!iptal) setOturumZamani((ot as any)?.scheduled_at ?? null);
+      } else {
+        setOturumZamani(null);
+      }
+      setLoading(false);
+    })();
+    return () => { iptal = true; };
+  }, [caseId, partyId]);
+
+  // Tarih ve saat DAİMA Europe/Istanbul ile gösterilir (elle saat farkı eklenmez).
+  const zaman = (() => {
+    if (!oturumZamani) return null;
+    const d = new Date(String(oturumZamani));
+    if (isNaN(d.getTime())) return null;
+    return {
+      tarih: d.toLocaleDateString("tr-TR", {
+        timeZone: "Europe/Istanbul", weekday: "long", day: "2-digit", month: "long", year: "numeric",
+      }),
+      saat: d.toLocaleTimeString("tr-TR", {
+        timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit", hour12: false,
+      }),
+    };
+  })();
+
+  const bolumler: HazirlikBolum[] = Array.isArray(foy?.bolumler) ? foy.bolumler : [];
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div>
+        <h3 className="font-semibold">Oturum hazırlığım</h3>
+        <p className="text-sm text-muted-foreground">
+          Arabulucunuzun sizin için hazırlayıp onayladığı hazırlık föyü. Yalnız siz görürsünüz;
+          karşı tarafa açılmaz. Bu föy hazırlık amaçlıdır, hukuki tavsiye değildir.
+        </p>
+      </div>
+
+      {hata && (
+        <div className="text-sm rounded border border-destructive/40 bg-destructive/10 text-destructive p-3">
+          {hata}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Okunuyor…
+        </div>
+      ) : !foy ? (
+        <p className="text-sm text-muted-foreground">
+          Arabulucunuz oturum hazırlığınızı gönderdiğinde burada görünecek.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {zaman && (
+            <div className="rounded border bg-muted/40 p-3">
+              <div className="text-xs text-muted-foreground">Oturum</div>
+              <div className="font-medium">{zaman.tarih}</div>
+              <div className="text-sm text-muted-foreground">Saat {zaman.saat}</div>
+            </div>
+          )}
+
+          {bolumler.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Föy içeriği boş görünüyor.</p>
+          ) : (
+            bolumler.map((b, i) => {
+              const maddeler = Array.isArray(b?.maddeler)
+                ? (b.maddeler as unknown[]).map((m) => String(m ?? "").trim()).filter(Boolean)
+                : [];
+              if (!b?.baslik && maddeler.length === 0) return null;
+              return (
+                <div key={i} className="space-y-1">
+                  {b?.baslik && <div className="font-medium text-sm">{b.baslik}</div>}
+                  {maddeler.length > 0 && (
+                    <ul className="list-disc pl-5 text-sm space-y-1">
+                      {maddeler.map((m, j) => <li key={j}>{m}</li>)}
+                    </ul>
+                  )}
+                </div>
+              );
+            })
+          )}
+
+          {foy.gonderim_zamani && (
+            <p className="text-[11px] text-muted-foreground">
+              Gönderildi — {new Date(String(foy.gonderim_zamani)).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}
+            </p>
+          )}
+        </div>
       )}
     </Card>
   );

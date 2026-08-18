@@ -778,3 +778,17 @@ atlanıp sebebi kaydediliyor. Haftalık özet e-postasının kendisi yazılmadı
 REDEPLOY GEREKLİ: ajan-nobetci · send-meeting-invite · cancel-meeting-invite ·
 send-session-reminders · send-reschedule-notification · send-session-notification ·
 randevu-teklif. PUBLISH: evet. SQL: yok — tablo kurucu tarafından canlıya alınmıştı.
+
+18.08.2026 — OTURUM HAZIRLIK FÖYÜ 2. TUR (İBA 3.1): GÖNDERİM + TARAF EKRANI.
+Yeni edge fonksiyon hazirlik-foyu-gonder yazıldı: yalnız dosyanın görevli
+arabulucusu (ve yönetici) çağırabiliyor; föy 'onaylandi' değilse gönderilmiyor,
+'gonderildi' ise ikinci kez gönderilmiyor. Alıcı YALNIZ o föyün party_id'sine ait
+tarafın adresi — cc/bcc yok. Metin onaylanan `bolumler` alanından birebir gidiyor,
+model çağrılmıyor. Gönderim ortak iletişim tercihi süzgecinden ("belge_talebi")
+geçiyor ve süzgeç FAIL-OPEN kaldı; süzgeç "gönderme" derse durum DEĞİŞMİYOR,
+sebep arabulucuya yazılıyor. Başarılıysa durum='gonderildi', gonderim_zamani=now().
+Arabulucu panelinde dördüncü düğme "Gönder" (yalnız onaylanmış föyde), taraf
+ekranında yeni "Oturum hazırlığım" sekmesi (salt okuma, oturum tarihi + saati
+Europe/Istanbul). Sessiz saat erteleme kuyruğu hâlâ 2. turda değil — kurulmadı.
+REDEPLOY GEREKLİ: hazirlik-foyu-gonder (YENİ fonksiyon, ilk deploy). PUBLISH: evet.
+SQL: yok — tablo ve RLS politikaları zaten canlıda.

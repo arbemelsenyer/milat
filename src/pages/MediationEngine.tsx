@@ -10711,8 +10711,10 @@ function UsulEngeliPanel({ caseRow }: { caseRow: CaseRow }) {
 }
 
 /* ====== OTURUM HAZIRLIK FÖYLERİ (İBA 3.1) — yalnız arabulucu ===============
-   1. TUR: föy YALNIZ hazırlanır ve onaylanır; TARAFA HİÇBİR ŞEY GÖNDERİLMEZ.
-   Gönderim düğmesi bilerek konulmadı — sonraki turda açılacak.
+   Föy hazırlanır, onaylanır ve ONAYDAN SONRA elle gönderilir. Gönderim
+   KENDİLİĞİNDEN OLMAZ: 'onaylandi' durumundaki föyde çıkan Gönder düğmesine
+   arabulucu basar (constitution m.3 — insan kapısı). Gönderim tek tarafa gider
+   (hazirlik-foyu-gonder); çift gönderim sunucuda kapalıdır.
    Onaylanan föyü ajan değiştiremez (fonksiyon 'onaylandi'/'gonderildi' satırın
    üzerine yazmaz). Düzenleme ve onay yalnız arabulucudadır (constitution m.3). */
 type FoyBolum = { baslik: string; maddeler: string[] };
@@ -10741,6 +10743,7 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
   const [yukleniyor, setYukleniyor] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [hata, setHata] = useState<string | null>(null);
+  const [bilgi, setBilgi] = useState<string | null>(null);
 
   const yukle = useCallback(async () => {
     setYukleniyor(true);
@@ -10836,6 +10839,54 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
     setBusy(null);
   }
 
+  /* GÖNDER — yalnız onaylanmış föy için. Metin burada yeniden üretilmez; sunucu
+     onaylanan `bolumler` alanını olduğu gibi tek tarafa yollar ve satırı
+     'gonderildi' işaretler. Çift gönderim sunucuda kapalıdır. */
+  async function foyGonder(partyId: string) {
+    const f = foyler[partyId];
+    if (!f) return;
+    setBusy(`gonder:${partyId}`);
+    setHata(null);
+    setBilgi(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("hazirlik-foyu-gonder", {
+        body: { foy_id: f.id },
+      });
+      if (error) {
+        // Gerçek sebep .context gövdesindedir; sessizce yutulmaz.
+        let ham = String((error as any)?.message ?? "bilinmeyen hata");
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.text === "function") {
+          try {
+            const govde = await ctx.text();
+            if (govde) {
+              try { const j = JSON.parse(govde); ham = String(j?.error ?? j?.sebep ?? govde); }
+              catch { ham = String(govde).slice(0, 400); }
+            }
+          } catch { /* gövde okunamadı */ }
+        }
+        throw new Error(ham);
+      }
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+      if ((data as any)?.gonderildi) {
+        setBilgi(
+          (data as any)?.durum_yazilamadi
+            ? String((data as any).sebep ?? "E-posta gönderildi, durum güncellenemedi.")
+            : "Föy tarafa e-postayla gönderildi.",
+        );
+      } else {
+        // Süzgeç ya da "zaten gönderildi": durum değişmedi, sebebi ekranda durur.
+        setBilgi(`Gönderilmedi — ${String((data as any)?.sebep ?? "sebep bildirilmedi")}`);
+      }
+      await yukle();
+    } catch (e: any) {
+      console.error("[hazirlik-foyu-gonder] çağrı başarısız", e);
+      setHata(`Föy gönderilemedi: ${trErr(e?.message ?? "bilinmeyen hata")}`);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function foyHazirla(partyId: string) {
     if (!oturum) return;
     setBusy(`hazirla:${partyId}`);
@@ -10874,13 +10925,18 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
       <p className="text-sm text-muted-foreground leading-snug">
         Her taraf için AYRI föy hazırlanır ve yalnız o tarafın kendi verisi kullanılır; karşı tarafın
         beyanı, belgesi ve analizi föye girmez. Föy hukuki tavsiye içermez, sonuç tahmini yapmaz.
-        Bu adımda tarafa hiçbir şey gönderilmez — metni siz onaylarsınız.
+        Föy kendiliğinden gönderilmez: metni siz onaylarsınız, tarafa ancak Gönder düğmesine
+        bastığınızda e-postayla gider.
       </p>
 
       {hata && (
         <div className="text-sm rounded border border-destructive/40 bg-destructive/10 text-destructive p-3">
           {hata}
         </div>
+      )}
+
+      {bilgi && (
+        <div className="text-sm rounded border bg-muted/40 p-3">{bilgi}</div>
       )}
 
       {yukleniyor ? (
@@ -10961,10 +11017,29 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
                       <UcretliIsaret metin="Bu tür için ilk hazırlıkta bir kez yapay zekâ çağrısı yapılabilir; sonraki föyler ücretsizdir." />
                     </div>
                   )}
+                  {/* GÖNDER: yalnız onaylanmış föyde çıkar. Taslakta görünmez,
+                      gönderildikten sonra yerini gönderim zamanı yazısı alır. */}
+                  {f && durum === "onaylandi" && (
+                    <Button size="sm" variant="secondary" className={KART_DUGME}
+                      disabled={busy === `gonder:${t.id}`} onClick={() => foyGonder(String(t.id))}>
+                      {busy === `gonder:${t.id}`
+                        ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Gönderiliyor…</>
+                        : <><Mail className="h-4 w-4 mr-1" /> Gönder</>}
+                    </Button>
+                  )}
                 </div>
 
-                {kilitli && (
-                  <p className="text-[11px] text-muted-foreground">Gönderim sonraki adımda açılacak.</p>
+                {durum === "onaylandi" && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Onaylandı. Tarafa gitmesi için Gönder düğmesine basın — kendiliğinden gönderilmez.
+                  </p>
+                )}
+                {durum === "gonderildi" && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Gönderildi{f?.gonderim_zamani
+                      ? ` — ${new Date(String(f.gonderim_zamani)).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}`
+                      : ""}
+                  </p>
                 )}
               </div>
             );

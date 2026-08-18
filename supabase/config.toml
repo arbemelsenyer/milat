@@ -142,3 +142,6 @@ verify_jwt = true
 
 [functions.hazirlik-foyu]
 verify_jwt = true
+
+[functions.hazirlik-foyu-gonder]
+verify_jwt = true
