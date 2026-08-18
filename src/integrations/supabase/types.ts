@@ -1788,6 +1788,39 @@ export type Database = {
           },
         ]
       }
+      gundem_kalem_havuzu: {
+        Row: {
+          baslik: string
+          created_at: string
+          durum: string
+          id: string
+          ipuclari: string[]
+          kategori: string
+          kaynak_alinti: string | null
+          kaynak_source_title: string | null
+        }
+        Insert: {
+          baslik: string
+          created_at?: string
+          durum?: string
+          id?: string
+          ipuclari?: string[]
+          kategori: string
+          kaynak_alinti?: string | null
+          kaynak_source_title?: string | null
+        }
+        Update: {
+          baslik?: string
+          created_at?: string
+          durum?: string
+          id?: string
+          ipuclari?: string[]
+          kategori?: string
+          kaynak_alinti?: string | null
+          kaynak_source_title?: string | null
+        }
+        Relationships: []
+      }
       iletisim_degisim: {
         Row: {
           alinti_ilk: string
