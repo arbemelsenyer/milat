@@ -1819,7 +1819,7 @@ function IletisimTercihlerim({ caseId, partyId }: { caseId: string; partyId: str
               <Switch id="sessiz-anahtar" checked={sessizAcik} onCheckedChange={setSessizAcik} />
             </div>
             <p className="text-xs text-muted-foreground">
-              Bu saatler arasında bildirim gönderilmez, ertesi ilk uygun saate bırakılır.
+              Bu saatler arasında acil olmayan bildirimler gönderilmez ve sonradan tekrar gönderilmez; gelişmeleri dosya ekranınızdan her zaman görebilirsiniz. Oturum daveti ile oturum değişikliği bildirimleri, kaçırmamanız için sessiz saatlerde de gönderilir.
             </p>
             {sessizAcik && (
               <div className="flex items-center gap-2 pt-1">
