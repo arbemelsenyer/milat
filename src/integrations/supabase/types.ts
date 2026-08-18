@@ -1894,6 +1894,64 @@ export type Database = {
           },
         ]
       }
+      iletisim_tercihleri: {
+        Row: {
+          case_id: string
+          created_at: string
+          id: string
+          kanal: string
+          party_id: string
+          sessiz_baslangic: string | null
+          sessiz_bitis: string | null
+          siklik: string
+          updated_at: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          id?: string
+          kanal?: string
+          party_id: string
+          sessiz_baslangic?: string | null
+          sessiz_bitis?: string | null
+          siklik?: string
+          updated_at?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          id?: string
+          kanal?: string
+          party_id?: string
+          sessiz_baslangic?: string | null
+          sessiz_bitis?: string | null
+          siklik?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iletisim_tercihleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "iletisim_tercihleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iletisim_tercihleri_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: true
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kayit_onay_talepleri: {
         Row: {
           case_id: string
