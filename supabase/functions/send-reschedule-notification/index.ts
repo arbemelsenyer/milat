@@ -1,6 +1,69 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+/* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
+   Taraf kendi ekranından bildirim sıklığını ve sessiz saatlerini belirler
+   (public.iletisim_tercihleri, UNIQUE party_id). Bu süzgeç YALNIZ "gönderilsin mi"
+   kararını verir — e-posta metinlerine, konularına ve alıcılarına DOKUNMAZ.
+     · her_adim (varsayılan) → hepsi gider.
+     · onemli                → yalnız ÖNEMLİ türler gider.
+     · haftalik_ozet         → yalnız ZAMANA BAĞLI türler gider (davet / değişiklik).
+     · sessiz saat           → o aralıkta gönderilmez; ZAMANA BAĞLI türler istisnadır.
+   FAIL-OPEN (kritik): party_id bilinmiyorsa, kayıt yoksa ya da sorgu hata verirse
+   E-POSTA GÖNDERİLİR. Bir tercih sorgusu arızası oturum davetini susturamaz;
+   tercih kaydı olmayan tarafta mevcut davranış birebir korunur.
+   ERTELEME YOK (1. tur kararı): sessiz saate denk gelen bildirim kuyruğa alınmaz,
+   atlanır ve sebebi dönüş gövdesine/ajan kaydına yazılır. Kuyruk 2. turda. */
+type BildirimTuru =
+  | "oturum_daveti" | "oturum_degisikligi" | "teklif" | "belge_talebi"
+  | "surec_sonu" | "hatirlatma" | "bilgilendirme";
+// Zamana bağlı: geciktirilemez. Sessiz saatte ve "haftalık özet" seçiliyken de gider.
+const ZAMANA_BAGLI_TURLER: string[] = ["oturum_daveti", "oturum_degisikligi"];
+const ONEMLI_TURLER: string[] = [
+  ...ZAMANA_BAGLI_TURLER, "teklif", "belge_talebi", "surec_sonu",
+];
+const TERCIH_SAAT_DILIMI = "Europe/Istanbul";
+
+/* Sessiz aralık kontrolü. Edge fonksiyon UTC'de koşar; karşılaştırma TÜRKİYE
+   saatiyle yapılır (17.08 föy dersi: elle saat farkı eklenmez, Intl'e bırakılır).
+   Gece devreden aralık (22:00–08:00) da doğru hesaplanır. */
+function sessizSaatteMi(baslangic: unknown, bitis: unknown): boolean {
+  const b = String(baslangic ?? "").slice(0, 5);
+  const s = String(bitis ?? "").slice(0, 5);
+  if (!/^\d{2}:\d{2}$/.test(b) || !/^\d{2}:\d{2}$/.test(s) || b === s) return false;
+  const simdi = new Date().toLocaleTimeString("tr-TR", {
+    timeZone: TERCIH_SAAT_DILIMI, hour: "2-digit", minute: "2-digit", hour12: false,
+  }).slice(0, 5);
+  return b < s ? (simdi >= b && simdi < s) : (simdi >= b || simdi < s);
+}
+
+async function gonderilsinMi(
+  admin: any, partyId: string | null | undefined, tur: BildirimTuru,
+): Promise<{ gonder: boolean; sebep: string }> {
+  if (!partyId) return { gonder: true, sebep: "taraf kaydı yok → varsayılan gönderim" };
+  try {
+    const { data, error } = await admin.from("iletisim_tercihleri")
+      .select("siklik, sessiz_baslangic, sessiz_bitis")
+      .eq("party_id", partyId).maybeSingle();
+    if (error || !data) return { gonder: true, sebep: "tercih kaydı yok → her_adim" };
+    const siklik = String((data as any).siklik ?? "her_adim");
+    const zamanaBagli = ZAMANA_BAGLI_TURLER.includes(tur);
+    if (siklik === "onemli" && !ONEMLI_TURLER.includes(tur)) {
+      return { gonder: false, sebep: `tercih 'yalnız önemli adımlar' — '${tur}' önemli listede değil` };
+    }
+    if (siklik === "haftalik_ozet" && !zamanaBagli) {
+      return { gonder: false, sebep: `tercih 'haftalık özet' — '${tur}' zamana bağlı değil` };
+    }
+    if (!zamanaBagli && sessizSaatteMi((data as any).sessiz_baslangic, (data as any).sessiz_bitis)) {
+      return { gonder: false, sebep: "sessiz saat aralığı — 1. turda erteleme yok, atlandı" };
+    }
+    return { gonder: true, sebep: "tercihe uygun" };
+  } catch (e: any) {
+    return { gonder: true, sebep: `tercih okunamadı (${String(e?.message ?? e).slice(0, 80)}) → gönderildi` };
+  }
+}
+
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
@@ -49,7 +112,7 @@ serve(async (req) => {
       .select(`
         *,
         mediator_requests (
-          id, user_id, mediator_id, scheduled_date,
+          id, user_id, mediator_id, case_id, scheduled_date,
           cases ( dispute_type, your_name, other_party_name )
         )
       `)
@@ -178,9 +241,22 @@ serve(async (req) => {
       </div>
     </body></html>`;
 
+    /* İLETİŞİM TERCİHİ (İBA 1.5): oturum tarihi değişikliği ZAMANA BAĞLIDIR — her
+       sıklık seçeneğinde ve sessiz saatte de gider. Alıcı arabulucu olabildiği için
+       taraf kaydı dosya + kullanıcı eşleşmesiyle aranır; bulunamazsa (arabulucu ya da
+       taraf kaydı olmayan kullanıcı) süzgeç açık kalır. */
+    let tercihPartyId: string | null = null;
+    if (mediatorRequest?.case_id) {
+      const { data: tarafSatiri } = await supabase
+        .from("case_parties").select("id")
+        .eq("case_id", mediatorRequest.case_id).eq("user_id", recipientUserId).maybeSingle();
+      tercihPartyId = (tarafSatiri as any)?.id ?? null;
+    }
+    const izin = await gonderilsinMi(supabase, tercihPartyId, "oturum_degisikligi");
+
     // Send email
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-    if (RESEND_API_KEY) {
+    if (RESEND_API_KEY && izin.gonder) {
       const emailRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },

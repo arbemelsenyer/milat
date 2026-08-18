@@ -1,6 +1,69 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+/* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
+   Taraf kendi ekranından bildirim sıklığını ve sessiz saatlerini belirler
+   (public.iletisim_tercihleri, UNIQUE party_id). Bu süzgeç YALNIZ "gönderilsin mi"
+   kararını verir — e-posta metinlerine, konularına ve alıcılarına DOKUNMAZ.
+     · her_adim (varsayılan) → hepsi gider.
+     · onemli                → yalnız ÖNEMLİ türler gider.
+     · haftalik_ozet         → yalnız ZAMANA BAĞLI türler gider (davet / değişiklik).
+     · sessiz saat           → o aralıkta gönderilmez; ZAMANA BAĞLI türler istisnadır.
+   FAIL-OPEN (kritik): party_id bilinmiyorsa, kayıt yoksa ya da sorgu hata verirse
+   E-POSTA GÖNDERİLİR. Bir tercih sorgusu arızası oturum davetini susturamaz;
+   tercih kaydı olmayan tarafta mevcut davranış birebir korunur.
+   ERTELEME YOK (1. tur kararı): sessiz saate denk gelen bildirim kuyruğa alınmaz,
+   atlanır ve sebebi dönüş gövdesine/ajan kaydına yazılır. Kuyruk 2. turda. */
+type BildirimTuru =
+  | "oturum_daveti" | "oturum_degisikligi" | "teklif" | "belge_talebi"
+  | "surec_sonu" | "hatirlatma" | "bilgilendirme";
+// Zamana bağlı: geciktirilemez. Sessiz saatte ve "haftalık özet" seçiliyken de gider.
+const ZAMANA_BAGLI_TURLER: string[] = ["oturum_daveti", "oturum_degisikligi"];
+const ONEMLI_TURLER: string[] = [
+  ...ZAMANA_BAGLI_TURLER, "teklif", "belge_talebi", "surec_sonu",
+];
+const TERCIH_SAAT_DILIMI = "Europe/Istanbul";
+
+/* Sessiz aralık kontrolü. Edge fonksiyon UTC'de koşar; karşılaştırma TÜRKİYE
+   saatiyle yapılır (17.08 föy dersi: elle saat farkı eklenmez, Intl'e bırakılır).
+   Gece devreden aralık (22:00–08:00) da doğru hesaplanır. */
+function sessizSaatteMi(baslangic: unknown, bitis: unknown): boolean {
+  const b = String(baslangic ?? "").slice(0, 5);
+  const s = String(bitis ?? "").slice(0, 5);
+  if (!/^\d{2}:\d{2}$/.test(b) || !/^\d{2}:\d{2}$/.test(s) || b === s) return false;
+  const simdi = new Date().toLocaleTimeString("tr-TR", {
+    timeZone: TERCIH_SAAT_DILIMI, hour: "2-digit", minute: "2-digit", hour12: false,
+  }).slice(0, 5);
+  return b < s ? (simdi >= b && simdi < s) : (simdi >= b || simdi < s);
+}
+
+async function gonderilsinMi(
+  admin: any, partyId: string | null | undefined, tur: BildirimTuru,
+): Promise<{ gonder: boolean; sebep: string }> {
+  if (!partyId) return { gonder: true, sebep: "taraf kaydı yok → varsayılan gönderim" };
+  try {
+    const { data, error } = await admin.from("iletisim_tercihleri")
+      .select("siklik, sessiz_baslangic, sessiz_bitis")
+      .eq("party_id", partyId).maybeSingle();
+    if (error || !data) return { gonder: true, sebep: "tercih kaydı yok → her_adim" };
+    const siklik = String((data as any).siklik ?? "her_adim");
+    const zamanaBagli = ZAMANA_BAGLI_TURLER.includes(tur);
+    if (siklik === "onemli" && !ONEMLI_TURLER.includes(tur)) {
+      return { gonder: false, sebep: `tercih 'yalnız önemli adımlar' — '${tur}' önemli listede değil` };
+    }
+    if (siklik === "haftalik_ozet" && !zamanaBagli) {
+      return { gonder: false, sebep: `tercih 'haftalık özet' — '${tur}' zamana bağlı değil` };
+    }
+    if (!zamanaBagli && sessizSaatteMi((data as any).sessiz_baslangic, (data as any).sessiz_bitis)) {
+      return { gonder: false, sebep: "sessiz saat aralığı — 1. turda erteleme yok, atlandı" };
+    }
+    return { gonder: true, sebep: "tercihe uygun" };
+  } catch (e: any) {
+    return { gonder: true, sebep: `tercih okunamadı (${String(e?.message ?? e).slice(0, 80)}) → gönderildi` };
+  }
+}
+
+
 const resend = {
   emails: {
     send: async (params: {
@@ -224,15 +287,32 @@ serve(async (req: Request): Promise<Response> => {
             </html>
           `;
 
-          await resend.emails.send({
-            from: "MİLAT Arabuluculuk <info@milatmediation.com>",
-            to: [userProfile.email],
-            subject: `⏰ Reminder: Your Mediation Session is Tomorrow - ${formattedDate}`,
-            html: userEmailHtml,
-          });
+          /* İLETİŞİM TERCİHİ (İBA 1.5): hatırlatma ÖNEMLİ listede değildir —
+             "yalnız önemli adımlar" ve "haftalık özet" seçildiğinde gönderilmez,
+             sessiz saatte de düşer. Alıcı user_id ile geldiği için taraf kaydı
+             dosya + kullanıcı eşleşmesiyle bulunur; taraf kaydı yoksa (ör. dosya
+             sahibi taraf olarak kayıtlı değilse) süzgeç açık kalır ve gönderilir. */
+          const { data: tarafSatiri } = await supabase
+            .from("case_parties")
+            .select("id")
+            .eq("case_id", session.case_id)
+            .eq("user_id", session.user_id)
+            .maybeSingle();
+          const izin = await gonderilsinMi(supabase, (tarafSatiri as any)?.id, "hatirlatma");
+          if (!izin.gonder) {
+            console.log(`Reminder skipped (iletişim tercihi): ${izin.sebep}`);
+            errors.push(`hatırlatma atlandı — iletişim tercihi: ${izin.sebep}`);
+          } else {
+            await resend.emails.send({
+              from: "MİLAT Arabuluculuk <info@milatmediation.com>",
+              to: [userProfile.email],
+              subject: `⏰ Reminder: Your Mediation Session is Tomorrow - ${formattedDate}`,
+              html: userEmailHtml,
+            });
 
-          console.log(`Sent reminder to user: ${userProfile.email}`);
-          sentCount++;
+            console.log(`Sent reminder to user: ${userProfile.email}`);
+            sentCount++;
+          }
         }
 
         // Send reminder to mediator

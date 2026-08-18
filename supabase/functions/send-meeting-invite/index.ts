@@ -1,6 +1,69 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+/* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
+   Taraf kendi ekranından bildirim sıklığını ve sessiz saatlerini belirler
+   (public.iletisim_tercihleri, UNIQUE party_id). Bu süzgeç YALNIZ "gönderilsin mi"
+   kararını verir — e-posta metinlerine, konularına ve alıcılarına DOKUNMAZ.
+     · her_adim (varsayılan) → hepsi gider.
+     · onemli                → yalnız ÖNEMLİ türler gider.
+     · haftalik_ozet         → yalnız ZAMANA BAĞLI türler gider (davet / değişiklik).
+     · sessiz saat           → o aralıkta gönderilmez; ZAMANA BAĞLI türler istisnadır.
+   FAIL-OPEN (kritik): party_id bilinmiyorsa, kayıt yoksa ya da sorgu hata verirse
+   E-POSTA GÖNDERİLİR. Bir tercih sorgusu arızası oturum davetini susturamaz;
+   tercih kaydı olmayan tarafta mevcut davranış birebir korunur.
+   ERTELEME YOK (1. tur kararı): sessiz saate denk gelen bildirim kuyruğa alınmaz,
+   atlanır ve sebebi dönüş gövdesine/ajan kaydına yazılır. Kuyruk 2. turda. */
+type BildirimTuru =
+  | "oturum_daveti" | "oturum_degisikligi" | "teklif" | "belge_talebi"
+  | "surec_sonu" | "hatirlatma" | "bilgilendirme";
+// Zamana bağlı: geciktirilemez. Sessiz saatte ve "haftalık özet" seçiliyken de gider.
+const ZAMANA_BAGLI_TURLER: string[] = ["oturum_daveti", "oturum_degisikligi"];
+const ONEMLI_TURLER: string[] = [
+  ...ZAMANA_BAGLI_TURLER, "teklif", "belge_talebi", "surec_sonu",
+];
+const TERCIH_SAAT_DILIMI = "Europe/Istanbul";
+
+/* Sessiz aralık kontrolü. Edge fonksiyon UTC'de koşar; karşılaştırma TÜRKİYE
+   saatiyle yapılır (17.08 föy dersi: elle saat farkı eklenmez, Intl'e bırakılır).
+   Gece devreden aralık (22:00–08:00) da doğru hesaplanır. */
+function sessizSaatteMi(baslangic: unknown, bitis: unknown): boolean {
+  const b = String(baslangic ?? "").slice(0, 5);
+  const s = String(bitis ?? "").slice(0, 5);
+  if (!/^\d{2}:\d{2}$/.test(b) || !/^\d{2}:\d{2}$/.test(s) || b === s) return false;
+  const simdi = new Date().toLocaleTimeString("tr-TR", {
+    timeZone: TERCIH_SAAT_DILIMI, hour: "2-digit", minute: "2-digit", hour12: false,
+  }).slice(0, 5);
+  return b < s ? (simdi >= b && simdi < s) : (simdi >= b || simdi < s);
+}
+
+async function gonderilsinMi(
+  admin: any, partyId: string | null | undefined, tur: BildirimTuru,
+): Promise<{ gonder: boolean; sebep: string }> {
+  if (!partyId) return { gonder: true, sebep: "taraf kaydı yok → varsayılan gönderim" };
+  try {
+    const { data, error } = await admin.from("iletisim_tercihleri")
+      .select("siklik, sessiz_baslangic, sessiz_bitis")
+      .eq("party_id", partyId).maybeSingle();
+    if (error || !data) return { gonder: true, sebep: "tercih kaydı yok → her_adim" };
+    const siklik = String((data as any).siklik ?? "her_adim");
+    const zamanaBagli = ZAMANA_BAGLI_TURLER.includes(tur);
+    if (siklik === "onemli" && !ONEMLI_TURLER.includes(tur)) {
+      return { gonder: false, sebep: `tercih 'yalnız önemli adımlar' — '${tur}' önemli listede değil` };
+    }
+    if (siklik === "haftalik_ozet" && !zamanaBagli) {
+      return { gonder: false, sebep: `tercih 'haftalık özet' — '${tur}' zamana bağlı değil` };
+    }
+    if (!zamanaBagli && sessizSaatteMi((data as any).sessiz_baslangic, (data as any).sessiz_bitis)) {
+      return { gonder: false, sebep: "sessiz saat aralığı — 1. turda erteleme yok, atlandı" };
+    }
+    return { gonder: true, sebep: "tercihe uygun" };
+  } catch (e: any) {
+    return { gonder: true, sebep: `tercih okunamadı (${String(e?.message ?? e).slice(0, 80)}) → gönderildi` };
+  }
+}
+
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -187,6 +250,14 @@ serve(async (req) => {
     const results: Array<{ party_id: string; email: string; ok: boolean; error?: string; resend_id?: string }> = [];
 
     for (const p of recipients as any[]) {
+      /* İLETİŞİM TERCİHİ (İBA 1.5): oturum daveti ZAMANA BAĞLIDIR — üç sıklık
+         seçeneğinde de ve sessiz saatte de gider. Süzgeç yine de burada durur ki
+         kural tek yerden değişsin ve her gönderim noktası aynı kapıdan geçsin. */
+      const izin = await gonderilsinMi(admin, p.id, "oturum_daveti");
+      if (!izin.gonder) {
+        results.push({ party_id: p.id, email: p.email, ok: false, error: `iletişim tercihi: ${izin.sebep}` });
+        continue;
+      }
       const displayName = p.company_name || `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "Değerli Taraf";
       const html = buildHtml({ displayName, dateStr, timeStr, typeLabel, notes: session.notes });
 

@@ -8,6 +8,69 @@
 // Güvenlik deseni check-new-tariff ile aynı: x-cron-secret veya admin JWT; yoksa 401.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
+/* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
+   Taraf kendi ekranından bildirim sıklığını ve sessiz saatlerini belirler
+   (public.iletisim_tercihleri, UNIQUE party_id). Bu süzgeç YALNIZ "gönderilsin mi"
+   kararını verir — e-posta metinlerine, konularına ve alıcılarına DOKUNMAZ.
+     · her_adim (varsayılan) → hepsi gider.
+     · onemli                → yalnız ÖNEMLİ türler gider.
+     · haftalik_ozet         → yalnız ZAMANA BAĞLI türler gider (davet / değişiklik).
+     · sessiz saat           → o aralıkta gönderilmez; ZAMANA BAĞLI türler istisnadır.
+   FAIL-OPEN (kritik): party_id bilinmiyorsa, kayıt yoksa ya da sorgu hata verirse
+   E-POSTA GÖNDERİLİR. Bir tercih sorgusu arızası oturum davetini susturamaz;
+   tercih kaydı olmayan tarafta mevcut davranış birebir korunur.
+   ERTELEME YOK (1. tur kararı): sessiz saate denk gelen bildirim kuyruğa alınmaz,
+   atlanır ve sebebi dönüş gövdesine/ajan kaydına yazılır. Kuyruk 2. turda. */
+type BildirimTuru =
+  | "oturum_daveti" | "oturum_degisikligi" | "teklif" | "belge_talebi"
+  | "surec_sonu" | "hatirlatma" | "bilgilendirme";
+// Zamana bağlı: geciktirilemez. Sessiz saatte ve "haftalık özet" seçiliyken de gider.
+const ZAMANA_BAGLI_TURLER: string[] = ["oturum_daveti", "oturum_degisikligi"];
+const ONEMLI_TURLER: string[] = [
+  ...ZAMANA_BAGLI_TURLER, "teklif", "belge_talebi", "surec_sonu",
+];
+const TERCIH_SAAT_DILIMI = "Europe/Istanbul";
+
+/* Sessiz aralık kontrolü. Edge fonksiyon UTC'de koşar; karşılaştırma TÜRKİYE
+   saatiyle yapılır (17.08 föy dersi: elle saat farkı eklenmez, Intl'e bırakılır).
+   Gece devreden aralık (22:00–08:00) da doğru hesaplanır. */
+function sessizSaatteMi(baslangic: unknown, bitis: unknown): boolean {
+  const b = String(baslangic ?? "").slice(0, 5);
+  const s = String(bitis ?? "").slice(0, 5);
+  if (!/^\d{2}:\d{2}$/.test(b) || !/^\d{2}:\d{2}$/.test(s) || b === s) return false;
+  const simdi = new Date().toLocaleTimeString("tr-TR", {
+    timeZone: TERCIH_SAAT_DILIMI, hour: "2-digit", minute: "2-digit", hour12: false,
+  }).slice(0, 5);
+  return b < s ? (simdi >= b && simdi < s) : (simdi >= b || simdi < s);
+}
+
+async function gonderilsinMi(
+  admin: any, partyId: string | null | undefined, tur: BildirimTuru,
+): Promise<{ gonder: boolean; sebep: string }> {
+  if (!partyId) return { gonder: true, sebep: "taraf kaydı yok → varsayılan gönderim" };
+  try {
+    const { data, error } = await admin.from("iletisim_tercihleri")
+      .select("siklik, sessiz_baslangic, sessiz_bitis")
+      .eq("party_id", partyId).maybeSingle();
+    if (error || !data) return { gonder: true, sebep: "tercih kaydı yok → her_adim" };
+    const siklik = String((data as any).siklik ?? "her_adim");
+    const zamanaBagli = ZAMANA_BAGLI_TURLER.includes(tur);
+    if (siklik === "onemli" && !ONEMLI_TURLER.includes(tur)) {
+      return { gonder: false, sebep: `tercih 'yalnız önemli adımlar' — '${tur}' önemli listede değil` };
+    }
+    if (siklik === "haftalik_ozet" && !zamanaBagli) {
+      return { gonder: false, sebep: `tercih 'haftalık özet' — '${tur}' zamana bağlı değil` };
+    }
+    if (!zamanaBagli && sessizSaatteMi((data as any).sessiz_baslangic, (data as any).sessiz_bitis)) {
+      return { gonder: false, sebep: "sessiz saat aralığı — 1. turda erteleme yok, atlandı" };
+    }
+    return { gonder: true, sebep: "tercihe uygun" };
+  } catch (e: any) {
+    return { gonder: true, sebep: `tercih okunamadı (${String(e?.message ?? e).slice(0, 80)}) → gönderildi` };
+  }
+}
+
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -561,6 +624,9 @@ async function oturumHatirlatmaYurut(admin: any, dosya: any, gerekce: string): P
   for (const t of (taraflar ?? []) as any[]) {
     const email = String(t?.email ?? "").trim();
     if (!email) { hatalar.push("tarafın e-postası yok"); continue; }
+    // İLETİŞİM TERCİHİ: hatırlatma "önemli" listede değildir; kısıtlı tercihte düşer.
+    const izin = await gonderilsinMi(admin, t?.id, "hatirlatma");
+    if (!izin.gonder) { hatalar.push(`hatırlatma atlandı — iletişim tercihi: ${izin.sebep}`); continue; }
     const ad = t?.party_type === "individual"
       ? `${t?.first_name ?? ""} ${t?.last_name ?? ""}`.trim()
       : String(t?.company_name ?? "").trim();
@@ -694,13 +760,19 @@ async function kapanisKollari(admin: any, dosya: any): Promise<{ acilan: number;
 
 // Tarafa e-posta: arabulucu imzalı, tek seferlik (mükerrer gönderim panodaki
 // etiketle engellenir). Yalnız kendi tarafına gider; karşı taraf verisi geçmez.
+// `tur` (İBA 1.5): tarafın iletişim tercihi süzgeci için bildirim sınıfı.
 async function tarafaEposta(
   admin: any, dosya: any, taraf: any, konu: string, govdeHtml: string,
+  tur: BildirimTuru = "bilgilendirme",
 ): Promise<{ gonderildi: boolean; sebep?: string }> {
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) return { gonderildi: false, sebep: "RESEND_API_KEY yok" };
   const email = String(taraf?.email ?? "").trim();
   if (!email) return { gonderildi: false, sebep: "tarafın e-posta adresi yok" };
+
+  // İLETİŞİM TERCİHİ: taraf sıklığı kıstıysa ya da sessiz saatteyse gönderilmez.
+  const izin = await gonderilsinMi(admin, (taraf as any)?.id, tur);
+  if (!izin.gonder) return { gonderildi: false, sebep: `iletişim tercihi: ${izin.sebep}` };
 
   const { imza, dosyaSatiri } = await imzaBlogu(admin, dosya.id);
   const esc = (t: string) => String(t).replace(/</g, "&lt;");
@@ -773,7 +845,8 @@ async function musaitlikIsteYurut(admin: any, dosya: any, partyId: string): Prom
       <strong>“Randevu Tercihlerim”</strong> bölümünden müsait gün ve saatlerinizi
       girmenizi rica ederiz.</p>
      <p>Dilerseniz aynı bölümden “randevuları benim adıma onaylayabilir” anahtarını açarak
-      uygun saatlerinizle örtüşen teklifleri otomatik onaylatabilirsiniz.</p>`);
+      uygun saatlerinizle örtüşen teklifleri otomatik onaylatabilirsiniz.</p>`,
+    "belge_talebi");
   if (!r.gonderildi) return { durum: "bekliyor", sonuc: `Müsaitlik istenemedi: ${r.sebep ?? "bilinmeyen hata"}` };
   return { durum: "yapildi", sonuc: "Taraftan müsait saatleri istendi" };
 }
@@ -868,7 +941,8 @@ async function teklifDegerlendirYurut(admin: any, dosya: any, gerekce: string, p
         <strong>${trTarihMetni(uyan.gun)} · ${uyan.saat}</strong> saatinin girdiğiniz müsaitlik
         aralığınıza uyduğunu tespit etti.</p>
        <p>Onaylıyor musunuz? Size gönderilen randevu bağlantısından tek dokunuşla
-        cevaplayabilirsiniz.</p>`);
+        cevaplayabilirsiniz.</p>`,
+      "oturum_daveti");
     if (!r.gonderildi) return { durum: "bekliyor", sonuc: `Hatırlatma gönderilemedi: ${r.sebep ?? "bilinmeyen hata"}` };
     return { durum: "yapildi", sonuc: `Uygun saat (${uyan.gun} ${uyan.saat}) için tarafa onay hatırlatması gönderildi` };
   }
@@ -944,7 +1018,8 @@ async function eksikBilgiYurut(admin: any, dosya: any, partyId: string): Promise
       (sözleşme, yazışma, fatura, bordro gibi) dosya ekranınızdaki
       <strong>“Belgelerim”</strong> bölümünden yükleyebilirsiniz.</p>
      <p>Belge yüklemek zorunlu değildir; yüklediğiniz belgeler yalnız sizin ve
-      arabulucunun görebileceği şekilde saklanır.</p>`);
+      arabulucunun görebileceği şekilde saklanır.</p>`,
+    "belge_talebi");
   if (!r.gonderildi) return { durum: "bekliyor", sonuc: `Eksik bilgi istenemedi: ${r.sebep ?? "bilinmeyen hata"}` };
   return { durum: "yapildi", sonuc: "Taraftan belge/bilgi istendi" };
 }
@@ -1540,6 +1615,10 @@ async function videoBaglantiEpostasi(
   for (const t of (taraflar ?? []) as any[]) {
     const email = String(t?.email ?? "").trim();
     if (!email) { hatalar.push("tarafın e-postası yok, bağlantı iletilemedi"); continue; }
+    /* İLETİŞİM TERCİHİ: görüşme bağlantısı oturuma bağlıdır ve geciktirilemez —
+       "oturum_daveti" sınıfındadır, sessiz saatte ve haftalık özet seçiliyken de gider. */
+    const izin = await gonderilsinMi(admin, t?.id, "oturum_daveti");
+    if (!izin.gonder) { hatalar.push(`bağlantı e-postası atlandı — iletişim tercihi: ${izin.sebep}`); continue; }
     const ad = t?.party_type === "individual"
       ? `${t?.first_name ?? ""} ${t?.last_name ?? ""}`.trim()
       : String(t?.company_name ?? "").trim();

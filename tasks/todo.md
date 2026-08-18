@@ -40,6 +40,63 @@ e-postayla tarafa gitmesi (arabulucu "Gönder"e basınca, kendiliğinden değil)
 ekranında "Oturum hazırlığım" bölümü (tarafın oturum tarihini görememesi sorununu da
 çözer) + maliyet işaretinin kaldırılması.
 
+## Nerede kaldık — 18.08.2026 (84) · İLETİŞİM TERCİHİ KATMANI (İBA 1.5) — 1. TUR
+
+BİTTİ (18.08): Taraf, süreçle ilgili bildirimleri hangi sıklıkta alacağını ve sessiz
+saatlerini kendi ekranından belirliyor; e-posta gönderen bütün yollar bu tercihi
+kontrol ediyor.
+
+TARAF EKRANI (CaseRoom > yeni "İletişim Tercihlerim" sekmesi)
+- Sıklık: Her adımda (varsayılan) · Yalnız önemli adımlarda · Haftalık özet.
+- Sessiz saatler: açma/kapama + başlangıç-bitiş; kapalıysa iki alan da boş kaydedilir.
+- Kanal: yalnız E-posta seçili; "Uygulama içi bildirim — yakında" ve "WhatsApp —
+  yakında" satırları GRİ ve TIKLANAMAZ duruyor (sahte seçenek değil, yol haritası).
+- Kayıt yoksa varsayılan gösteriliyor; Kaydet'e basınca satır oluşuyor
+  (upsert, onConflict "party_id").
+
+ARABULUCU (kokpit > Taraflar > taraf kartı, taraf bilgisi ızgarası)
+- Tek satır SALT OKUMA: "İletişim tercihi: yalnız önemli adımlarda (sessiz: 22:00–08:00)".
+- Arabulucu DEĞİŞTİREMEZ. Tercih tarafın kendi kararıdır.
+
+GÖNDERİM SÜZGECİ (gonderilsinMi — yedi edge fonksiyona ayrı ayrı kondu)
+- her_adim → hepsi gider (mevcut davranış).
+- onemli → yalnız oturum daveti, oturum değişikliği/iptali, teklif, belge/bilgi
+  talebi, süreç sonu gider.
+- haftalik_ozet → yalnız ZAMANA BAĞLI olanlar (oturum daveti ve değişikliği) gider.
+- Sessiz saat → o aralıkta gönderilmez; zamana bağlı türler istisnadır. Saat
+  karşılaştırması Europe/Istanbul ile yapılır (edge UTC'de koşar).
+- FAIL-OPEN: tercih kaydı yoksa, party_id çözülemiyorsa ya da sorgu hata verirse
+  E-POSTA GÖNDERİLİR. Bir tercih arızası oturum davetini susturamaz.
+- ERTELEME YOK (1. tur kararı): sessiz saate düşen bildirim kuyruğa alınmıyor,
+  atlanıyor ve sebebi ajan kaydına/dönüş gövdesine yazılıyor. Kuyruk 2. turda.
+
+HAFTALIK ÖZET E-POSTASI YAZILMADI (bilerek). Seçenek kaydediliyor ve süzgeçte
+kullanılıyor; özet e-postasının kendisi sonraki tura kaldı. Taraf ekranında bu
+seçeneğin altında tek satır not var.
+
+KEŞİFTE ÇIKAN İKİ MÜKERRERLİK RİSKİ — KURUCU KARARI BEKLİYOR
+1. src/pages/NotificationSettings.tsx + notification_preferences tablosu zaten var:
+   KULLANICI düzeyinde, bildirim TÜRÜ başına e-posta/uygulama içi açma-kapama.
+   ÖNEMLİSİ: bu tercihleri HİÇBİR gönderim yolu okumuyor — ekran var, karşılığı yok.
+   Yeni katman TARAF düzeyinde ve SIKLIK ekseninde olduğu için mükerrer değil, ama
+   iki ekranın ilişkisi kurucu tarafından kararlaştırılmalı.
+2. case_parties.hatirlatma_izni (boolean) yalnız ajan-nobetci'de okunuyor. Yeni
+   süzgeç onun ÜSTÜNE bindi, yerine geçmedi; ikisi de çalışıyor.
+
+DOĞRULANDI: npx tsc --noEmit -p tsconfig.json temiz · yedi edge fonksiyonun tekil
+tsc denetimi temiz · npx vite build temiz (42 sn). Canlıda doğrulanmadı.
+
+SIRADAKİ ADIM (19.08 ilk iş)
+- REDEPLOY (yedi fonksiyon): ajan-nobetci · send-meeting-invite ·
+  cancel-meeting-invite · send-session-reminders · send-reschedule-notification ·
+  send-session-notification · randevu-teklif.
+- PUBLISH: evet (taraf sekmesi + kokpit satırı).
+- Canlı doğrulama: bir tarafta "Yalnız önemli adımlarda" + sessiz 22:00–08:00
+  kaydedilecek; kokpitte taraf kartında satırın göründüğü, karşı tarafın tercihinin
+  görünmediği doğrulanacak.
+- 17.08'den DEVREDEN: föyde saatin 10:00 göründüğü hâlâ canlıda doğrulanmadı.
+- 18.08'den DEVREDEN: gündem havuzu (83) canlıda doğrulanmadı.
+
 ## Nerede kaldık — 18.08.2026 (83) · FÖY GÜNDEMİ BİLGİ TABANINA BAĞLANDI
 
 BİTTİ (18.08): Gündem başlıkları artık koda elle yazılmış kalıp listesinden DEĞİL,

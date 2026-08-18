@@ -572,3 +572,30 @@ kendiliğinden oluşur.
 · YEDEK YOL SİLİNMEZ: türetme başarısız olursa ya da havuzdan hiçbir başlık eşleşmezse
   elle yazılmış GUNDEM_KALIPLARI / BELGE_TURU_KALIPLARI / ASGARI_GUNDEM yolu devreye
   girer. USUL_BASLIGI ("Oturumda kimin yer alacağı ve karar yetkisi") her föyde vardır.
+
+
+[EKLEME 18.08.2026 — İLETİŞİM TERCİHİ KATMANI (İBA 1.5), 1. tur]
+● CANLI. Taraf, süreçle ilgili bildirimleri hangi sıklıkta alacağını ve hangi saatler
+arasında hiç almayacağını KENDİ belirler. Tercih taraf düzeyindedir
+(public.iletisim_tercihleri, UNIQUE party_id) ve tarafın kendi ekranından yazılır.
+· SIKLIK: "her adımda" (varsayılan) · "yalnız önemli adımlarda" · "haftalık özet".
+  Önemli sayılanlar tek yerde tanımlıdır: oturum daveti, oturum tarihi/saati
+  değişikliği veya iptali, teklif bildirimi, belge/bilgi talebi, süreç sonu bildirimi.
+· ZAMANA BAĞLI İSTİSNA: oturum daveti ve oturum değişikliği/iptali geciktirilemez —
+  üç sıklık seçeneğinde de ve sessiz saatte de gönderilir. Bu, tarafın usule ilişkin
+  hak kaybına uğramamasını sağlar; tercih bir bildirim tercihidir, süreçten çekilme
+  değildir.
+· SESSİZ SAAT: taraf bir aralık verirse o aralıkta (Europe/Istanbul) acil olmayan
+  bildirim gönderilmez. 1. turda ERTELEME KUYRUĞU YOKTUR: bildirim atlanır ve sebebi
+  kayda geçer; kuyruk 2. turda ele alınacaktır.
+· FAIL-OPEN İLKESİ: tercih kaydı yoksa, taraf kaydı çözülemiyorsa ya da sorgu hata
+  verirse e-posta GÖNDERİLİR. Bir tercih arızası hiçbir koşulda bildirimi susturamaz;
+  tercih kaydı olmayan tarafta davranış birebir eskisi gibidir.
+· KANAL: bugün yalnız e-postadır. Taraf ekranında "uygulama içi bildirim" ve
+  "WhatsApp" satırları GRİ ve SEÇİLEMEZ durur — sahte seçenek değil, yol haritasının
+  görünür hâlidir.
+· HAFTALIK ÖZET E-POSTASI 1. TURDA YAZILMADI: seçenek kaydedilir ve süzgeçte
+  kullanılır (acil olmayanı durdurur), özet iletisinin kendisi sonraki turdadır.
+· KÖR VERİ (m.1): tercih yalnız o tarafa ve görevli arabulucuya açıktır. Karşı tarafın
+  tercihi hiçbir ekrandan, rapordan veya sorgudan görünmez. Arabulucu tercihi yalnız
+  GÖRÜR; değiştiremez — bildirim tercihi tarafın kendi kararıdır.

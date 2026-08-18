@@ -764,3 +764,17 @@ BELGE_TURU_KALIPLARI / ASGARI_GUNDEM yolu YEDEK olarak duruyor, silinmedi.
 Föy düğmesinin maliyet uyarısı gerçeğe göre düzeltildi (ortak sabite dokunulmadı).
 REDEPLOY GEREKLİ: hazirlik-foyu. PUBLISH: evet (ön yüz metni). SQL: yok — tablo
 kurucu tarafından önceden canlıya alınmıştı.
+
+18.08.2026 — İLETİŞİM TERCİHİ KATMANI (İBA 1.5) 1. TUR. Taraf, bildirim sıklığını
+(her adımda / yalnız önemli / haftalık özet) ve sessiz saatlerini kendi ekranından
+belirliyor (CaseRoom > "İletişim Tercihlerim" sekmesi, public.iletisim_tercihleri).
+Arabulucu kokpitte yalnız salt okuma tek satır görüyor, değiştiremiyor. E-posta
+gönderen yedi yola ortak süzgeç (gonderilsinMi) kondu: oturum daveti ve oturum
+değişikliği/iptali zamana bağlı sayılıp her koşulda gidiyor; hatırlatma ve
+bilgilendirme kısıtlı tercihte ve sessiz saatte düşüyor. Süzgeç FAIL-OPEN'dır —
+tercih okunamazsa e-posta gönderilir, tercih kaydı olmayan tarafta mevcut davranış
+birebir korunur. Sessiz saatte erteleme kuyruğu KURULMADI (1. tur kararı), bildirim
+atlanıp sebebi kaydediliyor. Haftalık özet e-postasının kendisi yazılmadı.
+REDEPLOY GEREKLİ: ajan-nobetci · send-meeting-invite · cancel-meeting-invite ·
+send-session-reminders · send-reschedule-notification · send-session-notification ·
+randevu-teklif. PUBLISH: evet. SQL: yok — tablo kurucu tarafından canlıya alınmıştı.

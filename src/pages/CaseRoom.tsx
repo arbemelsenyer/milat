@@ -20,7 +20,7 @@ import {
 import {
   Loader2, ShieldCheck, Lock, Sparkles, Upload, FileText, Users, Brain, Lightbulb,
   Calendar, Award, Repeat, FileSignature, ArrowRight, Check, X, History, Filter, FileDown, MessageSquare, Bot,
-  Wallet, Pencil, EyeOff,
+  Wallet, Pencil, EyeOff, Mail,
 } from "lucide-react";
 import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 import { SessionScheduler } from "@/components/mediation/SessionScheduler";
@@ -33,6 +33,7 @@ import { downloadPaymentInfoPdf } from "@/lib/invoice-pdf";
 import { formatDisputeType } from "@/lib/disputeLabels";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 // YZ kullanım beyanı — metin ve sürümü tek yerde; sürüm değişirse onay yeniden istenir.
 const YZ_BEYAN_SURUMU = "v1";
@@ -698,6 +699,7 @@ export default function CaseRoom() {
           <TabsTrigger value="experts" className={tabTriggerAccentClass}><Award className="h-4 w-4 mr-1" />Bilirkişi Onayı</TabsTrigger>
           <TabsTrigger value="payment" className={tabTriggerAccentClass}><Wallet className="h-4 w-4 mr-1" />Ödeme Bilgim</TabsTrigger>
           <TabsTrigger value="randevu" className={tabTriggerAccentClass}><Calendar className="h-4 w-4 mr-1" />Randevu Tercihlerim</TabsTrigger>
+          <TabsTrigger value="iletisim" className={tabTriggerAccentClass}><Mail className="h-4 w-4 mr-1" />İletişim Tercihlerim</TabsTrigger>
           <TabsTrigger value="braket" className={tabTriggerAccentClass}><EyeOff className="h-4 w-4 mr-1" />Kabul Aralığım</TabsTrigger>
           <TabsTrigger value="ajanim" className={tabTriggerAccentClass}><Bot className="h-4 w-4 mr-1" />Ajanım</TabsTrigger>
           <TabsTrigger value="agents" className={tabTriggerAccentClass}><Bot className="h-4 w-4 mr-1" />AI Aktivitelerim</TabsTrigger>
@@ -718,6 +720,12 @@ export default function CaseRoom() {
         <TabsContent value="randevu">
           {myParty?.id
             ? <RandevuTercihlerim partyId={myParty.id} />
+            : <Card className="p-5"><p className="text-sm text-muted-foreground">Taraf kaydınız bulunamadı.</p></Card>}
+        </TabsContent>
+
+        <TabsContent value="iletisim">
+          {myParty?.id
+            ? <IletisimTercihlerim caseId={caseId!} partyId={myParty.id} />
             : <Card className="p-5"><p className="text-sm text-muted-foreground">Taraf kaydınız bulunamadı.</p></Card>}
         </TabsContent>
 
@@ -1682,6 +1690,178 @@ function AjanimBolumu({ caseId, partyId }: { caseId: string; partyId: string }) 
           })}
         </ul>
       </div>
+    </Card>
+  );
+}
+
+/* ── İLETİŞİM TERCİHLERİM (İBA 1.5, 1. tur) ───────────────────────────────────
+   TARAFIN KENDİ kararıdır: bildirim sıklığı ve sessiz saatler. Arabulucu bu
+   bölümü değiştiremez; kokpitte yalnız SALT OKUMA tek satır görür.
+   KÖR VERİ: kayıt yalnız o tarafa ve arabulucuya açıktır (RLS); karşı tarafın
+   tercihi hiçbir yüzeyden görünmez.
+   Kayıt yoksa varsayılan gösterilir (her adımda, sessiz saat kapalı); taraf
+   kaydedince satır oluşur (upsert, onConflict: "party_id"). */
+type SiklikKodu = "her_adim" | "onemli" | "haftalik_ozet";
+
+const SIKLIK_SECENEKLERI: Array<{ kod: SiklikKodu; etiket: string; aciklama?: string }> = [
+  { kod: "her_adim", etiket: "Her adımda" },
+  {
+    kod: "onemli", etiket: "Yalnız önemli adımlarda",
+    aciklama: "oturum daveti ve değişikliği, teklif, belge talebi, süreç sonu",
+  },
+  {
+    kod: "haftalik_ozet", etiket: "Haftalık özet",
+    /* 1. tur sınırı açıkça yazılır: seçenek kaydedilir ve süzgeçte kullanılır,
+       ama haftalık özet e-postasının kendisi henüz yazılmadı. */
+    aciklama: "Haftalık özet e-postası yakında; şu an bu seçenek yalnız acil olmayan bildirimleri durdurur.",
+  },
+];
+
+function IletisimTercihlerim({ caseId, partyId }: { caseId: string; partyId: string }) {
+  const [siklik, setSiklik] = useState<SiklikKodu>("her_adim");
+  const [sessizAcik, setSessizAcik] = useState(false);
+  const [sessizBas, setSessizBas] = useState("22:00");
+  const [sessizBit, setSessizBit] = useState("08:00");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const hhmm = (t: unknown) => String(t ?? "").slice(0, 5);
+
+  useEffect(() => {
+    let iptal = false;
+    (async () => {
+      setLoading(true);
+      const { data, error } = await (supabase.from("iletisim_tercihleri" as any) as any)
+        .select("siklik, sessiz_baslangic, sessiz_bitis")
+        .eq("party_id", partyId)
+        .maybeSingle();
+      if (iptal) return;
+      if (error) {
+        setHata(`Tercihler okunamadı: ${error.message}`);
+      } else if (data) {
+        setHata(null);
+        const gelen = String(data.siklik ?? "");
+        setSiklik((["her_adim", "onemli", "haftalik_ozet"].includes(gelen) ? gelen : "her_adim") as SiklikKodu);
+        const b = hhmm(data.sessiz_baslangic);
+        const s = hhmm(data.sessiz_bitis);
+        if (b && s) { setSessizAcik(true); setSessizBas(b); setSessizBit(s); }
+        else setSessizAcik(false);
+      } else {
+        setHata(null);   // Kayıt yok → varsayılan (her adımda, sessiz saat kapalı).
+      }
+      setLoading(false);
+    })();
+    return () => { iptal = true; };
+  }, [partyId]);
+
+  async function kaydet() {
+    if (sessizAcik) {
+      if (!/^\d{2}:\d{2}$/.test(sessizBas) || !/^\d{2}:\d{2}$/.test(sessizBit)) {
+        setHata("Sessiz saat için başlangıç ve bitiş saatini girin."); return;
+      }
+      if (sessizBas === sessizBit) {
+        setHata("Sessiz saat başlangıcı ve bitişi aynı olamaz."); return;
+      }
+    }
+    setBusy(true);
+    setHata(null);
+    // Kapalıysa iki alan da BOŞ kaydedilir; süzgeç o zaman sessiz saati hiç görmez.
+    const { error } = await (supabase.from("iletisim_tercihleri" as any) as any).upsert({
+      case_id: caseId,
+      party_id: partyId,
+      kanal: "eposta",
+      siklik,
+      sessiz_baslangic: sessizAcik ? sessizBas : null,
+      sessiz_bitis: sessizAcik ? sessizBit : null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "party_id" });
+    if (error) setHata(`Kaydedilemedi: ${error.message}`);
+    else toast({ title: "İletişim tercihleriniz kaydedildi." });
+    setBusy(false);
+  }
+
+  return (
+    <Card className="p-5 space-y-5">
+      <div>
+        <h3 className="font-semibold">İletişim tercihlerim</h3>
+        <p className="text-sm text-muted-foreground">
+          Süreçle ilgili bildirimleri nasıl almak istediğinizi siz belirlersiniz.
+        </p>
+      </div>
+
+      {hata && (
+        <div className="text-sm rounded border border-destructive/40 bg-destructive/10 text-destructive p-3">{hata}</div>
+      )}
+
+      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+        <>
+          {/* (a) SIKLIK — üç seçenek, tek seçim */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Ne sıklıkta bildirim almak istersiniz?</Label>
+            <RadioGroup value={siklik} onValueChange={(v) => setSiklik(v as SiklikKodu)} className="space-y-2">
+              {SIKLIK_SECENEKLERI.map((s) => (
+                <div key={s.kod} className="flex items-start gap-2">
+                  <RadioGroupItem value={s.kod} id={`siklik-${s.kod}`} className="mt-1" />
+                  <div className="space-y-0.5">
+                    <Label htmlFor={`siklik-${s.kod}`} className="font-normal cursor-pointer">{s.etiket}</Label>
+                    {s.aciklama && <p className="text-xs text-muted-foreground">{s.aciklama}</p>}
+                  </div>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
+
+          {/* (b) SESSİZ SAATLER — isteğe bağlı */}
+          <div className="space-y-2 border-t pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="sessiz-anahtar" className="text-sm font-medium">Sessiz saatler</Label>
+              <Switch id="sessiz-anahtar" checked={sessizAcik} onCheckedChange={setSessizAcik} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Bu saatler arasında bildirim gönderilmez, ertesi ilk uygun saate bırakılır.
+            </p>
+            {sessizAcik && (
+              <div className="flex items-center gap-2 pt-1">
+                <Input type="time" value={sessizBas} onChange={(e) => setSessizBas(e.target.value)} className="w-32" />
+                <span className="text-sm text-muted-foreground">–</span>
+                <Input type="time" value={sessizBit} onChange={(e) => setSessizBit(e.target.value)} className="w-32" />
+              </div>
+            )}
+          </div>
+
+          {/* (c) KANAL — şu an yalnız e-posta. Alttaki iki satır seçilemez; sahte
+              seçenek değildir, neyin geleceğini görün diye durur. */}
+          <div className="space-y-2 border-t pt-4">
+            <Label className="text-sm font-medium">Bildirim kanalı</Label>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-sm">
+                <Check className="h-4 w-4 text-primary" />
+                <span>E-posta</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground/60 cursor-not-allowed" aria-disabled="true">
+                <Lock className="h-3.5 w-3.5" />
+                <span>Uygulama içi bildirim — yakında</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground/60 cursor-not-allowed" aria-disabled="true">
+                <Lock className="h-3.5 w-3.5" />
+                <span>WhatsApp — yakında</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 border-t pt-4">
+            <Button size="sm" disabled={busy} onClick={() => void kaydet()}>
+              {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+              Kaydet
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              <ShieldCheck className="inline h-3 w-3 mr-1" />
+              Tercihinizi yalnız siz ve arabulucunuz görür; karşı tarafa açılmaz.
+            </p>
+          </div>
+        </>
+      )}
     </Card>
   );
 }

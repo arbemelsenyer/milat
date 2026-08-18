@@ -183,3 +183,16 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   yanlışa döndü. Kural: maliyet/çağrı bildiren her alan HESAPLANIR, sabit yazılmaz; kola
   model çağrısı ekleyen her tur, dosya başlığındaki maliyet cümlesini de aynı commit'te
   düzeltir.
+- DERS (18.08.2026) — TERCİH EKRANI VAR DİYE TERCİH UYGULANIYOR SANILMAZ. İletişim
+  tercihi katmanına başlarken NotificationSettings.tsx ve notification_preferences
+  tablosu bulundu; ilk izlenim "bu iş zaten var" idi. Grep ile bakıldığında tabloyu
+  HİÇBİR gönderim yolunun okumadığı görüldü — ekran kullanıcıdan tercih topluyor ama
+  hiçbir e-posta bu tercihe bakmıyor. Kural: bir tercih/ayar yüzeyi bulunduğunda
+  "var mı" değil "OKUNUYOR MU" sorulur; ayarı yazan yer değil, TÜKETEN yer grep'lenir.
+  Tüketeni olmayan ayar ekranı üründe var sayılmaz, açık kalem olarak raporlanır.
+- DERS (18.08.2026) — BİLDİRİM SÜZGECİ FAIL-OPEN KURULUR. Gönderim kararını veren her
+  süzgeç, hata/kayıt yokluğu/çözülemeyen kimlik durumunda GÖNDERMEYE meyleder. Ters
+  kurulsaydı (şüphede sustur) tek bir sorgu arızası oturum davetini yutar ve taraf
+  duruşmayı kaçırırdı; sessiz kalan hata en pahalı hata türüdür. Kural: bir süzgeç
+  kullanıcıya ulaşan bildirimi kesiyorsa varsayılanı DAİMA "gönder" olur ve bu, kodda
+  yorumla işaretlenir.

@@ -150,3 +150,19 @@ Gün sonu belge komutuna dahildir.
   "kategori,baslik"). Havuz kategori düzeyindedir, dosya verisi TAŞIMAZ.
   NOT: bir kategoride satır var ama hepsi 'pasif' ise fonksiyon yeniden türetme
   YAPMAZ (kurucunun bilerek kapattığı kabul edilir), doğrudan yedek yola geçer.
+- 18.08: public.iletisim_tercihleri tablosu CANLIDA (kurucu kurdu, bu turda SQL
+  çalıştırılmadı): id uuid pk · case_id uuid → cases · party_id uuid → case_parties ·
+  kanal text default 'eposta' · siklik text default 'her_adim' · sessiz_baslangic time ·
+  sessiz_bitis time · created_at · updated_at. UNIQUE (party_id) ·
+  CHECK siklik IN ('her_adim','onemli','haftalik_ozet') · CHECK kanal IN ('eposta') ·
+  RLS AÇIK. Politikalar: SELECT → arabulucu veya kendi tarafı · INSERT/UPDATE →
+  yalnız kendi tarafı.
+  YAZAN: src/pages/CaseRoom.tsx > IletisimTercihlerim (taraf, upsert onConflict
+  "party_id"). OKUYAN: src/pages/MediationEngine.tsx > IletisimTercihiSatiri (salt
+  okuma) ve yedi edge fonksiyondaki gonderilsinMi süzgeci (ajan-nobetci ·
+  send-meeting-invite · cancel-meeting-invite · send-session-reminders ·
+  send-reschedule-notification · send-session-notification · randevu-teklif).
+  NOT — MEVCUT VE AYRI: notification_preferences tablosu (kullanıcı düzeyinde, tür
+  başına aç/kapa) ve case_parties.hatirlatma_izni (boolean) DURUYOR, kaldırılmadı.
+  notification_preferences'ı hiçbir gönderim yolu okumuyor; NotificationSettings.tsx
+  ekranı bugün karşılıksızdır — kurucu kararı bekliyor.

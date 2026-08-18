@@ -4032,6 +4032,44 @@ function roleLabel(r?: string) {
   return r === "applicant" ? "Başvurucu" : r === "respondent" ? "Karşı Taraf" : "Üçüncü Taraf";
 }
 
+/* İLETİŞİM TERCİHİ — SALT OKUMA (İBA 1.5). Taraf kendi ekranından belirler;
+   arabulucu yalnız GÖRÜR, değiştiremez. Kayıt yoksa varsayılan yazılır.
+   Kör veri: tercih kendi party_id'siyle okunur, karşı tarafın tercihi görünmez
+   (bu satır zaten yalnız açılan tarafın kartında çizilir). */
+const SIKLIK_METNI: Record<string, string> = {
+  her_adim: "her adımda",
+  onemli: "yalnız önemli adımlarda",
+  haftalik_ozet: "haftalık özet",
+};
+function IletisimTercihiSatiri({ partyId }: { partyId: string }) {
+  const [metin, setMetin] = useState<string | null>(null);
+
+  useEffect(() => {
+    let iptal = false;
+    (async () => {
+      const { data, error } = await (supabase.from("iletisim_tercihleri" as any) as any)
+        .select("siklik, sessiz_baslangic, sessiz_bitis")
+        .eq("party_id", partyId)
+        .maybeSingle();
+      if (iptal) return;
+      if (error) { setMetin(null); return; }
+      const siklik = SIKLIK_METNI[String((data as any)?.siklik ?? "her_adim")] ?? "her adımda";
+      const bas = String((data as any)?.sessiz_baslangic ?? "").slice(0, 5);
+      const bit = String((data as any)?.sessiz_bitis ?? "").slice(0, 5);
+      const sessiz = bas && bit ? ` (sessiz: ${bas}–${bit})` : "";
+      setMetin(`${siklik}${sessiz}`);
+    })();
+    return () => { iptal = true; };
+  }, [partyId]);
+
+  if (!metin) return null;
+  return (
+    <div className="col-span-2">
+      <span className="text-muted-foreground">İletişim tercihi:</span> {metin}
+    </div>
+  );
+}
+
 // Faz 3 katmanları: Faz 4'teki kalıbın aynısı — sabit id (sol menüden derin bağlantı),
 // katlanır başlık, altında tek satır açıklama. Liste statik: üç katman her zaman vardır.
 const FAZ3_LAYERS = [
@@ -4690,6 +4728,8 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
                     {p.email && <div><span className="text-muted-foreground">E-posta:</span> {p.email}</div>}
                     {p.gsm && <div><span className="text-muted-foreground">GSM:</span> {p.gsm}</div>}
                     {p.address && <div className="col-span-2"><span className="text-muted-foreground">Adres:</span> {p.address}</div>}
+                    {/* İBA 1.5 — SALT OKUMA: tercih tarafın kendi kararıdır, buradan değiştirilemez. */}
+                    <IletisimTercihiSatiri partyId={p.id} />
                   </div>
 
                   {/* Party statement */}

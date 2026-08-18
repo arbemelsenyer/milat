@@ -240,3 +240,15 @@ arabulucunun kendi girdiği kayıttır.
   — o satırda düzenleme düğmesi çıkmaz, ajan da üzerine yazmaz.
 · 1. turda tarafa GÖNDERİM YOKTUR; gönderim ve taraf ekranındaki "Oturum hazırlığım"
   bölümü 2. tura bırakılmıştır.
+
+
+[EKLEME 18.08.2026 — İLETİŞİM TERCİHİ EKRANLARI (İBA 1.5)]
+· TARAF YÜZEYİ: CaseRoom (dosya odası) > taraf görünümü > yeni "İletişim Tercihlerim"
+  sekmesi. Sekme, "Randevu Tercihlerim"in HEMEN ARDINA eklendi; mevcut sekmelerin
+  göreli sırası değişmedi, hiçbiri adlandırılmadı, taşınmadı ya da kaldırılmadı.
+  İkisi de tarafın KENDİ kararını yazdığı bölümlerdir, bu yüzden yan yana dururlar.
+· ARABULUCU YÜZEYİ: Aşama 3 kokpit > TARAFLAR katmanı > taraf kartı açıldığında
+  taraf bilgisi ızgarasının SON satırı. Tek satır, salt okuma, düğme yok:
+  "İletişim tercihi: yalnız önemli adımlarda (sessiz: 22:00–08:00)". Tercih kaydı
+  yoksa satır HİÇ ÇİZİLMEZ (boş etiket gösterilmez).
+· Arabuluculuk yüzeyinde bu tercihi değiştiren hiçbir denetim yoktur ve eklenmeyecektir.
