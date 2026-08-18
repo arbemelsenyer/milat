@@ -40,6 +40,20 @@ e-postayla tarafa gitmesi (arabulucu "Gönder"e basınca, kendiliğinden değil)
 ekranında "Oturum hazırlığım" bölümü (tarafın oturum tarihini görememesi sorununu da
 çözer) + maliyet işaretinin kaldırılması.
 
+## Nerede kaldık — 19.08.2026 (86) · KOKPİTTEKİ MÜKERRER FÖY KAYDI KALDIRILDI
+
+BİTTİ (19.08):
+- [x] Aşama 3 kokpit > RAPOR VE BELGELER katmanındaki "Oturum hazırlık föyleri"
+      (id="kokpit-hazirlik-foyu") sectionDefs kaydı silindi. Föyün tek yeri artık
+      Aşama 4'ün en üstü (faz4-hazirlik-foyu).
+- [x] HazirlikFoyuPanel bileşeni, Aşama 4 kartı, FAZ4 menü girdisi ve katman
+      tanımları el değmeden duruyor. Kokpit menüsü/numaralandırma sectionDefs'ten
+      türediği için kendiliğinden güncellendi; kokpit PDF listesi de aynı kaynaktan.
+
+SIRADA: canlı doğrulama (publish sonrası kokpitte kaydın düştüğü, Aşama 4'te föyün
+yerinde durduğu) + hâlâ bekleyen 18.08 işi: Lovable'da hazirlik-foyu-gonder İLK
+DEPLOY ve gönderim canlı testi.
+
 ## Nerede kaldık — 18.08.2026 (85) · OTURUM HAZIRLIK FÖYÜ — 2. TUR (GÖNDERİM + TARAF EKRANI)
 
 BİTTİ (18.08):

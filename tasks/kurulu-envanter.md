@@ -166,3 +166,12 @@ Gün sonu belge komutuna dahildir.
   başına aç/kapa) ve case_parties.hatirlatma_izni (boolean) DURUYOR, kaldırılmadı.
   notification_preferences'ı hiçbir gönderim yolu okumuyor; NotificationSettings.tsx
   ekranı bugün karşılıksızdır — kurucu kararı bekliyor.
+- 19.08: Oturum hazırlık föyü ARTIK TEK YERDE. Yukarıdaki 17.08 kaydındaki (2) numaralı
+  kokpit girişi (Aşama 3 > RAPOR VE BELGELER, id="kokpit-hazirlik-foyu") KALDIRILDI;
+  mükerrerdi. Föyün tek yeri Aşama 4 en üst, id="faz4-hazirlik-foyu". Bileşen
+  (HazirlikFoyuPanel), tablo, RLS ve edge fonksiyonlar aynen duruyor.
+- 19.08: Föy gönderimi CANLI YOLDA: yeni edge fonksiyon hazirlik-foyu-gonder
+  (verify_jwt=true). Yalnız onaylanmış föyü, yalnız kendi tarafına e-postayla
+  gönderir; iletişim tercihi süzgecinden ("belge_talebi", FAIL-OPEN) geçer.
+  Taraf yüzeyi: CaseRoom > "Oturum hazırlığım" sekmesi (salt okuma).
+  İLK DEPLOY GEREKİR — Lovable'da redeploy edilmeden canlıda yoktur.

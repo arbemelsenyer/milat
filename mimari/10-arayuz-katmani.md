@@ -270,3 +270,14 @@ arabulucunun kendi girdiği kayıttır.
   tarihini görememesi sorununu da kapatır. Föy yoksa sakin boş durum yazar.
 · GİZLİLİK: taraf yalnız kendi gönderilmiş föyünü görür (RLS + sorguda aynı iki
   şart). Karşı tarafın föyü, adı, beyanı ya da belgesi bu ekrana girmez.
+
+
+[EKLEME 19.08.2026 — KOKPİTTEKİ FÖY KAYDI KALDIRILDI (İBA 3.1)]
+● CANLI. Yukarıdaki 17.08 kaydında "çift çıpa" olarak bırakılan Aşama 3 kokpit >
+  RAPOR VE BELGELER > id="kokpit-hazirlik-foyu" kaydı KALDIRILDI. Föyün tek yeri
+  artık Aşama 4'ün en üstüdür (id="faz4-hazirlik-foyu", sol dizinde kendi girdisi).
+  Sebep: aynı panelin iki yerde durması mükerrerdi; oturum Aşama 4'te planlanıyor.
+· HazirlikFoyuPanel bileşeni DURUYOR — Aşama 4 onu kullanır.
+· Kokpit sol menüsü ve numaralandırma sectionDefs'ten türediği için kayıt elle
+  dokunulmadan düştü; RAPOR VE BELGELER katmanındaki öteki bölümler yerinde.
+  Kokpit PDF çıktısı da aynı listeden türer, föy bölümü oradan da düşer.

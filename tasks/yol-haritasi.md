@@ -792,3 +792,10 @@ ekranında yeni "Oturum hazırlığım" sekmesi (salt okuma, oturum tarihi + saa
 Europe/Istanbul). Sessiz saat erteleme kuyruğu hâlâ 2. turda değil — kurulmadı.
 REDEPLOY GEREKLİ: hazirlik-foyu-gonder (YENİ fonksiyon, ilk deploy). PUBLISH: evet.
 SQL: yok — tablo ve RLS politikaları zaten canlıda.
+
+19.08.2026 — KOKPİTTEKİ MÜKERRER FÖY KAYDI KALDIRILDI. Aşama 3 kokpit > RAPOR VE
+BELGELER katmanındaki "Oturum hazırlık föyleri" (id="kokpit-hazirlik-foyu")
+sectionDefs kaydı silindi. Föy artık yalnız Aşama 4'ün en üstünde (faz4-hazirlik-foyu).
+HazirlikFoyuPanel bileşenine, Aşama 4 kartına, sol menü girdisine ve katman
+tanımlarına dokunulmadı; kokpit menüsü ve numaralandırma sectionDefs'ten türediği
+için kendiliğinden güncellendi. REDEPLOY: yok. PUBLISH: evet. SQL: yok.

@@ -7676,13 +7676,6 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     body: <SecenekSepetiPanel caseRow={caseRow} />,
   });
 
-  // Oturum hazırlık föyleri (İBA 3.1) — RAPOR VE BELGELER katmanı. 1. tur: yalnız
-  // hazırlama ve onaylama; tarafa gönderim YOK (sonraki turda açılacak).
-  sectionDefs.push({
-    id: "kokpit-hazirlik-foyu", layer: LAYER_REPORTS, title: "Oturum hazırlık föyleri",
-    body: <HazirlikFoyuPanel caseRow={caseRow} />,
-  });
-
   const layerOrder = [LAYER_TABLE, LAYER_EVIDENCE, LAYER_COCKPIT, LAYER_REPORTS];
   // Katman başlığının kendi çıpası (sol menüden katman adına tıklanınca oraya kayılır)
   // ve başlığın altındaki tek satır açıklama; aynı açıklama menüde tooltip olur.
