@@ -15,16 +15,24 @@
 // kurucunun yazacağı sabit soru havuzundan seçimle yeniden açılacak; ilgili kod
 // silinmedi, yorum içinde bekliyor.
 //
-// GÜNDEM KODA ALINDI (16.08 kurucu kararı): Gündem başlıkları ARTIK MODELE
-// YAZDIRILMIYOR. Sebep: beş turda süzgeç kovalandı, model her turda yeni bir soru
-// kalıbı üretti ("…talebiniz nelerdir", "…hangi ayları kapsar", "…beklentiniz
-// nasıldır"). Bu kolun işi dosyada NE OLDUĞUNU göstermek; cümle üretmesi
-// gerekmiyor. Başlıklar artık o tarafa ait verilerden SABİT KALIPLARLA kurulur
-// (bkz. GUNDEM_KALIPLARI).
+// GÜNDEM KODA ALINDI (16.08 kurucu kararı): Gündem başlıkları o gün MODELE
+// YAZDIRILMAKTAN çıkarıldı. Sebep: beş turda süzgeç kovalandı, model her turda yeni
+// bir soru kalıbı üretti ("…talebiniz nelerdir", "…hangi ayları kapsar",
+// "…beklentiniz nasıldır"). Bu kolun işi dosyada NE OLDUĞUNU göstermek; cümle
+// üretmesi gerekmiyor. (bkz. GUNDEM_KALIPLARI — bugün YEDEK yoldur.)
 //
-// MODEL ÇAĞRISI TÜMÜYLE KALDIRILDI (17.08 kurucu kararı): "Yanınızda bulundurmanız
-// iyi olur" bölümü de artık çıkarım yapmıyor; o bölüm tarafın KENDİ yüklediği
-// belgelerin GERÇEK ADINI listeliyor. Bu fonksiyon artık hiç ücretli çağrı yapmaz.
+// GÜNDEM BİLGİ TABANINA BAĞLANDI (18.08 kurucu kararı): Başlıklar artık koda elle
+// yazılmış kalıp listesinden değil, üründeki bilgi tabanından (knowledge_base_chunks)
+// türer ve kategori düzeyinde `gundem_kalem_havuzu` tablosunda saklanır. Yeni bir
+// uyuşmazlık türü geldiğinde kimse elle liste yazmaz. Havuz DOLUYSA model
+// çağrılmaz; boşsa KATEGORİ BAŞINA BİR KEZ çağrılır. Türetme başarısız olursa
+// GUNDEM_KALIPLARI / BELGE_TURU_KALIPLARI / ASGARI_GUNDEM yolu YEDEKTİR ve
+// SİLİNMEZ. (bkz. havuzdanOku · havuzuTuret · havuzdanGundemKur)
+//
+// MODEL ÇAĞRISI (17.08 kurucu kararı): "Yanınızda bulundurmanız iyi olur" bölümü
+// çıkarım yapmaz; o bölüm tarafın KENDİ yüklediği belgelerin GERÇEK ADINI listeler.
+// Fonksiyondaki TEK ücretli çağrı, bir kategorinin gündem havuzu ilk kez
+// türetilirken yapılan çağrıdır; sonraki föyler o kategoride bedavadır.
 //
 // GÜNDEM BİÇİMİ (16.08 canlı bulgu): "Oturumda konuşulacak başlıklar" bölümündeki
 // her madde konuşulacak konunun ADIDIR — kısa isim öbeği. Soru olamaz; soru
@@ -367,7 +375,262 @@ const ASGARI_GUNDEM = [
 // Her föyde yer alan usul başlığı (veri başlığı bulunsa da eklenir).
 const USUL_BASLIGI = "Oturumda kimin yer alacağı ve karar yetkisi";
 
-/* GÜNDEMİ KUR: yalnız BU TARAFA ait veriden. `korpus` = dosya konusu + uyuşmazlık
+/* ══ GÜNDEM HAVUZU — BAŞLIKLAR BİLGİ TABANINDAN TÜRER ═════════════════════════
+   18.08 kurucu kararı: gündem başlıkları artık koda elle yazılmış kalıp
+   listesinden DEĞİL, üründeki bilgi tabanından (knowledge_base_chunks) türer.
+   Yeni bir uyuşmazlık türü geldiğinde kimse elle liste yazmaz.
+
+   AKIŞ
+   (1) Dosyanın KATEGORİSİ bulunur (cases.dispute_type → category → subtype).
+   (2) gundem_kalem_havuzu'ndan o kategorinin ETKİN kalemleri okunur. Havuz
+       DOLUYSA HİÇBİR MODEL ÇAĞRISI YAPILMAZ — bu yol bedavadır.
+   (3) Havuz BOŞSA o kategorinin mevzuat parçaları modele verilir; çıkan kalemler
+       MEVCUT süzgeçlerden geçirilip havuza yazılır. Kategori başına BİR KEZ.
+   (4) Föye girecek başlıklar havuzdan, YALNIZ o tarafın kendi korpusuyla seçilir.
+   (5) Model çağrısı başarısız olur ya da hiç kalem geçmezse aşağıdaki
+       GUNDEM_KALIPLARI / BELGE_TURU_KALIPLARI / ASGARI_GUNDEM yolu YEDEKTİR;
+       o kod SİLİNMEDİ ve silinmeyecek.
+
+   KÖR VERİ (constitution m.1): Havuz KATEGORİ düzeyindedir, hiçbir dosya verisi
+   taşımaz — bir dosyada türetilen kalem başka dosyanın içeriğini değil, yalnız
+   mevzuat metnini yansıtır. Eşleştirme yalnız O TARAFIN korpusuyla yapılır.
+   HALÜSİNASYON (m.2): kaynak adı verilen listeden olmak zorundadır; alıntı harf
+   katlamasıyla kaynak metninde doğrulanır. Künye föye YAZILMAZ (föy sade kalır),
+   yalnız havuz satırında saklanır. */
+
+const HAVUZ_TABLOSU = "gundem_kalem_havuzu";
+const HAVUZ_MAX_KALEM = 25;
+const KB_PARCA_LIMIT = 40;
+const VARSAYILAN_KATEGORI = "genel";
+// İpucu bu uzunluğun altındaysa atılır: "ay", "is" gibi parçalar her metne uyar.
+const IPUCU_MIN = 4;
+
+type HavuzKalemi = {
+  baslik: string;
+  ipuclari: string[];
+  kaynak_source_title: string | null;
+  kaynak_alinti: string | null;
+};
+
+/* KATEGORİ: cases.dispute_type ile knowledge_base_chunks.category AYNI SÖZLÜĞÜ
+   kullanır (canlıda doğrulandı). Sıra: dispute_type → category → dispute_subtype;
+   hiçbiri yoksa "genel". Ham değer değiştirilmez, yalnız kırpılır. */
+function kategoriBelirle(c: any): string {
+  return temiz(c?.dispute_type) || temiz(c?.category) || temiz(c?.dispute_subtype)
+    || VARSAYILAN_KATEGORI;
+}
+
+/* Modelden gelen HAM kalem, gündem maddesi üreten her yolun geçtiği süzgeçlerden
+   geçer: gundemBasligiKur (TEK KAPI) · yasakIfade · hukukiNitelemeVarMi ·
+   soruYasakMi · soruYonYasakMi · gundemTutumMu. Geçemeyen null döner.
+   Saklanan başlık TEK KAPI'nın temizlediği biçimdir. */
+function havuzKalemiSuz(
+  ham: any, kaynakAdlari: Set<string>, sadeKaynak: string, elenen: string[],
+): HavuzKalemi | null {
+  const b = gundemBasligiKur(temiz(ham?.baslik));
+  if (!b) { elenen.push("havuz kalemi elendi: başlık isim öbeğine çevrilemedi"); return null; }
+  const y = yasakIfade(b) ?? hukukiNitelemeVarMi(b) ?? soruYasakMi(b)
+    ?? soruYonYasakMi(b) ?? gundemTutumMu(b);
+  if (y) { elenen.push(`havuz kalemi elendi: dil sınırı ("${y}")`); return null; }
+  // Gündem başlığı KONU ADIDIR: rakam taşımaz (tutar/oran föye sızmasın).
+  if (/\d/.test(b)) { elenen.push(`havuz kalemi elendi: başlıkta rakam var (${b})`); return null; }
+
+  const ipuclari: string[] = (Array.isArray(ham?.ipuclari) ? ham.ipuclari : [])
+    .map((i: unknown) => sade(temiz(i)))
+    .filter((i: string) => i.length >= IPUCU_MIN)
+    .filter((i: string, x: number, hepsi: string[]) => hepsi.indexOf(i) === x)
+    .slice(0, 5);
+  if (ipuclari.length === 0) {
+    elenen.push(`havuz kalemi elendi: kullanılabilir ipucu yok (${b})`);
+    return null;
+  }
+
+  /* Künye uydurma yasağı (m.2): kaynak adı VERİLEN listeden olmalı.
+     Alıntı doğrulaması harf katlamasıyla yapılır (16.08 dersi). Doğrulanamayan
+     künye kalemi DÜŞÜRMEZ — yalnız o alan boş bırakılır (15.08 dersi: zayıf alan
+     yüzünden iyi kayıt elenmez). Künye zaten föye yazılmaz. */
+  const kaynak = temiz(ham?.kaynak);
+  const alinti = temiz(ham?.alinti).slice(0, 200);
+  const alintiGecerli = alinti.length >= 15 && sadeKaynak.includes(sade(alinti));
+
+  return {
+    baslik: b,
+    ipuclari,
+    kaynak_source_title: kaynak && kaynakAdlari.has(kaynak) ? kaynak : null,
+    kaynak_alinti: alintiGecerli ? alinti : null,
+  };
+}
+
+/* HAVUZDAN OKU (bedava yol). `kalemler` yalnız ETKİN satırları taşır; `varAma`
+   ise "kategoride satır var ama hepsi pasif" durumunu bildirir — bu, kurucunun
+   kalemleri BİLEREK kapattığı anlamına gelir; o hâlde yeniden türetme yapılmaz
+   (insan kararı modelin üstündedir ve boşuna ücret çıkmaz). */
+async function havuzdanOku(admin: any, kategori: string, elenen: string[]): Promise<{
+  kalemler: HavuzKalemi[]; varAmaPasif: boolean;
+}> {
+  const { data, error } = await admin.from(HAVUZ_TABLOSU)
+    .select("baslik, ipuclari, kaynak_source_title, kaynak_alinti, durum")
+    .eq("kategori", kategori).limit(200);
+  if (error) {
+    elenen.push(`havuz okunamadı: ${error.message}`);
+    return { kalemler: [], varAmaPasif: false };
+  }
+  const satirlar = (data ?? []) as any[];
+  const kalemler: HavuzKalemi[] = satirlar
+    .filter((r) => temiz(r.durum) === "etkin")
+    .map((r) => ({
+      baslik: temiz(r.baslik),
+      ipuclari: (Array.isArray(r.ipuclari) ? r.ipuclari : [])
+        .map((i: unknown) => sade(temiz(i))).filter((i: string) => i.length >= IPUCU_MIN),
+      kaynak_source_title: temiz(r.kaynak_source_title) || null,
+      kaynak_alinti: temiz(r.kaynak_alinti) || null,
+    }))
+    .filter((k) => k.baslik && k.ipuclari.length > 0);
+  return { kalemler, varAmaPasif: satirlar.length > 0 && kalemler.length === 0 };
+}
+
+/* HAVUZ BOŞSA MEVZUATTAN TÜRET — kategori başına BİR KEZ çalışır (sonuç havuza
+   yazıldığı için bir daha model çağrılmaz). Modelden istenen TEK ŞEY: bu
+   uyuşmazlık türünde oturumda ele alınan KONU BAŞLIKLARI ve her başlık için
+   dosyada aranacak anahtar sözcükler. Dosya verisi isteme GİRMEZ. */
+async function havuzuTuret(
+  admin: any, apiKey: string | undefined, kategori: string, elenen: string[],
+): Promise<HavuzKalemi[]> {
+  if (!apiKey) { elenen.push("havuz türetilemedi: model anahtarı tanımsız"); return []; }
+
+  const { data: parcalar, error: kErr } = await admin.from("knowledge_base_chunks")
+    .select("source_title, chunk_text").eq("category", kategori).limit(KB_PARCA_LIMIT);
+  if (kErr) {
+    elenen.push(`havuz türetilemedi: bilgi tabanı okunamadı (${kErr.message})`);
+    return [];
+  }
+  const satirlar = ((parcalar ?? []) as any[])
+    .map((p) => ({ ad: temiz(p.source_title), metin: temiz(p.chunk_text) }))
+    .filter((p) => p.ad && p.metin);
+  if (satirlar.length === 0) {
+    elenen.push(`havuz türetilemedi: "${kategori}" için bilgi tabanı parçası yok`);
+    return [];
+  }
+
+  const kaynakAdlari = new Set(satirlar.map((p) => p.ad));
+  const sadeKaynak = sade(satirlar.map((p) => p.metin).join("\n"));
+  const kaynakBlogu = satirlar
+    .map((p, i) => `[${i + 1}] ${p.ad}\n${p.metin.slice(0, 1_200)}`)
+    .join("\n\n").slice(0, 60_000);
+
+  const systemPrompt =
+    "Sen bir arabuluculuk oturumu hazırlık asistanısın. Sana bir uyuşmazlık türüne ait "
+    + "mevzuat/kaynak parçaları verilecek. Görevin TEK: bu uyuşmazlık türünde arabuluculuk "
+    + "oturumunda ELE ALINAN KONU BAŞLIKLARINI çıkarmak ve her başlık için bir dosya metninde "
+    + "o başlığın varlığını gösterecek anahtar sözcükleri yazmak.\n\n"
+    + "BAŞLIK BİÇİMİ (uyulmayan madde sunucuda elenir):\n"
+    + "- KISA İSİM ÖBEĞİ olacak. Soru DEĞİL, cümle DEĞİL.\n"
+    + "- İkinci kişi hitabı YOK (…nız/…niz ekleri, 'sizin', 'talebiniz' yasak).\n"
+    + "- Hukuki niteleme YOK (kusur, ihmal, sorumluluk, tazminat hakkı, ihlal…).\n"
+    + "- Rakam YOK. Tavsiye, sonuç tahmini, taraf yorumu YOK.\n"
+    + "- Tarafın tutumunu TESPİT eden kuruluş YOK (…olmaması, …kabul etmediği).\n"
+    + "- Doğru biçim örnekleri: \"Ödenmemiş kira bedeli kalemi\", \"Ortak gider (aidat) kalemi\", "
+    + "\"Ödeme takvimi\", \"Teslim ve gecikme süreleri\".\n\n"
+    + "İPUÇLARI: her başlık için 2-5 sade sözcük ya da sözcük öbeği; küçük harf, dosya "
+    + "metninde geçebilecek günlük karşılıkları (ör. \"kira bedeli\", \"aidat\", \"gecikme faizi\").\n\n"
+    + "KAYNAK: yalnız sana verilen parçaların başlıklarından birini yaz, UYDURMA. "
+    + "ALINTI: başlığın dayandığı kısa cümle, en çok 200 karakter, kaynak metinden birebir.\n\n"
+    + `En çok ${HAVUZ_MAX_KALEM} kalem. Yalnız JSON döndür, başka hiçbir metin yazma:\n`
+    + "{\"kalemler\":[{\"baslik\":\"\",\"ipuclari\":[\"\"],\"kaynak\":\"\",\"alinti\":\"\"}]}";
+
+  const userPrompt = `[UYUŞMAZLIK TÜRÜ]\n${kategori}\n\n[KAYNAK PARÇALARI]\n${kaynakBlogu}`;
+
+  let ham: any[] = [];
+  try {
+    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!aiRes.ok) {
+      // Gerekçe SUNUCUDAN dönen gerçek durumu taşır (16.08 dersi: sabit metin yanıltır).
+      const t = await aiRes.text();
+      elenen.push(`havuz türetilemedi: model HTTP ${aiRes.status} — ${t.slice(0, 120)}`);
+      return [];
+    }
+    const aiJson = await aiRes.json();
+    const parsed = JSON.parse(aiJson?.choices?.[0]?.message?.content ?? "{}");
+    ham = Array.isArray(parsed?.kalemler) ? parsed.kalemler : [];
+  } catch (e: any) {
+    elenen.push(`havuz türetilemedi: ${String(e?.message ?? e).slice(0, 120)}`);
+    return [];
+  }
+  if (ham.length === 0) { elenen.push("havuz türetilemedi: model kalem döndürmedi"); return []; }
+
+  const gecenler: HavuzKalemi[] = [];
+  for (const k of ham.slice(0, HAVUZ_MAX_KALEM * 2)) {
+    const kalem = havuzKalemiSuz(k, kaynakAdlari, sadeKaynak, elenen);
+    if (!kalem) continue;
+    if (gecenler.some((g) => g.baslik === kalem.baslik)) continue;
+    gecenler.push(kalem);
+    if (gecenler.length >= HAVUZ_MAX_KALEM) break;
+  }
+  if (gecenler.length === 0) { elenen.push("havuz türetilemedi: hiçbir kalem süzgeçten geçmedi"); return []; }
+
+  const { error: yErr } = await admin.from(HAVUZ_TABLOSU).upsert(
+    gecenler.map((g) => ({ kategori, durum: "etkin", ...g })),
+    { onConflict: "kategori,baslik" },
+  );
+  // Yazılamazsa iş DURMAZ: kalemler bu tur kullanılır, sonraki turda yeniden denenir.
+  if (yErr) elenen.push(`havuz yazılamadı: ${yErr.message}`);
+
+  return gecenler;
+}
+
+/* HAVUZDAN FÖYE SEÇİM: ipuçlarından en az biri BU TARAFIN korpusunda geçen
+   kalemler girer. Karşı tarafın hiçbir alanı bu fonksiyona ulaşmaz. */
+function havuzdanGundemKur(
+  kalemler: HavuzKalemi[], korpus: string, braketVar: boolean,
+): { basliklar: string[]; izler: string[] } {
+  const metin = sade(korpus);
+  const secilen: string[] = [];
+  const izler: string[] = [];
+
+  for (const k of kalemler) {
+    if (secilen.includes(k.baslik)) continue;
+    const vuran = k.ipuclari.find((i) => metin.includes(i));
+    if (!vuran) continue;
+    secilen.push(k.baslik);
+    izler.push(`havuz: "${vuran}" → ${k.baslik}`);
+  }
+
+  /* Kabul aralığı kaydı varsa ödeme başlığı eklenir — ancak YALNIZ havuzda böyle
+     bir başlık varsa. Yeni metin uydurulmaz; hiçbir rakam okunmaz veya yazılmaz. */
+  if (braketVar) {
+    const odeme = kalemler.find((k) => sade(k.baslik).includes("odeme takvimi"));
+    if (odeme && !secilen.includes(odeme.baslik)) {
+      secilen.push(odeme.baslik);
+      izler.push(`kabul aralığı kaydı var → ${odeme.baslik}`);
+    }
+  }
+
+  if (secilen.length === 0) return { basliklar: [], izler };
+
+  /* Son süzgeç: havuzdan gelen başlık da TEK KAPI'dan geçer (havuza elle satır
+     eklenmiş olabilir). USUL_BASLIGI her föyde yer alır. */
+  const temizBasliklar: string[] = [];
+  for (const h of [...secilen, USUL_BASLIGI]) {
+    const b = gundemBasligiKur(h);
+    if (!b) continue;
+    if (yasakIfade(b) || hukukiNitelemeVarMi(b) || soruYasakMi(b) || soruYonYasakMi(b)) continue;
+    if (!temizBasliklar.includes(b)) temizBasliklar.push(b);
+  }
+  return { basliklar: temizBasliklar.slice(0, 6), izler };
+}
+
+/* GÜNDEMİ KUR (YEDEK YOL — SİLİNMEZ): yalnız BU TARAFA ait veriden. `korpus` = dosya konusu + uyuşmazlık
    türü + tarafın kendi beyanı + kendi belge özetleri. `belgeAdlari` = yalnız bu
    tarafın belgeleri. `braketVar` = bu tarafın kabul aralığı kaydının VARLIĞI;
    rakam okunmaz, yazılmaz. Karşı tarafın hiçbir alanı bu fonksiyona girmez. */
@@ -639,13 +902,41 @@ Deno.serve(async (req) => {
     const bolumler: Bolum[] = [];
     const elenen: string[] = [];
 
-    /* ── (a) GÜNDEM — KODDAN KURULUR, MODEL KULLANILMAZ ─────────────────────
-       Kaynaklar: dosya konusu + uyuşmazlık türü + tarafın kendi beyanı + kendi
-       belge özetleri (kalıp eşleştirme), kendi belgelerinin türü, kendi kabul
-       aralığı kaydının varlığı. En az 2, en çok 6 başlık; tekrar yazılmaz. */
-    const { basliklar: gundemBasliklari, izler: gundemIzleri } = gundemKur({
-      korpus, belgeAdlari, braketVar,
-    });
+    /* ── (a) GÜNDEM — ÖNCE BİLGİ TABANI HAVUZU, YEDEKTE KOD KALIPLARI ───────
+       (1) Dosyanın kategorisi bulunur. (2) Havuz okunur — DOLUYSA model
+       çağrılmaz. (3) Havuz boşsa o kategorinin mevzuatından BİR KEZ türetilir ve
+       havuza yazılır. (4) Seçim yalnız BU TARAFIN korpusuyla yapılır.
+       (5) Havuzdan başlık çıkmazsa mevcut kod kalıpları / asgari gündem yolu
+       YEDEK olarak devreye girer (o kod silinmedi). */
+    const kategori = kategoriBelirle(caseRow);
+    let havuzDurumu = "dolu";
+    let { kalemler: havuzKalemleri, varAmaPasif } = await havuzdanOku(admin, kategori, elenen);
+    if (havuzKalemleri.length === 0) {
+      if (varAmaPasif) {
+        // Kalemler kurucu tarafından kapatılmış: yeniden türetme YOK, ücret çıkmaz.
+        havuzDurumu = "pasif";
+        elenen.push(`havuz "${kategori}" için pasif — yedek yola geçildi`);
+      } else {
+        havuzKalemleri = await havuzuTuret(admin, apiKey, kategori, elenen);
+        havuzDurumu = havuzKalemleri.length > 0 ? "turetildi" : "yok";
+      }
+    }
+
+    let gundemKaynagi = "havuz";
+    let { basliklar: gundemBasliklari, izler: gundemIzleri } = havuzKalemleri.length > 0
+      ? havuzdanGundemKur(havuzKalemleri, korpus, braketVar)
+      : { basliklar: [] as string[], izler: [] as string[] };
+
+    if (gundemBasliklari.length === 0) {
+      /* YEDEK YOL — SİLİNMEZ: elle yazılmış kalıplar ve asgari gündem.
+         Kaynaklar: dosya konusu + uyuşmazlık türü + tarafın kendi beyanı + kendi
+         belge özetleri, kendi belgelerinin türü, kendi kabul aralığı kaydı. */
+      const yedek = gundemKur({ korpus, belgeAdlari, braketVar });
+      gundemBasliklari = yedek.basliklar;
+      gundemIzleri = [...gundemIzleri, ...yedek.izler];
+      gundemKaynagi = "kod";
+    }
+
     if (gundemBasliklari.length > 0) {
       bolumler.push({ baslik: "Oturumda konuşulacak başlıklar", maddeler: gundemBasliklari });
     }
@@ -670,9 +961,9 @@ Deno.serve(async (req) => {
       baslik: "Yanınızda bulundurmanız iyi olur",
       maddeler: belgeMaddeleri.length > 0 ? belgeMaddeleri : [BELGE_YOK_SATIRI],
     });
-    /* Model çağrısı kaldırıldığı için bu bayrak artık daima false; dönüş gövdesinde
-       ve ajan durumunda geriye dönük uyumluluk için duruyor. */
-    const modelGerekli = false;
+    /* Bu bölüm hâlâ model çağırmaz — belge adları kayıttan okunur. Fonksiyondaki
+       tek model çağrısı gündem havuzunun ilk türetilmesidir (bkz. havuzuTuret);
+       `model_cagrisi` alanı dönüş gövdesinde o gerçeği bildirir. */
 
     /* ── (c) KAPALI — "Cevabını hazırlamanız iyi olur" bölümü ARTIK ÜRETİLMEZ ──
        Soru bölümü 16.08.2026'da kapatıldı: serbest üretim dava/delil mantığına
@@ -794,15 +1085,26 @@ Deno.serve(async (req) => {
       return json({ error: `Kayıt yazılamadı: ${yErr.message}` }, 500);
     }
 
+    /* Gündemin GERÇEK kaynağı: havuz (bedava) · turetildi (bu turda bir kez model)
+       · kod (yedek kalıplar) · yedek (boş föy koruması) · yok.
+       Model çağrısı YALNIZ havuz türetilirken yapılır; sabit metin yazılmaz. */
+    const gundemKaynakEtiketi = !gundemVar
+      ? "yok"
+      : yedekGundemKullanildi ? "yedek" : gundemKaynagi;
+    const modelCagrisi = havuzDurumu === "turetildi" ? "havuz_turetildi" : "yapilmadi";
+
     await durumYaz(durumAdmin, durumCaseId, durumPartyId, {
       status: "completed", error_message: null,
       last_output: {
         sonuc: dolu ? "taslak_hazir" : "bos_taslak",
         bolum: bolumler.length,
-        gundem: gundemVar ? (yedekGundemKullanildi ? "yedek" : "kod") : "yok",
+        gundem: gundemKaynakEtiketi,
         gundem_sayisi: gundemBasliklari.length,
         gundem_izleri: gundemIzleri.slice(0, 6),
-        model_cagrisi: modelGerekli ? "eksik_belge" : "yapilmadi",
+        kategori,
+        havuz: havuzDurumu,
+        havuz_kalem: havuzKalemleri.length,
+        model_cagrisi: modelCagrisi,
         elenen: elenen.slice(0, 5),
       },
     });
@@ -810,9 +1112,12 @@ Deno.serve(async (req) => {
       durum: "taslak",
       bolum: bolumler.length,
       bos: !dolu,
-      gundem: gundemVar ? (yedekGundemKullanildi ? "yedek" : "kod") : "yok",
+      gundem: gundemKaynakEtiketi,
       gundem_sayisi: gundemBasliklari.length,
-      model_cagrisi: modelGerekli ? "eksik_belge" : "yapilmadi",
+      kategori,
+      havuz: havuzDurumu,
+      havuz_kalem: havuzKalemleri.length,
+      model_cagrisi: modelCagrisi,
       elenen: elenen.slice(0, 5),
     });
   } catch (e: any) {

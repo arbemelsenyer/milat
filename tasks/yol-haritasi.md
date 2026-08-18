@@ -753,3 +753,14 @@ Kokpitin RAPOR VE BELGELER katmanına "Oturum hazırlık föyleri" bölümü ekl
 BU TURDA TARAFA HİÇBİR ŞEY GÖNDERİLMEDİ; gönderim 2. turda.
 REDEPLOY GEREKLİ: hazirlik-foyu (YENİ) · ajan-nobetci. SQL: kurucu tarafından çalıştırıldı.
 
+
+18.08.2026 — FÖY GÜNDEMİ BİLGİ TABANINA BAĞLANDI. Gündem başlıkları artık koda elle
+yazılmış kalıp listesinden değil, knowledge_base_chunks'tan türüyor ve kategori
+düzeyinde gundem_kalem_havuzu tablosunda saklanıyor. Havuz doluysa model çağrılmıyor;
+boşsa kategori başına BİR KEZ çağrılıyor ve çıkan kalemler mevcut süzgeçlerden geçip
+havuza yazılıyor. Seçim yalnız o tarafın kendi korpusuyla yapılıyor (kör veri korundu);
+kaynak künyesi föye yazılmıyor, havuzda saklanıyor. Elle yazılmış GUNDEM_KALIPLARI /
+BELGE_TURU_KALIPLARI / ASGARI_GUNDEM yolu YEDEK olarak duruyor, silinmedi.
+Föy düğmesinin maliyet uyarısı gerçeğe göre düzeltildi (ortak sabite dokunulmadı).
+REDEPLOY GEREKLİ: hazirlik-foyu. PUBLISH: evet (ön yüz metni). SQL: yok — tablo
+kurucu tarafından önceden canlıya alınmıştı.

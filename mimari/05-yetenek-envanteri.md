@@ -544,3 +544,31 @@ sadeleştirme veya refaktör gerekçesiyle de kaldırılamaz. Alt uzmanlığın 
 edge fonksiyonunda SUNUCU TARAFINDA yazılır (persist:true akışında, geçerli slug gelmezse mevcut
 değer ezilmez); kullanıcının menüden yaptığı ELLE seçimin yazımı istemcide korunur — manuel her
 zaman kazanır (§10.6).
+
+
+[EKLEME 18.08.2026 — GÜNDEM KALEM HAVUZU (föy gündeminin bilgi tabanı bağı)]
+● CANLI. Oturum hazırlık föyündeki "Oturumda konuşulacak başlıklar" bölümünün başlık
+kaynağı artık kodda elle yazılmış kalıp listesi DEĞİL, ürünün kendi bilgi tabanıdır
+(knowledge_base_chunks). Başlıklar uyuşmazlık KATEGORİSİ düzeyinde bir kez türetilir ve
+gundem_kalem_havuzu tablosunda saklanır; yeni bir uyuşmazlık türü ürüne girdiğinde
+kimse elle liste yazmaz — o türün mevzuatı bilgi tabanına yüklendiği anda gündem de
+kendiliğinden oluşur.
+· Kategori sözlüğü ORTAKTIR: cases.dispute_type ile knowledge_base_chunks.category aynı
+  değerleri kullanır (kira · işçi_işveren · tüketici · fikri_mülkiyet · sigorta ·
+  ticari · sağlık · aile · inşaat · gayrimenkul · bankacılık · enerji_maden · spor ·
+  genel · mevzuat). Föy tarafında sıra: dispute_type → category → dispute_subtype →
+  "genel".
+· MALİYET: havuz doluysa model çağrısı YOKTUR. Model yalnız bir kategorinin havuzu ilk
+  kez kurulurken çağrılır; o türün sonraki bütün föyleri bedavadır.
+· HALÜSİNASYON SINIRI (m.2): modelden istenen tek şey konu başlığı + anahtar sözcük +
+  kaynak adı + alıntıdır. Kaynak adı verilen parça listesinde yoksa künye boş bırakılır;
+  alıntı harf katlamasıyla kaynak metninde doğrulanır, doğrulanamazsa yalnız o alan boş
+  kalır (kayıt elenmez). Başlık, gündem üreten her yolun geçtiği tek kapıdan
+  (gundemBasligiKur) ve dil süzgeçlerinden geçer; rakam taşıyan başlık elenir.
+· KÖR VERİ (m.1): havuz kategori düzeyindedir, hiçbir dosya verisi taşımaz. Föye hangi
+  başlığın gireceği YALNIZ o tarafın kendi korpusuyla (dosya konusu + tür + o tarafın
+  beyanı + kendi belge özetleri + kendi belge adları) belirlenir. Kaynak künyesi föy
+  metnine YAZILMAZ; föy sade kalır, künye havuzda saklanır.
+· YEDEK YOL SİLİNMEZ: türetme başarısız olursa ya da havuzdan hiçbir başlık eşleşmezse
+  elle yazılmış GUNDEM_KALIPLARI / BELGE_TURU_KALIPLARI / ASGARI_GUNDEM yolu devreye
+  girer. USUL_BASLIGI ("Oturumda kimin yer alacağı ve karar yetkisi") her föyde vardır.

@@ -141,3 +141,12 @@ Gün sonu belge komutuna dahildir.
 - analyze-meeting-notes: kodda değişiklik gerekmedi. verify_jwt zaten true ve fonksiyon
   Authorization + getUser + dosya kapsamlı yetki (arabulucu/sahip/admin) denetimini AI
   çağrısından önce yapıyor; yetkisizde 401/403 dönüyor.
+- 18.08: public.gundem_kalem_havuzu tablosu CANLIDA (kurucu kurdu, bu turda SQL
+  çalıştırılmadı): id uuid pk · kategori text · baslik text · ipuclari text[] ·
+  kaynak_source_title text · kaynak_alinti text · durum text default 'etkin' ·
+  created_at timestamptz. UNIQUE (kategori, baslik) · CHECK durum IN ('etkin','pasif')
+  · index (kategori) · RLS AÇIK, POLİTİKA YOK (yalnız service role erişir).
+  KULLANAN: supabase/functions/hazirlik-foyu (okuma + upsert onConflict
+  "kategori,baslik"). Havuz kategori düzeyindedir, dosya verisi TAŞIMAZ.
+  NOT: bir kategoride satır var ama hepsi 'pasif' ise fonksiyon yeniden türetme
+  YAPMAZ (kurucunun bilerek kapattığı kabul edilir), doğrudan yedek yola geçer.

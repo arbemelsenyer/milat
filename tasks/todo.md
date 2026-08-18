@@ -40,6 +40,51 @@ e-postayla tarafa gitmesi (arabulucu "Gönder"e basınca, kendiliğinden değil)
 ekranında "Oturum hazırlığım" bölümü (tarafın oturum tarihini görememesi sorununu da
 çözer) + maliyet işaretinin kaldırılması.
 
+## Nerede kaldık — 18.08.2026 (83) · FÖY GÜNDEMİ BİLGİ TABANINA BAĞLANDI
+
+BİTTİ (18.08): Gündem başlıkları artık koda elle yazılmış kalıp listesinden DEĞİL,
+üründeki bilgi tabanından (knowledge_base_chunks) türüyor. Yeni bir uyuşmazlık türü
+geldiğinde kimse elle liste yazmayacak.
+
+AKIŞ (hazirlik-foyu/index.ts)
+1. Dosyanın KATEGORİSİ bulunuyor: cases.dispute_type → category → dispute_subtype →
+   "genel". (cases.dispute_type ile knowledge_base_chunks.category aynı sözlük.)
+2. gundem_kalem_havuzu'ndan o kategorinin ETKİN kalemleri okunuyor. Havuz DOLUYSA
+   HİÇBİR MODEL ÇAĞRISI YAPILMIYOR — bu yol bedava.
+3. Havuz BOŞSA o kategorinin mevzuat parçaları (limit 40) modele veriliyor; model
+   yalnız KONU BAŞLIĞI + 2-5 anahtar sözcük + kaynak + alıntı üretiyor. Çıkan her
+   kalem mevcut süzgeçlerden geçiyor (gundemBasligiKur tek kapı · yasakIfade ·
+   hukukiNitelemeVarMi · soruYasakMi · soruYonYasakMi · gundemTutumMu + rakam yasağı).
+   Geçenler havuza upsert ediliyor → o kategori için bir daha model çağrılmıyor.
+4. Föye girecek başlıklar havuzdan, YALNIZ o tarafın kendi korpusuyla seçiliyor
+   (dosya konusu + tür + BU TARAFIN beyanı + kendi belge özetleri + kendi belge adları).
+5. Havuzdan başlık çıkmazsa GUNDEM_KALIPLARI / BELGE_TURU_KALIPLARI / ASGARI_GUNDEM
+   yolu YEDEK olarak devreye giriyor. O kod SİLİNMEDİ ve silinmeyecek.
+
+KÖR VERİ: Havuz KATEGORİ düzeyinde; hiçbir dosya verisi taşımıyor. Eşleştirme yalnız
+o tarafın kendi korpusuyla. Föy metnine kaynak künyesi YAZILMIYOR (föy sade kalıyor);
+künye yalnız havuz satırında saklanıyor.
+
+EK KARAR (kodda uygulandı): Kategoride satır VAR ama hepsi 'pasif' ise yeniden türetme
+YAPILMIYOR — kurucunun kalemleri bilerek kapattığı anlamına gelir; boşuna ücret çıkmaz,
+doğrudan yedek yola geçilir.
+
+ÖN YÜZ: Föy düğmesinin altındaki maliyet uyarısı düzeltildi. Artık "Bu tür için ilk
+hazırlıkta bir kez yapay zekâ çağrısı yapılabilir; sonraki föyler ücretsizdir." Ortak
+UCRETLI_ISARET_METNI sabitine DOKUNULMADI (14 düğme onu kullanıyor); metin yalnız föy
+düğmesine prop ile verildi.
+
+DOĞRULANDI: npx tsc --noEmit -p tsconfig.json temiz · edge fonksiyon tekil tsc temiz ·
+npx vite build temiz (35 sn).
+
+SIRADAKİ ADIM (19.08 ilk iş)
+- REDEPLOY: hazirlik-foyu (Lovable GitHub push'unu edge fonksiyona OTOMATİK DEPLOY ETMEZ).
+- PUBLISH: ön yüz metni için gerekli.
+- Canlı doğrulama: bir kira dosyasında "Yeniden hazırla" → dönüş gövdesindeki
+  `havuz` ("turetildi" beklenir) ve `kategori` alanları okunacak; ikinci bir kira
+  dosyasında `havuz: "dolu"` ve `model_cagrisi: "yapilmadi"` görülmeli.
+- 17.08'den DEVREDEN: föyde saatin 10:00 göründüğü hâlâ canlıda doğrulanmadı.
+
 ## Nerede kaldık — 17.08.2026 (82) · OTURUM HAZIRLIK FÖYÜ — AŞAMA 4'E TAŞINDI
 
 BİTTİ (17.08): Oturum hazırlık föyü 1. tur canlıda (İBA 3.1). Föy kendi bölümü olarak

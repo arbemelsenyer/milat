@@ -10918,7 +10918,7 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
                           ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Hazırlanıyor…</>
                           : <><Sparkles className="h-4 w-4 mr-1" /> {f ? "Yeniden hazırla" : "Föy hazırla"}</>}
                       </Button>
-                      <UcretliIsaret />
+                      <UcretliIsaret metin="Bu tür için ilk hazırlıkta bir kez yapay zekâ çağrısı yapılabilir; sonraki föyler ücretsizdir." />
                     </div>
                   )}
                 </div>

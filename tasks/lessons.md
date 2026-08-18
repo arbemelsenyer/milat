@@ -170,3 +170,16 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   Aşama 4'te duruyordu, bileşen hiç çizilmiyordu. Ders: "bölüm görünmüyor" denince önce
   dosyanın current_phase'i ile bölümün kayıtlı olduğu aşama karşılaştırılır.
 
+- DERS (18.08.2026) — PAYLAŞILAN METİN SABİTİ TEK KOL İÇİN DEĞİŞTİRİLMEZ. Föyün maliyet
+  uyarısı yanlış hâle gelmişti; düzeltmenin kolay yolu UcretliIsaret.tsx içindeki
+  UCRETLI_ISARET_METNI sabitini değiştirmekti — ama o sabiti 14 düğme kullanıyor ve
+  hepsi gerçekten her basışta ücret üretiyor. Sabit değiştirilseydi tek kolu düzeltirken
+  on üç kolu yalancı çıkaracaktı. Kural: ortak bileşenin varsayılan metni yalnız
+  DAVRANIŞI değişen tüm yüzeyler için geçerliyse değiştirilir; tek kola özgü gerçek
+  prop ile verilir. Değiştirmeden önce bileşenin kaç yerde kullanıldığı grep'le sayılır.
+- DERS (18.08.2026) — "ÜCRETSİZ" ETİKETİ KODUN BUGÜNKÜ HÂLİNE BAĞLIDIR, BELGEYE DEĞİL.
+  Dosya başlığında "bu fonksiyon artık hiç ücretli çağrı yapmaz" yazıyordu; havuz
+  türetmesi eklenince bu cümle ve dönüş gövdesindeki sabit `model_cagrisi: "yapilmadi"`
+  yanlışa döndü. Kural: maliyet/çağrı bildiren her alan HESAPLANIR, sabit yazılmaz; kola
+  model çağrısı ekleyen her tur, dosya başlığındaki maliyet cümlesini de aynı commit'te
+  düzeltir.
