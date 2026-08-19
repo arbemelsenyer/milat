@@ -135,13 +135,14 @@ Deno.serve(async (req) => {
     const ortusen: any[] = [];
     const yakin: any[] = [];
     const ayrilan: any[] = [];
-    const tekTarafli: any[] = [];
+    // Adı iki tarafta da geçmeyen kalemler: tutar eşleştirmesi için beklemede.
+    const kalanlar: Kalem[] = [];
 
     for (const [, grup] of gruplar) {
       const partiler = Array.from(new Set(grup.map((k) => k.party_id)));
       const ad = grup[0].kalem_adi;
       if (partiler.length < 2) {
-        tekTarafli.push({ kalem: ad, taraf: partiler[0] ?? null });
+        for (const k of grup) kalanlar.push(k);
         continue;
       }
       const a = grup.find((k) => k.party_id === partiler[0])!;
@@ -172,10 +173,64 @@ Deno.serve(async (req) => {
       }
     }
 
+    /* EK ADIM (19.08 canlı bulgu) — TUTAR EŞLEŞMESİ, deterministik, model YOK.
+       Taraflar aynı kaleme farklı ad verdiğinde ad eşleşmesi tutmuyordu
+       ("Ameliyat ve Hastane Masrafları" 68.400 ↔ "ameliyat bedeli iadesi" 68.400).
+       Kural: tutarı BİREBİR aynı olan kalemler, o tutar HER İKİ TARAFTA DA TEK
+       kalemde geçiyorsa eşleştirilir. Aynı tutar birden çok kaleme denk geliyorsa
+       EŞLEŞTİRME YAPILMAZ — belirsizlikte boş bırakılır, uydurulmaz (m.2). */
+    const tutarSayaci = new Map<string, number>();
+    for (const k of kalanlar) {
+      if (k.tutar === null) continue;
+      const anah = `${k.party_id}|${k.tutar}`;
+      tutarSayaci.set(anah, (tutarSayaci.get(anah) ?? 0) + 1);
+    }
+    const eslesenler = new Set<Kalem>();
+    for (const k of kalanlar) {
+      if (k.tutar === null || eslesenler.has(k)) continue;
+      if ((tutarSayaci.get(`${k.party_id}|${k.tutar}`) ?? 0) !== 1) continue;   // kendi tarafında tek olmalı
+      const karsi = kalanlar.find((x) =>
+        x !== k && !eslesenler.has(x) && x.party_id !== k.party_id && x.tutar === k.tutar);
+      if (!karsi) continue;
+      if ((tutarSayaci.get(`${karsi.party_id}|${karsi.tutar}`) ?? 0) !== 1) continue;   // karşıda da tek olmalı
+      eslesenler.add(k);
+      eslesenler.add(karsi);
+      ortusen.push({
+        kalem: `${k.kalem_adi} ↔ ${karsi.kalem_adi}`,
+        tutar: k.tutar,
+        not: "tutar birebir aynı, adlar farklı",
+      });
+    }
+
+    const tekTarafli = kalanlar.filter((k) => !eslesenler.has(k))
+      .map((k) => ({ kalem: k.kalem_adi, taraf: k.party_id }));
+
+    /* Tek taraflı kalemler ÖZETE girer: arabulucu "karşılığı olmayan kaç kalem
+       var" sorusunu ekranı gezmeden görsün. Taraf etiketi rolden okunur; rol
+       bilinmiyorsa "bir tarafta" denir — uydurma etiket kullanılmaz. */
+    const { data: rolSatirlari } = await admin.from("case_parties")
+      .select("id, party_role").eq("case_id", case_id).limit(10);
+    const rolAdi = new Map<string, string>();
+    for (const r of ((rolSatirlari ?? []) as any[])) {
+      const rol = String(r.party_role ?? "");
+      rolAdi.set(String(r.id), rol === "applicant" ? "başvurucuda" : rol ? "diğer tarafta" : "bir tarafta");
+    }
+    const tekSayim = new Map<string, number>();
+    for (const t of tekTarafli) {
+      const etiket = rolAdi.get(String(t.taraf)) ?? "bir tarafta";
+      tekSayim.set(etiket, (tekSayim.get(etiket) ?? 0) + 1);
+    }
+    const tekMetni = Array.from(tekSayim.entries())
+      .map(([etiket, n]) => `${n} kalem yalnız ${etiket}`)
+      .join(", ");
+
     const toplam = ortusen.length + yakin.length + ayrilan.length;
-    const ozet = toplam === 0
-      ? "İki tarafta da karşılığı olan ortak kalem bulamadım."
-      : `${toplam} ortak kalemin ${ortusen.length}'i örtüşüyor, gerçek ayrılık ${ayrilan.length} yerde.`;
+    const ozet = [
+      toplam === 0
+        ? "İki tarafta da karşılığı olan ortak kalem bulamadım."
+        : `${toplam} ortak kalemin ${ortusen.length}'i örtüşüyor, gerçek ayrılık ${ayrilan.length} yerde.`,
+      tekMetni ? `${tekMetni}.` : "",
+    ].filter(Boolean).join(" ");
 
     // Çıktı YALNIZ arabulucunun satırına yazılır; tarafa_gorunur verilmez.
     await anlatim.adim(ozet);

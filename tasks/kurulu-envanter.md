@@ -259,6 +259,11 @@ Gün sonu belge komutuna dahildir.
   şerit olarak durur, "Cevap yaz" ile cevap kipine geçilir.
 
 [EKLEME 19.08.2026 — ÜÇ YENİ AJAN İŞİ · AŞAMA MOTORU · SESLİ GİRİŞ]
+- 19.08: masa-kalem-karsilastir EŞLEŞTİRME ÖLÇÜSÜ genişletildi. Ad eşleşmesine ek
+  olarak TUTAR eşleşmesi: tutarı birebir aynı olan kalemler, o tutar her iki
+  tarafta da TEK kalemde geçiyorsa eşleşir ("tutar birebir aynı, adlar farklı").
+  Aynı tutar birden çok kaleme denk geliyorsa eşleştirme YAPILMAZ. Özet cümlesine
+  tek taraflı kalem sayısı da girer. Model çağrısı yok, deterministik.
 - Edge fonksiyon: masa-kalem-karsilastir — YENİ (verify_jwt=false, kendi kapısı).
   İki tarafın kalemlerini örtüşen/yakın/ayrılan diye ayırır, sonucu kendi durum
   satırının last_output.karsilastirma alanına yazar; kokpitteki "Kalem

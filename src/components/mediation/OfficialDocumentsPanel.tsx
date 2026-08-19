@@ -13,10 +13,10 @@ import { downloadOfficialPdf, downloadOfficialDocx, downloadOfficialUdf, officia
 // TASLAK DENETİMİ — 16.08.2026'da EKRANDAN KALDIRILDI (kurucu kararı).
 // Sebep: tutanak/anlaşma şablonları yüklenmeden denetim gerçek bir kontrol yapamıyor;
 // kutu "denetimde eksiklik görünmüyor" yazıp yanlış güven veriyordu.
-// Kod SİLİNMEDİ: bileşen src/components/mediation/TaslakDenetimi.tsx'te duruyor.
-// GERİ AÇMAK İÇİN: aşağıdaki import satırının ve taslak metninin altındaki
-// <TaslakDenetimi …/> çağrısının yorum işaretlerini kaldırmak yeter.
-// import { TaslakDenetimi } from "@/components/mediation/TaslakDenetimi";
+// 19.08.2026 — GERİ AÇILDI: kutu 16.08'de "şablonlar yüklenince geri açılacak"
+// notuyla kapatılmıştı; şart sağlandı (47 şablon yüklü). Bileşen hep yerinde
+// durdu (src/components/mediation/TaslakDenetimi.tsx), yalnız çağrısı kapalıydı.
+import { TaslakDenetimi } from "@/components/mediation/TaslakDenetimi";
 
 interface Props {
   caseRow: any;
@@ -571,10 +571,10 @@ ${paragraphElems.join("\n")}
                         Onayla
                       </Button>
                     </div>
-                    {/* Taslak denetimi kutusu 16.08.2026'da kaldırıldı (şablonlar
-                        yüklendikten sonra geri açılacak). Geri açmak için bu satırın ve
-                        yukarıdaki import satırının yorumunu kaldırın: */}
-                    {/* <TaslakDenetimi caseId={caseRow?.id} metin={doc.filled_text} /> */}
+                    {/* Taslak denetimi kutusu 19.08.2026'da geri açıldı (şablon şartı
+                        sağlandı). Denetim belgeyi DEĞİŞTİRMEZ; yalnız belirsiz, eksik ya
+                        da çelişkili görünen noktaları gösterir, düzeltmeyi insan yapar. */}
+                    <TaslakDenetimi caseId={caseRow?.id} metin={doc.filled_text} />
                   </div>
                 )}
               </li>

@@ -1,3 +1,17 @@
+## Nerede kaldık — 19.08.2026 (95) · EŞLEŞTİRME ÖLÇÜSÜ + TASLAK DENETİMİ KUTUSU
+
+- [x] masa-kalem-karsilastir: ada ek olarak TUTAR eşleşmesi. Tutarı birebir aynı
+      olan kalemler, o tutar her iki tarafta da TEK kalemde geçiyorsa eşleşiyor;
+      belirsizlikte (aynı tutar birden çok kalemde) eşleştirme yapılmıyor.
+      Özet cümlesine tek taraflı kalem sayısı da girdi.
+- [x] Taslak denetimi kutusu OfficialDocumentsPanel'de geri açıldı (16.08'de
+      "şablonlar yüklenince" notuyla kapatılmıştı; şart sağlandı).
+- [x] Föy gönderimi motora bağlandı, kuralı açıldı; bilirkişi ve taslak kuralları
+      veritabanına eklendi.
+
+SIRADA: masa-kalem-karsilastir redeploy + publish, sonra canlı test — farklı ad
+aynı tutar eşleşiyor mu, taslak denetimi kutusu belge altında görünüyor mu.
+
 ## Nerede kaldık — 19.08.2026 (94) · FÖY GÖNDERİMİ MOTORA BAĞLANDI
 
 - [x] hazirlik-foyu-gonder ortak motora bağlandı: MOTORA_BAGLI listesinde, zorunlu
