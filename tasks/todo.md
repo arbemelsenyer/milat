@@ -10,6 +10,7 @@
       masa-kalem-karsilastir'ı kendiliğinden çağırdı (19:32:07 → 19:33:08).
 - [x] CANLI TEST 2: eşleştirme ölçüsü doğrulandı — özet: "2 ortak kalemin 2'si
       örtüşüyor, gerçek ayrılık 0 yerde. 4 kalem yalnız başvurucuda."
+- [x] CLAUDE.md'ye SABİT KURALLAR bölümü eklendi (bilmiyorum/referans/döküm).
 
 SIRADA: publish ekran kontrolü · bilirkişi ve taslak kollarının canlı testi ·
 föy onayının uçtan uca gönderim testi.

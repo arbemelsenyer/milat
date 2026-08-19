@@ -91,3 +91,11 @@ değişmediği işlerde (yalnız keşif, inceleme, rapor) bu adım atlanır.
 - Her görev BİTİMİNDE, "bitti" demeden önce: tasks/todo.md'de tamamlananı [x] işaretle; kalan işleri ve bir sonraki adımı "## Nerede kaldık" başlığı altına 2-3 satırla yaz (tarih ekle).
 - Yeni bir ders/tuzak çıktıysa tasks/lessons.md'ye tek satır ekle.
 - Bu ritüel atlanamaz: todo.md güncellenmeden görev tamamlanmış sayılmaz.
+
+## SABİT KURALLAR (19.08.2026, kurucu)
+- Bilmediğin yerde "bilmiyorum" yaz. Uydurma, sanma, tahmin yürütme.
+- Yaptığın ve bulduğun her şeyi referansıyla yaz (dosya + satır).
+- Emin olmadığın şeyi yapılmış gibi raporlama.
+- Komutta bölüm listesi varsa cevabın sonuna "BÖLÜM DÖKÜMÜ" yaz: her bölüm
+  için YAPILDI ya da ATLANDI(sebep). Sessiz atlama yasak.
+- Her cevabın sonunda üç satır: commit / değişen / gereken.
