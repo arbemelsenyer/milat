@@ -3616,6 +3616,83 @@ export type Database = {
           },
         ]
       }
+      taraf_kalemleri: {
+        Row: {
+          ajan_notu: string | null
+          case_id: string
+          created_at: string
+          dayanak_alinti: string | null
+          dayanak_belge_id: string | null
+          durum: string
+          id: string
+          kalem_adi: string
+          kaynak: string
+          para_birimi: string
+          party_id: string
+          tutar: number | null
+          updated_at: string
+        }
+        Insert: {
+          ajan_notu?: string | null
+          case_id: string
+          created_at?: string
+          dayanak_alinti?: string | null
+          dayanak_belge_id?: string | null
+          durum?: string
+          id?: string
+          kalem_adi: string
+          kaynak?: string
+          para_birimi?: string
+          party_id: string
+          tutar?: number | null
+          updated_at?: string
+        }
+        Update: {
+          ajan_notu?: string | null
+          case_id?: string
+          created_at?: string
+          dayanak_alinti?: string | null
+          dayanak_belge_id?: string | null
+          durum?: string
+          id?: string
+          kalem_adi?: string
+          kaynak?: string
+          para_birimi?: string
+          party_id?: string
+          tutar?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "taraf_kalemleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "taraf_kalemleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "taraf_kalemleri_dayanak_belge_id_fkey"
+            columns: ["dayanak_belge_id"]
+            isOneToOne: false
+            referencedRelation: "case_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "taraf_kalemleri_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       taraf_musaitlik: {
         Row: {
           baslangic: string
