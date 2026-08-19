@@ -10721,6 +10721,16 @@ type FoySatiri = {
   gonderim_zamani: string | null;
 };
 
+/* Gönderim kaydı (public.foy_gonderim_kayitlari) — föy başına en son deneme.
+   status: 'kabul_edildi' (e-posta servisi isteği KABUL ETTİ — teslim değildir) ·
+   'hata' · 'suzgec_engelledi' (iletişim tercihi durdurdu). */
+type GonderimKaydi = {
+  foy_id: string;
+  status: string;
+  error_message: string | null;
+  created_at: string;
+};
+
 const FOY_DURUM_ETIKET: Record<string, string> = {
   taslak: "taslak",
   onaylandi: "onaylandı",
@@ -10737,6 +10747,7 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [hata, setHata] = useState<string | null>(null);
   const [bilgi, setBilgi] = useState<string | null>(null);
+  const [kayitlar, setKayitlar] = useState<Record<string, GonderimKaydi>>({});
 
   const yukle = useCallback(async () => {
     setYukleniyor(true);
@@ -10771,8 +10782,27 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
       const harita: Record<string, FoySatiri> = {};
       for (const f of ((fy ?? []) as any[])) harita[String(f.party_id)] = f as FoySatiri;
       setFoyler(harita);
+
+      /* Gönderim kayıtları (foy_gonderim_kayitlari): föy başına EN SON deneme.
+         'kabul_edildi' = e-posta servisi isteği kabul etti; TESLİM DEĞİLDİR. */
+      const foyIdleri = Object.values(harita).map((x) => String(x.id));
+      if (foyIdleri.length > 0) {
+        const { data: kt } = await (supabase.from("foy_gonderim_kayitlari" as any) as any)
+          .select("foy_id, status, error_message, created_at")
+          .in("foy_id", foyIdleri)
+          .order("created_at", { ascending: false });
+        const sonKayitlar: Record<string, GonderimKaydi> = {};
+        for (const k of ((kt ?? []) as any[])) {
+          const anahtar = String(k.foy_id);
+          if (!sonKayitlar[anahtar]) sonKayitlar[anahtar] = k as GonderimKaydi;
+        }
+        setKayitlar(sonKayitlar);
+      } else {
+        setKayitlar({});
+      }
     } else {
       setFoyler({});
+      setKayitlar({});
     }
     setYukleniyor(false);
   }, [caseRow.id]);
@@ -10812,10 +10842,10 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
     setBusy(null);
   }
 
-  async function foyOnayla(partyId: string) {
+  async function foyOnayla(partyId: string, sonraGonder = false) {
     const f = foyler[partyId];
     if (!f) return;
-    setBusy(`onay:${partyId}`);
+    setBusy(sonraGonder ? `onaygonder:${partyId}` : `onay:${partyId}`);
     setHata(null);
     const { data: kullanici } = await supabase.auth.getUser();
     const govde: Record<string, unknown> = {
@@ -10827,8 +10857,19 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
     if ((taslak[partyId] ?? "").trim()) govde.bolumler = metniBolumlereCevir(taslak[partyId]);
     const { error } = await (supabase.from("oturum_hazirlik_foyleri" as any) as any)
       .update(govde).eq("id", f.id);
-    if (error) setHata(`Föy onaylanamadı: ${error.message}`);
-    else { setTaslak((o) => ({ ...o, [partyId]: "" })); await yukle(); }
+    if (error) {
+      setHata(`Föy onaylanamadı: ${error.message}`);
+      setBusy(null);
+      return;
+    }
+    setTaslak((o) => ({ ...o, [partyId]: "" }));
+    if (sonraGonder) {
+      /* Onay YAZILDI. Gönderim ayrı adımdır: başarısız olursa föy 'onaylandi'
+         kalır ve hata ekranda görünür — onay geri alınmaz. */
+      await foyGonder(partyId);
+      return;   // busy'yi foyGonder kapatır, yeniden yükleme de oradadır.
+    }
+    await yukle();
     setBusy(null);
   }
 
@@ -10949,6 +10990,7 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
             const f = foyler[String(t.id)];
             const durum = String(f?.durum ?? "");
             const kilitli = durum === "onaylandi" || durum === "gonderildi";
+            const sonKayit = f ? kayitlar[String(f.id)] ?? null : null;
             const metin = taslak[String(t.id)] ?? (f ? foyMetni(f) : "");
             return (
               <div key={t.id} className="border rounded p-3 space-y-2">
@@ -10990,12 +11032,21 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
                         {busy === `kaydet:${t.id}` ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
                         Kaydet
                       </Button>
+                      {/* BİRİNCİL: onay + gönderim tek tıkta. Gönderim başarısız
+                          olursa föy 'onaylandi' KALIR — onay geri alınmaz. */}
                       <Button size="sm" className={KART_DUGME}
-                        disabled={busy === `onay:${t.id}`} onClick={() => foyOnayla(String(t.id))}>
-                        {busy === `onay:${t.id}`
+                        disabled={busy === `onaygonder:${t.id}` || busy === `gonder:${t.id}`}
+                        onClick={() => foyOnayla(String(t.id), true)}>
+                        {busy === `onaygonder:${t.id}` || busy === `gonder:${t.id}`
                           ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                           : <CheckCircle2 className="h-4 w-4 mr-1" />}
-                        Onayla
+                        Onayla ve gönder
+                      </Button>
+                      {/* İKİNCİL: bugünkü davranış — yalnız onaylar, göndermez. */}
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
+                        disabled={busy === `onay:${t.id}`} onClick={() => foyOnayla(String(t.id))}>
+                        {busy === `onay:${t.id}` ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+                        Yalnız onayla
                       </Button>
                     </>
                   )}
@@ -11023,16 +11074,36 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
                 </div>
 
                 {durum === "onaylandi" && (
-                  <p className="text-[11px] text-muted-foreground">
-                    Onaylandı. Tarafa gitmesi için Gönder düğmesine basın — kendiliğinden gönderilmez.
-                  </p>
+                  <>
+                    {sonKayit?.status === "hata" && (
+                      <p className="text-[11px] text-destructive">
+                        Gönderilemedi — {sonKayit.error_message || "sebep kaydedilmemiş"}
+                      </p>
+                    )}
+                    <p className="text-[11px] text-muted-foreground">
+                      Onaylandı. Tarafa gitmesi için Gönder düğmesine basın — kendiliğinden gönderilmez.
+                    </p>
+                  </>
                 )}
                 {durum === "gonderildi" && (
-                  <p className="text-[11px] text-muted-foreground">
-                    Gönderildi{f?.gonderim_zamani
-                      ? ` — ${new Date(String(f.gonderim_zamani)).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}`
-                      : ""}
-                  </p>
+                  sonKayit?.status === "hata" ? (
+                    <p className="text-[11px] text-destructive">
+                      Gönderilemedi — {sonKayit.error_message || "sebep kaydedilmemiş"}
+                    </p>
+                  ) : !sonKayit ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      Gönderim kaydı bulunamadı — nöbetçi bunu arabulucu panosuna düşürür.
+                    </p>
+                  ) : (
+                    /* "kabul edildi" = e-posta servisi isteği aldı. TESLİM DEĞİLDİR;
+                       teslim/bounce takibi servis webhook'u ister (2. tur). */
+                    <p className="text-[11px] text-muted-foreground">
+                      Gönderildi{f?.gonderim_zamani
+                        ? ` — ${new Date(String(f.gonderim_zamani)).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}`
+                        : ""}
+                      {sonKayit.status === "kabul_edildi" ? " · e-posta servisi isteği kabul etti" : ""}
+                    </p>
+                  )
                 )}
               </div>
             );

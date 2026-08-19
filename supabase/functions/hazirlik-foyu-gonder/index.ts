@@ -204,6 +204,54 @@ async function sendResend(opts: { from: string; to: string[]; subject: string; h
   try { return JSON.parse(text); } catch { return {}; }
 }
 
+/* ── GÖNDERİM KAYDI (public.foy_gonderim_kayitlari) ───────────────────────────
+   Her gönderim DENEMESİ bir satır bırakır: kabul edilen, hata veren ve süzgecin
+   durdurduğu denemeler dahil. Desen kaynağı meeting_invite_logs.
+   DİL UYARISI: 'kabul_edildi' = "e-posta servisi isteği KABUL ETTİ". Bu TESLİM
+   DEĞİLDİR; gerçek teslim/bounce takibi Resend webhook'u ister ve 2. turdadır.
+   Hiçbir alana "teslim edildi" yazılmaz. Anahtar hiçbir alana yazılmaz.
+   Kayıt yazılamazsa gönderim BAŞARISIZ SAYILMAZ — hata yutulmaz, dönüş
+   gövdesine "kayıt yazılamadı" notu düşer. */
+type KayitDurumu = "kabul_edildi" | "hata" | "suzgec_engelledi";
+
+// attempt = o föy için bugüne kadarki kayıt sayısı + 1.
+async function denemeSayisi(admin: any, foyId: string): Promise<number> {
+  try {
+    const { count, error } = await admin.from("foy_gonderim_kayitlari")
+      .select("id", { count: "exact", head: true }).eq("foy_id", foyId);
+    if (error) return 1;
+    return (count ?? 0) + 1;
+  } catch { return 1; }
+}
+
+async function kayitYaz(admin: any, satir: {
+  foy_id: string; case_id: string; party_id: string; recipient_email: string;
+  status: KayitDurumu; resend_message_id?: string | null; error_message?: string | null;
+  attempt: number;
+}): Promise<string | null> {
+  try {
+    const { error } = await admin.from("foy_gonderim_kayitlari").insert({
+      foy_id: satir.foy_id,
+      case_id: satir.case_id,
+      party_id: satir.party_id,
+      recipient_email: satir.recipient_email,
+      status: satir.status,
+      resend_message_id: satir.resend_message_id ?? null,
+      error_message: satir.error_message ?? null,
+      attempt: satir.attempt,
+    });
+    if (error) {
+      console.error("[hazirlik-foyu-gonder] gönderim kaydı yazılamadı", { foy_id: satir.foy_id, error: error.message });
+      return `gönderim kaydı yazılamadı: ${error.message}`;
+    }
+    return null;
+  } catch (e: any) {
+    const msg = String(e?.message ?? e).slice(0, 200);
+    console.error("[hazirlik-foyu-gonder] gönderim kaydı yazılamadı", { foy_id: satir.foy_id, error: msg });
+    return `gönderim kaydı yazılamadı: ${msg}`;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -275,22 +323,56 @@ Deno.serve(async (req) => {
       .select("id, scheduled_at").eq("id", (foy as any).session_id).maybeSingle();
     const { tarih, saat } = tarihSaat((oturum as any)?.scheduled_at);
 
+    // Kayıt ortak alanları — üç sonuç yolunda da aynı satır iskeleti kullanılır.
+    const kayitTemeli = {
+      foy_id: String((foy as any).id),
+      case_id: String((foy as any).case_id),
+      party_id: String((foy as any).party_id),
+      recipient_email: eposta,
+      attempt: await denemeSayisi(admin, String((foy as any).id)),
+    };
+
     // İLETİŞİM TERCİHİ: gönderim de diğer noktalarla aynı kapıdan geçer.
     const izin = await gonderilsinMi(admin, (foy as any).party_id, "belge_talebi");
     if (!izin.gonder) {
       // Durum DEĞİŞMEZ: föy 'onaylandi' kalır, arabulucu sonra yeniden deneyebilir.
-      return json({ gonderildi: false, sebep: `iletişim tercihi: ${izin.sebep}` });
+      const kayitNotu = await kayitYaz(admin, {
+        ...kayitTemeli, status: "suzgec_engelledi", error_message: izin.sebep,
+      });
+      return json({
+        gonderildi: false, sebep: `iletişim tercihi: ${izin.sebep}`,
+        ...(kayitNotu ? { kayit_yazilamadi: kayitNotu } : {}),
+      });
     }
 
     const displayName = temiz((taraf as any).company_name)
       || `${temiz((taraf as any).first_name)} ${temiz((taraf as any).last_name)}`.trim()
       || "Değerli Taraf";
 
-    await sendResend({
-      from: GONDEREN,
-      to: [eposta],
-      subject: tarih ? `Oturum Hazırlığınız - ${tarih}` : "Oturum Hazırlığınız",
-      html: buildHtml({ displayName, tarih, saat, bolumler: (foy as any).bolumler }),
+    let resendId: string | null = null;
+    try {
+      const resp = await sendResend({
+        from: GONDEREN,
+        to: [eposta],
+        subject: tarih ? `Oturum Hazırlığınız - ${tarih}` : "Oturum Hazırlığınız",
+        html: buildHtml({ displayName, tarih, saat, bolumler: (foy as any).bolumler }),
+      });
+      resendId = (resp && (resp as any).id) ? String((resp as any).id) : null;
+    } catch (e: any) {
+      // Hata kaydı yazılır, sonra hata aynen yukarı verilir (davranış değişmedi).
+      const sade = String(e?.message ?? "Bilinmeyen gönderim hatası");
+      const kayitNotu = await kayitYaz(admin, {
+        ...kayitTemeli, status: "hata", error_message: sade.slice(0, 500),
+      });
+      return json({
+        error: sade,
+        ...(kayitNotu ? { kayit_yazilamadi: kayitNotu } : {}),
+      }, 502);
+    }
+
+    /* İstek kabul edildi. 'kabul_edildi' TESLİM DEĞİLDİR — servis isteği aldı. */
+    const kayitNotu = await kayitYaz(admin, {
+      ...kayitTemeli, status: "kabul_edildi", resend_message_id: resendId,
     });
 
     const gonderimZamani = new Date().toISOString();
@@ -303,10 +385,15 @@ Deno.serve(async (req) => {
       return json({
         gonderildi: true, durum_yazilamadi: true, gonderim_zamani: gonderimZamani,
         sebep: `E-posta gönderildi ancak föy durumu güncellenemedi: ${uErr.message}`,
+        ...(kayitNotu ? { kayit_yazilamadi: kayitNotu } : {}),
       });
     }
 
-    return json({ gonderildi: true, gonderim_zamani: gonderimZamani, sebep: izin.sebep });
+    return json({
+      gonderildi: true, gonderim_zamani: gonderimZamani, sebep: izin.sebep,
+      resend_message_id: resendId,
+      ...(kayitNotu ? { kayit_yazilamadi: kayitNotu } : {}),
+    });
   } catch (e: any) {
     const msg = e?.message ?? "Bilinmeyen sistem hatası";
     console.error("[hazirlik-foyu-gonder] Genel hata:", msg);

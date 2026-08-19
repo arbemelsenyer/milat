@@ -1,3 +1,21 @@
+## Nerede kaldık — 19.08.2026 (88) · GÖNDERİM KAYDI · NÖBETÇİ · TEK DÜĞME
+
+BİTTİ (kodda, deploy bekliyor):
+- [x] hazirlik-foyu-gonder her denemede foy_gonderim_kayitlari'na satır yazıyor:
+      'kabul_edildi' (+ resend_message_id) · 'hata' (+ sadeleştirilmiş mesaj) ·
+      'suzgec_engelledi' (+ süzgecin sebebi). attempt = mevcut kayıt sayısı + 1.
+      Kayıt yazılamazsa gönderim başarısız sayılmıyor; dönüşe "kayıt yazılamadı" notu.
+- [x] "Teslim edildi" ifadesi hiçbir yerde kullanılmadı — 'kabul_edildi' yalnız
+      servisin isteği aldığı anlamına gelir. Webhook 2. turda.
+- [x] ajan-nobetci: kaydı olmayan ya da son kaydı 'hata' olan 'gonderildi' föyler için
+      panoya 'foy_teslim_uyarisi' (yürütülmeyen tip → e-posta yok, mükerrer yazmaz).
+- [x] Panelde taslak föyde birincil "Onayla ve gönder" + ikincil "Yalnız onayla";
+      gönderilmiş föyün altında gönderim kaydına göre üç ayrı durum satırı.
+
+SIRADA: Lovable'da hazirlik-foyu-gonder VE ajan-nobetci redeploy + publish, sonra
+canlı test — taslak föyde tek tıkla gönderim, kayıt satırının düşmesi, nöbetçi turunda
+kaydı olmayan eski föy için panoya uyarı düşmesi.
+
 ### Z RAPORU — 18.08.2026 (gün kapandı)
 
 ## Nerede kaldık — 18.08.2026 (87) · GÜN SONU

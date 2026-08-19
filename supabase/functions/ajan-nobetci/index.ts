@@ -1004,6 +1004,74 @@ async function eksikBilgiGorevleriAc(admin: any, dosya: any, taraflar: any[]): P
   return { acilan, sebepler };
 }
 
+/* ── FÖY TESLİM DOĞRULAMASI (İBA 3.3, 2. tur) ────────────────────────────────
+   'gonderildi' işaretli föylerin gönderim kaydı (foy_gonderim_kayitlari) VAR MI,
+   varsa en son denemesi hata mı verdi — bunu kontrol eder. Bulgu için panoya
+   'foy_teslim_uyarisi' satırı düşer; bu tip YURUTULEN_TIPLER listesinde DEĞİLDİR,
+   yani nöbetçi onu yürütmez ve HİÇBİR E-POSTA GÖNDERMEZ. İş arabulucunundur.
+   MÜKERRER YAZMAZ: aynı dosya + tip + hedef taraf için 'bekliyor' satır varsa
+   yeniden yazılmaz (analiz_baslat / randevu_teklifi kollarındaki kalıp).
+   DİL: "teslim edildi" denmez — servis yalnız isteği kabul ettiğini söyler. */
+async function foyTeslimGorevleriAc(admin: any, dosya: any, taraflar: any[]): Promise<{ acilan: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  let acilan = 0;
+
+  const { data: foyler, error: fErr } = await admin.from("oturum_hazirlik_foyleri")
+    .select("id, party_id, durum, gonderim_zamani")
+    .eq("case_id", dosya.id).eq("durum", "gonderildi").limit(50);
+  if (fErr) {
+    sebepler.push(`föy teslim doğrulaması yapılamadı: föyler okunamadı — ${fErr.message}`);
+    return { acilan, sebepler };
+  }
+  if (!foyler || foyler.length === 0) return { acilan, sebepler };
+
+  for (const f of (foyler as any[])) {
+    const { data: kayitlar, error: kErr } = await admin.from("foy_gonderim_kayitlari")
+      .select("id, status, error_message, created_at")
+      .eq("foy_id", f.id).order("created_at", { ascending: false }).limit(1);
+    if (kErr) {
+      sebepler.push(`föy teslim doğrulaması yapılamadı: gönderim kaydı okunamadı — ${kErr.message}`);
+      continue;
+    }
+    const son = ((kayitlar ?? []) as any[])[0] ?? null;
+    let sebep = "";
+    if (!son) sebep = "gönderim kaydı yok";
+    else if (String(son.status) === "hata") {
+      sebep = `e-posta servisi hatası: ${metin(son.error_message) || "sebep kaydedilmemiş"}`;
+    }
+    if (!sebep) continue;   // en son kayıt kabul edildi ya da süzgeç engelledi
+
+    // Mükerrer yazma: aynı dosya + tip + hedef taraf için bekleyen satır varsa geç.
+    const { data: mevcut } = await admin.from("ajan_gorevleri")
+      .select("id").eq("case_id", dosya.id).eq("gorev_tipi", "foy_teslim_uyarisi")
+      .eq("hedef_party_id", f.party_id).eq("durum", "bekliyor").limit(1);
+    if (mevcut && mevcut.length > 0) continue;
+
+    const t = taraflar.find((x) => String(x.id) === String(f.party_id));
+    const ad = t
+      ? (t.party_type === "individual"
+        ? `${metin(t.first_name)} ${metin(t.last_name)}`.trim()
+        : metin(t.company_name))
+      : "";
+    const kim = ad || "taraf";
+
+    const { error } = await admin.from("ajan_gorevleri").insert({
+      case_id: dosya.id,
+      gorev_tipi: "foy_teslim_uyarisi",
+      durum: "bekliyor",
+      hedef_party_id: f.party_id,
+      gerekce: `${kim}: hazırlık föyü gönderildi işaretli ama ${sebep}`,
+    });
+    if (error) {
+      console.error(`[ajan-nobetci] foy_teslim_uyarisi yazılamadı (${dosya.id}): ${error.message}`);
+      sebepler.push(`föy teslim uyarısı yazılamadı: ${error.message}`);
+      continue;
+    }
+    acilan++;
+  }
+  return { acilan, sebepler };
+}
+
 async function eksikBilgiYurut(admin: any, dosya: any, partyId: string): Promise<{ durum: string; sonuc: string }> {
   const { data: taraf } = await admin.from("case_parties").select("*").eq("id", partyId).maybeSingle();
   if (!taraf) return { durum: "atlandi", sonuc: "Taraf kaydı bulunamadı" };
@@ -2199,6 +2267,10 @@ Deno.serve(async (req) => {
 
         const eksikKol = await eksikBilgiGorevleriAc(admin, dosya, taraflar);
         eksikKol.sebepler.forEach(sebepEkle);
+
+        // ── FÖY TESLİM DOĞRULAMASI (İBA 3.3): yalnız panoya uyarı düşer, e-posta yok ──
+        const foyTeslimKol = await foyTeslimGorevleriAc(admin, dosya, taraflar);
+        foyTeslimKol.sebepler.forEach(sebepEkle);
 
         // ── TUR C-2: kör teklif v2 — koşullu aralık / braketleme ──
         const braketKol = await braketKollari(admin, dosya, taraflar);

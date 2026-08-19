@@ -799,3 +799,16 @@ sectionDefs kaydı silindi. Föy artık yalnız Aşama 4'ün en üstünde (faz4-
 HazirlikFoyuPanel bileşenine, Aşama 4 kartına, sol menü girdisine ve katman
 tanımlarına dokunulmadı; kokpit menüsü ve numaralandırma sectionDefs'ten türediği
 için kendiliğinden güncellendi. REDEPLOY: yok. PUBLISH: evet. SQL: yok.
+
+19.08.2026 — FÖY GÖNDERİM KAYDI + NÖBETÇİ DOĞRULAMASI + "ONAYLA VE GÖNDER".
+hazirlik-foyu-gonder her denemede foy_gonderim_kayitlari'na satır yazıyor
+('kabul_edildi' / 'hata' / 'suzgec_engelledi', attempt sayacıyla); kayıt yazılamazsa
+gönderim başarısız sayılmıyor, dönüş gövdesine not düşüyor. "Teslim edildi" ifadesi
+hiçbir yerde kullanılmadı — servis yalnız isteği kabul ediyor, webhook 2. turda.
+ajan-nobetci'ye yeni kontrol: kaydı olmayan ya da son kaydı hata olan 'gonderildi'
+föyler için panoya 'foy_teslim_uyarisi' düşüyor (yürütülmeyen tip — e-posta yok,
+mükerrer yazmıyor). Arabulucu panelinde taslak föyde birincil "Onayla ve gönder" +
+ikincil "Yalnız onayla"; gönderilmiş föyün altında gönderim kaydına göre üç ayrı
+satır. Mevcut Kaydet / Yeniden hazırla / Gönder düğmeleri ve nöbetçinin öteki
+kontrolleri değişmedi. REDEPLOY GEREKLİ: hazirlik-foyu-gonder · ajan-nobetci.
+PUBLISH: evet. SQL: yok — tablo ve RLS kurucu tarafından canlıya alınmıştı.

@@ -616,3 +616,26 @@ arasında hiç almayacağını KENDİ belirler. Tercih taraf düzeyindedir
   Kokpitteki mükerrer föy kaydı kaldırıldı; föyün tek yeri Aşama 4'ün en üstü.
   EKSİK (açık kalem): gönderimin TESLİM KAYDI yok — servis dönüş kimliği ve teslim
   durumu hiçbir yere yazılmıyor; İBA denetim izi maddesiyle aynı iştir.
+
+
+[EKLEME 19.08.2026 — FÖY GÖNDERİM KAYDI VE TESLİM DOĞRULAMASI (İBA 3.3, 2. tur)]
+● CANLI (deploy sonrası). Yukarıdaki "teslim kaydı yok" açık kalemi kapatıldı.
+· KAYIT: her gönderim DENEMESİ public.foy_gonderim_kayitlari'na bir satır bırakır —
+  kabul edilen, hata veren ve iletişim tercihi süzgecinin durdurduğu denemeler dahil.
+  attempt = o föy için mevcut kayıt sayısı + 1. Desen kaynağı meeting_invite_logs.
+· DİL SINIRI (bağlayıcı): 'kabul_edildi' = "e-posta servisi isteği KABUL ETTİ".
+  Bu TESLİM DEĞİLDİR. Hiçbir ekranda, kayıtta ve dönüş gövdesinde "teslim edildi"
+  yazmaz. Gerçek teslim/bounce takibi servis webhook'u ister — 2. tura kaldı.
+· SÜZGEÇ ENGELİ: status='suzgec_engelledi' yazılır, föyün durumu DEĞİŞMEZ
+  ('onaylandi' kalır), arabulucu sebebi ekranda görür ve sonra yeniden deneyebilir.
+· KAYIT YAZILAMAZSA gönderim başarısız sayılmaz; hata yutulmaz, dönüş gövdesine
+  "kayıt yazılamadı" notu düşer.
+· NÖBETÇİ DOĞRULAMASI: 'gonderildi' işaretli olup (a) hiç kaydı olmayan veya
+  (b) son kaydı 'hata' olan föyler için panoya 'foy_teslim_uyarisi' düşer
+  (hedef_party_id + gerekçe). Bu tip YURUTULEN_TIPLER listesinde DEĞİLDİR: nöbetçi
+  yürütmez, e-posta göndermez — iş arabulucunundur. Aynı dosya+tip+taraf için
+  'bekliyor' satır varsa mükerrer yazılmaz.
+· TEK DÜĞME: taslak föyde birincil düğme "Onayla ve gönder" (onay yazılır, hemen
+  gönderilir); ikincil küçük düğme "Yalnız onayla" bugünkü davranıştır. Gönderim
+  başarısız olursa föy 'onaylandi' KALIR — onay geri alınmaz. "Kaydet",
+  "Yeniden hazırla" ve onaylanmış föydeki "Gönder" düğmesi yerinde durur.
