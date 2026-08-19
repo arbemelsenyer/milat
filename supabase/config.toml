@@ -154,3 +154,12 @@ verify_jwt = false
 
 [functions.taraf-cevap]
 verify_jwt = true
+
+[functions.masa-kalem-karsilastir]
+verify_jwt = false
+
+[functions.bilirkisi-sorulari]
+verify_jwt = false
+
+[functions.taslak-denetim]
+verify_jwt = false

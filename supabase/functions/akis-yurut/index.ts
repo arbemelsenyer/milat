@@ -143,6 +143,129 @@ async function hataYaz(
   }
 }
 
+/* ── AŞAMA İLERLETME MOTORU (yasa · sahip=sistem) ────────────────────────────
+   cases.current_phase, KOŞULLAR SAĞLANINCA ajan tarafından ilerletilir.
+   Koşullar NESNELDİR: yalnız kayıt sayımı ve kayıt varlığı okunur. Model yorumu,
+   tahmin ve sezgi YASAK — veri yoksa aşama DEĞİŞMEZ (constitution m.2).
+
+   ASLA KENDİLİĞİNDEN GEÇİLMEYENLER (dört insan kapısından ikisi):
+   · Aşama 5 → 6 (bilirkişi): dosyada bilirkişi görevi varsa ajan geçmez.
+   · Aşama 6 → 7 ve sonrası (imza / kapanış): ajan hiçbir koşulda geçmez.
+
+   GERİ ALINABİLİR: arabulucu aşamayı elle geri alabilir. Ajan aynı geçişi
+   yeniden yazmaz — her geçişin panoda "[gecis:ESKİ->YENİ]" etiketli tek kaydı
+   olur ve etiket varsa geçiş tekrar denenmez.
+
+   Kayıt biçimi sohbetin beklediği biçimdir: gerekce = "[gecis:E->Y] sebep".
+   Mevcut aşama kilitleri ve nöbetçinin kendi aşama kolu YERİNDE KALIR; ikisi de
+   aynı etiketi kullandığı için aynı geçiş iki kez yazılamaz. */
+async function asamaSay(admin: any, tablo: string, caseId: string, ekle?: (q: any) => any): Promise<number> {
+  try {
+    let q = admin.from(tablo).select("id", { count: "exact", head: true }).eq("case_id", caseId);
+    if (ekle) q = ekle(q);
+    const { count } = await q;
+    return count ?? 0;
+  } catch { return 0; }
+}
+
+async function asamaHedefi(
+  admin: any, dosya: any,
+): Promise<{ hedef: number | null; sebep: string; neden?: string }> {
+  const mevcut = Math.min(7, Math.max(1, Number(dosya?.current_phase ?? 1) || 1));
+  const caseId = String(dosya.id);
+
+  if (mevcut === 1) {
+    const taraf = await asamaSay(admin, "case_parties", caseId);
+    if (taraf < 2) return { hedef: null, sebep: "", neden: "en az iki taraf kaydı gerekiyor" };
+    const belge = await asamaSay(admin, "case_documents", caseId);
+    const konuVar = String(dosya?.issue_description ?? "").trim().length > 0;
+    if (belge === 0 && !konuVar) return { hedef: null, sebep: "", neden: "belge ya da başvuru metni yok" };
+    return { hedef: 2, sebep: `${taraf} taraf kayıtlı, ${belge} belge yüklü` };
+  }
+
+  if (mevcut === 2) {
+    const taraf = await asamaSay(admin, "case_parties", caseId);
+    const analiz = await asamaSay(admin, "party_analyses", caseId);
+    if (taraf === 0 || analiz < taraf) {
+      return { hedef: null, sebep: "", neden: `taraf analizleri tamam değil (${analiz}/${taraf})` };
+    }
+    const rapor = await asamaSay(admin, "common_ground_reports", caseId);
+    if (rapor < 1) return { hedef: null, sebep: "", neden: "ortak zemin raporu bekleniyor" };
+    return { hedef: 3, sebep: `taraf analizleri tamam (${analiz}/${taraf}) ve ortak zemin raporu üretildi` };
+  }
+
+  if (mevcut === 3) {
+    const oturum = await asamaSay(admin, "case_sessions", caseId, (q: any) => q.eq("status", "scheduled"));
+    if (oturum < 1) return { hedef: null, sebep: "", neden: "planlanmış oturum yok" };
+    return { hedef: 4, sebep: "planlanmış oturum var" };
+  }
+
+  if (mevcut === 4) {
+    const yapilan = await asamaSay(admin, "case_sessions", caseId, (q: any) => q.eq("status", "completed"));
+    if (yapilan < 1) return { hedef: null, sebep: "", neden: "oturum henüz yapıldı işaretlenmedi" };
+    return { hedef: 5, sebep: "oturum yapıldı olarak işaretlendi" };
+  }
+
+  if (mevcut === 5) {
+    // İNSAN KAPISI: dosyada bilirkişi görevi varsa ajan bu aşamayı GEÇMEZ.
+    const bilirkisi = await asamaSay(admin, "case_expert_assignments", caseId);
+    if (bilirkisi > 0) {
+      return { hedef: null, sebep: "", neden: "dosyada bilirkişi görevi var — bu aşama insan kararıyla geçilir" };
+    }
+    const not = await asamaSay(admin, "case_notes", caseId, (q: any) => q.eq("phase", 7));
+    if (not < 1) return { hedef: null, sebep: "", neden: "görüşme notu yok" };
+    return { hedef: 6, sebep: "bilirkişi istenmedi, görüşme notu kayıtlı" };
+  }
+
+  // İNSAN KAPISI: imza ve kapanış aşaması ajan tarafından GEÇİLMEZ.
+  return { hedef: null, sebep: "", neden: "imza ve kapanış aşaması insan kararıyla ilerler" };
+}
+
+async function asamaIlerlet(admin: any): Promise<{ ilerletilen: number; notlar: string[] }> {
+  const notlar: string[] = [];
+  let ilerletilen = 0;
+  try {
+    const { data: dosyalar, error } = await admin.from("cases")
+      .select("id, current_phase, issue_description")
+      .eq("otomatik_akis", true).limit(200);
+    if (error) {
+      notlar.push(`aşama değerlendirmesi yapılamadı: ${error.message}`);
+      return { ilerletilen, notlar };
+    }
+
+    for (const dosya of ((dosyalar ?? []) as any[])) {
+      const mevcut = Math.min(7, Math.max(1, Number(dosya?.current_phase ?? 1) || 1));
+      const { hedef, sebep, neden } = await asamaHedefi(admin, dosya);
+      if (!hedef || hedef <= mevcut) {
+        if (neden) notlar.push(`aşama ilerlemedi (${dosya.id}): ${neden}`);
+        continue;
+      }
+
+      /* Aynı geçiş İKİNCİ KEZ yazılmaz — arabulucu elle geri aldıysa ajan aynı
+         geçişi tekrar denemez. Etiket nöbetçinin kullandığıyla AYNIDIR. */
+      const etiket = `[gecis:${mevcut}->${hedef}]`;
+      const { data: iz } = await admin.from("ajan_gorevleri")
+        .select("id, gerekce").eq("case_id", dosya.id).eq("gorev_tipi", "asama_gecisi").limit(200);
+      if (((iz ?? []) as any[]).some((r) => String(r?.gerekce ?? "").startsWith(etiket))) continue;
+
+      const { error: uErr } = await admin.from("cases")
+        .update({ current_phase: hedef }).eq("id", dosya.id).eq("current_phase", mevcut);
+      if (uErr) { notlar.push(`aşama yazılamadı (${dosya.id}): ${uErr.message}`); continue; }
+
+      // Sohbetin okuduğu biçim: "[gecis:ESKİ->YENİ] sebep".
+      await admin.from("ajan_gorevleri").insert({
+        case_id: dosya.id, gorev_tipi: "asama_gecisi", durum: "yapildi",
+        hedef_party_id: null, gerekce: `${etiket} ${sebep}`.slice(0, 500),
+        sonuc: "ajan ilerletti",
+      });
+      ilerletilen++;
+    }
+  } catch (e: any) {
+    notlar.push(`aşama değerlendirmesi yapılamadı: ${String(e?.message ?? e).slice(0, 120)}`);
+  }
+  return { ilerletilen, notlar };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -330,7 +453,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ ok: true, ...ozet, notlar: ozet.notlar.slice(0, 50) });
+    /* AŞAMA İLERLETME: koşucunun her turunun SONUNDA değerlendirilir. Nöbetçi
+       koşucuyu zaten 3 dakikada bir tetiklediği için yeni bir zamanlayıcı
+       kurulmaz. Koşullar nesnel; sağlanmıyorsa aşama değişmez. */
+    const asama = await asamaIlerlet(admin);
+    ozet.notlar.push(...asama.notlar);
+
+    return json({
+      ok: true, ...ozet,
+      asama_ilerletildi: asama.ilerletilen,
+      notlar: ozet.notlar.slice(0, 50),
+    });
   } catch (e: any) {
     const msg = String(e?.message ?? "Bilinmeyen sistem hatası");
     console.error("[akis-yurut] Genel hata:", msg);

@@ -543,3 +543,26 @@ DEĞİŞMEZ SINIRLAR (yasanın üstünde):
   taraf ajanının metnini görmez; belge karşı tarafa geçmez.
 · Ajan hukuki tavsiye vermez, karar vermez; duygu, kişilik, niyet ve teşhis
   etiketi yasaktır; uydurma yasaktır — bulamadıysa "bulamadım" der.
+
+
+[EKLEME 19.08.2026 — AŞAMA İLERLETME MOTORU (sahip=sistem)]
+● CANLI (deploy sonrası). Aşamanın görüntüsü vardı, ilerleten motor koşucuda YOKTU;
+bu turda akis-yurut'a kondu. Nöbetçi koşucuyu zaten 3 dakikada bir tetiklediği için
+YENİ ZAMANLAYICI KURULMADI.
+· KOŞULLAR NESNELDİR — yalnız kayıt sayımı ve kayıt varlığı okunur. Model yorumu,
+  tahmin ve sezgi YASAK. Veri yoksa aşama DEĞİŞMEZ (constitution m.2):
+  1→2: en az iki taraf kaydı VE (en az bir belge VEYA başvuru metni).
+  2→3: taraf sayısı kadar taraf analizi VE en az bir ortak zemin raporu.
+  3→4: durumu 'scheduled' olan en az bir oturum.
+  4→5: durumu 'completed' olan en az bir oturum.
+  5→6: dosyada bilirkişi görevi YOKSA ve en az bir görüşme notu varsa.
+· ASLA KENDİLİĞİNDEN GEÇİLMEYENLER (dört insan kapısından ikisi):
+  — Bilirkişi: dosyada bilirkişi görevi varsa ajan Aşama 5'i geçmez.
+  — İmza ve kapanış: Aşama 6 ve sonrası ajan tarafından hiçbir koşulda geçilmez.
+· GERİ ALINABİLİR: arabulucu aşamayı elle geri alabilir. Her geçişin panoda
+  "[gecis:ESKİ->YENİ] sebep" etiketli TEK kaydı olur; etiket varsa ajan aynı
+  geçişi bir daha denemez. Yazım koşullu güncellemedir (current_phase hâlâ eski
+  değerdeyse yazılır), böylece elle yapılan değişikliğin üzerine yazılmaz.
+· Kayıt biçimi sohbetin okuduğu biçimdir; nöbetçinin mevcut aşama kolu YERİNDE
+  KALDI ve ikisi AYNI etiketi kullandığı için aynı geçiş iki kez yazılamaz.
+· Mevcut aşama kilitleri (ekrandaki "Aşama 2 tamamlanmadı" gibi) değişmedi.

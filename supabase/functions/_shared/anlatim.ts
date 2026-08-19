@@ -429,6 +429,8 @@ export const MOTORA_BAGLI: string[] = [
   "elverislilik", "usul-onerisi", "usul-engeli", "olay-cizelgesi", "guc-dengesi",
   "iletisim-degisim", "dosya-ozeti-oner", "analyze-meeting-notes",
   "multi-agent-negotiation",
+  // 19.08 · masa kalem karşılaştırması, bilirkişi soruları, taslak denetimi
+  "masa-kalem-karsilastir", "bilirkisi-sorulari", "taslak-denetim",
 ];
 
 export function motoraBagliMi(fonksiyon: string): boolean {
@@ -445,6 +447,9 @@ const ZORUNLU_GIRDI: Record<string, string[]> = {
   "party-consistency-check": ["case_id", "party_id"],
   "party-communication-analysis": ["case_id", "party_id"],
   "iletisim-degisim": ["case_id", "party_id"],
+  "masa-kalem-karsilastir": ["case_id"],
+  "bilirkisi-sorulari": ["case_id"],
+  "taslak-denetim": ["case_id"],
 };
 
 function dolu(v: unknown): boolean {

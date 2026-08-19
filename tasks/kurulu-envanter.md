@@ -253,3 +253,28 @@ Gün sonu belge komutuna dahildir.
   YÜRÜTÜLMEZ; cevap gelene kadar 'bekliyor' kalır ve sohbette görünür.
 - AjanPenceresi: bekleyen soru varsa sohbet kendiliğinden açılır, soru en üstte
   şerit olarak durur, "Cevap yaz" ile cevap kipine geçilir.
+
+[EKLEME 19.08.2026 — ÜÇ YENİ AJAN İŞİ · AŞAMA MOTORU · SESLİ GİRİŞ]
+- Edge fonksiyon: masa-kalem-karsilastir — YENİ (verify_jwt=false, kendi kapısı).
+  İki tarafın kalemlerini örtüşen/yakın/ayrılan diye ayırır, sonucu kendi durum
+  satırının last_output.karsilastirma alanına yazar; kokpitteki "Kalem
+  karşılaştırması" kartı oradan okur. Model çağrısı YOK. İLK DEPLOY GEREKİR.
+- Edge fonksiyon: bilirkisi-sorulari — YENİ. Bilirkişiye sorulacak soruları
+  dosyadaki kayıtlardan çıkarır, eksik taraf onayını o tarafın sohbetinden ister.
+  ATAMA YAPMAZ (insan kapısı). İLK DEPLOY GEREKİR.
+- Edge fonksiyon: taslak-denetim — YENİ. Anlaşma taslağını denetler; mantık
+  YENİDEN YAZILMADI, _shared/taslak-denetle.ts ön yüzdeki TaslakDenetimi.tsx'in
+  saf bölümünün BİREBİR kopyasıdır (edge, src/ altını içe aktaramaz). Taslak
+  metni agreement_documents.metadata.filled_text alanından okunur. Belgeyi
+  DEĞİŞTİRMEZ. İLK DEPLOY GEREKİR.
+- _shared/taslak-denetle.ts — YENİ paylaşılan modül (sunucu kopyası).
+  KURAL: ön yüzdeki TaslakDenetimi.tsx değişirse bu kopya aynı commit'te güncellenir.
+- akis-yurut: tur sonunda AŞAMA İLERLETME motoru koşar (nesnel koşullar; imza,
+  kapanış ve bilirkişi aşamaları ajan tarafından geçilmez). YENİ CRON KURULMADI.
+- Üçü de ortak motora bağlandı (MOTORA_BAGLI + zorunlu girdi eşlemesi).
+- Ön yüz: kokpitte "Tümünü aç/kapat", kart başlığında "yeni" işareti, boş kartta
+  "Ajan hazırlıyor." satırı, "Kalem karşılaştırması" kartı; ajan sohbetinde
+  mikrofon (tarayıcı tanıması, dış servis yok) ve varsayılan kapalı sesli okuma.
+- KALDIRILDI: MediationEngine'deki 30 saniyelik belge sayacı
+  (scheduleAutoOrchestrator) — aynı işi olay + kural düzeni yapıyor. Elle
+  "Tüm Analizi Başlat" düğmesi duruyor.

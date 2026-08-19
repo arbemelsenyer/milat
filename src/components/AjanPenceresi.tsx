@@ -26,7 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Bot, ChevronDown, Loader2, ArrowRight, Send, CheckCircle2 } from "lucide-react";
+import { Bot, ChevronDown, Loader2, ArrowRight, Send, CheckCircle2, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 
 type Rol = "arabulucu" | "taraf";
 
@@ -140,6 +140,20 @@ const GOREV_SEKMESI: Record<string, string> = {
   ozel_oturum: "randevu",
 };
 
+/* ── SESLİ GİRİŞ (tarayıcının kendi konuşma tanıması) ────────────────────────
+   Ses TARAYICIDA yazıya çevrilir. Dış servise İSTEK GİTMEZ, ses kaydı hiçbir
+   yere yazılmaz, sunucuya gönderilmez. Çevrilen metin yazı kutusuna düşer;
+   GÖNDERME KARARI KULLANICININDIR — kendiliğinden gönderilmez.
+   Tarayıcı desteklemiyorsa düğme HİÇ ÇİZİLMEZ (çalışmayan düğme gösterilmez). */
+function konusmaTanimaVarMi(): boolean {
+  if (typeof window === "undefined") return false;
+  return !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+}
+
+function seslendirmeVarMi(): boolean {
+  return typeof window !== "undefined" && "speechSynthesis" in window;
+}
+
 function saatMetni(zaman: number): string {
   const d = new Date(zaman);
   if (isNaN(d.getTime())) return "";
@@ -187,6 +201,12 @@ export function AjanPenceresi({
   const [soru, setSoru] = useState("");
   const [bekliyor, setBekliyor] = useState(false);
   const [cevaplanan, setCevaplanan] = useState<GorevSatiri | null>(null);
+  // Sesli giriş/okuma: ikisi de tarayıcıda çalışır, varsayılan KAPALI.
+  const [dinliyor, setDinliyor] = useState(false);
+  const [sesliOkuma, setSesliOkuma] = useState(false);
+  const tanimaRef = useRef<any>(null);
+  const sesVar = konusmaTanimaVarMi();
+  const okumaVar = seslendirmeVarMi();
   const altRef = useRef<HTMLDivElement | null>(null);
   // Kendiliğinden açılma YALNIZ BİR KEZ olur; kullanıcı kapatırsa tekrar açılmaz.
   const kendiAcildiRef = useRef(false);
@@ -385,6 +405,54 @@ export function AjanPenceresi({
     () => gorevler.find((g) => CEVAPLANABILIR.includes(g.gorev_tipi)) ?? null,
     [gorevler],
   );
+
+  /* Mikrofon: tarayıcının tanıması açılır, çıkan metin kutuya EKLENİR.
+     Gönderilmez. Kapanışta tanıma durdurulur; kayıt tutulmaz. */
+  function mikrofon() {
+    if (!sesVar) return;
+    if (dinliyor) {
+      try { tanimaRef.current?.stop(); } catch { /* zaten durmuş */ }
+      setDinliyor(false);
+      return;
+    }
+    try {
+      const Tanima = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const t = new Tanima();
+      t.lang = "tr-TR";
+      t.interimResults = false;
+      t.continuous = false;
+      t.onresult = (e: any) => {
+        const parca = String(e?.results?.[0]?.[0]?.transcript ?? "").trim();
+        if (parca) setSoru((o) => (o ? `${o} ${parca}` : parca));
+      };
+      t.onend = () => setDinliyor(false);
+      t.onerror = () => setDinliyor(false);
+      tanimaRef.current = t;
+      t.start();
+      setDinliyor(true);
+    } catch {
+      setDinliyor(false);
+    }
+  }
+
+  // Bileşen kapanırken dinleme ve okuma durdurulur.
+  useEffect(() => () => {
+    try { tanimaRef.current?.stop(); } catch { /* zaten durmuş */ }
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+  }, []);
+
+  /* Sesli okuma yalnız AÇIKKEN ve yalnız ajanın SON cevabını okur. Varsayılan
+     kapalıdır; kapalıyken hiçbir şey seslendirilmez. */
+  const sonAjanCevabi = yazisma.filter((m) => m.tip === "ajan").slice(-1)[0]?.metin ?? "";
+  useEffect(() => {
+    if (!sesliOkuma || !okumaVar || !sonAjanCevabi) return;
+    try {
+      window.speechSynthesis.cancel();
+      const s = new SpeechSynthesisUtterance(sonAjanCevabi);
+      s.lang = "tr-TR";
+      window.speechSynthesis.speak(s);
+    } catch { /* seslendirme yoksa sessizce geçilir */ }
+  }, [sonAjanCevabi, sesliOkuma, okumaVar]);
 
   function gorevTikla(g?: GorevSatiri) {
     if (!g) return;
@@ -595,6 +663,25 @@ export function AjanPenceresi({
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); gonder(); }
             }}
           />
+          {/* Mikrofon: destekleyen tarayıcıda görünür. Ses yazıya çevrilir,
+              kutuya düşer; gönderme kararı kullanıcınındır. */}
+          {sesVar && (
+            <Button size="sm" variant={dinliyor ? "secondary" : "ghost"} className="h-9 px-2"
+              title={dinliyor ? "Dinlemeyi durdur" : "Konuşarak yaz"} onClick={mikrofon}>
+              {dinliyor ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
+          )}
+          {/* Sesli okuma — varsayılan KAPALI. */}
+          {okumaVar && (
+            <Button size="sm" variant="ghost" className="h-9 px-2"
+              title={sesliOkuma ? "Sesli okumayı kapat" : "Cevapları sesli oku"}
+              onClick={() => {
+                if (sesliOkuma) { try { window.speechSynthesis.cancel(); } catch { /* yok */ } }
+                setSesliOkuma((o) => !o);
+              }}>
+              {sesliOkuma ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 opacity-60" />}
+            </Button>
+          )}
           <Button size="sm" className="h-9 px-2.5" disabled={bekliyor || !soru.trim()} onClick={gonder}>
             {bekliyor ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>

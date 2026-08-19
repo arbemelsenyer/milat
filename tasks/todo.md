@@ -1,3 +1,22 @@
+## Nerede kaldık — 19.08.2026 (93) · ATLANAN VE KALAN HER ŞEY (7 bölüm)
+
+BİTTİ (kodda, deploy bekliyor):
+- [x] 1 · masa-kalem-karsilastir: iki tarafın kalemleri örtüşen/yakın/ayrılan diye
+      ayrılıyor, kokpite tek yeni kart "Kalem karşılaştırması" eklendi.
+- [x] 2 · Ölçü: belgede karşı tarafa atfedilen talep artık listeye yazılmıyor.
+- [x] 3 · 30 sn belge sayacı kaldırıldı; föy paneli tek "Onayla"ya indi, eski
+      onaylı föylerde "Gönder" yedek kaldı.
+- [x] 4 · Sohbete mikrofon (tarayıcı tanıması, dış servis yok, ses kaydı yok) ve
+      varsayılan kapalı sesli okuma eklendi.
+- [x] 5 · bilirkisi-sorulari (atama insanda) ve taslak-denetim (mevcut denetim
+      mantığı birebir sunucuya taşındı, belge değişmez) yazıldı.
+- [x] 6 · Aşama ilerletme motoru koşucuya kondu; koşullar nesnel, imza/kapanış ve
+      bilirkişi ajan tarafından geçilmiyor, geçişler geri alınabilir.
+- [x] 7 · Kokpitte "Tümünü aç/kapat", "yeni" işareti, boş kartta "Ajan hazırlıyor.",
+      yeni kartta canlı tazelenme. (Katlama ve sol menüden açma ZATEN vardı.)
+
+SIRADA: deploy, publish, 3 kapalı kuralın açılması, canlı test.
+
 ## Nerede kaldık — 19.08.2026 (92) · SİSTEMİN GENEL KANUNU (yasa-1)
 
 BİTTİ (kodda, deploy bekliyor):

@@ -4342,38 +4342,10 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
     return () => clearTimeout(t);
   }, [jump?.id, jump?.nonce]);
 
-  // Belge yüklendikten 30 sn sonra analiz kendiliğinden koşar. Arka arkaya
-  // yüklemede sayaç sıfırlanır → tek koşum. Çağrı, "Tüm Analizi Başlat"
-  // düğmesiyle aynıdır (orchestrator-run, oturum JWT'siyle).
-  const autoRunTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const scheduleAutoOrchestrator = useCallback(() => {
-    if (autoRunTimerRef.current) clearTimeout(autoRunTimerRef.current);
-    autoRunTimerRef.current = setTimeout(async () => {
-      autoRunTimerRef.current = null;
-      try {
-        const [partyRes, runningRes] = await Promise.all([
-          supabase.from("case_parties").select("id", { count: "exact", head: true }).eq("case_id", caseRow.id),
-          supabase.from("agent_states").select("id")
-            .eq("case_id", caseRow.id).eq("agent_type", "orchestrator").eq("status", "running").limit(1),
-        ]);
-        // Şart sağlanmıyorsa sessizce bekle — hata gösterilmez.
-        if (partyRes.error || runningRes.error) return;
-        if ((partyRes.count ?? 0) < 2) return;
-        if (Array.isArray(runningRes.data) && runningRes.data.length > 0) return;
-
-        const { error } = await supabase.functions.invoke("orchestrator-run", { body: { case_id: caseRow.id } });
-        if (error) return;
-        toast({ title: "Yeni belge algılandı — analiz başlatıldı" });
-      } catch {
-        /* sessiz: otomatik koşum kullanıcıya hata göstermez */
-      }
-    }, 30_000);
-  }, [caseRow.id]);
-
-  useEffect(() => () => {
-    if (autoRunTimerRef.current) clearTimeout(autoRunTimerRef.current);
-  }, []);
+  /* 19.08 — 30 SANİYELİK BELGE SAYACI KALDIRILDI. Aynı işi artık olay + kural
+     düzeni yapıyor: belge yüklenince 'belge_yuklendi' olayı düşüyor, koşucu
+     ilgili kolu çalıştırıyor. Ön yüzde ikinci bir yol tutulmuyor.
+     Elle "Tüm Analizi Başlat" düğmesi YERİNDE DURUYOR ve değişmedi. */
 
   async function handleUpload(partyId: string, e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -4418,7 +4390,6 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
           .catch((e) => console.error("[extract-document-text] tetiklenemedi", e));
       }
       toast({ title: "Belge yüklendi" });
-      scheduleAutoOrchestrator();
       loadAll();
     } catch (err: any) {
       toast({ title: "Yükleme başarısız", description: err?.message ?? "Bilinmeyen hata", variant: "destructive" });
@@ -6224,13 +6195,108 @@ function printSectionsPdf(opts: {
 // Faz 3'teki taraf kartı katlanma kalıbının kokpit karşılığı: tek satır başlık +
 // sağda kısa özet + ok; içerik tıklanınca açılır. Kutu içinde kutu olmaması için
 // Card yerine ince üst ayraç kullanılır — Faz 3'teki etkileşimin aynısı.
+/* ====== KALEM KARŞILAŞTIRMASI (İBA · masa ajanı) — yalnız arabulucu ========
+   Masa ajanının çıkardığı karşılaştırmayı gösterir: örtüşen · yakın · ayrılan.
+   Bu kart VERİ ÜRETMEZ, ajanın yazdığını okur; ajan yazdığında Realtime ile
+   kendiliğinden tazelenir, sayfa yenilenmez.
+   KÖR VERİ: yalnız kalem adı ve fark görünür; hiçbir tarafın belgesi, beyanı ya
+   da analizi bu karta girmez. TARAFSIZLIK: kart bilgi verir, "kabul et/etme"
+   demez (constitution m.4). */
+function KalemKarsilastirmaPanel({ caseId, onVeri }: { caseId: string; onVeri?: (v: boolean) => void }) {
+  const [veri, setVeri] = useState<any | null>(null);
+  const [yukleniyor, setYukleniyor] = useState(true);
+
+  const yukle = useCallback(async () => {
+    const { data } = await supabase.from("agent_states")
+      .select("last_output").eq("case_id", caseId)
+      .eq("agent_type", "mediator").is("party_id", null).maybeSingle();
+    const cikti = (data as any)?.last_output;
+    const k = cikti && typeof cikti === "object" ? (cikti as any).karsilastirma : null;
+    setVeri(k ?? null);
+    onVeri?.(!!k);
+    setYukleniyor(false);
+  }, [caseId, onVeri]);
+
+  useEffect(() => { yukle(); }, [yukle]);
+
+  // Mevcut Realtime deseni: ajan yazdığında açık kart kendiliğinden tazelenir.
+  useEffect(() => {
+    const kanal = supabase
+      .channel(`kalem_karsilastirma:${caseId}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "agent_states", filter: `case_id=eq.${caseId}` },
+        () => { yukle(); })
+      .subscribe();
+    return () => { supabase.removeChannel(kanal); };
+  }, [caseId, yukle]);
+
+  if (yukleniyor) {
+    return <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Okunuyor…</div>;
+  }
+  if (!veri) return <p className="text-sm text-muted-foreground">Ajan hazırlıyor.</p>;
+
+  const grup = (baslik: string, satirlar: any[], aciklama: string) => (
+    <div className="space-y-1">
+      <div className="text-sm font-medium">{baslik} <span className="text-muted-foreground font-normal">({satirlar.length})</span></div>
+      <p className="text-[11px] text-muted-foreground">{aciklama}</p>
+      {satirlar.length === 0
+        ? <p className="text-xs text-muted-foreground italic">bu grupta kalem yok</p>
+        : (
+          <ul className="text-sm space-y-1">
+            {satirlar.slice(0, 20).map((x: any, i: number) => (
+              <li key={i} className="flex items-start justify-between gap-3 border-b py-1">
+                <span className="min-w-0">{String(x?.kalem ?? "")}</span>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {x?.fark === null || x?.fark === undefined
+                    ? (x?.not ?? "")
+                    : `fark ${Number(x.fark).toLocaleString("tr-TR")}${x?.not ? ` · ${x.not}` : ""}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm">{String(veri.ozet ?? "")}</p>
+      {grup("Örtüşen", Array.isArray(veri.ortusen) ? veri.ortusen : [], "iki tarafın tutarı aynı")}
+      {grup("Yakın", Array.isArray(veri.yakin) ? veri.yakin : [], "fark küçük ya da tutar net okunamadı")}
+      {grup("Ayrılan", Array.isArray(veri.ayrilan) ? veri.ayrilan : [], "tutarlar ayrışıyor")}
+      <p className="text-[11px] text-muted-foreground">
+        Bu kart bilgi verir; hangi kalemin kabul edileceği kararı sizindir.
+      </p>
+    </div>
+  );
+}
+
+/* Hangi ajan kolunun çıktısı hangi kokpit bölümünde görünür — "yeni" işareti
+   bu eşlemeden hesaplanır. Eşlemesi olmayan kol işaret üretmez. */
+const AJAN_BOLUMU: Record<string, string> = {
+  mediator: "kokpit-kalem-karsilastirma",
+  elverislilik: "kokpit-elverislilik",
+  usul_onerisi: "kokpit-usul-onerisi",
+  usul_engeli: "kokpit-usul-engeli",
+  party_consistency: "kokpit-ic-tutarlilik",
+  party_communication: "kokpit-iletisim",
+  iletisim_degisim: "kokpit-iletisim-degisim",
+  common_ground: "kokpit-ortak-zemin",
+  party_analysis: "kokpit-taraf-analizleri",
+};
+
 function CockpitCollapsible({
-  id, title, summary, hint, open, onToggle, pdfActions, children,
+  id, title, summary, hint, open, onToggle, pdfActions, yeni, bos, children,
 }: {
   id: string; title: string; summary?: string; hint?: string; open: boolean; onToggle: () => void;
   // Yalnız çıktısı olan bölümlerde dolu gelir; boşsa PDF düğmesi hiç çizilmez.
   // Bir bölüm rapor tarafında birden çok kaleme ayrılmışsa her kalem kendi düğmesini alır.
   pdfActions?: { label: string; run: () => void }[];
+  /* 19.08 — ajan bu bölüme yeni veri yazdıysa başlıkta sakin bir "yeni" işareti
+     durur; kart açılınca kaybolur. Uyarı değildir, renk taşımaz. */
+  yeni?: boolean;
+  /* Kart boşken hata görünümü yerine sakin tek satır yazılır. */
+  bos?: boolean;
   children: React.ReactNode;
 }) {
   const actions = pdfActions ?? [];
@@ -6246,6 +6312,9 @@ function CockpitCollapsible({
         >
           <span className="text-sm font-medium truncate">{title}</span>
           <span className="flex items-center gap-2 shrink-0">
+            {yeni && !open && (
+              <span className="text-[10px] font-normal text-muted-foreground border rounded px-1 py-0.5">yeni</span>
+            )}
             {summary && <span className="text-sm text-muted-foreground">{summary}</span>}
             {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </span>
@@ -6263,7 +6332,13 @@ function CockpitCollapsible({
           </Button>
         ))}
       </div>
-      {open && <div className="pb-4">{children}</div>}
+      {open && (
+        <div className="pb-4">
+          {bos
+            ? <p className="text-sm text-muted-foreground">Ajan hazırlıyor.</p>
+            : children}
+        </div>
+      )}
     </div>
   );
 }
@@ -7716,6 +7791,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     body: <SecenekSepetiPanel caseRow={caseRow} />,
   });
 
+  // Kalem karşılaştırması (19.08) — kokpitin TEK yeni kartı, katmanın sonunda.
+  sectionDefs.push({
+    id: "kokpit-kalem-karsilastirma", layer: LAYER_REPORTS, title: "Kalem karşılaştırması",
+    body: <KalemKarsilastirmaPanel caseId={caseRow.id} onVeri={(v) => { kalemVeriRef.current = v; }} />,
+  });
+
   const layerOrder = [LAYER_TABLE, LAYER_EVIDENCE, LAYER_COCKPIT, LAYER_REPORTS];
   // Katman başlığının kendi çıpası (sol menüden katman adına tıklanınca oraya kayılır)
   // ve başlığın altındaki tek satır açıklama; aynı açıklama menüde tooltip olur.
@@ -7820,6 +7901,28 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
       window.removeEventListener("touchmove", stop);
     };
   }, [jump?.id, jump?.nonce]);
+
+  /* 19.08 — kokpit eksikleri:
+     · "Tümünü aç/kapat": bütün katman ve bölümleri tek düğmeyle açar/kapatır.
+     · "yeni" işareti: ajan bir bölümün verisini yazdığında başlıkta sakin bir
+       işaret durur, kart açılınca kaybolur. Mevcut Realtime deseni kullanılır. */
+  const kalemVeriRef = useRef(false);
+  const [yeniBolumler, setYeniBolumler] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    const kanal = supabase
+      .channel(`kokpit_yeni:${caseRow.id}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "agent_states", filter: `case_id=eq.${caseRow.id}` },
+        (payload: any) => {
+          const tip = String(payload?.new?.agent_type ?? "");
+          const bolum = AJAN_BOLUMU[tip];
+          if (!bolum || String(payload?.new?.status ?? "") !== "completed") return;
+          setYeniBolumler((prev) => (prev.has(bolum) ? prev : new Set(prev).add(bolum)));
+        })
+      .subscribe();
+    return () => { supabase.removeChannel(kanal); };
+  }, [caseRow.id]);
 
   // Faz 4 montajında sayfa üstten açılır; ancak kokpit kartları yüklendikten sonra
   // sayfanın yüksekliği değiştiği için tarayıcı eski kaydırma konumunu geri
@@ -7987,6 +8090,26 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
           </div>
         )}
 
+        {/* Tümünü aç/kapat — katlama sistemi zaten vardı, yalnız bu düğme eklendi. */}
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs"
+            onClick={() => {
+              const hepsiAcik = sectionDefs.length > 0 && sectionDefs.every((x) => openSections.has(x.id));
+              if (hepsiAcik) { setOpenSections(new Set()); setOpenLayers(new Set()); }
+              else {
+                setOpenSections(new Set(sectionDefs.map((x) => x.id)));
+                setOpenLayers(new Set(layerOrder.map((l) => LAYER_META[l].id)));
+              }
+            }}
+          >
+            {sectionDefs.length > 0 && sectionDefs.every((x) => openSections.has(x.id))
+              ? "Tümünü kapat" : "Tümünü aç"}
+          </Button>
+        </div>
+
         {/* ── 2-5. KATMANLAR — her katman sade başlık + katlanır satırlar ── */}
         {layerOrder.map((layer) => {
           const items = sectionDefs.filter((s) => s.layer === layer);
@@ -8032,7 +8155,16 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
                     summary={s.summary}
                     hint={SECTION_HINTS[s.id]}
                     open={openSections.has(s.id)}
-                    onToggle={() => toggleSection(s.id)}
+                    yeni={yeniBolumler.has(s.id)}
+                    bos={s.id === "kokpit-kalem-karsilastirma" && !kalemVeriRef.current}
+                    onToggle={() => {
+                      // Kart açılınca "yeni" işareti kaybolur.
+                      setYeniBolumler((prev) => {
+                        if (!prev.has(s.id)) return prev;
+                        const y = new Set(prev); y.delete(s.id); return y;
+                      });
+                      toggleSection(s.id);
+                    }}
                     pdfActions={pdfSections.filter((x) => x.sectionId === s.id).map((x) => ({
                       label: x.title,
                       run: () => printSectionsPdf({
@@ -10999,8 +11131,8 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
       <p className="text-sm text-muted-foreground leading-snug">
         Her taraf için AYRI föy hazırlanır ve yalnız o tarafın kendi verisi kullanılır; karşı tarafın
         beyanı, belgesi ve analizi föye girmez. Föy hukuki tavsiye içermez, sonuç tahmini yapmaz.
-        Föy kendiliğinden gönderilmez: metni siz onaylarsınız, tarafa ancak Gönder düğmesine
-        bastığınızda e-postayla gider.
+        Onaylandığında ajan tarafa gönderir. Önceden onaylanmış föylerde gönderim
+        düğmesi yedek olarak durur.
       </p>
 
       {hata && (
@@ -11072,21 +11204,16 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
                         {busy === `kaydet:${t.id}` ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
                         Kaydet
                       </Button>
-                      {/* BİRİNCİL: onay + gönderim tek tıkta. Gönderim başarısız
-                          olursa föy 'onaylandi' KALIR — onay geri alınmaz. */}
+                      {/* TEK DÜĞME (19.08): onay insan kapısıdır, gönderimi ajan
+                          yapar. İkili düğme tekleşti; sunucudaki çift gönderim
+                          kilidine dokunulmadı. */}
                       <Button size="sm" className={KART_DUGME}
                         disabled={busy === `onaygonder:${t.id}` || busy === `gonder:${t.id}`}
                         onClick={() => foyOnayla(String(t.id), true)}>
                         {busy === `onaygonder:${t.id}` || busy === `gonder:${t.id}`
                           ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                           : <CheckCircle2 className="h-4 w-4 mr-1" />}
-                        Onayla ve gönder
-                      </Button>
-                      {/* İKİNCİL: bugünkü davranış — yalnız onaylar, göndermez. */}
-                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
-                        disabled={busy === `onay:${t.id}`} onClick={() => foyOnayla(String(t.id))}>
-                        {busy === `onay:${t.id}` ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
-                        Yalnız onayla
+                        Onayla
                       </Button>
                     </>
                   )}
@@ -11121,7 +11248,7 @@ function HazirlikFoyuPanel({ caseRow }: { caseRow: CaseRow }) {
                       </p>
                     )}
                     <p className="text-[11px] text-muted-foreground">
-                      Onaylandı. Tarafa gitmesi için Gönder düğmesine basın — kendiliğinden gönderilmez.
+                      Onaylandı. Gönderimi ajan yapar; gitmediyse yandaki Gönder düğmesi yedektir.
                     </p>
                   </>
                 )}

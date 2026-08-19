@@ -88,6 +88,20 @@ function kanitBelgesiMi(metin: string): boolean {
   return KANIT_BELGE_SOZCUKLERI.some((k) => a.includes(metinNormalize(k)));
 }
 
+/* ÖLÇÜ (19.08 kurucu kararı): belgede KARŞI TARAFA ait diye anılan talep
+   listeye yazılmaz. Model kuralı atlarsa sunucu eler: dayanak alıntısı karşı
+   tarafa atıf kalıbı taşıyorsa kalem hiç yazılmaz. Kimin talebi olduğu
+   belirsizse yazılmaz — uydurma yerine boş bırakılır (constitution m.2). */
+const KARSI_TARAF_KALIPLARI = [
+  "karşı taraf", "karsi taraf", "davalı", "davali", "davacı taraf",
+  "muhatap", "işveren tarafı", "isveren tarafi", "diğer taraf", "diger taraf",
+];
+
+function karsiTarafaAtfediliyorMu(metin: string): boolean {
+  const a = metinNormalize(metin);
+  return KARSI_TARAF_KALIPLARI.some((k) => a.includes(metinNormalize(k)));
+}
+
 function niteligiGeregiBelgesiz(kalemAdi: string): boolean {
   const a = metinNormalize(kalemAdi);
   return BELGEYE_BAGLANMAYAN.some((k) => a.includes(metinNormalize(k)));
@@ -198,6 +212,10 @@ MUTLAK KURALLAR:
 5. Kişilik, niyet, duygu veya teşhis etiketi kullanma.
 6. Kalem adı KISA bir isim öbeği olsun ("kira farkı", "gecikme faizi"); soru cümlesi olamaz.
 7. Belgede talep kalemi yoksa boş liste döndür. Kalem UYDURMA.
+8. YALNIZ BU BELGENİN SAHİBİNİN KENDİ talebini/teklifini yaz. Belgede KARŞI
+   TARAFA ait olduğu söylenen talepler ("karşı taraf ... talep etmektedir",
+   "davalı ... istemektedir", "işveren ... ileri sürmektedir") LİSTEYE GİRMEZ.
+   Kimin talebi olduğu belirsizse o kalemi yazma.
 
 Çıktı YALNIZCA JSON: {"kalemler":[{"kalem_adi":"...","tutar":"...","dayanak_alinti":"..."}]}`;
 
@@ -239,6 +257,10 @@ MUTLAK KURALLAR:
       for (const aday of adaylar) {
         const kalemAdi = temiz(aday?.kalem_adi).slice(0, 120);
         if (!kalemAdi || kalemAdi.includes("?")) continue;
+        // ÖLÇÜ: karşı tarafa atfedilen talep bu tarafın listesine yazılmaz.
+        if (karsiTarafaAtfediliyorMu(kalemAdi) || karsiTarafaAtfediliyorMu(temiz(aday?.dayanak_alinti))) {
+          continue;
+        }
 
         // SUNUCU ELEMESİ: alıntı belgede birebir yoksa kabul edilmez.
         let alinti = temiz(aday?.dayanak_alinti).slice(0, 300);

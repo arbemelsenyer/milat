@@ -346,3 +346,39 @@ arabulucunun kendi girdiği kayıttır.
   yanar (bakılan aşama değil). Yalnız bir aşamada yanar, aşama değişince
   kendiliğinden taşınır; o anda bir ajan çalışıyorsa nabız gibi atar, iş yoksa
   sabit durur. Menü sırası, adlar ve numaralandırma DEĞİŞMEDİ.
+
+
+[EKLEME 19.08.2026 — KOKPİT EKSİKLERİ · CANLI KARTLAR · MİKROFON]
+● CANLI. Kokpitte katlama sistemi ZATEN vardı (CockpitCollapsible); yeniden
+yapılmadı, yalnız eksikleri eklendi:
+· "Tümünü aç/kapat" düğmesi — katman listesinin üstünde, sağda. Bütün katman ve
+  bölümleri tek tıkla açar/kapatır. Bölüm sırası ve adları değişmedi.
+· Kart başlığında sakin "yeni" işareti: ajan o bölümün verisini yazdığında
+  (agent_states 'completed') başlıkta gri bir "yeni" etiketi durur, kart
+  açılınca kaybolur. Renk taşımaz, uyarı değildir. Hangi ajan kolunun hangi
+  bölümü işaretlediği tek eşlemede tutulur (AJAN_BOLUMU); eşlemesi olmayan kol
+  işaret üretmez.
+· Kart boşken sakin tek satır: "Ajan hazırlıyor." (hata görünümü kullanılmaz).
+· Ajan bir kartın verisini yazdığında AÇIK kart kendiliğinden tazelenir —
+  mevcut Realtime deseni (postgres_changes + case_id süzgeci); sayfa yenilenmez.
+· Sol menüden tıklanan başlık ilgili kartı AÇIP oraya kaydırır — bu davranış
+  zaten vardı, dokunulmadı. Sol menüdeki altın nokta da yerinde.
+· YENİ TEK KART: "Kalem karşılaştırması" (RAPOR VE BELGELER katmanının sonunda).
+  Masa ajanının çıkardığı üç grubu gösterir: örtüşen · yakın · ayrılan, üstte tek
+  cümlelik özet. Kart bilgi verir, "kabul et/etme" demez. Yalnız arabulucuda.
+
+[EKLEME 19.08.2026 — SESLİ GİRİŞ (ajan sohbeti)]
+· Mikrofon düğmesi TARAYICININ KENDİ konuşma tanımasını kullanır. Dış servise
+  istek gitmez, ses kaydı hiçbir yere yazılmaz, sunucuya gönderilmez.
+· Çevrilen metin yazı kutusuna DÜŞER; gönderme kararı kullanıcınındır —
+  kendiliğinden gönderilmez.
+· Desteklemeyen tarayıcıda düğme HİÇ ÇİZİLMEZ (çalışmayan düğme gösterilmez).
+· Sesli okuma ikinci düğmededir ve VARSAYILAN KAPALIDIR; açıkken yalnız ajanın
+  son cevabını okur. Pencere kapanınca dinleme ve okuma durdurulur.
+
+[EKLEME 19.08.2026 — FÖY PANELİ TEK DÜĞMEYE İNDİ]
+· "Onayla ve gönder" + "Yalnız onayla" ikilisi TEK "Onayla" düğmesine indi:
+  onay insan kapısıdır, gönderimi ajan yapar. Panel metni "Onaylandığında ajan
+  tarafa gönderir" olarak düzeltildi.
+· Önceden onaylanmış föyler için "Gönder" düğmesi YEDEK olarak duruyor.
+  Sunucudaki çift gönderim kilidine dokunulmadı.
