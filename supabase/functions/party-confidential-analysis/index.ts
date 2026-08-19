@@ -1,5 +1,6 @@
 // Party-confidential analysis: only the party (and mediator via RLS) can see results
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { anlatimYansit } from "../_shared/anlatim.ts";
 import { olayYaz } from "../_shared/olay.ts";
 
 // Provided by the Supabase Edge Runtime; lets background writes (agent_states) finish
@@ -31,6 +32,8 @@ async function upsertPartyAnalysisState(
   } else {
     await admin.from("agent_states").insert({ case_id, agent_type: "party_analysis", party_id, ...patch });
   }
+  // ANLATIM (best-effort): aynı satıra düz Türkçe adım yazılır; davranış değişmez.
+  await anlatimYansit(admin, { case_id, agent_type: "party_analysis", party_id }, patch);
 }
 
 Deno.serve(async (req) => {

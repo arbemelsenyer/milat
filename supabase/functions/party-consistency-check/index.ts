@@ -4,6 +4,7 @@
 // Karşı tarafın hiçbir verisi prompt'a GİRMEZ. Yalnız party_consistency_findings
 // tablosuna yazar (RLS: yalnız arabulucu + admin) — RAG / benzer dava / worklog YOK.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { anlatimYansit } from "../_shared/anlatim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,6 +36,8 @@ async function upsertConsistencyState(
     ? await admin.from("agent_states").update(patch).eq("id", existing.id)
     : await admin.from("agent_states").insert({ case_id, agent_type: AGENT_TYPE, party_id, ...patch });
   if (error) throw error;
+  // ANLATIM (best-effort): aynı satıra düz Türkçe adım yazılır; davranış değişmez.
+  await anlatimYansit(admin, { case_id, agent_type: AGENT_TYPE, party_id }, patch);
 }
 
 // Belge içerik bütçesi — party-confidential-analysis/index.ts kalıbının aynısı.

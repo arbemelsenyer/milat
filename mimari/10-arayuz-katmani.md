@@ -318,3 +318,31 @@ arabulucunun kendi girdiği kayıttır.
 · Realtime aboneliği AgentControlPanel'deki desenin aynısıdır (postgres_changes +
   case_id süzgeci) ve bileşen kapanınca kanal kaldırılır. ajan_gorevleri yayın
   listesinde olmadığı için bekleyen listesi ayrıca dakikada bir tazelenir.
+
+
+[EKLEME 19.08.2026 — AJAN SOHBETİ · PANELLERİN KENDİ DOLMASI · ALTIN NOKTA]
+● CANLI. 18.08'de salt görünüm olarak açılan ajan penceresi SOHBETE çevrildi.
+· TEK AKIŞ: bölüm, sekme ve katlanan başlık yok. Akışta üç tür mesaj zamana göre
+  sıralı durur — ajan adımları · ajan bildirimleri (bekleyen işler, tıklanabilir)
+  · kullanıcı yazışması. Altta yazı kutusu: Enter gönderir, Shift+Enter alt satır.
+· SORU KİME GİDER: rol OTURUMDAN belirlenir, ekran adına güvenilmez. Görevli
+  arabulucu/yönetici → case-qa · dosyanın tarafı → taraf-asistan. Taraf dalında
+  case-qa'ya çağrı yolu HİÇ BULUNMAZ; tersi de öyle. Hata halinde tek sakin cümle
+  görünür; ham hata, fonksiyon adı ve kod ekrana çıkmaz.
+· AŞAMA İLERLEMESİ sohbete tek satır düşer: "Dosya Aşama N'e geçti — sebebi: …".
+· KÖR VERİ: taraf yalnız kendi satırlarını görür (party_id + tarafa_gorunur, ve
+  yalnız tarafa yönelik görev tipleri). Arabulucu penceresinde taraf ajanı
+  satırları AYRI bir sorguyla, last_output ALINMADAN okunur — arabulucu yalnız
+  olan biteni görür.
+· PANELLER KENDİ DOLAR: ajan işini bitirince sonuç ilgili panele kendi düşer
+  (nöbetçinin otomatik koşum kolu + Realtime). Kart boşken sakin satır yazar
+  ("Ajan hazırlıyor."), hata görünümü kullanılmaz. Mevcut elle çalıştırma
+  düğmeleri KALDI ve "yeniden çalıştır" işlevini sürdürüyor.
+· TARAF EKRANI: sekmelerin SONUNA "Taleplerim ve dayanakları" eklendi. Taraf
+  kendi kalemlerini görür, düzeltir, yeni kalem ekler (kaynak='taraf'); ajanın
+  çıkardığı satırlar dayanak alıntısıyla görünür. Karşı tarafın kalemi, adı ve
+  belgesi bu ekranda GÖRÜNMEZ. Mevcut sekmeler silinmedi, taşınmadı, adlandırılmadı.
+· SOL MENÜDE ALTIN NOKTA: dosyanın BULUNDUĞU aşamanın yanında altın renkli nokta
+  yanar (bakılan aşama değil). Yalnız bir aşamada yanar, aşama değişince
+  kendiliğinden taşınır; o anda bir ajan çalışıyorsa nabız gibi atar, iş yoksa
+  sabit durur. Menü sırası, adlar ve numaralandırma DEĞİŞMEDİ.

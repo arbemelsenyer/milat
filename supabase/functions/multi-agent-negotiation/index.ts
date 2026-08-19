@@ -3,6 +3,7 @@
 // Uses Lovable AI Gateway (server-side) — never expose API key to client.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { anlatimYansit } from "../_shared/anlatim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,8 +63,10 @@ async function upsertAgentState(
     .eq("agent_type", agentType)
     .maybeSingle();
 
+  // ANLATIM (best-effort): aynı satıra düz Türkçe adım yazılır; davranış değişmez.
   if (existing?.id) {
     await supabase.from("agent_states").update(patch).eq("id", existing.id);
+    await anlatimYansit(supabase, { case_id: caseId, agent_type: agentType, party_id: null }, patch);
     return existing.id;
   } else {
     const { data } = await supabase

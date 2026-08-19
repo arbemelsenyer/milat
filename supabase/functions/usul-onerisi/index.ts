@@ -15,6 +15,7 @@
 // Çıktı usul_onerileri tablosuna yazılır; tarafa SELECT politikası YOKTUR, tarafa
 // gösterilmez, bildirim gönderilmez. Yalnız arabulucu düğmeye basınca çalışır.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { anlatimYansit } from "../_shared/anlatim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,6 +48,8 @@ async function durumYaz(admin: any, caseId: string, patch: Record<string, unknow
     if (mevcut?.id) await admin.from("agent_states").update(govde).eq("id", mevcut.id);
     else await admin.from("agent_states")
       .insert({ case_id: caseId, agent_type: AGENT_TYPE, party_id: null, ...govde });
+    // ANLATIM (best-effort): aynı satıra düz Türkçe adım yazılır; davranış değişmez.
+    await anlatimYansit(admin, { case_id: caseId, agent_type: AGENT_TYPE, party_id: null }, patch);
   } catch (e: any) {
     console.error(`[${AGENT_TYPE}] durum yazılamadı: ${e?.message ?? e}`);
   }

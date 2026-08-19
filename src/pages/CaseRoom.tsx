@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AppNavbar } from "@/components/AppNavbar";
 import { Card } from "@/components/ui/card";
@@ -717,6 +717,7 @@ export default function CaseRoom() {
           <TabsTrigger value="ajanim" className={tabTriggerAccentClass}><Bot className="h-4 w-4 mr-1" />Ajanım</TabsTrigger>
           <TabsTrigger value="agents" className={tabTriggerAccentClass}><Bot className="h-4 w-4 mr-1" />AI Aktivitelerim</TabsTrigger>
           <TabsTrigger value="hazirligim" className={tabTriggerAccentClass}><FileText className="h-4 w-4 mr-1" />Oturum hazırlığım</TabsTrigger>
+          <TabsTrigger value="kalemlerim" className={tabTriggerAccentClass}><Wallet className="h-4 w-4 mr-1" />Taleplerim ve dayanakları</TabsTrigger>
         </TabsList>
 
         <TabsContent value="braket">
@@ -740,6 +741,12 @@ export default function CaseRoom() {
         <TabsContent value="iletisim">
           {myParty?.id
             ? <IletisimTercihlerim caseId={caseId!} partyId={myParty.id} />
+            : <Card className="p-5"><p className="text-sm text-muted-foreground">Taraf kaydınız bulunamadı.</p></Card>}
+        </TabsContent>
+
+        <TabsContent value="kalemlerim">
+          {myParty?.id
+            ? <TaleplerimBolumu caseId={caseId!} partyId={myParty.id} />
             : <Card className="p-5"><p className="text-sm text-muted-foreground">Taraf kaydınız bulunamadı.</p></Card>}
         </TabsContent>
 
@@ -2012,6 +2019,156 @@ function OturumHazirligim({ caseId, partyId }: { caseId: string; partyId: string
           )}
         </div>
       )}
+    </Card>
+  );
+}
+
+/* ====== TALEPLERİM VE DAYANAKLARI (taraf ekranı) =============================
+   Taraf KENDİ talep kalemlerini görür, düzeltir ve yenisini ekler. Ajanın
+   çıkardığı satırlar (kaynak='ajan') dayanak alıntısıyla birlikte görünür;
+   tarafın kendi eklediği satır kaynak='taraf' yazılır ve ajan ona dokunmaz.
+   KÖR VERİ: sorgu party_id ile sınırlıdır — karşı tarafın kalemi, adı ve
+   belgesi bu ekrana hiçbir yoldan girmez. */
+const KALEM_DURUM_ETIKET: Record<string, string> = {
+  taslak: "taslak",
+  onaylandi: "onaylandı",
+  celiskili: "çelişkili",
+  dayanaksiz: "dayanağı bulunamadı",
+};
+
+function TaleplerimBolumu({ caseId, partyId }: { caseId: string; partyId: string }) {
+  const [satirlar, setSatirlar] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [hata, setHata] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [yeniAd, setYeniAd] = useState("");
+  const [yeniTutar, setYeniTutar] = useState("");
+
+  const yukle = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await (supabase.from("taraf_kalemleri" as any) as any)
+      .select("id, kalem_adi, tutar, para_birimi, dayanak_alinti, ajan_notu, durum, kaynak, created_at")
+      .eq("case_id", caseId).eq("party_id", partyId)
+      .order("created_at", { ascending: true });
+    if (error) { setHata("Talep kalemleriniz şu an okunamıyor."); setSatirlar([]); }
+    else { setHata(null); setSatirlar((data ?? []) as any[]); }
+    setLoading(false);
+  }, [caseId, partyId]);
+
+  useEffect(() => { yukle(); }, [yukle]);
+
+  async function kalemEkle() {
+    const ad = yeniAd.trim();
+    if (!ad) return;
+    setBusy("ekle");
+    const sayi = yeniTutar.trim() ? Number(yeniTutar.replace(",", ".")) : null;
+    const { error } = await (supabase.from("taraf_kalemleri" as any) as any).insert({
+      case_id: caseId, party_id: partyId, kalem_adi: ad,
+      tutar: sayi !== null && Number.isFinite(sayi) ? sayi : null,
+      para_birimi: "TRY", durum: "taslak", kaynak: "taraf",
+    });
+    if (error) setHata("Kalem eklenemedi.");
+    else { setYeniAd(""); setYeniTutar(""); await yukle(); }
+    setBusy(null);
+  }
+
+  async function kalemGuncelle(id: string, alan: "kalem_adi" | "tutar", deger: string) {
+    setBusy(id);
+    const govde: Record<string, unknown> = alan === "tutar"
+      ? { tutar: deger.trim() ? Number(deger.replace(",", ".")) : null }
+      : { kalem_adi: deger.trim() };
+    const { error } = await (supabase.from("taraf_kalemleri" as any) as any)
+      .update(govde).eq("id", id);
+    if (error) setHata("Değişiklik kaydedilemedi.");
+    else { setHata(null); await yukle(); }
+    setBusy(null);
+  }
+
+  async function kalemSil(id: string) {
+    setBusy(id);
+    const { error } = await (supabase.from("taraf_kalemleri" as any) as any).delete().eq("id", id);
+    if (error) setHata("Kalem silinemedi.");
+    else await yukle();
+    setBusy(null);
+  }
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div>
+        <h3 className="font-semibold">Taleplerim ve dayanakları</h3>
+        <p className="text-sm text-muted-foreground">
+          Ajanınız belgelerinizden çıkardığı talep kalemlerini burada gösterir; siz düzeltebilir,
+          yeni kalem ekleyebilirsiniz. Karşı taraf bu ekranı göremez.
+        </p>
+      </div>
+
+      {hata && <p className="text-sm text-muted-foreground">{hata}</p>}
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Okunuyor…
+        </div>
+      ) : satirlar.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Ajan hazırlıyor. Belgelerinizden talep kalemleri çıkarıldığında burada görünecek.
+        </p>
+      ) : (
+        <ul className="space-y-3">
+          {satirlar.map((k) => (
+            <li key={k.id} className="border rounded p-3 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  className="h-8 text-sm flex-1 min-w-[10rem]"
+                  defaultValue={k.kalem_adi ?? ""}
+                  onBlur={(e) => {
+                    const v = e.target.value;
+                    if (v.trim() && v.trim() !== (k.kalem_adi ?? "")) {
+                      kalemGuncelle(String(k.id), "kalem_adi", v);
+                    }
+                  }}
+                />
+                <Input
+                  className="h-8 text-sm w-32"
+                  placeholder="tutar"
+                  defaultValue={k.tutar ?? ""}
+                  onBlur={(e) => {
+                    if (String(e.target.value) !== String(k.tutar ?? "")) {
+                      kalemGuncelle(String(k.id), "tutar", e.target.value);
+                    }
+                  }}
+                />
+                <Badge variant={k.durum === "dayanaksiz" ? "outline" : "secondary"}>
+                  {KALEM_DURUM_ETIKET[String(k.durum)] ?? String(k.durum)}
+                </Badge>
+                <Button size="sm" variant="ghost" className="h-8 px-2"
+                  disabled={busy === k.id} onClick={() => kalemSil(String(k.id))}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              {k.dayanak_alinti && (
+                <p className="text-xs text-muted-foreground italic border-l-2 pl-2">
+                  {k.dayanak_alinti}
+                </p>
+              )}
+              {k.ajan_notu && <p className="text-[11px] text-muted-foreground">{k.ajan_notu}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="border-t pt-3 space-y-2">
+        <Label className="text-sm">Yeni kalem ekle</Label>
+        <div className="flex flex-wrap items-center gap-2">
+          <Input className="h-8 text-sm flex-1 min-w-[10rem]" placeholder="kalem adı"
+            value={yeniAd} onChange={(e) => setYeniAd(e.target.value)} />
+          <Input className="h-8 text-sm w-32" placeholder="tutar (isteğe bağlı)"
+            value={yeniTutar} onChange={(e) => setYeniTutar(e.target.value)} />
+          <Button size="sm" disabled={busy === "ekle" || !yeniAd.trim()} onClick={kalemEkle}>
+            {busy === "ekle" ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+            Ekle
+          </Button>
+        </div>
+      </div>
     </Card>
   );
 }

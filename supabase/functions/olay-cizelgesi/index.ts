@@ -13,6 +13,7 @@
 // HALÜSİNASYON KAPISI (m.2): kaynağı olmayan satır ÇİZELGEYE GİRMEZ. Tahmini tarih
 // üretilmez; belgede "yaklaşık/civarında" gibi ifade varsa tarih_metni'ne aynen aktarılır.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { anlatimYansit } from "../_shared/anlatim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -144,6 +145,8 @@ async function durumYaz(
       await admin.from("agent_states")
         .insert({ case_id: caseId, agent_type: AGENT_TYPE, party_id: partyId, ...govde });
     }
+    // ANLATIM (best-effort): aynı satıra düz Türkçe adım yazılır; davranış değişmez.
+    await anlatimYansit(admin, { case_id: caseId, agent_type: AGENT_TYPE, party_id: partyId }, patch);
   } catch (e: any) {
     console.error(`[${AGENT_TYPE}] durum yazılamadı: ${e?.message ?? e}`);
   }

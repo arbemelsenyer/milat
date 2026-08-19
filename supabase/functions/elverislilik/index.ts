@@ -17,6 +17,7 @@
 // Yalnız arabulucu düğmeye bastığında çalışır (ücretli çağrı) — kendiliğinden
 // tetiklenmez.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { anlatimYansit } from "../_shared/anlatim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,6 +55,8 @@ async function durumYaz(admin: any, caseId: string, patch: Record<string, unknow
       await admin.from("agent_states")
         .insert({ case_id: caseId, agent_type: AGENT_TYPE, party_id: null, ...govde });
     }
+    // ANLATIM (best-effort): aynı satıra düz Türkçe adım yazılır; davranış değişmez.
+    await anlatimYansit(admin, { case_id: caseId, agent_type: AGENT_TYPE, party_id: null }, patch);
   } catch (e: any) {
     console.error(`[${AGENT_TYPE}] durum yazılamadı: ${e?.message ?? e}`);
   }

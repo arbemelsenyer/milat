@@ -216,3 +216,21 @@ Gün sonu belge komutuna dahildir.
   NOT: ajan_gorevleri supabase_realtime yayın listesinde DEĞİL — bekleyen listesi
   anlık bildirimle değil, 60 saniyelik tazelemeyle ve agent_states değişimlerinde
   güncelleniyor.
+
+[EKLEME 19.08.2026 — ANLATAN AJAN DÜZENİ]
+- Ortak yardımcı: supabase/functions/_shared/anlatim.ts — anlatimAc (adım yazımı) ·
+  anlatimYansit (mevcut durum yazıcısına takılan anlatım) · belgedeAra ·
+  kayitlardaAra · bilgiTabanindaAra (eksik tamamlama sırası) · eksigiSor (doğru
+  kişiye sorma, mükerrer yazmaz) · zatenCalisiyorMu (eşzamanlılık kapısı).
+  Hepsi BEST-EFFORT; hiçbiri hata fırlatmaz.
+- Edge fonksiyon: taraf-kalem-cikar — YENİ (verify_jwt=false, kendi kapısı:
+  x-cron-secret veya admin JWT). Tarafın kendi belgelerinden talep kalemi çıkarır.
+  İLK DEPLOY GEREKİR.
+- Tablo: public.taraf_kalemleri — CANLIDA (kurucu kurdu). Ajan satırları
+  kaynak='ajan', tarafın kendi girdiği satırlar kaynak='taraf'.
+- Bileşen: CaseRoom > taraf görünümü > "Taleplerim ve dayanakları" sekmesi
+  (TaleplerimBolumu). AjanPenceresi.tsx artık SOHBET.
+- NOT — agent_states.agent_type bir CHECK kısıtıyla sınırlıdır. taraf-kalem-cikar
+  yeni bir ad yerine izinli 'document_analysis' tipini kullanır (bu tip zaten
+  taraf kapsamlıdır). randevu-teklif ve hazirlik-foyu-gonder için uygun bir izinli
+  tip YOK; anlatım eklenmedi — kurucunun tek satırlık SQL kararını bekliyor.

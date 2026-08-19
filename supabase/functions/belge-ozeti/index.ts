@@ -11,6 +11,7 @@
 // HALÜSİNASYON KAPISI: metin yoksa özet ÜRETİLMEZ, durum='metin_yok' yazılır
 // ("belge metni okunamadı"). Şema dışı/eksik çıktı sunucu tarafında elenir (durum='elendi').
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { anlatimYansit } from "../_shared/anlatim.ts";
 import { olayYaz } from "../_shared/olay.ts";
 
 const corsHeaders = {
@@ -91,6 +92,8 @@ async function durumYaz(
       await admin.from("agent_states")
         .insert({ case_id: caseId, agent_type: AGENT_TYPE, party_id: partyId, ...govde });
     }
+    // ANLATIM (best-effort): aynı satıra düz Türkçe adım yazılır; davranış değişmez.
+    await anlatimYansit(admin, { case_id: caseId, agent_type: AGENT_TYPE, party_id: partyId }, patch);
   } catch (e: any) {
     console.error(`[${AGENT_TYPE}] durum yazılamadı: ${e?.message ?? e}`);
   }

@@ -2,6 +2,7 @@
 // using RAG over knowledge_base_chunks + strict rule set. AI does not invent numbers — mapping
 // hafta/uzatma is derived from the classified court type.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { anlatimYansit } from "../_shared/anlatim.ts";
 
 // Provided by the Supabase Edge Runtime; lets background writes (agent_states) finish
 // after the response is sent instead of a bare fire-and-forget that may get cut off.
@@ -30,6 +31,8 @@ async function upsertAgentActivityState(
   } else {
     await admin.from("agent_states").insert({ case_id, agent_type, party_id, ...patch });
   }
+  // ANLATIM (best-effort): aynı satıra düz Türkçe adım yazılır; davranış değişmez.
+  await anlatimYansit(admin, { case_id, agent_type, party_id }, patch);
 }
 
 const COURT_RULES: Record<string, { sure_hafta: number | null; uzatma_hafta: number | null; dayanak: string; label: string }> = {

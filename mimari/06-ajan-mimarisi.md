@@ -409,3 +409,65 @@ NEDEN KURAL TABLOSU, NEDEN KODA GÖMÜLÜ ZİNCİR DEĞİL:
 · Güvenlik kapısı ajan-nobetci ile birebir aynıdır (x-cron-secret veya admin JWT).
   Koşucuyu nöbetçi, turunun SONUNDA bir kez tetikler; nöbetçinin mevcut kontrolleri
   ve sıraları değişmedi.
+
+
+[EKLEME 19.08.2026 — ÇALIŞAN, ANLATAN, EKSİĞİ TAMAMLAYAN AJAN DÜZENİ]
+● CANLI (deploy sonrası).
+
+VARSAYILAN AJAN, İSTİSNA İNSAN (bağlayıcı ilke):
+· Her adımda işi önce ilgili ajan çözer. İnsana ancak ŞU DÖRT işte gidilir:
+  (1) imza — anlaşma belgesi ve tutanak · (2) bilirkişi ataması ·
+  (3) kayıt/döküm rızası · (4) tarafla asıl müzakerenin kendisi.
+· Bu dördü dışında bir işi insana bırakan her yer GEREKÇE yazar
+  ("ajan yapamadı çünkü …"). Gerekçesiz insana bırakma yasaktır.
+· Tarafın işini önce KENDİ ajanı yapar; masa ajanı taraf işine el atmaz.
+· Sertleşme ve iletişim güçlüğü TESPİTİ de ajanın işidir: fark eder, OLGU DİLİYLE
+  arabulucuya bildirir, çıkış yolu önerir. Kararı arabulucu verir. Duygu, kişilik,
+  niyet ve teşhis etiketi yasaktır (constitution m.2).
+· Ajan hukuki tavsiye vermez, karar vermez, "şu talebi geri çek" demez.
+
+ANLATIM DESENİ (_shared/anlatim.ts — tek ortak yardımcı):
+· Ajan çalışırken adımlarını SIRAYLA yazar. Yer: agent_states.last_output içindeki
+  "adimlar" dizisi — { sira, metin, zaman }. Başlarken 'running', bitince
+  'completed', hatada 'failed'.
+· Her adım TEK CÜMLE, düz Türkçe. Fonksiyon adı, tablo adı, "edge function",
+  "upsert", "invoke" ekrana ÇIKMAZ (yardımcıda ayrıca süzülür).
+· Bitişte tek sonuç: "Yapıldı: …" ve GEREKİYORSA "Eksik: …". Eksik yoksa o satır
+  hiç yazılmaz.
+· BEST-EFFORT: anlatım yazılamazsa asıl iş DURMAZ; yardımcı hiçbir koşulda
+  hata fırlatmaz. Fonksiyonların girdisi, çıktısı ve süzgeçleri değişmez.
+· Anlatım fonksiyonların KENDİ durum yazıcısına takılır (anlatimYansit); böylece
+  tek satırla bütün kollara yayılır ve mevcut kod yolları bozulmaz.
+· SAHİBİNE GÖRÜNÜR: taraf ajanının adımları yalnız o tarafa (party_id +
+  tarafa_gorunur), masa ajanının adımları yalnız arabulucuya. Bayrak, çağıran
+  fonksiyon açıkça istemedikçe DEĞİŞTİRİLMEZ.
+
+EKSİĞİ ÖNCE KENDİ TAMAMLAMA — SIRA (bağlayıcı):
+  (a) aynı tarafın BAŞKA belgesi (belgedeAra) →
+  (b) dosyada daha önce girilmiş veri: kendi beyanı, önceki kalemler (kayitlardaAra) →
+  (c) YALNIZ mevzuat türü eksikler için ürünün bilgi tabanı (bilgiTabanindaAra).
+· Bulursa tamamlar ve "şunu şuradan tamamladım" der; eksik satırından düşer.
+· UYDURMA YASAK: bulamadıysa "tamamladım" DEMEZ, boş döner (constitution m.2).
+
+KİME SORULACAK (eksigiSor):
+· Eksik BELGE ya da TARAFIN BİLGİSİ ise → o tarafa (hedef_party_id dolu).
+  Dil tamamlayıcıdır: "…bulamadım — ilgili belgeyi ekler misiniz?" Suçlayıcı
+  sözcük ("eksik", "yetersiz", "vermediniz") kullanılmaz.
+· Eksik KARAR, ONAY ya da USUL ise → arabulucuya (hedef_party_id boş).
+· EMİN DEĞİLSE arabulucuya sorar ve gerekçesine "şüpheli" yazar.
+· Aynı eksik için mükerrer bildirim yazılmaz (etiketli "önce bak, varsa yazma").
+
+EŞZAMANLILIK:
+· Taraf ajanları ve masa ajanı birbirini BEKLEMEZ, aynı anda çalışabilir.
+· Aynı iş aynı dosya için iki kez başlatılmaz: satır 'running' iken yeniden
+  tetiklenmez, SIRAYA DA ALINMAZ — atlanır ve sebebi döner (zatenCalisiyorMu).
+  Yarıda kalmış koşum sonsuza dek kilitlemesin diye belirli süre sonra bayatlar.
+· Bir ajanın hatası ötekini durdurmaz; hata kendi sohbetine düşer.
+
+TARAF AJANININ İLK GERÇEK İŞİ (taraf-kalem-cikar):
+· Tarafın KENDİ belgelerinden talep kalemlerini çıkarır; her kalemi belgedeki
+  BİREBİR alıntıya bağlar. Alıntı belgede birebir yoksa SUNUCUDA ELENİR ve kalem
+  "dayanaksız" işaretlenir (constitution v3.4: şema + sunucu tarafı eleme).
+· Tutar belgede net okunamıyorsa boş bırakılır, tahmin edilmez.
+· Tarafın kendi girdiği satıra (kaynak='taraf') DOKUNMAZ — insan üstündür (m.3).
+· Karşı tarafın belgesi sorguya HİÇ GİRMEZ; masaya yalnız kalem ve dayanağı çıkar.

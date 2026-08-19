@@ -8,6 +8,7 @@
 // Kapsam dışı (bilinçli): multi-agent-negotiation (Kör Teklif) ve generate-official-document
 // (belge üretimi mediator kontrolünde) — bu zincire dahil edilmedi.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { anlatimYansit } from "../_shared/anlatim.ts";
 import { olayYaz } from "../_shared/olay.ts";
 
 // Takılı koşu eşiği: bu süreden eski, hâlâ "running" görünen orchestrator satırı
@@ -31,6 +32,8 @@ async function upsertOrchestratorState(admin: Admin, case_id: string, patch: Rec
     ? await admin.from("agent_states").update(patch).eq("id", existing.id)
     : await admin.from("agent_states").insert({ case_id, agent_type: "orchestrator", party_id: null, ...patch });
   if (error) throw error;
+  // ANLATIM (best-effort): aynı satıra düz Türkçe adım yazılır; davranış değişmez.
+  await anlatimYansit(admin, { case_id, agent_type: "orchestrator", party_id: null }, patch);
 }
 
 // Bir adımı ATLARKEN, o adımın KENDİ agent_states satırını (mevcut function'ların yazdığı

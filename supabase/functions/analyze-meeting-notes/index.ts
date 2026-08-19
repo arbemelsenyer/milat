@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { anlatimAc } from "../_shared/anlatim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -85,6 +86,11 @@ yardımcı içgörüler üretirsin. YALNIZCA geçerli JSON döndür — markdown
 
     const user = `DOSYA ÖZETİ:\n${caseSummary || "(yok)"}\n\nÖNCEKI NOTLAR:\n${priorNotes.slice(-5).join("\n---\n") || "(yok)"}\n\nÖNCEKI AI ANALİZLERİ:\n${priorAnalyses.slice(-3).map((a: any) => typeof a === "string" ? a : JSON.stringify(a)).join("\n---\n") || "(yok)"}\n\nYENİ GÖRÜŞME NOTU:\n${newNote}\n\nGörev: Yukarıdaki bilgilerle taraf pozisyonlarındaki değişimi, yeni tespit edilen ihtiyaçları, güncellenmiş çözüm önerilerini ve arabulucuya yeni strateji önerisini üret.`;
 
+    /* ANLATIM (best-effort): bu fonksiyonun kendi durum satırı yoktu; anlatım
+       arabulucuya görünür (meeting_notes tipi taraflara kapalıdır). */
+    const anlatim = anlatimAc(admin, { case_id, agent_type: "meeting_notes", party_id: null });
+    await anlatim.baslat("Görüşme notunu okuyorum.");
+
     const raw = await callAi([
       { role: "system", content: system },
       { role: "user", content: user },
@@ -97,6 +103,8 @@ yardımcı içgörüler üretirsin. YALNIZCA geçerli JSON döndür — markdown
       const m = cleaned.match(/\{[\s\S]*\}/);
       parsed = m ? JSON.parse(m[0]) : { yeni_strateji: cleaned };
     }
+    const tespit = Array.isArray(parsed?.yeni_tespitler) ? parsed.yeni_tespitler.length : 0;
+    await anlatim.bitti({ yapildi: `Görüşme notunu okudum, ${tespit} yeni tespit çıkardım.` });
     return new Response(JSON.stringify({ analysis: parsed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

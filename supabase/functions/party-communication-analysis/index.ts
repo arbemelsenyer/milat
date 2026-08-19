@@ -4,6 +4,7 @@
 // kendi ifadeleri girer (beyan + kendi belgeleri + kendi soru/cevapları); karşı tarafın
 // hiçbir metni girmez. Yalnız party_communication_analysis tablosuna yazar; RAG/worklog YOK.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { anlatimYansit } from "../_shared/anlatim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,6 +36,8 @@ async function upsertCommunicationState(
     ? await admin.from("agent_states").update(patch).eq("id", existing.id)
     : await admin.from("agent_states").insert({ case_id, agent_type: AGENT_TYPE, party_id, ...patch });
   if (error) throw error;
+  // ANLATIM (best-effort): aynı satıra düz Türkçe adım yazılır; davranış değişmez.
+  await anlatimYansit(admin, { case_id, agent_type: AGENT_TYPE, party_id }, patch);
 }
 
 // Belge içerik bütçesi — party-consistency-check/index.ts kalıbının aynısı.

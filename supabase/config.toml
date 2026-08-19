@@ -148,3 +148,6 @@ verify_jwt = true
 
 [functions.akis-yurut]
 verify_jwt = false
+
+[functions.taraf-kalem-cikar]
+verify_jwt = false

@@ -1,3 +1,32 @@
+## Nerede kaldık — 19.08.2026 (91) · ÇALIŞAN-ANLATAN-TAMAMLAYAN AJAN DÜZENİ
+
+BİTTİ (kodda, deploy bekliyor):
+- [x] Ortak yardımcı _shared/anlatim.ts: adım anlatımı · eksik tamamlama sırası
+      (kendi belgesi → önceki veri → mevzuat için bilgi tabanı) · doğru kişiye
+      sorma · eşzamanlılık kapısı. Hepsi best-effort, hiçbiri hata fırlatmıyor.
+- [x] 18 ajan fonksiyonuna anlatım bağlandı (her fonksiyonun KENDİ durum
+      yazıcısına tek satır; davranış, girdi, çıktı ve süzgeçler değişmedi).
+- [x] YENİ taraf-kalem-cikar: tarafın kendi belgelerinden talep kalemleri,
+      belgede BİREBİR alıntı doğrulaması, dayanaksız kalem işaretlemesi,
+      bulamadığını o tarafa tamamlayıcı dille sorma.
+- [x] Ajan penceresi SOHBET oldu: tek akış, altta yazı kutusu, rol oturumdan
+      (arabulucu → case-qa, taraf → taraf-asistan), aşama geçişi satırı.
+- [x] CaseRoom taraf sekmelerinin SONUNA "Taleplerim ve dayanakları".
+- [x] Sol menüde dosyanın bulunduğu aşamada altın nokta; ajan çalışırken nabız.
+
+YAPILMADI — KURUCU KARARI GEREKİYOR:
+- randevu-teklif ve hazirlik-foyu-gonder anlatımı: agent_states.agent_type CHECK
+  kısıtında bu ikisine uyan izinli ad yok. Tek satırlık SQL (kısıta 'randevu' ve
+  'foy_gonderim' eklenmesi) sizden gelirse anlatım da eklenir.
+- generate-options: hizmet anahtarlı istemcisi ve case_id'si yok; anlatım için
+  önce girdisine case_id eklenmeli.
+- Kokpitteki mevcut kartların "Ajan hazırlıyor." boş satırı: yeni panelde var,
+  eski kartlara toptan uygulanmadı (her kartın kendi boş durumu var; tek tek
+  geçmek ayrı ve geniş bir ön yüz turu).
+
+SIRADA: Lovable'da deploy (liste raporun sonunda) + publish, sonra canlı test.
+
+
 ## Nerede kaldık — 19.08.2026 (90) · AJAN PENCERESİ 1. TUR (SALT GÖRÜNÜM)
 
 BİTTİ (kodda, publish bekliyor):

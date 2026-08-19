@@ -372,6 +372,30 @@ export default function MediationEngine() {
   // null = henüz hiç hesaplanmadı (dosya ilk açılışı); ilk hesaplamada geçiş sayılmaz.
   const prevPhaseStatusRef = useRef<Record<number, boolean> | null>(null);
   const [glowPhase, setGlowPhase] = useState<number | null>(null);
+  /* Sol menüdeki altın nokta: dosyanın BULUNDUĞU aşamayı gösterir (bakılan aşamayı
+     değil). Bir ajan çalışıyorsa nokta nabız gibi atar, iş yoksa sabit durur.
+     Menü sırası, adlar ve numaralandırma DEĞİŞMEZ; yalnız nokta eklenir. */
+  const [ajanCalisiyor, setAjanCalisiyor] = useState(false);
+
+  useEffect(() => {
+    if (!activeCase?.id) { setAjanCalisiyor(false); return; }
+    let iptal = false;
+    const bak = async () => {
+      const { count } = await supabase.from("agent_states")
+        .select("id", { count: "exact", head: true })
+        .eq("case_id", activeCase.id).eq("status", "running");
+      if (!iptal) setAjanCalisiyor((count ?? 0) > 0);
+    };
+    bak();
+    // Mevcut Realtime deseni; kanal bileşen kapanınca kaldırılır.
+    const kanal = supabase
+      .channel(`asama_noktasi:${activeCase.id}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "agent_states", filter: `case_id=eq.${activeCase.id}` },
+        () => { bak(); })
+      .subscribe();
+    return () => { iptal = true; supabase.removeChannel(kanal); };
+  }, [activeCase?.id]);
 
   useEffect(() => {
     if (activeCase && (isMediator || isAdmin) && params.get("tab") === "surec") {
@@ -839,6 +863,16 @@ export default function MediationEngine() {
                       : <Circle className="h-4 w-4 opacity-60 shrink-0" />}
                   <Icon className="h-4 w-4" />
                   <span className="flex-1 text-left">{p.id}. {p.label}</span>
+                  {/* ALTIN NOKTA: dosyanın bulunduğu aşama. Yalnız bir aşamada yanar,
+                      aşama değişince kendiliğinden taşınır. Ajan çalışırken atar. */}
+                  {p.id === Math.min(7, Math.max(1, Number(activeCase?.current_phase ?? 1) || 1)) && (
+                    <span className="relative flex h-2 w-2 shrink-0" title="Dosya şu anda bu aşamada">
+                      {ajanCalisiyor && (
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                      )}
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-400" />
+                    </span>
+                  )}
                   {optional && <span className="text-[10px] opacity-60">opsiyonel</span>}
                   {isNext && (
                     <span className="relative flex h-2 w-2 shrink-0">
