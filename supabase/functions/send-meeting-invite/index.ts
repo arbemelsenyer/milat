@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { olayYaz } from "../_shared/olay.ts";
 
 /* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
    Taraf kendi ekranından bildirim sıklığını ve sessiz saatlerini belirler
@@ -310,6 +311,11 @@ serve(async (req) => {
       await admin.from("case_sessions")
         .update({ invite_sent_at: new Date().toISOString() })
         .eq("id", sessionId);
+      // AKIŞ OLAYI (best-effort): oturum daveti tarafa gönderildi. Alıcı adresi yazılmaz.
+      await olayYaz(admin, {
+        case_id: session.case_id, olay_kodu: "oturum_daveti_gonderildi",
+        veri: { session_id: sessionId, gonderilen: sentCount, basarisiz: failedCount },
+      });
     }
     return new Response(JSON.stringify({
       success: true, sent: sentCount, failed: failedCount, total: results.length, results,

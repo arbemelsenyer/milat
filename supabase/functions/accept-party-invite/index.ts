@@ -1,5 +1,6 @@
 // Bind logged-in user to a case_party via invite token
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { olayYaz } from "../_shared/olay.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,6 +56,11 @@ Deno.serve(async (req) => {
       case_id: party.case_id, party_id: party.id, event_type: "accepted", ip_address: ip,
     });
 
+    // AKIŞ OLAYI (best-effort): taraf daveti kabul etti ve hesabına bağlandı.
+    await olayYaz(admin, {
+      case_id: party.case_id, party_id: party.id,
+      olay_kodu: "taraf_katilim_kabul_edildi", veri: {},
+    });
     return new Response(JSON.stringify({ case_id: party.case_id, party_id: party.id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

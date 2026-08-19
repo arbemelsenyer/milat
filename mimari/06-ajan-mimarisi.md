@@ -370,3 +370,42 @@ hiçbir yoldan görmez. Süreç ajanıyla doğrudan konuşmaz — iletişim ajan
   numarası üretilmez (constitution m.2).
 · Süre satırı mevcut süre takibinden (deadline_total / deadline_extended / extension_used)
   OKUNUR; yeniden hesaplanmaz — DeadlineCard ile çakışma olmaz.
+
+
+[EKLEME 19.08.2026 — AKIŞ OMURGASI: OLAY → KURAL → SAHİP → İNSAN KAPISI]
+● CANLI (deploy sonrası). Ürünün akışı bugüne kadar KODA GÖMÜLÜ ZİNCİRDİ: hangi
+adımdan sonra ne olacağı, o adımı yapan fonksiyonun içine yazılıydı. Bu taşla
+akış VERİYE taşındı; eski zincirler yerinde bırakıldı, yeni omurga PARALEL çalışır.
+
+NEDEN KURAL TABLOSU, NEDEN KODA GÖMÜLÜ ZİNCİR DEĞİL:
+· Zincir koda gömülüyken "bu adımdan sonra ne oluyor" sorusunun cevabı ancak kod
+  okunarak bulunur. Kurucu teknik bilmez; akışı göremediği bir ürünün kararını
+  veremez. Kural tablosu akışı OKUNUR kılar: bir satır bir cümledir.
+· Yeni bir adım eklemek kod değişikliği, gözden geçirme ve deploy ister. Kural
+  satırı yazmak istemez. Akışın hızı, kodun deploy hızına bağlı kalmaz.
+· İnsan kapısı koda gömülüyken her fonksiyonda ayrı ayrı korunur ve biri unutulursa
+  sessizce delinir. Kural tablosunda kapı TEK ALANDIR (insan_kapisi) ve tek yerden
+  denetlenir — constitution m.3'ün ("AI önerir, insan karar verir") makine okunur hâli.
+· Sahip alanı (taraf_ajani / masa_ajani / sistem), hangi ajanın hangi işi yaptığını
+  tabloda görünür kılar; ajan hesap verebilirliğinin (m.6) kayıt karşılığıdır.
+
+ÜÇ PARÇA:
+1. OLAY (public.akis_olaylari) — "şu adım bitti" satırı. Yazıcı: _shared/olay.ts
+   içindeki olayYaz. BEST-EFFORT: olay yazılamazsa asıl işlem BAŞARISIZ SAYILMAZ.
+   KÖR VERİ: veri alanında yalnız kimlikler ve durum bilgisi durur; taraf beyanı,
+   belge içeriği, analiz metni ve tutar YAZILMAZ (m.1 · m.6).
+2. KURAL (public.akis_kurallari) — olay_kodu · kosul · sonraki_adim · sahip ·
+   insan_kapisi · gerekce · sira · etkin. Kuralları AJAN YAZMAZ; kurucu yazar.
+3. KOŞUCU (akis-yurut) — işlenmemiş olayları okur, kuralı uygular:
+   · insan_kapisi=false → sonraki adımı iç kapıdan çağırır (aynı olay + aynı kural
+     ikinci kez çalışmaz).
+   · insan_kapisi=true → HİÇBİR ŞEY ÇAĞIRMAZ; panoya 'akis_onay_bekliyor' düşer.
+   · kosul: bugün yalnız {"en_az_taraf": N}. TANIMADIĞI ANAHTARDA KURALI ATLAR —
+     bilinmeyen koşul "koşul yok" sayılmaz.
+   · Kural hata verirse olay İŞLENMİŞ SAYILMAZ, hata panoya 'akis_hatasi' düşer.
+     Sessiz başarısızlık yoktur (m.9).
+   · Koşucu TARAFA HİÇBİR ŞEY GÖNDERMEZ. E-posta gönderen tek yer kuralın çağırdığı
+     mevcut fonksiyondur ve o kendi iletişim tercihi süzgecinden geçer.
+· Güvenlik kapısı ajan-nobetci ile birebir aynıdır (x-cron-secret veya admin JWT).
+  Koşucuyu nöbetçi, turunun SONUNDA bir kez tetikler; nöbetçinin mevcut kontrolleri
+  ve sıraları değişmedi.

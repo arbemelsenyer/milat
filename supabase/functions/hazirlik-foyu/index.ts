@@ -47,6 +47,7 @@
 // ONAYLI FÖYE DOKUNULMAZ: durumu 'onaylandi' ya da 'gonderildi' olan satır
 // yeniden üretilmez (arabulucunun onayladığı metni ajan değiştiremez).
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { olayYaz } from "../_shared/olay.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1084,6 +1085,12 @@ Deno.serve(async (req) => {
       await durumYaz(durumAdmin, durumCaseId, durumPartyId, { status: "failed", error_message: yErr.message });
       return json({ error: `Kayıt yazılamadı: ${yErr.message}` }, 500);
     }
+
+    // AKIŞ OLAYI (best-effort): föy taslağı yazıldı. Föy METNİ olaya girmez.
+    await olayYaz(admin, {
+      case_id, party_id, olay_kodu: "foy_taslagi_hazirlandi",
+      veri: { session_id, bolum_sayisi: bolumler.length, dolu },
+    });
 
     /* Gündemin GERÇEK kaynağı: havuz (bedava) · turetildi (bu turda bir kez model)
        · kod (yedek kalıplar) · yedek (boş föy koruması) · yok.

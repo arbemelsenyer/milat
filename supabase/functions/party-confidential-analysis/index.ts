@@ -1,5 +1,6 @@
 // Party-confidential analysis: only the party (and mediator via RLS) can see results
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { olayYaz } from "../_shared/olay.ts";
 
 // Provided by the Supabase Edge Runtime; lets background writes (agent_states) finish
 // after the response is sent instead of a bare fire-and-forget that may get cut off.
@@ -306,6 +307,13 @@ Bu tarafın perspektifinden detaylı analiz üret. Yukarıdaki bloklarda somut b
         issue_description_snapshot: caseRow?.issue_description ?? null,
       });
     }
+
+    /* AKIŞ OLAYI (best-effort): bu tarafın analizi tamamlandı. Analiz METNİ,
+       bulgular ve sorular olaya YAZILMAZ — yalnız kimlikler ve sayı. */
+    await olayYaz(admin, {
+      case_id, party_id, olay_kodu: "taraf_analizi_tamamlandi",
+      veri: { soru_sayisi: Array.isArray(parsed?.discovery_questions) ? parsed.discovery_questions.length : 0 },
+    });
 
     // Kök Neden Katmanı: ayrı, mediator-only tabloya ek yazım (party_analyses'ten bağımsız,
     // party_root_cause_analysis'in RLS'i tarafa hiç SELECT vermiyor). Best-effort — bu yazım

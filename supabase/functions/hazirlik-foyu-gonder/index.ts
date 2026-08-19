@@ -18,6 +18,7 @@
 // süzgeçten geçer. Tür "belge_talebi" — önemli listesindedir. Süzgeç "gönderme"
 // derse durum DEĞİŞMEZ; sebep dönüş gövdesine yazılır ve arabulucu görür.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { olayYaz } from "../_shared/olay.ts";
 
 /* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
    Taraf kendi ekranından bildirim sıklığını ve sessiz saatlerini belirler
@@ -388,6 +389,13 @@ Deno.serve(async (req) => {
         ...(kayitNotu ? { kayit_yazilamadi: kayitNotu } : {}),
       });
     }
+
+    // AKIŞ OLAYI (best-effort): föy tarafına gönderildi. Föy metni ve adres yazılmaz.
+    await olayYaz(admin, {
+      case_id: String((foy as any).case_id), party_id: String((foy as any).party_id),
+      olay_kodu: "foy_gonderildi",
+      veri: { foy_id: String((foy as any).id), session_id: (foy as any).session_id ?? null },
+    });
 
     return json({
       gonderildi: true, gonderim_zamani: gonderimZamani, sebep: izin.sebep,

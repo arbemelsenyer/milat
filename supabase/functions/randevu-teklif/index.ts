@@ -2,6 +2,7 @@
 // Kör veri ilkesi: "getir" yalnız seçenekleri, taraf adını ve dosya başlığını döner;
 // token'ı bilmeyen hiçbir istek hiçbir veri alamaz.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { olayYaz } from "../_shared/olay.ts";
 
 /* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
    Taraf kendi ekranından bildirim sıklığını ve sessiz saatlerini belirler
@@ -660,6 +661,14 @@ async function cevaplaIsle(admin: any, token: string, secimRaw: string): Promise
             : [],
         } as any).select("id").maybeSingle();
         if (sesErr) console.error("[randevu-teklif] oturum kaydı yazılamadı", sesErr.message);
+        else {
+          // AKIŞ OLAYI (best-effort): taraf saati kabul etti, oturum satırı açıldı.
+          await olayYaz(admin, {
+            case_id: (row as any).case_id, party_id: (p as any)?.id ?? null,
+            olay_kodu: "oturum_planlandi",
+            veri: { session_id: (yeniOturum as any)?.id ?? null, ozel_oturum: ozelOturum },
+          });
+        }
 
         // Çevrim içi görüşmede (oturum_tipi yoksa da çevrim içi sayılır) video odası
         // hemen iç kapıdan üretilir; link oturuma yazılır ve davet yazısına girer.

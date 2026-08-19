@@ -1,5 +1,6 @@
 // Mediator-only: combine both party analyses → common ground + strategy
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { olayYaz } from "../_shared/olay.ts";
 
 // Provided by the Supabase Edge Runtime; lets background writes (agent_states) finish
 // after the response is sent instead of a bare fire-and-forget that may get cut off.
@@ -297,6 +298,11 @@ Yukarıdaki resmi kaynaklardan ve benzer geçmiş davalardan yararlanarak ortak 
       );
     }
 
+    // AKIŞ OLAYI (best-effort): ortak zemin raporu üretildi. Rapor METNİ yazılmaz.
+    await olayYaz(admin, {
+      case_id: case_id!, olay_kodu: "ortak_zemin_raporu_uretildi",
+      veri: { rapor_id: (inserted as any)?.id ?? null },
+    });
     return new Response(JSON.stringify({ report: inserted }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

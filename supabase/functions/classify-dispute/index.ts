@@ -1,5 +1,6 @@
 // Classify dispute type via Gemini using RAG context from knowledge_base_chunks.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { olayYaz } from "../_shared/olay.ts";
 
 // Provided by the Supabase Edge Runtime; lets background writes (agent_states) finish
 // after the response is sent instead of a bare fire-and-forget that may get cut off.
@@ -205,6 +206,12 @@ KURALLAR:
       if (Object.keys(patch).length > 0) {
         await admin.from("cases").update(patch as any).eq("id", case_id);
       }
+      // AKIŞ OLAYI (best-effort): tür önerisi yazıldı. Kategori KODU dışında
+      // dosya içeriğinden hiçbir metin olaya girmez.
+      await olayYaz(admin, {
+        case_id, olay_kodu: "uyusmazlik_turu_onerildi",
+        veri: { kategori, alt_uzmanlik, mevcut_tur_vardi: !!mevcutTur },
+      });
     }
 
     // Activity log: mark completed. Fire via waitUntil so it can't delay the response,

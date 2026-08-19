@@ -1,5 +1,6 @@
 // Send invite email to a party so they can sign in and access only their data
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { olayYaz } from "../_shared/olay.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -109,6 +110,11 @@ Deno.serve(async (req) => {
       }
     }
 
+    // AKIŞ OLAYI (best-effort): taraf daveti gönderildi. E-posta adresi olaya yazılmaz.
+    await olayYaz(admin, {
+      case_id: (party as any).case_id, party_id: party_id,
+      olay_kodu: "taraf_daveti_gonderildi", veri: {},
+    });
     return new Response(JSON.stringify({ invite_url: inviteUrl, token }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

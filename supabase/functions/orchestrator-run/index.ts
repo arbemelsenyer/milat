@@ -8,6 +8,7 @@
 // Kapsam dışı (bilinçli): multi-agent-negotiation (Kör Teklif) ve generate-official-document
 // (belge üretimi mediator kontrolünde) — bu zincire dahil edilmedi.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { olayYaz } from "../_shared/olay.ts";
 
 // Takılı koşu eşiği: bu süreden eski, hâlâ "running" görünen orchestrator satırı
 // yarıda kalmış bir koşudur; yeni koşu başlarken kapatılır.
@@ -336,6 +337,12 @@ Deno.serve(async (req) => {
       status: "completed", error_message: null, last_output: { steps },
     });
     terminalWritten = true;
+
+    // AKIŞ OLAYI (best-effort): analiz zinciri baştan sona tamamlandı.
+    await olayYaz(finalAdmin, {
+      case_id: finalCaseId, olay_kodu: "analiz_zinciri_tamamlandi",
+      veri: { adim_sayisi: steps.length },
+    });
 
     return new Response(JSON.stringify({ success: true, steps }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

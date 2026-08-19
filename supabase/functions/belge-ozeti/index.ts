@@ -11,6 +11,7 @@
 // HALÜSİNASYON KAPISI: metin yoksa özet ÜRETİLMEZ, durum='metin_yok' yazılır
 // ("belge metni okunamadı"). Şema dışı/eksik çıktı sunucu tarafında elenir (durum='elendi').
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { olayYaz } from "../_shared/olay.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -136,7 +137,7 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const { data: doc, error: dErr } = await admin.from("case_documents")
-      .select("id, case_id, file_name, mime_type, extracted_text, extraction_status")
+      .select("id, case_id, party_id, file_name, mime_type, extracted_text, extraction_status")
       .eq("id", document_id).maybeSingle();
     if (dErr) return json({ error: dErr.message }, 500);
     if (!doc) return json({ error: "Belge bulunamadı" }, 404);
@@ -360,7 +361,15 @@ Bu satırı yukarıdaki kurallara göre yeniden yaz.`;
     if (yErr) return json({ error: `Kayıt yazılamadı: ${yErr.message}` }, 500);
 
     await durumYaz(durumAdmin, durumCaseId, null, { status: "completed", error_message: null, last_output: { sonuc: "uretildi" } });
-    return json({ durum: "uretildi", ozet, kaniti, not: kanitNotu });
+    // AKIŞ OLAYI (best-effort): belge özeti üretildi. Özet METNİ olaya YAZILMAZ.
+    const olayNotu = await olayYaz(admin, {
+      case_id: durumCaseId, party_id: (doc as any)?.party_id ?? null,
+      olay_kodu: "belge_ozeti_uretildi", veri: { document_id: (doc as any)?.id ?? null },
+    });
+    return json({
+      durum: "uretildi", ozet, kaniti, not: kanitNotu,
+      ...(olayNotu ? { olay_yazilamadi: olayNotu } : {}),
+    });
   } catch (e: any) {
     console.error("[belge-ozeti] hata", e?.message ?? e);
     await durumYaz(durumAdmin, durumCaseId, durumPartyId, { status: "failed", error_message: String(e?.message ?? "Bilinmeyen hata").slice(0, 500) });

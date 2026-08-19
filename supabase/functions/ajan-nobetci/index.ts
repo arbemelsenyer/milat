@@ -2412,7 +2412,15 @@ Deno.serve(async (req) => {
       }
     }
 
+    /* AKIŞ KOŞUCUSU (agentic belkemiği): tur bittikten SONRA bir kez tetiklenir.
+       Mevcut kontrollerin hiçbirini beklemez, hiçbirini değiştirmez; bu turda
+       yazılan akış olaylarını akis-yurut okur. Hata olursa nöbetçi turu
+       başarısız SAYILMAZ — sebep özete not olarak düşer. */
+    const akisSonuc = await icFonksiyonCagir("akis-yurut", {});
+    if (!akisSonuc.ok) atlamaSebepleri.push(`akış koşucusu çalıştırılamadı: ${akisSonuc.sebep}`);
+
     return json({
+      akis_yurut: akisSonuc.ok ? "kosuldu" : `hata: ${akisSonuc.sebep}`.slice(0, 200),
       dosya: islenenDosya,
       gorev_yapildi: yapilanGorev,
       gorev_atlandi: atlananGorev,

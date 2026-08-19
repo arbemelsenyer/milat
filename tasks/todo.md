@@ -1,3 +1,32 @@
+## Nerede kaldık — 19.08.2026 (89) · AGENTIC BELKEMİĞİ 1. TAŞ (OLAY + KURAL + KOŞUCU)
+
+BİTTİ (kodda, deploy bekliyor):
+- [x] supabase/functions/_shared/olay.ts — olayYaz yardımcısı (deponun İLK _shared
+      dosyası). Best-effort: olay yazılamazsa çağıran işlem başarısız sayılmaz.
+- [x] 12 fonksiyona olay yazımı bağlandı (Aşama 1-2-3-4 kapsandı). Liste
+      tasks/kurulu-envanter.md ve akis-kurallari-onerisi.md içinde.
+- [x] tasks/akis-kurallari-onerisi.md — YEDİ AŞAMANIN olay haritası; her satırda
+      aşama · olay_kodu · sonraki adım · sahip · insan kapısı · gerekçe, artı iki
+      liste: BAĞLANAMAYANLAR ve EKSİK OLAY NOKTASI. VERİTABANINA KURAL YAZILMADI.
+- [x] akis-yurut (YENİ edge fonksiyon): işlenmemiş olayları okur, kuralı uygular.
+      insan_kapisi=true ise fonksiyon çağırmaz, panoya 'akis_onay_bekliyor' düşer.
+      kosul yalnız {"en_az_taraf": N}; tanımadığı anahtarda kuralı ATLAR.
+      Kural hata verirse olay işlenmiş sayılmaz, panoya 'akis_hatasi' düşer.
+      Güvenlik kapısı ajan-nobetci ile birebir aynı.
+- [x] ajan-nobetci turunun SONUNDA akis-yurut bir kez tetikleniyor; mevcut
+      kontroller, sıraları ve kapısı değişmedi.
+
+KURUCUYA DÜŞEN KARAR: akis-kurallari-onerisi.md okunacak, hangi kuralların tabloya
+gireceğine kurucu karar verecek ve satırları kurucu yazacak.
+
+DİKKAT — İLK DEPLOY RİSKİ: _shared bu depoda ilk kez kullanılıyor. Lovable'ın
+deploy'u parent klasörü bundle etmezse import kırılır. ÖNCE TEK FONKSİYON
+(extract-document-text) deploy edilip canlıda denenmeli; çalıştığı görülmeden
+öteki 11 fonksiyon deploy edilmemeli.
+
+SIRADA: tek fonksiyonla _shared denemesi → sonra kalan fonksiyonlar + akis-yurut
+deploy → nöbetçi turunda koşucunun çalıştığının doğrulanması.
+
 ## Nerede kaldık — 19.08.2026 (88) · GÖNDERİM KAYDI · NÖBETÇİ · TEK DÜĞME
 
 BİTTİ (kodda, deploy bekliyor):

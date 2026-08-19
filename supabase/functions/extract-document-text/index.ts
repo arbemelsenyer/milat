@@ -4,6 +4,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { extractText, getDocumentProxy } from "npm:unpdf@0.12.1";
 import mammoth from "npm:mammoth@1.8.0";
+import { olayYaz } from "../_shared/olay.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +14,10 @@ const corsHeaders = {
 // Belge başına en fazla 20.000 karakter — kalanı kırpılır.
 const MAX_CHARS_PER_DOC = 20_000;
 
-type DocRow = { id: string; file_name: string; file_path: string; mime_type: string | null };
+type DocRow = {
+  id: string; file_name: string; file_path: string; mime_type: string | null;
+  case_id: string; party_id: string | null;
+};
 
 class UnsupportedFormatError extends Error {}
 
@@ -87,7 +91,7 @@ Deno.serve(async (req) => {
     let targets: DocRow[] = [];
     if (document_id) {
       const { data: doc } = await userClient.from("case_documents")
-        .select("id, file_name, file_path, mime_type")
+        .select("id, file_name, file_path, mime_type, case_id, party_id")
         .eq("id", document_id).maybeSingle();
       if (!doc) {
         return new Response(JSON.stringify({ error: "Document not found or forbidden" }), {
@@ -97,7 +101,7 @@ Deno.serve(async (req) => {
       targets = [doc as DocRow];
     } else {
       const { data: docs } = await userClient.from("case_documents")
-        .select("id, file_name, file_path, mime_type")
+        .select("id, file_name, file_path, mime_type, case_id, party_id")
         .eq("case_id", case_id).eq("extraction_status", "bekliyor");
       targets = (docs ?? []) as DocRow[];
     }
@@ -106,6 +110,16 @@ Deno.serve(async (req) => {
     const results: { id: string; status: string }[] = [];
 
     for (const doc of targets) {
+      /* AKIŞ OLAYI (best-effort): belge yüklendi. Çıkarmanın SONUCUNDAN bağımsız
+         yazılır — desteklenmeyen formatta da belge dosyaya girmiştir. Yükleme anı
+         ön yüzdedir; bu fonksiyon her yükleme yolundan hemen sonra çağrıldığı için
+         bugünkü en yakın sunucu noktasıdır (bkz. akis-kurallari-onerisi.md). */
+      await olayYaz(admin, {
+        case_id: String((doc as any).case_id ?? ""),
+        party_id: (doc as any).party_id ?? null,
+        olay_kodu: "belge_yuklendi",
+        veri: { document_id: doc.id },
+      });
       try {
         const { data: blob, error: dlErr } = await admin.storage.from("case-documents").download(doc.file_path);
         if (dlErr || !blob) throw new Error(dlErr?.message ?? "Belge storage'dan indirilemedi");

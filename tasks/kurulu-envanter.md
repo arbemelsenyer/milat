@@ -188,3 +188,23 @@ Gün sonu belge komutuna dahildir.
   cancel-meeting-invite · randevu-teklif · send-meeting-invite ·
   send-reschedule-notification · send-session-notification · send-session-reminders.
   (hazirlik-foyu-gonder de aynı süzgeci taşır; yedili liste 1. turun kapsamıdır.)
+
+[EKLEME 19.08.2026 — AKIŞ OMURGASI (agentic belkemiği 1. taş)]
+- Tablo: public.akis_olaylari — CANLIDA. "Şu adım bitti" satırları; islendi/islenme_zamani
+  ile koşucu tarafından işaretlenir. RLS: SELECT arabulucu/dosya sahibi · ALL admin.
+- Tablo: public.akis_kurallari — CANLIDA. olay_kodu → sonraki_adim eşlemesi; sahip
+  (taraf_ajani/masa_ajani/sistem), insan_kapisi, kosul, sira, etkin. İçinde ÜÇ tohum
+  kural var: belge_yuklendi__analiz · oturum_planlandi__foy_hazirla · foy_onaylandi__gonder.
+  Kuralları AJAN YAZMAZ; satırları kurucu yazar.
+- Edge fonksiyon: akis-yurut — YENİ (verify_jwt=false, kendi kapısı var: x-cron-secret
+  veya admin JWT). Nöbetçi turunun sonunda iç kapıdan bir kez tetiklenir.
+  İLK DEPLOY GEREKİR.
+- Paylaşılan yardımcı: supabase/functions/_shared/olay.ts (olayYaz) — deponun İLK
+  _shared dosyasıdır. Olay yazımı best-effort'tur, çağıran işlemi bozmaz.
+- Olay yazımı bağlanan 12 fonksiyon: extract-document-text · belge-ozeti ·
+  classify-dispute · send-party-invite · accept-party-invite ·
+  party-confidential-analysis · orchestrator-run · common-ground-report ·
+  randevu-teklif · send-meeting-invite · hazirlik-foyu · hazirlik-foyu-gonder.
+  HEPSİ REDEPLOY İSTER (import yolu değişti).
+- Olay noktası OLMAYANLAR ve sebepleri: tasks/akis-kurallari-onerisi.md sonundaki
+  iki liste (bağlanamayanlar · eksik olay noktası).
