@@ -1740,6 +1740,74 @@ export type Database = {
         }
         Relationships: []
       }
+      foy_gonderim_kayitlari: {
+        Row: {
+          attempt: number
+          case_id: string
+          created_at: string
+          error_message: string | null
+          foy_id: string
+          id: string
+          party_id: string
+          recipient_email: string
+          resend_message_id: string | null
+          status: string
+        }
+        Insert: {
+          attempt?: number
+          case_id: string
+          created_at?: string
+          error_message?: string | null
+          foy_id: string
+          id?: string
+          party_id: string
+          recipient_email: string
+          resend_message_id?: string | null
+          status: string
+        }
+        Update: {
+          attempt?: number
+          case_id?: string
+          created_at?: string
+          error_message?: string | null
+          foy_id?: string
+          id?: string
+          party_id?: string
+          recipient_email?: string
+          resend_message_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "foy_gonderim_kayitlari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "foy_gonderim_kayitlari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "foy_gonderim_kayitlari_foy_id_fkey"
+            columns: ["foy_id"]
+            isOneToOne: false
+            referencedRelation: "oturum_hazirlik_foyleri"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "foy_gonderim_kayitlari_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guc_dengesi: {
         Row: {
           aciklama: string
