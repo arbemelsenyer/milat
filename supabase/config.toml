@@ -151,3 +151,6 @@ verify_jwt = false
 
 [functions.taraf-kalem-cikar]
 verify_jwt = false
+
+[functions.taraf-cevap]
+verify_jwt = true

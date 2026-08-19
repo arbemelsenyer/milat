@@ -1,3 +1,32 @@
+## Nerede kaldık — 19.08.2026 (92) · SİSTEMİN GENEL KANUNU (yasa-1)
+
+BİTTİ (kodda, deploy bekliyor):
+- [x] Ortak motor _shared/anlatim.ts içinde genişletildi: MOTORA_BAGLI listesi,
+      motoraBagliMi, girdiTamamla (eksik girdiyi en az iki yoldan arar), soru
+      tipleri ve kol etiketi.
+- [x] akis-yurut yasaya uyduruldu: motora bağlı olmayanı çağırmıyor ve sebebini
+      yazıyor · eksik girdiyi kendi tamamlayıp yeniden deniyor · aynı olay+kural
+      için en fazla iki deneme · her hata anlaşılır tek cümle.
+- [x] KUSUR (a) kapandı: hazirlik-foyu artık eksik girdiyle çağrılmıyor; oturum
+      ve taraf bilgisi dosyadan tamamlanıyor, gerekirse taraf başına ayrı koşum.
+- [x] KUSUR (b) kapandı: taraf sorusu artık 'taraf_sorusu' tipiyle yazılıyor;
+      nöbetçi bu tipi yürütmediği için soru 'atlandi' olmuyor, sohbette duruyor.
+- [x] KUSUR (c) kapandı: dayanak ölçüsü kondu — belgeye atıf yoksa 'dayanaksiz';
+      talep cümlesi dayanak sayılmıyor; manevi tazminat gibi kalemler bilgi
+      notuyla işaretleniyor ve tarafa sorulmuyor.
+- [x] ajan-nobetci'ye hatırlatma kolu: 24 saat/2 gün aralıkla hatırlatma,
+      e-posta iletişim tercihi süzgecinden geçiyor, cevap gelince duruyor;
+      cevaplanan soru ilgili kolu bir kez yeniden uyandırıyor.
+- [x] YENİ taraf-cevap: sohbetten verilen cevabı görevin sonuc alanına yazar.
+- [x] Sohbet: bekleyen istek varsa kendiliğinden açılıyor, istek en üstte,
+      "Cevap yaz" ile cevap kipi.
+
+KURUCUYA NOT: taraf, ajan_gorevleri satırlarını yalnız OKUYABİLİYOR (RLS). Cevap
+yazımı bu yüzden taraf-cevap kapısından geçiyor; politika değişmedi.
+
+SIRADA: deploy (liste raporda) + publish, sonra canlı test — belge yükle, kalem
+çıksın, dayanaksız kalemde soru sohbette KALSIN, cevap ver, kol devam etsin.
+
 ## Nerede kaldık — 19.08.2026 (91) · ÇALIŞAN-ANLATAN-TAMAMLAYAN AJAN DÜZENİ
 
 BİTTİ (kodda, deploy bekliyor):

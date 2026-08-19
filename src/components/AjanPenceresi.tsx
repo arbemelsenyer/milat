@@ -45,6 +45,7 @@ type GorevSatiri = {
   hedef_party_id: string | null;
   gerekce: string | null;
   durum: string;
+  sonuc?: string | null;
   created_at: string;
 };
 
@@ -103,14 +104,22 @@ const GOREV_BASLIGI: Record<string, string> = {
   akis_hatasi: "Kendiliğinden yapılamayan bir adım var.",
   foy_teslim_uyarisi: "Hazırlık föyünün gönderimi doğrulanamadı.",
   taraf_alternatif_saat: "Taraftan alternatif saat geldi.",
+  // Yasa 4. madde: ajanın sorduğu ve cevap bekleyen soru. Nöbetçi bu tipi
+  // yürütmez; soru cevaplanana kadar 'bekliyor' kalır ve burada görünür.
+  taraf_sorusu: "Ajanınızın size bir sorusu var.",
+  arabulucu_sorusu: "Ajanın size bir sorusu var.",
 };
 
 /* Taraf sohbetinde YALNIZ bu tipler görünür; arabulucuya ait tipler sorguya
    hiç girmez. */
 const TARAFA_ACIK_GOREVLER = [
   "soru_gonder", "taraf_eksik_bilgi", "taraf_musaitlik_iste",
-  "teklif_degerlendir", "ilk_temas", "ozel_oturum",
+  "teklif_degerlendir", "ilk_temas", "ozel_oturum", "taraf_sorusu",
 ];
+
+/* Cevap yazılabilen tipler: ajanın doğrudan sorduğu sorular. Öteki bekleyen
+   satırlar bir ekrana götürür, cevabı orada verilir. */
+const CEVAPLANABILIR = ["taraf_sorusu", "arabulucu_sorusu"];
 
 const GOREV_ASAMASI: Record<string, number> = {
   soru_gonder: 2, taraf_eksik_bilgi: 2, analiz_baslat: 2,
@@ -118,9 +127,11 @@ const GOREV_ASAMASI: Record<string, number> = {
   akis_hatasi: 3, asama_gecisi: 3,
   taraf_musaitlik_iste: 4, randevu_teklifi: 4, taraf_alternatif_saat: 4,
   oturum_hatirlatma: 4, ozel_oturum: 4, foy_teslim_uyarisi: 4,
+  taraf_sorusu: 3, arabulucu_sorusu: 3,
 };
 
 const GOREV_SEKMESI: Record<string, string> = {
+  taraf_sorusu: "kalemlerim",
   soru_gonder: "discovery",
   taraf_eksik_bilgi: "kalemlerim",
   taraf_musaitlik_iste: "randevu",
@@ -140,7 +151,19 @@ function saatMetni(zaman: number): string {
 
 // Gerekçedeki makine etiketi ("[oto:…]", "[akis:…]", "[eksik:…]") ekrana basılmaz.
 function gerekceTemizle(v: string | null): string {
-  return String(v ?? "").replace(/^\[[^\]]*\]\s*/, "").trim();
+  let t = String(v ?? "");
+  // Baştaki bütün makine etiketleri ("[eksik:…] [kol:…]") ayıklanır.
+  while (/^\[[^\]]*\]\s*/.test(t)) t = t.replace(/^\[[^\]]*\]\s*/, "");
+  return t.trim();
+}
+
+// "son hatırlatma: <ISO> (n. hatırlatma)" satırını okunur hâle getirir.
+function hatirlatmaMetni(sonuc: string | null): string {
+  const m = /son hatırlatma: (\S+) \((\d+)\. hatırlatma\)/.exec(String(sonuc ?? ""));
+  if (!m) return "";
+  const d = new Date(m[1]);
+  if (isNaN(d.getTime())) return "";
+  return `${m[2]}. kez hatırlatıldı — ${d.toLocaleString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`;
 }
 
 export function AjanPenceresi({
@@ -163,7 +186,10 @@ export function AjanPenceresi({
   const [yazisma, setYazisma] = useState<Mesaj[]>([]);
   const [soru, setSoru] = useState("");
   const [bekliyor, setBekliyor] = useState(false);
+  const [cevaplanan, setCevaplanan] = useState<GorevSatiri | null>(null);
   const altRef = useRef<HTMLDivElement | null>(null);
+  // Kendiliğinden açılma YALNIZ BİR KEZ olur; kullanıcı kapatırsa tekrar açılmaz.
+  const kendiAcildiRef = useRef(false);
 
   /* ROL OTURUMDAN: ekrandan gelen `mod` yalnız yerleşim ipucudur. Görevli
      arabulucu ya da yönetici → arabulucu; dosyanın tarafı → taraf; ikisi de
@@ -202,7 +228,7 @@ export function AjanPenceresi({
           .eq("case_id", caseId).eq("party_id", partyId!).eq("tarafa_gorunur", true)
           .order("updated_at", { ascending: false }).limit(10),
         supabase.from("ajan_gorevleri")
-          .select("id, gorev_tipi, hedef_party_id, gerekce, durum, created_at")
+          .select("id, gorev_tipi, hedef_party_id, gerekce, durum, sonuc, created_at")
           .eq("case_id", caseId).eq("durum", "bekliyor")
           .eq("hedef_party_id", partyId!).in("gorev_tipi", TARAFA_ACIK_GOREVLER)
           .order("created_at", { ascending: false }).limit(20),
@@ -227,11 +253,11 @@ export function AjanPenceresi({
           .eq("case_id", caseId).eq("tarafa_gorunur", true)
           .order("updated_at", { ascending: false }).limit(10),
         supabase.from("ajan_gorevleri")
-          .select("id, gorev_tipi, hedef_party_id, gerekce, durum, created_at")
+          .select("id, gorev_tipi, hedef_party_id, gerekce, durum, sonuc, created_at")
           .eq("case_id", caseId).eq("durum", "bekliyor")
           .order("created_at", { ascending: false }).limit(20),
         supabase.from("ajan_gorevleri")
-          .select("id, gorev_tipi, hedef_party_id, gerekce, durum, created_at")
+          .select("id, gorev_tipi, hedef_party_id, gerekce, durum, sonuc, created_at")
           .eq("case_id", caseId).eq("gorev_tipi", "asama_gecisi").eq("durum", "yapildi")
           .order("created_at", { ascending: false }).limit(5),
       ]);
@@ -346,6 +372,20 @@ export function AjanPenceresi({
     if (acik) altRef.current?.scrollIntoView({ block: "end" });
   }, [acik, mesajlar.length]);
 
+  /* TARAF GİRİNCE: bekleyen isteği varsa sohbet kendiliğinden açılır ve istek
+     en üstte gösterilir. Bekleyen yoksa açılmaz; kullanıcı kapatırsa bir daha
+     kendiliğinden açılmaz. */
+  useEffect(() => {
+    if (yukleniyor || kendiAcildiRef.current) return;
+    if (bekleyenIstek) { kendiAcildiRef.current = true; setAcik(true); }
+  }, [yukleniyor, gorevler]);
+
+  /* En üstte gösterilecek istek: ajanın doğrudan sorduğu, cevap bekleyen soru. */
+  const bekleyenIstek = useMemo(
+    () => gorevler.find((g) => CEVAPLANABILIR.includes(g.gorev_tipi)) ?? null,
+    [gorevler],
+  );
+
   function gorevTikla(g?: GorevSatiri) {
     if (!g) return;
     if (tarafModu) {
@@ -364,6 +404,34 @@ export function AjanPenceresi({
     setBekliyor(true);
     const simdi = Date.now();
     setYazisma((o) => [...o, { id: `ben-${simdi}`, zaman: simdi, tip: "ben", metin }]);
+
+    /* CEVAP KİPİ: bekleyen bir soruya cevap yazılıyorsa metin asistana değil,
+       sorunun kendisine gider; görev 'yapildi' olur ve ajan kaldığı yerden
+       devam eder. Yetki sunucuda doğrulanır. */
+    if (cevaplanan) {
+      const hedef = cevaplanan;
+      setCevaplanan(null);
+      try {
+        const { data, error } = await supabase.functions.invoke("taraf-cevap", {
+          body: { gorev_id: hedef.id, cevap: metin },
+        });
+        if (error || (data as any)?.error || !(data as any)?.yazildi) throw new Error("yazilamadi");
+        setYazisma((o) => [...o, {
+          id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+          metin: "Cevabınızı aldım, kaldığım yerden devam ediyorum.",
+        }]);
+        await yukle();
+      } catch {
+        setYazisma((o) => [...o, {
+          id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+          metin: "Cevabınızı şu an kaydedemedim. Birazdan tekrar deneyin.",
+        }]);
+      } finally {
+        setBekliyor(false);
+      }
+      return;
+    }
+
     try {
       /* Soru YALNIZ oturumdan doğrulanan role göre yönlenir. Taraf dalında
          case-qa'ya, arabulucu dalında taraf-asistan'a çağrı YOKTUR. */
@@ -431,6 +499,27 @@ export function AjanPenceresi({
         </Button>
       </div>
 
+      {/* İSTEK ŞERİDİ: bekleyen soru daima EN ÜSTTE durur. */}
+      {bekleyenIstek && (
+        <div className="border-b bg-muted/40 px-3 py-2 shrink-0">
+          <div className="text-xs leading-snug">
+            {GOREV_BASLIGI[bekleyenIstek.gorev_tipi] ?? "Bekleyen bir soru var."}{" "}
+            {gerekceTemizle(bekleyenIstek.gerekce)}
+          </div>
+          {hatirlatmaMetni(bekleyenIstek.sonuc ?? null) && (
+            <div className="text-[10px] text-muted-foreground mt-0.5">
+              {hatirlatmaMetni(bekleyenIstek.sonuc ?? null)}
+            </div>
+          )}
+          {cevaplanan?.id !== bekleyenIstek.id && (
+            <Button size="sm" variant="secondary" className="h-6 px-2 text-[11px] mt-1.5"
+              onClick={() => setCevaplanan(bekleyenIstek)}>
+              Cevap yaz
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {hata && <p className="text-xs text-muted-foreground">{hata}</p>}
 
@@ -488,11 +577,18 @@ export function AjanPenceresi({
       </div>
 
       <div className="border-t p-2 shrink-0">
+        {cevaplanan && (
+          <div className="flex items-center justify-between gap-2 mb-1.5 text-[11px] text-muted-foreground">
+            <span className="truncate">Bu soruya cevap yazıyorsunuz.</span>
+            <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[11px]"
+              onClick={() => setCevaplanan(null)}>Vazgeç</Button>
+          </div>
+        )}
         <div className="flex items-end gap-2">
           <Textarea
             rows={1}
             value={soru}
-            placeholder="Ajana yazın…"
+            placeholder={cevaplanan ? "Cevabınızı yazın…" : "Ajana yazın…"}
             className="min-h-[36px] max-h-24 text-xs resize-none"
             onChange={(e) => setSoru(e.target.value)}
             onKeyDown={(e) => {

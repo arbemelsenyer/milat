@@ -398,3 +398,164 @@ export async function anlatimYansit(
     console.error("[anlatimYansit] yazılamadı", { agent_type: sahip?.agent_type, hata: kisalt(e?.message ?? e, 120) });
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SİSTEMİN GENEL KANUNU — ORTAK MOTOR (yasa-1)
+   Ürünteki her iş şu döngüyü kendi içinde tamamlar:
+     1. KENDİ BAŞLAR       → olay düşünce koşucu tetikler, kimse düğmeye basmaz.
+     2. KENDİ SÜRER        → adımlarını sahibine düz Türkçe anlatır (anlatimAc).
+     3. ENGELE TAKILIRSA KENDİ ÇÖZER → eksik girdiyi EN AZ İKİ FARKLI YOLDAN arar
+        (girdiTamamla) ve devam eder.
+     4. ÇÖZEMEZSE DOĞRU KİŞİYE SORAR → eksigiSor; soru daima 'bekliyor' yazılır
+        ve cevaplanana kadar hatırlatılır.
+     5. CEVAP GELİNCE KALDIĞI YERDEN DEVAM EDER → cevaplanan soru kolu yeniden
+        uyandırır; yapılmış işler mükerrer yazım kapılarında atlanır.
+     6. KENDİ BİTİRİR      → "Yapıldı: … / Eksik: …" ve çıktı ilgili panele.
+     7. BİTİŞİ YENİ OLAY DOĞURUR → sıradaki ajan onunla uyanır.
+
+   YAPISAL ZORUNLULUK: bir fonksiyon bu motora bağlı değilse KOŞUCU ONU ÇAĞIRMAZ
+   ve sebebini açık bir satırla yazar. Böylece sonradan eklenen hiçbir yetenek
+   döngünün dışında kalamaz. Yeni bir fonksiyon yazıldığında adı aşağıdaki
+   MOTORA_BAGLI listesine eklenir; eklenmezse akış onu çalıştırmaz. */
+export const MOTOR_SURUMU = "yasa-1";
+
+/* Motora bağlı fonksiyonlar. Soru-cevap YÜZEYLERİ (case-qa, taraf-asistan)
+   bilerek dışarıdadır: onlar akış adımı değil, kullanıcının sorusuna cevap veren
+   danışma yüzeyleridir — olayla uyanmazlar, çıktıyı panele yazmazlar. */
+export const MOTORA_BAGLI: string[] = [
+  "taraf-kalem-cikar", "hazirlik-foyu", "belge-ozeti", "classify-dispute",
+  "detect-legal-deadlines", "party-confidential-analysis", "party-consistency-check",
+  "party-communication-analysis", "common-ground-report", "orchestrator-run",
+  "elverislilik", "usul-onerisi", "usul-engeli", "olay-cizelgesi", "guc-dengesi",
+  "iletisim-degisim", "dosya-ozeti-oner", "analyze-meeting-notes",
+  "multi-agent-negotiation",
+];
+
+export function motoraBagliMi(fonksiyon: string): boolean {
+  return MOTORA_BAGLI.includes(String(fonksiyon ?? "").trim());
+}
+
+/* Fonksiyonların ZORUNLU girdileri. Koşucu eksik girdiyle çağırıp hata almaz;
+   önce buradan bakar, sonra girdiTamamla ile arar. */
+const ZORUNLU_GIRDI: Record<string, string[]> = {
+  "taraf-kalem-cikar": ["case_id", "party_id"],
+  "hazirlik-foyu": ["case_id", "session_id", "party_id"],
+  "belge-ozeti": ["document_id"],
+  "party-confidential-analysis": ["case_id", "party_id"],
+  "party-consistency-check": ["case_id", "party_id"],
+  "party-communication-analysis": ["case_id", "party_id"],
+  "iletisim-degisim": ["case_id", "party_id"],
+};
+
+function dolu(v: unknown): boolean {
+  return typeof v === "string" ? v.trim().length > 0 : v !== null && v !== undefined;
+}
+
+export type GirdiSonucu = {
+  /** Çalıştırılacak gövdeler. Taraf başına iş ise taraf sayısı kadar olur. */
+  govdeler: Record<string, unknown>[];
+  /** Hangi alan hangi yoldan tamamlandı — anlatıma ve panoya yazılır. */
+  tamamlanan: string[];
+  /** Hiçbir yoldan bulunamayan alanlar. */
+  eksik: string[];
+};
+
+/* 3. MADDE: eksik girdiyi EN AZ İKİ FARKLI YOLDAN arar.
+   session_id  → (1) olayın verisi · (2) planlanmış oturum · (3) dosyadaki son oturum
+   party_id    → (1) olayın verisi · (2) belgenin sahibi · (3) dosyanın tarafları
+                 (her taraf için AYRI koşum kurulur)
+   document_id → (1) olayın verisi · (2) tarafın/dosyanın en son belgesi
+   Hiçbiri tutmazsa uydurulmaz; eksik olarak döner (constitution m.2). */
+export async function girdiTamamla(
+  admin: any, fonksiyon: string, govde: Record<string, unknown>,
+): Promise<GirdiSonucu> {
+  const gerekli = ZORUNLU_GIRDI[fonksiyon] ?? ["case_id"];
+  const temel: Record<string, unknown> = { ...govde };
+  const tamamlanan: string[] = [];
+  const eksik: string[] = [];
+  const caseId = String(temel.case_id ?? "").trim();
+
+  if (!caseId) return { govdeler: [], tamamlanan, eksik: ["dosya"] };
+
+  // ── session_id ────────────────────────────────────────────────────────────
+  if (gerekli.includes("session_id") && !dolu(temel.session_id)) {
+    try {
+      const { data: oturumlar } = await admin.from("case_sessions")
+        .select("id, scheduled_at, status").eq("case_id", caseId).limit(30);
+      const uygun = ((oturumlar ?? []) as any[]).filter((o) => String(o.status ?? "") !== "cancelled");
+      const simdi = Date.now();
+      const planli = uygun
+        .filter((o) => o.scheduled_at && new Date(String(o.scheduled_at)).getTime() > simdi)
+        .sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)))[0];
+      const yedek = planli ?? [...uygun]
+        .sort((a, b) => String(b.scheduled_at ?? "").localeCompare(String(a.scheduled_at ?? "")))[0];
+      if (yedek?.id) {
+        temel.session_id = yedek.id;
+        tamamlanan.push(planli
+          ? "oturum bilgisi planlanmış oturumdan alındı"
+          : "oturum bilgisi dosyadaki son oturumdan alındı");
+      } else eksik.push("oturum");
+    } catch { eksik.push("oturum"); }
+  }
+
+  // ── document_id ───────────────────────────────────────────────────────────
+  if (gerekli.includes("document_id") && !dolu(temel.document_id)) {
+    try {
+      let q = admin.from("case_documents").select("id, party_id")
+        .eq("case_id", caseId).order("created_at", { ascending: false }).limit(1);
+      if (dolu(temel.party_id)) q = q.eq("party_id", String(temel.party_id));
+      const { data } = await q;
+      const belge = ((data ?? []) as any[])[0];
+      if (belge?.id) {
+        temel.document_id = belge.id;
+        if (!dolu(temel.party_id) && belge.party_id) temel.party_id = belge.party_id;
+        tamamlanan.push("belge bilgisi dosyadaki son belgeden alındı");
+      } else eksik.push("belge");
+    } catch { eksik.push("belge"); }
+  }
+
+  // ── party_id ──────────────────────────────────────────────────────────────
+  if (gerekli.includes("party_id") && !dolu(temel.party_id)) {
+    if (dolu(temel.document_id)) {
+      try {
+        const { data: belge } = await admin.from("case_documents")
+          .select("party_id").eq("id", String(temel.document_id)).maybeSingle();
+        if ((belge as any)?.party_id) {
+          temel.party_id = (belge as any).party_id;
+          tamamlanan.push("taraf bilgisi belgenin sahibinden alındı");
+        }
+      } catch { /* sonraki yola geçilir */ }
+    }
+    if (!dolu(temel.party_id)) {
+      try {
+        const { data: taraflar } = await admin.from("case_parties")
+          .select("id").eq("case_id", caseId).limit(10);
+        const liste = ((taraflar ?? []) as any[]).map((t) => String(t.id)).filter(Boolean);
+        if (liste.length > 0) {
+          return {
+            govdeler: liste.map((pid) => ({ ...temel, party_id: pid })),
+            tamamlanan: [...tamamlanan, `iş dosyadaki ${liste.length} taraf için ayrı ayrı kuruldu`],
+            eksik,
+          };
+        }
+        eksik.push("taraf");
+      } catch { eksik.push("taraf"); }
+    }
+  }
+
+  const kalanEksik = gerekli.filter((a) => !dolu(temel[a]));
+  return { govdeler: kalanEksik.length ? [] : [temel], tamamlanan, eksik: [...eksik, ...kalanEksik] };
+}
+
+/* 4./5. MADDE — SORU KAYDI: soru daima 'bekliyor' yazılır ve cevaplanana kadar
+   hatırlatılır. Nöbetçinin YÜRÜTTÜĞÜ tiplerden AYRI bir tip kullanılır; yoksa
+   soru başka bir kol tarafından "atlandı" sayılıp sohbetten düşebilir
+   (19.08 canlı kusuru: taraf belge yüklemiş diye dayanak sorusu kapandı).
+   Cevap gelince kol yeniden uyanır. */
+export const SORU_TIPI_TARAF = "taraf_sorusu";
+export const SORU_TIPI_ARABULUCU = "arabulucu_sorusu";
+
+/** Sorunun hangi kolu uyandıracağını gerekçeye makine okunur biçimde yazar. */
+export function kolEtiketi(fonksiyon: string): string {
+  return `[kol:${String(fonksiyon ?? "").trim()}]`;
+}

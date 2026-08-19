@@ -1072,6 +1072,101 @@ async function foyTeslimGorevleriAc(admin: any, dosya: any, taraflar: any[]): Pr
   return { acilan, sebepler };
 }
 
+/* ── SORU HATIRLATMA VE KALDIĞI YERDEN DEVAM (yasa 4. ve 5. madde) ───────────
+   Ajanın sorduğu ve HENÜZ CEVAPLANMAMIŞ sorular cevaplanana kadar hatırlatılır:
+   ilk 24 saatte günde bir, sonrasında iki günde bir. Hatırlatma sohbette görünür
+   (görevin sonuc alanına yazılır); AYNI METİN üst üste yazılmaz.
+   E-posta gidiyorsa mevcut iletişim tercihi süzgecinden GEÇER (tarafaEposta →
+   gonderilsinMi): sessiz saate ve sıklık tercihine uyar. Cevap gelince durur.
+
+   KALDIĞI YERDEN DEVAM: cevaplanmış ('yapildi') bir soru gerekçesinde
+   "[kol:<fonksiyon>]" taşıyorsa o kol BİR KEZ yeniden uyandırılır. Kollar kendi
+   mükerrer yazım kapılarına sahip olduğu için yapılmış işler tekrarlanmaz;
+   yalnız eksik kalan yerden devam edilir. */
+const SORU_TIPLERI = ["taraf_sorusu", "arabulucu_sorusu"];
+
+function sonHatirlatmaZamani(sonuc: unknown): number | null {
+  const m = /son hatırlatma: (\S+)/.exec(String(sonuc ?? ""));
+  if (!m) return null;
+  const t = new Date(m[1]).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+function hatirlatmaSayisi(sonuc: unknown): number {
+  const m = /\((\d+)\. hatırlatma\)/.exec(String(sonuc ?? ""));
+  return m ? Number(m[1]) || 0 : 0;
+}
+
+async function soruHatirlatmaKollari(
+  admin: any, dosya: any, taraflar: any[],
+): Promise<{ hatirlatilan: number; uyandirilan: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  let hatirlatilan = 0;
+  let uyandirilan = 0;
+
+  const { data: sorular, error } = await admin.from("ajan_gorevleri")
+    .select("id, gorev_tipi, hedef_party_id, gerekce, durum, sonuc, created_at, updated_at")
+    .eq("case_id", dosya.id).in("gorev_tipi", SORU_TIPLERI).limit(50);
+  if (error) {
+    sebepler.push(`soru hatırlatması yapılamadı: sorular okunamadı — ${error.message}`);
+    return { hatirlatilan, uyandirilan, sebepler };
+  }
+
+  const simdi = Date.now();
+  for (const soru of ((sorular ?? []) as any[])) {
+    const durum = String(soru.durum ?? "");
+
+    // ── 5. MADDE: cevaplanmış soru, sorduğu kolu bir kez yeniden uyandırır ──
+    if (durum === "yapildi") {
+      if (String(soru.sonuc ?? "").includes("kol yeniden uyandırıldı")) continue;
+      const kol = /\[kol:([a-z0-9-]+)\]/i.exec(String(soru.gerekce ?? ""));
+      if (!kol) continue;
+      const govde: Record<string, unknown> = { case_id: dosya.id };
+      if (soru.hedef_party_id) govde.party_id = soru.hedef_party_id;
+      const r = await icFonksiyonCagir(kol[1], govde);
+      await admin.from("ajan_gorevleri")
+        .update({ sonuc: `${metin(soru.sonuc)} · kol yeniden uyandırıldı${r.ok ? "" : " (çalıştırılamadı)"}`.trim().slice(0, 500) })
+        .eq("id", soru.id);
+      if (r.ok) uyandirilan++;
+      else sebepler.push(`cevaplanan soru sonrası ${kol[1]} çalıştırılamadı: ${r.sebep}`);
+      continue;
+    }
+
+    if (durum !== "bekliyor") continue;
+
+    /* İlk 24 saatte günde bir, sonrasında iki günde bir. Sayaç ve son zaman
+       görevin sonuc alanında durur; ayrı bir tablo açılmaz. */
+    const acilis = new Date(String(soru.created_at ?? "")).getTime();
+    const yasSaat = Number.isFinite(acilis) ? (simdi - acilis) / 3_600_000 : 0;
+    const araSaat = yasSaat <= 24 ? 24 : 48;
+    const son = sonHatirlatmaZamani(soru.sonuc) ?? acilis;
+    if (!Number.isFinite(son) || simdi - son < araSaat * 3_600_000) continue;
+
+    const sayi = hatirlatmaSayisi(soru.sonuc) + 1;
+    const metinGovde = metin(soru.gerekce).replace(/^\[[^\]]*\]\s*/g, "").replace(/^\[[^\]]*\]\s*/g, "");
+
+    // Tarafa gidecekse e-posta mevcut süzgeçten geçer; arabulucu sorusunda
+    // e-posta gönderilmez, hatırlatma sohbette görünür.
+    if (soru.hedef_party_id) {
+      const taraf = taraflar.find((t) => String(t.id) === String(soru.hedef_party_id));
+      if (taraf && hatirlatmaIzniVar(taraf)) {
+        await tarafaEposta(admin, dosya, taraf,
+          "Dosyanızda bekleyen bir konu var",
+          `<p>${metinGovde.replace(/</g, "&lt;")}</p>
+           <p>Dosya ekranınızdaki ajan sohbetinden yanıtlayabilirsiniz.</p>`,
+          "hatirlatma");
+      }
+    }
+
+    const yeniSonuc = `son hatırlatma: ${new Date().toISOString()} (${sayi}. hatırlatma)`;
+    if (metin(soru.sonuc) === yeniSonuc) continue;   // aynı metin üst üste yazılmaz
+    await admin.from("ajan_gorevleri").update({ sonuc: yeniSonuc }).eq("id", soru.id);
+    hatirlatilan++;
+  }
+
+  return { hatirlatilan, uyandirilan, sebepler };
+}
+
 async function eksikBilgiYurut(admin: any, dosya: any, partyId: string): Promise<{ durum: string; sonuc: string }> {
   const { data: taraf } = await admin.from("case_parties").select("*").eq("id", partyId).maybeSingle();
   if (!taraf) return { durum: "atlandi", sonuc: "Taraf kaydı bulunamadı" };
@@ -2146,6 +2241,8 @@ Deno.serve(async (req) => {
     let incelenenOturum = 0;
     let atlananYuzYuze = 0;
     const atlamaSebepleri: string[] = [];
+    let soruHatirlatildi = 0;
+    let koluYenidenUyandirildi = 0;
     let imzaAdi = "";
     let analizBaslatildi = 0;
     let yeniAnalizGorevi = 0;
@@ -2271,6 +2368,14 @@ Deno.serve(async (req) => {
         // ── FÖY TESLİM DOĞRULAMASI (İBA 3.3): yalnız panoya uyarı düşer, e-posta yok ──
         const foyTeslimKol = await foyTeslimGorevleriAc(admin, dosya, taraflar);
         foyTeslimKol.sebepler.forEach(sebepEkle);
+
+        /* ── SORU HATIRLATMA + KALDIĞI YERDEN DEVAM (yasa 4./5. madde) ──
+           Cevaplanmamış sorular hatırlatılır, cevaplananlar sordukları kolu
+           bir kez yeniden uyandırır. Mevcut kolların hiçbirine dokunulmadı. */
+        const soruKol = await soruHatirlatmaKollari(admin, dosya, taraflar);
+        soruHatirlatildi += soruKol.hatirlatilan;
+        koluYenidenUyandirildi += soruKol.uyandirilan;
+        soruKol.sebepler.forEach(sebepEkle);
 
         // ── TUR C-2: kör teklif v2 — koşullu aralık / braketleme ──
         const braketKol = await braketKollari(admin, dosya, taraflar);
@@ -2421,6 +2526,8 @@ Deno.serve(async (req) => {
 
     return json({
       akis_yurut: akisSonuc.ok ? "kosuldu" : `hata: ${akisSonuc.sebep}`.slice(0, 200),
+      soru_hatirlatildi: soruHatirlatildi,
+      kol_yeniden_uyandirildi: koluYenidenUyandirildi,
       dosya: islenenDosya,
       gorev_yapildi: yapilanGorev,
       gorev_atlandi: atlananGorev,

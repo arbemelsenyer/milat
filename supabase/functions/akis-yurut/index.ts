@@ -19,6 +19,7 @@
 //
 // GÜVENLİK KAPISI ajan-nobetci ile birebir aynıdır: x-cron-secret VEYA admin JWT.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { motoraBagliMi, girdiTamamla } from "../_shared/anlatim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -123,6 +124,25 @@ async function panoyaYaz(
   return { yazildi: true, sebep: "yazıldı" };
 }
 
+/* Akış hatası kaydı. Deneme sayısı bu satırlardan okunduğu için HER DENEME
+   kendi satırını bırakır; ama AYNI ETİKET + AYNI METİN üst üste yazılmaz. */
+async function hataYaz(
+  admin: any, caseId: string, partyId: string | null, etiket: string, mesaj: string,
+): Promise<void> {
+  try {
+    const gerekce = `${etiket} ${mesaj}`.slice(0, 500);
+    const { data: mevcut } = await admin.from("ajan_gorevleri")
+      .select("id, gerekce").eq("case_id", caseId).eq("gorev_tipi", "akis_hatasi").limit(300);
+    if (((mevcut ?? []) as any[]).some((r) => String(r?.gerekce ?? "") === gerekce)) return;
+    await admin.from("ajan_gorevleri").insert({
+      case_id: caseId, gorev_tipi: "akis_hatasi", durum: "bekliyor",
+      hedef_party_id: partyId, gerekce,
+    });
+  } catch (e: any) {
+    console.error("[akis-yurut] hata kaydı yazılamadı", String(e?.message ?? e).slice(0, 120));
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -218,42 +238,86 @@ Deno.serve(async (req) => {
         /* Aynı olay için aynı kural İKİNCİ KEZ çalıştırılmaz. İz, panoda
            'akis_kosuldu' satırı olarak durur ve etiketiyle aranır. */
         const etiket = `[akis:${olay.id}:${kuralKodu}]`;
-        const { data: iz } = await admin.from("ajan_gorevleri")
-          .select("id, gerekce").eq("case_id", caseId).eq("gorev_tipi", "akis_kosuldu").limit(200);
-        const kosulmus = ((iz ?? []) as any[]).some((r) => String(r?.gerekce ?? "").startsWith(etiket));
+        const { data: izSatirlari } = await admin.from("ajan_gorevleri")
+          .select("id, gorev_tipi, gerekce").eq("case_id", caseId)
+          .in("gorev_tipi", ["akis_kosuldu", "akis_hatasi"]).limit(300);
+        const kosulmus = ((izSatirlari ?? []) as any[])
+          .some((r) => String(r?.gerekce ?? "").startsWith(etiket) && String(r?.gorev_tipi) === "akis_kosuldu");
         if (kosulmus) {
           ozet.atlanan_kural++;
           ozet.notlar.push(`${kuralKodu}: bu olay için zaten koşuldu`);
           continue;
         }
 
-        const govde: Record<string, unknown> = { case_id: caseId };
-        if (partyId) govde.party_id = partyId;
+        /* YAPISAL ZORUNLULUK (yasa): ortak motora bağlı olmayan fonksiyon
+           ÇAĞRILMAZ. Sebep açık bir satırla yazılır ki hiçbir yetenek sessizce
+           döngünün dışında kalmasın. Olay işlenmiş sayılır — bu kural bugünkü
+           hâliyle hiçbir denemede çalışamaz, sonsuza dek tekrar denenmez. */
+        if (!motoraBagliMi(fonksiyon)) {
+          ozet.atlanan_kural++;
+          ozet.notlar.push(`${kuralKodu}: '${fonksiyon}' ortak motora bağlı değil — çağrılmadı`);
+          await hataYaz(admin, caseId, partyId, etiket,
+            `${fonksiyon} ortak çalışma motoruna bağlı olmadığı için çalıştırılmadı.`);
+          continue;
+        }
+
+        const temelGovde: Record<string, unknown> = { case_id: caseId };
+        if (partyId) temelGovde.party_id = partyId;
         if (olay.veri && typeof olay.veri === "object") {
           // Olayın taşıdığı kimlikler (session_id, document_id, foy_id …) çağrıya geçer.
           for (const [k, v] of Object.entries(olay.veri as Record<string, unknown>)) {
-            if (v !== null && v !== undefined) govde[k] = v;
+            if (v !== null && v !== undefined) temelGovde[k] = v;
           }
         }
 
-        const r = await icFonksiyonCagir(fonksiyon, govde);
-        if (r.ok) {
+        /* İKİ DENEME SINIRI: aynı olay+kural için en fazla iki deneme yapılır.
+           Sınır dolmuşsa olay işlenmiş sayılır ve sonsuz döngü kurulmaz. */
+        const oncekiHatalar = ((izSatirlari ?? []) as any[])
+          .filter((r) => String(r?.gerekce ?? "").startsWith(etiket) && String(r?.gorev_tipi) === "akis_hatasi").length;
+        if (oncekiHatalar >= 2) {
+          ozet.atlanan_kural++;
+          ozet.notlar.push(`${kuralKodu}: iki denemede de çalışmadı, bırakıldı`);
+          continue;
+        }
+
+        /* 3. MADDE — ENGELE TAKILIRSA KENDİ ÇÖZER: eksik girdi dosyadan aranır.
+           Bulunamazsa uydurulmaz; anlaşılır tek cümleyle bildirilir. */
+        const girdi = await girdiTamamla(admin, fonksiyon, temelGovde);
+        if (girdi.govdeler.length === 0) {
+          olayHatali = oncekiHatalar + 1 < 2;   // bir deneme daha hakkı varsa olay açık kalır
+          ozet.hatali_kural++;
+          const eksikMetni = girdi.eksik.length ? girdi.eksik.join(", ") : "gerekli bilgi";
+          ozet.notlar.push(`${kuralKodu}: ${eksikMetni} dosyada bulunamadı`);
+          await hataYaz(admin, caseId, partyId, etiket,
+            `${fonksiyon} çalıştırılamadı: ${eksikMetni} dosyada bulunamadı.`);
+          continue;
+        }
+        if (girdi.tamamlanan.length > 0) {
+          ozet.notlar.push(`${kuralKodu}: ${girdi.tamamlanan.join(" · ")}`);
+        }
+
+        let hepsiOldu = true;
+        let sonSebep = "";
+        for (const govde of girdi.govdeler) {
+          const r = await icFonksiyonCagir(fonksiyon, govde);
+          if (!r.ok) { hepsiOldu = false; sonSebep = r.sebep; }
+        }
+
+        if (hepsiOldu) {
           ozet.calistirilan_kural++;
           await admin.from("ajan_gorevleri").insert({
             case_id: caseId, gorev_tipi: "akis_kosuldu", durum: "yapildi",
             hedef_party_id: partyId,
-            gerekce: `${etiket} ${fonksiyon} çalıştırıldı`,
+            gerekce: `${etiket} ${fonksiyon} çalıştırıldı${girdi.govdeler.length > 1 ? ` (${girdi.govdeler.length} taraf)` : ""}`,
           });
         } else {
-          /* SESSİZ BAŞARISIZLIK YOK: olay işlenmiş sayılmaz, hata panoya düşer,
-             koşucu öteki olaylarla devam eder. */
-          olayHatali = true;
+          /* SESSİZ BAŞARISIZLIK YOK. Bir deneme hakkı daha varsa olay açık kalır
+             ve sonraki turda girdi yeniden tamamlanıp yeniden denenir. */
+          olayHatali = oncekiHatalar + 1 < 2;
           ozet.hatali_kural++;
-          ozet.notlar.push(`${kuralKodu}: hata — ${r.sebep}`);
-          await panoyaYaz(
-            admin, caseId, "akis_hatasi", partyId,
-            `${etiket} ${fonksiyon} çalıştırılamadı: ${r.sebep}`.slice(0, 500),
-          );
+          ozet.notlar.push(`${kuralKodu}: çalıştırılamadı — ${sonSebep}`);
+          await hataYaz(admin, caseId, partyId, etiket,
+            `${fonksiyon} çalıştırılamadı: ${sonSebep}`);
         }
       }
 

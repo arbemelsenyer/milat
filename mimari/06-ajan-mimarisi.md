@@ -471,3 +471,75 @@ TARAF AJANININ İLK GERÇEK İŞİ (taraf-kalem-cikar):
 · Tutar belgede net okunamıyorsa boş bırakılır, tahmin edilmez.
 · Tarafın kendi girdiği satıra (kaynak='taraf') DOKUNMAZ — insan üstündür (m.3).
 · Karşı tarafın belgesi sorguya HİÇ GİRMEZ; masaya yalnız kalem ve dayanağı çıkar.
+
+
+[EKLEME 19.08.2026 — SİSTEMİN GENEL KANUNU (yasa-1)]
+● CANLI (deploy sonrası). BU BÖLÜM BAĞLAYICIDIR: bundan sonra yazılan her
+yetenek bu yedi maddeye uymak zorundadır. Belirli bir özelliğin değil, ürünün
+her adımının çalışma yasasıdır.
+
+1. KENDİ BAŞLAR. İş, ilgili olay düştüğünde tetiklenir; kimse düğmeye basmaz.
+   Olay yazıcısı olayYaz, tetikleyen koşucu akis-yurut, saat başı sürücü
+   ajan-nobetci'dir. Elle çalıştırma düğmeleri KALIR ve "yeniden çalıştır"
+   işlevini sürdürür — kaldırılmaz, yeni işin şartı değildir.
+2. KENDİ SÜRER. Ajan adımlarını sırayla yapar ve SAHİBİNE düz Türkçe anlatır
+   (anlatimAc / anlatimYansit). Taraf ajanının adımları yalnız o tarafa, masa
+   ajanının adımları yalnız arabulucuya görünür.
+3. ENGELE TAKILIRSA KENDİ ÇÖZER. Eksik girdi EN AZ İKİ FARKLI YOLDAN aranır
+   (girdiTamamla): olayın verisi → dosyadaki kayıt (oturum, belge, taraf) →
+   tarafın kendi başka belgesi → mevzuat türünde bilgi tabanı. Bulursa devam
+   eder ve neyi nereden tamamladığını yazar. UYDURMA YASAK (constitution m.2):
+   bulamadıysa tamamladım demez.
+4. ÇÖZEMEZSE DOĞRU KİŞİYE SORAR. Belge ya da tarafın bilgisi ise o tarafın
+   kendi ajanı üzerinden TARAFA; karar, onay ya da usul ise ARABULUCUYA
+   (eksigiSor). Soru DAİMA durum='bekliyor' yazılır ve cevaplanana kadar
+   hatırlatılır. Soru tipi, nöbetçinin yürüttüğü tiplerden AYRIDIR
+   ('taraf_sorusu' / 'arabulucu_sorusu') — başka bir kol soruyu "atlandı"
+   sayıp kapatamaz (19.08 canlı kusuru).
+5. CEVAP GELİNCE KALDIĞI YERDEN DEVAM EDER. Cevap görevin sonuc alanına yazılır,
+   durum 'yapildi' olur; nöbetçi cevaplanan sorunun gerekçesindeki "[kol:…]"
+   etiketinden ilgili kolu BİR KEZ yeniden uyandırır. Kollar kendi mükerrer
+   yazım kapılarına sahip olduğu için yapılmış işler tekrarlanmaz — baştan
+   başlanmaz, eksik kalan yerden devam edilir.
+6. KENDİ BİTİRİR. Her iş "Yapıldı: … / Eksik: …" ile kapanır (eksik yoksa o
+   satır hiç yazılmaz) ve çıktısını ilgili panele kendisi yazar.
+7. BİTİŞİ YENİ OLAY DOĞURUR. Biten iş akis_olaylari'na satır bırakır; sıradaki
+   ajan onunla uyanır. Döngü, eksik kalmayana kadar döner.
+
+YAPISAL ZORUNLULUK (yasanın kendini koruması):
+· Ortak motora bağlı olmayan bir fonksiyonu KOŞUCU ÇAĞIRMAZ ve sebebini açık
+  bir satırla panoya yazar. Bağlı fonksiyonların listesi tek yerdedir:
+  _shared/anlatim.ts içindeki MOTORA_BAGLI. Yeni bir ajan fonksiyonu bu listeye
+  eklenmeden akışta çalışamaz — böylece sonradan eklenen hiçbir yetenek
+  döngünün dışında kalamaz.
+· KAPSAM DIŞI OLANLAR ve gerekçesi: case-qa ve taraf-asistan yalnız soru-cevap
+  YÜZEYLERİdir — olayla uyanmazlar, çıktıyı panele yazmazlar, akış adımı
+  değildirler. taraf-cevap da akış adımı değildir; tarafın cevabını yazan dar
+  bir kapıdır.
+· İKİ DENEME SINIRI: aynı olay + aynı kural için en fazla iki deneme yapılır.
+  İkisinde de olmazsa iş bırakılır ve sebebi anlaşılır tek cümleyle yazılır;
+  sonsuz döngü kurulmaz.
+
+DAYANAK ÖLÇÜSÜ (19.08 kurucu kararı, kalem çıkarımında bağlayıcı):
+· Dayanak, kalemi DOĞRULAYAN BELGEYE atıftır: fatura, makbuz, dekont, rapor,
+  sözleşme, bordro, ekstre, tutanak gibi. Rakamın yazılı olması dayanak değildir.
+· Talebin KENDİ CÜMLESİ dayanak sayılmaz: "talep edilmektedir",
+  "değerlendirilmektedir" gibi ifadeler kalemi doğrulamaz → 'dayanaksiz'.
+· Niteliği gereği belgeye bağlanmayan kalem (manevi tazminat gibi) 'dayanaksiz'
+  + ajan_notu="niteliği gereği belgeye bağlanmaz". BU BİR KUSUR DEĞİL, bilgi
+  notudur; tarafa sorulmaz, suçlayıcı dil kullanılmaz.
+
+HATIRLATMA:
+· Cevaplanmamış sorular cevaplanana kadar hatırlatılır: ilk 24 saatte günde bir,
+  sonrasında iki günde bir. Hatırlatma sohbette görünür (görevin sonuc alanı).
+· E-posta gidiyorsa mevcut iletişim tercihi süzgecinden (gonderilsinMi) GEÇER:
+  sessiz saate ve sıklık tercihine uyar. Aynı metin üst üste yazılmaz.
+· Cevap gelince hatırlatma durur.
+
+DEĞİŞMEZ SINIRLAR (yasanın üstünde):
+· İnsana yalnız dört işte gidilir: imza · bilirkişi ataması · kayıt/döküm
+  rızası · tarafla asıl müzakere. Başka her yerde insana bırakma GEREKÇE ister.
+· Kör veri: taraf yalnız kendi satırlarını görür (süzgeç SORGUDA); arabulucu
+  taraf ajanının metnini görmez; belge karşı tarafa geçmez.
+· Ajan hukuki tavsiye vermez, karar vermez; duygu, kişilik, niyet ve teşhis
+  etiketi yasaktır; uydurma yasaktır — bulamadıysa "bulamadım" der.

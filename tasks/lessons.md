@@ -214,3 +214,13 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   hukuki beyan gibi okunur. Kural: davranış vaat eden her cümle (gönderilir, ertelenir,
   saklanır, silinir) yazıldığı turda kodla karşılaştırılır; karşılığı yoksa cümle
   gerçeğe göre yazılır, kod cümleye uydurulmaz.
+- DERS (19.08.2026) — KOMUT TEK YETENEK İÇİN YAZILIRSA SİSTEM TEK YETENEK İÇİN
+  KURULUR. Föy gönderimi, kalem çıkarımı ve anlatım ayrı ayrı istendi; her biri
+  tek başına doğru kuruldu ama aralarındaki ORTAK DAVRANIŞ (eksik girdiyi kendi
+  çözme, doğru kişiye sorma, cevaptan sonra devam etme) hiçbirinde yoktu — çünkü
+  hiçbir komut onu istememişti. Sonuç: koşucu eksik girdiyle çağırıp pes etti,
+  sorulan soru başka bir kol tarafından kapatıldı, dayanaksız kalem 'taslak'
+  sayıldı. Üçü de aynı boşluğun görüntüleriydi. Kural: tekrar eden davranış üç
+  yerde görünüyorsa artık özellik değil YASADIR; tek ortak motora yazılır ve
+  bütün kollar oradan geçirilir. Yeni yetenek, motora bağlanmadan çalışamamalıdır
+  — yapısal zorunluluk olmadan kural zamanla delinir.

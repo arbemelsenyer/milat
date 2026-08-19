@@ -14,7 +14,9 @@
 // İNSAN ÜSTÜNLÜĞÜ (constitution m.3): tarafın kendi girdiği satırlara
 // (kaynak='taraf') DOKUNULMAZ; ajan yalnız kendi yazdığı satırları günceller.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { anlatimAc, zatenCalisiyorMu, belgedeAra, eksigiSor } from "../_shared/anlatim.ts";
+import {
+  anlatimAc, zatenCalisiyorMu, belgedeAra, eksigiSor, SORU_TIPI_TARAF, kolEtiketi,
+} from "../_shared/anlatim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -57,6 +59,47 @@ function alintiBelgedeVarMi(belgeMetni: string, alinti: string): boolean {
   const a = metinNormalize(alinti);
   if (a.length < 12) return false;
   return metinNormalize(belgeMetni).includes(a);
+}
+
+/* DAYANAK ÖLÇÜSÜ (19.08 kurucu kararı) — dayanak, kalemi DOĞRULAYAN BELGEYE
+   atıftır: fatura, makbuz, dekont, rapor, sözleşme, bordro, ekstre, tutanak…
+   Talebin KENDİ CÜMLESİ dayanak değildir: "talep edilmektedir",
+   "değerlendirilmektedir" gibi ifadeler kalemi doğrulamaz, yalnız tekrar eder. */
+const KANIT_BELGE_SOZCUKLERI = [
+  "fatura", "makbuz", "dekont", "rapor", "sözleşme", "sozlesme", "bordro",
+  "ekstre", "tutanak", "irsaliye", "hesap özeti", "banka", "ödeme", "teslim",
+  "protokol", "kira kontratı", "senet", "epikriz", "reçete",
+];
+const TALEP_KALIPLARI = [
+  "talep edil", "talep ediyor", "talep olunur", "talebimiz", "değerlendirilmekte",
+  "degerlendirilmekte", "istenmekte", "talep edilmiştir", "ödenmesi gerek",
+];
+/* Niteliği gereği belgeye bağlanmayan kalemler: bu bir KUSUR DEĞİL, bilgi
+   notudur. Tarafa suçlayıcı dille sorulmaz, sorulacaklar listesine girmez. */
+const BELGEYE_BAGLANMAYAN = ["manevi tazminat", "manevi zarar"];
+
+function talepCumlesiMi(alinti: string): boolean {
+  const a = metinNormalize(alinti);
+  return TALEP_KALIPLARI.some((k) => a.includes(metinNormalize(k)));
+}
+
+function kanitBelgesiMi(metin: string): boolean {
+  const a = metinNormalize(metin);
+  return KANIT_BELGE_SOZCUKLERI.some((k) => a.includes(metinNormalize(k)));
+}
+
+function niteligiGeregiBelgesiz(kalemAdi: string): boolean {
+  const a = metinNormalize(kalemAdi);
+  return BELGEYE_BAGLANMAYAN.some((k) => a.includes(metinNormalize(k)));
+}
+
+/* Alıntı, kalemi doğrulayan bir belgeye atıf sayılıyor mu: talep cümlesi
+   olmayacak VE ya kaynak belge bir kanıt belgesi olacak ya da alıntı bir belge
+   sözcüğü taşıyacak. */
+function dayanakSayilirMi(alinti: string, belgeAdi: string): boolean {
+  if (!alinti) return false;
+  if (talepCumlesiMi(alinti)) return false;
+  return kanitBelgesiMi(belgeAdi) || kanitBelgesiMi(alinti);
 }
 
 // Tutar: belgede net okunan sayı. Tahmin YOK — okunamıyorsa null döner.
@@ -200,7 +243,10 @@ MUTLAK KURALLAR:
         // SUNUCU ELEMESİ: alıntı belgede birebir yoksa kabul edilmez.
         let alinti = temiz(aday?.dayanak_alinti).slice(0, 300);
         let dayanakBelgeId: string | null = belge.id;
-        if (alinti && !alintiBelgedeVarMi(belgeMetni, alinti)) {
+        // (1) Belgede birebir var mı — uydurma alıntı sunucuda elenir.
+        if (alinti && !alintiBelgedeVarMi(belgeMetni, alinti)) alinti = "";
+        // (2) Belgeye atıf mı, yoksa talebin kendi cümlesi mi.
+        if (alinti && !dayanakSayilirMi(alinti, String(belge.file_name ?? ""))) {
           alinti = "";
         }
 
@@ -221,13 +267,18 @@ MUTLAK KURALLAR:
         }
 
         const tutar = tutarOku(aday?.tutar);
+        const belgesizKalem = niteligiGeregiBelgesiz(kalemAdi);
         const notlar: string[] = [];
         if (tamamlamaNotu) notlar.push(tamamlamaNotu);
+        if (belgesizKalem) notlar.push("niteliği gereği belgeye bağlanmaz");
         if (tutar === null) notlar.push("tutar belgede net okunamadı");
-        if (!alinti) notlar.push("belgede birebir dayanak bulunamadı");
+        if (!alinti && !belgesizKalem) notlar.push("kalemi doğrulayan belge bulunamadı");
 
-        const durum = !alinti || tutar === null ? "dayanaksiz" : "taslak";
-        if (durum === "dayanaksiz") dayanaksizSayisi++;
+        /* RAKAM YAZILI OLMASI DAYANAK DEĞİLDİR: belgeye atıf yoksa kalem
+           'dayanaksiz' kalır. Niteliği gereği belgeye bağlanmayan kalem de
+           'dayanaksiz' işaretlenir ama bu bir kusur değil, bilgi notudur. */
+        const durum = (!alinti || tutar === null) ? "dayanaksiz" : "taslak";
+        if (durum === "dayanaksiz" && !belgesizKalem) dayanaksizSayisi++;
 
         // MÜKERRER YAZMA: aynı dosya + taraf + kalem adı bir kez yazılır.
         // Tarafın kendi girdiği satıra (kaynak='taraf') DOKUNULMAZ.
@@ -250,7 +301,7 @@ MUTLAK KURALLAR:
             durum, kaynak: "ajan",
           });
         }
-        yazilan.push({ kalem_adi: kalemAdi, durum });
+        yazilan.push({ kalem_adi: kalemAdi, durum, belgesiz: belgesizKalem });
       }
 
       if (dayanaksizSayisi > 0) {
@@ -258,15 +309,22 @@ MUTLAK KURALLAR:
       }
     }
 
-    const dayanaksiz = yazilan.filter((k) => k.durum === "dayanaksiz");
+    /* Niteliği gereği belgeye bağlanmayan kalemler SORULACAKLAR listesine
+       girmez — onlarda eksik yoktur, bilgi notu vardır. */
+    const dayanaksiz = yazilan.filter((k) => k.durum === "dayanaksiz" && !k.belgesiz);
     if (dayanaksiz.length > 0) {
       /* TAMAMLAYAMADI → DOĞRU KİŞİYE SOR. Eksik BELGE/tarafın bilgisi olduğu için
          soru O TARAFA gider. Dil tamamlayıcıdır; suçlayıcı sözcük kullanılmaz. */
       const adlar = dayanaksiz.slice(0, 3).map((k) => `"${k.kalem_adi}"`).join(", ");
+      /* SORU TİPİ (19.08 canlı kusuru): 'taraf_eksik_bilgi' tipini nöbetçinin
+         başka bir kolu yürütüyor ve taraf belge yüklemişse "atlandı" yazıp
+         soruyu kapatıyordu; soru tarafın sohbetinden düşüyordu. Bu yüzden
+         nöbetçinin YÜRÜTMEDİĞİ 'taraf_sorusu' tipi kullanılır: soru cevap
+         gelene kadar 'bekliyor' kalır ve sohbette görünür. */
       const r = await eksigiSor(admin, {
-        case_id, hedef: "taraf", party_id, gorev_tipi: "taraf_eksik_bilgi",
+        case_id, hedef: "taraf", party_id, gorev_tipi: SORU_TIPI_TARAF,
         etiket: `kalem-dayanak:${dayanaksiz.length}`,
-        mesaj: `${adlar} kalemlerinin belgedeki dayanağını bulamadım — ilgili belgeyi ekler misiniz?`,
+        mesaj: `${kolEtiketi("taraf-kalem-cikar")} ${adlar} kalemlerini doğrulayan belgeyi bulamadım — varsa ekler misiniz?`,
       });
       eksikler.push(`${dayanaksiz.length} kalemin belgedeki dayanağı bulunamadı${r.yazildi ? " — size sordum" : ""}.`);
     }

@@ -234,3 +234,22 @@ Gün sonu belge komutuna dahildir.
   yeni bir ad yerine izinli 'document_analysis' tipini kullanır (bu tip zaten
   taraf kapsamlıdır). randevu-teklif ve hazirlik-foyu-gonder için uygun bir izinli
   tip YOK; anlatım eklenmedi — kurucunun tek satırlık SQL kararını bekliyor.
+
+[EKLEME 19.08.2026 — GENEL KANUN ALTYAPISI]
+- _shared/anlatim.ts genişletildi: MOTOR_SURUMU · MOTORA_BAGLI (koşucunun
+  çağırmasına izin verilen fonksiyon listesi) · motoraBagliMi · girdiTamamla
+  (eksik girdiyi en az iki yoldan arar, taraf başına iş kurabilir) ·
+  SORU_TIPI_TARAF / SORU_TIPI_ARABULUCU · kolEtiketi.
+- akis-yurut: motora bağlı olmayan fonksiyonu ÇAĞIRMIYOR ve sebebini yazıyor;
+  eksik girdiyi kendi tamamlayıp yeniden deniyor; aynı olay+kural için en fazla
+  iki deneme. Hata kayıtları etiketli ve aynı metin üst üste yazılmıyor.
+- ajan-nobetci: YENİ kol soruHatirlatmaKollari — cevaplanmamış soruları
+  hatırlatır (24 saat / 2 gün), cevaplananlarda ilgili kolu bir kez yeniden
+  uyandırır. Mevcut kollara, sıralarına ve güvenlik kapısına dokunulmadı.
+- Edge fonksiyon: taraf-cevap — YENİ (verify_jwt=true). Sohbetten verilen cevabı
+  görevin sonuc alanına yazar, durum 'yapildi' yapar. Yetkiyi sunucuda doğrular
+  (sorunun hedefi olan taraf ya da dosyanın arabulucusu). İLK DEPLOY GEREKİR.
+- Görev tipleri: 'taraf_sorusu' ve 'arabulucu_sorusu' nöbetçi tarafından
+  YÜRÜTÜLMEZ; cevap gelene kadar 'bekliyor' kalır ve sohbette görünür.
+- AjanPenceresi: bekleyen soru varsa sohbet kendiliğinden açılır, soru en üstte
+  şerit olarak durur, "Cevap yaz" ile cevap kipine geçilir.
