@@ -208,3 +208,11 @@ Gün sonu belge komutuna dahildir.
   HEPSİ REDEPLOY İSTER (import yolu değişti).
 - Olay noktası OLMAYANLAR ve sebepleri: tasks/akis-kurallari-onerisi.md sonundaki
   iki liste (bağlanamayanlar · eksik olay noktası).
+- 19.08: Bileşen: src/components/AjanPenceresi.tsx — ajan penceresi (salt görünüm).
+  İki yüzeyde de aynı bileşen: MediationEngine (mod="arabulucu", tek yerden mount,
+  bütün aşamalarda) ve CaseRoom taraf görünümü (mod="taraf", partyId zorunlu).
+  Kaynaklar: agent_states + ajan_gorevleri. YENİ TABLO, YENİ SÜTUN, YENİ EDGE
+  FONKSİYON YOK; yalnız ön yüz. Kör veri süzgeci SORGUDADIR.
+  NOT: ajan_gorevleri supabase_realtime yayın listesinde DEĞİL — bekleyen listesi
+  anlık bildirimle değil, 60 saniyelik tazelemeyle ve agent_states değişimlerinde
+  güncelleniyor.

@@ -28,6 +28,7 @@ import { ExpertSelector } from "@/components/mediation/ExpertSelector";
 import { OfficialDocsPanel } from "@/components/mediation/OfficialDocsPanel";
 import { StepTimeline } from "@/components/mediation/StepTimeline";
 import { AgentControlPanel } from "@/components/mediation/AgentControlPanel";
+import { AjanPenceresi } from "@/components/AjanPenceresi";
 import { downloadOfficialPdf } from "@/lib/pdfTemplates";
 import { downloadPaymentInfoPdf } from "@/lib/invoice-pdf";
 import { formatDisputeType } from "@/lib/disputeLabels";
@@ -128,6 +129,10 @@ export default function CaseRoom() {
   const [yzDurum, setYzDurum] = useState<"yukleniyor" | "gerekli" | "tamam">("yukleniyor");
   const [yzBusy, setYzBusy] = useState(false);
   const [yzHata, setYzHata] = useState<string | null>(null);
+  // Taraf sekmelerinde AÇIK OLAN sekme. Varsayılan eskisiyle aynı ("analysis");
+  // ajan penceresi bekleyen bir işe basılınca ilgili sekmeyi açabilsin diye durum
+  // olarak tutuluyor. Sekme listesi, sırası ve adları değişmedi.
+  const [partySekme, setPartySekme] = useState("analysis");
 
   const myParty = parties.find((p) => p.user_id === user?.id) ?? null;
   const isOwner = !!(caseRow && user && caseRow.user_id === user.id);
@@ -691,7 +696,15 @@ export default function CaseRoom() {
       {/* Kayıt onayı: arabulucu onay formunu açtıysa görünür, açmadıysa hiç çıkmaz.
           Sekmelerin ÜSTÜNDE durur ama kapı değildir — ekranın geri kalanı açık. */}
       {myParty?.id && <div className="mb-4"><KayitOnayKarti caseId={caseId!} partyId={myParty.id} /></div>}
-      <Tabs defaultValue="analysis">
+      {/* AJAN PENCERESİ (salt görünüm) — taraf yalnız KENDİ satırlarını görür;
+          süzgeç sorgudadır. Bekleyen satıra basınca ilgili sekme açılır. */}
+      {myParty?.id && (
+        <AjanPenceresi caseId={caseId!} mod="taraf" partyId={myParty.id} onGit={(s) => setPartySekme(s)} />
+      )}
+      {/* Sekme listesi, sırası ve adları DEĞİŞMEDİ; yalnız hangi sekmenin açık
+          olduğu duruma bağlandı ki ajan penceresi ilgili sekmeyi açabilsin.
+          Varsayılan yine "analysis". */}
+      <Tabs value={partySekme} onValueChange={setPartySekme}>
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="documents" className={tabTriggerAccentClass}><Upload className="h-4 w-4 mr-1" />Belgelerim</TabsTrigger>
           <TabsTrigger value="analysis" className={tabTriggerAccentClass}><Brain className="h-4 w-4 mr-1" />Gizli Analizim</TabsTrigger>

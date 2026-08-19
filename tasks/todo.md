@@ -1,3 +1,24 @@
+## Nerede kaldık — 19.08.2026 (90) · AJAN PENCERESİ 1. TUR (SALT GÖRÜNÜM)
+
+BİTTİ (kodda, publish bekliyor):
+- [x] src/components/AjanPenceresi.tsx — sağ alt köşede sabit, kapatılabilir pencere.
+      Kapalıyken düğme + bekleyen sayısı rozeti; açıkken "Ajan ne yaptı" (en fazla
+      20 satır, tarih-saatli, tek cümle, teknik terim yok) ve "Bekleyen" (tıklanınca
+      ilgili ekrana/sekmeye götürür; cevap yazma 2. turda).
+- [x] İki ekranda: MediationEngine (arabulucu, tek yerden mount, bütün aşamalar) ve
+      CaseRoom taraf görünümü.
+- [x] KÖR VERİ SORGUDA: taraf yalnız party_id=kendi + tarafa_gorunur=true satırları
+      ve yalnız kendine yönelik görev tiplerini görüyor. Arabulucu penceresi
+      last_output/confidence/hallucination alanlarını sorguda bile seçmiyor.
+- [x] Realtime AgentControlPanel deseniyle; kanal bileşen kapanınca kaldırılıyor.
+
+KURUCUYA SORU: taraf penceresinde bekleyen iş satırlarının GEREKÇESİ ajanın
+arabulucu panosuna yazdığı cümledir. Tarafa yönelik tiplerde sakıncasız görünüyor
+ama metni ajan yazıyor; tarafa hiç gösterilmesin isterseniz tek satırla kapatılır.
+
+SIRADA: publish + canlı test (arabulucu ve taraf hesabıyla ayrı ayrı), sonra
+2. tur — pencereden cevap yazma.
+
 ## Nerede kaldık — 19.08.2026 (89) · AGENTIC BELKEMİĞİ 1. TAŞ (OLAY + KURAL + KOŞUCU)
 
 BİTTİ (kodda, deploy bekliyor):

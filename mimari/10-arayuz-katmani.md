@@ -281,3 +281,40 @@ arabulucunun kendi girdiği kayıttır.
 · Kokpit sol menüsü ve numaralandırma sectionDefs'ten türediği için kayıt elle
   dokunulmadan düştü; RAPOR VE BELGELER katmanındaki öteki bölümler yerinde.
   Kokpit PDF çıktısı da aynı listeden türer, föy bölümü oradan da düşer.
+
+
+[EKLEME 19.08.2026 — AJAN PENCERESİ (1. tur, SALT GÖRÜNÜM)]
+● CANLI. Sağ alt köşede sabit duran küçük pencere (src/components/AjanPenceresi.tsx).
+İKİ YÜZEYDE de aynı bileşendir; hangi verinin geldiğini `mod` belirler.
+· ARABULUCU: MediationEngine'de TEK YERDEN mount edilir, dosya açıkken bütün
+  aşamalarda görünür. Aşama ekranlarına, kokpit kartlarına ve AgentControlPanel'e
+  hiçbir şey eklenmedi/çıkarılmadı.
+· TARAF: CaseRoom taraf görünümünde, sekmelerin üstünde mount edilir. Sekme listesi,
+  sırası ve adları DEĞİŞMEDİ; yalnız açık sekme duruma bağlandı (varsayılan yine
+  "analysis") ki pencere bekleyen bir işe basılınca ilgili sekmeyi açabilsin.
+· Kapalıyken tek düğme + bekleyen sayısı rozeti; açıkken iki bölüm:
+  (1) "Ajan ne yaptı" — en yeniden eskiye, tarih-saatli, en fazla 20 satır.
+  (2) "Bekleyen" — durum='bekliyor' satırlar, gerekçesiyle ve tıklanabilir.
+  Bu turda tıklama YALNIZ YÖNLENDİRİR; pencereden cevap yazılmaz.
+· DİL: ekranda teknik terim yoktur. Satırlar SABİT CÜMLE KALIPLARINDAN kurulur
+  ("Nurten ÇOBANOĞLU için oturum hazırlık föyünü hazırladım"); fonksiyon adı,
+  tablo adı, "edge function", "upsert" gibi kelimeler ekrana çıkmaz. Bilinmeyen
+  ajan kolu için içerik taşımayan yedek cümle basılır, ham kod yazılmaz.
+· BOŞ DURUM sakindir ("Ajan şu an bir şey yapmıyor."); kırmızı görünüm yalnız
+  gerçek hatada.
+
+İKİ YÖNLÜ DUVAR (constitution m.1 — süzgeç SORGUDA, ekranda gizleme değil):
+· TARAF yalnız kendi satırlarını görür: agent_states'te party_id = kendi kimliği
+  VE tarafa_gorunur = true; ajan_gorevleri'nde hedef_party_id = kendi kimliği ve
+  YALNIZ tarafa yönelik görev tipleri (soru · eksik bilgi · müsaitlik · teklif ·
+  ilk temas · özel oturum). Arabulucuya ait tipler sorguya hiç girmez.
+  Karşı tarafın hiçbir satırı, adı, belgesi, analizi görünmez; taraf ekranında
+  hiçbir taraf adı okunmaz.
+· ARABULUCU taraf ajanının ÜRETTİĞİ METNİ görmez: pencere last_output,
+  confidence_score ve hallucination_risk alanlarını SORGUDA BİLE SEÇMEZ. Yalnız
+  olan biten görünür. Tarafın kendi asistanı (taraf_asistan) satırları arabulucu
+  penceresinden sorgu düzeyinde dışlandı — kendi danışma kanalıdır.
+· Pencere bir AKIŞ ADIMI DEĞİLDİR: olay yazmaz, akış kuralı gerektirmez.
+· Realtime aboneliği AgentControlPanel'deki desenin aynısıdır (postgres_changes +
+  case_id süzgeci) ve bileşen kapanınca kanal kaldırılır. ajan_gorevleri yayın
+  listesinde olmadığı için bekleyen listesi ayrıca dakikada bir tazelenir.

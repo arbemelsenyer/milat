@@ -46,6 +46,7 @@ import { Phase3ErrorBoundary } from "@/components/mediation/Phase3ErrorBoundary"
 import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 import { ProcessTrackerPanel } from "@/components/mediation/ProcessTrackerPanel";
 import { AgentControlPanel } from "@/components/mediation/AgentControlPanel";
+import { AjanPenceresi } from "@/components/AjanPenceresi";
 import { CaseQaPanel } from "@/components/mediation/CaseQaPanel";
 // Ücretli model çağrısı işareti — TEK tanım (bkz. UcretliIsaret.tsx).
 import { UcretliIsaret } from "@/components/mediation/UcretliIsaret";
@@ -907,6 +908,11 @@ export default function MediationEngine() {
       </div>
       {(isMediator || isAdmin) && (
         <ProcessTrackerPanel caseRow={activeCase} open={trackerOpen} onOpenChange={setTrackerOpen} />
+      )}
+      {/* AJAN PENCERESİ — dosya açıkken TÜM aşamalarda görünür. Tek yerden mount
+          edilir; aşama ekranlarına hiçbir şey eklenmedi. Salt görünümdür. */}
+      {(isMediator || isAdmin) && (
+        <AjanPenceresi caseId={activeCase.id} mod="arabulucu" />
       )}
       <Dialog open={agentPanelOpen} onOpenChange={setAgentPanelOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
