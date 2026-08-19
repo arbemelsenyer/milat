@@ -431,6 +431,8 @@ export const MOTORA_BAGLI: string[] = [
   "multi-agent-negotiation",
   // 19.08 · masa kalem karşılaştırması, bilirkişi soruları, taslak denetimi
   "masa-kalem-karsilastir", "bilirkisi-sorulari", "taslak-denetim",
+  // 19.08 · onaylanan föyün gönderimi (olay: foy_onaylandi, girdi: foy_id)
+  "hazirlik-foyu-gonder",
 ];
 
 export function motoraBagliMi(fonksiyon: string): boolean {
@@ -447,6 +449,8 @@ const ZORUNLU_GIRDI: Record<string, string[]> = {
   "party-consistency-check": ["case_id", "party_id"],
   "party-communication-analysis": ["case_id", "party_id"],
   "iletisim-degisim": ["case_id", "party_id"],
+  // Bu fonksiyon dosya değil FÖY kimliği ister; foy_onaylandi olayı foy_id taşır.
+  "hazirlik-foyu-gonder": ["foy_id"],
   "masa-kalem-karsilastir": ["case_id"],
   "bilirkisi-sorulari": ["case_id"],
   "taslak-denetim": ["case_id"],

@@ -182,6 +182,10 @@ Gün sonu belge komutuna dahildir.
 - Tablo: public.gundem_kalem_havuzu — CANLIDA ama ŞU AN BOŞ (0 kalem). İlk türetme
   hiçbir kategoride tetiklenmedi; havuz boş olduğu sürece föy gündemi YEDEK yoldan
   (GUNDEM_KALIPLARI / BELGE_TURU_KALIPLARI / ASGARI_GUNDEM) kuruluyor.
+- 19.08: hazirlik-foyu-gonder ORTAK MOTORA BAĞLANDI (MOTORA_BAGLI + zorunlu girdi
+  foy_id). Çalışırken adımlarını yazıyor, Yapıldı/Eksik ile kapanıyor, eşzamanlılık
+  kilidi motordan geliyor. Kilit çakışırsa 409 döner ki koşucu yeniden denesin —
+  gönderim sessizce düşmez. Gönderim mantığı, süzgeç ve kör veri kuralları aynı.
 - Edge fonksiyon: hazirlik-foyu-gonder — CANLIDA (19.08 01:02 canlı test geçti,
   iki föy de tarafına gönderildi).
 - gonderilsinMi (iletişim tercihi) süzgeci BULUNAN YEDİ FONKSİYON: ajan-nobetci ·

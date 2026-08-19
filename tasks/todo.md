@@ -1,3 +1,12 @@
+## Nerede kaldık — 19.08.2026 (94) · FÖY GÖNDERİMİ MOTORA BAĞLANDI
+
+- [x] hazirlik-foyu-gonder ortak motora bağlandı: MOTORA_BAGLI listesinde, zorunlu
+      girdisi foy_id, çalışırken adımlarını sohbete yazıyor ve Yapıldı/Eksik ile
+      kapanıyor; eşzamanlılık kilidi motordan. Kilit çakışırsa 409 döner (koşucu
+      yeniden dener, gönderim sessizce düşmez). Gönderim mantığına dokunulmadı.
+
+SIRADA: hazirlik-foyu-gonder redeploy + foy_onaylandi__gonder kuralının açılması.
+
 ## Nerede kaldık — 19.08.2026 (93) · ATLANAN VE KALAN HER ŞEY (7 bölüm)
 
 BİTTİ (kodda, deploy bekliyor):

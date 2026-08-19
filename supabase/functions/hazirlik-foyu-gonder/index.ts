@@ -19,6 +19,7 @@
 // derse durum DEĞİŞMEZ; sebep dönüş gövdesine yazılır ve arabulucu görür.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { olayYaz } from "../_shared/olay.ts";
+import { anlatimAc, zatenCalisiyorMu } from "../_shared/anlatim.ts";
 
 /* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
    Taraf kendi ekranından bildirim sıklığını ve sessiz saatlerini belirler
@@ -256,6 +257,9 @@ async function kayitYaz(admin: any, satir: {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Anlatım dış kapsamda: beklenmedik hatada satır 'running' asılı kalmasın.
+  let anlatim: ReturnType<typeof anlatimAc> | null = null;
+
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -295,8 +299,29 @@ Deno.serve(async (req) => {
     const yetkili = String((caseRow as any).assigned_mediator_id ?? "") === userId || !!roleRow;
     if (!yetkili) return json({ error: "Bu dosya için yetkiniz yok" }, 403);
 
+    /* ORTAK MOTOR (yasa): adım anlatımı ve eşzamanlılık kilidi motordan gelir.
+       Anlatım föyün kendi satırında ('hazirlik_foyu' + party_id) sürer —
+       gönderim, hazırlığın devamıdır. Tarafa açılmaz (tarafa_gorunur verilmez);
+       gönderimi izleyen arabulucudur. GÖNDERİM MANTIĞI, iletişim tercihi
+       süzgeci ve kör veri kuralları DEĞİŞMEDİ. */
+    const sahip = {
+      case_id: String((foy as any).case_id),
+      agent_type: "hazirlik_foyu",
+      party_id: String((foy as any).party_id),
+    };
+    const kilit = await zatenCalisiyorMu(admin, sahip);
+    if (kilit.calisiyor) {
+      /* Aynı föy satırında başka bir iş sürüyor. Gönderim SESSİZCE DÜŞMESİN
+         diye 409 döner: koşucu bunu başarısızlık sayar ve sonraki turda
+         yeniden dener (yasa: sessiz başarısızlık yok). */
+      return json({ gonderildi: false, sebep: kilit.sebep }, 409);
+    }
+    anlatim = anlatimAc(admin, sahip);
+    await anlatim.baslat("Onaylanan hazırlık föyünü göndermeye başlıyorum.");
+
     const durum = String((foy as any).durum ?? "");
     if (durum === "gonderildi") {
+      await anlatim.bitti({ yapildi: "Bu föy zaten gönderilmişti; ikinci kez göndermedim." });
       return json({
         gonderildi: false, zaten: true,
         gonderim_zamani: (foy as any).gonderim_zamani ?? null,
@@ -304,6 +329,10 @@ Deno.serve(async (req) => {
       });
     }
     if (durum !== "onaylandi") {
+      await anlatim.bitti({
+        yapildi: "Föyü göndermedim.",
+        eksik: "Föy önce onaylanmalı; onaylanmamış föy gönderilmez.",
+      });
       return json({ error: "Föy önce onaylanmalı — onaylanmamış föy gönderilmez." }, 400);
     }
 
@@ -317,8 +346,13 @@ Deno.serve(async (req) => {
     }
     const eposta = temiz((taraf as any).email);
     if (!eposta) {
+      await anlatim.bitti({
+        yapildi: "Föyü göndermedim.",
+        eksik: "Bu tarafın e-posta adresi dosyada kayıtlı değil.",
+      });
       return json({ error: "Bu tarafın e-posta adresi kayıtlı değil; föy gönderilemedi." }, 400);
     }
+    await anlatim.adim("Föyü okudum, gönderim tercihini kontrol ediyorum.");
 
     const { data: oturum } = await admin.from("case_sessions")
       .select("id, scheduled_at").eq("id", (foy as any).session_id).maybeSingle();
@@ -339,6 +373,10 @@ Deno.serve(async (req) => {
       // Durum DEĞİŞMEZ: föy 'onaylandi' kalır, arabulucu sonra yeniden deneyebilir.
       const kayitNotu = await kayitYaz(admin, {
         ...kayitTemeli, status: "suzgec_engelledi", error_message: izin.sebep,
+      });
+      await anlatim.bitti({
+        yapildi: "Föyü şu an göndermedim.",
+        eksik: `İletişim tercihi gönderime izin vermedi: ${izin.sebep}`,
       });
       return json({
         gonderildi: false, sebep: `iletişim tercihi: ${izin.sebep}`,
@@ -365,6 +403,7 @@ Deno.serve(async (req) => {
       const kayitNotu = await kayitYaz(admin, {
         ...kayitTemeli, status: "hata", error_message: sade.slice(0, 500),
       });
+      await anlatim.hata(sade);
       return json({
         error: sade,
         ...(kayitNotu ? { kayit_yazilamadi: kayitNotu } : {}),
@@ -397,6 +436,10 @@ Deno.serve(async (req) => {
       veri: { foy_id: String((foy as any).id), session_id: (foy as any).session_id ?? null },
     });
 
+    await anlatim.bitti({
+      yapildi: "Onaylanan hazırlık föyünü tarafına e-postayla gönderdim.",
+    });
+
     return json({
       gonderildi: true, gonderim_zamani: gonderimZamani, sebep: izin.sebep,
       resend_message_id: resendId,
@@ -405,6 +448,7 @@ Deno.serve(async (req) => {
   } catch (e: any) {
     const msg = e?.message ?? "Bilinmeyen sistem hatası";
     console.error("[hazirlik-foyu-gonder] Genel hata:", msg);
+    if (anlatim) await anlatim.hata("Föyü göndermeyi tamamlayamadım, sonra tekrar deneyeceğim.");
     return json({ error: String(msg) }, 500);
   }
 });
