@@ -280,6 +280,106 @@ export type Database = {
           },
         ]
       }
+      akis_kurallari: {
+        Row: {
+          created_at: string
+          etkin: boolean
+          gerekce: string | null
+          id: string
+          insan_kapisi: boolean
+          kod: string
+          kosul: Json
+          olay_kodu: string
+          sahip: string
+          sira: number
+          sonraki_adim: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          etkin?: boolean
+          gerekce?: string | null
+          id?: string
+          insan_kapisi?: boolean
+          kod: string
+          kosul?: Json
+          olay_kodu: string
+          sahip: string
+          sira?: number
+          sonraki_adim: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          etkin?: boolean
+          gerekce?: string | null
+          id?: string
+          insan_kapisi?: boolean
+          kod?: string
+          kosul?: Json
+          olay_kodu?: string
+          sahip?: string
+          sira?: number
+          sonraki_adim?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      akis_olaylari: {
+        Row: {
+          case_id: string
+          created_at: string
+          id: string
+          islendi: boolean
+          islenme_zamani: string | null
+          olay_kodu: string
+          party_id: string | null
+          veri: Json
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          id?: string
+          islendi?: boolean
+          islenme_zamani?: string | null
+          olay_kodu: string
+          party_id?: string | null
+          veri?: Json
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          id?: string
+          islendi?: boolean
+          islenme_zamani?: string | null
+          olay_kodu?: string
+          party_id?: string | null
+          veri?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "akis_olaylari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "akis_olaylari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "akis_olaylari_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       belge_ozetleri: {
         Row: {
           case_id: string
