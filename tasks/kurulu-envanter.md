@@ -197,8 +197,11 @@ Gün sonu belge komutuna dahildir.
 - Tablo: public.akis_olaylari — CANLIDA. "Şu adım bitti" satırları; islendi/islenme_zamani
   ile koşucu tarafından işaretlenir. RLS: SELECT arabulucu/dosya sahibi · ALL admin.
 - Tablo: public.akis_kurallari — CANLIDA. olay_kodu → sonraki_adim eşlemesi; sahip
-  (taraf_ajani/masa_ajani/sistem), insan_kapisi, kosul, sira, etkin. İçinde ÜÇ tohum
-  kural var: belge_yuklendi__analiz · oturum_planlandi__foy_hazirla · foy_onaylandi__gonder.
+  (taraf_ajani/masa_ajani/sistem), insan_kapisi, kosul, sira, etkin.
+  19.08 itibarıyla canlıda YEDİ kural var ve YEDİSİ DE ETKİN:
+  belge_yuklendi__analiz · belge_yuklendi__taraf_kalem ·
+  oturum_planlandi__foy_hazirla · kalem_guncellendi__karsilastir ·
+  foy_onaylandi__gonder · bilirkisi_onerildi__sorular · taslak_uretildi__denetim.
   Kuralları AJAN YAZMAZ; satırları kurucu yazar.
 - Edge fonksiyon: akis-yurut — YENİ (verify_jwt=false, kendi kapısı var: x-cron-secret
   veya admin JWT). Nöbetçi turunun sonunda iç kapıdan bir kez tetiklenir.

@@ -1,3 +1,19 @@
+## Nerede kaldık — 19.08.2026 (96) · DEPLOY + KURALLAR + CANLI TEST SONUÇLARI (Claude)
+
+- [x] Deploy edildi: masa-kalem-karsilastir, bilirkisi-sorulari, taslak-denetim
+      (üçü ilk deploy), akis-yurut, taraf-kalem-cikar, hazirlik-foyu-gonder;
+      masa-kalem-karsilastir eşleştirme ölçüsüyle ikinci kez. Publish yapıldı.
+- [x] akis_kurallari: bilirkisi_onerildi__sorular ve taslak_uretildi__denetim
+      satırları EKLENDİ; belge_yuklendi__analiz, foy_onaylandi__gonder,
+      kalem_guncellendi__karsilastir AÇILDI. Canlıda 7 kural, 7'si açık.
+- [x] CANLI TEST 1: kalem güncellendi → olay → koşucu 61 saniyede
+      masa-kalem-karsilastir'ı kendiliğinden çağırdı (19:32:07 → 19:33:08).
+- [x] CANLI TEST 2: eşleştirme ölçüsü doğrulandı — özet: "2 ortak kalemin 2'si
+      örtüşüyor, gerçek ayrılık 0 yerde. 4 kalem yalnız başvurucuda."
+
+SIRADA: publish ekran kontrolü · bilirkişi ve taslak kollarının canlı testi ·
+föy onayının uçtan uca gönderim testi.
+
 ## Nerede kaldık — 19.08.2026 (95) · EŞLEŞTİRME ÖLÇÜSÜ + TASLAK DENETİMİ KUTUSU
 
 - [x] masa-kalem-karsilastir: ada ek olarak TUTAR eşleşmesi. Tutarı birebir aynı
