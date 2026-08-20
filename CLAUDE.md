@@ -12,6 +12,13 @@
 Çelişki hâlinde üst sıradaki kazanır:
 constitution > komut > mimari > tasks.
 
+## Bayat liste uyarısı (bağlayıcı)
+tasks/todo.md'nin alt kısmındaki işaretlenmemiş maddeler (A/B/C/D grupları,
+IBA maddeleri) BAYATTIR. Kutuya bakarak ne "yapılmış" ne "yapılmamış" say.
+O maddeye dokunacaksan üründe İŞLEVİNİ ARA (ad değil işlev — aynı iş başka
+adla yapılmış olabilir), sonra karar ver. Güncel durum yalnız dosyanın
+üstündeki en son "Nerede kaldık" bloğudur.
+
 ## Okuma sınırı (token disiplini)
 
 - `mimari/99-ARSIV-mimari-tam.md` bütün metni taşır ve tek doğruluk
@@ -38,9 +45,13 @@ değişmediği işlerde (yalnız keşif, inceleme, rapor) bu adım atlanır.
 ## İş Akışı
 
 ### 1. Önce Planla
-- 3+ adım veya mimari karar içeren HER görevde önce plan yap; planı tasks/todo.md dosyasına kontrol edilebilir maddeler halinde yaz
+- KEŞİF RAPORU VE PLAN SUNMA YOK: komut geldiğinde doğrudan işi yap. Ayrı bir keşif
+  turu, plan onayı ya da ön rapor isteme. Planı kendine tut, çıktıya yazma.
+- İstisna: komut açıkça "önce plan ver" ya da "önce incele" diyorsa o zaman
+  plan/inceleme yap, kod yazma.
+- İş bitince tek çıktı: BÖLÜM DÖKÜMÜ + üç satır. Ara rapor, uzun özet, gerekçe
+  anlatımı yok.
 - Bir şeyler ters giderse DUR ve yeniden planla — zorlamaya devam etme
-- Plan modunu doğrulama adımları için de kullan
 - Belirsizlik varsa uygulamadan önce SOR. Karar verici kurucudur; kurucu teknik bilmez, seçenekleri düz dille sun
 
 ### 2. Tek Görev, Tek Odak
@@ -56,6 +67,11 @@ değişmediği işlerde (yalnız keşif, inceleme, rapor) bu adım atlanır.
 ### 4. Bitirmeden Önce Doğrula
 - Canlıda kanıtlanmadan hiçbir görev tamamlandı sayılmaz
 - supabase/functions klasörüne dokunan her push sonrası MUTLAKA hatırlat: Lovable, GitHub push'unu edge fonksiyonlara otomatik deploy ETMEZ — redeploy gerekir
+- ORTAK DOSYA KURALI: supabase/functions/_shared/ altındaki bir dosyayı
+  (ör. anlatim.ts) değiştirdiysen, o dosyayı İÇE AKTARAN BÜTÜN fonksiyonlar
+  yeniden yayına alınır — yalnız senin dokunduğun fonksiyon değil. Üç satırdaki
+  "gereken" alanına bunu açıkça yaz. (20.08'de bu atlandı, iki kez eksik yayın
+  yapıldı; canlıda "motora bağlı değil" hatası ve boş defter buradan çıktı.)
 - Kendine sor: "Kıdemli bir mühendis bunu onaylar mı?"
 
 ### 5. Sadelik — ama Çalışan Yol Kutsaldır
@@ -71,20 +87,30 @@ değişmediği işlerde (yalnız keşif, inceleme, rapor) bu adım atlanır.
 
 ## Görev Yönetimi
 1. Önce Planla: planı tasks/todo.md'ye yaz
-2. Planı Doğrula: uygulamadan önce kontrol ettir
-3. İlerlemeyi Takip Et: biten maddeleri işaretle
-4. Değişiklikleri Açıkla: her adımda düz dille üst düzey özet ver
-5. Sonuçları Belgele: tasks/todo.md'ye inceleme bölümü ekle
-6. Dersleri Kaydet: düzeltmelerden sonra tasks/lessons.md'yi güncelle
+2. İlerlemeyi Takip Et: biten maddeleri işaretle
+3. Değişiklikleri Açıkla: her adımda düz dille üst düzey özet ver
+4. Sonuçları Belgele: tasks/todo.md'ye inceleme bölümü ekle
+5. Dersleri Kaydet: düzeltmelerden sonra tasks/lessons.md'yi güncelle
 
 ## Temel İlkeler
 - GİZLİLİK #1: Her özellik kör veri ilkesine karşı test edilir. Karşı taraf diğer tarafın verisini ASLA göremez. Erişimi genişleten policy önerme
 - HALÜSİNASYON YASAK: Veri yetersizse "Yeterli veri yok" de. Uydurma künye/atıf üretme
 - KIRINTI BIRAKMA: Yarım kalan hiçbir parça sessizce bırakılmaz — kaydet ve raporla
-- SQL migrasyonları her zaman idempotent yazılır; SQL kurucu tarafından Lovable Cloud > SQL'den çalıştırılır, Supabase Dashboard yok
+- SQL, migration, politika ve akis_kurallari satırları CODE TARAFINDAN YAZILMAZ —
+  hepsi Claude'da. Gerekiyorsa üç satırda "SQL: var — <ne gerekiyor>" diye rapor et,
+  kendin yazma. Supabase Dashboard yolu kapalı.
 - Altyapı kurmadan önce tasks/kurulu-envanter.md okunacak ve canlıda cron.job sorgusuyla doğrulanacak; depoda görünmemesi "yok" demek değildir
 - Tek lockfile bun.lock'tur; npm install kullanılmaz, bun install kullanılır
 - Kök nedeni bul; geçici yama yapma
+
+## Kısayol kelimeleri
+- "medipact" → constitution.md, tasks/todo.md (en üstteki "Nerede kaldık" bloğu) ve
+  tasks/lessons.md okunur; sonra TEK CÜMLEYLE "son oturumda X yapıldı, sırada Y var"
+  denir ve KOMUT BEKLENİR. Bu kelime üzerine kod yazılmaz, iş başlatılmaz, uzun özet
+  çıkarılmaz.
+- "medipact devam" → aynı dosyalar okunur, sonra "Nerede kaldık" bloğunda SIRADAKİ
+  olarak yazan ilk madde doğrudan yapılmaya başlanır; ayrıca onay sorulmaz. Yalnız o
+  madde yapılır, kapsam genişletilmez.
 
 ## Oturum Ritüeli (süreklilik kuralı)
 - Oturum BAŞINDA: tasks/todo.md dosyasını oku ve "Nerede kaldık" bölümünden devam et. Kullanıcıya özetle: "Son oturumda X yapılmıştı, sırada Y var."
@@ -102,3 +128,15 @@ değişmediği işlerde (yalnız keşif, inceleme, rapor) bu adım atlanır.
 - Sınırlar, kısıtlar ve öğrenme yasakları TÜM ajanlar ve TÜM aşamalar için,
   ajanın devreye girdiği her an geçerlidir; ortak motorda tek yerde durur,
   hiçbir fonksiyon kendi içinde gevşetemez.
+- YALNIZ SÖYLENENİ YAP: komutta yazmayan işi yapma, kapsamı kendiliğinden
+  genişletme, "bunu da düzelteyim" deme. Kapsam dışı gördüğünü RAPORLA.
+- BÜTÜN ADIMLARI EKSİKSİZ YAP: komuttaki hiçbir bölümü, hiçbir maddeyi, hiçbir
+  cümleyi atlama. Yapamadığını sessizce geçme — "ATLANDI: sebep" yaz.
+- TAM OKU: dosyayı üstünkörü okuma, yalnız başlıklara bakıp içeriği okudum deme.
+  Okumadığın yeri "okudum" diye yazmak yalandır. Ne kadarını okuduğunu dürüstçe
+  yaz; gerekiyorsa "yalnız şu aralığı okudum" de.
+- KARAR SENDE DEĞİL: kapsam, öncelik ve yöntem kararlarını kurucu verir. Kendi
+  kafandan karar verip uygulama; seçenek varsa yaz ve sor.
+- UYDURMA, TAHMİN YÜRÜTME, SANMA: emin olmadığın her yerde "bilmiyorum" yaz.
+  Referanssız hiçbir "yapıldı / var / doğru" cümlesi kurma.
+- UZATMA: gerekçe, özet ve rapor kısa olsun; hikâye anlatma, aynı şeyi iki kez yazma.
