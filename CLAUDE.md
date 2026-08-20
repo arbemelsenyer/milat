@@ -92,6 +92,46 @@ değişmediği işlerde (yalnız keşif, inceleme, rapor) bu adım atlanır.
 4. Sonuçları Belgele: tasks/todo.md'ye inceleme bölümü ekle
 5. Dersleri Kaydet: düzeltmelerden sonra tasks/lessons.md'yi güncelle
 
+## Koruma ve yetki sınırı (bağlayıcı — her işte geçerli)
+BUGÜNE KADAR ÜRÜNDE KURULMUŞ VE ÇALIŞAN HER ŞEY OLDUĞU GİBİ KALIR — silinmez,
+yeniden yazılmaz, taşınmaz, sadeleştirilmez, "daha temiz olur" diye elden
+geçirilmez. Yeni iş, var olanın ÜSTÜNE EKLENİR.
+
+Var olan bir yerde değişiklik GEREKİYORSA: kendin değiştirme. Nerede, ne sorun
+var, neden değişmesi gerekiyor — bunu yaz ve DUR. Kurucu onaylamadan tek satır
+değiştirilmez. Bu, gördüğün her kusur için geçerlidir: kapsam dışı hatayı
+düzeltme, RAPORLA.
+
+Hiçbir bölümü, kartı, düğmeyi, sekmeyi SİLME. Yerini DEĞİŞTİRME. Yeniden
+ADLANDIRMA. Sırasını bozma. Sayaçları ve numaralandırmayı bozma. Çalışan akışı
+ve tasarım bütünlüğünü bozma. Fonksiyon imzalarını ve çağıran yerleri kırma.
+Şüpheye düşersen DUR ve sor, tahminle ilerleme.
+
+BUNDAN SONRASINI İNŞA ET: hedef, ürünü pilota hazır hâle getirmektir. Aldığın
+işin BÜTÜN aşamalarını eksiksiz yap — yarım bırakma, "sonra tamamlanır" deme,
+bir bölümü sessizce atlama. Yapamadığını "ATLANDI: sebep" diye yaz.
+
+İş bitince kaldırdığın, taşıdığın ya da yeniden adlandırdığın her şeyi ve
+dokunduğun bütün dosyaları TEK TEK listele.
+
+Bu blok her komutta yazılmasa da geçerlidir; komutta yazmıyor diye gevşetilmez.
+
+## Agentic bağ ve insan kapıları (bağlayıcı)
+HİÇBİR YETENEK YALNIZ DÜĞME OLARAK YAPILMAZ. Ürüne eklenen her yetenek için şu
+dördü yazılır ve kurulur:
+- hangi OLAY üzerine kendiliğinden çalışacak,
+- sahibi hangi ajan (taraf ajanı / masa ajanı / ana ajan / sistem),
+- insan kapısı var mı, yok mu, gerekçesi ne,
+- akis_kurallari'na kural satırı gerekiyor mu (satırı Claude yazar, sen yazma).
+Bağlanmıyorsa gerekçesi yazılır. Düğmeye basılan ürün agentic değildir.
+
+BEŞ İNSAN KAPISI — ajanın asla kendi başına yapamayacakları:
+imza · bilirkişi ataması · kayıt/döküm rızası · tarafla asıl müzakere · silme onayı.
+Bunların dışındaki her iş ajandadır; insana bırakmak için bu listeye girmesi gerekir.
+
+KÖR VERİ: bir tarafın verisi, belgesi, analizi, kalemi karşı tarafa ve karşı tarafın
+ajanına hiçbir yüzeyden görünmez. Süzme EKRANDA DEĞİL SORGUDA kurulur.
+
 ## Temel İlkeler
 - GİZLİLİK #1: Her özellik kör veri ilkesine karşı test edilir. Karşı taraf diğer tarafın verisini ASLA göremez. Erişimi genişleten policy önerme
 - HALÜSİNASYON YASAK: Veri yetersizse "Yeterli veri yok" de. Uydurma künye/atıf üretme
@@ -118,6 +158,17 @@ değişmediği işlerde (yalnız keşif, inceleme, rapor) bu adım atlanır.
 - Yeni bir ders/tuzak çıktıysa tasks/lessons.md'ye tek satır ekle.
 - Bu ritüel atlanamaz: todo.md güncellenmeden görev tamamlanmış sayılmaz.
 
+## İş sonu kaydı (bağlayıcı — otomatik, hatırlatılmadan)
+Her iş biterken tasks/todo.md'nin en üstündeki "Nerede kaldık" bloğuna, sana
+söylenmeden şunları yazarsın:
+- YAPILDI: hangi bölüm/madde bitti, tek satır + dosya referansı.
+- EKSİK KALDI: bitmeyen ya da yarım kalan her şey, sebebiyle. Sessizce geçilmez;
+  "sonra bakılır" denmez.
+- GİDERMEK İÇİN: her eksik kalemin altına, onu kapatmak için tam olarak ne
+  yapılması gerektiği — hangi dosya, hangi adım, kimde (Code / Claude / kurucu).
+Bu kayıt işin parçasıdır, ayrı tur değildir: kayıt düşmeden iş bitmiş sayılmaz
+ve commit atılmaz.
+
 ## SABİT KURALLAR (19.08.2026, kurucu)
 - Bilmediğin yerde "bilmiyorum" yaz. Uydurma, sanma, tahmin yürütme.
 - Yaptığın ve bulduğun her şeyi referansıyla yaz (dosya + satır).
@@ -140,3 +191,5 @@ değişmediği işlerde (yalnız keşif, inceleme, rapor) bu adım atlanır.
 - UYDURMA, TAHMİN YÜRÜTME, SANMA: emin olmadığın her yerde "bilmiyorum" yaz.
   Referanssız hiçbir "yapıldı / var / doğru" cümlesi kurma.
 - UZATMA: gerekçe, özet ve rapor kısa olsun; hikâye anlatma, aynı şeyi iki kez yazma.
+- İŞE BAŞLAMADAN ÖNCE TEK SATIRLA YAZ: "okudum: <hangi dosyalar + hangi bölüm>".
+  Bu satır yoksa iş başlamamış sayılır. Okumadığın dosyayı okudum diye yazmak yalandır.
