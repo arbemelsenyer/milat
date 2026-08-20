@@ -280,6 +280,60 @@ export type Database = {
           },
         ]
       }
+      akis_duraklatma: {
+        Row: {
+          aktif: boolean
+          case_id: string
+          created_at: string
+          duraklatan: string | null
+          hedef_adim: string | null
+          id: string
+          kaldiran: string | null
+          kaldirma_zamani: string | null
+          kapsam: string
+          sebep: string | null
+        }
+        Insert: {
+          aktif?: boolean
+          case_id: string
+          created_at?: string
+          duraklatan?: string | null
+          hedef_adim?: string | null
+          id?: string
+          kaldiran?: string | null
+          kaldirma_zamani?: string | null
+          kapsam?: string
+          sebep?: string | null
+        }
+        Update: {
+          aktif?: boolean
+          case_id?: string
+          created_at?: string
+          duraklatan?: string | null
+          hedef_adim?: string | null
+          id?: string
+          kaldiran?: string | null
+          kaldirma_zamani?: string | null
+          kapsam?: string
+          sebep?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "akis_duraklatma_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "akis_duraklatma_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       akis_kurallari: {
         Row: {
           created_at: string
@@ -376,6 +430,51 @@ export type Database = {
             columns: ["party_id"]
             isOneToOne: false
             referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arabulucu_kontrol_tercihleri: {
+        Row: {
+          aciklama_surumu: string
+          case_id: string
+          guncelleme_zamani: string
+          id: string
+          mediator_id: string
+          onay_isteyen_adimlar: string[]
+          secim_zamani: string
+        }
+        Insert: {
+          aciklama_surumu?: string
+          case_id: string
+          guncelleme_zamani?: string
+          id?: string
+          mediator_id: string
+          onay_isteyen_adimlar?: string[]
+          secim_zamani?: string
+        }
+        Update: {
+          aciklama_surumu?: string
+          case_id?: string
+          guncelleme_zamani?: string
+          id?: string
+          mediator_id?: string
+          onay_isteyen_adimlar?: string[]
+          secim_zamani?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arabulucu_kontrol_tercihleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "arabulucu_kontrol_tercihleri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
             referencedColumns: ["id"]
           },
         ]
