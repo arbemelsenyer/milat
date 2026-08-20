@@ -238,7 +238,7 @@ export type Database = {
           adim: string
           case_id: string | null
           created_at: string
-          deneme_no: number
+          deneme_no: number | null
           hata_kodu: string | null
           id: string
           mediator_id: string | null
@@ -250,7 +250,7 @@ export type Database = {
           adim: string
           case_id?: string | null
           created_at?: string
-          deneme_no?: number
+          deneme_no?: number | null
           hata_kodu?: string | null
           id?: string
           mediator_id?: string | null
@@ -262,7 +262,7 @@ export type Database = {
           adim?: string
           case_id?: string | null
           created_at?: string
-          deneme_no?: number
+          deneme_no?: number | null
           hata_kodu?: string | null
           id?: string
           mediator_id?: string | null
