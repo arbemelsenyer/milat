@@ -290,3 +290,23 @@ Gün sonu belge komutuna dahildir.
 - KALDIRILDI: MediationEngine'deki 30 saniyelik belge sayacı
   (scheduleAutoOrchestrator) — aynı işi olay + kural düzeni yapıyor. Elle
   "Tüm Analizi Başlat" düğmesi duruyor.
+
+[EKLEME 20.08.2026 — ARABULUCU FRENİ VE KONTROL TERCİHİ]
+- Tablo: public.akis_duraklatma — CANLIDA (kurucu kurdu). aktif · kapsam
+  ('dosya'|'adim') · hedef_adim · sebep · duraklatan · kaldirma_zamani ·
+  kaldiran. Arabulucuya ALL, admin ALL. Yazım doğrudan sohbetten yapılır;
+  bunun için YENİ EDGE FONKSİYON YOK.
+- Tablo: public.arabulucu_kontrol_tercihleri — CANLIDA (kurucu kurdu).
+  onay_isteyen_adimlar text[] (kural kodları), UNIQUE(case_id, mediator_id).
+  Varsayılan boş = ajan kendiliğinden yapar.
+- Edge fonksiyon: akis-onayla — YENİ (verify_jwt=true). Bekleyen onay görevini
+  'yapildi' yapar ve bekleyen olayın verisine onay_verildi=true koyar; koşucu
+  bunu görünce tercih listesine bakmadan adımı koşar. Ortak motora bağlı
+  (MOTORA_BAGLI + zorunlu girdi gorev_id). İLK DEPLOY GEREKİR.
+- akis-yurut: her turda dosya bazlı duraklatma ve kontrol tercihi kontrolü
+  eklendi (duraklatmalariOku · onayIsteyenAdimlar). Duraklatmada olay işlenmiş
+  sayılmaz; devam edilince kaldığı yerden sürer.
+- hazirlik-foyu-gonder: KAPI ONARILDI. Kapı yalnız kullanıcı oturumu kabul
+  ediyordu, koşucu çağırınca 401 dönüyordu (canlı pano 20.08 00:48). Artık
+  masa-kalem-karsilastir desenindeki çift kapı: x-cron-secret VEYA kullanıcı
+  oturumu. Kullanıcı yolu ve yetki kontrolü harfi harfine korundu.

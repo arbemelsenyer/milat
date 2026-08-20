@@ -85,7 +85,7 @@ async function gonderilsinMi(
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
 
 const FOY_SAAT_DILIMI = "Europe/Istanbul";
@@ -265,14 +265,27 @@ Deno.serve(async (req) => {
     const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return json({ error: "Oturum doğrulanamadı" }, 401);
-    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData?.user) return json({ error: "Oturum doğrulanamadı" }, 401);
-    const userId = userData.user.id;
+    /* ÇİFT KAPI (20.08 canlı kusuru): kapı yalnız kullanıcı oturumu kabul
+       ediyordu; koşucu iç kapıdan çağırınca 401 dönüyor ve onaylanan föy hiç
+       gönderilmiyordu (pano kaydı 20.08 00:48 "HTTP 401 — Oturum doğrulanamadı").
+       Desen masa-kalem-karsilastir/index.ts ile aynıdır: x-cron-secret eşleşirse
+       ajan çağrısı kabul edilir, EŞLEŞMEZSE MEVCUT KULLANICI YOLU HARFİ HARFİNE
+       aynen işler (yetki kontrolü aşağıda yine yapılır). */
+    const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
+    const cronHeader = req.headers.get("x-cron-secret");
+    const isCron = !!CRON_SECRET && cronHeader === CRON_SECRET;
+
+    let userId = "";
+    if (!isCron) {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) return json({ error: "Oturum doğrulanamadı" }, 401);
+      const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: userData, error: userErr } = await userClient.auth.getUser();
+      if (userErr || !userData?.user) return json({ error: "Oturum doğrulanamadı" }, 401);
+      userId = userData.user.id;
+    }
 
     const body = await req.json().catch(() => ({}));
     const foy_id = temiz((body as any)?.foy_id);
@@ -294,10 +307,12 @@ Deno.serve(async (req) => {
     if (cErr) return json({ error: cErr.message }, 500);
     if (!caseRow) return json({ error: "Dosya bulunamadı" }, 404);
 
-    const { data: roleRow } = await admin.from("user_roles")
-      .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
-    const yetkili = String((caseRow as any).assigned_mediator_id ?? "") === userId || !!roleRow;
-    if (!yetkili) return json({ error: "Bu dosya için yetkiniz yok" }, 403);
+    if (!isCron) {
+      const { data: roleRow } = await admin.from("user_roles")
+        .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+      const yetkili = String((caseRow as any).assigned_mediator_id ?? "") === userId || !!roleRow;
+      if (!yetkili) return json({ error: "Bu dosya için yetkiniz yok" }, 403);
+    }
 
     /* ORTAK MOTOR (yasa): adım anlatımı ve eşzamanlılık kilidi motordan gelir.
        Anlatım föyün kendi satırında ('hazirlik_foyu' + party_id) sürer —

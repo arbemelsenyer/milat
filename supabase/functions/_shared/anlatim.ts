@@ -433,6 +433,8 @@ export const MOTORA_BAGLI: string[] = [
   "masa-kalem-karsilastir", "bilirkisi-sorulari", "taslak-denetim",
   // 19.08 · onaylanan föyün gönderimi (olay: foy_onaylandi, girdi: foy_id)
   "hazirlik-foyu-gonder",
+  // 20.08 · arabulucunun akış onayı (sohbetten çağrılır, girdi: gorev_id)
+  "akis-onayla",
 ];
 
 export function motoraBagliMi(fonksiyon: string): boolean {
@@ -451,6 +453,8 @@ const ZORUNLU_GIRDI: Record<string, string[]> = {
   "iletisim-degisim": ["case_id", "party_id"],
   // Bu fonksiyon dosya değil FÖY kimliği ister; foy_onaylandi olayı foy_id taşır.
   "hazirlik-foyu-gonder": ["foy_id"],
+  // Onay kapısı: bekleyen onay görevinin kimliğiyle çağrılır.
+  "akis-onayla": ["gorev_id"],
   "masa-kalem-karsilastir": ["case_id"],
   "bilirkisi-sorulari": ["case_id"],
   "taslak-denetim": ["case_id"],

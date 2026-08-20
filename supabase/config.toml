@@ -163,3 +163,6 @@ verify_jwt = false
 
 [functions.taslak-denetim]
 verify_jwt = false
+
+[functions.akis-onayla]
+verify_jwt = true

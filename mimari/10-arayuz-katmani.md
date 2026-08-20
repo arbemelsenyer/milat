@@ -382,3 +382,23 @@ yapılmadı, yalnız eksikleri eklendi:
   tarafa gönderir" olarak düzeltildi.
 · Önceden onaylanmış föyler için "Gönder" düğmesi YEDEK olarak duruyor.
   Sunucudaki çift gönderim kilidine dokunulmadı.
+
+
+[EKLEME 20.08.2026 — SOHBETTE DUR/DEVAM/DEĞİŞTİR · AŞAMA 1 KONTROL TERCİHİ]
+● CANLI. İkisi de YALNIZ ARABULUCU yüzeyindedir; taraf sohbetine ve taraf
+ekranlarına hiçbir iz düşmez (sorgular arabulucu dalında çalışır).
+· SOHBET ÜST ŞERİDİ (src/components/AjanPenceresi.tsx): Durdur · Devam ·
+  Değiştir düğmeleri. "Durdur" sebep ister ve dosya kapsamlı duraklatma yazar;
+  "Değiştir" koşmuş adımlar listesinden bir adım seçtirir ve yalnız o adımı
+  durdurur; "Devam" aktif duraklatmayı kaldırır.
+· Durdurulmuş dosyada üstte sakin tek satır: "Akış durduruldu — <sebep>.
+  Devam etmek için Devam'a basın." Uyarı rengi kullanılmaz.
+· Onay bekleyen adım satırına tıklanınca onay verilir (akis-onayla); ekrana
+  götürme yerine doğrudan onay, çünkü iş zaten sohbette bekliyor.
+· AŞAMA 1 KONTROL TERCİHİ KARTI (src/pages/MediationEngine.tsx): "Ajan hangi
+  adımlarda önce size sorsun?" Yedi adım tek cümlelik sade dille listelenir;
+  hiçbiri varsayılan olarak işaretli DEĞİLDİR. Kart, Aşama 1 katmanlarının
+  SONUNA eklendi; mevcut katman ve bölümler silinmedi, taşınmadı, adlandırılmadı.
+· Kartın altında değiştirilemez, işaretli ve kilitli dört satır durur (imza ·
+  bilirkişi ataması · kayıt/döküm rızası · tarafla asıl müzakere) ve üstünde
+  "Bunlar her hâlde sizde kalır" notu vardır.

@@ -2558,6 +2558,19 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
                   onCountChange={setDocCount}
                 />
               </Phase3Layer>
+
+              {/* KONTROL TERCİHİ — 20.08 eklendi. Mevcut katmanların SONUNA
+                  geldi; hiçbir bölüm silinmedi, taşınmadı, adlandırılmadı. */}
+              <div className={FAZ1_LAYER_BOX}>
+                <CockpitCollapsible
+                  id="faz1-kontrol-tercihi"
+                  title="Ajan hangi adımlarda önce size sorsun?"
+                  open={openSections.has("faz1-kontrol-tercihi")}
+                  onToggle={() => toggleSection("faz1-kontrol-tercihi")}
+                >
+                  <KontrolTercihiKarti caseRow={caseRow} userId={userId} />
+                </CockpitCollapsible>
+              </div>
           </div>
         </motion.div>
       </Card>
@@ -2581,6 +2594,122 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/* ====== KONTROL TERCİHİ (Aşama 1) — yalnız arabulucu =======================
+   KAPI SAYISINI ÜRÜN DEĞİL ARABULUCU BELİRLER. Varsayılan: hiçbiri işaretli
+   değildir; ajan adımları kendiliğinden yapar. Arabulucu işaretlediği adımda
+   ajanın ÖNCE sormasını ister; koşucu o adımı koşmaz, sohbete onay satırı düşer.
+   Alttaki dört satır DEĞİŞTİRİLEMEZ ve yalnız bilgi amaçlıdır: bu dört iş her
+   hâlde insanda kalır (constitution m.3 · m.5).
+   KÖR VERİ: bu kart yalnız arabulucu yüzeyindedir; tarafa hiçbir iz düşmez. */
+const KONTROL_ADIMLARI: { kod: string; metin: string }[] = [
+  { kod: "belge_yuklendi__analiz", metin: "Belgelerin okunup analiz edilmesi" },
+  { kod: "belge_yuklendi__taraf_kalem", metin: "Tarafın talep kalemlerinin çıkarılması" },
+  { kod: "oturum_planlandi__foy_hazirla", metin: "Oturum hazırlık föyünün hazırlanması" },
+  { kod: "kalem_guncellendi__karsilastir", metin: "İki tarafın kalemlerinin karşılaştırılması" },
+  { kod: "foy_onaylandi__gonder", metin: "Hazırlık föyünün tarafa gönderilmesi" },
+  { kod: "bilirkisi_onerildi__sorular", metin: "Bilirkişiye sorulacak soruların çıkarılması" },
+  { kod: "taslak_uretildi__denetim", metin: "Anlaşma taslağının denetlenmesi" },
+];
+
+// Değiştirilemez dört insan kapısı — yalnız bilgi olarak gösterilir.
+const DEGISMEZ_KAPILAR = [
+  "İmza",
+  "Bilirkişi ataması",
+  "Kayıt ve döküm rızası",
+  "Tarafla asıl müzakere",
+];
+
+function KontrolTercihiKarti({ caseRow, userId }: { caseRow: CaseRow; userId: string }) {
+  const [secili, setSecili] = useState<Set<string>>(() => new Set());
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+
+  useEffect(() => {
+    let iptal = false;
+    (async () => {
+      const { data, error } = await (supabase.from("arabulucu_kontrol_tercihleri" as any) as any)
+        .select("onay_isteyen_adimlar")
+        .eq("case_id", caseRow.id).eq("mediator_id", userId).maybeSingle();
+      if (iptal) return;
+      if (error) setHata("Tercihiniz şu an okunamıyor.");
+      else if (data) {
+        const liste = Array.isArray((data as any).onay_isteyen_adimlar) ? (data as any).onay_isteyen_adimlar : [];
+        setSecili(new Set(liste.map((x: any) => String(x))));
+      }
+      setYukleniyor(false);
+    })();
+    return () => { iptal = true; };
+  }, [caseRow.id, userId]);
+
+  async function kaydet(yeni: Set<string>) {
+    setBusy(true);
+    setHata(null);
+    const { error } = await (supabase.from("arabulucu_kontrol_tercihleri" as any) as any).upsert({
+      case_id: caseRow.id,
+      mediator_id: userId,
+      onay_isteyen_adimlar: Array.from(yeni),
+      guncelleme_zamani: new Date().toISOString(),
+    }, { onConflict: "case_id,mediator_id" });
+    if (error) setHata("Tercihiniz kaydedilemedi.");
+    setBusy(false);
+  }
+
+  function degistir(kod: string) {
+    const yeni = new Set(secili);
+    if (yeni.has(kod)) yeni.delete(kod); else yeni.add(kod);
+    setSecili(yeni);
+    kaydet(yeni);
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Ajan hangi adımlarda önce size sorsun? İşaretlemediğiniz adımları ajan kendiliğinden yapar;
+        işaretlediklerinde önce sizin onayınızı bekler. Bu seçimi sonradan da değiştirebilirsiniz.
+      </p>
+
+      {hata && <p className="text-sm text-muted-foreground">{hata}</p>}
+
+      {yukleniyor ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Okunuyor…
+        </div>
+      ) : (
+        <ul className="space-y-1.5">
+          {KONTROL_ADIMLARI.map((a) => (
+            <li key={a.kod} className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                id={`kontrol-${a.kod}`}
+                className="mt-1"
+                checked={secili.has(a.kod)}
+                disabled={busy}
+                onChange={() => degistir(a.kod)}
+              />
+              <Label htmlFor={`kontrol-${a.kod}`} className="text-sm font-normal cursor-pointer">
+                {a.metin}
+              </Label>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="border-t pt-3 space-y-1.5">
+        <p className="text-xs text-muted-foreground">Bunlar her hâlde sizde kalır:</p>
+        <ul className="space-y-1">
+          {DEGISMEZ_KAPILAR.map((k) => (
+            <li key={k} className="flex items-center gap-2 text-sm text-muted-foreground">
+              <input type="checkbox" checked readOnly disabled className="mt-0" />
+              {k}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

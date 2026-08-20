@@ -566,3 +566,37 @@ YENİ ZAMANLAYICI KURULMADI.
 · Kayıt biçimi sohbetin okuduğu biçimdir; nöbetçinin mevcut aşama kolu YERİNDE
   KALDI ve ikisi AYNI etiketi kullandığı için aynı geçiş iki kez yazılamaz.
 · Mevcut aşama kilitleri (ekrandaki "Aşama 2 tamamlanmadı" gibi) değişmedi.
+
+
+[EKLEME 20.08.2026 — ARABULUCU FRENİ VE KAPI SAYISI]
+● CANLI (deploy sonrası). Yasanın "varsayılan ajan yapar" ilkesi DEĞİŞMEDİ; bu
+bölüm o ilkenin insan tarafındaki karşılığıdır.
+
+ARABULUCU FRENİ (public.akis_duraklatma):
+· Arabulucu akışı istediği an durdurabilir. Koşucu, bir dosyada kural
+  koşturmadan ÖNCE aktif duraklatma var mı bakar
+  (supabase/functions/akis-yurut/index.ts · duraklatmalariOku):
+  — kapsam='dosya' → o dosyada HİÇBİR kural koşmaz, panoya tek satır düşer:
+    "Arabulucu akışı durdurdu: <sebep>".
+  — kapsam='adim' → yalnız hedef_adim'daki kural koşmaz, ötekiler sürer.
+· Olay İŞLENMİŞ SAYILMAZ: devam edilince akış kaldığı yerden sürer.
+· AJAN DURDURMAYI KENDİLİĞİNDEN KALDIRAMAZ. Kaldırma arabulucunun işidir
+  (sohbetteki Devam düğmesi); aktif satır aktif=false yapılır, kaldirma_zamani
+  ve kaldiran yazılır.
+· Sebep alanı arabulucunun kendi yazdığı metindir; ajan sebep uydurmaz.
+
+KAPI SAYISINI ÜRÜN DEĞİL ARABULUCU BELİRLER
+(public.arabulucu_kontrol_tercihleri):
+· Varsayılan: hiçbir adım işaretli değildir — ajan adımları kendiliğinden yapar.
+· Arabulucu bir adımı işaretlerse koşucu o kuralı KOŞMAZ; sohbete
+  'akis_onay_bekliyor' satırı düşer ve tek cümle yazılır:
+  "<adım> için onayınızı bekliyorum."
+· Onay sohbetten verilir (edge fonksiyon akis-onayla): görev 'yapildi' olur,
+  bekleyen olayın verisine onay_verildi=true konur ve olay yeniden işlenir.
+  Koşucu onay_verildi=true gördüğünde tercih listesine BAKMADAN adımı koşar.
+· DÖRT DEĞİŞMEZ İNSAN KAPISI bu düzenekle AÇILAMAZ ve kapatılamaz: imza ·
+  bilirkişi ataması · kayıt/döküm rızası · tarafla asıl müzakere. Bunlar
+  arabulucunun seçimine bağlı değildir; ekranda değiştirilemez ve işaretli
+  gösterilir, yalnız bilgi amaçlıdır.
+· Tercih dosya + arabulucu bazlıdır (UNIQUE case_id, mediator_id) ve sonradan
+  değiştirilebilir.

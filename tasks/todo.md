@@ -1,3 +1,22 @@
+## Nerede kaldık — 20.08.2026 (97) · ARABULUCU FRENİ VE KONTROL TERCİHİ
+
+- [x] 1 · hazirlik-foyu-gonder kapısı onarıldı: koşucu iç kapıdan çağırabiliyor
+      (x-cron-secret), kullanıcı yolu aynen duruyor. 20.08 00:48'deki
+      "HTTP 401 — Oturum doğrulanamadı" kaydının sebebi buydu.
+- [x] 2 · Sohbette Durdur / Devam / Değiştir. Koşucu her turda aktif duraklatmaya
+      bakıyor: dosya kapsamlıysa hiçbir kural koşmuyor, adım kapsamlıysa yalnız
+      o adım duruyor. Ajan durdurmayı kendiliğinden kaldırmıyor.
+- [x] 3 · Aşama 1'e "Ajan hangi adımlarda önce size sorsun?" kartı; varsayılan
+      hiçbiri işaretli değil. Koşucu tercih listesine bakıyor, işaretli adımda
+      onay bekliyor. YENİ akis-onayla fonksiyonu onayı alıp olayı uyandırıyor.
+      Dört değişmez kapı kartta kilitli ve bilgi amaçlı gösteriliyor.
+- [x] 4 · Föy hazır olunca sohbete "Oturum hazırlık föyünü hazırladım." satırı
+      ortak anlatımdan düşüyor; gönderim tercihe bağlı (işaretliyse onay,
+      değilse ajan gönderip "gönderdim" yazıyor). Paneldeki Onayla düğmesi kaldı.
+
+SIRADA: akis-onayla ilk deploy · akis-yurut ve hazirlik-foyu-gonder redeploy ·
+publish · canlı test (durdur/devam, onay kapısı, föyün uçtan uca gönderimi).
+
 ## Nerede kaldık — 19.08.2026 (96) · DEPLOY + KURALLAR + CANLI TEST SONUÇLARI (Claude)
 
 - [x] Deploy edildi: masa-kalem-karsilastir, bilirkisi-sorulari, taslak-denetim

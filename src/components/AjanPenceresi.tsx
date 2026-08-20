@@ -26,7 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Bot, ChevronDown, Loader2, ArrowRight, Send, CheckCircle2, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { Bot, ChevronDown, Loader2, ArrowRight, Send, CheckCircle2, Mic, MicOff, Volume2, VolumeX, Pause, Play, Pencil } from "lucide-react";
 
 type Rol = "arabulucu" | "taraf";
 
@@ -205,6 +205,12 @@ export function AjanPenceresi({
   const [dinliyor, setDinliyor] = useState(false);
   const [sesliOkuma, setSesliOkuma] = useState(false);
   const tanimaRef = useRef<any>(null);
+  /* ARABULUCU FRENİ — yalnız arabulucu yüzeyinde. Taraf sohbetine hiçbir iz
+     düşmez (sorgular da yalnız arabulucu dalında çalışır). */
+  const [duraklatma, setDuraklatma] = useState<any | null>(null);
+  const [frenKipi, setFrenKipi] = useState<null | "durdur" | "degistir">(null);
+  const [kosanAdimlar, setKosanAdimlar] = useState<string[]>([]);
+  const [secilenAdim, setSecilenAdim] = useState("");
   const sesVar = konusmaTanimaVarMi();
   const okumaVar = seslendirmeVarMi();
   const altRef = useRef<HTMLDivElement | null>(null);
@@ -281,6 +287,24 @@ export function AjanPenceresi({
           .eq("case_id", caseId).eq("gorev_tipi", "asama_gecisi").eq("durum", "yapildi")
           .order("created_at", { ascending: false }).limit(5),
       ]);
+      /* Aktif duraklatma ve koşmuş adımlar — YALNIZ arabulucu dalında okunur. */
+      const [dur, kosan] = await Promise.all([
+        (supabase.from("akis_duraklatma" as any) as any)
+          .select("id, kapsam, hedef_adim, sebep, aktif")
+          .eq("case_id", caseId).eq("aktif", true)
+          .order("created_at", { ascending: false }).limit(1),
+        supabase.from("ajan_gorevleri")
+          .select("gerekce").eq("case_id", caseId).eq("gorev_tipi", "akis_kosuldu").limit(100),
+      ]);
+      setDuraklatma(((dur.data ?? []) as any[])[0] ?? null);
+      // "[akis:<olay>:<kural>] …" gerekçesinden kural kodları çıkarılır.
+      const kodlar = new Set<string>();
+      for (const r of ((kosan.data ?? []) as any[])) {
+        const m = /^\[akis:[^:]+:([^\]]+)\]/.exec(String(r?.gerekce ?? ""));
+        if (m) kodlar.add(m[1]);
+      }
+      setKosanAdimlar(Array.from(kodlar));
+
       if (d1.error && g.error) setHata("Şu an ajanla bağlantı kurulamıyor.");
       setDurumlar(((d1.data ?? []) as any[]) as DurumSatiri[]);
       setOlanBiten(((d2.data ?? []) as any[]) as DurumSatiri[]);
@@ -454,6 +478,45 @@ export function AjanPenceresi({
     } catch { /* seslendirme yoksa sessizce geçilir */ }
   }, [sonAjanCevabi, sesliOkuma, okumaVar]);
 
+  /* DUR / DEVAM / DEĞİŞTİR — yazım doğrudan sohbetten yapılır; tablo
+     politikası arabulucuya açık olduğu için yeni edge fonksiyon gerekmez.
+     Ajan durdurmayı kendiliğinden kaldıramaz; kaldırma buradan yapılır. */
+  async function durdur(sebep: string, kapsam: "dosya" | "adim", hedefAdim?: string) {
+    const { data: oturum } = await supabase.auth.getUser();
+    const { error } = await (supabase.from("akis_duraklatma" as any) as any).insert({
+      case_id: caseId, aktif: true, kapsam,
+      hedef_adim: kapsam === "adim" ? (hedefAdim ?? null) : null,
+      sebep: sebep.trim() || null,
+      duraklatan: oturum?.user?.id ?? null,
+    });
+    if (error) {
+      setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+        metin: "Akışı şu an durduramadım. Birazdan tekrar deneyin." }]);
+      return;
+    }
+    setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+      metin: kapsam === "dosya" ? "Akışı durdurdum." : "Bu adımı durdurdum, ötekiler sürüyor." }]);
+    await yukle();
+  }
+
+  async function devamEt() {
+    if (!duraklatma?.id) return;
+    const { data: oturum } = await supabase.auth.getUser();
+    const { error } = await (supabase.from("akis_duraklatma" as any) as any).update({
+      aktif: false,
+      kaldirma_zamani: new Date().toISOString(),
+      kaldiran: oturum?.user?.id ?? null,
+    }).eq("id", duraklatma.id);
+    if (error) {
+      setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+        metin: "Akışı şu an sürdüremedim. Birazdan tekrar deneyin." }]);
+      return;
+    }
+    setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+      metin: "Kaldığım yerden devam ediyorum." }]);
+    await yukle();
+  }
+
   function gorevTikla(g?: GorevSatiri) {
     if (!g) return;
     if (tarafModu) {
@@ -461,8 +524,27 @@ export function AjanPenceresi({
       if (sekme && onGit) onGit(sekme);
       return;
     }
+    // Akış onayı: tıklanınca ekrana götürmek yerine onay verilir.
+    if (g.gorev_tipi === "akis_onay_bekliyor") { onayVer(g); return; }
     const asama = GOREV_ASAMASI[g.gorev_tipi] ?? 3;
     window.location.assign(`/cases/${caseId}?phase=${asama}&pv=2`);
+  }
+
+  /* Arabulucu, kendi seçtiği bir adım için istenen onayı sohbetten verir.
+     Onay kapısını ürün değil arabulucu koymuştu; kaldıran da odur. */
+  async function onayVer(g: GorevSatiri) {
+    try {
+      const { data, error } = await supabase.functions.invoke("akis-onayla", {
+        body: { gorev_id: g.id },
+      });
+      if (error || (data as any)?.error) throw new Error("olmadi");
+      setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+        metin: "Onayınızı aldım, adımı şimdi yapıyorum." }]);
+      await yukle();
+    } catch {
+      setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+        metin: "Onayı şu an kaydedemedim. Birazdan tekrar deneyin." }]);
+    }
   }
 
   async function gonder() {
@@ -566,6 +648,73 @@ export function AjanPenceresi({
           <ChevronDown className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* ARABULUCU FRENİ — yalnız arabulucu yüzeyinde. Durdurulmuş dosyada
+          sakin tek satır; altında Durdur / Devam / Değiştir. */}
+      {!tarafModu && (
+        <div className="border-b px-3 py-2 shrink-0 space-y-1.5">
+          {duraklatma && (
+            <p className="text-xs">
+              Akış durduruldu — {String(duraklatma.sebep ?? "sebep yazılmadı")}. Devam etmek için Devam'a basın.
+            </p>
+          )}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {!duraklatma && (
+              <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]"
+                onClick={() => { setFrenKipi(frenKipi === "durdur" ? null : "durdur"); }}>
+                <Pause className="h-3 w-3 mr-1" /> Durdur
+              </Button>
+            )}
+            {duraklatma && (
+              <Button size="sm" variant="secondary" className="h-6 px-2 text-[11px]" onClick={devamEt}>
+                <Play className="h-3 w-3 mr-1" /> Devam
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]"
+              onClick={() => { setFrenKipi(frenKipi === "degistir" ? null : "degistir"); }}>
+              <Pencil className="h-3 w-3 mr-1" /> Değiştir
+            </Button>
+          </div>
+
+          {frenKipi === "durdur" && (
+            <div className="space-y-1.5">
+              <Textarea rows={2} value={soru} placeholder="Neden durduruyorsunuz?"
+                className="text-xs resize-none" onChange={(e) => setSoru(e.target.value)} />
+              <Button size="sm" className="h-6 px-2 text-[11px]"
+                onClick={async () => { const t = soru; setSoru(""); setFrenKipi(null); await durdur(t, "dosya"); }}>
+                Akışı durdur
+              </Button>
+            </div>
+          )}
+
+          {frenKipi === "degistir" && (
+            <div className="space-y-1.5">
+              {kosanAdimlar.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">Henüz koşmuş bir adım bulamadım.</p>
+              ) : (
+                <select
+                  className="w-full h-7 text-xs border rounded bg-background px-1"
+                  value={secilenAdim}
+                  onChange={(e) => setSecilenAdim(e.target.value)}
+                >
+                  <option value="">adım seçin</option>
+                  {kosanAdimlar.map((k) => <option key={k} value={k}>{k}</option>)}
+                </select>
+              )}
+              <Textarea rows={2} value={soru} placeholder="Neyin düzeltilmesini istiyorsunuz?"
+                className="text-xs resize-none" onChange={(e) => setSoru(e.target.value)} />
+              <Button size="sm" className="h-6 px-2 text-[11px]" disabled={!secilenAdim}
+                onClick={async () => {
+                  const t = soru; const a = secilenAdim;
+                  setSoru(""); setSecilenAdim(""); setFrenKipi(null);
+                  await durdur(t, "adim", a);
+                }}>
+                Bu adımı durdur
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* İSTEK ŞERİDİ: bekleyen soru daima EN ÜSTTE durur. */}
       {bekleyenIstek && (

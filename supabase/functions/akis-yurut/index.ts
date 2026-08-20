@@ -124,6 +124,44 @@ async function panoyaYaz(
   return { yazildi: true, sebep: "yazıldı" };
 }
 
+/* ── ARABULUCU FRENİ (akis_duraklatma) ───────────────────────────────────────
+   Arabulucu akışı durdurabilir. Koşucu, bir dosyada kural koşturmadan ÖNCE
+   aktif duraklatma var mı bakar:
+     · kapsam='dosya' → o dosyada HİÇBİR kural koşmaz.
+     · kapsam='adim'  → yalnız hedef_adim'daki kural koşmaz, ötekiler sürer.
+   Ajan durdurmayı KENDİLİĞİNDEN KALDIRAMAZ; kaldırma arabulucunun işidir
+   (constitution m.3 — süreç hâkimiyeti insandadır). */
+type Duraklatma = { kapsam: string; hedef_adim: string | null; sebep: string | null };
+
+async function duraklatmalariOku(admin: any, caseId: string): Promise<Duraklatma[]> {
+  try {
+    const { data } = await admin.from("akis_duraklatma")
+      .select("kapsam, hedef_adim, sebep")
+      .eq("case_id", caseId).eq("aktif", true).limit(20);
+    return ((data ?? []) as any[]).map((d) => ({
+      kapsam: String(d.kapsam ?? "dosya"),
+      hedef_adim: d.hedef_adim ? String(d.hedef_adim) : null,
+      sebep: d.sebep ? String(d.sebep) : null,
+    }));
+  } catch { return []; }
+}
+
+/* ── KONTROL TERCİHİ (arabulucu_kontrol_tercihleri) ──────────────────────────
+   Kapı sayısını ürün değil ARABULUCU belirler: işaretlediği adımlarda ajan
+   önce sorar. Liste boşsa (varsayılan) ajan kendiliğinden yapar. */
+async function onayIsteyenAdimlar(admin: any, caseId: string): Promise<string[]> {
+  try {
+    const { data } = await admin.from("arabulucu_kontrol_tercihleri")
+      .select("onay_isteyen_adimlar").eq("case_id", caseId).limit(5);
+    const hepsi: string[] = [];
+    for (const r of ((data ?? []) as any[])) {
+      const liste = Array.isArray(r?.onay_isteyen_adimlar) ? r.onay_isteyen_adimlar : [];
+      for (const x of liste) { const t = String(x ?? "").trim(); if (t) hepsi.push(t); }
+    }
+    return hepsi;
+  } catch { return []; }
+}
+
 /* Akış hatası kaydı. Deneme sayısı bu satırlardan okunduğu için HER DENEME
    kendi satırını bırakır; ama AYNI ETİKET + AYNI METİN üst üste yazılmaz. */
 async function hataYaz(
@@ -299,6 +337,7 @@ Deno.serve(async (req) => {
       calistirilan_kural: 0,
       onaya_dusen: 0,
       atlanan_kural: 0,
+      duraklatilan_dosya: 0,
       hatali_kural: 0,
       notlar: [] as string[],
     };
@@ -327,10 +366,52 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      /* ARABULUCU FRENİ: kural koşturmadan ÖNCE bakılır. Dosya kapsamlı
+         duraklatma varsa bu dosyada HİÇBİR kural koşmaz; olay işlenmiş
+         SAYILMAZ ki devam edilince kaldığı yerden sürsün. */
+      const duraklatmalar = await duraklatmalariOku(admin, caseId);
+      const dosyaDuraklatmasi = duraklatmalar.find((d) => d.kapsam === "dosya") ?? null;
+      if (dosyaDuraklatmasi) {
+        ozet.duraklatilan_dosya++;
+        const sebep = dosyaDuraklatmasi.sebep || "sebep yazılmadı";
+        ozet.notlar.push(`${caseId}: arabulucu akışı durdurdu — ${sebep}`);
+        await hataYaz(admin, caseId, partyId, `[dur:${caseId}]`,
+          `Arabulucu akışı durdurdu: ${sebep}`);
+        continue;
+      }
+      const adimDuraklatmalari = duraklatmalar
+        .filter((d) => d.kapsam === "adim" && d.hedef_adim)
+        .map((d) => String(d.hedef_adim));
+      const onayGerekenler = await onayIsteyenAdimlar(admin, caseId);
+      // Onay verilmiş olay: tercih listesine BAKILMADAN koşulur.
+      const onayVerildi = !!(olay.veri && typeof olay.veri === "object"
+        && (olay.veri as any).onay_verildi === true);
+
       let olayHatali = false;
 
       for (const kural of eslesen) {
         const kuralKodu = metin(kural.kod) || String(kural.id);
+
+        // ADIM kapsamlı duraklatma: yalnız bu kural koşmaz, ötekiler sürer.
+        if (adimDuraklatmalari.includes(kuralKodu)) {
+          ozet.atlanan_kural++;
+          ozet.notlar.push(`${kuralKodu}: arabulucu bu adımı durdurdu`);
+          continue;
+        }
+
+        /* KONTROL TERCİHİ: arabulucu bu adımda önce sorulmasını istediyse
+           fonksiyon ÇAĞRILMAZ, panoya onay satırı düşer. Onay verilmiş
+           olayda bu kapı atlanır. */
+        if (!onayVerildi && onayGerekenler.includes(kuralKodu)) {
+          const r = await panoyaYaz(
+            admin, caseId, "akis_onay_bekliyor", partyId,
+            `${metin(kural.gerekce) || kuralKodu} için onayınızı bekliyorum.`,
+          );
+          if (r.yazildi) ozet.onaya_dusen++;
+          else ozet.notlar.push(`${kuralKodu}: ${r.sebep}`);
+          olayHatali = true;   // olay açık kalır: onay gelince koşulacak
+          continue;
+        }
 
         const { saglandi, sebep: kosulSebep } = await kosulSaglandiMi(admin, kural.kosul, caseId);
         if (!saglandi) {
