@@ -289,6 +289,7 @@ export type Database = {
       }
       ajan_gorevleri: {
         Row: {
+          bekleyen: string | null
           case_id: string
           created_at: string
           durum: string
@@ -296,10 +297,12 @@ export type Database = {
           gorev_tipi: string
           hedef_party_id: string | null
           id: string
+          kaynak: string | null
           sonuc: string | null
           updated_at: string
         }
         Insert: {
+          bekleyen?: string | null
           case_id: string
           created_at?: string
           durum?: string
@@ -307,10 +310,12 @@ export type Database = {
           gorev_tipi: string
           hedef_party_id?: string | null
           id?: string
+          kaynak?: string | null
           sonuc?: string | null
           updated_at?: string
         }
         Update: {
+          bekleyen?: string | null
           case_id?: string
           created_at?: string
           durum?: string
@@ -318,6 +323,7 @@ export type Database = {
           gorev_tipi?: string
           hedef_party_id?: string | null
           id?: string
+          kaynak?: string | null
           sonuc?: string | null
           updated_at?: string
         }
