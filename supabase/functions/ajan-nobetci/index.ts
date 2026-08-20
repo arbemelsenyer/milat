@@ -1167,6 +1167,236 @@ async function soruHatirlatmaKollari(
   return { hatirlatilan, uyandirilan, sebepler };
 }
 
+/* ── AJAN ÖNERİLERİ (public.ajan_onerileri) ──────────────────────────────────
+   AJAN ÖNERİR, İNSAN SEÇER. Öneri hiçbir akışı durdurmaz, hiçbir işi bekletmez,
+   zorunluluk doğurmaz. Kapatmak sonuçsuzdur.
+
+   DETERMİNİSTİK: öneriler dosyanın GERÇEK durumundan, sayımla doğar. Model
+   çağrısı YOKTUR, uydurma YOKTUR — her önerinin gerekçesinde neye dayandığı
+   yazılır (constitution m.2).
+
+   DİL SINIRI (constitution m.4 · m.5): öneriler YALNIZ USULE dairdir.
+   "Kabul et / etme", "hakkınız var", "şu tutara razı olun", "dava açın" gibi
+   cümle KURULMAZ; hukuki tavsiye ve değerlendirme yasaktır. Suçlayıcı dil
+   yasaktır: "vermediniz" değil "eklenebilir". Duygu, kişilik, niyet ve teşhis
+   etiketi yasaktır.
+
+   KÖR VERİ (constitution m.1): TARAF önerisi YALNIZ o tarafın kendi verisinden
+   üretilir; karşı tarafın belgesi, kalemi ve analizi hiçbir öneriye girmez.
+   Süzgeç sorgudadır. Arabulucu önerileri hedef='arabulucu' satırlarıdır.
+
+   TEKRAR: aynı başlık o dosyada bir kez açılır; kapatılan ya da kabul edilen
+   öneri YENİDEN AÇILMAZ. Açık öneri sayısı her yüzeyde (arabulucu ve her taraf)
+   en çok ÜÇTÜR — kalabalık yapmaz. */
+const ONERI_SINIRI = 3;
+
+async function oneriYaz(
+  admin: any,
+  o: {
+    case_id: string; party_id: string | null; hedef: "arabulucu" | "taraf";
+    baslik: string; gerekce: string;
+    eylem_turu: "adim" | "talimat" | "bilgi"; eylem_adim?: string | null;
+  },
+): Promise<boolean> {
+  try {
+    // Aynı başlık daha önce açıldıysa (açık, kabul ya da kapatılmış) tekrar açılmaz.
+    let q = admin.from("ajan_onerileri")
+      .select("id, durum").eq("case_id", o.case_id).eq("baslik", o.baslik).limit(5);
+    q = o.party_id ? q.eq("party_id", o.party_id) : q.is("party_id", null);
+    const { data: mevcut } = await q;
+    if (((mevcut ?? []) as any[]).length > 0) return false;
+
+    const { error } = await admin.from("ajan_onerileri").insert({
+      case_id: o.case_id,
+      party_id: o.party_id,
+      hedef: o.hedef,
+      baslik: o.baslik,
+      gerekce: o.gerekce,
+      eylem_turu: o.eylem_turu,
+      eylem_adim: o.eylem_adim ?? null,
+      durum: "acik",
+    });
+    return !error;
+  } catch { return false; }
+}
+
+async function acikOneriSayisi(
+  admin: any, caseId: string, hedef: string, partyId: string | null,
+): Promise<number> {
+  try {
+    let q = admin.from("ajan_onerileri")
+      .select("id", { count: "exact", head: true })
+      .eq("case_id", caseId).eq("hedef", hedef).eq("durum", "acik");
+    q = partyId ? q.eq("party_id", partyId) : q.is("party_id", null);
+    const { count } = await q;
+    return count ?? 0;
+  } catch { return ONERI_SINIRI; }   // okunamazsa yeni öneri yazılmaz
+}
+
+async function oneriKollari(
+  admin: any, dosya: any, taraflar: any[],
+): Promise<{ acilan: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  let acilan = 0;
+  const caseId = String(dosya.id);
+
+  try {
+    // ── ARABULUCUYA ────────────────────────────────────────────────────────
+    let kalan = ONERI_SINIRI - await acikOneriSayisi(admin, caseId, "arabulucu", null);
+
+    if (kalan > 0) {
+      // (a) Bir tarafın hiç belgesi yok.
+      for (const t of taraflar) {
+        if (kalan <= 0) break;
+        const { count } = await admin.from("case_documents")
+          .select("id", { count: "exact", head: true })
+          .eq("case_id", caseId).eq("party_id", t.id);
+        if ((count ?? 0) > 0) continue;
+        const ad = t?.party_type === "individual"
+          ? `${metin(t.first_name)} ${metin(t.last_name)}`.trim()
+          : metin(t.company_name);
+        if (await oneriYaz(admin, {
+          case_id: caseId, party_id: null, hedef: "arabulucu",
+          baslik: `${ad || "Bir taraf"} için dosyada belge görünmüyor`,
+          gerekce: "Bu tarafın adına kayıtlı belge sayısı sıfır; istenirse belge eklenmesi hatırlatılabilir.",
+          eylem_turu: "bilgi",
+        })) { acilan++; kalan--; }
+      }
+    }
+
+    if (kalan > 0) {
+      // (b) Dayanaksız kalem var.
+      const { count: dayanaksiz } = await admin.from("taraf_kalemleri")
+        .select("id", { count: "exact", head: true })
+        .eq("case_id", caseId).eq("durum", "dayanaksiz");
+      if ((dayanaksiz ?? 0) > 0 && await oneriYaz(admin, {
+        case_id: caseId, party_id: null, hedef: "arabulucu",
+        baslik: `${dayanaksiz} kalemin belgeye bağlı dayanağı görünmüyor`,
+        gerekce: "Kalem kayıtlarında bu sayıda satır 'dayanağı bulunamadı' durumunda; dayanak belgesi eklenirse karşılaştırma güçlenir.",
+        eylem_turu: "adim", eylem_adim: "kokpit-kalem-karsilastirma",
+      })) { acilan++; kalan--; }
+    }
+
+    if (kalan > 0) {
+      // (c) Planlanmış oturum yok.
+      const { count: oturum } = await admin.from("case_sessions")
+        .select("id", { count: "exact", head: true })
+        .eq("case_id", caseId).eq("status", "scheduled");
+      if ((oturum ?? 0) === 0 && await oneriYaz(admin, {
+        case_id: caseId, party_id: null, hedef: "arabulucu",
+        baslik: "Dosyada planlanmış oturum görünmüyor",
+        gerekce: "Oturum kayıtları arasında 'planlandı' durumunda satır yok; randevu adımı açılabilir.",
+        eylem_turu: "bilgi",
+      })) { acilan++; kalan--; }
+    }
+
+    if (kalan > 0) {
+      // (d) Cevapsız taraf sorusu 24 saati geçti.
+      const sinir = new Date(Date.now() - 24 * 3_600_000).toISOString();
+      const { count: bekleyen } = await admin.from("ajan_gorevleri")
+        .select("id", { count: "exact", head: true })
+        .eq("case_id", caseId).eq("gorev_tipi", "taraf_sorusu")
+        .eq("durum", "bekliyor").lt("created_at", sinir);
+      if ((bekleyen ?? 0) > 0 && await oneriYaz(admin, {
+        case_id: caseId, party_id: null, hedef: "arabulucu",
+        baslik: `${bekleyen} soru bir günden uzun süredir cevapsız`,
+        gerekce: "Taraflara sorulan sorular arasında 24 saatten eski ve hâlâ bekleyen kayıt var.",
+        eylem_turu: "bilgi",
+      })) { acilan++; kalan--; }
+    }
+
+    if (kalan > 0) {
+      // (e) Anlaşma taslağı var ama denetlenmemiş.
+      const { count: taslak } = await admin.from("agreement_documents")
+        .select("id", { count: "exact", head: true }).eq("case_id", caseId);
+      if ((taslak ?? 0) > 0) {
+        const { data: denetim } = await admin.from("agent_states")
+          .select("id, status").eq("case_id", caseId)
+          .eq("agent_type", "agreement_generation").is("party_id", null).maybeSingle();
+        const denetlenmis = String((denetim as any)?.status ?? "") === "completed";
+        if (!denetlenmis && await oneriYaz(admin, {
+          case_id: caseId, party_id: null, hedef: "arabulucu",
+          baslik: "Anlaşma taslağı henüz denetlenmemiş görünüyor",
+          gerekce: "Dosyada taslak kaydı var, taslak denetimi kaydı yok; denetim istenebilir.",
+          eylem_turu: "talimat", eylem_adim: "taslak-denetim",
+        })) { acilan++; kalan--; }
+      }
+    }
+
+    // ── TARAFA — yalnız o tarafın KENDİ verisinden ────────────────────────
+    for (const t of taraflar) {
+      const partyId = String(t.id);
+      let tKalan = ONERI_SINIRI - await acikOneriSayisi(admin, caseId, "taraf", partyId);
+      if (tKalan <= 0) continue;
+
+      // (f) Kendi kaleminde dayanak belgesi yok.
+      const { count: kendiDayanaksiz } = await admin.from("taraf_kalemleri")
+        .select("id", { count: "exact", head: true })
+        .eq("case_id", caseId).eq("party_id", partyId).eq("durum", "dayanaksiz");
+      if ((kendiDayanaksiz ?? 0) > 0 && await oneriYaz(admin, {
+        case_id: caseId, party_id: partyId, hedef: "taraf",
+        baslik: `${kendiDayanaksiz} talebiniz için belge eklenebilir`,
+        gerekce: "Bu kalemlerde belgeye dayanan bir karşılık bulunamadı; ilgili belge eklenirse kalem dayanağına bağlanır.",
+        eylem_turu: "adim", eylem_adim: "kalemlerim",
+      })) { acilan++; tKalan--; }
+
+      // (g) Kendisine sorulan soru cevapsız.
+      if (tKalan > 0) {
+        const { count: soru } = await admin.from("ajan_gorevleri")
+          .select("id", { count: "exact", head: true })
+          .eq("case_id", caseId).eq("hedef_party_id", partyId)
+          .eq("gorev_tipi", "taraf_sorusu").eq("durum", "bekliyor");
+        if ((soru ?? 0) > 0 && await oneriYaz(admin, {
+          case_id: caseId, party_id: partyId, hedef: "taraf",
+          baslik: "Cevabınızı bekleyen bir soru var",
+          gerekce: "Size iletilen sorulardan biri hâlâ açık; sohbetten yanıtlayabilirsiniz.",
+          eylem_turu: "bilgi",
+        })) { acilan++; tKalan--; }
+      }
+
+      // (h) Oturum yaklaşıyor ve gönderilmiş hazırlık föyü var.
+      // NOT: föyün OKUNUP okunmadığı üründe TUTULMUYOR; bu yüzden "okunmadı"
+      // denmez, yalnız oturumun yaklaştığı ve föyün ekranda olduğu hatırlatılır.
+      if (tKalan > 0) {
+        const simdi = Date.now();
+        const { data: oturumlar } = await admin.from("case_sessions")
+          .select("scheduled_at, status").eq("case_id", caseId).eq("status", "scheduled").limit(10);
+        const yakin = ((oturumlar ?? []) as any[]).some((o) => {
+          const z = new Date(String(o.scheduled_at ?? "")).getTime();
+          return Number.isFinite(z) && z > simdi && z - simdi <= 3 * 24 * 3_600_000;
+        });
+        if (yakin) {
+          const { count: foy } = await admin.from("oturum_hazirlik_foyleri")
+            .select("id", { count: "exact", head: true })
+            .eq("case_id", caseId).eq("party_id", partyId).eq("durum", "gonderildi");
+          if ((foy ?? 0) > 0 && await oneriYaz(admin, {
+            case_id: caseId, party_id: partyId, hedef: "taraf",
+            baslik: "Oturum yaklaşıyor — hazırlık föyünüz ekranınızda",
+            gerekce: "Planlanmış oturuma üç günden az kaldı ve size gönderilmiş bir hazırlık föyü var.",
+            eylem_turu: "adim", eylem_adim: "hazirligim",
+          })) { acilan++; tKalan--; }
+        }
+      }
+
+      // (i) İletişim tercihi hiç ayarlanmamış.
+      if (tKalan > 0) {
+        const { count: tercih } = await admin.from("iletisim_tercihleri")
+          .select("id", { count: "exact", head: true }).eq("party_id", partyId);
+        if ((tercih ?? 0) === 0 && await oneriYaz(admin, {
+          case_id: caseId, party_id: partyId, hedef: "taraf",
+          baslik: "Bildirim tercihinizi ayarlayabilirsiniz",
+          gerekce: "Bu dosyada sizin adınıza kayıtlı bir iletişim tercihi bulunmuyor; sıklık ve sessiz saat seçilebilir.",
+          eylem_turu: "adim", eylem_adim: "iletisim",
+        })) { acilan++; tKalan--; }
+      }
+    }
+  } catch (e: any) {
+    sebepler.push(`öneri üretilemedi: ${String(e?.message ?? e).slice(0, 120)}`);
+  }
+
+  return { acilan, sebepler };
+}
+
 async function eksikBilgiYurut(admin: any, dosya: any, partyId: string): Promise<{ durum: string; sonuc: string }> {
   const { data: taraf } = await admin.from("case_parties").select("*").eq("id", partyId).maybeSingle();
   if (!taraf) return { durum: "atlandi", sonuc: "Taraf kaydı bulunamadı" };
@@ -2242,6 +2472,7 @@ Deno.serve(async (req) => {
     let atlananYuzYuze = 0;
     const atlamaSebepleri: string[] = [];
     let soruHatirlatildi = 0;
+    let oneriAcildi = 0;
     let koluYenidenUyandirildi = 0;
     let imzaAdi = "";
     let analizBaslatildi = 0;
@@ -2376,6 +2607,12 @@ Deno.serve(async (req) => {
         soruHatirlatildi += soruKol.hatirlatilan;
         koluYenidenUyandirildi += soruKol.uyandirilan;
         soruKol.sebepler.forEach(sebepEkle);
+
+        /* ── AJAN ÖNERİLERİ: ajan önerir, insan seçer. Hiçbir akışı durdurmaz,
+           hiçbir işi bekletmez. Deterministik kurallardan doğar. */
+        const oneriKol = await oneriKollari(admin, dosya, taraflar);
+        oneriAcildi += oneriKol.acilan;
+        oneriKol.sebepler.forEach(sebepEkle);
 
         // ── TUR C-2: kör teklif v2 — koşullu aralık / braketleme ──
         const braketKol = await braketKollari(admin, dosya, taraflar);
@@ -2527,6 +2764,7 @@ Deno.serve(async (req) => {
     return json({
       akis_yurut: akisSonuc.ok ? "kosuldu" : `hata: ${akisSonuc.sebep}`.slice(0, 200),
       soru_hatirlatildi: soruHatirlatildi,
+      oneri_acildi: oneriAcildi,
       kol_yeniden_uyandirildi: koluYenidenUyandirildi,
       dosya: islenenDosya,
       gorev_yapildi: yapilanGorev,

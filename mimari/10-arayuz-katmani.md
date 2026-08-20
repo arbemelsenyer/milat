@@ -418,3 +418,16 @@ ekranlarına hiçbir iz düşmez (sorgular arabulucu dalında çalışır).
   talimat yazılabilir.
 · Onay satırına tıklamak da onay verir; bu satırlarda ekrana götürme oku
   gösterilmez, çünkü iş zaten sohbette karara bağlanır.
+
+
+[EKLEME 20.08.2026 — SOHBETTE ÖNERİLER BÖLÜMÜ (iki yüzey)]
+● CANLI. Sohbetin ALTINDA, yazı kutusunun üstünde sakin bir "Öneriler" bölümü.
+· En fazla ÜÇ açık öneri; her biri tek satır başlık + tek satır gerekçe,
+  yanında "Uygula" ve "Kapat". Renk taşımaz, uyarı görünümü kullanılmaz.
+· ARABULUCU yüzeyinde hedef='arabulucu' satırları; TARAF yüzeyinde yalnız kendi
+  party_id'sindeki hedef='taraf' satırları. Süzme SORGUDA yapılır.
+· "Uygula": eylem_turu='talimat' ise mevcut talimat düzenine satır yazılır ·
+  'adim' ise ilgili ekrana/sekmeye götürür · 'bilgi' ise yalnız kapanır.
+  Her iki düğme de öneriyi kapatır (kabul / kapatildi) ve karar_zamani yazılır.
+· Talimat kipi, Dur/Devam/Değiştir, onay satırı, mikrofon ve kontrol tercihi
+  kartı yerinde kaldı; hiçbiri taşınmadı, adlandırılmadı.

@@ -104,23 +104,41 @@ async function kosulSaglandiMi(
   return { saglandi: true, sebep: `taraf sayısı ${mevcut} ≥ ${gereken}` };
 }
 
-/* Pano yazımı — mükerrer yazmaz (nöbetçideki "önce bak, varsa yazma" kalıbı):
-   aynı dosya + tip + hedef taraf için 'bekliyor' satır varsa yeniden yazılmaz. */
+/* Pano yazımı — tekrar süzgeci KONU ÜZERİNDEN çalışır.
+   20.08 CANLI KUSURU: süzgeç TÜR üzerinden kuruluydu (aynı gorev_tipi + hedef
+   için bekleyen satır varsa yazma). Föy onayı beklerken gelen TALİMAT REDDİ
+   bildirimi bu yüzden elendi ve sohbete hiç düşmedi (02:06 kaydı).
+   ONARIM: her bildirim bir KONU anahtarıyla yazılır ("[konu:…]"). Aynı konuda
+   bekleyen satır varsa yazılmaz; FARKLI konudaki bildirim HER ZAMAN yazılır.
+   Konu verilmezse eski davranış korunur (tür + hedef).
+   ÖLÇÜ: hiçbir ret, hata ya da onay isteği sessizce düşmez — yazılamayan
+   bildirimin sebebi çağırana döner ve koşucunun özet notuna geçer. */
 async function panoyaYaz(
   admin: any, caseId: string, gorevTipi: string, hedefPartyId: string | null, gerekce: string,
+  konu?: string,
 ): Promise<{ yazildi: boolean; sebep: string }> {
+  const konuEtiketi = konu ? `[konu:${String(konu).slice(0, 80)}]` : "";
   let sorgu = admin.from("ajan_gorevleri")
-    .select("id").eq("case_id", caseId).eq("gorev_tipi", gorevTipi).eq("durum", "bekliyor");
+    .select("id, gerekce").eq("case_id", caseId).eq("gorev_tipi", gorevTipi).eq("durum", "bekliyor");
   sorgu = hedefPartyId ? sorgu.eq("hedef_party_id", hedefPartyId) : sorgu.is("hedef_party_id", null);
-  const { data: mevcut } = await sorgu.limit(1);
-  if (mevcut && mevcut.length > 0) return { yazildi: false, sebep: "bekleyen aynı satır zaten var" };
+  const { data: mevcut } = await sorgu.limit(200);
+  const bekleyenler = (mevcut ?? []) as any[];
+
+  if (konuEtiketi) {
+    // KONU bazlı: yalnız AYNI konuda bekleyen satır varsa yazılmaz.
+    if (bekleyenler.some((r) => String(r?.gerekce ?? "").includes(konuEtiketi))) {
+      return { yazildi: false, sebep: "bu konuda bekleyen satır zaten var" };
+    }
+  } else if (bekleyenler.length > 0) {
+    return { yazildi: false, sebep: "bekleyen aynı satır zaten var" };
+  }
 
   const { error } = await admin.from("ajan_gorevleri").insert({
     case_id: caseId,
     gorev_tipi: gorevTipi,
     durum: "bekliyor",
     hedef_party_id: hedefPartyId,
-    gerekce,
+    gerekce: konuEtiketi ? `${konuEtiketi} ${gerekce}` : gerekce,
   });
   if (error) return { yazildi: false, sebep: `pano satırı yazılamadı: ${error.message}` };
   return { yazildi: true, sebep: "yazıldı" };
@@ -353,7 +371,7 @@ async function talimatlariYurut(
           karar_zamani: new Date().toISOString(),
         }).eq("id", t.id);
         await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
-          "Bu talimatı uygulayamam — bu adım veriden hesaplanır.");
+          "Bu talimatı uygulayamam — bu adım veriden hesaplanır.", `talimat:${t.id}`);
         reddedilen++;
         continue;
       }
@@ -377,7 +395,7 @@ async function talimatlariYurut(
           karar_zamani: new Date().toISOString(),
         }).eq("id", t.id);
         await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
-          `Bu talimatı uygulayamam — ${denetim.sebep}.`);
+          `Bu talimatı uygulayamam — ${denetim.sebep}.`, `talimat:${t.id}`);
         reddedilen++;
         continue;
       }
@@ -391,7 +409,7 @@ async function talimatlariYurut(
           karar_zamani: new Date().toISOString(),
         }).eq("id", t.id);
         await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
-          `Bu talimatı uygulayamadım — ${eksikMetni} dosyada bulunamadı.`);
+          `Bu talimatı uygulayamadım — ${eksikMetni} dosyada bulunamadı.`, `talimat:${t.id}`);
         reddedilen++;
         continue;
       }
@@ -416,7 +434,7 @@ async function talimatlariYurut(
             karar_zamani: new Date().toISOString(),
           }).eq("id", t.id);
           await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
-            "Bu talimatı iki denemede de uygulayamadım.");
+            "Bu talimatı iki denemede de uygulayamadım.", `talimat:${t.id}`);
           reddedilen++;
         } else {
           await admin.from("arabulucu_talimatlari")
@@ -434,8 +452,13 @@ async function talimatlariYurut(
 
       /* ONAYA SUNULUR: iş taraf yüzeyine çıkmadan arabulucunun sohbetine düşer.
          Onay satırı 'arabulucu_onayi' tipindedir; nöbetçi bu tipi yürütmez. */
-      await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
-        `[talimat:${t.id}] Talimatınıza göre yeniden hazırladım, onayınıza sunuyorum.`);
+      const onaySatiri = await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
+        `[talimat:${t.id}] Talimatınıza göre yeniden hazırladım, onayınıza sunuyorum.`,
+        `talimat:${t.id}`);
+      if (!onaySatiri.yazildi) {
+        // SESSİZ DÜŞME YOK: yazılamayan onay isteğinin sebebi özete geçer.
+        ozet.notlar.push(`talimat onayı sohbete yazılamadı (${caseId}): ${onaySatiri.sebep}`);
+      }
       uygulanan++;
     }
   } catch (e: any) {
@@ -554,6 +577,7 @@ Deno.serve(async (req) => {
           const r = await panoyaYaz(
             admin, caseId, "akis_onay_bekliyor", partyId,
             `${metin(kural.gerekce) || kuralKodu} için onayınızı bekliyorum.`,
+            `kural:${kuralKodu}`,
           );
           if (r.yazildi) ozet.onaya_dusen++;
           else ozet.notlar.push(`${kuralKodu}: ${r.sebep}`);
@@ -574,6 +598,7 @@ Deno.serve(async (req) => {
           const r = await panoyaYaz(
             admin, caseId, "akis_onay_bekliyor", partyId,
             metin(kural.gerekce) || `${kuralKodu} kuralı arabulucu onayı bekliyor`,
+            `kural:${kuralKodu}`,
           );
           if (r.yazildi) ozet.onaya_dusen++;
           else ozet.notlar.push(`${kuralKodu}: ${r.sebep}`);

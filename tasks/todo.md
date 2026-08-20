@@ -1,3 +1,22 @@
+## Nerede kaldık — 20.08.2026 (99) · AJAN ÖNERİLERİ + PANO KUSURU ONARIMI
+
+- [x] 1 · Sohbetin altına "Öneriler" bölümü (iki yüzey): en fazla üç açık öneri,
+      başlık + gerekçe, Uygula / Kapat. Süzme sorguda; taraf yalnız kendi
+      önerilerini görüyor. Hiçbir öneri akışı durdurmuyor.
+- [x] 2 · ajan-nobetci'ye oneriKollari: dosyanın gerçek durumundan deterministik
+      öneri üretimi (arabulucuya beş kural, tarafa dört kural). Aynı başlık bir
+      kez açılıyor, kapatılan yeniden açılmıyor, yüzey başına en çok üç.
+- [x] 3 · Dil sınırı: öneri metinleri koda tek tek yazıldı, yalnız usule dair,
+      suçlayıcı dil ve hukuki değerlendirme yok. Föyün okunup okunmadığı üründe
+      tutulmadığı için "okumadınız" denmiyor — bilinmeyen bilinmiyor diye yazıldı.
+- [x] 4 · CANLI BULGU (20.08 02:06): talimat reddi ("Bu adım veriden hesaplanır")
+      sohbete DÜŞMEDİ; pano tekrar süzgeci TÜR üzerinden kuruluydu ve föy onayı
+      beklerken gelen ret elendi. panoyaYaz artık KONU anahtarıyla çalışıyor;
+      farklı konudaki bildirim her zaman yazılıyor, yazılamazsa sebebi özete geçiyor.
+
+SIRADA: ajan-nobetci · akis-yurut redeploy · publish · canlı test (öneriler iki
+yüzeyde görünüyor mu, talimat reddi sohbete düşüyor mu).
+
 ## Nerede kaldık — 20.08.2026 (98) · ARABULUCU TALİMATI ("şunu şöyle yap, onaya sun")
 
 - [x] 1 · Sohbette "Talimat ver": hedef adım (föy · bilirkişi soruları · taslak

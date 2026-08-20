@@ -224,3 +224,9 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   yerde görünüyorsa artık özellik değil YASADIR; tek ortak motora yazılır ve
   bütün kollar oradan geçirilir. Yeni yetenek, motora bağlanmadan çalışamamalıdır
   — yapısal zorunluluk olmadan kural zamanla delinir.
+- DERS (20.08.2026) — TEKRAR SÜZGECİ TÜR ÜZERİNDEN KURULURSA FARKLI KONUDAKİ
+  BİLDİRİM ELENİR. akis-yurut'taki panoyaYaz "aynı tip + aynı hedef için
+  bekleyen satır varsa yazma" diyordu; föy onayı beklerken gelen talimat reddi
+  bu yüzden sohbete hiç düşmedi (canlı bulgu 20.08 02:06). Kural: tekrar süzgeci
+  TÜR üzerinden değil KONU üzerinden kurulur (talimat kimliği, kural kodu gibi);
+  farklı konudaki bildirim her zaman yazılır ve yazılamıyorsa sebebi özete geçer.

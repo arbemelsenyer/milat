@@ -644,3 +644,33 @@ DÜRÜSTLÜK NOTU (bilerek yazıldı): talimat denetimi KALIP TABANLIDIR
 dolaylı anlatımı yakalamayabilir. Bu yüzden adımların KENDİ kuralları — birebir
 alıntı doğrulaması, kör veri sorguları, insan kapıları — yürürlükte kalır;
 talimat denetimi onların yerine geçmez, üstüne eklenir.
+
+
+[EKLEME 20.08.2026 — AJAN ÖNERİR, İNSAN SEÇER]
+● CANLI (deploy sonrası). Tablo: public.ajan_onerileri.
+· Öneri HİÇBİR akışı durdurmaz, hiçbir işi bekletmez, zorunluluk doğurmaz.
+  Kapatmak sonuçsuzdur; kapatılan öneri o dosyada YENİDEN AÇILMAZ.
+· DETERMİNİSTİK: öneriler dosyanın gerçek durumundan SAYIMLA doğar; model
+  çağrısı yoktur. Her önerinin gerekçesinde neye dayandığı yazılır (m.2).
+· ÜRETİM YERİ: ajan-nobetci · oneriKollari. Her turda çalışır.
+  ARABULUCUYA: bir tarafın hiç belgesi yoksa · dayanaksız kalem varsa ·
+  planlanmış oturum yoksa · cevapsız taraf sorusu 24 saati geçtiyse ·
+  anlaşma taslağı var ama denetim kaydı yoksa.
+  TARAFA (yalnız KENDİ verisinden): kendi kaleminde dayanak belgesi yoksa ·
+  kendisine sorulan soru cevapsızsa · planlanmış oturuma üç günden az kaldıysa
+  ve kendisine gönderilmiş föy varsa · iletişim tercihi hiç ayarlanmamışsa.
+· AÇIK ÖNERİ SINIRI: her yüzeyde (arabulucu ve HER TARAF ayrı ayrı) en çok ÜÇ.
+  Komuttaki "dosya başına üç" ölçüsü yüzey başına uygulandı; yoksa arabulucu
+  önerileri tarafların önerilerini bastırırdı. Aynı başlık bir kez açılır.
+· DİL SINIRI (m.4 · m.5): öneriler YALNIZ USULE dairdir. "Kabul et / etme",
+  "hakkınız var", "şu tutara razı olun", "dava açın" gibi cümle KURULMAZ;
+  hukuki tavsiye ve değerlendirme yasaktır. Suçlayıcı dil yasaktır:
+  "vermediniz" değil "eklenebilir". Duygu, kişilik, niyet ve teşhis etiketi
+  yasaktır. Öneri metinleri koda SABİT ve tek tek yazılmıştır; model üretmez.
+· KÖR VERİ (m.1): taraf önerisi yalnız o tarafın kendi verisinden üretilir ve
+  yalnız o tarafa görünür (sorguda party_id + hedef süzgeci). Karşı tarafın
+  belgesi, kalemi ve analizi hiçbir öneriye girmez.
+· DÖRT İNSAN KAPISI: öneri bu kapıları atlatmaz, yalnız hatırlatır.
+· BİLİNMEYEN, BİLİNMİYOR DİYE YAZILDI: hazırlık föyünün OKUNUP okunmadığı
+  üründe tutulmuyor. Bu yüzden "föyü okumadınız" denmez; yalnız oturumun
+  yaklaştığı ve föyün ekranda olduğu hatırlatılır.

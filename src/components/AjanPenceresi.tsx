@@ -224,6 +224,9 @@ export function AjanPenceresi({
   const [talimatAdimi, setTalimatAdimi] = useState("");
   const [bekleyenTalimat, setBekleyenTalimat] = useState<any | null>(null);
   const [redKipi, setRedKipi] = useState<GorevSatiri | null>(null);
+  /* ÖNERİLER — iki yüzeyde de var. Ajan önerir, insan seçer: hiçbir öneri
+     akışı durdurmaz, hiçbir işi bekletmez, zorunluluk doğurmaz. */
+  const [oneriler, setOneriler] = useState<any[]>([]);
   const sesVar = konusmaTanimaVarMi();
   const okumaVar = seslendirmeVarMi();
   const altRef = useRef<HTMLDivElement | null>(null);
@@ -272,6 +275,15 @@ export function AjanPenceresi({
           .eq("hedef_party_id", partyId!).in("gorev_tipi", TARAFA_ACIK_GOREVLER)
           .order("created_at", { ascending: false }).limit(20),
       ]);
+      /* KÖR VERİ: taraf yalnız KENDİ party_id'sindeki hedef='taraf' önerilerini
+         görür. Süzgeç sorgudadır, ekranda gizleme yoktur. */
+      const { data: oneri } = await (supabase.from("ajan_onerileri" as any) as any)
+        .select("id, baslik, gerekce, eylem_turu, eylem_adim, hedef, party_id, durum, created_at")
+        .eq("case_id", caseId).eq("durum", "acik")
+        .eq("hedef", "taraf").eq("party_id", partyId!)
+        .order("created_at", { ascending: false }).limit(3);
+      setOneriler(((oneri ?? []) as any[]));
+
       if (d.error && g.error) setHata("Şu an ajanla bağlantı kurulamıyor.");
       setDurumlar(((d.data ?? []) as any[]) as DurumSatiri[]);
       setOlanBiten([]);
@@ -324,6 +336,13 @@ export function AjanPenceresi({
         .eq("case_id", caseId).eq("durum", "bekliyor")
         .order("created_at", { ascending: false }).limit(1);
       setBekleyenTalimat(((tal ?? []) as any[])[0] ?? null);
+
+      // Arabulucu önerileri: hedef='arabulucu' satırları (taraf satırları girmez).
+      const { data: oneri } = await (supabase.from("ajan_onerileri" as any) as any)
+        .select("id, baslik, gerekce, eylem_turu, eylem_adim, hedef, party_id, durum, created_at")
+        .eq("case_id", caseId).eq("durum", "acik").eq("hedef", "arabulucu")
+        .order("created_at", { ascending: false }).limit(3);
+      setOneriler(((oneri ?? []) as any[]));
 
       if (d1.error && g.error) setHata("Şu an ajanla bağlantı kurulamıyor.");
       setDurumlar(((d1.data ?? []) as any[]) as DurumSatiri[]);
@@ -572,6 +591,38 @@ export function AjanPenceresi({
       metin: "Anladım, yeniden yapacağım. Yeni talimatınızı yazabilirsiniz." }]);
     setTalimatKipi(true);
     await yukle();
+  }
+
+  /* ÖNERİYİ UYGULA: 'talimat' ise mevcut talimat düzenine satır yazılır,
+     'adim' ise ilgili ekrana götürür, 'bilgi' ise yalnız kapanır.
+     KAPAT sonuçsuzdur: kapatılan öneri o dosyada yeniden açılmaz. */
+  async function oneriUygula(o: any) {
+    const tur = String(o?.eylem_turu ?? "bilgi");
+    if (tur === "talimat" && !tarafModu) {
+      await talimatYaz(String(o.eylem_adim ?? ""), String(o.baslik ?? ""));
+    } else if (tur === "adim") {
+      const hedef = String(o.eylem_adim ?? "");
+      if (tarafModu) { if (hedef && onGit) onGit(hedef); }
+      else if (hedef) { setCockpitHedef(hedef); }
+    }
+    await oneriKapat(o, "kabul");
+  }
+
+  async function oneriKapat(o: any, durum: "kabul" | "kapatildi") {
+    const { error } = await (supabase.from("ajan_onerileri" as any) as any).update({
+      durum, karar_zamani: new Date().toISOString(),
+    }).eq("id", o.id);
+    if (error) {
+      setYazisma((x) => [...x, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+        metin: "Bu öneriyi şu an kapatamadım. Birazdan tekrar deneyin." }]);
+      return;
+    }
+    setOneriler((x) => x.filter((y) => y.id !== o.id));
+  }
+
+  // Arabulucu yüzeyinde kokpitteki bölüme götürme: mevcut adres deseni.
+  function setCockpitHedef(bolumId: string) {
+    window.location.assign(`/cases/${caseId}?phase=3&pv=2#${bolumId}`);
   }
 
   function gorevTikla(g?: GorevSatiri) {
@@ -918,6 +969,28 @@ export function AjanPenceresi({
         )}
         <div ref={altRef} />
       </div>
+
+      {/* ÖNERİLER — sohbetin altında, en fazla üç satır. Uyarı değildir:
+          renk taşımaz, akışı durdurmaz, zorunluluk doğurmaz. */}
+      {oneriler.length > 0 && (
+        <div className="border-t px-3 py-2 shrink-0 space-y-1.5">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Öneriler</div>
+          {oneriler.slice(0, 3).map((o) => (
+            <div key={o.id} className="space-y-0.5">
+              <div className="text-xs leading-snug">{String(o.baslik ?? "")}</div>
+              {o.gerekce && (
+                <div className="text-[11px] text-muted-foreground leading-snug">{String(o.gerekce)}</div>
+              )}
+              <div className="flex items-center gap-1.5">
+                <Button size="sm" variant="secondary" className="h-5 px-2 text-[11px]"
+                  onClick={() => oneriUygula(o)}>Uygula</Button>
+                <Button size="sm" variant="ghost" className="h-5 px-2 text-[11px]"
+                  onClick={() => oneriKapat(o, "kapatildi")}>Kapat</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="border-t p-2 shrink-0">
         {cevaplanan && (

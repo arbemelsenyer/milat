@@ -329,3 +329,18 @@ Gün sonu belge komutuna dahildir.
 - akis-onayla: talimat_id desteği eklendi (gövdeden ya da gerekçedeki
   "[talimat:<id>]" etiketinden okunur); onayda talimat 'onaylandi' olur.
   'arabulucu_onayi' tipindeki satırlar da onaylanabilir hâle geldi.
+
+[EKLEME 20.08.2026 — AJAN ÖNERİLERİ VE PANO KONU ANAHTARI]
+- Tablo: public.ajan_onerileri — CANLIDA (kurucu kurdu). hedef
+  ('arabulucu'|'taraf') · baslik · gerekce · eylem_turu ('adim'|'talimat'|
+  'bilgi') · eylem_adim · durum ('acik'|'kabul'|'kapatildi') · karar_zamani.
+  RLS: arabulucu yalnız hedef='arabulucu'; taraf yalnız kendi party_id'sindeki
+  hedef='taraf' satırlarını görür.
+- ajan-nobetci: YENİ kol oneriKollari — dosyanın gerçek durumundan deterministik
+  öneri üretir (model yok). Açık öneri sınırı yüzey başına üç; aynı başlık bir
+  kez açılır, kapatılan yeniden açılmaz.
+- AjanPenceresi: sohbetin altında "Öneriler" bölümü (iki yüzey), Uygula/Kapat.
+- akis-yurut · panoyaYaz: tekrar süzgeci artık KONU anahtarı üzerinden çalışıyor
+  ("[konu:…]"). Aynı konuda bekleyen satır varsa yazılmaz; FARKLI konudaki
+  bildirim her zaman yazılır. Talimat reddi/onayı ve onay isteği bu anahtarla
+  yazılıyor; yazılamayan bildirimin sebebi koşucunun özet notuna geçiyor.
