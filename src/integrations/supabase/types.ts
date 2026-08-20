@@ -479,6 +479,63 @@ export type Database = {
           },
         ]
       }
+      arabulucu_talimatlari: {
+        Row: {
+          case_id: string
+          created_at: string
+          durum: string
+          hedef_adim: string
+          id: string
+          karar_zamani: string | null
+          red_sebebi: string | null
+          sonuc_ozeti: string | null
+          talimat: string
+          uygulanma_zamani: string | null
+          veren: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          durum?: string
+          hedef_adim: string
+          id?: string
+          karar_zamani?: string | null
+          red_sebebi?: string | null
+          sonuc_ozeti?: string | null
+          talimat: string
+          uygulanma_zamani?: string | null
+          veren?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          durum?: string
+          hedef_adim?: string
+          id?: string
+          karar_zamani?: string | null
+          red_sebebi?: string | null
+          sonuc_ozeti?: string | null
+          talimat?: string
+          uygulanma_zamani?: string | null
+          veren?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arabulucu_talimatlari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "arabulucu_talimatlari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       belge_ozetleri: {
         Row: {
           case_id: string
