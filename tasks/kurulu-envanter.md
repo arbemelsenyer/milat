@@ -344,3 +344,26 @@ Gün sonu belge komutuna dahildir.
   ("[konu:…]"). Aynı konuda bekleyen satır varsa yazılmaz; FARKLI konudaki
   bildirim her zaman yazılır. Talimat reddi/onayı ve onay isteği bu anahtarla
   yazılıyor; yazılamayan bildirimin sebebi koşucunun özet notuna geçiyor.
+
+[EKLEME 20.08.2026 — ÖĞRENME KATMANI VE KAPANIŞ]
+- Tablolar (hepsi kurucu tarafından canlıya alındı): ajan_deneyim ·
+  ajan_bellek · arabulucu_aliskanliklari · duzeltme_kayitlari ·
+  kural_kutuphanesi · dosya_kapanis. Hiçbirinde kişisel veri tutulmaz
+  (ajan_bellek yalnız anahtar ve durum taşır).
+- _shared/anlatim.ts: deneyimYaz · bellekVarMi/bellekYaz/bellekOku ·
+  YOL_MERDIVENI · yolGecmisi/yolSirasi · DEVIR_ESLEME/devirHedefi ·
+  etkinKurallar. anlatimAc ve anlatimYansit kapanışta deneyimi kendiliğinden
+  yazar — böylece motora bağlı HER fonksiyon deneyim defterine yazmış olur.
+- girdiTamamla: yol sırası deneyimden; iki kez düşen yol elenir.
+- akis-yurut: dosyaHedefi (nesnel hedef listesi) · olaylariSirala (hedefe
+  yaklaştırma gücüne göre öncelik) · devirKollari (eksik işi üretebilecek ajana
+  devreder, ajan_bellek'e yazar).
+- ajan-nobetci: kuralOnerKollari (üç tekrarda kural önerir, etkin=false) ·
+  aliskanlikKollari (sayım + öneri) · kapanisHatirlatma (günde bir).
+- Edge fonksiyon: dosya-verilerini-sil — YENİ (verify_jwt=true). x-cron-secret
+  KABUL ETMEZ. İki onay ister; silme sırası yabancı anahtarlara uygun, hata
+  olursa durur. Silmeden sonra ajan_deneyim ve duzeltme_kayitlari satırlarında
+  case_id NULL yapılır. İLK DEPLOY GEREKİR.
+- Ön yüz: kokpitte "Ajan ne öğrendi" kartı · Aşama 7 Kapanış sekmesinde
+  "Kapanış kontrolü, paket ve veri silme" kartı (JSZip ile tek paket, UYAP
+  rehberi) · sohbette düzeltme sorusu · kontrol tercihi kartında üç adım uyarısı.

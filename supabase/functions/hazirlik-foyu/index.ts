@@ -47,7 +47,7 @@
 // ONAYLI FÖYE DOKUNULMAZ: durumu 'onaylandi' ya da 'gonderildi' olan satır
 // yeniden üretilmez (arabulucunun onayladığı metni ajan değiştiremez).
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { anlatimYansit } from "../_shared/anlatim.ts";
+import { anlatimYansit, etkinKurallar } from "../_shared/anlatim.ts";
 import { olayYaz } from "../_shared/olay.ts";
 
 const corsHeaders = {
@@ -1099,6 +1099,17 @@ Deno.serve(async (req) => {
       const varOlan = bolumler.find((b) => b.baslik === "Oturum bilgileri");
       if (varOlan) varOlan.maddeler.unshift(notSatiri);
       else bolumler.unshift({ baslik: "Oturum bilgileri", maddeler: [notSatiri] });
+    }
+
+    /* B6 — KURAL KÜTÜPHANESİ: bu adım için ETKİN ve geri alınmamış kurallar ek
+       yönerge olarak uygulanır ve çıktıda tek satırla belirtilir. Hiçbir kural
+       KENDİLİĞİNDEN etkinleşmez; etkinleştirme insan onayıyla olur. */
+    const kurallar = await etkinKurallar(admin, "hazirlik-foyu");
+    if (kurallar.length > 0) {
+      const satir = `Açık kurallar uygulandı: ${kurallar.map((k) => k.baslik).join(" · ")}`;
+      const bolum = bolumler.find((b) => b.baslik === "Oturum bilgileri");
+      if (bolum) bolum.maddeler.unshift(satir);
+      else bolumler.unshift({ baslik: "Oturum bilgileri", maddeler: [satir] });
     }
 
     // AKIŞ OLAYI (best-effort): föy taslağı yazıldı. Föy METNİ olaya girmez.

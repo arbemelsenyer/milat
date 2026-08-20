@@ -1,3 +1,44 @@
+## Nerede kaldık — 20.08.2026 (100) · ÖĞRENEN AJAN + KAPANIŞ VE SİLME
+
+KISIM A (A1-A4 bir önceki turda bitmişti, 93a3f62):
+- [x] A5 · Kontrol tercihi kartında üçten fazla adım işaretlenince sakin uyarı.
+
+KISIM B — ÖĞRENEN VE HEDEFE GÖRE PLAN KURAN AJAN:
+- [x] B1 · deneyimYaz ortak motora eklendi; anlatimAc ve anlatimYansit kapanışta
+      kendiliğinden yazıyor — motora bağlı her fonksiyon deneyim defterine yazar.
+- [x] B2 · Yol merdiveni kodda açık liste; iki kez düşen yol elenir, işe yarayan
+      yol öne alınır (girdiTamamla · oturum ve taraf yolları).
+- [x] B3 · Hedef nesnel listeden okunuyor, olaylar hedefe yaklaştırma gücüne göre
+      sıralanıyor, eksik işler üretebilecek ajana devrediliyor.
+- [x] B4 · ajan_bellek yardımcıları (istendi/soruldu/tamamlandi/devir).
+- [x] B5 · Sohbette tek soru "Neyi düzelttiniz?" — yalnız TÜR kaydediliyor,
+      metin kaydedilmiyor, geçilebilir.
+- [x] B6 · Üç tekrarda kural önerisi (etkin=false), sohbetten onayla etkinleşme,
+      geri alma; kural metni değişmez, değişiklik yeni sürüm. Etkin kurallar üç
+      metin üreten adımda ek yönerge olarak uygulanıyor.
+- [x] B7 · Alışkanlık sayımı ve "bu dosyada da onay isteyeyim mi?" önerisi;
+      kabul edilirse tercihe yazılıyor, kendiliğinden asla uygulanmıyor.
+- [x] B8 · Kokpitte "Ajan ne öğrendi" kartı + sayımları sıfırlama.
+
+KISIM C — KAPANIŞ, PAKET, SİLME:
+- [x] C1 · Kapanış kontrol turu: eksik yazılırsa talimat kuyruğuna gidiyor,
+      eksik kapanmadan kapanış ilerlemiyor.
+- [x] C2 · Tek ZIP kapanış paketi (belgeler + UDF + notlar + oturumlar + kalem
+      dökümü + süreç özeti) ve UYAP rehberi. Otomatik yükleme YOK.
+- [x] C3 · dosya-verilerini-sil: iki onay, geri alınamaz, x-cron-secret kabul
+      etmez. Kişisel veri gider; sayımlar ve kural kütüphanesi kalır (case_id NULL).
+- [x] C4 · Nöbetçi günde bir sakin hatırlatma; silme asla kendiliğinden çalışmaz.
+
+AÇIK KALEM: değerlendirme seti ve sürüm karşılaştırması — anonim (uydurma) test
+dosyaları üretilince yapılacak; ölçülmeyen iyileştirme uygulanmaz.
+
+YARIM KALAN (dürüstlük notu): düzeltme sorusu şu an SOHBETTEKİ düzeltme
+anlarında çıkıyor (talimat verme ve "beğenmedim"). Föy panelinde metin
+kaydetme ve taraf ekranında kalem düzeltme henüz soruyu tetiklemiyor.
+
+SIRADA: akis-yurut · ajan-nobetci · hazirlik-foyu · bilirkisi-sorulari ·
+taslak-denetim redeploy · dosya-verilerini-sil ilk deploy · publish · canlı test.
+
 ## Nerede kaldık — 20.08.2026 (99) · AJAN ÖNERİLERİ + PANO KUSURU ONARIMI
 
 - [x] 1 · Sohbetin altına "Öneriler" bölümü (iki yüzey): en fazla üç açık öneri,

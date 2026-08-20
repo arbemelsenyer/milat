@@ -108,6 +108,8 @@ async function yaz(
 /** Anlatım açar. Dönen nesnenin hiçbir işlevi throw etmez. */
 export function anlatimAc(admin: any, sahip: AnlatimSahibi): Anlatim {
   const adimlar: Adim[] = [];
+  // B1 — deneyim defteri: her kapanış nesnel sonucu yazar (metin yazmaz).
+  const baslangic = Date.now();
   const ekle = (metin: string) => {
     const t = kisalt(metin);
     if (!t) return;
@@ -131,10 +133,18 @@ export function anlatimAc(admin: any, sahip: AnlatimSahibi): Anlatim {
         yapildi: kisalt(yapildi),
         ...(eksikler.length ? { eksik: eksikler.map((x) => kisalt(x)) } : {}),
       });
+      await deneyimYaz(admin, {
+        case_id: sahip.case_id, adim: sahip.agent_type, sonuc: "basarili",
+        sure_ms: Date.now() - baslangic,
+      });
     },
     async hata(sebep: string) {
       ekle(`Bu işi tamamlayamadım: ${kisalt(sebep, 200)}`);
       await yaz(admin, sahip, "failed", adimlar);
+      await deneyimYaz(admin, {
+        case_id: sahip.case_id, adim: sahip.agent_type, sonuc: "hata",
+        hata_kodu: kisalt(sebep, 80), sure_ms: Date.now() - baslangic,
+      });
     },
   };
 }
@@ -394,6 +404,17 @@ export async function anlatimYansit(
     await admin.from("agent_states").update({
       last_output: { ...cikti, ...patchCikti, adimlar, durum_izi: status },
     }).eq("id", (mevcut as any).id);
+
+    /* B1 — deneyim defteri: kendi durum yazıcısını kullanan kollar da nesnel
+       sonucu yazar. Yalnız kapanışta yazılır, ara adımlarda değil. */
+    if (status === "completed" || status === "failed") {
+      await deneyimYaz(admin, {
+        case_id: sahip.case_id, adim: sahip.agent_type,
+        sonuc: status === "completed" ? "basarili" : "hata",
+        hata_kodu: status === "failed"
+          ? sadelestir((patch as any)?.error_message, 80) || null : null,
+      });
+    }
   } catch (e: any) {
     console.error("[anlatimYansit] yazılamadı", { agent_type: sahip?.agent_type, hata: kisalt(e?.message ?? e, 120) });
   }
@@ -490,24 +511,41 @@ export async function girdiTamamla(
 
   if (!caseId) return { govdeler: [], tamamlanan, eksik: ["dosya"] };
 
-  // ── session_id ────────────────────────────────────────────────────────────
+  /* ── session_id — B2 YOL MERDİVENİ ────────────────────────────────────────
+     Merdiven kodda açıktır (YOL_MERDIVENI.eksik_oturum). Aynı yol geçmişte iki
+     kez düşmüşse bu turda DENENMEZ; geçmişte en çok işe yarayan yol öne alınır.
+     Merdiven biterse "oturum" eksik kalır — uydurulmaz. */
   if (gerekli.includes("session_id") && !dolu(temel.session_id)) {
+    const gecmis = await yolGecmisi(admin, caseId, fonksiyon);
+    const sira = yolSirasi(YOL_MERDIVENI.eksik_oturum, gecmis);
     try {
       const { data: oturumlar } = await admin.from("case_sessions")
         .select("id, scheduled_at, status").eq("case_id", caseId).limit(30);
       const uygun = ((oturumlar ?? []) as any[]).filter((o) => String(o.status ?? "") !== "cancelled");
       const simdi = Date.now();
-      const planli = uygun
-        .filter((o) => o.scheduled_at && new Date(String(o.scheduled_at)).getTime() > simdi)
-        .sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)))[0];
-      const yedek = planli ?? [...uygun]
-        .sort((a, b) => String(b.scheduled_at ?? "").localeCompare(String(a.scheduled_at ?? "")))[0];
-      if (yedek?.id) {
-        temel.session_id = yedek.id;
-        tamamlanan.push(planli
-          ? "oturum bilgisi planlanmış oturumdan alındı"
-          : "oturum bilgisi dosyadaki son oturumdan alındı");
-      } else eksik.push("oturum");
+      for (const yol of sira) {
+        let bulunan: any = null;
+        if (yol === "planlanmis_oturum") {
+          bulunan = uygun
+            .filter((o) => o.scheduled_at && new Date(String(o.scheduled_at)).getTime() > simdi)
+            .sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)))[0] ?? null;
+        } else if (yol === "son_oturum") {
+          bulunan = [...uygun]
+            .sort((a, b) => String(b.scheduled_at ?? "").localeCompare(String(a.scheduled_at ?? "")))[0] ?? null;
+        }
+        if (bulunan?.id) {
+          temel.session_id = bulunan.id;
+          tamamlanan.push(yol === "planlanmis_oturum"
+            ? "oturum bilgisi planlanmış oturumdan alındı"
+            : "oturum bilgisi dosyadaki son oturumdan alındı");
+          await deneyimYaz(admin, { case_id: caseId, adim: fonksiyon, sonuc: "basarili", yol });
+          break;
+        }
+        await deneyimYaz(admin, {
+          case_id: caseId, adim: fonksiyon, sonuc: "hata", yol, hata_kodu: "eksik_oturum",
+        });
+      }
+      if (!dolu(temel.session_id)) eksik.push("oturum");
     } catch { eksik.push("oturum"); }
   }
 
@@ -528,14 +566,25 @@ export async function girdiTamamla(
   }
 
   // ── party_id ──────────────────────────────────────────────────────────────
+  /* ── party_id — B2 YOL MERDİVENİ (eksik_taraf_bilgisi) ────────────────────
+     (1) dosya kaydı: belgenin sahibi → (2) dosyanın tarafları için ayrı koşum.
+     İki kez düşen yol atlanır; hiçbiri tutmazsa taraf eksik kalır. */
   if (gerekli.includes("party_id") && !dolu(temel.party_id)) {
-    if (dolu(temel.document_id)) {
+    const tarafGecmis = await yolGecmisi(admin, caseId, fonksiyon);
+    const dosyaKaydiElendi = (tarafGecmis.hatali["dosya_kaydi"] ?? 0) >= 2;
+    if (dolu(temel.document_id) && !dosyaKaydiElendi) {
       try {
         const { data: belge } = await admin.from("case_documents")
           .select("party_id").eq("id", String(temel.document_id)).maybeSingle();
         if ((belge as any)?.party_id) {
           temel.party_id = (belge as any).party_id;
           tamamlanan.push("taraf bilgisi belgenin sahibinden alındı");
+          await deneyimYaz(admin, { case_id: caseId, adim: fonksiyon, sonuc: "basarili", yol: "dosya_kaydi" });
+        } else {
+          await deneyimYaz(admin, {
+            case_id: caseId, adim: fonksiyon, sonuc: "hata",
+            yol: "dosya_kaydi", hata_kodu: "eksik_taraf_bilgisi",
+          });
         }
       } catch { /* sonraki yola geçilir */ }
     }
@@ -640,4 +689,182 @@ export function talimatOzeti(talimat: unknown, n = 160): string {
   if (!t) return "";
   const ilk = t.split(/(?<=[.!?])\s/)[0] ?? t;
   return ilk.length > n ? `${ilk.slice(0, n - 1)}…` : ilk;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ÖĞRENME KATMANI (Öğrenme Mimarisi · 20.08 kurucu kararları — BAĞLAYICI)
+
+   MODEL TARAF VERİSİYLE EĞİTİLMEZ. Öğrenen şey ürünün KURAL ve AKIŞ katmanıdır.
+   Öğrenme kaynağı YALNIZ ikisidir:
+     (a) insan düzeltmesi (türü, metni değil),
+     (b) nesnel sonuç: bulundu / bulunamadı, hata kodu, süre.
+   AJAN KENDİ ÜRETTİĞİ METİNDEN YA DA KENDİ KALİTE YARGISINDAN ÖĞRENEMEZ.
+   Bu yasak bilerek koda yazılmıştır: aşağıdaki hiçbir işlev ajanın kendi
+   çıktısını "iyi/kötü" diye puanlamaz, puanlayamaz.
+
+   KİŞİSEL VERİ ÖĞRENME HATTINA GİRMEZ: bu tablolara ad, unvan, adres, tutar,
+   gerekçe metni, beyan ve belge metni YAZILMAZ. Yazılan yalnız adım adı,
+   sonuç, kısa hata kodu, yol adı, süre, düzeltme TÜRÜ ve sayılardır.
+
+   AJAN KENDİ YETKİSİNİ GENİŞLETMEZ: başarı sayısı hiçbir kapıyı açmaz, hiçbir
+   onayı kaldırmaz. Yetki artışı insan kararıdır, yazılır ve sürümlenir.
+
+   ERKEN SONUÇ TAHMİNİ YASAK: bu katman "bu dosya şu tutarda anlaşır" gibi bir
+   çıkarım üretmez ve üretecek veriyi tutmaz.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+export type DeneyimSonucu = "basarili" | "hata" | "atlandi";
+
+/* B1 — DENEYİM DEFTERİ. Ortak motora bağlı her fonksiyon kendi kapanışında
+   yazar (anlatimAc.bitti / .hata ve anlatimYansit bunu kendiliğinden çağırır).
+   BEST-EFFORT: yazılamazsa asıl iş DÜŞMEZ. */
+export async function deneyimYaz(
+  admin: any,
+  o: {
+    case_id?: string | null; mediator_id?: string | null; adim: string;
+    sonuc: DeneyimSonucu; hata_kodu?: string | null; yol?: string | null;
+    sure_ms?: number | null; deneme_no?: number | null;
+  },
+): Promise<string | null> {
+  try {
+    const adim = String(o.adim ?? "").trim();
+    if (!adim) return "deneyim yazılamadı: adım adı yok";
+    // Hata kodu KISA tutulur; içerik, ad ve metin taşımaz.
+    const kod = o.hata_kodu ? String(o.hata_kodu).replace(/\s+/g, " ").trim().slice(0, 80) : null;
+    const { error } = await admin.from("ajan_deneyim").insert({
+      case_id: o.case_id ?? null,
+      mediator_id: o.mediator_id ?? null,
+      adim,
+      sonuc: o.sonuc,
+      hata_kodu: kod,
+      yol: o.yol ? String(o.yol).slice(0, 60) : null,
+      sure_ms: Number.isFinite(o.sure_ms as number) ? o.sure_ms : null,
+      deneme_no: Number.isFinite(o.deneme_no as number) ? o.deneme_no : null,
+    });
+    if (error) return `deneyim yazılamadı: ${error.message}`;
+    return null;
+  } catch (e: any) {
+    return `deneyim yazılamadı: ${String(e?.message ?? e).slice(0, 120)}`;
+  }
+}
+
+/* B4 — DOSYA İÇİ BELLEK. Aynı belge iki kez istenmez, aynı soru iki kez
+   sorulmaz, biten adım baştan yapılmaz.
+   Anahtar biçimi: "istendi:<belge>" · "soruldu:<konu>" · "tamamlandi:<adım>" ·
+   "devir:<eksik>". DEĞER yalnız durum ve sayı taşır; metin taşımaz. */
+export async function bellekVarMi(
+  admin: any, caseId: string, partyId: string | null, anahtar: string,
+): Promise<boolean> {
+  try {
+    let q = admin.from("ajan_bellek").select("id")
+      .eq("case_id", caseId).eq("anahtar", anahtar).limit(1);
+    q = partyId ? q.eq("party_id", partyId) : q.is("party_id", null);
+    const { data } = await q;
+    return ((data ?? []) as any[]).length > 0;
+  } catch { return false; }
+}
+
+export async function bellekYaz(
+  admin: any, caseId: string, partyId: string | null, anahtar: string,
+  deger?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await admin.from("ajan_bellek").upsert({
+      case_id: caseId, party_id: partyId, anahtar,
+      deger: deger ?? { zaman: new Date().toISOString() },
+    }, { onConflict: "case_id,party_id,anahtar" });
+  } catch { /* bellek yazımı asıl işi düşürmez */ }
+}
+
+export async function bellekOku(
+  admin: any, caseId: string, anahtarOneki: string,
+): Promise<{ anahtar: string; deger: any }[]> {
+  try {
+    const { data } = await admin.from("ajan_bellek")
+      .select("anahtar, deger").eq("case_id", caseId)
+      .like("anahtar", `${anahtarOneki}%`).limit(200);
+    return ((data ?? []) as any[]).map((r) => ({ anahtar: String(r.anahtar), deger: r.deger }));
+  } catch { return []; }
+}
+
+/* B2 — ALTERNATİF YOL MERDİVENİ. Aynı hata kodu iki kez çıktıysa AYNI yoldan
+   üçüncü kez denenmez; sıradaki yol denenir. Merdiven KODDA AÇIK LİSTEDİR:
+   sırayı model belirlemez. Merdiven biterse adım "tıkalı" sayılır. */
+export const YOL_MERDIVENI: Record<string, string[]> = {
+  eksik_belge: ["dosyadaki_baska_belge", "taraf_ajani_sorar", "arabulucuya_bildir"],
+  eksik_oturum: ["planlanmis_oturum", "son_oturum", "arabulucuya_bildir"],
+  eksik_mevzuat: ["bilgi_tabani", "dosya_belgeleri", "bos_birak_bulamadim"],
+  eksik_taraf_bilgisi: ["dosya_kaydi", "taraf_ajani_sorar", "arabulucuya_bildir"],
+};
+
+/* Bir yolun geçmişte kaç kez AYNI hata koduyla düştüğünü sayar. İki kez
+   düşmüşse o yol bu turda atlanır. Sayım nesnel sonuçtan gelir; ajanın kendi
+   kalite yargısından DEĞİL. */
+export async function yolGecmisi(
+  admin: any, caseId: string, adim: string,
+): Promise<{ basarili: Record<string, number>; hatali: Record<string, number> }> {
+  const basarili: Record<string, number> = {};
+  const hatali: Record<string, number> = {};
+  try {
+    const { data } = await admin.from("ajan_deneyim")
+      .select("yol, sonuc").eq("case_id", caseId).eq("adim", adim).limit(200);
+    for (const r of ((data ?? []) as any[])) {
+      const yol = String(r.yol ?? "").trim();
+      if (!yol) continue;
+      if (String(r.sonuc) === "basarili") basarili[yol] = (basarili[yol] ?? 0) + 1;
+      else if (String(r.sonuc) === "hata") hatali[yol] = (hatali[yol] ?? 0) + 1;
+    }
+  } catch { /* geçmiş okunamazsa merdiven olağan sırayla işler */ }
+  return { basarili, hatali };
+}
+
+/** Denenecek yol sırası: iki kez düşen yol elenir, çok işe yarayan öne alınır. */
+export function yolSirasi(
+  merdiven: string[], gecmis: { basarili: Record<string, number>; hatali: Record<string, number> },
+): string[] {
+  const kullanilabilir = merdiven.filter((y) => (gecmis.hatali[y] ?? 0) < 2);
+  return [...kullanilabilir].sort(
+    (a, b) => (gecmis.basarili[b] ?? 0) - (gecmis.basarili[a] ?? 0),
+  );
+}
+
+/* B3 — DEVİR EŞLEMESİ. Bir ajan "Eksik: X" ile kapanınca eksik, önce onu
+   ÜRETEBİLECEK ajana devredilir; insana ancak hiçbir ajan üretemiyorsa gider.
+   Eşleme KODDA AÇIK LİSTEDİR. */
+export const DEVIR_ESLEME: { anahtar: string[]; adim: string | null; kim: string }[] = [
+  { anahtar: ["belge", "dayanak"], adim: "taraf-kalem-cikar", kim: "taraf ajanı" },
+  { anahtar: ["oturum", "randevu"], adim: null, kim: "arabulucu" },
+  { anahtar: ["kalem"], adim: "masa-kalem-karsilastir", kim: "masa ajanı" },
+  { anahtar: ["taslak", "anlaşma"], adim: "taslak-denetim", kim: "belge ajanı" },
+  { anahtar: ["bilirkişi"], adim: "bilirkisi-sorulari", kim: "masa ajanı" },
+];
+
+export function devirHedefi(eksikMetni: string): { adim: string | null; kim: string } | null {
+  const t = String(eksikMetni ?? "").toLocaleLowerCase("tr-TR");
+  if (!t.trim()) return null;
+  for (const d of DEVIR_ESLEME) {
+    if (d.anahtar.some((a) => t.includes(a.toLocaleLowerCase("tr-TR")))) {
+      return { adim: d.adim, kim: d.kim };
+    }
+  }
+  return null;
+}
+
+/* B6 — KURAL KÜTÜPHANESİ (okuma tarafı). Bir adımda ETKİN ve geri alınmamış
+   kurallar, o adımın ek yönergesi olarak okunur.
+   DEĞERLENDİRME SETİ HENÜZ YOK: hiçbir kural KENDİLİĞİNDEN etkinleşmez.
+   Ölçülmemiş iyileştirme uygulanmaz — bu sınır bilerek buraya yazılmıştır. */
+export async function etkinKurallar(
+  admin: any, hedefAdim: string,
+): Promise<{ kod: string; baslik: string; aciklama: string; surum: number }[]> {
+  try {
+    const { data } = await admin.from("kural_kutuphanesi")
+      .select("kod, baslik, aciklama, surum, etkin, geri_alindi")
+      .eq("hedef_adim", hedefAdim).eq("etkin", true).eq("geri_alindi", false)
+      .order("surum", { ascending: false }).limit(20);
+    return ((data ?? []) as any[]).map((r) => ({
+      kod: String(r.kod), baslik: String(r.baslik ?? ""),
+      aciklama: String(r.aciklama ?? ""), surum: Number(r.surum ?? 1),
+    }));
+  } catch { return []; }
 }

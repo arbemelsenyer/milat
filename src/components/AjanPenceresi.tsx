@@ -123,6 +123,23 @@ const CEVAPLANABILIR = ["taraf_sorusu", "arabulucu_sorusu"];
 
 /* TALİMAT VERİLEBİLEN ADIMLAR: metin üreten kollar. Veriden hesaplanan kollar
    (kalem karşılaştırması gibi) talimat almaz — sunucu da reddeder. */
+/* B5 — DÜZELTME KAYDI: METİN DEĞİL TÜR.
+   Arabulucu bir çıktıyı düzelttiğinde tek soru sorulur: "Neyi düzelttiniz?"
+   Yalnız SEÇİLEN TÜR kaydedilir; düzeltmenin METNİ KAYDEDİLMEZ. Soru zorunlu
+   değildir, geçilebilir. Bu kayıt öğrenmenin iki meşru kaynağından biridir
+   (öteki nesnel sonuçtur); ajan kendi çıktısını puanlamaz. */
+const DUZELTME_TURLERI: { kod: string; metin: string }[] = [
+  { kod: "eksik_kalem", metin: "eksik kalem" },
+  { kod: "yanlis_sure", metin: "yanlış süre" },
+  { kod: "fazla_iddia", metin: "fazla iddia" },
+  { kod: "usul_adimi_atlandi", metin: "usul adımı atlandı" },
+  { kod: "ton_uygunsuz", metin: "ton uygunsuz" },
+  { kod: "gereksiz_ayrinti", metin: "gereksiz ayrıntı" },
+  { kod: "yanlis_ad_unvan", metin: "yanlış ad/unvan" },
+  { kod: "yanlis_tutar", metin: "yanlış tutar" },
+  { kod: "diger", metin: "diğer" },
+];
+
 const TALIMAT_ADIMLARI: { kod: string; metin: string }[] = [
   { kod: "hazirlik-foyu", metin: "Oturum hazırlık föyü" },
   { kod: "bilirkisi-sorulari", metin: "Bilirkişiye sorulacak sorular" },
@@ -227,6 +244,8 @@ export function AjanPenceresi({
   /* ÖNERİLER — iki yüzeyde de var. Ajan önerir, insan seçer: hiçbir öneri
      akışı durdurmaz, hiçbir işi bekletmez, zorunluluk doğurmaz. */
   const [oneriler, setOneriler] = useState<any[]>([]);
+  // B5 — düzeltme sorusu: hangi adım için sorulduğu; null ise soru yok.
+  const [duzeltmeAdimi, setDuzeltmeAdimi] = useState<string | null>(null);
   const sesVar = konusmaTanimaVarMi();
   const okumaVar = seslendirmeVarMi();
   const altRef = useRef<HTMLDivElement | null>(null);
@@ -572,6 +591,7 @@ export function AjanPenceresi({
     }
     setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
       metin: "Talimatınızı aldım, sıradaki turda uygulayıp onayınıza sunacağım." }]);
+    setDuzeltmeAdimi(adim);   // B5 — tek soru: neyi düzelttiniz?
     await yukle();
   }
 
@@ -589,6 +609,7 @@ export function AjanPenceresi({
       .update({ durum: "atlandi", sonuc: "arabulucu beğenmedi" }).eq("id", g.id);
     setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
       metin: "Anladım, yeniden yapacağım. Yeni talimatınızı yazabilirsiniz." }]);
+    setDuzeltmeAdimi("talimat");   // B5 — tek soru: neyi düzelttiniz?
     setTalimatKipi(true);
     await yukle();
   }
@@ -602,7 +623,33 @@ export function AjanPenceresi({
       await talimatYaz(String(o.eylem_adim ?? ""), String(o.baslik ?? ""));
     } else if (tur === "adim") {
       const hedef = String(o.eylem_adim ?? "");
-      if (tarafModu) { if (hedef && onGit) onGit(hedef); }
+      if (hedef.startsWith("kural:")) {
+        /* B6 — kural ONAYI: kural ancak burada etkinleşir. Ajan hiçbir kuralı
+           kendiliğinden açamaz; metni değiştirilmez, değişiklik yeni sürümdür. */
+        const { data: oturum } = await supabase.auth.getUser();
+        const { error } = await (supabase.from("kural_kutuphanesi" as any) as any).update({
+          etkin: true, onaylayan: oturum?.user?.id ?? null,
+          onay_zamani: new Date().toISOString(),
+        }).eq("kod", hedef.slice(6));
+        setYazisma((x) => [...x, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+          metin: error ? "Kuralı şu an açamadım." : "Kuralı açtım; bundan sonra o adımda uygulayacağım." }]);
+      } else if (hedef.startsWith("tercih:")) {
+        // B7 — alışkanlık önerisi kabul edildi: tercihe YAZILIR, kendiliğinden değil.
+        const adim = hedef.slice(7);
+        const { data: oturum } = await supabase.auth.getUser();
+        const uid = oturum?.user?.id ?? null;
+        const { data: mevcut } = await (supabase.from("arabulucu_kontrol_tercihleri" as any) as any)
+          .select("onay_isteyen_adimlar").eq("case_id", caseId).eq("mediator_id", uid).maybeSingle();
+        const liste = Array.isArray((mevcut as any)?.onay_isteyen_adimlar)
+          ? (mevcut as any).onay_isteyen_adimlar.map((x: any) => String(x)) : [];
+        if (!liste.includes(adim)) liste.push(adim);
+        await (supabase.from("arabulucu_kontrol_tercihleri" as any) as any).upsert({
+          case_id: caseId, mediator_id: uid, onay_isteyen_adimlar: liste,
+          guncelleme_zamani: new Date().toISOString(),
+        }, { onConflict: "case_id,mediator_id" });
+        setYazisma((x) => [...x, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+          metin: "Bu dosyada o adımda önce size soracağım." }]);
+      } else if (tarafModu) { if (hedef && onGit) onGit(hedef); }
       else if (hedef) { setCockpitHedef(hedef); }
     }
     await oneriKapat(o, "kabul");
@@ -623,6 +670,18 @@ export function AjanPenceresi({
   // Arabulucu yüzeyinde kokpitteki bölüme götürme: mevcut adres deseni.
   function setCockpitHedef(bolumId: string) {
     window.location.assign(`/cases/${caseId}?phase=3&pv=2#${bolumId}`);
+  }
+
+  /* B5 — düzeltme TÜRÜ kaydedilir; metin kaydedilmez. Geçilebilir. */
+  async function duzeltmeKaydet(tur: string) {
+    const adim = duzeltmeAdimi;
+    setDuzeltmeAdimi(null);
+    if (!adim) return;
+    const { data: oturum } = await supabase.auth.getUser();
+    await (supabase.from("duzeltme_kayitlari" as any) as any).insert({
+      case_id: caseId, mediator_id: oturum?.user?.id ?? null,
+      adim, duzeltme_turu: tur,
+    });
   }
 
   function gorevTikla(g?: GorevSatiri) {
@@ -969,6 +1028,22 @@ export function AjanPenceresi({
         )}
         <div ref={altRef} />
       </div>
+
+      {/* B5 — DÜZELTME SORUSU: tek soru, tek tıkla cevap, geçilebilir.
+          Yalnız TÜR kaydedilir; düzeltmenin metni hiçbir yere yazılmaz. */}
+      {duzeltmeAdimi && !tarafModu && (
+        <div className="border-t px-3 py-2 shrink-0 space-y-1.5">
+          <div className="text-xs">Neyi düzelttiniz?</div>
+          <div className="flex flex-wrap gap-1">
+            {DUZELTME_TURLERI.map((t) => (
+              <Button key={t.kod} size="sm" variant="outline" className="h-5 px-2 text-[11px]"
+                onClick={() => duzeltmeKaydet(t.kod)}>{t.metin}</Button>
+            ))}
+            <Button size="sm" variant="ghost" className="h-5 px-2 text-[11px]"
+              onClick={() => setDuzeltmeAdimi(null)}>geç</Button>
+          </div>
+        </div>
+      )}
 
       {/* ÖNERİLER — sohbetin altında, en fazla üç satır. Uyarı değildir:
           renk taşımaz, akışı durdurmaz, zorunluluk doğurmaz. */}

@@ -21,6 +21,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import {
   motoraBagliMi, girdiTamamla, talimatiDenetle, TALIMAT_ALMAYAN, talimatOzeti,
+  devirHedefi, bellekVarMi, bellekYaz,
 } from "../_shared/anlatim.ts";
 
 const corsHeaders = {
@@ -295,7 +296,8 @@ async function asamaIlerlet(admin: any): Promise<{ ilerletilen: number; notlar: 
       const mevcut = Math.min(7, Math.max(1, Number(dosya?.current_phase ?? 1) || 1));
       const { hedef, sebep, neden } = await asamaHedefi(admin, dosya);
       if (!hedef || hedef <= mevcut) {
-        if (neden) notlar.push(`aşama ilerlemedi (${dosya.id}): ${neden}`);
+        // Hedef nesnel listeden okunur (ASAMA_HEDEFI); model yorumu yoktur.
+        if (neden) notlar.push(`aşama ilerlemedi (${dosya.id}): ${neden} · hedef: ${dosyaHedefi(mevcut)}`);
         continue;
       }
 
@@ -467,6 +469,81 @@ async function talimatlariYurut(
   return { uygulanan, reddedilen };
 }
 
+/* ── B3: HEDEFE GÖRE KOORDİNASYON ───────────────────────────────────────────
+   Koşucu her turda dosyanın O ANKİ HEDEFİNİ belirler. Hedef, aşamanın NESNEL
+   çıktısıdır — kodda açık listedir, model yorumu YOKTUR. Hedef bir yön verir;
+   hiçbir kapıyı açmaz, hiçbir onayı kaldırmaz. */
+const ASAMA_HEDEFI: Record<number, string> = {
+  1: "dosyanın kurulması: iki taraf kaydı ve en az bir belge ya da başvuru metni",
+  2: "taraf analizlerinin ve ortak zemin raporunun tamamlanması",
+  3: "oturumun planlanması",
+  4: "oturumun yapılmış olarak işaretlenmesi",
+  5: "bilirkişi kararı ve görüşme notunun kaydı",
+  6: "anlaşma taslağının hazırlanması",
+  7: "kapanış: imza ve belge teslimi (insan kapısı)",
+};
+
+function dosyaHedefi(currentPhase: unknown): string {
+  const n = Math.min(7, Math.max(1, Number(currentPhase ?? 1) || 1));
+  return ASAMA_HEDEFI[n] ?? "";
+}
+
+/* ÖNCELİK: bir olay ne kadar çok işi açıyorsa önce koşar (tamamlanmazsa kaç iş
+   bekliyor). Eşitlikte ESKİ olay önce. Sayım nesneldir: olaya bağlı ETKİN kural
+   sayısı. Model sıralama yapmaz. */
+function olaylariSirala(olaylar: any[], kurallar: any[]): any[] {
+  const agirlik = (olay: any) => kurallar
+    .filter((k) => String(k.olay_kodu) === String(olay.olay_kodu)).length;
+  return [...olaylar].sort((a, b) => {
+    const f = agirlik(b) - agirlik(a);
+    if (f !== 0) return f;
+    return String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
+  });
+}
+
+/* DEVİR: bir ajan "Eksik: X" ile kapandıysa eksik, önce onu ÜRETEBİLECEK ajana
+   devredilir; insana ancak hiçbir ajan üretemiyorsa gider. Eşleme kodda açık
+   listedir (DEVIR_ESLEME). Devir kaydı ajan_bellek'e yazılır ki aynı eksik
+   ikinci kez devredilmesin. */
+async function devirKollari(admin: any, ozet: { notlar: string[] }): Promise<number> {
+  let devredilen = 0;
+  try {
+    const { data: satirlar } = await admin.from("agent_states")
+      .select("case_id, agent_type, last_output, status")
+      .eq("status", "completed").limit(200);
+    for (const r of ((satirlar ?? []) as any[])) {
+      const cikti = r.last_output && typeof r.last_output === "object" ? r.last_output : {};
+      const eksikler = Array.isArray((cikti as any).eksik) ? (cikti as any).eksik : [];
+      for (const e of eksikler) {
+        const eksikMetni = String(e ?? "");
+        const hedef = devirHedefi(eksikMetni);
+        if (!hedef?.adim) continue;                       // insana gidecek olan burada kalır
+        const caseId = String(r.case_id);
+        const anahtar = `devir:${hedef.adim}`;
+        if (await bellekVarMi(admin, caseId, null, anahtar)) continue;   // ikinci kez devredilmez
+
+        const girdi = await girdiTamamla(admin, hedef.adim, { case_id: caseId });
+        if (girdi.govdeler.length === 0) continue;
+        let oldu = false;
+        for (const g of girdi.govdeler) {
+          const c = await icFonksiyonCagir(hedef.adim, g);
+          if (c.ok) oldu = true;
+        }
+        await bellekYaz(admin, caseId, null, anahtar, {
+          kim: hedef.kim, sonuc: oldu ? "devredildi" : "denenemedi",
+          zaman: new Date().toISOString(),
+        });
+        await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
+          `Eksik kalan işi ${hedef.kim} devraldı.`, `devir:${hedef.adim}`);
+        if (oldu) devredilen++;
+      }
+    }
+  } catch (e: any) {
+    ozet.notlar.push(`devir yapılamadı: ${String(e?.message ?? e).slice(0, 120)}`);
+  }
+  return devredilen;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -522,7 +599,10 @@ Deno.serve(async (req) => {
       .order("sira", { ascending: true });
     if (kErr) return json({ error: kErr.message }, 500);
 
-    for (const olay of (olaylar as any[])) {
+    /* ÖNCELİK: hedefe yaklaştırma gücüne göre sıra. Sayım nesneldir. */
+    const siraliOlaylar = olaylariSirala(olaylar as any[], (kurallar ?? []) as any[]);
+
+    for (const olay of siraliOlaylar) {
       const caseId = String(olay.case_id);
       const partyId = olay.party_id ? String(olay.party_id) : null;
       const eslesen = ((kurallar ?? []) as any[])
@@ -710,12 +790,16 @@ Deno.serve(async (req) => {
     /* AŞAMA İLERLETME: koşucunun her turunun SONUNDA değerlendirilir. Nöbetçi
        koşucuyu zaten 3 dakikada bir tetiklediği için yeni bir zamanlayıcı
        kurulmaz. Koşullar nesnel; sağlanmıyorsa aşama değişmez. */
+    // DEVİR: eksik kalan işler önce üretebilecek ajana geçer.
+    const devredilen = await devirKollari(admin, ozet);
+
     const asama = await asamaIlerlet(admin);
     ozet.notlar.push(...asama.notlar);
 
     return json({
       ok: true, ...ozet,
       asama_ilerletildi: asama.ilerletilen,
+      devredilen,
       notlar: ozet.notlar.slice(0, 50),
     });
   } catch (e: any) {

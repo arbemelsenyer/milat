@@ -431,3 +431,24 @@ ekranlarına hiçbir iz düşmez (sorgular arabulucu dalında çalışır).
   Her iki düğme de öneriyi kapatır (kabul / kapatildi) ve karar_zamani yazılır.
 · Talimat kipi, Dur/Devam/Değiştir, onay satırı, mikrofon ve kontrol tercihi
   kartı yerinde kaldı; hiçbiri taşınmadı, adlandırılmadı.
+
+
+[EKLEME 20.08.2026 — ÖĞRENME VE KAPANIŞ YÜZEYLERİ]
+● CANLI. Hepsi YALNIZ arabulucu yüzeyindedir.
+· KOKPİT > "Ajan ne öğrendi" kartı: adım başına koşum ve hata sayısı, en sık
+  tıkanan yer, işe yarayan yol, düzeltme türleri, kurallar ve sürümleri.
+  Teknik dil yoktur; taraf adı, belge adı, tutar ve metin GÖSTERİLMEZ.
+  "Sayımları sıfırla" arabulucunun kendi sayımlarını siler; kurallarda silme
+  değil geri alma vardır.
+· AŞAMA 1 > kontrol tercihi kartında üçten fazla adım işaretlenirse sakin tek
+  satır: "Çok adım işaretlediniz; akış yavaşlar ve çoğu iş sizin onayınızı
+  bekler." Engelleme yoktur.
+· SOHBET > düzeltme sorusu: arabulucu talimat verdiğinde ya da bir işi
+  beğenmediğinde tek soru çıkar — "Neyi düzelttiniz?" Dokuz seçenek ve "geç".
+  Yalnız TÜR kaydedilir; metin kaydedilmez.
+· AŞAMA 7 > Kapanış sekmesinde "Kapanış kontrolü, paket ve veri silme" kartı:
+  (1) eksik var mı sorusu — eksik yazılırsa talimat kuyruğuna gider,
+  (2) onaydan sonra TEK ZIP paket (belgeler + UDF + görüşme notları + oturum
+      listesi + kalem dökümü + süreç özeti) ve UYAP rehberi,
+  (3) paket alındıktan sonra iki onaylı silme: uyarı ekranı + elle "SİL" yazımı.
+  Mevcut kapanış düğmeleri ve kartı YERİNDE; bu kart onların üstüne eklendi.

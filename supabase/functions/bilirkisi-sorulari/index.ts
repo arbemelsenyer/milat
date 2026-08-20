@@ -18,7 +18,9 @@
 // taraf ayrımı yapılmadan, yalnız KONU olarak kullanılır; hiçbir tarafın
 // belgesi, beyanı ve analizi okunmaz.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { anlatimAc, zatenCalisiyorMu, eksigiSor, SORU_TIPI_TARAF, kolEtiketi } from "../_shared/anlatim.ts";
+import {
+  anlatimAc, zatenCalisiyorMu, eksigiSor, SORU_TIPI_TARAF, kolEtiketi, etkinKurallar,
+} from "../_shared/anlatim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,6 +79,12 @@ Deno.serve(async (req) => {
     await anlatim.baslat("Bilirkişiye sorulacak soruları dosyadan çıkarıyorum.");
     if (talimat) {
       await anlatim.adim(`Arabulucunun talimatı uygulandı: ${talimat.slice(0, 160)}`);
+    }
+
+    // B6 — bu adım için açık kurallar ek yönerge olarak uygulanır.
+    const acikKurallar = await etkinKurallar(admin, "bilirkisi-sorulari");
+    if (acikKurallar.length > 0) {
+      await anlatim.adim(`Açık kurallar uygulandı: ${acikKurallar.map((k) => k.baslik).join(" · ")}`);
     }
 
     // Atama kaydı: onay durumunu okumak için. Karar burada VERİLMEZ.

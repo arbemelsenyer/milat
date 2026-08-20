@@ -33,7 +33,7 @@ import {
   Plus, Loader2, FolderOpen, FileText, Users, Brain, ShieldCheck,
   Calendar as CalIcon, UserCheck, MessageSquare, FileCheck2, CheckCircle2, XCircle, Circle,
   Trash2, ArrowLeft, Sparkles, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Pencil,
-  LayoutDashboard, Lightbulb, Target, EyeOff, Mail, Copy,
+  LayoutDashboard, Lightbulb, Target, EyeOff, Mail, Copy, FileDown,
 } from "lucide-react";
 
 // CaseRoom.tsx'teki altın sekme diliyle aynı — data-[state=active] alt çizgisi accent renginde.
@@ -2598,6 +2598,397 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
   );
 }
 
+/* ====== C1·C2·C3 — KAPANIŞ KONTROLÜ, PAKET, VERİ SİLME ====================
+   C1 KONTROL TURU: ajan sorar, arabulucu eksik yazarsa talimat kuyruğuna gider
+   ve eksik kapanmadan kapanış ilerlemez.
+   C2 PAKET: onaylı belgeler (UDF + metin), görüşme notları, oturum listesi,
+   kalem dökümü ve süreç özeti TEK ZIP. Mevcut ZIP mantığı (JSZip + UDF'nin
+   zip-içinde-zip sarımı) kullanılır; belge ÜRETİM hattına dokunulmaz.
+   UYAP: OTOMATİK YÜKLEME YAPILMAZ. Gerekçe: yükleme arabulucunun kendi portal
+   oturumuyla yapılır; ürün şifre, oturum ya da e-imza TAŞIMAZ.
+   C3 SİLME: iki onay, geri alınamaz, kendiliğinden ASLA çalışmaz. */
+const UYAP_REHBERI = [
+  "Arabulucu Portal > Dosyalarım",
+  "dosyayı Görüntüle > Evrak Ekle",
+  'Evrak türü: "Son Tutanak"',
+  "UDF dosyasını seç (paketteki .udf dosyası)",
+  '"Arabuluculuk Sonucu" sekmesinde sonuç türü ve tarih',
+  "Kaydet",
+];
+
+function KapanisPaketiKarti({ caseRow }: { caseRow: CaseRow }) {
+  const [kayit, setKayit] = useState<any | null>(null);
+  const [eksikMetni, setEksikMetni] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [hata, setHata] = useState<string | null>(null);
+  const [silOnay, setSilOnay] = useState(false);
+  const [silYazi, setSilYazi] = useState("");
+  const [udfAdi, setUdfAdi] = useState<string | null>(null);
+
+  const yukle = useCallback(async () => {
+    const { data } = await (supabase.from("dosya_kapanis" as any) as any)
+      .select("kontrol_soruldu, eksik_notu, onay_verildi, onay_zamani, paket_alindi, paket_zamani, silme_zamani")
+      .eq("case_id", caseRow.id).maybeSingle();
+    setKayit(data ?? null);
+  }, [caseRow.id]);
+
+  useEffect(() => { yukle(); }, [yukle]);
+
+  async function kapanisYaz(govde: Record<string, unknown>) {
+    const { error } = await (supabase.from("dosya_kapanis" as any) as any).upsert({
+      case_id: caseRow.id, ...govde,
+    }, { onConflict: "case_id" });
+    if (error) { setHata("Kapanış kaydı şu an yazılamadı."); return false; }
+    setHata(null);
+    await yukle();
+    return true;
+  }
+
+  // C1 — eksik yazılırsa talimat kuyruğuna gider; ajan tamamlar, yeniden sorar.
+  async function eksikGonder() {
+    const t = eksikMetni.trim();
+    if (!t) return;
+    setBusy("eksik");
+    const { data: oturum } = await supabase.auth.getUser();
+    const { error } = await (supabase.from("arabulucu_talimatlari" as any) as any).insert({
+      case_id: caseRow.id, hedef_adim: "taslak-denetim", talimat: t,
+      durum: "bekliyor", veren: oturum?.user?.id ?? null,
+    });
+    if (error) setHata("Eksik notunuz şu an kaydedilemedi.");
+    else {
+      await kapanisYaz({ kontrol_soruldu: true, eksik_notu: t, onay_verildi: false });
+      setEksikMetni("");
+    }
+    setBusy(null);
+  }
+
+  // C2 — TEK PAKET. Belge üretim hattına dokunulmaz; üretilmiş kayıtlar okunur.
+  async function paketHazirla() {
+    setBusy("paket");
+    setHata(null);
+    try {
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+      const ad = caseRow.application_no || caseRow.id.slice(0, 8);
+
+      const [belgeler, notlar, oturumlar, kalemler] = await Promise.all([
+        supabase.from("agreement_documents").select("metadata, created_at").eq("case_id", caseRow.id),
+        supabase.from("case_notes").select("content, created_at").eq("case_id", caseRow.id),
+        supabase.from("case_sessions").select("scheduled_at, status, session_type").eq("case_id", caseRow.id),
+        (supabase.from("taraf_kalemleri" as any) as any)
+          .select("kalem_adi, tutar, para_birimi, durum").eq("case_id", caseRow.id),
+      ]);
+
+      let ilkUdf: string | null = null;
+      for (const r of ((belgeler.data ?? []) as any[])) {
+        const m = r?.metadata && typeof r.metadata === "object" ? r.metadata : {};
+        const tur = String((m as any).template_type ?? (m as any).kind ?? "belge");
+        const metin = String((m as any).filled_text ?? "");
+        if (!metin) continue;
+        zip.file(`belgeler/${tur}_${ad}.txt`, metin);
+        const udfXml = String((m as any).udf_xml ?? "");
+        if (udfXml) {
+          // UDF, UYAP düzenleyicisinin tanıması için zip-içinde-zip sarılır.
+          const ic = new JSZip();
+          ic.file("content.xml", udfXml);
+          ic.file("properties.xml", `<?xml version="1.0" encoding="UTF-8"?>\n<properties><format>UDF</format><version>1.7</version></properties>`);
+          const udfBlob = await ic.generateAsync({ type: "uint8array" });
+          const udfAd = `${tur}_${ad}.udf`;
+          zip.file(`belgeler/${udfAd}`, udfBlob);
+          if (!ilkUdf) { ilkUdf = udfAd; setUdfAdi(udfAd); }
+        }
+      }
+
+      const notMetni = ((notlar.data ?? []) as any[])
+        .map((n) => `${String(n.created_at ?? "").slice(0, 10)} — ${String(n.content ?? "")}`).join("\n\n");
+      if (notMetni) zip.file("gorusme_notlari.txt", notMetni);
+
+      const oturumMetni = ((oturumlar.data ?? []) as any[])
+        .map((o) => `${String(o.scheduled_at ?? "").slice(0, 16).replace("T", " ")} · ${String(o.session_type ?? "")} · ${String(o.status ?? "")}`)
+        .join("\n");
+      zip.file("oturum_listesi.txt", oturumMetni || "oturum kaydı yok");
+
+      const kalemMetni = ((kalemler.data ?? []) as any[])
+        .map((k) => `${String(k.kalem_adi ?? "")} · ${k.tutar ?? "tutar yok"} ${String(k.para_birimi ?? "")} · ${String(k.durum ?? "")}`)
+        .join("\n");
+      zip.file("kalem_dokumu.txt", kalemMetni || "kalem kaydı yok");
+
+      zip.file("surec_ozeti.txt", [
+        `Dosya: ${ad}`,
+        `Durum: ${String(caseRow.status ?? "")}`,
+        `Belge sayısı: ${((belgeler.data ?? []) as any[]).length}`,
+        `Oturum sayısı: ${((oturumlar.data ?? []) as any[]).length}`,
+        "",
+        "UYAP'a yükleme (elle yapılır):",
+        ...UYAP_REHBERI.map((x, i) => `${i + 1}. ${x}`),
+        "",
+        ilkUdf ? `Yüklenecek UDF dosyası: belgeler/${ilkUdf}` : "UDF dosyası bulunamadı; Belgeler sekmesinden üretebilirsiniz.",
+      ].join("\n"));
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `kapanis_paketi_${ad}.zip`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (e: any) {
+      setHata("Paket şu an hazırlanamadı.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // C3 — SİLME: iki onay. İkinci onayda arabulucu elle "SİL" yazar.
+  async function verileriSil() {
+    setBusy("sil");
+    setHata(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("dosya-verilerini-sil", {
+        body: { case_id: caseRow.id, onay: silYazi },
+      });
+      if (error || (data as any)?.error) {
+        setHata(String((data as any)?.error ?? "Silme tamamlanamadı; hiçbir kayıt yarım bırakılmadı."));
+      } else {
+        toast({ title: String((data as any)?.mesaj ?? "Veriler silindi.") });
+        setSilOnay(false); setSilYazi("");
+        await yukle();
+      }
+    } catch {
+      setHata("Silme sırasında bir sorun çıktı; işlem durduruldu.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const onayli = !!kayit?.onay_verildi;
+  const paketAlindi = !!kayit?.paket_alindi;
+  const silinmis = !!kayit?.silme_zamani;
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div>
+        <h3 className="font-semibold">Kapanış kontrolü, paket ve veri silme</h3>
+        <p className="text-sm text-muted-foreground">
+          Süreç tamamlandı. Eksik gördüğünüz bir şey var mı? Varsa yazın, tamamlayayım; yoksa onaylayın.
+        </p>
+      </div>
+
+      {hata && <p className="text-sm text-muted-foreground">{hata}</p>}
+      {silinmis && (
+        <p className="text-sm">Bu dosyanın kişisel verileri silindi.</p>
+      )}
+
+      {!silinmis && !onayli && (
+        <div className="space-y-2">
+          <Textarea rows={3} value={eksikMetni} placeholder="Eksik gördüğünüz şeyi yazın (isteğe bağlı)"
+            onChange={(e) => setEksikMetni(e.target.value)} />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="secondary" disabled={busy === "eksik" || !eksikMetni.trim()}
+              onClick={eksikGonder}>
+              {busy === "eksik" ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+              Eksiği tamamlat
+            </Button>
+            <Button size="sm" disabled={!!busy}
+              onClick={() => kapanisYaz({ kontrol_soruldu: true, onay_verildi: true, onay_zamani: new Date().toISOString() })}>
+              Eksik yok, onaylıyorum
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!silinmis && onayli && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" disabled={busy === "paket"} onClick={paketHazirla}>
+              {busy === "paket" ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileDown className="h-4 w-4 mr-1" />}
+              Kapanış paketini indir
+            </Button>
+            {!paketAlindi && (
+              <Button size="sm" variant="outline" disabled={!!busy}
+                onClick={() => kapanisYaz({ paket_alindi: true, paket_zamani: new Date().toISOString() })}>
+                Paketi aldım
+              </Button>
+            )}
+          </div>
+
+          <div className="text-xs text-muted-foreground space-y-0.5">
+            <div className="font-medium">UYAP'a yükleme (elle yapılır):</div>
+            <ol className="list-decimal pl-5 space-y-0.5">
+              {UYAP_REHBERI.map((x) => <li key={x}>{x}</li>)}
+            </ol>
+            <p>
+              UDF zorunludur{udfAdi ? `; paketteki dosya: ${udfAdi}` : "; paket indirildiğinde dosya adı burada yazılır"}.
+              Yüklemeyi ürün yapmaz — kendi portal oturumunuzla siz yaparsınız.
+            </p>
+          </div>
+
+          {paketAlindi && (
+            <div className="border-t pt-3 space-y-2">
+              {!silOnay ? (
+                <Button size="sm" variant="outline" onClick={() => setSilOnay(true)}>
+                  Verileri sil
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm">
+                    Onayladığınız veriler silinecektir. Bu işlem geri alınamaz.
+                  </p>
+                  <Input value={silYazi} onChange={(e) => setSilYazi(e.target.value)}
+                    placeholder='Onaylamak için SİL yazın' className="h-8 text-sm w-40" />
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="destructive"
+                      disabled={busy === "sil" || silYazi.trim().toLocaleUpperCase("tr-TR") !== "SİL"}
+                      onClick={verileriSil}>
+                      {busy === "sil" ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                      Sil
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setSilOnay(false); setSilYazi(""); }}>
+                      Vazgeç
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Kişisel veri silinir; kişisel veri içermeyen sayımlar ve kural kütüphanesi kalır.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/* ====== B8: AJAN NE ÖĞRENDİ — yalnız arabulucu, sade dil ==================
+   Sayımları gösterir: adım başına kaç koşum, kaç hata, hangi yol işe yaradı,
+   hangi düzeltme türü kaç kez, hangi kurallar açık ve hangi sürümde.
+   BU EKRAN KİŞİSEL VERİ GÖSTERMEZ: taraf adı, belge adı, tutar ve metin
+   burada yoktur — yalnız adım adı, sayı ve tür vardır.
+   "Sıfırla" arabulucunun KENDİ sayımlarını siler; kural kütüphanesinde silme
+   değil GERİ ALMA vardır (kural metni değişmez, değişiklik yeni sürümdür). */
+function OgrenmeKarti({ caseRow }: { caseRow: CaseRow }) {
+  const [ozet, setOzet] = useState<any | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const yukle = useCallback(async () => {
+    const [dnyRes, dzlRes, krlRes] = await Promise.all([
+      (supabase.from("ajan_deneyim" as any) as any)
+        .select("adim, sonuc, hata_kodu, yol").eq("case_id", caseRow.id).limit(500),
+      (supabase.from("duzeltme_kayitlari" as any) as any)
+        .select("adim, duzeltme_turu").eq("case_id", caseRow.id).limit(300),
+      (supabase.from("kural_kutuphanesi" as any) as any)
+        .select("kod, baslik, surum, etkin, geri_alindi").limit(50),
+    ]);
+    if (dnyRes.error && dzlRes.error) { setHata("Öğrenme kayıtları şu an okunamıyor."); return; }
+
+    const adimlar = new Map<string, { kosum: number; hata: number }>();
+    const yollar = new Map<string, number>();
+    const hatalar = new Map<string, number>();
+    for (const r of ((dnyRes.data ?? []) as any[])) {
+      const a = String(r.adim ?? "");
+      const kayit = adimlar.get(a) ?? { kosum: 0, hata: 0 };
+      kayit.kosum += 1;
+      if (String(r.sonuc) === "hata") {
+        kayit.hata += 1;
+        const k = String(r.hata_kodu ?? "").trim();
+        if (k) hatalar.set(k, (hatalar.get(k) ?? 0) + 1);
+      } else if (String(r.sonuc) === "basarili" && r.yol) {
+        const y = String(r.yol);
+        yollar.set(y, (yollar.get(y) ?? 0) + 1);
+      }
+      adimlar.set(a, kayit);
+    }
+    const duzeltmeler = new Map<string, number>();
+    for (const r of ((dzlRes.data ?? []) as any[])) {
+      const k = `${String(r.duzeltme_turu ?? "")} — ${String(r.adim ?? "")}`;
+      duzeltmeler.set(k, (duzeltmeler.get(k) ?? 0) + 1);
+    }
+    setOzet({
+      adimlar: Array.from(adimlar.entries()),
+      yollar: Array.from(yollar.entries()).sort((a, b) => b[1] - a[1]),
+      hatalar: Array.from(hatalar.entries()).sort((a, b) => b[1] - a[1]),
+      duzeltmeler: Array.from(duzeltmeler.entries()).sort((a, b) => b[1] - a[1]),
+      kurallar: ((krlRes.data ?? []) as any[]),
+    });
+  }, [caseRow.id]);
+
+  useEffect(() => { yukle(); }, [yukle]);
+
+  async function sifirla() {
+    setBusy(true);
+    setHata(null);
+    const d1 = await (supabase.from("ajan_deneyim" as any) as any).delete().eq("case_id", caseRow.id);
+    const d2 = await (supabase.from("duzeltme_kayitlari" as any) as any).delete().eq("case_id", caseRow.id);
+    if (d1.error || d2.error) setHata("Sayımlar şu an sıfırlanamadı.");
+    else await yukle();
+    setBusy(false);
+  }
+
+  if (!ozet) {
+    return <p className="text-sm text-muted-foreground">{hata ?? "Ajan hazırlıyor."}</p>;
+  }
+
+  const satir = (baslik: string, liste: [string, any][], bos: string) => (
+    <div className="space-y-1">
+      <div className="text-sm font-medium">{baslik}</div>
+      {liste.length === 0
+        ? <p className="text-xs text-muted-foreground italic">{bos}</p>
+        : (
+          <ul className="text-sm space-y-0.5">
+            {liste.slice(0, 8).map(([k, v]) => (
+              <li key={k} className="flex items-center justify-between gap-3 border-b py-0.5">
+                <span className="min-w-0">{k}</span>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {typeof v === "object" ? `${v.kosum} koşum · ${v.hata} hata` : `${v} kez`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      {hata && <p className="text-sm text-muted-foreground">{hata}</p>}
+      {satir("Adım adım koşum", ozet.adimlar, "henüz koşum kaydı yok")}
+      {satir("En sık tıkanan yer", ozet.hatalar, "tıkanma kaydı yok")}
+      {satir("İşe yarayan yol", ozet.yollar, "henüz kayıt yok")}
+      {satir("Düzeltme türleri", ozet.duzeltmeler, "düzeltme kaydı yok")}
+
+      <div className="space-y-1">
+        <div className="text-sm font-medium">Kurallar</div>
+        {ozet.kurallar.length === 0
+          ? <p className="text-xs text-muted-foreground italic">henüz kural yok</p>
+          : (
+            <ul className="text-sm space-y-0.5">
+              {ozet.kurallar.map((k: any) => (
+                <li key={`${k.kod}-${k.surum}`} className="flex items-center justify-between gap-3 border-b py-0.5">
+                  <span className="min-w-0">{String(k.baslik ?? k.kod)}</span>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    sürüm {k.surum} · {k.geri_alindi ? "geri alındı" : k.etkin ? "açık" : "kapalı"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+      </div>
+
+      <div className="border-t pt-3 space-y-1">
+        <Button size="sm" variant="outline" disabled={busy} onClick={sifirla}>
+          {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+          Sayımları sıfırla
+        </Button>
+        <p className="text-[11px] text-muted-foreground">
+          Sıfırlama yalnız bu dosyadaki koşum ve düzeltme sayımlarını siler.
+          Kurallarda silme yoktur; kural geri alınır ve metni değişmez.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /* ====== KONTROL TERCİHİ (Aşama 1) — yalnız arabulucu =======================
    KAPI SAYISINI ÜRÜN DEĞİL ARABULUCU BELİRLER. Varsayılan: hiçbiri işaretli
    değildir; ajan adımları kendiliğinden yapar. Arabulucu işaretlediği adımda
@@ -2674,6 +3065,13 @@ function KontrolTercihiKarti({ caseRow, userId }: { caseRow: CaseRow; userId: st
       </p>
 
       {hata && <p className="text-sm text-muted-foreground">{hata}</p>}
+
+      {/* A5 — sakin uyarı: engelleme yok, yalnız bilgi. */}
+      {secili.size > 3 && (
+        <p className="text-sm text-muted-foreground">
+          Çok adım işaretlediniz; akış yavaşlar ve çoğu iş sizin onayınızı bekler.
+        </p>
+      )}
 
       {yukleniyor ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -7920,6 +8318,12 @@ function Phase4Summary({ caseRow, onSectionsChange, jump, onRandevuAyarla }: {
     body: <SecenekSepetiPanel caseRow={caseRow} />,
   });
 
+  // Ajan ne öğrendi (20.08) — sayım ekranı, katmanın sonunda.
+  sectionDefs.push({
+    id: "kokpit-ogrenme", layer: LAYER_REPORTS, title: "Ajan ne öğrendi",
+    body: <OgrenmeKarti caseRow={caseRow} />,
+  });
+
   // Kalem karşılaştırması (19.08) — kokpitin TEK yeni kartı, katmanın sonunda.
   sectionDefs.push({
     id: "kokpit-kalem-karsilastirma", layer: LAYER_REPORTS, title: "Kalem karşılaştırması",
@@ -12654,6 +13058,10 @@ function Phase9Closing({ caseRow, reload }: { caseRow: CaseRow; reload: () => vo
         <TabsContent value="kapanis">
           <motion.section variants={itemVariants} className="space-y-4">
             <h3 className="text-lg font-semibold heading-gold-underline">Kapanış</h3>
+
+            {/* C1·C2·C3 — kapanış kontrolü, paket ve silme. Mevcut kapanış
+                düğmeleri ve kartı YERİNDE; bu kart onların ÜSTÜNE eklendi. */}
+            <KapanisPaketiKarti caseRow={caseRow} />
 
             {isClosed ? (
               <motion.div

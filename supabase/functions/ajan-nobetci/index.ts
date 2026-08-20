@@ -1397,6 +1397,192 @@ async function oneriKollari(
   return { acilan, sebepler };
 }
 
+/* ── ÖĞRENME KOLLARI (B6 · B7) VE KAPANIŞ HATIRLATMASI (C4) ──────────────────
+   ÖĞRENME KAYNAĞI YALNIZ İKİSİDİR: insan düzeltmesi (TÜRÜ) ve nesnel sonuç.
+   Ajan kendi ürettiği metinden ya da kendi kalite yargısından ÖĞRENMEZ.
+   Bu kollarda hiçbir yerde ajanın kendi çıktısı puanlanmaz.
+
+   KİŞİSEL VERİ GİRMEZ: sayımlar yalnız adım adı, düzeltme türü ve sayıdır.
+   AJAN KENDİ YETKİSİNİ GENİŞLETMEZ: hiçbir kural kendiliğinden etkinleşmez,
+   hiçbir sayım kapı açmaz. */
+const KURAL_ESIGI = 3;
+
+const DUZELTME_METNI: Record<string, string> = {
+  eksik_kalem: "eksik kalem",
+  yanlis_sure: "yanlış süre",
+  fazla_iddia: "fazla iddia",
+  usul_adimi_atlandi: "atlanan usul adımı",
+  ton_uygunsuz: "ton",
+  gereksiz_ayrinti: "gereksiz ayrıntı",
+  yanlis_ad_unvan: "yanlış ad/unvan",
+  yanlis_tutar: "yanlış tutar",
+  diger: "diğer",
+};
+
+/* B6 — TEKRARDAN KURALA. Aynı TÜR düzeltme aynı ADIMDA üç kez tekrarlanırsa
+   ajan kural ÖNERİR: kütüphaneye surum=1, etkin=FALSE satır yazar ve
+   arabulucunun sohbetine öneri düşer. ONAY GELMEDEN ETKİN OLMAZ.
+   DEĞERLENDİRME SETİ HENÜZ YOK: ölçülmemiş iyileştirme uygulanmaz. */
+async function kuralOnerKollari(admin: any, dosya: any): Promise<{ acilan: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  let acilan = 0;
+  try {
+    const { data: kayitlar } = await admin.from("duzeltme_kayitlari")
+      .select("adim, duzeltme_turu").eq("case_id", dosya.id).limit(300);
+    const sayim = new Map<string, number>();
+    for (const r of ((kayitlar ?? []) as any[])) {
+      const anahtar = `${String(r.adim ?? "")}|${String(r.duzeltme_turu ?? "")}`;
+      sayim.set(anahtar, (sayim.get(anahtar) ?? 0) + 1);
+    }
+
+    for (const [anahtar, adet] of sayim) {
+      if (adet < KURAL_ESIGI) continue;
+      const [adim, tur] = anahtar.split("|");
+      if (!adim || !tur) continue;
+      const kod = `${adim}__${tur}`;
+
+      const { data: varOlan } = await admin.from("kural_kutuphanesi")
+        .select("kod").eq("kod", kod).limit(1);
+      if (((varOlan ?? []) as any[]).length > 0) continue;
+
+      const aciklama = `${adim} adımında "${DUZELTME_METNI[tur] ?? tur}" düzeltmesi ${adet} kez tekrarlandı; bu adımda bu noktaya baştan dikkat edeyim.`;
+      const { error } = await admin.from("kural_kutuphanesi").insert({
+        kod, baslik: `${DUZELTME_METNI[tur] ?? tur} — ${adim}`,
+        aciklama, hedef_adim: adim, dogdugu_duzeltme_turu: tur,
+        // KAYNAK ÖZETİ: yalnız tür ve sayı. Dosya adı, taraf adı ve metin YAZILMAZ.
+        kaynak_ozet: `düzeltme türü: ${tur} · tekrar: ${adet}`,
+        surum: 1, etkin: false, geri_alindi: false,
+      });
+      if (error) { sebepler.push(`kural önerilemedi: ${error.message}`); continue; }
+
+      await admin.from("ajan_onerileri").insert({
+        case_id: dosya.id, party_id: null, hedef: "arabulucu",
+        baslik: `${adim} için bir kural öneriyorum`,
+        gerekce: `${aciklama} Açayım mı?`,
+        eylem_turu: "adim", eylem_adim: `kural:${kod}`, durum: "acik",
+      });
+      acilan++;
+    }
+  } catch (e: any) {
+    sebepler.push(`kural önerisi üretilemedi: ${String(e?.message ?? e).slice(0, 120)}`);
+  }
+  return { acilan, sebepler };
+}
+
+/* B7 — ARABULUCU ALIŞKANLIĞI. Sayımlar mevcut kayıtlardan YENİDEN hesaplanır
+   (idempotent). Kişilik çıkarımı DEĞİLDİR: yalnız kaç kez ne yapıldığı.
+   Alışkanlık ASLA kendiliğinden uygulanmaz; yalnız öneri doğurur. */
+async function aliskanlikKollari(admin: any, dosya: any): Promise<{ sebepler: string[] }> {
+  const sebepler: string[] = [];
+  const mediatorId = String(dosya?.assigned_mediator_id ?? "");
+  if (!mediatorId) return { sebepler };
+  try {
+    const say = async (tablo: string, kur: (q: any) => any): Promise<number> => {
+      const { count } = await kur(admin.from(tablo).select("id", { count: "exact", head: true }));
+      return count ?? 0;
+    };
+
+    const oneriKabul = await say("ajan_onerileri", (q: any) =>
+      q.eq("case_id", dosya.id).eq("hedef", "arabulucu").eq("durum", "kabul"));
+    const oneriKapatildi = await say("ajan_onerileri", (q: any) =>
+      q.eq("case_id", dosya.id).eq("hedef", "arabulucu").eq("durum", "kapatildi"));
+    const durdurma = await say("akis_duraklatma", (q: any) => q.eq("case_id", dosya.id));
+
+    const yaz = async (anahtar: string, sayac: number, sonDeger?: string) => {
+      await admin.from("arabulucu_aliskanliklari").upsert({
+        mediator_id: mediatorId, anahtar, sayac, son_deger: sonDeger ?? null,
+      }, { onConflict: "mediator_id,anahtar" });
+    };
+    await yaz("oneri_kabul", oneriKabul);
+    await yaz("oneri_kapatildi", oneriKapatildi);
+    await yaz("akis_durduruldu", durdurma);
+
+    // Adım başına talimat sayısı.
+    const { data: talimatlar } = await admin.from("arabulucu_talimatlari")
+      .select("hedef_adim").eq("case_id", dosya.id).limit(200);
+    const talimatSayim = new Map<string, number>();
+    for (const t of ((talimatlar ?? []) as any[])) {
+      const a = String(t.hedef_adim ?? "");
+      if (a) talimatSayim.set(a, (talimatSayim.get(a) ?? 0) + 1);
+    }
+    for (const [a, n] of talimatSayim) await yaz(`talimat:${a}`, n, a);
+
+    // Onay istenen adımlar: arabulucunun kendi tercihi.
+    const { data: tercih } = await admin.from("arabulucu_kontrol_tercihleri")
+      .select("onay_isteyen_adimlar").eq("mediator_id", mediatorId).limit(50);
+    const onaySayim = new Map<string, number>();
+    for (const r of ((tercih ?? []) as any[])) {
+      for (const a of (Array.isArray(r.onay_isteyen_adimlar) ? r.onay_isteyen_adimlar : [])) {
+        const k = String(a ?? "");
+        if (k) onaySayim.set(k, (onaySayim.get(k) ?? 0) + 1);
+      }
+    }
+    for (const [a, n] of onaySayim) await yaz(`onay_istenen:${a}`, n, a);
+
+    /* ÖNERİ: bu dosyada henüz o adım işaretli değilse ve arabulucu son
+       dosyalarında onayı hep kendisi vermişse, öneri düşer. Kabul edilirse
+       tercihe yazılır — kendiliğinden ASLA uygulanmaz. */
+    const { data: buDosyaTercih } = await admin.from("arabulucu_kontrol_tercihleri")
+      .select("onay_isteyen_adimlar").eq("case_id", dosya.id).eq("mediator_id", mediatorId).maybeSingle();
+    const buDosya = Array.isArray((buDosyaTercih as any)?.onay_isteyen_adimlar)
+      ? (buDosyaTercih as any).onay_isteyen_adimlar.map((x: any) => String(x)) : [];
+    for (const [a, n] of onaySayim) {
+      if (n < 2 || buDosya.includes(a)) continue;
+      const baslik = `${a} onayını hep siz verdiniz — bu dosyada da isteyeyim mi?`;
+      const { data: varOlan } = await admin.from("ajan_onerileri")
+        .select("id").eq("case_id", dosya.id).eq("baslik", baslik).limit(1);
+      if (((varOlan ?? []) as any[]).length > 0) continue;
+      await admin.from("ajan_onerileri").insert({
+        case_id: dosya.id, party_id: null, hedef: "arabulucu", baslik,
+        gerekce: `Son dosyalarınızda bu adımın onayını ${n} kez kendiniz verdiniz.`,
+        eylem_turu: "adim", eylem_adim: `tercih:${a}`, durum: "acik",
+      });
+    }
+  } catch (e: any) {
+    sebepler.push(`alışkanlık sayımı yapılamadı: ${String(e?.message ?? e).slice(0, 120)}`);
+  }
+  return { sebepler };
+}
+
+/* C4 — KAPANIŞ HATIRLATMASI. Kontrol turu cevaplanmamışsa, onay verilip paket
+   alınmamışsa, paket alınıp silme yapılmamışsa GÜNDE BİR sakin hatırlatma.
+   SİLME ASLA KENDİLİĞİNDEN ÇALIŞMAZ — bu kol yalnız hatırlatır. */
+async function kapanisHatirlatma(admin: any, dosya: any): Promise<{ hatirlatilan: number; sebepler: string[] }> {
+  const sebepler: string[] = [];
+  let hatirlatilan = 0;
+  try {
+    const kapali = String(dosya?.status ?? "") === "closed" || !!dosya?.closed_at;
+    if (!kapali) return { hatirlatilan, sebepler };
+
+    const { data: kayit } = await admin.from("dosya_kapanis")
+      .select("kontrol_soruldu, onay_verildi, paket_alindi, silme_zamani")
+      .eq("case_id", dosya.id).maybeSingle();
+
+    let mesaj = "";
+    if (!kayit || !(kayit as any).kontrol_soruldu) {
+      mesaj = "Süreç tamamlandı. Eksik gördüğünüz bir şey var mı? Varsa yazın, tamamlayayım; yoksa onaylayın.";
+    } else if (!(kayit as any).onay_verildi) {
+      mesaj = "Kapanış kontrolü hâlâ açık; eksik yoksa onaylayabilirsiniz.";
+    } else if (!(kayit as any).paket_alindi) {
+      mesaj = "Kapanış paketi hazır; indirdiğinizde bana bildirin.";
+    } else if (!(kayit as any).silme_zamani) {
+      mesaj = "Paketi aldınız. Dosya verilerini silmek isterseniz silme adımı açık.";
+    }
+    if (!mesaj) return { hatirlatilan, sebepler };
+
+    // Günde bir: aynı konuda bekleyen satır varsa yeniden yazılmaz.
+    const bugun = new Date().toISOString().slice(0, 10);
+    const r = await gorevAc(
+      admin, dosya.id, "arabulucu_onayi", `[kapanis:${bugun}]`, mesaj, { durum: "bekliyor" },
+    );
+    if (r.acildi) hatirlatilan++;
+    else if (r.sebep && !r.sebep.includes("zaten açılmış")) sebepler.push(r.sebep);
+  } catch (e: any) {
+    sebepler.push(`kapanış hatırlatması yapılamadı: ${String(e?.message ?? e).slice(0, 120)}`);
+  }
+  return { hatirlatilan, sebepler };
+}
+
 async function eksikBilgiYurut(admin: any, dosya: any, partyId: string): Promise<{ durum: string; sonuc: string }> {
   const { data: taraf } = await admin.from("case_parties").select("*").eq("id", partyId).maybeSingle();
   if (!taraf) return { durum: "atlandi", sonuc: "Taraf kaydı bulunamadı" };
@@ -2473,6 +2659,8 @@ Deno.serve(async (req) => {
     const atlamaSebepleri: string[] = [];
     let soruHatirlatildi = 0;
     let oneriAcildi = 0;
+    let kuralOnerildi = 0;
+    let kapanisHatirlatildi = 0;
     let koluYenidenUyandirildi = 0;
     let imzaAdi = "";
     let analizBaslatildi = 0;
@@ -2613,6 +2801,20 @@ Deno.serve(async (req) => {
         const oneriKol = await oneriKollari(admin, dosya, taraflar);
         oneriAcildi += oneriKol.acilan;
         oneriKol.sebepler.forEach(sebepEkle);
+
+        /* ── ÖĞRENME KOLLARI (B6 · B7) ve KAPANIŞ HATIRLATMASI (C4) ──
+           Öğrenme yalnız insan düzeltmesinden ve nesnel sonuçtan; ajan kendi
+           çıktısından öğrenmez. Hiçbir kural kendiliğinden etkinleşmez. */
+        const kuralKol = await kuralOnerKollari(admin, dosya);
+        kuralOnerildi += kuralKol.acilan;
+        kuralKol.sebepler.forEach(sebepEkle);
+
+        const aliskanlikKol = await aliskanlikKollari(admin, dosya);
+        aliskanlikKol.sebepler.forEach(sebepEkle);
+
+        const kapanisKol = await kapanisHatirlatma(admin, dosya);
+        kapanisHatirlatildi += kapanisKol.hatirlatilan;
+        kapanisKol.sebepler.forEach(sebepEkle);
 
         // ── TUR C-2: kör teklif v2 — koşullu aralık / braketleme ──
         const braketKol = await braketKollari(admin, dosya, taraflar);
@@ -2765,6 +2967,8 @@ Deno.serve(async (req) => {
       akis_yurut: akisSonuc.ok ? "kosuldu" : `hata: ${akisSonuc.sebep}`.slice(0, 200),
       soru_hatirlatildi: soruHatirlatildi,
       oneri_acildi: oneriAcildi,
+      kural_onerildi: kuralOnerildi,
+      kapanis_hatirlatildi: kapanisHatirlatildi,
       kol_yeniden_uyandirildi: koluYenidenUyandirildi,
       dosya: islenenDosya,
       gorev_yapildi: yapilanGorev,

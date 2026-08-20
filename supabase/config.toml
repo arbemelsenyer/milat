@@ -166,3 +166,6 @@ verify_jwt = false
 
 [functions.akis-onayla]
 verify_jwt = true
+
+[functions.dosya-verilerini-sil]
+verify_jwt = true

@@ -674,3 +674,55 @@ talimat denetimi onların yerine geçmez, üstüne eklenir.
 · BİLİNMEYEN, BİLİNMİYOR DİYE YAZILDI: hazırlık föyünün OKUNUP okunmadığı
   üründe tutulmuyor. Bu yüzden "föyü okumadınız" denmez; yalnız oturumun
   yaklaştığı ve föyün ekranda olduğu hatırlatılır.
+
+
+[EKLEME 20.08.2026 — ÖĞRENEN AJAN: KVKK ETKEN YZ KARŞILIKLARI VE SINIRLAR]
+● CANLI (deploy sonrası).
+
+KVKK'nın Etken (agentic) YZ için saydığı DÖRT UNSUR karşısında ürünün karşılığı:
+1. ÖZERKLİK — ajan adımları kendiliğinden başlatır; ama YETKİSİNİ KENDİ
+   GENİŞLETEMEZ. Başarı sayısı hiçbir kapıyı açmaz. Kapı sayısını arabulucu
+   belirler (arabulucu_kontrol_tercihleri) ve akışı istediği an durdurabilir
+   (akis_duraklatma). Beş insan kapısı sabittir: imza · bilirkişi ataması ·
+   kayıt/döküm rızası · tarafla asıl müzakere · SİLME ONAYI.
+2. HEDEFE YÖNELİK DAVRANIŞ — hedef, aşamanın NESNEL çıktısıdır ve kodda açık
+   listedir (akis-yurut · ASAMA_HEDEFI). Model hedef yorumlamaz; öncelik
+   sıralaması da sayımla yapılır (olaya bağlı etkin kural sayısı).
+3. ÇEVREYLE ETKİLEŞİM — dış dünyaya çıkan tek yol e-postadır ve mevcut iletişim
+   tercihi süzgecinden geçer. UYAP'a otomatik bağlanılmaz; ürün şifre, oturum
+   ya da e-imza taşımaz.
+4. UYARLANABİLİRLİK — öğrenme YALNIZ (a) insan düzeltmesinin TÜRÜNDEN ve
+   (b) nesnel sonuçtan (bulundu/bulunamadı, hata kodu, süre) doğar. AJAN KENDİ
+   ÜRETTİĞİ METİNDEN YA DA KENDİ KALİTE YARGISINDAN ÖĞRENEMEZ; bu yasak koda
+   yazılıdır (_shared/anlatim.ts · öğrenme katmanı başlığı).
+
+ÖĞRENME MİMARİSİNİN DÖRT PARÇASI:
+· DENEYİM DEFTERİ (ajan_deneyim): adım, sonuç, kısa hata kodu, denenen yol,
+  süre, deneme sırası. Her kapanışta kendiliğinden yazılır.
+· DOSYA İÇİ BELLEK (ajan_bellek): "istendi:<belge>" · "soruldu:<konu>" ·
+  "tamamlandi:<adım>" · "devir:<eksik>". Aynı belge iki kez istenmez, aynı soru
+  iki kez sorulmaz, biten adım baştan yapılmaz.
+· DÜZELTME KAYDI (duzeltme_kayitlari): yalnız TÜR ve sayı. DÜZELTMENİN METNİ
+  KAYDEDİLMEZ. Soru zorunlu değildir, geçilebilir.
+· KURAL KÜTÜPHANESİ (kural_kutuphanesi): aynı tür düzeltme aynı adımda ÜÇ kez
+  tekrarlanırsa ajan kural ÖNERİR (surum=1, etkin=false). Onay gelmeden etkin
+  olmaz. Geri alma vardır; kural METNİ DEĞİŞTİRİLMEZ, değişiklik yeni SÜRÜMDÜR.
+
+ALTERNATİF YOL MERDİVENİ (kodda açık liste — YOL_MERDIVENI):
+  eksik belge → dosyadaki başka belge → taraf ajanı tarafa sorar → arabulucuya bildir
+  eksik oturum → planlanmış oturum → son oturum → bildir
+  eksik mevzuat → bilgi tabanı → dosya belgeleri → boş bırak, "bulamadım" yaz
+  eksik taraf bilgisi → dosya kaydı → taraf ajanı sorar → bildir
+Aynı hata kodu iki kez çıktıysa AYNI yol üçüncü kez denenmez. Yol sırası
+deneyimden gelir: geçmişte en çok işe yarayan yol önce denenir.
+
+DEVİR: bir ajan "Eksik: X" ile kapanınca eksik, önce onu üretebilecek ajana
+devredilir (DEVIR_ESLEME); insana ancak hiçbir ajan üretemiyorsa gider. Devir
+kaydı ajan_bellek'e yazılır, sohbete tek satır düşer.
+
+ERKEN SONUÇ TAHMİNİ YASAK: "bu dosya şu tutarda anlaşır" türü çıkarım
+üretilmez; bunu üretecek veri de tutulmaz.
+
+AÇIK SINIR (bilerek yazıldı): DEĞERLENDİRME SETİ HENÜZ YOKTUR. Hiçbir kural
+kendiliğinden etkinleşmez; ölçülmemiş iyileştirme uygulanmaz. Sürüm
+karşılaştırması, anonim (uydurma) test dosyaları üretildikten sonra yapılacaktır.

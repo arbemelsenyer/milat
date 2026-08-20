@@ -18,7 +18,7 @@
 // KÖR VERİ: taslak metni ve taraf ADLARI dışında hiçbir veri okunmaz; bulgular
 // yalnız arabulucunun satırına yazılır, tarafa açılmaz.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { anlatimAc, zatenCalisiyorMu } from "../_shared/anlatim.ts";
+import { anlatimAc, zatenCalisiyorMu, etkinKurallar } from "../_shared/anlatim.ts";
 import { taslagiDenetle } from "../_shared/taslak-denetle.ts";
 
 const corsHeaders = {
@@ -78,6 +78,12 @@ Deno.serve(async (req) => {
     await anlatim.baslat("Anlaşma taslağını okuyorum.");
     if (talimat) {
       await anlatim.adim(`Arabulucunun talimatı uygulandı: ${talimat.slice(0, 160)}`);
+    }
+
+    // B6 — bu adım için açık kurallar ek yönerge olarak uygulanır.
+    const acikKurallar = await etkinKurallar(admin, "taslak-denetim");
+    if (acikKurallar.length > 0) {
+      await anlatim.adim(`Açık kurallar uygulandı: ${acikKurallar.map((k) => k.baslik).join(" · ")}`);
     }
 
     /* Taslak metni agreement_documents.metadata.filled_text alanında durur

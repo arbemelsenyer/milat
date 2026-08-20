@@ -46,3 +46,22 @@ yönlendirilir.
   .user_id eşleşmesi) taraf ekranına, dosya sahibi/görevli arabulucu/admin ise arabulucu
   ekranına yönlendirilir; hiçbiri değilse erişim reddedilir. Dosya açan tüm bağlantılar
   (liste kartları, davet sonrası yönlendirme, bildirim linkleri) bu kapıdan geçer.
+
+
+[EKLEME 20.08.2026 — SÜREÇ BİTİMİNDE VERİ]
+· Süreç bitiminde dosyanın KİŞİSEL VERİSİ silinir: belgeler ve metinleri,
+  analizler, taraf kalemleri, görüşme notları, föyler ve gönderim kayıtları,
+  sohbet ve görev satırları, akış olayları, ajan durumları, talimatlar,
+  öneriler, dosya belleği, oturum ve randevu kayıtları, taraf kayıtları,
+  dosyanın kendisi, varsa ses ve döküm.
+· KİŞİSEL VERİ İÇERMEYEN kayıtlar KALIR (20.08 kurucu kararı): ajan_deneyim ve
+  duzeltme_kayitlari satırlarında dosya bağlantısı KOPARILIR (case_id NULL),
+  sayımlar kalır · arabulucu_aliskanliklari kalır · kural_kutuphanesi kalır ·
+  bir satırlık anonim kapanış kaydı (tarih, sonuç türü, süreç gün sayısı).
+· SİLME İNSAN KAPISIDIR: iki onay ister (uyarı ekranı + elle "SİL" yazımı),
+  geri alınamaz ve KENDİLİĞİNDEN ÇALIŞMAZ. Silme fonksiyonu x-cron-secret
+  kabul etmez; yalnız dosyanın arabulucusu ya da yönetici çağırabilir.
+· ARABULUCUNUN HAKLARI: ajanın ne öğrendiğini GÖRME (kokpitteki "Ajan ne
+  öğrendi" kartı), kendi sayımlarını SIFIRLAMA ve dosya verilerini SİLME.
+· Öğrenme kayıtları dosya içeriği taşımaz: ad, unvan, adres, tutar, gerekçe
+  metni, beyan ve belge metni bu tablolara YAZILMAZ.
