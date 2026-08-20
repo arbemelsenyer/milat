@@ -1,3 +1,26 @@
+## Nerede kaldık — 20.08.2026 (101) · ORTAK SINIR KATMANI (ürün geneli)
+
+- [x] 1 · sinirDenetle/sinirdanGecir: insana giden metin süzgeçten geçiyor
+      (hukuki tavsiye · teşhis etiketi · suçlayıcı dil · dayanaksız rakam ·
+      sonuç tahmini). Künyeli alıntı serbest; ayırt edilemeyen cümle geçmiyor.
+      Elenen tür kayda geçiyor, sessiz eleme yok.
+- [x] 2 · Prompt injection: ajanaTalimatMi + alintiOlarakSar. Belge içeriği
+      model çağrısına ALINTI olarak giriyor; ajana yönelik cümle uygulanmıyor
+      ve arabulucuya bildiriliyor (taraf-kalem-cikar, taraf-cevap).
+- [x] 3 · yazmaIzniVar + INSAN_KAPISI_ALANLARI: ajan başına açık yazma listesi;
+      insan kapılarının sonucunu hiçbir ajan yazamaz.
+- [x] 4 · Öğrenme yazım süzgeci: deneyimYaz ve bellekYaz serbest metni, uzun
+      değeri ve tutar benzeri sayıyı reddediyor; sebep dönüyor.
+- [x] 5 · Anahtar ve dış erişim sınırı belgeye işlendi; loglarda anahtar yok,
+      UYAP'a otomatik bağlanma yok.
+- [x] 6 · Miras: kurallar ortak motorda tek yerde; motora bağlı 24 fonksiyon
+      kendiliğinden kapsamda. Sohbet/bildirim yüzeyleri yalnız süzgeci çağırıyor,
+      MOTORA_BAGLI'ya eklenmiyor (kilit sohbeti kırardı).
+- [x] 7 · Kapsam tablosu raporda; kapsam dışı bırakılanlar tek tek yazıldı.
+
+SIRADA: dokunulan fonksiyonların redeploy'u + publish + canlı test (süzgeç
+künyeli alıntıyı geçiriyor mu, tavsiye cümlesini eliyor mu).
+
 ## Nerede kaldık — 20.08.2026 (100) · ÖĞRENEN AJAN + KAPANIŞ VE SİLME
 
 KISIM A (A1-A4 bir önceki turda bitmişti, 93a3f62):

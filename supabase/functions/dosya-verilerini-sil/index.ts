@@ -14,6 +14,7 @@
 //
 // SİLİNEN İÇERİK HİÇBİR LOGA YAZILMAZ; anahtarlar loglanmaz.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { sinirdanGecir } from "../_shared/anlatim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -160,7 +161,7 @@ Deno.serve(async (req) => {
 
     return json({
       silindi: true, kayit: oncekiToplam,
-      mesaj: `${oncekiToplam} kayıt silindi, dosyada kişisel veri kalmadı.`,
+      mesaj: sinirdanGecir(`${oncekiToplam} kayıt silindi, dosyada kişisel veri kalmadı.`, "silme"),
     });
   } catch (e: any) {
     console.error("[dosya-verilerini-sil] Genel hata:", String(e?.message ?? e).slice(0, 200));

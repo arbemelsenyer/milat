@@ -8,6 +8,13 @@
 // kendi belgeleri (case_documents.party_id) ve kendi beyanı (case_parties.statement)
 // üzerinden gelir. Yeni tablo varsayılmadı.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { sinirdanGecir, ajanaTalimatMi } from "../_shared/anlatim.ts";
+
+/* ORTAK SINIR KATMANI: insana giden metin süzgeçten geçer (hukuki tavsiye,
+   teşhis etiketi, suçlayıcı dil, dayanaksız rakam, sonuç tahmini elenir;
+   künyeli alıntı serbesttir). Bu fonksiyon bir SOHBET/BİLDİRİM yüzeyidir:
+   ortak motora BAĞLANMAZ — eşzamanlılık kilidi uygulanırsa üst üste iki mesaj
+   yazan kullanıcının ikinci mesajı reddedilir ve sohbet kırılır. */
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -284,7 +291,8 @@ ${belgeBloklari.join("\n\n") || "(yüklenmiş belgeniz yok)"}`;
       console.error(`[taraf-asistan] iz yazılamadı: ${e?.message ?? e}`);
     }
 
-    return json({ cevap });
+    // Cevap tarafa gidiyor: ortak sınır süzgecinden geçer.
+    return json({ cevap: sinirdanGecir(cevap, "taraf-asistan") });
   } catch (e: any) {
     console.error("[taraf-asistan] hata", e?.message ?? e);
     return json({ error: e?.message ?? "Bilinmeyen hata" }, 500);

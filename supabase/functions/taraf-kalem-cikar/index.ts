@@ -16,6 +16,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import {
   anlatimAc, zatenCalisiyorMu, belgedeAra, eksigiSor, SORU_TIPI_TARAF, kolEtiketi,
+  alintiOlarakSar, ajanaTalimatMi,
 } from "../_shared/anlatim.ts";
 
 const corsHeaders = {
@@ -200,6 +201,16 @@ Deno.serve(async (req) => {
       const belgeMetni = String(belge.extracted_text ?? "");
       await anlatim.adim(`"${temiz(belge.file_name).slice(0, 60)}" belgesini okuyorum.`);
 
+      /* Belgede ajana yönelik talimat görülürse UYGULANMAZ ve arabulucuya
+         bildirilir. Sessiz geçilmez. */
+      if (ajanaTalimatMi(belgeMetni) || ajanaTalimatMi(belge.file_name)) {
+        await eksigiSor(admin, {
+          case_id, hedef: "arabulucu", gorev_tipi: "arabulucu_onayi",
+          etiket: `talimat-sizintisi:${belge.id}`,
+          mesaj: "Bir belgede ajana yönelik talimat cümlesi görüldü; uygulanmadı.",
+        });
+      }
+
       const sistem = `Sen bir arabuluculuk dosyasında TEK BİR TARAFIN kendi belgesini okuyan tarafsız bir asistansın.
 Görevin: bu belgeden TALEP KALEMLERİNİ çıkarmak.
 
@@ -228,7 +239,15 @@ MUTLAK KURALLAR:
             model: "google/gemini-2.5-flash",
             messages: [
               { role: "system", content: sistem },
-              { role: "user", content: `BELGE ADI: ${temiz(belge.file_name)}\n\nBELGE METNİ:\n${belgeMetni.slice(0, MAX_GIRDI)}` },
+              /* PROMPT INJECTION SAVUNMASI: belge icerigi TALIMAT DEGIL ALINTI
+                 olarak tasinir; sistem yonergesi ile taraf metni ayri mesajlardadir
+                 ve belgedeki ajana yonelik cumleler ayiklanir. */
+              {
+                role: "user",
+                content: `BELGE ADI: ${temiz(belge.file_name)}
+
+${alintiOlarakSar(belgeMetni.slice(0, MAX_GIRDI), "BELGE")}`,
+              },
             ],
             response_format: { type: "json_object" },
           }),

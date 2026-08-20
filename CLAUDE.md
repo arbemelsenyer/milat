@@ -99,3 +99,6 @@ değişmediği işlerde (yalnız keşif, inceleme, rapor) bu adım atlanır.
 - Komutta bölüm listesi varsa cevabın sonuna "BÖLÜM DÖKÜMÜ" yaz: her bölüm
   için YAPILDI ya da ATLANDI(sebep). Sessiz atlama yasak.
 - Her cevabın sonunda üç satır: commit / değişen / gereken.
+- Sınırlar, kısıtlar ve öğrenme yasakları TÜM ajanlar ve TÜM aşamalar için,
+  ajanın devreye girdiği her an geçerlidir; ortak motorda tek yerde durur,
+  hiçbir fonksiyon kendi içinde gevşetemez.

@@ -7,6 +7,7 @@
 // içindeki "yapilmayanlar" listesine zaman damgasıyla yazılır (Ajan Paneli okur).
 // Güvenlik deseni check-new-tariff ile aynı: x-cron-secret veya admin JWT; yoksa 401.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { sinirdanGecir } from "../_shared/anlatim.ts";
 
 /* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
    Taraf kendi ekranından bildirim sıklığını ve sessiz saatlerini belirler
@@ -147,11 +148,12 @@ async function gorevAc(
   if (await gorevEtiketiVarMi(admin, caseId, gorevTipi, etiket)) {
     return { acildi: false, sebep: `${gorevTipi} görevi zaten açılmış (${etiket})` };
   }
+  // ORTAK SINIR KATMANI: panoya yazılan her açıklama süzgeçten geçer.
   const { error } = await admin.from("ajan_gorevleri").insert({
     case_id: caseId,
     gorev_tipi: gorevTipi,
     durum: opts?.durum ?? "bekliyor",
-    gerekce: `${etiket} ${aciklama}`.trim(),
+    gerekce: `${etiket} ${sinirdanGecir(aciklama, "nobetci.pano")}`.trim(),
     hedef_party_id: opts?.hedefPartyId ?? null,
   });
   if (error) return { acildi: false, sebep: `görev yazılamadı: ${error.message}` };

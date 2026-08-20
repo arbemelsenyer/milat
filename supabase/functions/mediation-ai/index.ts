@@ -7,6 +7,13 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sinirdanGecir, ajanaTalimatMi } from "../_shared/anlatim.ts";
+
+/* ORTAK SINIR KATMANI: insana giden metin süzgeçten geçer (hukuki tavsiye,
+   teşhis etiketi, suçlayıcı dil, dayanaksız rakam, sonuç tahmini elenir;
+   künyeli alıntı serbesttir). Bu fonksiyon bir SOHBET/BİLDİRİM yüzeyidir:
+   ortak motora BAĞLANMAZ — eşzamanlılık kilidi uygulanırsa üst üste iki mesaj
+   yazan kullanıcının ikinci mesajı reddedilir ve sohbet kırılır. */
 import { extractText, getDocumentProxy } from "npm:unpdf@0.12.1";
 import mammoth from "npm:mammoth@1.8.0";
 
@@ -376,7 +383,7 @@ ${ctx || "(bağlam yok)"}
         ...safeHistory,
       ]);
       const data = await r.json();
-      const reply = data.choices?.[0]?.message?.content ?? "";
+      const reply = sinirdanGecir(data.choices?.[0]?.message?.content ?? "", "mediation-ai");
       return new Response(JSON.stringify({ reply }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

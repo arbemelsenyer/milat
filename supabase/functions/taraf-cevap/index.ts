@@ -17,6 +17,7 @@
 // ya da dosyanın görevli arabulucusudur. Başkasının sorusuna cevap yazılamaz;
 // yetki kontrolü sunucuda yapılır, ekrandan gelen bilgiye güvenilmez.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { ajanaTalimatMi } from "../_shared/anlatim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,8 +78,18 @@ Deno.serve(async (req) => {
     }
     if (!yetkili) return json({ error: "Bu soruya cevap yazma yetkiniz yok" }, 403);
 
+    /* PROMPT INJECTION SAVUNMASI: cevap VERİDİR, TALİMAT DEĞİLDİR. İçinde
+       ajana yönelik cümle varsa işaretlenir; ajan onu uygulamaz. Cevabın kendisi
+       insanın sözüdür, sansürlenmez — yalnız talimat olarak okunmaz. */
+    const talimatSizintisi = ajanaTalimatMi(cevap);
     const { error: uErr } = await admin.from("ajan_gorevleri")
-      .update({ durum: "yapildi", sonuc: cevap }).eq("id", gorev_id);
+      .update({
+        durum: "yapildi",
+        sonuc: talimatSizintisi ? `[veri] ${cevap}` : cevap,
+      }).eq("id", gorev_id);
+    if (talimatSizintisi) {
+      console.error("[taraf-cevap] cevapta ajana yönelik talimat görüldü, uygulanmadı");
+    }
     if (uErr) return json({ error: uErr.message }, 500);
 
     return json({ yazildi: true });

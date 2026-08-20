@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sinirdanGecir } from "../_shared/anlatim.ts";
 
 /* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
    Taraf kendi ekranından bildirim sıklığını ve sessiz saatlerini belirler
@@ -146,7 +147,10 @@ serve(async (req) => {
       );
     }
 
-    const { requestId, scheduledDate, mediatorNotes, language = "tr" } = await req.json() as SessionNotificationRequest;
+    const { requestId, scheduledDate, mediatorNotes: hamNot, language = "tr" } = await req.json() as SessionNotificationRequest;
+    /* ORTAK SINIR KATMANI: e-postaya giren SERBEST NOT süzgeçten geçer.
+       Şablonun sabit metnine dokunulmaz. */
+    const mediatorNotes = hamNot ? sinirdanGecir(hamNot, "send-session-notification.notes") : hamNot;
 
     // Validate input
     if (!requestId || typeof requestId !== "string") {

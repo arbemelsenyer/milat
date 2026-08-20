@@ -1,5 +1,12 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2.49.4';
+import { sinirdanGecir, ajanaTalimatMi } from "../_shared/anlatim.ts";
+
+/* ORTAK SINIR KATMANI: insana giden metin süzgeçten geçer (hukuki tavsiye,
+   teşhis etiketi, suçlayıcı dil, dayanaksız rakam, sonuç tahmini elenir;
+   künyeli alıntı serbesttir). Bu fonksiyon bir SOHBET/BİLDİRİM yüzeyidir:
+   ortak motora BAĞLANMAZ — eşzamanlılık kilidi uygulanırsa üst üste iki mesaj
+   yazan kullanıcının ikinci mesajı reddedilir ve sohbet kırılır. */
 
 // OPENAI_API_KEY tanımlıysa embedding çağrıları doğrudan OpenAI'a gider (paylaşımlı
 // Lovable gateway kuyruğunu atlar); tanımlı değilse Lovable gateway + LOVABLE_API_KEY'e döner.
@@ -111,7 +118,8 @@ KESİN KURAL: Blok boşsa veya sorunla ilgili kaynak yoksa ASLA uydurma karar nu
       if (end > start) text = text.substring(start, end + 1);
     }
 
-    return new Response(JSON.stringify({ text }), {
+    // Üretilen metin insana gidiyor: ortak sınır süzgecinden geçer.
+    return new Response(JSON.stringify({ text: sinirdanGecir(text, "legal-reasoning-gemini") }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {

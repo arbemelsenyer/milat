@@ -367,3 +367,18 @@ Gün sonu belge komutuna dahildir.
 - Ön yüz: kokpitte "Ajan ne öğrendi" kartı · Aşama 7 Kapanış sekmesinde
   "Kapanış kontrolü, paket ve veri silme" kartı (JSZip ile tek paket, UYAP
   rehberi) · sohbette düzeltme sorusu · kontrol tercihi kartında üç adım uyarısı.
+
+[EKLEME 20.08.2026 — ORTAK SINIR KATMANI]
+- _shared/anlatim.ts: sinirDenetle / sinirdanGecir (çıktı süzgeci, künyeli
+  alıntı serbest) · ajanaTalimatMi + alintiOlarakSar (prompt injection) ·
+  yazmaIzniVar + INSAN_KAPISI_ALANLARI (yazma yetkisi) ·
+  ogrenmeGirdisiUygunMu (öğrenme yazım süzgeci).
+- MİRAS: anlatimAc.adim ve eksigiSor süzgeci çağırdığı için ortak motora bağlı
+  bütün fonksiyonlar (MOTORA_BAGLI, 24 adet) kendiliğinden kapsamdadır.
+- DOĞRUDAN BAĞLANANLAR (sohbet/bildirim yüzeyleri — motora BAĞLANMADAN yalnız
+  süzgeci çağırır; eşzamanlılık kilidi UYGULANMAZ, yoksa üst üste iki mesajın
+  ikincisi reddedilir): case-qa · taraf-asistan · taraf-cevap · mediation-ai ·
+  legal-reasoning-gemini · generate-options · akis-yurut (pano) · ajan-nobetci
+  (pano) · dosya-verilerini-sil · send-meeting-invite (serbest not) ·
+  send-session-notification (serbest not) · taraf-kalem-cikar (belge alıntısı).
+- deneyimYaz ve bellekYaz artık serbest metin ve tutar benzeri değeri REDDEDER.

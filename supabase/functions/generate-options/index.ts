@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sinirdanGecir } from "../_shared/anlatim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -215,7 +216,13 @@ Please suggest 3-4 resolution scenarios appropriate for this situation.`;
       ];
     }
 
-    return new Response(JSON.stringify({ options }), {
+    // Seçenek metinleri insana gidiyor: ortak sınır süzgecinden geçer.
+    const guvenliOptions = (Array.isArray(options) ? options : []).map((o: any) => ({
+      ...o,
+      title: sinirdanGecir(o?.title, "generate-options"),
+      description: sinirdanGecir(o?.description, "generate-options"),
+    }));
+    return new Response(JSON.stringify({ options: guvenliOptions }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

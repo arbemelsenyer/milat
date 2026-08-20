@@ -21,7 +21,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import {
   motoraBagliMi, girdiTamamla, talimatiDenetle, TALIMAT_ALMAYAN, talimatOzeti,
-  devirHedefi, bellekVarMi, bellekYaz,
+  devirHedefi, bellekVarMi, bellekYaz, sinirdanGecir,
 } from "../_shared/anlatim.ts";
 
 const corsHeaders = {
@@ -118,6 +118,8 @@ async function panoyaYaz(
   admin: any, caseId: string, gorevTipi: string, hedefPartyId: string | null, gerekce: string,
   konu?: string,
 ): Promise<{ yazildi: boolean; sebep: string }> {
+  // ORTAK SINIR KATMANI: panoya yazılan her bildirim süzgeçten geçer.
+  const guvenliGerekce = sinirdanGecir(gerekce, "akis-yurut.pano");
   const konuEtiketi = konu ? `[konu:${String(konu).slice(0, 80)}]` : "";
   let sorgu = admin.from("ajan_gorevleri")
     .select("id, gerekce").eq("case_id", caseId).eq("gorev_tipi", gorevTipi).eq("durum", "bekliyor");
@@ -139,7 +141,7 @@ async function panoyaYaz(
     gorev_tipi: gorevTipi,
     durum: "bekliyor",
     hedef_party_id: hedefPartyId,
-    gerekce: konuEtiketi ? `${konuEtiketi} ${gerekce}` : gerekce,
+    gerekce: konuEtiketi ? `${konuEtiketi} ${guvenliGerekce}` : guvenliGerekce,
   });
   if (error) return { yazildi: false, sebep: `pano satırı yazılamadı: ${error.message}` };
   return { yazildi: true, sebep: "yazıldı" };
@@ -189,7 +191,7 @@ async function hataYaz(
   admin: any, caseId: string, partyId: string | null, etiket: string, mesaj: string,
 ): Promise<void> {
   try {
-    const gerekce = `${etiket} ${mesaj}`.slice(0, 500);
+    const gerekce = `${etiket} ${sinirdanGecir(mesaj, "akis-yurut.hata")}`.slice(0, 500);
     const { data: mevcut } = await admin.from("ajan_gorevleri")
       .select("id, gerekce").eq("case_id", caseId).eq("gorev_tipi", "akis_hatasi").limit(300);
     if (((mevcut ?? []) as any[]).some((r) => String(r?.gerekce ?? "") === gerekce)) return;

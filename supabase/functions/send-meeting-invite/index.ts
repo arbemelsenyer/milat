@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { olayYaz } from "../_shared/olay.ts";
+import { sinirdanGecir } from "../_shared/anlatim.ts";
 
 /* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
    Taraf kendi ekranından bildirim sıklığını ve sessiz saatlerini belirler
@@ -260,7 +261,12 @@ serve(async (req) => {
         continue;
       }
       const displayName = p.company_name || `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "Değerli Taraf";
-      const html = buildHtml({ displayName, dateStr, timeStr, typeLabel, notes: session.notes });
+      /* ORTAK SINIR KATMANI: davete giren SERBEST NOT süzgeçten geçer.
+         Şablonun sabit metnine DOKUNULMAZ; yalnız değişken alan süzülür. */
+      const html = buildHtml({
+        displayName, dateStr, timeStr, typeLabel,
+        notes: session.notes ? sinirdanGecir(session.notes, "send-meeting-invite.notes") : session.notes,
+      });
 
       // pending log
       const { data: pendingLog } = await admin.from("meeting_invite_logs").insert({

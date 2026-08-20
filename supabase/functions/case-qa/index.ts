@@ -2,6 +2,13 @@
 // Read-only by design — this function writes to NO table (not even agent_states):
 // it is a query tool, not an agent run. No RAG / knowledge-base call either (V1 scope).
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { sinirdanGecir, ajanaTalimatMi } from "../_shared/anlatim.ts";
+
+/* ORTAK SINIR KATMANI: insana giden metin süzgeçten geçer (hukuki tavsiye,
+   teşhis etiketi, suçlayıcı dil, dayanaksız rakam, sonuç tahmini elenir;
+   künyeli alıntı serbesttir). Bu fonksiyon bir SOHBET/BİLDİRİM yüzeyidir:
+   ortak motora BAĞLANMAZ — eşzamanlılık kilidi uygulanırsa üst üste iki mesaj
+   yazan kullanıcının ikinci mesajı reddedilir ve sohbet kırılır. */
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -431,7 +438,9 @@ Yukarıdaki kayıtlara dayanarak cevapla; kayıtlarda karşılığı olmayan hi�
     console.log(`[case-qa] case=${case_id} bağlam=${contextBlocks.length} krk | kaynak=${sources.length} | insufficient=${insufficient}`);
 
     // Bu fonksiyon hiçbir tabloya YAZMAZ — sorgu aracıdır, ajan koşusu değildir.
-    return new Response(JSON.stringify({ answer, sources, insufficient }), {
+    // Cevap insana gidiyor: ortak sınır süzgecinden geçer.
+    const guvenliCevap = sinirdanGecir(answer, "case-qa");
+    return new Response(JSON.stringify({ answer: guvenliCevap, sources, insufficient }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
