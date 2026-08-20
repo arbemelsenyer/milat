@@ -181,6 +181,112 @@ export type Database = {
           },
         ]
       }
+      ajan_bellek: {
+        Row: {
+          anahtar: string
+          case_id: string
+          created_at: string
+          deger: Json
+          guncelleme_zamani: string
+          id: string
+          party_id: string | null
+        }
+        Insert: {
+          anahtar: string
+          case_id: string
+          created_at?: string
+          deger?: Json
+          guncelleme_zamani?: string
+          id?: string
+          party_id?: string | null
+        }
+        Update: {
+          anahtar?: string
+          case_id?: string
+          created_at?: string
+          deger?: Json
+          guncelleme_zamani?: string
+          id?: string
+          party_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ajan_bellek_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "ajan_bellek_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ajan_bellek_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ajan_deneyim: {
+        Row: {
+          adim: string
+          case_id: string | null
+          created_at: string
+          deneme_no: number
+          hata_kodu: string | null
+          id: string
+          mediator_id: string | null
+          sonuc: string
+          sure_ms: number | null
+          yol: string | null
+        }
+        Insert: {
+          adim: string
+          case_id?: string | null
+          created_at?: string
+          deneme_no?: number
+          hata_kodu?: string | null
+          id?: string
+          mediator_id?: string | null
+          sonuc: string
+          sure_ms?: number | null
+          yol?: string | null
+        }
+        Update: {
+          adim?: string
+          case_id?: string | null
+          created_at?: string
+          deneme_no?: number
+          hata_kodu?: string | null
+          id?: string
+          mediator_id?: string | null
+          sonuc?: string
+          sure_ms?: number | null
+          yol?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ajan_deneyim_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "ajan_deneyim_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ajan_gorevleri: {
         Row: {
           case_id: string
@@ -276,6 +382,70 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ajan_onerileri: {
+        Row: {
+          baslik: string
+          case_id: string
+          created_at: string
+          durum: string
+          eylem_adim: string | null
+          eylem_turu: string
+          gerekce: string | null
+          hedef: string
+          id: string
+          karar_zamani: string | null
+          party_id: string | null
+        }
+        Insert: {
+          baslik: string
+          case_id: string
+          created_at?: string
+          durum?: string
+          eylem_adim?: string | null
+          eylem_turu?: string
+          gerekce?: string | null
+          hedef: string
+          id?: string
+          karar_zamani?: string | null
+          party_id?: string | null
+        }
+        Update: {
+          baslik?: string
+          case_id?: string
+          created_at?: string
+          durum?: string
+          eylem_adim?: string | null
+          eylem_turu?: string
+          gerekce?: string | null
+          hedef?: string
+          id?: string
+          karar_zamani?: string | null
+          party_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ajan_onerileri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "ajan_onerileri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ajan_onerileri_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
             referencedColumns: ["id"]
           },
         ]
@@ -434,6 +604,33 @@ export type Database = {
           },
         ]
       }
+      arabulucu_aliskanliklari: {
+        Row: {
+          anahtar: string
+          guncelleme_zamani: string
+          id: string
+          mediator_id: string
+          sayac: number
+          son_deger: string | null
+        }
+        Insert: {
+          anahtar: string
+          guncelleme_zamani?: string
+          id?: string
+          mediator_id: string
+          sayac?: number
+          son_deger?: string | null
+        }
+        Update: {
+          anahtar?: string
+          guncelleme_zamani?: string
+          id?: string
+          mediator_id?: string
+          sayac?: number
+          son_deger?: string | null
+        }
+        Relationships: []
+      }
       arabulucu_kontrol_tercihleri: {
         Row: {
           aciklama_surumu: string
@@ -587,6 +784,323 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: true
             referencedRelation: "case_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bilirkisi_evrak_kumesi: {
+        Row: {
+          case_id: string
+          created_at: string
+          document_id: string
+          expert_id: string
+          gerekce: string | null
+          id: string
+          onay_zamani: string | null
+          onaylandi: boolean
+          onaylayan: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          document_id: string
+          expert_id: string
+          gerekce?: string | null
+          id?: string
+          onay_zamani?: string | null
+          onaylandi?: boolean
+          onaylayan?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          document_id?: string
+          expert_id?: string
+          gerekce?: string | null
+          id?: string
+          onay_zamani?: string | null
+          onaylandi?: boolean
+          onaylayan?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bilirkisi_evrak_kumesi_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "bilirkisi_evrak_kumesi_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bilirkisi_evrak_kumesi_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "case_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bilirkisi_evrak_kumesi_expert_id_fkey"
+            columns: ["expert_id"]
+            isOneToOne: false
+            referencedRelation: "experts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bilirkisi_onerileri: {
+        Row: {
+          alan: string | null
+          arabulucu_onay_zamani: string | null
+          arabulucu_onayi: boolean
+          arabulucu_secimi: boolean
+          case_id: string
+          created_at: string
+          durum: string
+          eslesme_gerekcesi: string
+          expert_id: string
+          id: string
+          oneren: string
+          oneren_party_id: string | null
+          sira: number
+        }
+        Insert: {
+          alan?: string | null
+          arabulucu_onay_zamani?: string | null
+          arabulucu_onayi?: boolean
+          arabulucu_secimi?: boolean
+          case_id: string
+          created_at?: string
+          durum?: string
+          eslesme_gerekcesi: string
+          expert_id: string
+          id?: string
+          oneren: string
+          oneren_party_id?: string | null
+          sira?: number
+        }
+        Update: {
+          alan?: string | null
+          arabulucu_onay_zamani?: string | null
+          arabulucu_onayi?: boolean
+          arabulucu_secimi?: boolean
+          case_id?: string
+          created_at?: string
+          durum?: string
+          eslesme_gerekcesi?: string
+          expert_id?: string
+          id?: string
+          oneren?: string
+          oneren_party_id?: string | null
+          sira?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bilirkisi_onerileri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "bilirkisi_onerileri_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bilirkisi_onerileri_expert_id_fkey"
+            columns: ["expert_id"]
+            isOneToOne: false
+            referencedRelation: "experts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bilirkisi_onerileri_oneren_party_id_fkey"
+            columns: ["oneren_party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bilirkisi_raporlari: {
+        Row: {
+          alan: string | null
+          case_id: string
+          created_at: string
+          dosya_yolu: string | null
+          durum: string
+          expert_id: string
+          id: string
+          rapor_metni: string | null
+          teslim_zamani: string | null
+        }
+        Insert: {
+          alan?: string | null
+          case_id: string
+          created_at?: string
+          dosya_yolu?: string | null
+          durum?: string
+          expert_id: string
+          id?: string
+          rapor_metni?: string | null
+          teslim_zamani?: string | null
+        }
+        Update: {
+          alan?: string | null
+          case_id?: string
+          created_at?: string
+          dosya_yolu?: string | null
+          durum?: string
+          expert_id?: string
+          id?: string
+          rapor_metni?: string | null
+          teslim_zamani?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bilirkisi_raporlari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "bilirkisi_raporlari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bilirkisi_raporlari_expert_id_fkey"
+            columns: ["expert_id"]
+            isOneToOne: false
+            referencedRelation: "experts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bilirkisi_secim_beyani: {
+        Row: {
+          case_id: string
+          created_at: string
+          id: string
+          masraf_kabul: boolean
+          party_id: string
+          secim_yontemi: string
+          tikanma_halinde_arabulucu: boolean
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          id?: string
+          masraf_kabul?: boolean
+          party_id: string
+          secim_yontemi: string
+          tikanma_halinde_arabulucu?: boolean
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          id?: string
+          masraf_kabul?: boolean
+          party_id?: string
+          secim_yontemi?: string
+          tikanma_halinde_arabulucu?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bilirkisi_secim_beyani_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "bilirkisi_secim_beyani_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bilirkisi_secim_beyani_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bilirkisi_taraf_yanitlari: {
+        Row: {
+          alan: string | null
+          case_id: string
+          created_at: string
+          expert_id: string
+          gosterim_izni: boolean
+          id: string
+          not_metni: string | null
+          party_id: string
+          yanit: string
+        }
+        Insert: {
+          alan?: string | null
+          case_id: string
+          created_at?: string
+          expert_id: string
+          gosterim_izni?: boolean
+          id?: string
+          not_metni?: string | null
+          party_id: string
+          yanit: string
+        }
+        Update: {
+          alan?: string | null
+          case_id?: string
+          created_at?: string
+          expert_id?: string
+          gosterim_izni?: boolean
+          id?: string
+          not_metni?: string | null
+          party_id?: string
+          yanit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bilirkisi_taraf_yanitlari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "bilirkisi_taraf_yanitlari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bilirkisi_taraf_yanitlari_expert_id_fkey"
+            columns: ["expert_id"]
+            isOneToOne: false
+            referencedRelation: "experts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bilirkisi_taraf_yanitlari_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "case_parties"
             referencedColumns: ["id"]
           },
         ]
@@ -1813,6 +2327,105 @@ export type Database = {
         }
         Relationships: []
       }
+      dosya_kapanis: {
+        Row: {
+          case_id: string
+          created_at: string
+          eksik_notu: string | null
+          id: string
+          kontrol_soruldu: boolean
+          onay_verildi: boolean
+          onay_zamani: string | null
+          paket_alindi: boolean
+          paket_zamani: string | null
+          silen: string | null
+          silme_zamani: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          eksik_notu?: string | null
+          id?: string
+          kontrol_soruldu?: boolean
+          onay_verildi?: boolean
+          onay_zamani?: string | null
+          paket_alindi?: boolean
+          paket_zamani?: string | null
+          silen?: string | null
+          silme_zamani?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          eksik_notu?: string | null
+          id?: string
+          kontrol_soruldu?: boolean
+          onay_verildi?: boolean
+          onay_zamani?: string | null
+          paket_alindi?: boolean
+          paket_zamani?: string | null
+          silen?: string | null
+          silme_zamani?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dosya_kapanis_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: true
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "dosya_kapanis_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: true
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      duzeltme_kayitlari: {
+        Row: {
+          adim: string
+          case_id: string | null
+          created_at: string
+          duzeltme_turu: string
+          id: string
+          mediator_id: string | null
+        }
+        Insert: {
+          adim: string
+          case_id?: string | null
+          created_at?: string
+          duzeltme_turu: string
+          id?: string
+          mediator_id?: string | null
+        }
+        Update: {
+          adim?: string
+          case_id?: string | null
+          created_at?: string
+          duzeltme_turu?: string
+          id?: string
+          mediator_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duzeltme_kayitlari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "case_outcome_analytics"
+            referencedColumns: ["case_id"]
+          },
+          {
+            foreignKeyName: "duzeltme_kayitlari_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       elverislilik_kontrol: {
         Row: {
           bulgular: Json
@@ -1925,6 +2538,7 @@ export type Database = {
           specialization: string
           title: string | null
           updated_at: string
+          user_id: string | null
           years_experience: number | null
         }
         Insert: {
@@ -1942,6 +2556,7 @@ export type Database = {
           specialization: string
           title?: string | null
           updated_at?: string
+          user_id?: string | null
           years_experience?: number | null
         }
         Update: {
@@ -1959,6 +2574,7 @@ export type Database = {
           specialization?: string
           title?: string | null
           updated_at?: string
+          user_id?: string | null
           years_experience?: number | null
         }
         Relationships: []
@@ -2491,6 +3107,57 @@ export type Database = {
           total_books?: number
           total_chunks?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      kural_kutuphanesi: {
+        Row: {
+          aciklama: string
+          baslik: string
+          created_at: string
+          dogdugu_duzeltme_turu: string | null
+          etkin: boolean
+          geri_alindi: boolean
+          geri_alma_zamani: string | null
+          hedef_adim: string | null
+          id: string
+          kaynak_ozet: string | null
+          kod: string
+          onay_zamani: string | null
+          onaylayan: string | null
+          surum: number
+        }
+        Insert: {
+          aciklama: string
+          baslik: string
+          created_at?: string
+          dogdugu_duzeltme_turu?: string | null
+          etkin?: boolean
+          geri_alindi?: boolean
+          geri_alma_zamani?: string | null
+          hedef_adim?: string | null
+          id?: string
+          kaynak_ozet?: string | null
+          kod: string
+          onay_zamani?: string | null
+          onaylayan?: string | null
+          surum?: number
+        }
+        Update: {
+          aciklama?: string
+          baslik?: string
+          created_at?: string
+          dogdugu_duzeltme_turu?: string | null
+          etkin?: boolean
+          geri_alindi?: boolean
+          geri_alma_zamani?: string | null
+          hedef_adim?: string | null
+          id?: string
+          kaynak_ozet?: string | null
+          kod?: string
+          onay_zamani?: string | null
+          onaylayan?: string | null
+          surum?: number
         }
         Relationships: []
       }
@@ -4281,6 +4948,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_case_expert: {
+        Args: { _case_id: string; _user_id: string }
         Returns: boolean
       }
       is_case_mediator: {
