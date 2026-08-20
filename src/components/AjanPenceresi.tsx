@@ -110,6 +110,8 @@ const GOREV_BASLIGI: Record<string, string> = {
   // yürütmez; soru cevaplanana kadar 'bekliyor' kalır ve burada görünür.
   taraf_sorusu: "Ajanınızın size bir sorusu var.",
   arabulucu_sorusu: "Ajanın size bir sorusu var.",
+  // 20.08 · bilirkişi seçim akışı: aday sunumu, hatırlatma, atama bilgisi.
+  bilirkisi_secimi: "Bilirkişi seçimiyle ilgili bir adım var.",
 };
 
 /* Taraf sohbetinde YALNIZ bu tipler görünür; arabulucuya ait tipler sorguya
@@ -117,6 +119,8 @@ const GOREV_BASLIGI: Record<string, string> = {
 const TARAFA_ACIK_GOREVLER = [
   "soru_gonder", "taraf_eksik_bilgi", "taraf_musaitlik_iste",
   "teklif_degerlendir", "ilk_temas", "ozel_oturum", "taraf_sorusu",
+  // 20.08 · taraf ajanı bilirkişi adaylarını KENDİ sohbetinde sunar.
+  "bilirkisi_secimi",
 ];
 
 /* Cevap yazılabilen tipler: ajanın doğrudan sorduğu sorular. Öteki bekleyen
@@ -155,6 +159,7 @@ const GOREV_ASAMASI: Record<string, number> = {
   taraf_musaitlik_iste: 4, randevu_teklifi: 4, taraf_alternatif_saat: 4,
   oturum_hatirlatma: 4, ozel_oturum: 4, foy_teslim_uyarisi: 4,
   taraf_sorusu: 3, arabulucu_sorusu: 3,
+  bilirkisi_secimi: 6,
 };
 
 const GOREV_SEKMESI: Record<string, string> = {
@@ -165,6 +170,7 @@ const GOREV_SEKMESI: Record<string, string> = {
   teklif_degerlendir: "braket",
   ilk_temas: "ajanim",
   ozel_oturum: "randevu",
+  bilirkisi_secimi: "experts",
 };
 
 /* ── SESLİ GİRİŞ (tarayıcının kendi konuşma tanıması) ────────────────────────

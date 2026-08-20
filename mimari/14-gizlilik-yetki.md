@@ -97,3 +97,51 @@ her ajan bunları MİRAS ALIR, kendi metninde yeniden yazmaz ve gevşetemez.
    devreye girer. Sohbet ve bildirim yüzeyleri süzgeci ÇAĞIRIR ama motora
    BAĞLANMAZ — eşzamanlılık kilidi uygulanırsa üst üste iki mesajın ikincisi
    reddedilir ve sohbet kırılır.
+
+
+[EKLEME 20.08.2026 — BİLİRKİŞİNİN GÖRDÜĞÜ VE GÖREMEDİĞİ VERİ]
+● KOD CANLI KOLDA (deploy + publish sonrası doğrulanacak).
+
+BİLİRKİŞİ EKRANI İKİ KADEMEDİR
+· KABULDEN ÖNCE yalnız beş alan: dosya numarası · alan · görevlendirme tarihi ·
+  kapsamın tek cümlelik özeti · kendi ücreti. Taraf adları, belgeler, kalemler,
+  sohbet ve analizler SUNUCUDAN HİÇ GÖNDERİLMEZ — ekranda gizleme yoktur.
+· KABULDEN SONRA yalnız: bilirkisi_evrak_kumesi'nde onaylandi=true olan belgeler
+  ve kendi raporu. Başka hiçbir veriye erişemez.
+· Kapsam özeti cümlesi dosyanın KAYITLI uyuşmazlık türünden kurulur; taraf adı,
+  tutar ve beyan içermez.
+
+NEDEN SUNUCUDAN OKUNUYOR
+· Canlı politikada `experts` tablosunu yalnız yönetici ve görevli arabulucu
+  okuyabilir (20260630074226 göçü); ne taraf ne de bilirkişinin kendisi okur.
+  Bu yüzden hem tarafın gördüğü aday profili hem bilirkişinin gördüğü her şey
+  edge fonksiyonlardan gelir. SÜZME SORGUDADIR.
+
+KÖR PERDE (TARAF ↔ TARAF)
+· Taraf, karşı tarafın bilirkişi yanıtını göremez. bilirkisi-secim · "liste"
+  adımı taraf için sorguyu KENDİ party_id'siyle sınırlar; karşı tarafın satırı
+  ancak İKİ TARAF DA gosterim_izni verdiyse ayrıca okunur.
+· Tarafa açılan evrak bilgisi yalnız BAŞLIK düzeyindedir: "şu belgeler açıldı".
+  Belge içeriği karşı tarafa hiçbir yüzeyden gösterilmez.
+
+EVRAK KÜMESİ ONAYI — İNSAN KAPISI
+· Ajan belgeleri seçer ve her birine tek satır gerekçe yazar; satır
+  onaylandi=false olarak durur. ARABULUCU ONAYLAMADAN HİÇBİR BELGE AÇILMAZ.
+  Sebebi: tarafların verisi dosya dışına çıkıyor.
+· Onay yalnız arabulucunun oturumuyla verilir; cron/akış çağrısı reddedilir.
+
+BELGE İNDİRME
+· bilirkisi-belge-baglantisi üç kapıyı birden arar: (1) istek sahibi bir
+  bilirkişi kaydına bağlı mı, (2) görevi KABUL etmiş mi, (3) belge onaylanmış
+  kümede mi. Bağlantı 5 dakika yaşar. Depolama politikası DEĞİŞTİRİLMEDİ.
+· Açılan her belge denetim izine yazılır (expert_assignment_logs ·
+  action='document_opened'); iz belge İÇERİĞİNİ ve bağlantıyı taşımaz.
+
+DOSYA KAPANINCA
+· cases.closed_at dolu ya da status kapalı listedeyse (completed · resolved ·
+  closed · archived) bilirkişinin bütün adımları veri döndürmez, imzalı bağlantı
+  üretilmez. Açılan belgeler ve rapor, dosyanın silinen kümesi içindedir.
+
+ÜÇÜNCÜ KİŞİ VERİSİ
+· Taraf dışarıdan bir isim önerdiğinde ajan experts tablosuna KENDİLİĞİNDEN
+  YAZMAZ; bilgi arabulucuya bildirilir, listeye ekleme arabulucu onayıyla olur.

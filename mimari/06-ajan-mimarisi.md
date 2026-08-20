@@ -782,3 +782,44 @@ MÜKERRER KOŞUM KAPISI:
   (_shared/anlatim.ts · ogrenmeGirdisiUygunMu).
 · Bu muafiyet olmadan belleğe yazan bütün çağrılar düşüyordu; mükerrer koşum
   koruması ve devir zinciri fiilen kapalı kalmıştı (20.08 canlı bulgusu).
+
+
+[EKLEME 20.08.2026 — BİLİRKİŞİ SEÇİM AKIŞI VE AJANLAR ARASI DEVİR]
+● KOD CANLI KOLDA (deploy + publish sonrası doğrulanacak).
+
+AJAN BAĞI
+· Olay: bilirkisi_onerildi · bilirkisi_durumu_degisti · bilirkisi_beyani_verildi
+  (ilk ikisinin tetikleyicisi canlıda kurulu; kural satırları bu turda
+  YAZILMADI — komut gereği kurucunun öteki koluna bırakıldı).
+· Sahip: MASA AJANI (aday çıkarma, evrak kümesi önerisi, tıkanma raporu) +
+  TARAF AJANI (beyan sorusu, aday sunumu, yanıt toplama, rapor sunumu).
+· Motora bağlı fonksiyon: bilirkisi-secim (MOTORA_BAGLI listesinde,
+  zorunlu girdi: case_id, varsayılan adım: "ilerlet").
+· Motora BAĞLANMAYANLAR (bilerek): bilirkisi-ekranim · bilirkisi-belge-baglantisi
+  · bilirkisi-davet. Bunlar akış adımı değil, kullanıcının kendi yüzeyidir.
+
+ADIM ZİNCİRİ (supabase/functions/bilirkisi-secim/index.ts)
+1. beyan_yaz/beyanim  — taraf kendi beyanını verir (§1). Katılımcı yöntem
+   kuralı tek yerde: beyanlariOku() → hepsiArabulucu / tikanmaYetkisi.
+2. aday_oner (yazmaz) → arabulucu_ekle (arabulucu_secimi=true) · aday_cikar
+   (en fazla 3, deterministik: alt alan 3 puan → uzmanlık 2 puan → tecrübe →
+   puan → şehir alfabetik). Örtüşme yoksa aday YAZILMAZ.
+3. ilerlet/taraflara_sun → taraf ajanının panosuna "bilirkisi_secimi" satırı.
+   İki taraf da "arabulucu seçsin" dediyse bu adım ATLANIR.
+4. yanit_yaz (taraf) · liste (kör perdeli okuma) · ikinci_tur · tikanma.
+5. ata — İNSAN KAPISI, yalnız arabulucunun oturumu. case_expert_assignments'a
+   yazar, öneri durumu 'atandi' olur, iki tarafa ve arabulucuya bildirilir.
+6. evrak_oner (ajan hazırlar, onaylandi=false) → evrak_onayla — İNSAN KAPISI.
+7. raporlar · rapor_yorumu (tarafın diyeceği dosyaya işlenir).
+
+DEVİR ZİNCİRİ
+· devirYaz istek_turu="bilirkisi_secimi": ana ajan → taraf ajanı, sonuç
+  "bekliyor". İçerik taşınmaz; yalnız istek türü ve sonuç.
+· Nöbetçi kolu (ajan-nobetci · bilirkisiKollari): sessiz kalan tarafa BİR KEZ
+  hatırlatma, iki gün sonra beyana dayanarak sayım; rapor 14 günde bilirkişiye,
+  21 günde arabulucuya hatırlatılır. Bu kol atama YAPMAZ, belge AÇMAZ.
+
+DEĞİŞMEZ SINIR
+· Yapay zekâ tek başına bilirkişi ATAMAZ. 'sistem_oneri' beyanı verilse bile son
+  dokunuş arabulucudadır; 'ata' ve 'evrak_onayla' iç çağrı kapısından çalışmaz.
+· Ajan "bu uzman daha iyidir" demez; "şu alanla örtüşüyor" der.

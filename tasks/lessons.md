@@ -256,3 +256,19 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   süzgeç yazılırken MAKİNE KİMLİĞİ (saat damgası, UUID, kod, kısaltma) ile
   KİŞİSEL VERİ ayrımı baştan konur ve muafiyet desenle tanımlanır; süzgeç
   eklendikten sonra kendi yazdığı alanlarla bir kez denenir.
+- DERS (20.08.2026) — MÜKERRER YAZIM KAPISI ETİKETİN YERİNE BAĞLIDIR. Nöbetçinin
+  gorevEtiketiVarMi kapısı gerekçenin iş etiketiyle BAŞLADIĞINI varsayıyor
+  (startsWith); ama bildirimler anaAjanaBildir geçidinden geçtiğinden gerekçenin
+  başına artık "[kaynak:…]" konuyor ve iş etiketi ortada kalıyor. Kapı sessizce
+  açılıyor, aynı hatırlatma her turda yeniden yazılabiliyor. Kural: bir etiket
+  denetimi yazılırken metnin BAŞINA başka bir katmanın yazıp yazmadığı kontrol
+  edilir; ortak geçitten geçen metinlerde startsWith değil includes kullanılır.
+  (Bilirkişi kolunda bilirkisiEtiketiVarMi ile yapıldı; mevcut kapı KAPSAM DIŞI
+  olduğu için düzeltilmedi, todo.md'ye raporlandı.)
+- DERS (20.08.2026) — TARAFIN OKUYAMADIĞI TABLODAN EKRAN ÇİZİLMEZ. Bilirkişi
+  aday kartları önce doğrudan `experts` tablosundan çizilecekti; oysa canlı
+  politika (20260630074226) o tabloyu yalnız yöneticiye ve GÖREVLİ ARABULUCUYA
+  açıyor — taraf da, bilirkişinin kendisi de okuyamıyor. Kural: bir ekran
+  yazmadan önce o verinin ilgili ROLE açık olup olmadığı politikadan
+  doğrulanır; açık değilse veri sunucudan (edge fonksiyon) verilir ve süzme
+  sorguda yapılır. Ekranda gizlemek yetki değildir.

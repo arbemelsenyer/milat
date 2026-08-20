@@ -33,6 +33,7 @@ import RandevuCevap from "./pages/RandevuCevap";
 import KatilimCevap from "./pages/KatilimCevap";
 import YapayZekaBeyani from "./pages/YapayZekaBeyani";
 import Verilerim from "./pages/Verilerim";
+import BilirkisiEkrani from "./pages/BilirkisiEkrani";
 import AppLayout from "./components/AppLayout";
 import { HelmetProvider } from "react-helmet-async";
 
@@ -64,6 +65,11 @@ const App = () => (
             <Route path="/randevu/:token" element={<RandevuCevap />} />
             {/* Girişsiz katılım teyidi sayfası — AppLayout dışında, guard yok. */}
             <Route path="/katilim/:token" element={<KatilimCevap />} />
+
+            {/* BİLİRKİŞİ EKRANI — arabulucu kabuğunun (sol menü) DIŞINDA durur:
+                bilirkişi ürünün geri kalanını görmez, yalnız kendi iki kademeli
+                ekranını görür. Giriş kapısı sayfanın kendi içindedir. */}
+            <Route path="/bilirkisi" element={<BilirkisiEkrani />} />
 
             {/* App shell with left sidebar */}
             <Route element={<AppLayout />}>

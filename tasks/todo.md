@@ -1,3 +1,85 @@
+## Nerede kaldık — 20.08.2026 (104) · BİLİRKİŞİ KATMANI (yedi bölüm)
+
+- [x] 1 · BEYAN: taraf kendi beyanını verir (biz seçelim / arabulucu seçsin /
+      sistem önersin + tıkanmada arabulucu + masraf kabulü); katılımcı yöntem
+      kuralı tek yerde (beyanlariOku) — iki taraf da "arabulucu" demedikçe liste
+      ikisine de gider.
+- [x] 2 · ALAN + ADAY: arabulucu alan satırı açar; masa ajanı en fazla 3 aday
+      çıkarır, sıralama deterministik (alt alan 3 → uzmanlık 2 → tecrübe → puan
+      → şehir alfabetik), gerekçe yalnız GERÇEK örtüşen ifadelerden kurulur;
+      örtüşme yoksa isim uydurulmaz.
+- [x] 3 · SUNUM + KÖR PERDE: taraf ajanı kendi sohbetinde sunar, taraf işaretler
+      ve sıralar; karşı tarafın yanıtı ancak İKİ TARAF DA izin verirse görünür,
+      süzme sorguda. İkinci tur ve tıkanma yolları açık.
+- [x] 4 · ATAMA + DAVET + KABUL: atama insan kapısı (yalnız arabulucunun
+      oturumu), case_expert_assignments'a yazılır, öneri 'atandi' olur; davet
+      taraf daveti deseniyle gider; bilirkişi kabul edene kadar belge açılmaz.
+- [x] 5 · BİLİRKİŞİ EKRANI: /bilirkisi, iki kademe. Kabulden önce yalnız beş
+      alan; kabulden sonra yalnız açılan belgeler + kendi raporu. İndirme
+      bilirkisi-belge-baglantisi ile, 5 dakikalık imzalı bağlantı.
+- [x] 6 · EVRAK KÜMESİ: ajan seçer ve gerekçe yazar, onaylandi=false kalır;
+      ARABULUCU ONAYLAMADAN AÇILMAZ. Taraflara yalnız başlık düzeyinde bilgi
+      düşer. Dış aday yolu açık; ajan üçüncü kişinin verisini kendiliğinden
+      kaydetmiyor.
+- [x] 7 · RAPOR: bilirkişi kendi ekranından yükler; teslim olayı arabulucuya ve
+      taraf ajanlarına düşer, tarafın diyeceği dosyaya işlenir. Nöbetçi 14 günde
+      bilirkişiye, 21 günde arabulucuya hatırlatıyor.
+
+AÇIK KALEMLER:
+- UZMAN HAVUZU BUGÜN 6 KAYIT, GENİŞLETİLMELİ. (Sayı komutta bildirildi; bu
+  turda canlıya sorulmadı — doğrulanmadı.) Havuz dar olduğu için aday çıkarma
+  çoğu alanda "uygun aday bulamadım" diyecektir; bu bir arıza değil, veri
+  eksikliğidir.
+- TERCİH SIRASI ETİKETLE TUTULUYOR: bilirkisi_taraf_yanitlari'nda `sira` kolonu
+  yok; tarafın sıralaması not alanının başına "[sira:N]" etiketiyle yazılıp
+  ekranda ayıklanıyor (src/lib/bilirkisiCagri.ts). Kolon eklenirse etiket
+  bırakılıp alana taşınmalı.
+- BİLİRKİŞİNİN KAYIT OLMA YOLU YOK: projede açık kayıt kapalı, invite-signup
+  yalnız TARAF davet jetonuyla çalışıyor. Bilirkişinin hesabı önceden açılmış
+  olmalı; ekran bunu yazıyor. Yeni giriş sistemi kurulmadı (komut gereği).
+- AKIŞ KURAL SATIRLARI YAZILMADI (komut: "Kural satırlarını Claude ekleyecek —
+  sen ekleme"). bilirkisi-secim MOTORA_BAGLI listesinde ve zorunlu girdisi
+  case_id; kural satırı gelince olayla uyanacak.
+- KAPSAM DIŞI BULGU (düzeltilmedi, raporlanıyor): ajan-nobetci'deki
+  gorevEtiketiVarMi mükerrer yazım kapısı, gerekçenin iş etiketiyle BAŞLADIĞINI
+  varsayıyor (startsWith). Oysa anaAjanaBildir geçidi gerekçenin başına
+  "[kaynak:…]" etiketini koyuyor; etiket artık başta değil, İÇERİDE. Yani o
+  kapı fiilen açık ve nöbetçi bazı görevleri her turda yeniden yazabilir.
+  Bilirkişi kolu bu kapıya güvenmiyor, kendi includes'lu kapısını kullanıyor
+  (bilirkisiEtiketiVarMi). Düzeltme kararı kurucuda.
+
+SIRADA (canlı doğrulama):
+1. REDEPLOY: bilirkisi-secim · bilirkisi-ekranim · bilirkisi-belge-baglantisi ·
+   bilirkisi-davet · ajan-nobetci + _shared/anlatim.ts'i kullanan BÜTÜN
+   fonksiyonlar (ortak dosya değişti).
+2. PUBLISH (ön yüz): /bilirkisi ekranı ve CaseRoom Bilirkişi sekmeleri.
+3. Canlı test sırası: taraf beyanı → alan satırı + aday çıkarma → taraflara sun
+   → taraf işaretlemesi → atama → davet → bilirkişi kabulü → evrak önerisi →
+   arabulucu onayı → belge açma → rapor teslimi → tarafın görüşü.
+
+## PLAN — 20.08.2026 (104) · BİLİRKİŞİ: SEÇİM, KABUL, KENDİ EKRANI, RAPOR
+
+Kapsam: canlıda KURULU beş tablo + is_case_expert üzerine ÜRÜN katmanı.
+SQL/migration/politika YAZILMAYACAK. Akış kuralı satırları da yazılmayacak
+(komut: "Kural satırlarını Claude ekleyecek").
+
+- [ ] 1 · Beyan (§1): taraf kendi beyanını yazar; katılımcı yöntem kuralı.
+- [ ] 2 · Alan satırı + aday çıkarma (§2): deterministik sıralama, gerekçe.
+- [ ] 3 · Taraflara sunum + kör perde + ikinci tur + tıkanma (§3).
+- [ ] 4 · Atama (insan kapısı) + bilirkişi daveti + kabul/ret (§4).
+- [ ] 5 · Bilirkişi ekranı iki kademe + bilirkisi-belge-baglantisi (§5).
+- [ ] 6 · Evrak kümesi: ajan hazırlar, arabulucu onaylar; dış aday yolu (§6).
+- [ ] 7 · Rapor + akışın sürmesi + 14/21 gün nöbetçi hatırlatması (§7).
+
+Mimari kararlar (gerekçeli):
+- experts tablosunu TARAF OKUYAMAZ (20260630074226 politikası: yalnız admin ve
+  görevli arabulucu). Bu yüzden tarafın gördüğü aday profili ve bilirkişinin
+  gördüğü her şey SUNUCUDAN gelir; süzme sorguda olur, ekranda gizleme yok.
+- Yeni tablo/politika kurulamadığı için bilirkişi daveti YENİ giriş sistemi
+  açmaz: taraf daveti deseninin aynısı (izinli origin + e-posta) kullanılır,
+  bağlama doğrulanmış oturum e-postası ile experts.email eşleşmesinden yapılır.
+- Atama ve evrak kümesi onayı insan kapısıdır; ajan yalnız yazar/önerir.
+
 ## Nerede kaldık — 20.08.2026 (103) · ÖĞRENME SÜZGECİ ONARIMI
 
 - [x] eca1158'in beş bölümü CANLIDA DOĞRULANDI.

@@ -493,6 +493,12 @@ export const MOTORA_BAGLI: string[] = [
   "hazirlik-foyu-gonder",
   // 20.08 · arabulucunun akış onayı (sohbetten çağrılır, girdi: gorev_id)
   "akis-onayla",
+  /* 20.08 · bilirkişi seçim akışı. YALNIZ masa ajanı kolu motora bağlıdır;
+     bilirkişinin kendi ekranı (bilirkisi-ekranim), belge bağlantısı ve davet
+     akış adımı DEĞİL, kullanıcının kendi yüzeyidir — bilerek dışarıdadır.
+     Motordan çağrıldığında varsayılan adım "ilerlet"tir; atama ve evrak onayı
+     insan kapısıdır ve iç çağrı kapısından çalışmaz. */
+  "bilirkisi-secim",
 ];
 
 export function motoraBagliMi(fonksiyon: string): boolean {
@@ -516,6 +522,7 @@ const ZORUNLU_GIRDI: Record<string, string[]> = {
   "masa-kalem-karsilastir": ["case_id"],
   "bilirkisi-sorulari": ["case_id"],
   "taslak-denetim": ["case_id"],
+  "bilirkisi-secim": ["case_id"],
 };
 
 function dolu(v: unknown): boolean {

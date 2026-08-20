@@ -421,3 +421,46 @@ Gün sonu belge komutuna dahildir.
 - Bellek işareti ("tamamlandi:<adım>", "kalem_cikarildi:<belge>",
   "devir:<sıra>") bu commit'le açılıyor; öncesinde beş çağrı yerinin hepsi
   süzgeçte düşüyordu.
+
+[EKLEME 20.08.2026 — BİLİRKİŞİ KATMANI]
+CANLIDA KURULU (kurucu tarafından, bu turdan ÖNCE — kod bunların üzerine oturdu;
+bu turda SQL YAZILMADI, migration üretilmedi, politika değiştirilmedi):
+- Tablolar (5): bilirkisi_secim_beyani · bilirkisi_onerileri ·
+  bilirkisi_taraf_yanitlari · bilirkisi_evrak_kumesi · bilirkisi_raporlari.
+  Beşi de src/integrations/supabase/types.ts'te görünüyor (satır 797–1110
+  aralığı), yani canlı şemadan üretilmiş.
+- Yardımcı işlev: is_case_expert(case_id, user_id).
+- Politika: case_documents üzerinde "bilirkişi yalnız açılan belgeyi görür".
+- Tetikleyici: bilirkisi_onerildi ve bilirkisi_durumu_degisti olayları.
+NOT: Kod bu politikaya GÜVENMİYOR, ona ek olarak çalışıyor — bilirkişinin
+gördüğü her şey hizmet anahtarıyla ve üç kapı denetimiyle edge fonksiyondan
+geçiyor (aşağıya bak). Sebep: `experts` tablosunu bilirkişinin kendisi de
+okuyamıyor (20260630074226 göçü).
+
+BU TURDA EKLENEN EDGE FONKSİYONLAR (4 YENİ — REDEPLOY GEREKİR):
+- bilirkisi-secim ....... masa/taraf ajanı kolu. Adımlar: beyan_yaz · beyanim ·
+  beyanlar · aday_oner (yazmaz) · aday_cikar · ikinci_tur · arabulucu_ekle ·
+  taraf_aday_oner · ilerlet/taraflara_sun · liste · yanit_yaz · tikanma · ata ·
+  evrak_oner · evrak_listesi · evrak_onayla · dis_aday · raporlar · rapor_yorumu.
+  MOTORA_BAGLI listesinde; zorunlu girdi case_id; varsayılan adım "ilerlet".
+- bilirkisi-ekranim ..... bilirkişinin kendi ekranının sunucu tarafı. Adımlar:
+  eslestir · dosyalarim · ozet · kabul · ret · belgelerim · raporum ·
+  rapor_kaydet. Motora BAĞLI DEĞİL (yüzey, akış adımı değil).
+- bilirkisi-belge-baglantisi ... 5 dakikalık imzalı bağlantı, üç kapı denetimi.
+- bilirkisi-davet ....... görevlendirme e-postası (taraf daveti deseni, izinli
+  origin listesi aynı). YENİ GİRİŞ SİSTEMİ KURULMADI.
+
+DEĞİŞEN MEVCUT FONKSİYONLAR (REDEPLOY GEREKİR):
+- _shared/anlatim.ts ... MOTORA_BAGLI + ZORUNLU_GIRDI'ye "bilirkisi-secim".
+  Bu dosyayı kullanan BÜTÜN fonksiyonlar yeniden deploy edilmeli.
+- ajan-nobetci ......... yeni kol: bilirkisiKollari (sessiz taraf sayımı,
+  rapor 14/21 gün hatırlatması). Dönüş özetine iki sayaç eklendi.
+
+BİLİRKİŞİ EKRANININ İKİ KADEMESİ (ön yüz — PUBLISH GEREKİR):
+- /bilirkisi adresi, AppLayout'un (sol menü) DIŞINDA. Kademe 1: dosya no · alan ·
+  görevlendirme tarihi · kapsam özeti · kendi ücreti + Kabul/Ret. Kademe 2:
+  yalnız açılan belgeler + kendi raporu.
+
+BİLİNEN SINIR (açık kalem): bilirkişinin ürüne KAYIT OLMA yolu yoktur — projede
+açık kayıt kapalı, invite-signup yalnız TARAF davet jetonuyla çalışıyor. Bugün
+bilirkişinin hesabı önceden açılmış olmalıdır; ekran bunu açıkça yazıyor.

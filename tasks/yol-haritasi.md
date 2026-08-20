@@ -812,3 +812,21 @@ ikincil "Yalnız onayla"; gönderilmiş föyün altında gönderim kaydına gör
 satır. Mevcut Kaydet / Yeniden hazırla / Gönder düğmeleri ve nöbetçinin öteki
 kontrolleri değişmedi. REDEPLOY GEREKLİ: hazirlik-foyu-gonder · ajan-nobetci.
 PUBLISH: evet. SQL: yok — tablo ve RLS kurucu tarafından canlıya alınmıştı.
+
+20.08.2026 — BİLİRKİŞİ: SEÇİM, KABUL, KENDİ EKRANI, RAPOR (yedi bölüm).
+Canlıda kurulu beş tablonun üzerine ürün katmanı yazıldı; SQL YAZILMADI,
+migration üretilmedi, politika değiştirilmedi, akış kural satırı eklenmedi.
+Yeni edge fonksiyonlar: bilirkisi-secim (masa/taraf ajanı kolu, 19 adım) ·
+bilirkisi-ekranim (bilirkişi ekranının sunucu tarafı) · bilirkisi-belge-baglantisi
+(5 dk imzalı bağlantı, üç kapı) · bilirkisi-davet (taraf daveti deseni).
+Değişen: _shared/anlatim.ts (MOTORA_BAGLI + ZORUNLU_GIRDI) · ajan-nobetci
+(bilirkisiKollari: sessiz taraf sayımı, rapor 14/21 gün hatırlatması).
+Ön yüz: /bilirkisi iki kademeli bilirkişi ekranı (AppLayout dışında) ·
+CaseRoom Bilirkişi sekmesine arabulucu paneli, taraf sekmesine taraf paneli
+EKLENDİ (mevcut ExpertSelector, öneri/onay kartı ve denetim izi kaldırılmadı) ·
+AjanPenceresi'ne "bilirkisi_secimi" görev tipi tanıtıldı.
+İnsan kapıları korundu: atama ve evrak kümesi onayı yalnız arabulucunun
+oturumuyla; iç çağrı kapısından çalışmıyor. Yapay zekâ tek başına bilirkişi
+atamıyor. REDEPLOY GEREKLİ: bilirkisi-secim · bilirkisi-ekranim ·
+bilirkisi-belge-baglantisi · bilirkisi-davet · ajan-nobetci + _shared/anlatim.ts
+kullanan bütün fonksiyonlar. PUBLISH: evet. SQL: yok.

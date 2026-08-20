@@ -29,6 +29,8 @@ import { OfficialDocsPanel } from "@/components/mediation/OfficialDocsPanel";
 import { StepTimeline } from "@/components/mediation/StepTimeline";
 import { AgentControlPanel } from "@/components/mediation/AgentControlPanel";
 import { AjanPenceresi } from "@/components/AjanPenceresi";
+import { BilirkisiAlanlari } from "@/components/bilirkisi/BilirkisiAlanlari";
+import { BilirkisiTarafPaneli } from "@/components/bilirkisi/BilirkisiTarafPaneli";
 import { downloadOfficialPdf } from "@/lib/pdfTemplates";
 import { downloadPaymentInfoPdf } from "@/lib/invoice-pdf";
 import { formatDisputeType } from "@/lib/disputeLabels";
@@ -671,7 +673,12 @@ export default function CaseRoom() {
         </TabsContent>
 
         <TabsContent value="experts">
-          <ExpertsTab caseId={caseId!} niche={caseRow?.dispute_type ?? ""} parties={parties} />
+          {/* YENİ: alan satırları · aday · taraf yanıtları · atama · evrak kümesi.
+              Mevcut ExpertSelector ve öneri/onay kartı KALDIRILMADI, altta durur. */}
+          <div className="space-y-4">
+            <BilirkisiAlanlari caseId={caseId!} />
+            <ExpertsTab caseId={caseId!} niche={caseRow?.dispute_type ?? ""} parties={parties} />
+          </div>
         </TabsContent>
 
         <TabsContent value="rounds">
@@ -846,7 +853,12 @@ export default function CaseRoom() {
         </TabsContent>
 
         <TabsContent value="experts">
-          <PartyExpertApproval caseId={caseId!} partyId={myParty!.id} />
+          {/* YENİ: beyan · aday profil kartları · işaretleme · dış aday · rapor.
+              Mevcut onay kartı KALDIRILMADI, altta durur. */}
+          <div className="space-y-4">
+            <BilirkisiTarafPaneli caseId={caseId!} />
+            <PartyExpertApproval caseId={caseId!} partyId={myParty!.id} />
+          </div>
         </TabsContent>
 
         <TabsContent value="payment">

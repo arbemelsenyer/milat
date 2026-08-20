@@ -2349,6 +2349,197 @@ async function icFonksiyonCagir(fonksiyon: string, govde: unknown): Promise<{ ok
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   BİLİRKİŞİ KOLLARI (komut §3 ve §7 — saatle işleyen iki kural)
+
+   1) SESSİZ KALAN TARAF: beyanında "arabulucu/sistem seçsin" demiş bir taraf
+      aday listesine iki gün içinde hiç yanıt vermezse ajan BİR KEZ hatırlatır;
+      iki gün daha geçerse BEYANINA DAYANARAK arabulucunun adayını kabul etmiş
+      sayar ve bunu İKİ TARAFA DA yazar. Kimse seçmeye zorlanmaz, kimsenin
+      seçme hakkı kaldırılmaz — "biz seçelim" diyen taraf bu kolun DIŞINDADIR.
+
+   2) GECİKEN RAPOR: kabul tarihinden 14 gün sonra bilirkişiye sakin bir
+      hatırlatma, 21 gün sonra arabulucuya bildirim.
+
+   Bu kol hiçbir atama yapmaz, hiçbir belge açmaz. Yalnız yazar ve hatırlatır.
+   ──────────────────────────────────────────────────────────────────────────── */
+type BilirkisiOzet = { hatirlatilan: number; sayilan: number; sebepler: string[] };
+
+const GUN_MS = 24 * 60 * 60 * 1000;
+
+/* MÜKERRER YAZIM KAPISI — neden ayrı bir yardımcı:
+   Bildirimler anaAjanaBildir geçidinden geçiyor ve geçit gerekçenin BAŞINA
+   "[kaynak:…]" etiketini koyuyor. Bu yüzden gerekçe artık iş etiketiyle
+   BAŞLAMIYOR, onu İÇERİYOR. Bu kol o yüzden startsWith yerine includes ile
+   bakar; yoksa aynı hatırlatma her turda yeniden yazılırdı.
+   (Aynı kayma gorevEtiketiVarMi'yi de etkiliyor — KAPSAM DIŞI, raporlandı.) */
+async function bilirkisiEtiketiVarMi(
+  admin: any, caseId: string, gorevTipi: string, etiket: string,
+): Promise<boolean> {
+  const { data } = await admin.from("ajan_gorevleri")
+    .select("id, gerekce").eq("case_id", caseId).eq("gorev_tipi", gorevTipi).limit(200);
+  return ((data ?? []) as any[]).some((r) => String(r?.gerekce ?? "").includes(etiket));
+}
+
+async function bilirkisiKollari(admin: any, dosya: any): Promise<BilirkisiOzet> {
+  const ozet: BilirkisiOzet = { hatirlatilan: 0, sayilan: 0, sebepler: [] };
+  const caseId = String(dosya.id);
+
+  try {
+    // ── 1) SESSİZ KALAN TARAF ────────────────────────────────────────────
+    const { data: beyanlar } = await admin.from("bilirkisi_secim_beyani")
+      .select("party_id, secim_yontemi").eq("case_id", caseId).limit(50);
+    const sessizKalabilir = new Set(
+      ((beyanlar ?? []) as any[])
+        .filter((b) => b.secim_yontemi === "arabulucu" || b.secim_yontemi === "sistem_oneri")
+        .map((b) => String(b.party_id)),
+    );
+
+    if (sessizKalabilir.size > 0) {
+      const { data: sunumlar } = await admin.from("ajan_gorevleri")
+        .select("id, hedef_party_id, gerekce, durum, created_at")
+        .eq("case_id", caseId).eq("gorev_tipi", "bilirkisi_secimi").limit(200);
+      const satirlar = (sunumlar ?? []) as any[];
+
+      for (const g of satirlar) {
+        const partyId = String(g.hedef_party_id ?? "");
+        const gerekce = String(g.gerekce ?? "");
+        if (!partyId || !sessizKalabilir.has(partyId)) continue;
+        if (g.durum !== "bekliyor") continue;
+        const m = gerekce.match(/\[bilirkisi:sunum:([^\]]*)\]/);
+        if (!m) continue;
+        const alan = m[1];
+        const yas = Date.now() - new Date(g.created_at).getTime();
+        if (yas < 2 * GUN_MS) continue;
+
+        // Taraf gerçekten sessiz mi — BU ALANDA yanıtı var mı? (başka alandaki
+        // yanıt bu alanı sessiz olmaktan çıkarmaz)
+        const { data: yanit } = await admin.from("bilirkisi_taraf_yanitlari")
+          .select("id").eq("case_id", caseId).eq("party_id", partyId).eq("alan", alan).limit(1);
+        if (((yanit ?? []) as any[]).length > 0) continue;
+
+        const hatirlatmaEtiketi = `[bilirkisi:hatirlatma:${alan}]`;
+        const hatirlatma = satirlar.find((s) =>
+          String(s.hedef_party_id ?? "") === partyId
+          && String(s.gerekce ?? "").includes(hatirlatmaEtiketi));
+
+        if (!hatirlatma) {
+          const r = await anaAjanaBildir(admin, {
+            case_id: caseId, gorev_tipi: "bilirkisi_secimi", hedef_party_id: partyId,
+            gerekce: `${hatirlatmaEtiketi} "${alan}" alanındaki aday listesi bekliyor. `
+              + `İşaretlemek isterseniz Bilirkişi bölümünden bakabilirsiniz; `
+              + `beyanınıza göre seçim arabulucuya bırakılabilir.`,
+            kaynak: "taraf_ajani", bekleyen: "taraf_cevabi",
+          });
+          if (r.yazildi) { ozet.hatirlatilan++; ozet.sebepler.push(`${alan}: sessiz tarafa bir kez hatırlatıldı`); }
+          else ozet.sebepler.push(`hatırlatma yazılamadı — ${r.sebep}`);
+          continue;
+        }
+
+        // Hatırlatmanın da üstünden iki gün geçtiyse beyana dayanarak sayılır.
+        if (Date.now() - new Date(hatirlatma.created_at).getTime() < 2 * GUN_MS) continue;
+
+        const { data: adaylar } = await admin.from("bilirkisi_onerileri")
+          .select("expert_id, alan, arabulucu_secimi, sira")
+          .eq("case_id", caseId).eq("alan", alan).limit(50);
+        const liste = (adaylar ?? []) as any[];
+        // "Arabulucunun adayı": arabulucunun eklediği aday; yoksa sıradaki ilk aday.
+        const hedefAday = liste.find((a) => a.arabulucu_secimi === true)
+          ?? liste.slice().sort((a, b) => Number(a.sira ?? 0) - Number(b.sira ?? 0))[0];
+        if (!hedefAday) { ozet.sebepler.push(`${alan}: sayılacak aday yok`); continue; }
+
+        const { error: yErr } = await admin.from("bilirkisi_taraf_yanitlari").insert({
+          case_id: caseId, party_id: partyId, expert_id: hedefAday.expert_id, alan,
+          yanit: "kabul", gosterim_izni: false,
+          not_metni: "Beyanında seçimi arabulucuya bıraktığı ve süresinde yanıt vermediği için "
+            + "arabulucunun adayını kabul etmiş sayıldı.",
+        });
+        if (yErr) { ozet.sebepler.push(`${alan}: sayım yazılamadı — ${yErr.message}`); continue; }
+        await admin.from("ajan_gorevleri")
+          .update({ durum: "yapildi", sonuc: "beyana dayanarak kabul sayıldı" })
+          .eq("id", g.id);
+
+        // İKİ TARAFA DA yazılır (komut §1).
+        const { data: tumTaraflar } = await admin.from("case_parties")
+          .select("id").eq("case_id", caseId).limit(50);
+        for (const t of (tumTaraflar ?? []) as any[]) {
+          await anaAjanaBildir(admin, {
+            case_id: caseId, gorev_tipi: "bilirkisi_secimi", hedef_party_id: String(t.id),
+            gerekce: `[bilirkisi:sayildi:${alan}] "${alan}" alanında seçimi arabulucuya bırakan taraf `
+              + `süresinde yanıt vermedi; beyanına dayanarak arabulucunun adayını kabul etmiş sayıldı.`,
+            kaynak: "taraf_ajani", bekleyen: null, durum: "yapildi",
+          });
+        }
+        ozet.sayilan++;
+        ozet.sebepler.push(`${alan}: beyana dayanarak kabul sayıldı`);
+      }
+    }
+
+    // ── 2) GECİKEN RAPOR ─────────────────────────────────────────────────
+    const { data: kabuller } = await admin.from("bilirkisi_onerileri")
+      .select("expert_id, alan, durum").eq("case_id", caseId).eq("durum", "kabul").limit(50);
+    for (const kb of (kabuller ?? []) as any[]) {
+      const expertId = String(kb.expert_id);
+      const alan = String(kb.alan ?? "");
+      // Kabul tarihi denetim izinden okunur (bilirkisi_onerileri'nde güncelleme
+      // zamanı kolonu yok — uydurulmaz, gerçek kayda bakılır).
+      const { data: iz } = await admin.from("expert_assignment_logs")
+        .select("created_at").eq("case_id", caseId).eq("expert_id", expertId)
+        .eq("action", "expert_accepted").order("created_at", { ascending: true }).limit(1);
+      const kabulZamani = ((iz ?? []) as any[])[0]?.created_at;
+      if (!kabulZamani) { ozet.sebepler.push(`${alan}: kabul tarihi kaydı yok, gecikme sayılmadı`); continue; }
+      const gecen = Date.now() - new Date(kabulZamani).getTime();
+
+      const { data: rapor } = await admin.from("bilirkisi_raporlari")
+        .select("id").eq("case_id", caseId).eq("expert_id", expertId).eq("durum", "teslim").limit(1);
+      if (((rapor ?? []) as any[]).length > 0) continue;
+
+      if (gecen >= 21 * GUN_MS) {
+        const etiket21 = `[bilirkisi:rapor-gecikme-21:${expertId.slice(0, 8)}]`;
+        if (await bilirkisiEtiketiVarMi(admin, caseId, "arabulucu_sorusu", etiket21)) continue;
+        const r = await anaAjanaBildir(admin, {
+          case_id: caseId, gorev_tipi: "arabulucu_sorusu", hedef_party_id: null,
+          gerekce: `${etiket21} Bilirkişi raporu kabulden bu yana 21 günü geçti`
+            + `${alan ? ` ("${alan}" alanı)` : ""}. Bilirkişiye hatırlatıldı.`,
+          kaynak: "nobetci", bekleyen: "arabulucu_onayi",
+        });
+        if (r.yazildi) { ozet.hatirlatilan++; ozet.sebepler.push(`${alan}: 21 gün — arabulucuya bildirildi`); }
+        else ozet.sebepler.push(r.sebep);
+      } else if (gecen >= 14 * GUN_MS) {
+        const etiket = `[bilirkisi:rapor-gecikme-14:${expertId.slice(0, 8)}]`;
+        if (await bilirkisiEtiketiVarMi(admin, caseId, "arabulucu_sorusu", etiket)) continue;
+        // Bilirkişiye sakin bir hatırlatma: yalnız olay başlığı taşır (kör veri).
+        const { data: uzman } = await admin.from("experts")
+          .select("user_id").eq("id", expertId).maybeSingle();
+        if ((uzman as any)?.user_id) {
+          try {
+            await admin.rpc("create_notification", {
+              p_user_id: (uzman as any).user_id,
+              p_title: "Bilirkişi raporu bekleniyor",
+              p_message: "Görevi kabul ettiğiniz dosyada rapor henüz teslim edilmedi.",
+              p_type: "info", p_link: "/bilirkisi",
+            });
+          } catch (e: any) {
+            ozet.sebepler.push(`bilirkişiye hatırlatma yazılamadı: ${e?.message ?? e}`);
+          }
+        } else {
+          ozet.sebepler.push(`${alan}: bilirkişi hesabı bağlı değil, hatırlatma gönderilemedi`);
+        }
+        await anaAjanaBildir(admin, {
+          case_id: caseId, gorev_tipi: "arabulucu_sorusu", hedef_party_id: null,
+          gerekce: `${etiket} Bilirkişi raporu 14 günü geçti`
+            + `${alan ? ` ("${alan}" alanı)` : ""}; bilirkişiye sakin bir hatırlatma gönderildi.`,
+          kaynak: "nobetci", bekleyen: null, durum: "yapildi",
+        });
+        ozet.hatirlatilan++;
+      }
+    }
+  } catch (e: any) {
+    ozet.sebepler.push(`bilirkişi kolu çalışamadı: ${String(e?.message ?? e).slice(0, 200)}`);
+  }
+  return ozet;
+}
+
 type OtomatikOzet = { kosuldu: number; atlandi: number; hata: number; sebepler: string[] };
 
 async function otomatikKosumKollari(admin: any, dosya: any, butce: Butce): Promise<OtomatikOzet> {
@@ -2692,6 +2883,9 @@ Deno.serve(async (req) => {
     let ortusmeBulundu = 0;
     let bantSorusuGonderildi = 0;
     let taahhutDustu = 0;
+    // Bilirkişi kolları (20.08) sayaçları
+    let bilirkisiHatirlatildi = 0;
+    let bilirkisiSayildi = 0;
     // Kayıt protokolü (B18) silme sayaçları
     let sesKaydiSilindi = 0;
     let dokumSilindi = 0;
@@ -2835,6 +3029,14 @@ Deno.serve(async (req) => {
         sesKaydiSilindi += silmeKol.ses_silindi;
         dokumSilindi += silmeKol.dokum_silindi;
         silmeKol.sebepler.forEach(sebepEkle);
+
+        /* ── BİLİRKİŞİ KOLLARI (20.08): sessiz kalan tarafın beyanına dayanan
+           sayım (§3) ve geciken raporun 14/21 gün hatırlatması (§7).
+           Bu kol atama yapmaz, belge açmaz — yalnız yazar ve hatırlatır. */
+        const bilirkisiKol = await bilirkisiKollari(admin, dosya);
+        bilirkisiHatirlatildi += bilirkisiKol.hatirlatilan;
+        bilirkisiSayildi += bilirkisiKol.sayilan;
+        bilirkisiKol.sebepler.forEach(sebepEkle);
 
         // ── OTOMATİK KOŞUM (16.08): analiz kolları düğmesiz çalışır ──
         const otoKol = await otomatikKosumKollari(admin, dosya, otomatikButce);
@@ -3005,6 +3207,8 @@ Deno.serve(async (req) => {
       taahhut_dustu: taahhutDustu,
       ses_kaydi_silindi: sesKaydiSilindi,
       dokum_silindi: dokumSilindi,
+      bilirkisi_hatirlatildi: bilirkisiHatirlatildi,
+      bilirkisi_kabul_sayildi: bilirkisiSayildi,
       otomatik_kosuldu: otomatikKosuldu,
       otomatik_atlandi: otomatikAtlandi,
       otomatik_hata: otomatikHata,
