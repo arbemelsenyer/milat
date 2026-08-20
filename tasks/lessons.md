@@ -244,3 +244,15 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   işaret, adımın KENDİ BAŞARILI KAPANIŞINDA üretilir; devir/tetikleme kolları
   koşturmadan ÖNCE o işarete bakar. Ayrıca işlenen kaynağın kimliği (belge,
   kayıt) ayrı bir işaretle tutulur ki aynı kaynak iki kez işlenmesin.
+- DERS (20.08.2026) — HATA GÖRÜNÜR KILININCA SEBEP TEK KOŞUMDA BULUNDU. Defter
+  yazımı haftalardır sessizce düşüyordu; hata metni tam yazılıp olay kaydına ve
+  konsola taşınınca sebep ilk koşumda ortaya çıktı ("deneme_no not-null" ve
+  "tutar benzeri değer"). Kural: bir yazım best-effort ise bile SESSİZ OLMAZ;
+  görünmeyen hata, olmayan hata değildir — yalnız geç bulunan hatadır.
+- DERS (20.08.2026) — KORUMA SÜZGECİ KENDİ MAKİNE ALANLARINI DA ELEDİ. Öğrenme
+  hattını kişisel veriden korumak için konan "rakam yığını" denetimi, ISO saat
+  damgasındaki yılı tutar sanıp belleğe yazan bütün çağrıları düşürdü; mükerrer
+  koşum koruması ve devir zinciri farkına varılmadan kapalı kaldı. Kural: bir
+  süzgeç yazılırken MAKİNE KİMLİĞİ (saat damgası, UUID, kod, kısaltma) ile
+  KİŞİSEL VERİ ayrımı baştan konur ve muafiyet desenle tanımlanır; süzgeç
+  eklendikten sonra kendi yazdığı alanlarla bir kez denenir.

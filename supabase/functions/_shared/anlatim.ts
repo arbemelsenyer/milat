@@ -783,7 +783,10 @@ export async function deneyimYaz(
       hata_kodu: kod,
       yol: o.yol ? String(o.yol).slice(0, 60) : null,
       sure_ms: Number.isFinite(o.sure_ms as number) ? o.sure_ms : null,
-      deneme_no: Number.isFinite(o.deneme_no as number) ? o.deneme_no : null,
+      /* deneme_no BOŞ GİTMEZ (20.08 canlı bulgusu): tablo tarafındaki not-null
+         kısıtı kaldırıldı ama alan verilmediğinde null göndermek anlamsızdı —
+         verilmeyen deneme ilk denemedir. */
+      deneme_no: Number.isFinite(o.deneme_no as number) ? o.deneme_no : 1,
     });
     if (error) return `deneyim yazılamadı: ${hataMetni(error)}`;
     return null;
@@ -1180,6 +1183,22 @@ export function ogrenmeGirdisiUygunMu(
   if (/[.!?]/.test(t) && t.split(" ").length > 6) {
     return { uygun: false, sebep: "öğrenme kaydına serbest metin yazılmaz" };
   }
+  /* MAKİNE KİMLİĞİ MUAFİYETİ (20.08 canlı bulgusu):
+     "[defter] bellekYaz yazılamadı: bellek yazılmadı (zaman): öğrenme kaydına
+     tutar benzeri değer yazılmaz" — aşağıdaki rakam yığını denetimi, ISO saat
+     damgasındaki yıl kısmını ("2026") tutar sanıp reddediyordu. Belleğe yazan
+     BEŞ çağrı yerinin hepsi bu yüzden düşüyor, mükerrer koşum koruması ve devir
+     zinciri fiilen kapalı kalıyordu.
+     Bu iki biçim MAKİNE KİMLİĞİDİR: ad, beyan, tutar ya da başka kişisel veri
+     taşıyamaz. Tanıma DESENLEDİR — "içinde tire var" gibi gevşek kontrol yok.
+     §4 sınırının geri kalanı AYNEN durur: serbest metin, uzun metin ve gerçek
+     rakam yığınları reddedilmeye devam eder. */
+  const ISO_SAAT_DAMGASI = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
+  const UUID_BICIMI = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (ISO_SAAT_DAMGASI.test(t) || UUID_BICIMI.test(t)) {
+    return { uygun: true, sebep: "" };
+  }
+
   // Rakam yığını (tutar gibi) öğrenme hattına girmez.
   if (/\d{4,}/.test(t)) {
     return { uygun: false, sebep: "öğrenme kaydına tutar benzeri değer yazılmaz" };

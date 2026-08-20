@@ -407,3 +407,17 @@ Gün sonu belge komutuna dahildir.
   taraf ajanı / sistem). Yeni ekran, kart ya da düğme açılmadı.
 - SQL GEREKİYOR (bende değil, kurucuda): ajan_gorevleri'ne `kaynak` ve
   `bekleyen` kolonları · Bölüm 4 için akis_kurallari satırı.
+
+[EKLEME 20.08.2026 — ÖĞRENME HATTI CANLI DURUMU]
+- ajan_gorevleri tablosuna `kaynak` ve `bekleyen` kolonları EKLENDİ (SQL, Claude
+  tarafından). anaAjanaBildir artık doğrudan alana yazabiliyor; kolon yoksa
+  etikete düşen yedek yol kodda duruyor.
+- ajan_deneyim.deneme_no artık BOŞ KABUL EDİYOR (not-null kısıtı kaldırıldı,
+  SQL, Claude). Kod tarafında deneyimYaz alan verilmediğinde 1 yazıyor
+  (_shared/anlatim.ts · deneyimYaz insert gövdesi).
+- ogrenmeGirdisiUygunMu: ISO 8601 saat damgası ve UUID biçimleri MUAF; geri
+  kalan §4 sınırı aynen duruyor.
+- Deneyim defteri CANLIDA AÇIK: ilk satır düştü (mediator · basarili · 366 ms).
+- Bellek işareti ("tamamlandi:<adım>", "kalem_cikarildi:<belge>",
+  "devir:<sıra>") bu commit'le açılıyor; öncesinde beş çağrı yerinin hepsi
+  süzgeçte düşüyordu.

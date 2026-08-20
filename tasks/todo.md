@@ -1,3 +1,28 @@
+## Nerede kaldık — 20.08.2026 (103) · ÖĞRENME SÜZGECİ ONARIMI
+
+- [x] eca1158'in beş bölümü CANLIDA DOĞRULANDI.
+- [x] Deneyim defteri AÇILDI. Sebep görünür oldu ve bulundu: ajan_deneyim
+      tablosundaki deneme_no NOT NULL kısıtı yazımı düşürüyordu; kısıt SQL ile
+      kaldırıldı (Claude). Canlıda ilk satır düştü: mediator · basarili · 366 ms.
+      Kod tarafında deneyimYaz artık alan boşken 1 yazıyor.
+- [x] Bellek işareti bu commit'le açılıyor: ogrenmeGirdisiUygunMu'daki rakam
+      yığını denetimi ISO saat damgasındaki yılı tutar sanıp belleğe yazan BEŞ
+      çağrı yerinin hepsini düşürüyordu (anlatim.ts:162 · anlatim.ts devirYaz ·
+      akis-yurut devir atlandı/sonuç · taraf-kalem-cikar belge işareti).
+      ISO 8601 ve UUID biçimleri desenle muaf tutuldu; §4 sınırının geri kalanı
+      aynen duruyor.
+- [x] ajan_gorevleri'ne kaynak ve bekleyen kolonları eklendi (SQL, Claude).
+
+AÇIK KALEM (VERİ meselesi — karar Claude'da, koda dokunulmadı):
+akis_kurallari tablosunda iki kuralın GEREKÇESİNDE "KAPALI" yazıyor ama `etkin`
+alanı true. Koşucu yalnız `etkin` alanına bakıyor
+(supabase/functions/akis-yurut/index.ts:657 — `.eq("etkin", true)`), gerekçe
+metnini okumuyor. Yani o iki kural fiilen AÇIK çalışıyor. Satırlara dokunulmadı.
+
+SIRADA: _shared/anlatim.ts'i kullanan fonksiyonların redeploy'u + canlı test
+(bellek işaretleri düşüyor mu, mükerrer koşum koruması ve devir zinciri
+çalışıyor mu).
+
 ## Nerede kaldık — 20.08.2026 (102) · DEFTER ONARIMI, MÜKERRER KOŞUM, TEK ANA AJAN
 
 - [x] 1 · Defter sessiz düşmüyor: hata metni TAM yazılıyor (message+code+details

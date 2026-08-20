@@ -765,3 +765,20 @@ MÜKERRER KOŞUM KAPISI:
   koşturmaz, "daha önce tamamlandı" notu düşer.
 · taraf-kalem-cikar ayrıca belge başına "kalem_cikarildi:<document_id>" işareti
   tutar; aynı belgeden ikinci kez kalem yazmaz.
+
+
+[EKLEME 20.08.2026 — ÖĞRENME HATTINA NE GİRER, NE GİRMEZ]
+● CANLI (deploy sonrası). §4 öğrenme yazımı sınırının kesin sınırı:
+· GİRER: makine kimliği (ISO 8601 saat damgası, UUID) · adım adı · sonuç
+  (basarili/hata/atlandi) · KISA hata kodu · yol adı · süre (ms) · düzeltme
+  TÜRÜ · sayılar.
+· GİRMEZ: serbest metin, uzun metin (80 karakteri aşan), gerçek rakam yığınları
+  (tutar benzeri), ad, unvan, adres, beyan, belge metni, tutar gerekçesi.
+· MAKİNE KİMLİĞİ MUAFİYETİ NEDEN VAR: saat damgası ve UUID biçim olarak
+  rakam yığını gibi görünür ama kişisel veri TAŞIYAMAZ. Muafiyet DESENLE
+  tanınır (tam biçim eşleşmesi); "içinde tire var" gibi gevşek kontrol
+  kullanılmaz. Muafiyet uzunluk ve serbest metin denetimlerinden SONRA,
+  rakam yığını denetiminden ÖNCE çalışır
+  (_shared/anlatim.ts · ogrenmeGirdisiUygunMu).
+· Bu muafiyet olmadan belleğe yazan bütün çağrılar düşüyordu; mükerrer koşum
+  koruması ve devir zinciri fiilen kapalı kalmıştı (20.08 canlı bulgusu).
