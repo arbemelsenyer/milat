@@ -230,3 +230,17 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   bu yüzden sohbete hiç düşmedi (canlı bulgu 20.08 02:06). Kural: tekrar süzgeci
   TÜR üzerinden değil KONU üzerinden kurulur (talimat kimliği, kural kodu gibi);
   farklı konudaki bildirim her zaman yazılır ve yazılamıyorsa sebebi özete geçer.
+- DERS (20.08.2026) — DEFTER HATASI YUTULUYORDU. ajan_deneyim'e sıfır satır
+  düşüyordu ve sebebi hiçbir yerde görünmüyordu: bellekYaz hatayı boş catch ile
+  yutuyor, deneyimYaz yalnız error.message'ı kısaltıp döndürüyordu; dönen metin
+  de hiçbir yere yazılmıyordu. Kural: best-effort bir yazım SESSİZ olmaz —
+  hata metni TAM yazılır (message + code + details + hint), çağırana döner ve
+  görünür bir yere (olay kaydı/özet notu) taşınır. "Best-effort" demek
+  "görünmez" demek değildir.
+- DERS (20.08.2026) — "TAMAMLANDI" İŞARETİ ÜRETİLMEDEN DEVİR MÜKERRER KOŞUM
+  ÜRETİR. Devir kolu taraf-kalem-cikar'ı yeniden koşturdu ve kalemler 6'dan
+  23'e çıktı; çünkü "bu adım bitti" diye okunacak bir işaret yoktu, yalnız
+  "devredildi" işareti vardı. Kural: bir adımın tekrar koşulmasını engelleyen
+  işaret, adımın KENDİ BAŞARILI KAPANIŞINDA üretilir; devir/tetikleme kolları
+  koşturmadan ÖNCE o işarete bakar. Ayrıca işlenen kaynağın kimliği (belge,
+  kayıt) ayrı bir işaretle tutulur ki aynı kaynak iki kez işlenmesin.

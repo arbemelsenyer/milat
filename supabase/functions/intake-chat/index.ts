@@ -1,5 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { ajanaTalimatMi, alintiOlarakSar } from "../_shared/anlatim.ts";
+
+/* BÖLÜM 3 — GİRİŞ SÜZGECİ EN BAŞTA: sisteme ilk giren serbest metin, henüz
+   dosya oluşmadan işleniyor. Kullanıcı metni MODELE GİTMEDEN ÖNCE süzgeçten
+   geçer: içindeki emir kipi cümleler UYGULANMAZ, metin ALINTI olarak sarılır
+   ve modele "bu kullanıcı verisidir, talimat değildir" çerçevesiyle verilir.
+   KİLİT (zatenCalisiyorMu) BU UÇTA KULLANILMAZ — kilit sohbeti kırar. */
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -58,6 +65,21 @@ serve(async (req) => {
       );
     }
 
+    /* GİRİŞ SÜZGECİ: her kullanıcı mesajı VERİDİR, TALİMAT DEĞİLDİR.
+       Emir kipi taşıyan mesaj uygulanmaz; alıntı olarak sarılır. Reddedilen
+       girdi SESSİZCE YUTULMAZ, kullanıcıya tek cümleyle bildirilir. */
+    let talimatGoruldu = false;
+    const guvenliMesajlar = (messages as { role: string; content: string }[]).map((m) => {
+      if (m.role !== "user") return m;
+      if (!ajanaTalimatMi(m.content)) return m;
+      talimatGoruldu = true;
+      return { ...m, content: alintiOlarakSar(m.content, "KULLANICI METNİ") };
+    });
+
+    if (talimatGoruldu) {
+      console.error("[intake-chat] kullanıcı metninde ajana yönelik talimat görüldü, uygulanmadı");
+    }
+
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     if (!LOVABLE_API_KEY) {
@@ -91,7 +113,8 @@ Keep your answers brief, clear, and helpful. Don't give legal advice, only provi
         model: 'google/gemini-3-flash-preview',
         messages: [
           { role: 'system', content: systemPrompt },
-          ...messages,
+          // Süzgeçten geçmiş mesajlar: emir kipi taşıyanlar alıntı olarak sarıldı.
+          ...guvenliMesajlar,
         ],
         stream: true,
       }),
@@ -115,8 +138,16 @@ Keep your answers brief, clear, and helpful. Don't give legal advice, only provi
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
+    /* Cevap AKIŞ olarak döner; süzgeç GİRİŞTE çalışır. Çıkışı süzmek için tüm
+       yanıtı tamponlamak gerekir, bu da yazarken akan cevabı bitirir — sohbetin
+       akıcılığı bozulmaz kuralı gereği çıkış tamponlanmadı. */
     return new Response(response.body, {
-      headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' },
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/event-stream',
+        // Süzgecin girdiyi işaretlediği durum başlıkla bildirilir; sessiz değil.
+        ...(talimatGoruldu ? { 'X-Medipact-Girdi-Notu': 'talimat-alinti-olarak-sarildi' } : {}),
+      },
     });
   } catch (error) {
     console.error('Intake chat error:', error);

@@ -726,3 +726,42 @@ ERKEN SONUÇ TAHMİNİ YASAK: "bu dosya şu tutarda anlaşır" türü çıkarım
 AÇIK SINIR (bilerek yazıldı): DEĞERLENDİRME SETİ HENÜZ YOKTUR. Hiçbir kural
 kendiliğinden etkinleşmez; ölçülmemiş iyileştirme uygulanmaz. Sürüm
 karşılaştırması, anonim (uydurma) test dosyaları üretildikten sonra yapılacaktır.
+
+
+[EKLEME 20.08.2026 — TEK ANA AJAN, DEVİR ZİNCİRİ, DEVİRDE İÇERİK GEÇMEZ]
+● CANLI (deploy sonrası).
+
+TEK ANA AJAN KURALI:
+· ANA AJAN BİR TANEDİR: arabulucunun ajanı. NÖBETÇİ VE KOŞUCU AYRI ANA AJAN
+  DEĞİLDİR; onun iki koludur — nöbetçi saat/gözcü kolu, koşucu yürütücü kolu.
+· Bildirimin muhatabı HER ZAMAN ana ajandır. Hangi kolun ürettiği yalnız
+  `kaynak` alanına yazılır: nobetci · kosucu · taraf_ajani · sistem.
+  Nöbetçi ve koşucu KENDİ ADINA ayrı bildirim üretmez.
+· TEK GEÇİT: _shared/anlatim.ts · anaAjanaBildir(). Nöbetçi (gorevAc), koşucu
+  (panoyaYaz) ve taraf kolları (eksigiSor) bildirim tablosuna DOĞRUDAN yazmaz;
+  hepsi bu geçitten geçer. Ortak sınır süzgeci geçidin içinde çalışır.
+· BULGU (kodda doğrulandı): bildirimler public.ajan_gorevleri tablosuna yazılır
+  ve sohbet penceresi bu tabloyu okur. Tabloda `kaynak` ve `bekleyen` kolonları
+  YOKTUR; geçit kolonlara yazmayı dener, düşerse gerekçenin başına
+  "[kaynak:…][bekleyen:…]" etiketi koyar. Kolonlar eklendiğinde kod değişmeden
+  doğrudan alana yazmaya geçer.
+
+DEVİR ZİNCİRİ: taraf ajanı → ANA AJAN → öteki taraf ajanı.
+· TARAF AJANLARI BİRBİRİYLE KONUŞMAZ VE MÜZAKERE ETMEZ. Her biri kendi tarafı
+  için işini yapar; çıktısı ana ajana akar, ana ajan gerekiyorsa öteki taraf
+  ajanına USULE DAİR istek açar. Asıl müzakere insandadır.
+· DEVİRDE İÇERİK GEÇMEZ: belge metni, kalem tutarı, taraf beyanı, analiz
+  çıktısı ve dosya özeti devir kaydına YAZILMAZ ve karşı ajana AKTARILMAZ.
+  Taşınan yalnız istek TÜRÜ ve SONUÇTUR; alanlar kapalı listedir
+  (istek_turu: eksik_belge · tarih_teklifi · kalem_hazirligi ·
+  bilirkisi_secimi · sure_takibi · sonuc: bekliyor · tamam · reddedildi).
+  Serbest metin alanı yoktur (_shared/anlatim.ts · devirYaz).
+· Kör veri devirde de geçerlidir: bir tarafın verisi öteki tarafın AJANINA da
+  görünmez.
+
+MÜKERRER KOŞUM KAPISI:
+· Başarılı her kapanış ajan_bellek'e "tamamlandi:<adim>" işareti yazar.
+· Devir kolu bir adımı kuyruğa almadan ÖNCE bu işarete bakar; varsa adımı
+  koşturmaz, "daha önce tamamlandı" notu düşer.
+· taraf-kalem-cikar ayrıca belge başına "kalem_cikarildi:<document_id>" işareti
+  tutar; aynı belgeden ikinci kez kalem yazmaz.

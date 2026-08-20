@@ -7,7 +7,7 @@
 // içindeki "yapilmayanlar" listesine zaman damgasıyla yazılır (Ajan Paneli okur).
 // Güvenlik deseni check-new-tariff ile aynı: x-cron-secret veya admin JWT; yoksa 401.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { sinirdanGecir } from "../_shared/anlatim.ts";
+import { sinirdanGecir, anaAjanaBildir } from "../_shared/anlatim.ts";
 
 /* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
    Taraf kendi ekranından bildirim sıklığını ve sessiz saatlerini belirler
@@ -148,15 +148,19 @@ async function gorevAc(
   if (await gorevEtiketiVarMi(admin, caseId, gorevTipi, etiket)) {
     return { acildi: false, sebep: `${gorevTipi} görevi zaten açılmış (${etiket})` };
   }
-  // ORTAK SINIR KATMANI: panoya yazılan her açıklama süzgeçten geçer.
-  const { error } = await admin.from("ajan_gorevleri").insert({
+  /* BÖLÜM 5 — TEK ADRES: nöbetçi ana ajanın GÖZCÜ KOLUDUR, ayrı bir ana ajan
+     değildir. Kendi adına bildirim üretmez; geçitten geçer ve kaynak "nobetci"
+     olarak yazılır. Ortak sınır süzgeci geçidin içinde çalışır. */
+  const r = await anaAjanaBildir(admin, {
     case_id: caseId,
     gorev_tipi: gorevTipi,
-    durum: opts?.durum ?? "bekliyor",
-    gerekce: `${etiket} ${sinirdanGecir(aciklama, "nobetci.pano")}`.trim(),
     hedef_party_id: opts?.hedefPartyId ?? null,
+    gerekce: `${etiket} ${aciklama}`.trim(),
+    kaynak: "nobetci",
+    bekleyen: (opts?.durum ?? "bekliyor") === "onay_bekliyor" ? "arabulucu_onayi" : null,
+    durum: opts?.durum ?? "bekliyor",
   });
-  if (error) return { acildi: false, sebep: `görev yazılamadı: ${error.message}` };
+  if (!r.yazildi) return { acildi: false, sebep: `görev yazılamadı: ${r.sebep}` };
   return { acildi: true };
 }
 

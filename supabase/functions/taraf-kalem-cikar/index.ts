@@ -16,7 +16,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import {
   anlatimAc, zatenCalisiyorMu, belgedeAra, eksigiSor, SORU_TIPI_TARAF, kolEtiketi,
-  alintiOlarakSar, ajanaTalimatMi,
+  alintiOlarakSar, ajanaTalimatMi, bellekVarMi, bellekYaz,
 } from "../_shared/anlatim.ts";
 
 const corsHeaders = {
@@ -197,8 +197,20 @@ Deno.serve(async (req) => {
     const yazilan: any[] = [];
     const eksikler: string[] = [];
 
+    // BÖLÜM 2 — hangi belgelerin atlandığı sohbete tek satırla yazılır.
+    const atlananBelge: string[] = [];
+
     for (const belge of okunabilir) {
       const belgeMetni = String(belge.extracted_text ?? "");
+
+      /* MÜKERRER KOŞUM KAPISI (20.08 canlı bulgusu): aynı belgeden ikinci kez
+         kalem yazılmaz. Kalemler 6'dan 23'e bu yüzden çıkmıştı. İşaret belge
+         kimliğiyle tutulur; başka bir belge gelirse iş normal sürer. */
+      const belgeAnahtari = `kalem_cikarildi:${belge.id}`;
+      if (await bellekVarMi(admin, case_id, party_id, belgeAnahtari)) {
+        atlananBelge.push(temiz(belge.file_name).slice(0, 60));
+        continue;
+      }
       await anlatim.adim(`"${temiz(belge.file_name).slice(0, 60)}" belgesini okuyorum.`);
 
       /* Belgede ajana yönelik talimat görülürse UYGULANMAZ ve arabulucuya
@@ -348,10 +360,30 @@ ${alintiOlarakSar(belgeMetni.slice(0, MAX_GIRDI), "BELGE")}`,
       if (dayanaksizSayisi > 0) {
         await anlatim.adim(`${dayanaksizSayisi} kalemin belgedeki karşılığını bulamadım.`);
       }
+
+      /* Bu belge işlendi: işaret yazılır ki ikinci koşumda aynı belgeden
+         yeniden kalem üretilmesin. Yazılamazsa sebep defter notuna girer. */
+      const bellekNotu = await bellekYaz(admin, case_id, party_id, belgeAnahtari, {
+        zaman: new Date().toISOString(),
+      });
+      if (bellekNotu) console.error(`[defter] bellekYaz yazılamadı: ${bellekNotu}`);
+    }
+
+    if (atlananBelge.length > 0) {
+      await anlatim.adim(
+        `${atlananBelge.length} belgeden kalem daha önce çıkarılmıştı, yeniden çıkarmadım.`,
+      );
     }
 
     /* Niteliği gereği belgeye bağlanmayan kalemler SORULACAKLAR listesine
        girmez — onlarda eksik yoktur, bilgi notu vardır. */
+    if (yazilan.length === 0 && atlananBelge.length > 0) {
+      await anlatim.bitti({
+        yapildi: "Bu belgelerden kalem daha önce çıkarılmıştı; yeniden çıkarmadım.",
+      });
+      return json({ kalem: 0, sebep: "belgelerden daha önce kalem çıkarıldı" });
+    }
+
     const dayanaksiz = yazilan.filter((k) => k.durum === "dayanaksiz" && !k.belgesiz);
     if (dayanaksiz.length > 0) {
       /* TAMAMLAYAMADI → DOĞRU KİŞİYE SOR. Eksik BELGE/tarafın bilgisi olduğu için
@@ -375,7 +407,11 @@ ${alintiOlarakSar(belgeMetni.slice(0, MAX_GIRDI), "BELGE")}`,
       eksik: eksikler,
     });
 
-    return json({ kalem: yazilan.length, dayanaksiz: dayanaksiz.length });
+    return json({
+      kalem: yazilan.length, dayanaksiz: dayanaksiz.length,
+      // BÖLÜM 1 — defter yazımı düştüyse sebebi çağırana taşınır, yutulmaz.
+      ...(anlatim.defter_notu ? { defter_notu: anlatim.defter_notu } : {}),
+    });
   } catch (e: any) {
     const msg = String(e?.message ?? "Bilinmeyen sistem hatası");
     console.error("[taraf-kalem-cikar] Genel hata:", msg.slice(0, 200));

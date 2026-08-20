@@ -37,6 +37,10 @@ export type AnlatimSahibi = {
   party_id?: string | null;
   /** YALNIZ tarafın KENDİ ajanı için true. Masa ajanında verilmez. */
   tarafaGorunur?: boolean;
+  /* BÖLÜM 2 — "tamamlandi" işaretine yazılacak isteğe bağlı kimlikler.
+     Verilmezse işaret yalnız zamanla yazılır; mevcut çağıranlar kırılmaz. */
+  olay_id?: string | null;
+  kaynak_kimlik?: string | null;
 };
 
 type Adim = { sira: number; metin: string; zaman: string };
@@ -50,6 +54,9 @@ function kisalt(v: unknown, n = 300): string {
 }
 
 export type Anlatim = {
+  /* BÖLÜM 1 — DEFTER SESSİZ DÜŞMEZ: deneyim/bellek yazımı başarısız olursa
+     sebebi BURAYA yazılır ve çağıran onu olay kaydına taşır. Sessiz yutma yok. */
+  defter_notu: string | null;
   /** İşe başladığını yazar (status='running'). */
   baslat: (ilkAdim?: string) => Promise<void>;
   /** Tek cümlelik bir adım ekler. */
@@ -110,6 +117,14 @@ export function anlatimAc(admin: any, sahip: AnlatimSahibi): Anlatim {
   const adimlar: Adim[] = [];
   // B1 — deneyim defteri: her kapanış nesnel sonucu yazar (metin yazmaz).
   const baslangic = Date.now();
+  // BÖLÜM 1 — defter notu: yazılamayan defter kaydının sebebi burada birikir.
+  const defterNotlari: string[] = [];
+  const notEkle = (not: string | null, nereden: string) => {
+    if (!not) return;
+    // (a) tek satır konsol notu — içerik değil, sebep.
+    console.error(`[defter] ${nereden} yazılamadı: ${not}`);
+    defterNotlari.push(`${nereden}: ${not}`);
+  };
   const ekle = (metin: string) => {
     /* ORTAK SINIR KATMANI (miras): insana giden HER adım cümlesi süzgeçten
        geçer. Hiçbir fonksiyon bu kuralı kendi metninde gevşetemez. */
@@ -117,7 +132,8 @@ export function anlatimAc(admin: any, sahip: AnlatimSahibi): Anlatim {
     if (!t) return;
     adimlar.push({ sira: adimlar.length + 1, metin: t, zaman: simdi() });
   };
-  return {
+  const nesne: Anlatim = {
+    defter_notu: null,
     async baslat(ilkAdim?: string) {
       if (ilkAdim) ekle(ilkAdim);
       await yaz(admin, sahip, "running", adimlar);
@@ -135,20 +151,34 @@ export function anlatimAc(admin: any, sahip: AnlatimSahibi): Anlatim {
         yapildi: kisalt(yapildi),
         ...(eksikler.length ? { eksik: eksikler.map((x) => kisalt(x)) } : {}),
       });
-      await deneyimYaz(admin, {
+      notEkle(await deneyimYaz(admin, {
         case_id: sahip.case_id, adim: sahip.agent_type, sonuc: "basarili",
         sure_ms: Date.now() - baslangic,
-      });
+      }), "deneyimYaz");
+
+      /* BÖLÜM 2 — MÜKERRER KOŞUM BİTİYOR: başarılı kapanışta "bu adım
+         tamamlandı" işareti üretilir. Devir kolu bu işareti görürse adımı
+         yeniden koşturmaz. Aynı anahtar varsa üzerine yazılır (upsert). */
+      notEkle(await bellekYaz(admin, sahip.case_id, sahip.party_id ?? null,
+        `tamamlandi:${sahip.agent_type}`, {
+          zaman: new Date().toISOString(),
+          ...(sahip.olay_id ? { olay_id: sahip.olay_id } : {}),
+          ...(sahip.kaynak_kimlik ? { kaynak_kimlik: sahip.kaynak_kimlik } : {}),
+        }), "bellekYaz");
+
+      nesne.defter_notu = defterNotlari.length ? defterNotlari.join(" | ") : null;
     },
     async hata(sebep: string) {
       ekle(`Bu işi tamamlayamadım: ${kisalt(sebep, 200)}`);
       await yaz(admin, sahip, "failed", adimlar);
-      await deneyimYaz(admin, {
+      notEkle(await deneyimYaz(admin, {
         case_id: sahip.case_id, adim: sahip.agent_type, sonuc: "hata",
         hata_kodu: kisalt(sebep, 80), sure_ms: Date.now() - baslangic,
-      });
+      }), "deneyimYaz");
+      nesne.defter_notu = defterNotlari.length ? defterNotlari.join(" | ") : null;
     },
   };
+  return nesne;
 }
 
 /* ── EKSİK TAMAMLAMA ARAMALARI ───────────────────────────────────────────────
@@ -269,14 +299,17 @@ export async function eksigiSor(
       return { yazildi: false, sebep: "aynı eksik için kayıt zaten var" };
     }
 
-    const { error } = await admin.from("ajan_gorevleri").insert({
+    /* BÖLÜM 5 — TEK ADRES: bildirim doğrudan tabloya değil, ana ajan geçidinden
+       yazılır. Kaynak yalnız hangi kolun ürettiğini söyler. */
+    const r = await anaAjanaBildir(admin, {
       case_id: o.case_id,
       gorev_tipi: o.gorev_tipi,
-      durum: "bekliyor",
       hedef_party_id: hedefPartyId,
       gerekce,
+      kaynak: hedefPartyId ? "taraf_ajani" : "sistem",
+      bekleyen: hedefPartyId ? "taraf_cevabi" : "arabulucu_onayi",
     });
-    if (error) return { yazildi: false, sebep: `kayıt yazılamadı: ${kisalt(error.message, 120)}` };
+    if (!r.yazildi) return { yazildi: false, sebep: r.sebep };
     return { yazildi: true, sebep: "soruldu" };
   } catch (e: any) {
     return { yazildi: false, sebep: `kayıt yazılamadı: ${kisalt(e?.message ?? e, 120)}` };
@@ -752,11 +785,24 @@ export async function deneyimYaz(
       sure_ms: Number.isFinite(o.sure_ms as number) ? o.sure_ms : null,
       deneme_no: Number.isFinite(o.deneme_no as number) ? o.deneme_no : null,
     });
-    if (error) return `deneyim yazılamadı: ${error.message}`;
+    if (error) return `deneyim yazılamadı: ${hataMetni(error)}`;
     return null;
   } catch (e: any) {
     return `deneyim yazılamadı: ${String(e?.message ?? e).slice(0, 120)}`;
   }
+}
+
+/* Hata metni TAM yazılır: message + code + details + hint (hangisi doluysa).
+   Kısaltılmış ya da yutulmuş hata, kusurun görünmemesine yol açıyordu
+   (20.08 canlı bulgu: ajan_deneyim'e sıfır satır düşüyordu, sebebi görünmüyordu). */
+function hataMetni(error: any): string {
+  const parcalar = [
+    error?.message ? String(error.message) : "",
+    error?.code ? `kod: ${String(error.code)}` : "",
+    error?.details ? `ayrıntı: ${String(error.details)}` : "",
+    error?.hint ? `ipucu: ${String(error.hint)}` : "",
+  ].filter(Boolean);
+  return parcalar.join(" · ") || "sebep bildirilmedi";
 }
 
 /* B4 — DOSYA İÇİ BELLEK. Aynı belge iki kez istenmez, aynı soru iki kez
@@ -775,20 +821,28 @@ export async function bellekVarMi(
   } catch { return false; }
 }
 
+/* BÖLÜM 1: yazılamazsa SEBEBİ DÖNER (eskiden sessizce yutuluyordu). Dönüş
+   null ise yazıldı demektir; çağıran işini yine sürdürür, yalnız sebep görünür. */
 export async function bellekYaz(
   admin: any, caseId: string, partyId: string | null, anahtar: string,
   deger?: Record<string, unknown>,
-): Promise<void> {
+): Promise<string | null> {
   try {
     // §4: bellek değeri yalnız durum ve sayı taşır; serbest metin reddedilir.
-    for (const v of Object.values(deger ?? {})) {
-      if (!ogrenmeGirdisiUygunMu(v, 120).uygun) return;
+    for (const [alan, v] of Object.entries(deger ?? {})) {
+      const kontrol = ogrenmeGirdisiUygunMu(v, 120);
+      if (!kontrol.uygun) return `bellek yazılmadı (${alan}): ${kontrol.sebep}`;
     }
-    await admin.from("ajan_bellek").upsert({
+    const { error } = await admin.from("ajan_bellek").upsert({
       case_id: caseId, party_id: partyId, anahtar,
       deger: deger ?? { zaman: new Date().toISOString() },
+      guncelleme_zamani: new Date().toISOString(),
     }, { onConflict: "case_id,party_id,anahtar" });
-  } catch { /* bellek yazımı asıl işi düşürmez */ }
+    if (error) return `bellek yazılamadı (${anahtar}): ${hataMetni(error)}`;
+    return null;
+  } catch (e: any) {
+    return `bellek yazılamadı (${anahtar}): ${String(e?.message ?? e).slice(0, 200)}`;
+  }
 }
 
 export async function bellekOku(
@@ -1131,4 +1185,107 @@ export function ogrenmeGirdisiUygunMu(
     return { uygun: false, sebep: "öğrenme kaydına tutar benzeri değer yazılmaz" };
   }
   return { uygun: true, sebep: "" };
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BÖLÜM 4 — AJANLAR ARASI DEVİR ZİNCİRİ
+   Zincir: taraf ajanı → ANA AJAN → öteki taraf ajanı.
+   TARAF AJANLARI BİRBİRİYLE KONUŞMAZ VE MÜZAKERE ETMEZ. Her biri kendi tarafı
+   için işini yapar; çıktısı ana ajana akar, ana ajan gerekiyorsa öteki taraf
+   ajanına USULE DAİR istek açar. Asıl müzakere insandadır (beş insan kapısı).
+
+   İÇERİK GEÇMEZ: belge metni, kalem tutarı, taraf beyanı, analiz çıktısı ve
+   dosya özeti devir kaydına YAZILMAZ ve karşı ajana AKTARILMAZ. Taşınan yalnız
+   istek TÜRÜ ve SONUCUDUR. Serbest metin alanı yoktur — alanlar kapalı listedir.
+   Kör veri devirde de geçerlidir (constitution m.1).
+   ═══════════════════════════════════════════════════════════════════════════ */
+export type DevirIstekTuru =
+  | "eksik_belge" | "tarih_teklifi" | "kalem_hazirligi"
+  | "bilirkisi_secimi" | "sure_takibi";
+
+export type DevirSonucu = "bekliyor" | "tamam" | "reddedildi";
+
+/** Devir kaydı: yalnız kim → kim, istek türü ve sonuç. İçerik taşımaz. */
+export async function devirYaz(
+  admin: any,
+  o: {
+    case_id: string;
+    sira_no: number | string;
+    kimden: "taraf ajanı" | "ana ajan";
+    kime: "taraf ajanı" | "ana ajan";
+    istek_turu: DevirIstekTuru;
+    sonuc: DevirSonucu;
+  },
+): Promise<string | null> {
+  // Alanlar KAPALI LİSTEDİR: listede olmayan değer yazılmaz.
+  const turler: string[] = ["eksik_belge", "tarih_teklifi", "kalem_hazirligi", "bilirkisi_secimi", "sure_takibi"];
+  const sonuclar: string[] = ["bekliyor", "tamam", "reddedildi"];
+  if (!turler.includes(o.istek_turu)) return `devir yazılmadı: tanınmayan istek türü`;
+  if (!sonuclar.includes(o.sonuc)) return `devir yazılmadı: tanınmayan sonuç`;
+
+  return await bellekYaz(admin, o.case_id, null, `devir:${o.sira_no}`, {
+    kimden: o.kimden,
+    kime: o.kime,
+    istek_turu: o.istek_turu,
+    sonuc: o.sonuc,
+    zaman: new Date().toISOString(),
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BÖLÜM 5 — TEK ANA AJAN, TEK ADRES
+   ANA AJAN BİR TANEDİR: arabulucunun ajanı. Nöbetçi ve koşucu ayrı ana ajan
+   DEĞİLDİR; onun iki koludur (biri saat/gözcü, biri yürütücü).
+
+   Bildirimin muhatabı HER ZAMAN ana ajandır. Hangi kolun ürettiği yalnız
+   `kaynak` alanına yazılır: nobetci · kosucu · taraf_ajani · sistem.
+   Nöbetçi ve koşucu kendi adına AYRI bildirim üretmez.
+
+   BULGU (kodda doğrulandı): bildirimler public.ajan_gorevleri tablosuna
+   yazılıyor (sohbet penceresi bu tabloyu okuyor). Tabloda `kaynak` ve
+   `bekleyen` KOLONLARI YOKTUR (src/integrations/supabase/types.ts ·
+   ajan_gorevleri Row: case_id · created_at · durum · gerekce · gorev_tipi ·
+   hedef_party_id · id · sonuc · updated_at). Kolonlar eklenene kadar bu geçit
+   değerleri gerekçenin başına makine okunur etiketle yazar; kolonlar gelince
+   doğrudan alana yazmayı dener ve düşerse etikete geri döner. SQL yazılmadı. */
+export type BildirimKaynagi = "nobetci" | "kosucu" | "taraf_ajani" | "sistem";
+
+export async function anaAjanaBildir(
+  admin: any,
+  o: {
+    case_id: string;
+    gorev_tipi: string;
+    hedef_party_id?: string | null;
+    gerekce: string;
+    kaynak: BildirimKaynagi;
+    /** Ne bekleniyor: "arabulucu_onayi" · "taraf_cevabi" · "" (bekleyen yok). */
+    bekleyen?: string | null;
+    durum?: string;
+  },
+): Promise<{ yazildi: boolean; sebep: string }> {
+  try {
+    // ORTAK SINIR KATMANI: insana giden metin süzgeçten geçer.
+    const guvenli = sinirdanGecir(o.gerekce, `anaAjanaBildir.${o.kaynak}`);
+    const etiket = `[kaynak:${o.kaynak}]${o.bekleyen ? `[bekleyen:${o.bekleyen}]` : ""}`;
+    const temelSatir: Record<string, unknown> = {
+      case_id: o.case_id,
+      gorev_tipi: o.gorev_tipi,
+      durum: o.durum ?? "bekliyor",
+      hedef_party_id: o.hedef_party_id ?? null,
+      gerekce: `${etiket} ${guvenli}`.trim().slice(0, 800),
+    };
+
+    // Kolonlar eklendiyse doğrudan alana yaz; yoksa etiketli satıra geri dön.
+    const { error: ilkHata } = await admin.from("ajan_gorevleri").insert({
+      ...temelSatir, kaynak: o.kaynak, bekleyen: o.bekleyen ?? null,
+    });
+    if (!ilkHata) return { yazildi: true, sebep: "yazıldı" };
+
+    const { error } = await admin.from("ajan_gorevleri").insert(temelSatir);
+    if (error) return { yazildi: false, sebep: `bildirim yazılamadı: ${hataMetni(error)}` };
+    return { yazildi: true, sebep: "yazıldı (kaynak alanı yok, etikete yazıldı)" };
+  } catch (e: any) {
+    return { yazildi: false, sebep: `bildirim yazılamadı: ${String(e?.message ?? e).slice(0, 200)}` };
+  }
 }

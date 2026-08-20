@@ -382,3 +382,28 @@ Gün sonu belge komutuna dahildir.
   (pano) · dosya-verilerini-sil · send-meeting-invite (serbest not) ·
   send-session-notification (serbest not) · taraf-kalem-cikar (belge alıntısı).
 - deneyimYaz ve bellekYaz artık serbest metin ve tutar benzeri değeri REDDEDER.
+
+[EKLEME 20.08.2026 — DEFTER ONARIMI, TEK ANA AJAN, DEVİR ZİNCİRİ]
+- _shared/anlatim.ts (yeni/değişen): hataMetni (message+code+details+hint) ·
+  deneyimYaz ve bellekYaz artık SEBEP DÖNDÜRÜR (bellekYaz eskiden sessizce
+  yutuyordu, dönüş tipi void → string|null) · Anlatim nesnesine `defter_notu`
+  alanı · başarılı kapanışta "tamamlandi:<adim>" bellek işareti ·
+  AnlatimSahibi'ne isteğe bağlı olay_id / kaynak_kimlik · devirYaz (kapalı
+  listeli devir kaydı) · anaAjanaBildir (tek bildirim geçidi).
+- akis-yurut: olayiKapat yardımcısı — akis_olaylari'nda NOT/SONUC KOLONU YOK
+  (kolonlar: id · case_id · party_id · olay_kodu · veri · islendi ·
+  islenme_zamani · created_at), bu yüzden defter notu `veri` alanına
+  "defter_notu" anahtarıyla yazılıyor. panoyaYaz artık anaAjanaBildir'den
+  geçiyor; devir kolu "tamamlandi:<adim>" işaretine bakıyor ve devir kaydı
+  devirYaz ile yazılıyor.
+- ajan-nobetci: gorevAc artık anaAjanaBildir'den geçiyor (kaynak "nobetci").
+- taraf-kalem-cikar: belge başına "kalem_cikarildi:<document_id>" işareti;
+  aynı belgeden ikinci kez kalem yazılmıyor, atlananlar sohbete tek satır.
+- intake-chat: giriş süzgeci EN BAŞTA — kullanıcı metni modele gitmeden önce
+  ajanaTalimatMi ile bakılıyor, emir kipi taşıyan mesaj alintiOlarakSar ile
+  sarılıyor. KİLİT KULLANILMADI (sohbeti kırar). Cevap akış olarak döndüğü için
+  çıkış tamponlanmadı; girdi notu yanıt başlığıyla bildiriliyor.
+- AjanPenceresi: bildirim satırında kaynak etiketi (gözcü kolu / yürütücü kolu /
+  taraf ajanı / sistem). Yeni ekran, kart ya da düğme açılmadı.
+- SQL GEREKİYOR (bende değil, kurucuda): ajan_gorevleri'ne `kaynak` ve
+  `bekleyen` kolonları · Bölüm 4 için akis_kurallari satırı.

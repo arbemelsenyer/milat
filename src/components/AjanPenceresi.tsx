@@ -42,6 +42,8 @@ type DurumSatiri = {
 type GorevSatiri = {
   id: string;
   gorev_tipi: string;
+  /* Bildirim kaynağı: kolon varsa okunur, yoksa gerekçedeki etiketten. */
+  kaynak?: string | null;
   hedef_party_id: string | null;
   gerekce: string | null;
   durum: string;
@@ -194,6 +196,23 @@ function gerekceTemizle(v: string | null): string {
   // Baştaki bütün makine etiketleri ("[eksik:…] [kol:…]") ayıklanır.
   while (/^\[[^\]]*\]\s*/.test(t)) t = t.replace(/^\[[^\]]*\]\s*/, "");
   return t.trim();
+}
+
+/* TEK ANA AJAN: bildirimin muhatabı her zaman ana ajandır; hangi KOLUN ürettiği
+   yalnız kaynak etiketiyle gösterilir. Kolon henüz yoksa gerekçedeki
+   "[kaynak:…]" etiketinden okunur. Yeni ekran/kart açılmadı. */
+const KAYNAK_ETIKETI: Record<string, string> = {
+  nobetci: "gözcü kolu",
+  kosucu: "yürütücü kolu",
+  taraf_ajani: "taraf ajanı",
+  sistem: "sistem",
+};
+
+function kaynakOku(g: { kaynak?: string | null; gerekce: string | null }): string {
+  const kolon = String(g?.kaynak ?? "").trim();
+  if (kolon) return KAYNAK_ETIKETI[kolon] ?? kolon;
+  const m = /\[kaynak:([a-z_]+)\]/i.exec(String(g?.gerekce ?? ""));
+  return m ? (KAYNAK_ETIKETI[m[1]] ?? m[1]) : "";
 }
 
 // "son hatırlatma: <ISO> (n. hatırlatma)" satırını okunur hâle getirir.
@@ -987,7 +1006,14 @@ export function AjanPenceresi({
                 <div key={m.id} className="rounded-lg border px-2.5 py-1.5">
                   <button type="button" onClick={() => gorevTikla(m.gorev)} className="w-full text-left">
                     <div className="flex items-start justify-between gap-2">
-                      <span className="text-xs leading-snug">{m.metin}</span>
+                      <span className="text-xs leading-snug">
+                        {m.metin}
+                        {m.gorev && kaynakOku(m.gorev) && (
+                          <span className="text-[10px] text-muted-foreground ml-1">
+                            ({kaynakOku(m.gorev)})
+                          </span>
+                        )}
+                      </span>
                       {!onayMi && <ArrowRight className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />}
                     </div>
                   </button>

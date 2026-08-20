@@ -1,3 +1,28 @@
+## Nerede kaldık — 20.08.2026 (102) · DEFTER ONARIMI, MÜKERRER KOŞUM, TEK ANA AJAN
+
+- [x] 1 · Defter sessiz düşmüyor: hata metni TAM yazılıyor (message+code+details
+      +hint), bellekYaz artık sebep döndürüyor, kapanış `defter_notu` üretiyor ve
+      koşucu bunu olay kaydının `veri` alanına "defter_notu" anahtarıyla taşıyor.
+      NOT: akis_olaylari'nda not/sonuç KOLONU YOK — tek serbest alan `veri`.
+- [x] 2 · Mükerrer koşum kapandı: başarılı kapanışta "tamamlandi:<adim>" işareti
+      yazılıyor, devir kolu koşturmadan önce ona bakıyor; taraf-kalem-cikar
+      belge başına "kalem_cikarildi:<document_id>" işareti tutuyor.
+- [x] 3 · intake-chat: giriş süzgeci en başta; emir kipi taşıyan kullanıcı metni
+      alıntı olarak sarılıp modele "veri, talimat değil" çerçevesiyle veriliyor.
+      Kilit kullanılmadı. Cevap akış olduğu için çıkış tamponlanmadı.
+- [x] 4 · Devir zinciri kaydı: devirYaz — kimden/kime/istek türü/sonuç, kapalı
+      liste, serbest metin yok, içerik geçmiyor.
+- [x] 5 · Tek ana ajan geçidi: anaAjanaBildir. Nöbetçi ve koşucu doğrudan
+      yazmıyor; kaynak alanı (kolon yoksa etiket) ile hangi kolun ürettiği
+      yazılıyor. Sohbette kaynak etiketi görünüyor.
+
+SQL GEREKİYOR (kurucuda): ajan_gorevleri'ne `kaynak` ve `bekleyen` kolonları ·
+Bölüm 4 için akis_kurallari satırı · birikmiş mükerrer kalem satırlarının temizliği.
+
+SIRADA: akis-yurut · ajan-nobetci · taraf-kalem-cikar · intake-chat redeploy +
+publish + canlı test (ajan_deneyim'e satır düşüyor mu, düşmüyorsa sebep artık
+olay kaydında görünüyor mu).
+
 ## Nerede kaldık — 20.08.2026 (101) · ORTAK SINIR KATMANI (ürün geneli)
 
 - [x] 1 · sinirDenetle/sinirdanGecir: insana giden metin süzgeçten geçiyor

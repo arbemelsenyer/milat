@@ -21,8 +21,31 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import {
   motoraBagliMi, girdiTamamla, talimatiDenetle, TALIMAT_ALMAYAN, talimatOzeti,
-  devirHedefi, bellekVarMi, bellekYaz, sinirdanGecir,
+  devirHedefi, bellekVarMi, bellekYaz, sinirdanGecir, anaAjanaBildir, devirYaz,
 } from "../_shared/anlatim.ts";
+
+/* BÖLÜM 1 — DEFTER NOTU NEREYE YAZILIR:
+   akis_olaylari tablosunda not/sonuc diye bir KOLON YOKTUR. Kolonlar:
+   id · case_id · party_id · olay_kodu · veri (jsonb) · islendi ·
+   islenme_zamani · created_at (src/integrations/supabase/types.ts:552-561;
+   yazan yerler: _shared/olay.ts:30 insert, bu dosyadaki iki update).
+   Serbest not için tek yer `veri` alanıdır; defter notu oraya "defter_notu"
+   anahtarıyla eklenir. Yeni kolon açılmadı, SQL yazılmadı. */
+async function olayiKapat(
+  admin: any, olay: any, defterNotu?: string | null,
+): Promise<{ ok: boolean; sebep: string }> {
+  const govde: Record<string, unknown> = {
+    islendi: true, islenme_zamani: new Date().toISOString(),
+  };
+  if (defterNotu) {
+    const eskiVeri = olay?.veri && typeof olay.veri === "object" && !Array.isArray(olay.veri)
+      ? olay.veri : {};
+    govde.veri = { ...eskiVeri, defter_notu: String(defterNotu).slice(0, 500) };
+  }
+  const { error } = await admin.from("akis_olaylari").update(govde).eq("id", olay.id);
+  if (error) return { ok: false, sebep: error.message };
+  return { ok: true, sebep: "" };
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -136,14 +159,18 @@ async function panoyaYaz(
     return { yazildi: false, sebep: "bekleyen aynı satır zaten var" };
   }
 
-  const { error } = await admin.from("ajan_gorevleri").insert({
+  /* BÖLÜM 5 — TEK ADRES: koşucu da doğrudan yazmaz, ana ajan geçidinden geçer.
+     Kaynak yalnız hangi kolun ürettiğini söyler; muhatap her zaman ana ajandır. */
+  const r = await anaAjanaBildir(admin, {
     case_id: caseId,
     gorev_tipi: gorevTipi,
-    durum: "bekliyor",
     hedef_party_id: hedefPartyId,
     gerekce: konuEtiketi ? `${konuEtiketi} ${guvenliGerekce}` : guvenliGerekce,
+    kaynak: "kosucu",
+    bekleyen: gorevTipi === "akis_onay_bekliyor" || gorevTipi === "arabulucu_onayi"
+      ? "arabulucu_onayi" : null,
   });
-  if (error) return { yazildi: false, sebep: `pano satırı yazılamadı: ${error.message}` };
+  if (!r.yazildi) return { yazildi: false, sebep: r.sebep };
   return { yazildi: true, sebep: "yazıldı" };
 }
 
@@ -509,9 +536,11 @@ function olaylariSirala(olaylar: any[], kurallar: any[]): any[] {
    ikinci kez devredilmesin. */
 async function devirKollari(admin: any, ozet: { notlar: string[] }): Promise<number> {
   let devredilen = 0;
+  // Devir zincirindeki sıra numarası (kayıt anahtarı için).
+  let devirSira = 0;
   try {
     const { data: satirlar } = await admin.from("agent_states")
-      .select("case_id, agent_type, last_output, status")
+      .select("case_id, agent_type, party_id, last_output, status")
       .eq("status", "completed").limit(200);
     for (const r of ((satirlar ?? []) as any[])) {
       const cikti = r.last_output && typeof r.last_output === "object" ? r.last_output : {};
@@ -524,6 +553,21 @@ async function devirKollari(admin: any, ozet: { notlar: string[] }): Promise<num
         const anahtar = `devir:${hedef.adim}`;
         if (await bellekVarMi(admin, caseId, null, anahtar)) continue;   // ikinci kez devredilmez
 
+        /* BÖLÜM 2 — MÜKERRER KOŞUM BİTİYOR: adım daha önce BAŞARIYLA
+           tamamlandıysa devir onu yeniden koşturmaz. 20.08 canlı bulgusu:
+           devir kolu taraf-kalem-cikar'ı yeniden koşturdu, kalemler 6'dan
+           23'e çıktı. İşaret artık kapanışta üretiliyor. */
+        const tamamlandiAnahtari = `tamamlandi:${hedef.adim}`;
+        const tamamlandiMi = await bellekVarMi(admin, caseId, null, tamamlandiAnahtari)
+          || await bellekVarMi(admin, caseId, r.party_id ? String(r.party_id) : null, tamamlandiAnahtari);
+        if (tamamlandiMi) {
+          ozet.notlar.push(`devir atlandı (${caseId}): ${hedef.adim} daha önce tamamlandı`);
+          await bellekYaz(admin, caseId, null, anahtar, {
+            kim: hedef.kim, sonuc: "zaten_tamam", zaman: new Date().toISOString(),
+          });
+          continue;
+        }
+
         const girdi = await girdiTamamla(admin, hedef.adim, { case_id: caseId });
         if (girdi.govdeler.length === 0) continue;
         let oldu = false;
@@ -534,6 +578,19 @@ async function devirKollari(admin: any, ozet: { notlar: string[] }): Promise<num
         await bellekYaz(admin, caseId, null, anahtar, {
           kim: hedef.kim, sonuc: oldu ? "devredildi" : "denenemedi",
           zaman: new Date().toISOString(),
+        });
+
+        /* BÖLÜM 4 — DEVİR ZİNCİRİ KAYDI: yalnız kim → kim, istek türü ve sonuç.
+           İçerik (belge metni, tutar, beyan, analiz) YAZILMAZ ve aktarılmaz. */
+        devirSira += 1;
+        await devirYaz(admin, {
+          case_id: caseId, sira_no: devirSira,
+          kimden: "taraf ajanı", kime: "ana ajan",
+          istek_turu: hedef.adim === "taraf-kalem-cikar" ? "kalem_hazirligi"
+            : hedef.adim === "bilirkisi-sorulari" ? "bilirkisi_secimi"
+            : hedef.adim === "masa-kalem-karsilastir" ? "kalem_hazirligi"
+            : "eksik_belge",
+          sonuc: oldu ? "tamam" : "bekliyor",
         });
         await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
           `Eksik kalan işi ${hedef.kim} devraldı.`, `devir:${hedef.adim}`);
@@ -612,9 +669,7 @@ Deno.serve(async (req) => {
 
       if (eslesen.length === 0) {
         // Kuralı olmayan olay da işlenmiş sayılır: tekrar tekrar okunmasın.
-        await admin.from("akis_olaylari")
-          .update({ islendi: true, islenme_zamani: new Date().toISOString() })
-          .eq("id", olay.id);
+        await olayiKapat(admin, olay);
         ozet.islenen_olay++;
         continue;
       }
@@ -641,6 +696,8 @@ Deno.serve(async (req) => {
         && (olay.veri as any).onay_verildi === true);
 
       let olayHatali = false;
+      // BÖLÜM 1 — bu olayın adımlarından dönen defter notları burada birikir.
+      let olayDefterNotu: string | null = null;
 
       for (const kural of eslesen) {
         const kuralKodu = metin(kural.kod) || String(kural.id);
@@ -760,6 +817,10 @@ Deno.serve(async (req) => {
         for (const govde of girdi.govdeler) {
           const r = await icFonksiyonCagir(fonksiyon, govde);
           if (!r.ok) { hepsiOldu = false; sonSebep = r.sebep; }
+          /* BÖLÜM 1 — çağrılan adım defter notu döndürdüyse yutulmaz; olay
+             kaydına taşınır. Adımlar bu notu dönüş gövdesine koyar. */
+          const notEsleme = /"defter_notu"\s*:\s*"([^"]{1,400})"/.exec(r.sebep ?? "");
+          if (notEsleme) olayDefterNotu = notEsleme[1];
         }
 
         if (hepsiOldu) {
@@ -781,11 +842,11 @@ Deno.serve(async (req) => {
       }
 
       if (!olayHatali) {
-        const { error: uErr } = await admin.from("akis_olaylari")
-          .update({ islendi: true, islenme_zamani: new Date().toISOString() })
-          .eq("id", olay.id);
-        if (uErr) ozet.notlar.push(`olay ${olay.id}: işlendi yazılamadı — ${uErr.message}`);
+        /* BÖLÜM 1 — defter notu varsa olay kaydına taşınır; sessiz düşmez. */
+        const kapanis = await olayiKapat(admin, olay, olayDefterNotu);
+        if (!kapanis.ok) ozet.notlar.push(`olay ${olay.id}: işlendi yazılamadı — ${kapanis.sebep}`);
         else ozet.islenen_olay++;
+        if (olayDefterNotu) ozet.notlar.push(`defter notu (${olay.id}): ${olayDefterNotu}`);
       }
     }
 
