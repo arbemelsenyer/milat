@@ -402,3 +402,19 @@ ekranlarına hiçbir iz düşmez (sorgular arabulucu dalında çalışır).
 · Kartın altında değiştirilemez, işaretli ve kilitli dört satır durur (imza ·
   bilirkişi ataması · kayıt/döküm rızası · tarafla asıl müzakere) ve üstünde
   "Bunlar her hâlde sizde kalır" notu vardır.
+
+
+[EKLEME 20.08.2026 — SOHBETTE TALİMAT VERME VE ONAY/RET]
+● CANLI. YALNIZ ARABULUCU yüzeyinde; taraf sohbetine hiçbir iz düşmez.
+· Üst şeritte dördüncü düğme: "Talimat ver". (Durdur · Devam · Değiştir
+  düğmeleri yerinde kaldı, sıraları değişmedi.)
+· Talimat kipinde: hedef adım listeden seçilir — Oturum hazırlık föyü ·
+  Bilirkişiye sorulacak sorular · Anlaşma taslağı denetimi — ve altına serbest
+  metin yazılır. Veriden hesaplanan kollar listede yoktur.
+· Bekleyen talimat üstte sakin tek satır: "Talimatınız sırada: <adım> —
+  <talimatın ilk cümlesi>".
+· İş bitince sohbete onay satırı düşer; satırın altında iki seçenek: "Onayla"
+  ve "Beğenmedim, yeniden". Ret seçilirse sebep sorulur ve aynı ekrandan yeni
+  talimat yazılabilir.
+· Onay satırına tıklamak da onay verir; bu satırlarda ekrana götürme oku
+  gösterilmez, çünkü iş zaten sohbette karara bağlanır.

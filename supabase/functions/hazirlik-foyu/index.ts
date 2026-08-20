@@ -783,6 +783,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
+    const talimat = temiz((body as any)?.talimat);
     const case_id = temiz((body as any)?.case_id);
     const session_id = temiz((body as any)?.session_id);
     const party_id = temiz((body as any)?.party_id);
@@ -1087,6 +1088,17 @@ Deno.serve(async (req) => {
     if (yErr) {
       await durumYaz(durumAdmin, durumCaseId, durumPartyId, { status: "failed", error_message: yErr.message });
       return json({ error: `Kayıt yazılamadı: ${yErr.message}` }, 500);
+    }
+
+    /* ARABULUCU TALİMATI (varsa): adımın KENDİ yönergesine EK yönergedir,
+       yerine geçmez. Anayasa üstündür — yasak isteyen talimat koşucuda elenir;
+       burada yalnız uygun talimat işlenir. Talimat kipinde tarafa yazan hiçbir
+       şey yapılmaz; iş önce arabulucunun onayına sunulur. */
+    if (talimat) {
+      const notSatiri = `Arabulucunun talimatı uygulandı: ${talimat.replace(/\s+/g, " ").trim().slice(0, 160)}`;
+      const varOlan = bolumler.find((b) => b.baslik === "Oturum bilgileri");
+      if (varOlan) varOlan.maddeler.unshift(notSatiri);
+      else bolumler.unshift({ baslik: "Oturum bilgileri", maddeler: [notSatiri] });
     }
 
     // AKIŞ OLAYI (best-effort): föy taslağı yazıldı. Föy METNİ olaya girmez.

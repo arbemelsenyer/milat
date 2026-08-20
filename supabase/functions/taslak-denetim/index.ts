@@ -63,14 +63,22 @@ Deno.serve(async (req) => {
     const govde = await req.json().catch(() => ({}));
     const case_id = temiz((govde as any)?.case_id);
     const belge_id = temiz((govde as any)?.belge_id) || temiz((govde as any)?.document_id);
+    const talimat = temiz((govde as any)?.talimat);
     if (!case_id) return json({ error: "case_id gerekli" }, 400);
 
     const sahip = { case_id, agent_type: AGENT_TYPE, party_id: null };
     const kilit = await zatenCalisiyorMu(admin, sahip);
     if (kilit.calisiyor) return json({ atlandi: true, sebep: kilit.sebep });
 
+    /* ARABULUCU TALİMATI (varsa): adımın KENDİ yönergesine EK yönergedir,
+       yerine geçmez. Anayasa üstündür — yasak isteyen talimat koşucuda elenir;
+       burada yalnız uygun talimat işlenir. Talimat kipinde tarafa yazan hiçbir
+       şey yapılmaz; iş önce arabulucunun onayına sunulur. */
     anlatim = anlatimAc(admin, sahip);
     await anlatim.baslat("Anlaşma taslağını okuyorum.");
+    if (talimat) {
+      await anlatim.adim(`Arabulucunun talimatı uygulandı: ${talimat.slice(0, 160)}`);
+    }
 
     /* Taslak metni agreement_documents.metadata.filled_text alanında durur
        (ön yüzdeki sürüm listesiyle aynı kaynak). Belge id verilmemişse dosyanın

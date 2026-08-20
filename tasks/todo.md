@@ -1,3 +1,22 @@
+## Nerede kaldık — 20.08.2026 (98) · ARABULUCU TALİMATI ("şunu şöyle yap, onaya sun")
+
+- [x] 1 · Sohbette "Talimat ver": hedef adım (föy · bilirkişi soruları · taslak
+      denetimi) seçilip serbest metin yazılıyor; kayıt doğrudan tablodan, yeni
+      fonksiyon yok. Bekleyen talimat üstte tek satır görünüyor.
+- [x] 2 · Koşucu her turda olaylardan ÖNCE talimat kuyruğuna bakıyor; adımı
+      talimatla çağırıyor, bitince 'uygulandi' yapıp onay satırı düşürüyor.
+      Onay gelmeden iş taraf yüzeyine çıkmıyor. Duraklatma talimatın üstünde.
+- [x] 3 · Üç adım talimatı ek yönerge olarak alıyor ve çıktının başında
+      belirtiyor. Anayasaya aykırı talimat 'uygulanamadi' + sade sebep;
+      kalem karşılaştırması talimat almıyor ("veriden hesaplanır").
+- [x] 4 · Onay satırında "Onayla" ve "Beğenmedim, yeniden". akis-onayla'ya
+      talimat_id desteği eklendi; ret talimatı 'reddedildi' yapıp yeni talimat
+      yazmayı açıyor.
+
+SIRADA: akis-yurut · akis-onayla · hazirlik-foyu · bilirkisi-sorulari ·
+taslak-denetim redeploy · publish · canlı test (talimat ver → uygula → onayla /
+beğenme → tur dönsün).
+
 ## Nerede kaldık — 20.08.2026 (97) · ARABULUCU FRENİ VE KONTROL TERCİHİ
 
 - [x] 1 · hazirlik-foyu-gonder kapısı onarıldı: koşucu iç kapıdan çağırabiliyor

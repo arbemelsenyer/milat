@@ -310,3 +310,22 @@ Gün sonu belge komutuna dahildir.
   ediyordu, koşucu çağırınca 401 dönüyordu (canlı pano 20.08 00:48). Artık
   masa-kalem-karsilastir desenindeki çift kapı: x-cron-secret VEYA kullanıcı
   oturumu. Kullanıcı yolu ve yetki kontrolü harfi harfine korundu.
+
+[EKLEME 20.08.2026 — ARABULUCU TALİMATI]
+- Tablo: public.arabulucu_talimatlari — CANLIDA (kurucu kurdu). hedef_adim ·
+  talimat · durum ('bekliyor'|'uygulandi'|'onaylandi'|'reddedildi'|
+  'uygulanamadi') · veren · sonuc_ozeti · red_sebebi · uygulanma_zamani ·
+  karar_zamani. Arabulucuya ALL, admin ALL. Yazım doğrudan sohbetten yapılır;
+  bunun için YENİ EDGE FONKSİYON YOK.
+- akis-yurut: talimat kuyruğu eklendi (talimatlariYurut). Olaylardan ÖNCE koşar;
+  hedef adımı talimat_id + talimat + talimat_modu ile çağırır, bitince talimatı
+  'uygulandi' yapar ve arabulucunun sohbetine onay satırı düşer. Duraklatma
+  varsa talimat da bekler. Aynı talimat en fazla iki kez denenir.
+- _shared/anlatim.ts: talimatiDenetle (anayasa süzgeci, kalıp tabanlı) ·
+  TALIMAT_ALMAYAN (masa-kalem-karsilastir) · talimatOzeti.
+- hazirlik-foyu · bilirkisi-sorulari · taslak-denetim: gövdede talimat gelirse
+  ek yönerge olarak alır ve çıktının başında tek cümleyle belirtir. Talimat
+  kipinde tarafa yazan hiçbir şey yapılmaz.
+- akis-onayla: talimat_id desteği eklendi (gövdeden ya da gerekçedeki
+  "[talimat:<id>]" etiketinden okunur); onayda talimat 'onaylandi' olur.
+  'arabulucu_onayi' tipindeki satırlar da onaylanabilir hâle geldi.

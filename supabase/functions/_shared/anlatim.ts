@@ -572,3 +572,72 @@ export const SORU_TIPI_ARABULUCU = "arabulucu_sorusu";
 export function kolEtiketi(fonksiyon: string): string {
   return `[kol:${String(fonksiyon ?? "").trim()}]`;
 }
+
+/* ── ARABULUCU TALİMATI (public.arabulucu_talimatlari) ───────────────────────
+   Arabulucu "şunu şöyle yap" der; ajan yapar ve ONAYA SUNAR. Talimat, adımın
+   kendi üretim yönergesine EK yönergedir — yerine geçmez.
+
+   ANAYASA ÜSTÜNDÜR (constitution m.1 · m.2 · m.3 · m.5): talimat
+     · uydurma istiyorsa,
+     · karşı tarafın verisini istiyorsa,
+     · tarafa hukuki tavsiye ya da karar dayatıyorsa,
+     · dört insan kapısını (imza · bilirkişi ataması · kayıt/döküm rızası ·
+       tarafla asıl müzakere) atlatmaya çalışıyorsa
+   UYGULANMAZ. Durum 'uygulanamadi' yazılır, sebebi sade dille söylenir.
+
+   SINIR — DÜRÜSTLÜK NOTU: bu denetim KALIP TABANLIDIR. Açıkça yazılmış istekleri
+   yakalar; dolaylı ya da örtük anlatımı yakalamayabilir. Bu yüzden adımların
+   KENDİ kuralları (birebir alıntı doğrulaması, kör veri sorguları, insan kapıları)
+   yürürlükte kalır — talimat denetimi onların yerine geçmez, üstüne eklenir. */
+export type TalimatDenetimi = { uygun: boolean; sebep: string };
+
+const TALIMAT_YASAK_KALIPLARI: { kalip: string[]; sebep: string }[] = [
+  {
+    kalip: ["uydur", "varsay", "tahmin et", "olmasa bile yaz", "yoksa da yaz", "yokmuş gibi", "kendin ekle"],
+    sebep: "dosyada karşılığı olmayan bir şey yazmamı istiyor; ben yalnız kayıtlı veriden yazabilirim",
+  },
+  {
+    kalip: ["karşı tarafın belge", "karsi tarafin belge", "diğer tarafın belge", "diger tarafin belge",
+            "karşı tarafın beyan", "karşı tarafın analiz", "öteki tarafın", "oteki tarafin",
+            "karşı tarafın verisi", "karsi tarafin verisi"],
+    sebep: "karşı tarafın verisini kullanmamı istiyor; her tarafın verisi kendi odasında kalır",
+  },
+  {
+    kalip: ["hukuki tavsiye", "tavsiye ver", "karar ver", "kabul etsin", "kabul et de",
+            "talebi geri çek", "talebinden vazgeç", "haklı olduğunu yaz", "haksız olduğunu yaz"],
+    sebep: "hukuki tavsiye ya da karar içeriyor; ben öneri üretirim, kararı siz verirsiniz",
+  },
+  {
+    kalip: ["imzala", "imzayı at", "bilirkişi ata", "bilirkişiyi görevlendir",
+            "onay almadan gönder", "onaysız gönder", "rıza almadan", "rızasız kaydet",
+            "taraf yerine", "taraf adına karar"],
+    sebep: "yalnız insanda kalan bir işi bana yaptırmak istiyor (imza, bilirkişi ataması, kayıt rızası, asıl müzakere)",
+  },
+];
+
+function talimatNormalize(v: unknown): string {
+  return String(v ?? "").toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
+}
+
+export function talimatiDenetle(talimat: unknown): TalimatDenetimi {
+  const t = talimatNormalize(talimat);
+  if (!t) return { uygun: false, sebep: "talimat metni boş geldi" };
+  for (const g of TALIMAT_YASAK_KALIPLARI) {
+    if (g.kalip.some((k) => t.includes(talimatNormalize(k)))) {
+      return { uygun: false, sebep: g.sebep };
+    }
+  }
+  return { uygun: true, sebep: "" };
+}
+
+/* Talimat ALMAYAN adımlar: çıktısı veriden hesaplanan, metin üretmeyen kollar.
+   Bunlara talimat verilirse 'uygulanamadi' yazılır ve sebebi söylenir. */
+export const TALIMAT_ALMAYAN: string[] = ["masa-kalem-karsilastir"];
+
+/** Talimat özetini tek cümleye indirir — çıktının başına yazılacak satır için. */
+export function talimatOzeti(talimat: unknown, n = 160): string {
+  const t = String(talimat ?? "").replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  const ilk = t.split(/(?<=[.!?])\s/)[0] ?? t;
+  return ilk.length > n ? `${ilk.slice(0, n - 1)}…` : ilk;
+}

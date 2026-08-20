@@ -19,7 +19,9 @@
 //
 // GÜVENLİK KAPISI ajan-nobetci ile birebir aynıdır: x-cron-secret VEYA admin JWT.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { motoraBagliMi, girdiTamamla } from "../_shared/anlatim.ts";
+import {
+  motoraBagliMi, girdiTamamla, talimatiDenetle, TALIMAT_ALMAYAN, talimatOzeti,
+} from "../_shared/anlatim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -304,6 +306,144 @@ async function asamaIlerlet(admin: any): Promise<{ ilerletilen: number; notlar: 
   return { ilerletilen, notlar };
 }
 
+/* ── ARABULUCU TALİMAT KUYRUĞU (yasa · "şunu şöyle yap, onaya sun") ──────────
+   Koşucu, olayları işlemeden ÖNCE bekleyen talimatlara bakar. Bekleyen talimat
+   varsa hedef adımı çağırır ve gövdeye talimat_id + talimat metnini koyar.
+   Adım bitince talimat 'uygulandi' olur ve ARABULUCUNUN sohbetine onay satırı
+   düşer ('arabulucu_onayi'). Onay gelmeden yapılan iş taraf yüzeyine ÇIKMAZ:
+   çağrıya talimat_modu=true geçilir, adımlar bu kipte tarafa yazan hiçbir şey
+   yapmaz (föy gönderilmez, taraftan bir şey istenmez, e-posta gitmez).
+   FREN ÜSTÜNDÜR: dosyada aktif duraklatma varsa talimat da bekler.
+   İKİ DENEME: aynı talimat en fazla iki kez denenir, sonra 'uygulanamadi'. */
+const TALIMAT_TUR_SINIRI = 20;
+
+async function talimatlariYurut(
+  admin: any, ozet: { notlar: string[] },
+): Promise<{ uygulanan: number; reddedilen: number }> {
+  let uygulanan = 0;
+  let reddedilen = 0;
+  try {
+    const { data: talimatlar, error } = await admin.from("arabulucu_talimatlari")
+      .select("id, case_id, hedef_adim, talimat, durum, sonuc_ozeti, created_at")
+      .eq("durum", "bekliyor")
+      .order("created_at", { ascending: true })
+      .limit(TALIMAT_TUR_SINIRI);
+    if (error) {
+      ozet.notlar.push(`talimatlar okunamadı: ${error.message}`);
+      return { uygulanan, reddedilen };
+    }
+
+    for (const t of ((talimatlar ?? []) as any[])) {
+      const caseId = String(t.case_id);
+      const adim = metin(t.hedef_adim);
+      const talimatMetni = metin(t.talimat);
+
+      // FREN ÜSTÜNDÜR: duraklatma varsa talimat da bekler, durumu değişmez.
+      const duraklatmalar = await duraklatmalariOku(admin, caseId);
+      if (duraklatmalar.some((d) => d.kapsam === "dosya" || d.hedef_adim === adim)) {
+        ozet.notlar.push(`talimat bekliyor (${caseId}): akış durdurulmuş`);
+        continue;
+      }
+
+      // Talimat almayan adım: hesap işidir, metin üretmez.
+      if (TALIMAT_ALMAYAN.includes(adim)) {
+        await admin.from("arabulucu_talimatlari").update({
+          durum: "uygulanamadi",
+          red_sebebi: "Bu adım veriden hesaplanır.",
+          karar_zamani: new Date().toISOString(),
+        }).eq("id", t.id);
+        await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
+          "Bu talimatı uygulayamam — bu adım veriden hesaplanır.");
+        reddedilen++;
+        continue;
+      }
+
+      if (!motoraBagliMi(adim)) {
+        await admin.from("arabulucu_talimatlari").update({
+          durum: "uygulanamadi",
+          red_sebebi: "Bu adım ortak çalışma motoruna bağlı değil.",
+          karar_zamani: new Date().toISOString(),
+        }).eq("id", t.id);
+        reddedilen++;
+        continue;
+      }
+
+      // ANAYASA ÜSTÜNDÜR: yasak isteyen talimat uygulanmaz.
+      const denetim = talimatiDenetle(talimatMetni);
+      if (!denetim.uygun) {
+        await admin.from("arabulucu_talimatlari").update({
+          durum: "uygulanamadi",
+          red_sebebi: denetim.sebep,
+          karar_zamani: new Date().toISOString(),
+        }).eq("id", t.id);
+        await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
+          `Bu talimatı uygulayamam — ${denetim.sebep}.`);
+        reddedilen++;
+        continue;
+      }
+
+      const girdi = await girdiTamamla(admin, adim, { case_id: caseId });
+      if (girdi.govdeler.length === 0) {
+        const eksikMetni = girdi.eksik.length ? girdi.eksik.join(", ") : "gerekli bilgi";
+        await admin.from("arabulucu_talimatlari").update({
+          durum: "uygulanamadi",
+          red_sebebi: `${eksikMetni} dosyada bulunamadı`,
+          karar_zamani: new Date().toISOString(),
+        }).eq("id", t.id);
+        await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
+          `Bu talimatı uygulayamadım — ${eksikMetni} dosyada bulunamadı.`);
+        reddedilen++;
+        continue;
+      }
+
+      let hepsiOldu = true;
+      let sonSebep = "";
+      for (const g of girdi.govdeler) {
+        const r = await icFonksiyonCagir(adim, {
+          ...g, talimat_id: String(t.id), talimat: talimatMetni, talimat_modu: true,
+        });
+        if (!r.ok) { hepsiOldu = false; sonSebep = r.sebep; }
+      }
+
+      if (!hepsiOldu) {
+        /* İKİ DENEME SINIRI: sonuc_ozeti alanında deneme izi tutulur; ikinci
+           denemede de olmazsa talimat bırakılır ve sebebi yazılır. */
+        const denemeVar = String(t.sonuc_ozeti ?? "").includes("deneme:1");
+        if (denemeVar) {
+          await admin.from("arabulucu_talimatlari").update({
+            durum: "uygulanamadi",
+            red_sebebi: `İki denemede de çalışmadı: ${sonSebep}`.slice(0, 500),
+            karar_zamani: new Date().toISOString(),
+          }).eq("id", t.id);
+          await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
+            "Bu talimatı iki denemede de uygulayamadım.");
+          reddedilen++;
+        } else {
+          await admin.from("arabulucu_talimatlari")
+            .update({ sonuc_ozeti: "deneme:1" }).eq("id", t.id);
+          ozet.notlar.push(`talimat çalıştırılamadı (${caseId}): ${sonSebep}`);
+        }
+        continue;
+      }
+
+      await admin.from("arabulucu_talimatlari").update({
+        durum: "uygulandi",
+        uygulanma_zamani: new Date().toISOString(),
+        sonuc_ozeti: talimatOzeti(talimatMetni),
+      }).eq("id", t.id);
+
+      /* ONAYA SUNULUR: iş taraf yüzeyine çıkmadan arabulucunun sohbetine düşer.
+         Onay satırı 'arabulucu_onayi' tipindedir; nöbetçi bu tipi yürütmez. */
+      await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
+        `[talimat:${t.id}] Talimatınıza göre yeniden hazırladım, onayınıza sunuyorum.`);
+      uygulanan++;
+    }
+  } catch (e: any) {
+    ozet.notlar.push(`talimat kuyruğu çalışamadı: ${String(e?.message ?? e).slice(0, 120)}`);
+  }
+  return { uygulanan, reddedilen };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -324,6 +464,11 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
+    /* TALİMAT KUYRUĞU: olaylar işlenmeden ÖNCE koşar — arabulucunun verdiği
+       talimat sıradaki olayların arkasında beklemez. */
+    const talimatOzetSayaci = { notlar: [] as string[] };
+    const talimatSonuc = await talimatlariYurut(admin, talimatOzetSayaci);
+
     const { data: olaylar, error: oErr } = await admin.from("akis_olaylari")
       .select("id, case_id, party_id, olay_kodu, veri, islendi, created_at")
       .eq("islendi", false)
@@ -332,6 +477,8 @@ Deno.serve(async (req) => {
     if (oErr) return json({ error: oErr.message }, 500);
 
     const ozet = {
+      talimat_uygulandi: talimatSonuc.uygulanan,
+      talimat_uygulanamadi: talimatSonuc.reddedilen,
       okunan_olay: (olaylar ?? []).length,
       islenen_olay: 0,
       calistirilan_kural: 0,
@@ -341,6 +488,7 @@ Deno.serve(async (req) => {
       hatali_kural: 0,
       notlar: [] as string[],
     };
+    ozet.notlar.push(...talimatOzetSayaci.notlar);
     if (!olaylar || olaylar.length === 0) return json({ ok: true, ...ozet });
 
     // Kurallar bir kez okunur; olay kodlarına göre eşleştirilir.

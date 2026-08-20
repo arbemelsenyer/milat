@@ -51,14 +51,22 @@ Deno.serve(async (req) => {
 
     const govde = await req.json().catch(() => ({}));
     const gorev_id = temiz((govde as any)?.gorev_id);
+    // Talimatla yapılmış işin onayı: gerekçedeki "[talimat:<id>]" etiketinden
+    // ya da doğrudan gövdeden gelir.
+    let talimat_id = temiz((govde as any)?.talimat_id);
     if (!gorev_id) return json({ error: "gorev_id gerekli" }, 400);
 
     const { data: gorev, error: gErr } = await admin.from("ajan_gorevleri")
       .select("id, case_id, gorev_tipi, hedef_party_id, durum, gerekce").eq("id", gorev_id).maybeSingle();
     if (gErr) return json({ error: gErr.message }, 500);
     if (!gorev) return json({ error: "Onay kaydı bulunamadı" }, 404);
-    if (String((gorev as any).gorev_tipi) !== "akis_onay_bekliyor") {
+    const gorevTipi = String((gorev as any).gorev_tipi);
+    if (gorevTipi !== "akis_onay_bekliyor" && gorevTipi !== "arabulucu_onayi") {
       return json({ error: "Bu kayıt bir akış onayı değil" }, 400);
+    }
+    if (!talimat_id) {
+      const m = /\[talimat:([0-9a-f-]{6,})\]/i.exec(String((gorev as any).gerekce ?? ""));
+      if (m) talimat_id = m[1];
     }
     if (String((gorev as any).durum) !== "bekliyor") {
       return json({ onaylandi: false, sebep: "Bu onay zaten kapanmış." });
@@ -80,6 +88,14 @@ Deno.serve(async (req) => {
       .update({ durum: "yapildi", sonuc: "arabulucu onayladı" }).eq("id", gorev_id);
     if (uErr) return json({ error: uErr.message }, 500);
 
+    /* TALİMAT ONAYI: talimatla yapılan iş onaylandı — durum 'onaylandi' olur ve
+       olağan akış sürer. Onay gelmeden bu iş taraf yüzeyine çıkmamıştı. */
+    if (talimat_id) {
+      await admin.from("arabulucu_talimatlari").update({
+        durum: "onaylandi", karar_zamani: new Date().toISOString(),
+      }).eq("id", talimat_id).eq("case_id", caseId);
+    }
+
     /* Adımı bekleten olay(lar) yeniden işlenecek şekilde işaretlenir ve
        verisine onay_verildi=true konur. Yeni olay AÇILMAZ; bekleyen olay
        kaldığı yerden sürer (yasa 5. madde). */
@@ -96,7 +112,7 @@ Deno.serve(async (req) => {
       if (!oErr) uyandirilan++;
     }
 
-    return json({ onaylandi: true, uyandirilan });
+    return json({ onaylandi: true, uyandirilan, talimat_id: talimat_id || null });
   } catch (e: any) {
     const msg = String(e?.message ?? "Bilinmeyen sistem hatası");
     console.error("[akis-onayla] Genel hata:", msg.slice(0, 200));

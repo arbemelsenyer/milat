@@ -26,7 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Bot, ChevronDown, Loader2, ArrowRight, Send, CheckCircle2, Mic, MicOff, Volume2, VolumeX, Pause, Play, Pencil } from "lucide-react";
+import { Bot, ChevronDown, Loader2, ArrowRight, Send, CheckCircle2, Mic, MicOff, Volume2, VolumeX, Pause, Play, Pencil, ClipboardList } from "lucide-react";
 
 type Rol = "arabulucu" | "taraf";
 
@@ -121,6 +121,14 @@ const TARAFA_ACIK_GOREVLER = [
    satırlar bir ekrana götürür, cevabı orada verilir. */
 const CEVAPLANABILIR = ["taraf_sorusu", "arabulucu_sorusu"];
 
+/* TALİMAT VERİLEBİLEN ADIMLAR: metin üreten kollar. Veriden hesaplanan kollar
+   (kalem karşılaştırması gibi) talimat almaz — sunucu da reddeder. */
+const TALIMAT_ADIMLARI: { kod: string; metin: string }[] = [
+  { kod: "hazirlik-foyu", metin: "Oturum hazırlık föyü" },
+  { kod: "bilirkisi-sorulari", metin: "Bilirkişiye sorulacak sorular" },
+  { kod: "taslak-denetim", metin: "Anlaşma taslağı denetimi" },
+];
+
 const GOREV_ASAMASI: Record<string, number> = {
   soru_gonder: 2, taraf_eksik_bilgi: 2, analiz_baslat: 2,
   teklif_degerlendir: 3, arabulucu_onayi: 3, akis_onay_bekliyor: 3,
@@ -211,6 +219,11 @@ export function AjanPenceresi({
   const [frenKipi, setFrenKipi] = useState<null | "durdur" | "degistir">(null);
   const [kosanAdimlar, setKosanAdimlar] = useState<string[]>([]);
   const [secilenAdim, setSecilenAdim] = useState("");
+  /* TALİMAT — yalnız arabulucu yüzeyinde: "şunu şöyle yap, onaya sun". */
+  const [talimatKipi, setTalimatKipi] = useState(false);
+  const [talimatAdimi, setTalimatAdimi] = useState("");
+  const [bekleyenTalimat, setBekleyenTalimat] = useState<any | null>(null);
+  const [redKipi, setRedKipi] = useState<GorevSatiri | null>(null);
   const sesVar = konusmaTanimaVarMi();
   const okumaVar = seslendirmeVarMi();
   const altRef = useRef<HTMLDivElement | null>(null);
@@ -304,6 +317,13 @@ export function AjanPenceresi({
         if (m) kodlar.add(m[1]);
       }
       setKosanAdimlar(Array.from(kodlar));
+
+      // Bekleyen talimat — yalnız arabulucu görür.
+      const { data: tal } = await (supabase.from("arabulucu_talimatlari" as any) as any)
+        .select("id, hedef_adim, talimat, durum, created_at")
+        .eq("case_id", caseId).eq("durum", "bekliyor")
+        .order("created_at", { ascending: false }).limit(1);
+      setBekleyenTalimat(((tal ?? []) as any[])[0] ?? null);
 
       if (d1.error && g.error) setHata("Şu an ajanla bağlantı kurulamıyor.");
       setDurumlar(((d1.data ?? []) as any[]) as DurumSatiri[]);
@@ -517,6 +537,43 @@ export function AjanPenceresi({
     await yukle();
   }
 
+  /* TALİMAT YAZ: kayıt doğrudan sohbetten tabloya yazılır; tablo politikası
+     arabulucuya açık olduğu için yeni edge fonksiyon gerekmez. Koşucu bekleyen
+     talimatı bir sonraki turunda alır, uygular ve ONAYA SUNAR. */
+  async function talimatYaz(adim: string, metin: string) {
+    const { data: oturum } = await supabase.auth.getUser();
+    const { error } = await (supabase.from("arabulucu_talimatlari" as any) as any).insert({
+      case_id: caseId, hedef_adim: adim, talimat: metin.trim(),
+      durum: "bekliyor", veren: oturum?.user?.id ?? null,
+    });
+    if (error) {
+      setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+        metin: "Talimatınızı şu an kaydedemedim. Birazdan tekrar deneyin." }]);
+      return;
+    }
+    setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+      metin: "Talimatınızı aldım, sıradaki turda uygulayıp onayınıza sunacağım." }]);
+    await yukle();
+  }
+
+  /* "Beğenmedim, yeniden": talimat reddedilir, sebebi arabulucunun yazdığı
+     metindir. Aynı ekrandan yeni talimat yazılabilir; tur döner. */
+  async function talimatReddet(g: GorevSatiri, sebep: string) {
+    const m = /\[talimat:([0-9a-f-]{6,})\]/i.exec(String(g.gerekce ?? ""));
+    if (m) {
+      await (supabase.from("arabulucu_talimatlari" as any) as any).update({
+        durum: "reddedildi", red_sebebi: sebep.trim() || null,
+        karar_zamani: new Date().toISOString(),
+      }).eq("id", m[1]);
+    }
+    await supabase.from("ajan_gorevleri")
+      .update({ durum: "atlandi", sonuc: "arabulucu beğenmedi" }).eq("id", g.id);
+    setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+      metin: "Anladım, yeniden yapacağım. Yeni talimatınızı yazabilirsiniz." }]);
+    setTalimatKipi(true);
+    await yukle();
+  }
+
   function gorevTikla(g?: GorevSatiri) {
     if (!g) return;
     if (tarafModu) {
@@ -524,8 +581,10 @@ export function AjanPenceresi({
       if (sekme && onGit) onGit(sekme);
       return;
     }
-    // Akış onayı: tıklanınca ekrana götürmek yerine onay verilir.
-    if (g.gorev_tipi === "akis_onay_bekliyor") { onayVer(g); return; }
+    // Akış onayı ve talimat onayı: tıklanınca ekrana götürmek yerine onay verilir.
+    if (g.gorev_tipi === "akis_onay_bekliyor" || g.gorev_tipi === "arabulucu_onayi") {
+      onayVer(g); return;
+    }
     const asama = GOREV_ASAMASI[g.gorev_tipi] ?? 3;
     window.location.assign(`/cases/${caseId}?phase=${asama}&pv=2`);
   }
@@ -674,7 +733,61 @@ export function AjanPenceresi({
               onClick={() => { setFrenKipi(frenKipi === "degistir" ? null : "degistir"); }}>
               <Pencil className="h-3 w-3 mr-1" /> Değiştir
             </Button>
+            <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]"
+              onClick={() => { setTalimatKipi((o) => !o); setFrenKipi(null); }}>
+              <ClipboardList className="h-3 w-3 mr-1" /> Talimat ver
+            </Button>
           </div>
+
+          {bekleyenTalimat && (
+            <p className="text-[11px] text-muted-foreground">
+              Talimatınız sırada: {TALIMAT_ADIMLARI.find((a) => a.kod === String(bekleyenTalimat.hedef_adim))?.metin
+                ?? String(bekleyenTalimat.hedef_adim ?? "")} — {String(bekleyenTalimat.talimat ?? "").split(/(?<=[.!?])\s/)[0]}
+            </p>
+          )}
+
+          {talimatKipi && (
+            <div className="space-y-1.5">
+              <select
+                className="w-full h-7 text-xs border rounded bg-background px-1"
+                value={talimatAdimi}
+                onChange={(e) => setTalimatAdimi(e.target.value)}
+              >
+                <option value="">hangi adım?</option>
+                {TALIMAT_ADIMLARI.map((a) => <option key={a.kod} value={a.kod}>{a.metin}</option>)}
+              </select>
+              <Textarea rows={3} value={soru} placeholder="Şunu şöyle yap…"
+                className="text-xs resize-none" onChange={(e) => setSoru(e.target.value)} />
+              <Button size="sm" className="h-6 px-2 text-[11px]"
+                disabled={!talimatAdimi || !soru.trim()}
+                onClick={async () => {
+                  const a = talimatAdimi; const t = soru;
+                  setSoru(""); setTalimatAdimi(""); setTalimatKipi(false);
+                  await talimatYaz(a, t);
+                }}>
+                Talimatı gönder
+              </Button>
+            </div>
+          )}
+
+          {redKipi && (
+            <div className="space-y-1.5">
+              <Textarea rows={2} value={soru} placeholder="Neyi beğenmediniz?"
+                className="text-xs resize-none" onChange={(e) => setSoru(e.target.value)} />
+              <div className="flex items-center gap-1.5">
+                <Button size="sm" className="h-6 px-2 text-[11px]"
+                  onClick={async () => {
+                    const g = redKipi; const t = soru;
+                    setSoru(""); setRedKipi(null);
+                    await talimatReddet(g, t);
+                  }}>
+                  Yeniden yap
+                </Button>
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]"
+                  onClick={() => setRedKipi(null)}>Vazgeç</Button>
+              </div>
+            </div>
+          )}
 
           {frenKipi === "durdur" && (
             <div className="space-y-1.5">
@@ -758,14 +871,27 @@ export function AjanPenceresi({
               );
             }
             if (m.tip === "bildirim") {
+              const onayMi = m.gorev?.gorev_tipi === "arabulucu_onayi"
+                || m.gorev?.gorev_tipi === "akis_onay_bekliyor";
               return (
-                <button key={m.id} type="button" onClick={() => gorevTikla(m.gorev)}
-                  className="w-full text-left rounded-lg border px-2.5 py-1.5 hover:bg-muted/60">
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-xs leading-snug">{m.metin}</span>
-                    <ArrowRight className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
-                  </div>
-                </button>
+                <div key={m.id} className="rounded-lg border px-2.5 py-1.5">
+                  <button type="button" onClick={() => gorevTikla(m.gorev)} className="w-full text-left">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-xs leading-snug">{m.metin}</span>
+                      {!onayMi && <ArrowRight className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />}
+                    </div>
+                  </button>
+                  {onayMi && !tarafModu && (
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <Button size="sm" className="h-6 px-2 text-[11px]"
+                        onClick={() => m.gorev && onayVer(m.gorev)}>Onayla</Button>
+                      <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]"
+                        onClick={() => { setRedKipi(m.gorev ?? null); setSoru(""); }}>
+                        Beğenmedim, yeniden
+                      </Button>
+                    </div>
+                  )}
+                </div>
               );
             }
             if (m.tip === "asama") {

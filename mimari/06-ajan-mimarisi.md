@@ -600,3 +600,47 @@ KAPI SAYISINI ÜRÜN DEĞİL ARABULUCU BELİRLER
   gösterilir, yalnız bilgi amaçlıdır.
 · Tercih dosya + arabulucu bazlıdır (UNIQUE case_id, mediator_id) ve sonradan
   değiştirilebilir.
+
+
+[EKLEME 20.08.2026 — ARABULUCU TALİMAT VERİR, AJAN YAPAR, ONAYA SUNAR]
+● CANLI (deploy sonrası). Tablo: public.arabulucu_talimatlari.
+
+DÖNGÜ:
+1. Arabulucu sohbetten hedef adımı seçer ve serbest metinle talimat yazar
+   (durum='bekliyor'). Kayıt doğrudan tablodan yapılır; yeni fonksiyon yoktur.
+2. Koşucu (akis-yurut · talimatlariYurut) her turunda, OLAYLARI İŞLEMEDEN ÖNCE
+   bekleyen talimatlara bakar ve hedef adımı çağırır; gövdeye talimat_id,
+   talimat metni ve talimat_modu=true koyar.
+3. Adım, talimatı KENDİ üretim yönergesine EK yönerge olarak alır ve çıktının
+   başında tek cümleyle belirtir: "Arabulucunun talimatı uygulandı: <özet>".
+4. İş bitince talimat 'uygulandi' olur ve ARABULUCUNUN sohbetine onay satırı
+   düşer ('arabulucu_onayi'): "Talimatınıza göre yeniden hazırladım, onayınıza
+   sunuyorum."
+5. Onay → akis-onayla talimatı 'onaylandi' yapar, olağan akış sürer.
+   Ret ("Beğenmedim, yeniden") → talimat 'reddedildi', red_sebebi arabulucunun
+   yazdığı metindir; aynı ekrandan yeni talimat yazılır, tur döner.
+
+ONAY GELMEDEN TARAF YÜZEYİNE ÇIKMAZ: talimat kipinde adımlar tarafa yazan
+hiçbir şey yapmaz — föy gönderilmez, taraftan bir şey istenmez, e-posta gitmez.
+Bilirkişi kolu bu kipte taraf onayı istemez; sohbete "onayınızdan sonra
+istenecek" notu düşer.
+
+FREN ÜSTÜNDÜR: dosyada aktif duraklatma varsa talimat da bekler, durumu
+değişmez. İKİ DENEME: aynı talimat en fazla iki kez denenir; ikisinde de
+olmazsa 'uygulanamadi' ve sebebi yazılır.
+
+ANAYASA ÜSTÜNDÜR (constitution m.1 · m.2 · m.3 · m.5) — talimat şunları
+istiyorsa UYGULANMAZ ve durum 'uygulanamadi' olur, sebebi sade dille söylenir:
+· uydurma / dosyada karşılığı olmayan içerik,
+· karşı tarafın verisi,
+· tarafa hukuki tavsiye ya da karar dayatması,
+· dört insan kapısının atlanması (imza · bilirkişi ataması · kayıt/döküm
+  rızası · tarafla asıl müzakere).
+Veriden hesaplanan kollar (masa-kalem-karsilastir) talimat ALMAZ; sebep:
+"Bu adım veriden hesaplanır."
+
+DÜRÜSTLÜK NOTU (bilerek yazıldı): talimat denetimi KALIP TABANLIDIR
+(_shared/anlatim.ts · talimatiDenetle). Açıkça yazılmış istekleri yakalar,
+dolaylı anlatımı yakalamayabilir. Bu yüzden adımların KENDİ kuralları — birebir
+alıntı doğrulaması, kör veri sorguları, insan kapıları — yürürlükte kalır;
+talimat denetimi onların yerine geçmez, üstüne eklenir.

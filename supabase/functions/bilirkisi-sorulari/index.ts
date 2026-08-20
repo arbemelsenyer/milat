@@ -61,14 +61,23 @@ Deno.serve(async (req) => {
 
     const govde = await req.json().catch(() => ({}));
     const case_id = temiz((govde as any)?.case_id);
+    const talimat = temiz((govde as any)?.talimat);
+    const talimatModu = (govde as any)?.talimat_modu === true;
     if (!case_id) return json({ error: "case_id gerekli" }, 400);
 
     const sahip = { case_id, agent_type: AGENT_TYPE, party_id: null };
     const kilit = await zatenCalisiyorMu(admin, sahip);
     if (kilit.calisiyor) return json({ atlandi: true, sebep: kilit.sebep });
 
+    /* ARABULUCU TALİMATI (varsa): adımın KENDİ yönergesine EK yönergedir,
+       yerine geçmez. Anayasa üstündür — yasak isteyen talimat koşucuda elenir;
+       burada yalnız uygun talimat işlenir. Talimat kipinde tarafa yazan hiçbir
+       şey yapılmaz; iş önce arabulucunun onayına sunulur. */
     anlatim = anlatimAc(admin, sahip);
     await anlatim.baslat("Bilirkişiye sorulacak soruları dosyadan çıkarıyorum.");
+    if (talimat) {
+      await anlatim.adim(`Arabulucunun talimatı uygulandı: ${talimat.slice(0, 160)}`);
+    }
 
     // Atama kaydı: onay durumunu okumak için. Karar burada VERİLMEZ.
     const { data: atamalar } = await admin.from("case_expert_assignments")
@@ -112,7 +121,10 @@ Deno.serve(async (req) => {
        taraf sayısından azsa onay eksiktir. Onayı, o tarafın KENDİ sohbetinden
        tamamlayıcı dille isteriz — suçlayıcı sözcük kullanılmaz. */
     const eksikler: string[] = [];
-    if (atama) {
+    if (atama && talimatModu) {
+      // Talimat kipi: onay gelmeden taraf yüzeyine çıkılmaz, taraftan bir şey istenmez.
+      eksikler.push("Talimat kipinde tarafa soru gönderilmedi; onayınızdan sonra istenecek.");
+    } else if (atama) {
       const onaylar = (atama as any)?.approvals;
       const onaylayanlar = onaylar && typeof onaylar === "object" && !Array.isArray(onaylar)
         ? Object.keys(onaylar).filter((k) => !!(onaylar as any)[k])
