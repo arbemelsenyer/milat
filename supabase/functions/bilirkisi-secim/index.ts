@@ -250,6 +250,41 @@ async function olayYazDegistiyse(
   return { yazildi: !olayNotu, sebep: notlar || `yazıldı (${onceki || "ilk"} → ${iz})`, iz };
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   ERTELEME VE TUR SINIRI (21.08.2026 kurucu kararı)
+   Bilirkişi seçilemediğinde süreç TIKANMAZ: dosyaya tek satır "ertelendi" kaydı
+   düşer ve ajan aynı şeyi bir daha sormaz. Kayıt ajan_bellek'te durur — yeni
+   tablo açılmadı, kolon düşürülmedi. Yalnız durum kodu ve sayı yazılır (öğrenme
+   sınırı §4: ad, beyan, serbest metin yazılmaz).
+   Sebep kodları: vazgecildi | ortak_irade_yok | tur_siniri
+   TUR SINIRI: arabulucu en fazla İKİ kez yeni bir uzmanlık alanı yazıp
+   taratabilir; üçüncüde erteleme durumuna geçilir.
+   ──────────────────────────────────────────────────────────────────────────── */
+const ERTELEME_SEBEPLERI = ["vazgecildi", "ortak_irade_yok", "tur_siniri"];
+const ALAN_TUR_SINIRI = 2;
+
+async function ertelemeOku(admin: any, caseId: string): Promise<string> {
+  const kayitlar = await bellekOku(admin, caseId, "bilirkisi_ertelendi");
+  return metin((kayitlar.find((x) => x.anahtar === "bilirkisi_ertelendi")?.deger as any)?.sebep);
+}
+
+async function ertelemeYaz(admin: any, caseId: string, sebep: string): Promise<string> {
+  const not = await bellekYaz(admin, caseId, null, "bilirkisi_ertelendi", { sebep });
+  const r = await anaAjanaBildir(admin, {
+    case_id: caseId, gorev_tipi: "arabulucu_sorusu", hedef_party_id: null,
+    gerekce: `[bilirkisi:ertelendi:${sebep}] Bilirkişi seçilmedi — bu aşama ertelendi (${sebep}). `
+      + `Süreç kaldığı yerden sürüyor.`,
+    kaynak: "sistem", bekleyen: null,
+  });
+  /* SESSİZ ATLAMA YOK: kayıt düşmediyse sebebi koşum özetine taşınır. */
+  return [not, r.yazildi ? "" : `bildirim yazılmadı: ${r.sebep}`].filter(Boolean).join(" | ");
+}
+
+async function alanTuruSay(admin: any, caseId: string): Promise<number> {
+  const kayitlar = await bellekOku(admin, caseId, "bilirkisi_alan_turu");
+  return Number((kayitlar.find((x) => x.anahtar === "bilirkisi_alan_turu")?.deger as any)?.tur ?? 0) || 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -327,9 +362,43 @@ Deno.serve(async (req) => {
     }
 
     // ─────────────────────────────────────────────── 2) ALAN + ADAY ÇIKARMA
-    if (adim === "aday_cikar" || adim === "ikinci_tur") {
+    if (adim === "aday_cikar" || adim === "ikinci_tur" || adim === "alan_tara") {
       if (k.rol === "taraf") return json({ error: "Aday çıkarma masa ajanının işidir" }, 403);
       if (!alan) return json({ error: "alan gerekli" }, 400);
+
+      /* ERTELEME KAPISI: bu dosyada bilirkişi aşaması ertelendiyse ajan AYNI ŞEYİ
+         BİR DAHA SORMAZ; tarama yapılmaz, satır yazılmaz. */
+      const ertelenmisSebep = await ertelemeOku(admin, case_id);
+      if (ertelenmisSebep) {
+        return json({
+          ok: true, alan, ertelendi: true, sebep: ertelenmisSebep,
+          mesaj: `Bilirkişi seçilmedi — bu aşama ertelendi (${ertelenmisSebep}).`,
+        });
+      }
+
+      /* TUR SINIRI: "alan_tara" arabulucunun sohbete YENİ bir uzmanlık alanı
+         yazmasıdır. En fazla iki kez; üçüncüde erteleme durumuna geçilir. */
+      let alanTuru = 0;
+      if (adim === "alan_tara") {
+        alanTuru = await alanTuruSay(admin, case_id);
+        if (alanTuru >= ALAN_TUR_SINIRI) {
+          const not = await ertelemeYaz(admin, case_id, "tur_siniri");
+          return json({
+            ok: true, alan, ertelendi: true, sebep: "tur_siniri",
+            mesaj: "Bilirkişi seçilmedi — bu aşama ertelendi (tur sınırı doldu).",
+            kayit_notu: not,
+          });
+        }
+        alanTuru += 1;
+        await bellekYaz(admin, case_id, null, "bilirkisi_alan_turu", { tur: alanTuru });
+        /* Arabulucunun cevapladığı bekleyen satır kapanır; aynı soru tekrar sorulmaz. */
+        const gorevId = metin((govde as any)?.gorev_id);
+        if (gorevId) {
+          await admin.from("ajan_gorevleri")
+            .update({ durum: "yapildi", sonuc: `yeni alan tarandı (tur ${alanTuru}/${ALAN_TUR_SINIRI})` })
+            .eq("id", gorevId);
+        }
+      }
 
       anlatim = anlatimAc(admin, { case_id, agent_type: AGENT_TYPE, party_id: null });
       await anlatim.baslat(`"${alan}" alanı için uzman kayıtlarını tarıyorum.`);
@@ -357,14 +426,21 @@ Deno.serve(async (req) => {
            ve ikisi AYNI CÜMLEYLE yazılmaz: hiç örtüşme yok / örtüşenler zaten
            listede. */
         const tukendi = oncekiSayi > 0;
-        const cumle = tukendi
-          ? `"${alan}" alanında çıkarılabilecek YENİ aday kalmadı; örtüşen uzmanlar zaten listede.`
-          : `"${alan}" alanında kayıtlı uzmanlarla örtüşme bulamadım. `
-            + `Taraflardan dışarıdan isim önermelerini isteyebilirim.`;
+        /* TÜKENME HÂLİ (21.08): tek cümle olgu dili + ne yapılabileceği. Pencere
+           KAPANMAZ; arabulucu yakın bir uzmanlık alanı yazarsa `alan_tara` ile
+           sistem o alanla yeniden taranır (en fazla iki tur). */
+        const kalanTur = Math.max(0, ALAN_TUR_SINIRI - (await alanTuruSay(admin, case_id)));
+        const cumle = (tukendi
+          ? `Bu alanda kayıtlı başka uzman yok.`
+          : `Bu alanda kayıtlı uzman yok.`)
+          + ` Dayanak: "${alan}" alanıyla örtüşen kayıtlı ${oncekiSayi} uzman var.`
+          + (kalanTur > 0
+            ? ` Başka bir uzmanlık alanı yazarsanız o alanla tararım (kalan tur: ${kalanTur}).`
+            : ` Yeni alan tarama hakkı kalmadı.`);
         await anaAjanaBildir(admin, {
           case_id, gorev_tipi: "arabulucu_sorusu", hedef_party_id: null,
           gerekce: `[bilirkisi:aday-yok:${alan}] ${cumle}`,
-          kaynak: "sistem", bekleyen: "arabulucu_onayi",
+          kaynak: "sistem", bekleyen: "arabulucu_cevabi",
         });
         await anlatim.bitti({
           yapildi: `"${alan}" alanı tarandı`,
@@ -391,6 +467,7 @@ Deno.serve(async (req) => {
 
       const adayOlay = await olayYazDegistiyse(admin, case_id, "bilirkisi_onerildi", {
         alan, aday_sayisi: yazilacak.length, tur: adim === "ikinci_tur" ? 2 : 1,
+        alan_turu: alanTuru,
       });
       await anlatim.bitti({ yapildi: `"${alan}" alanı için ${yazilacak.length} aday çıkarıldı` });
       return json({
@@ -461,6 +538,15 @@ Deno.serve(async (req) => {
     // ─────────────────────────────────────────── 3) TARAFLARA SUNUM / İLERLET
     if (adim === "ilerlet" || adim === "taraflara_sun") {
       if (k.rol === "taraf") return json({ error: "Bu adım masa ajanınındır" }, 403);
+      /* ERTELEME KAPISI: aşama ertelendiyse ajan yeniden sormaz, sunmaz, yazmaz.
+         Süreç kaldığı yerden sürer; aşama ilerletme motoruna DOKUNULMAZ. */
+      const ertelenmis = await ertelemeOku(admin, case_id);
+      if (ertelenmis) {
+        return json({
+          ok: true, ertelendi: true, sebep: ertelenmis, sunulan: 0,
+          olay: `bilirkişi aşaması ertelendi (${ertelenmis}) — olay yazılmadı`,
+        });
+      }
       anlatim = anlatimAc(admin, { case_id, agent_type: AGENT_TYPE, party_id: null });
       await anlatim.baslat("Bilirkişi seçim akışını ilerletiyorum.");
 
@@ -874,6 +960,56 @@ Deno.serve(async (req) => {
     }
 
     // ───────────────────────────────────────── 6b) DIŞ ADAY — AJAN KAYDETMEZ
+    /* ───────────────────────────── 6c) ERTELEME — SONUÇ KAYDI VE SÜRECİN DEVAMI
+       Bilirkişi seçilmezse süreç durmaz: tek satır kayıt düşer ve ajan aynı şeyi
+       bir daha sormaz. Sebep kodu üçten biridir. Arabulucu ve taraf çağırabilir
+       (tarafın "Bilirkişiden vazgeç" düğmesi buraya bağlıdır). */
+    if (adim === "ertele") {
+      const sebep = metin((govde as any)?.sebep) || "vazgecildi";
+      if (!ERTELEME_SEBEPLERI.includes(sebep)) {
+        return json({ error: `sebep: ${ERTELEME_SEBEPLERI.join(" | ")}` }, 400);
+      }
+      const mevcut = await ertelemeOku(admin, case_id);
+      if (mevcut) return json({ ok: true, ertelendi: true, sebep: mevcut, olay: "zaten ertelenmiş" });
+      const not = await ertelemeYaz(admin, case_id, sebep);
+      return json({
+        ok: true, ertelendi: true, sebep,
+        mesaj: "Bilirkişi seçilmedi — bu aşama ertelendi. Süreç kaldığı yerden sürüyor.",
+        kayit_notu: not,
+      });
+    }
+
+    /* ─────────────────────── 6d) DIŞARIDAN UZMAN GÜNDEMİ — KÖR VERİ SINIRI
+       Arabulucu "dışarıdan uzman seçilebilir" dediğinde karşı tarafın ajanına
+       YALNIZ İKİSİ gider: tek satır usul bilgisi ve uzmanlık ALANI. Kişi adı,
+       arabulucunun yazdığı metin, dosya içeriği ve karşı tarafın hiçbir verisi
+       GEÇMEZ (constitution m.1). Seçim ortak iradeye bağlıdır; arabulucu tek
+       başına dayatmaz — atama zaten iki tarafın yanıtından türetilir. */
+    if (adim === "dis_uzman_gundem") {
+      if (k.rol !== "arabulucu" || !k.user_id) {
+        return json({ error: "Bu adım arabulucunundur" }, 403);
+      }
+      if (!alan) return json({ error: "alan gerekli" }, 400);
+      const { data: kayitliTaraflar } = await admin.from("case_parties")
+        .select("id").eq("case_id", case_id).limit(50);
+      const hedefler = ((kayitliTaraflar ?? []) as any[]).map((t) => String(t.id));
+      const notlar: string[] = [];
+      for (const partyId of hedefler) {
+        const r = await anaAjanaBildir(admin, {
+          case_id, gorev_tipi: "bilirkisi_secimi", hedef_party_id: partyId,
+          /* TEK SATIR USUL + ALAN. Başka hiçbir şey yazılmaz. */
+          gerekce: `[bilirkisi:dis-uzman-gundem:${alan}] Dışarıdan uzman seçilmesi gündemde. `
+            + `Uzmanlık alanı: ${alan}.`,
+          kaynak: "taraf_ajani", bekleyen: "taraf_cevabi",
+        });
+        if (!r.yazildi) notlar.push(`taraf ${partyId.slice(0, 8)}: ${r.sebep}`);
+      }
+      return json({
+        ok: true, alan, bildirilen: hedefler.length,
+        olay: notlar.length ? notlar.join(" | ") : "iki tarafın ajanına usul satırı yazıldı",
+      });
+    }
+
     if (adim === "dis_aday") {
       if (k.rol !== "taraf" || !k.party_id) return json({ error: "Bu adım tarafındır" }, 403);
       const ad = metin((govde as any)?.ad_soyad).slice(0, 120);

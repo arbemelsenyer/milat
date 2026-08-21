@@ -150,8 +150,8 @@ export function IntakeChat() {
         { 
           role: 'assistant', 
           content: language === 'tr' 
-            ? 'Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.'
-            : 'Sorry, an error occurred. Please try again.'
+            ? 'Şu an cevap veremiyorum. Birazdan tekrar deneyin.'
+            : 'I cannot respond right now. Please try again shortly.'
         }
       ]);
     } finally {

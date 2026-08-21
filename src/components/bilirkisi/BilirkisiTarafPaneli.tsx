@@ -135,6 +135,20 @@ export function BilirkisiTarafPaneli({ caseId }: { caseId: string }) {
     setDisAd(""); setDisIletisim(""); setDisAlan("");
   };
 
+  /* BİLİRKİŞİDEN VAZGEÇ (21.08 kurucu kararı): taraf bu aşamadan vazgeçebilir.
+     Kayıt sunucuda düşer ("ertelendi — vazgecildi"); ajan aynı şeyi bir daha
+     sormaz, süreç kaldığı yerden sürer. Gerekçe SORULMAZ. */
+  const bilirkisidenVazgec = async () => {
+    setIsleniyor("vazgec");
+    const { hata: h } = await bilirkisiCagir("bilirkisi-secim", {
+      case_id: caseId, adim: "ertele", sebep: "vazgecildi",
+    });
+    setIsleniyor(null);
+    if (h) { setDurumSatiri(h); return; }
+    setDurumSatiri("Bilirkişi seçilmedi — bu aşama ertelendi. Süreç kaldığı yerden sürüyor.");
+    yukle();
+  };
+
   const yorumGonder = async () => {
     if (!yorum.trim()) { setDurumSatiri("Yazacak bir şeyiniz yoksa boş bırakabilirsiniz."); return; }
     setIsleniyor("yorum");
@@ -360,6 +374,20 @@ export function BilirkisiTarafPaneli({ caseId }: { caseId: string }) {
         <Button size="sm" variant="outline" onClick={disAdayGonder} disabled={isleniyor === "dis"}>
           {isleniyor === "dis" && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
           Arabulucuya ilet
+        </Button>
+      </Card>
+
+      {/* ──────────────────── §6b BİLİRKİŞİDEN VAZGEÇME ──────────────────── */}
+      <Card className="p-5 space-y-2">
+        <h3 className="font-semibold flex items-center gap-2">
+          <UserPlus className="h-4 w-4" /> Bilirkişi istemiyorsanız
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          Bu aşama ertelenir ve süreç kaldığı yerden sürer. Sebep sorulmaz.
+        </p>
+        <Button size="sm" variant="outline" onClick={bilirkisidenVazgec} disabled={isleniyor === "vazgec"}>
+          {isleniyor === "vazgec" && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+          Bilirkişiden vazgeç
         </Button>
       </Card>
 

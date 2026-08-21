@@ -121,6 +121,18 @@ export function BilirkisiAlanlari({ caseId }: { caseId: string }) {
   const bekleyenEvrak = evrak.filter((k) => !k.onaylandi);
   const acikEvrak = evrak.filter((k) => k.onaylandi);
 
+  /* Yalnız usul satırı + alan gider; sunucu tarafında da böyle yazılır. */
+  const disUzmanGundemi = async (alan: string) => {
+    if (!alan.trim()) { setDurum("Önce alan adı yazın."); return; }
+    setIsleniyor(`dis-${alan}`);
+    const { hata } = await bilirkisiCagir("bilirkisi-secim", {
+      case_id: caseId, adim: "dis_uzman_gundem", alan,
+    });
+    setIsleniyor(null);
+    if (hata) { setDurum(hata); return; }
+    setDurum("Taraf ajanlarına yalnız usul bilgisi ve uzmanlık alanı iletildi.");
+  };
+
   if (yukleniyor) {
     return (
       <Card className="p-6 flex items-center gap-2 text-muted-foreground">
@@ -187,6 +199,13 @@ export function BilirkisiAlanlari({ caseId }: { caseId: string }) {
           <Button size="sm" variant="outline" onClick={() => adayOner(yeniAlan)} disabled={!!isleniyor}>
             {isleniyor === `oner-${yeniAlan}` && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
             Önce bana öner (yazmadan)
+          </Button>
+          {/* DIŞARIDAN UZMAN GÜNDEMİ (21.08): karşı tarafın ajanına YALNIZ tek satır
+              usul bilgisi ve uzmanlık ALANI gider. Kişi adı, yazdığınız metin ve
+              dosya içeriği geçmez. Seçim ortak iradeye bağlıdır. */}
+          <Button size="sm" variant="outline" onClick={() => disUzmanGundemi(yeniAlan)} disabled={!!isleniyor}>
+            {isleniyor === `dis-${yeniAlan}` && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+            Dışarıdan uzman gündeme gelsin
           </Button>
         </div>
 

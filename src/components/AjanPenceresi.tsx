@@ -265,7 +265,6 @@ export function AjanPenceresi({
   const [talimatKipi, setTalimatKipi] = useState(false);
   const [talimatAdimi, setTalimatAdimi] = useState("");
   const [bekleyenTalimat, setBekleyenTalimat] = useState<any | null>(null);
-  const [redKipi, setRedKipi] = useState<GorevSatiri | null>(null);
   /* ÖNERİLER — iki yüzeyde de var. Ajan önerir, insan seçer: hiçbir öneri
      akışı durdurmaz, hiçbir işi bekletmez, zorunluluk doğurmaz. */
   const [oneriler, setOneriler] = useState<any[]>([]);
@@ -620,8 +619,8 @@ export function AjanPenceresi({
     await yukle();
   }
 
-  /* "Beğenmedim, yeniden": talimat reddedilir, sebebi arabulucunun yazdığı
-     metindir. Aynı ekrandan yeni talimat yazılabilir; tur döner. */
+  /* "Yeniden öner": talimat reddedilir. 21.08 kararı — gerekçe SORULMAZ; sohbet
+     anket ekranı değildir. red_sebebi kolonu YERİNDE DURUR, yalnız boş geçilir. */
   async function talimatReddet(g: GorevSatiri, sebep: string) {
     const m = /\[talimat:([0-9a-f-]{6,})\]/i.exec(String(g.gerekce ?? ""));
     if (m) {
@@ -631,9 +630,9 @@ export function AjanPenceresi({
       }).eq("id", m[1]);
     }
     await supabase.from("ajan_gorevleri")
-      .update({ durum: "atlandi", sonuc: "arabulucu beğenmedi" }).eq("id", g.id);
+      .update({ durum: "atlandi", sonuc: "arabulucu yeniden öneri istedi" }).eq("id", g.id);
     setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
-      metin: "Anladım, yeniden yapacağım. Yeni talimatınızı yazabilirsiniz." }]);
+      metin: "Yeniden önereceğim. Yeni talimatınızı yazabilirsiniz." }]);
     setDuzeltmeAdimi("talimat");   // B5 — tek soru: neyi düzelttiniz?
     setTalimatKipi(true);
     await yukle();
@@ -755,6 +754,40 @@ export function AjanPenceresi({
     if (cevaplanan) {
       const hedef = cevaplanan;
       setCevaplanan(null);
+
+      /* BİLİRKİŞİ TÜKENME AKIŞI (21.08): ajan "bu alanda kayıtlı başka uzman yok"
+         dediyse, arabulucunun yazdığı metin bir CEVAP değil YENİ UZMANLIK ALANIDIR.
+         O metin bilirkişi koluna gider ve sistem o alanla yeniden taranır; tur
+         sınırı ve erteleme kararı SUNUCUDA verilir. Pencere kapanmaz. */
+      const adayYok = /\[bilirkisi:aday-yok:([^\]]+)\]/.exec(String(hedef.gerekce ?? ""));
+      if (adayYok) {
+        try {
+          const { data, error } = await supabase.functions.invoke("bilirkisi-secim", {
+            body: { case_id: caseId, adim: "alan_tara", alan: metin, gorev_id: hedef.id },
+          });
+          if (error || (data as any)?.error) throw new Error("taranamadi");
+          const d = data as any;
+          const cevapMetni = d?.ertelendi
+            ? String(d?.mesaj ?? "Bilirkişi seçilmedi — bu aşama ertelendi.")
+            : d?.bulunamadi
+              ? String(d?.sebep ?? "Bu alanda kayıtlı uzman yok.")
+              : `"${metin}" alanı için ${Number(d?.adaylar?.length ?? 0)} aday çıkardım; `
+                + `Bilirkişi sekmesinde onayınıza sundum.`;
+          setYazisma((o) => [...o, {
+            id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan", metin: cevapMetni,
+          }]);
+          await yukle();
+        } catch {
+          setYazisma((o) => [...o, {
+            id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+            metin: "Bu alanı şu an tarayamadım. Birazdan tekrar deneyin.",
+          }]);
+        } finally {
+          setBekliyor(false);
+        }
+        return;
+      }
+
       try {
         const { data, error } = await supabase.functions.invoke("taraf-cevap", {
           body: { gorev_id: hedef.id, cevap: metin },
@@ -849,13 +882,13 @@ export function AjanPenceresi({
         <div className="border-b px-3 py-2 shrink-0 space-y-1.5">
           {duraklatma && (
             <p className="text-xs">
-              Akış durduruldu — {String(duraklatma.sebep ?? "sebep yazılmadı")}. Devam etmek için Devam'a basın.
+              Akış durduruldu{duraklatma.sebep ? ` — ${String(duraklatma.sebep)}` : ""}. Devam etmek için Devam'a basın.
             </p>
           )}
           <div className="flex items-center gap-1.5 flex-wrap">
             {!duraklatma && (
               <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]"
-                onClick={() => { setFrenKipi(frenKipi === "durdur" ? null : "durdur"); }}>
+                onClick={async () => { setFrenKipi(null); await durdur("", "dosya"); }}>
                 <Pause className="h-3 w-3 mr-1" /> Durdur
               </Button>
             )}
@@ -901,36 +934,6 @@ export function AjanPenceresi({
                   await talimatYaz(a, t);
                 }}>
                 Talimatı gönder
-              </Button>
-            </div>
-          )}
-
-          {redKipi && (
-            <div className="space-y-1.5">
-              <Textarea rows={2} value={soru} placeholder="Neyi beğenmediniz?"
-                className="text-xs resize-none" onChange={(e) => setSoru(e.target.value)} />
-              <div className="flex items-center gap-1.5">
-                <Button size="sm" className="h-6 px-2 text-[11px]"
-                  onClick={async () => {
-                    const g = redKipi; const t = soru;
-                    setSoru(""); setRedKipi(null);
-                    await talimatReddet(g, t);
-                  }}>
-                  Yeniden yap
-                </Button>
-                <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]"
-                  onClick={() => setRedKipi(null)}>Vazgeç</Button>
-              </div>
-            </div>
-          )}
-
-          {frenKipi === "durdur" && (
-            <div className="space-y-1.5">
-              <Textarea rows={2} value={soru} placeholder="Neden durduruyorsunuz?"
-                className="text-xs resize-none" onChange={(e) => setSoru(e.target.value)} />
-              <Button size="sm" className="h-6 px-2 text-[11px]"
-                onClick={async () => { const t = soru; setSoru(""); setFrenKipi(null); await durdur(t, "dosya"); }}>
-                Akışı durdur
               </Button>
             </div>
           )}
@@ -1028,8 +1031,8 @@ export function AjanPenceresi({
                       <Button size="sm" className="h-6 px-2 text-[11px]"
                         onClick={() => m.gorev && onayVer(m.gorev)}>Onayla</Button>
                       <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]"
-                        onClick={() => { setRedKipi(m.gorev ?? null); setSoru(""); }}>
-                        Beğenmedim, yeniden
+                        onClick={() => m.gorev && talimatReddet(m.gorev, "")}>
+                        Yeniden öner
                       </Button>
                     </div>
                   )}

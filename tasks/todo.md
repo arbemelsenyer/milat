@@ -1,3 +1,100 @@
+## Nerede kaldık — 21.08.2026 (107) · AJAN SORU KALIBI VE BİLİRKİŞİ TÜKENME AKIŞI
+
+KURUCU KARARI (21.08, sohbet ekranı incelemesi)
+- Sohbet anket ekranına dönmüştü: Onayla · Beğenmedim yeniden · Yeniden yap ·
+  Vazgeç · Neyi beğenmediniz? · Neden durduruyorsunuz? · Durdur · Değiştir ·
+  Talimat ver. Kurucu: "Bu ürün hukukçu kullanacak; bu kadar seçenek görüp
+  bırakırım." Karar: soru kalıbı TEK olacak, ajan dili öznellikten arınacak.
+- Ajan dilinde öznel/duygusal ifade YASAK; aynı işi yapan metin üründe TEK.
+  Kullanılacak ifade: "Yeniden öner".
+- Gerekçe sorusu ("Neyi beğenmediniz?", "Neden durduruyorsunuz?") sohbette
+  sorulmaz. İlgili veritabanı alanları yerinde kalır, boş geçilir.
+
+BİLİRKİŞİ TÜKENME AKIŞI (kurucu ile karara bağlandı)
+1 Aday sunulur: durum + dayanak + Onayla/Yeniden öner.
+2 Yeniden öner → aday yoksa "Bu alanda kayıtlı başka uzman yok", pencere
+  KAPANMAZ, arabulucu yazabilir.
+3 Arabulucu yakın bir uzmanlık alanı yazar, ajan o alanla yeniden tarar.
+4 TUR SINIRI 2.
+5 Dışarıdan uzman: karşı tarafın ajanına yalnız usul satırı + uzmanlık alanı
+  gider; kişi adı ve metin GEÇMEZ. Ortak irade yoksa seçilmez.
+6 Vazgeçilirse / seçilemezse: "bilirkişi seçilmedi — bu aşama ertelendi"
+  kayda geçer, ajan aynı şeyi bir daha sormaz, süreç kaldığı yerden sürer.
+
+YAPILDI (21.08, Code)
+- BÖLÜM 1 · SORU KALIBI. AjanPenceresi.tsx:
+  · Onay bildiriminde iki düğme kaldı: "Onayla" + "Yeniden öner" (eski
+    "Beğenmedim, yeniden" gitti). "Yeniden öner" gerekçe sormadan doğrudan
+    talimatReddet(g, "") çağırıyor.
+  · "Neyi beğenmediniz?" kutusu, içindeki "Yeniden yap" ve "Vazgeç" düğmeleri
+    KALDIRILDI (redKipi bloğu ve durumu tamamen silindi).
+  · "Neden durduruyorsunuz?" kutusu KALDIRILDI; "Durdur" düğmesi doğrudan
+    durduruyor (sebep boş geçiliyor). Durdurma satırı artık "sebep yazılmadı"
+    yazmıyor, sebep varsa gösteriyor.
+  · red_sebebi ve akis_duraklatma.sebep KOLONLARI YERİNDE — yalnız boş geçiliyor.
+    Kolon düşürülmedi, tablo değiştirilmedi, SQL yazılmadı.
+- BÖLÜM 3-5 · BİLİRKİŞİ TÜKENME AKIŞI. bilirkisi-secim/index.ts:
+  · Aynı isim ikinci kez sunulmuyordu, o kural zaten vardı (mevcut öneriler
+    dışlanıyor) — dokunulmadı.
+  · Tükenme cümlesi kurucu kalıbına çevrildi: DURUM ("Bu alanda kayıtlı başka
+    uzman yok.") + DAYANAK ("... örtüşen kayıtlı N uzman var.") + kalan tur.
+  · YENİ ADIM `alan_tara`: arabulucunun sohbete yazdığı uzmanlık alanı ile
+    yeniden tarama. Tur sayacı ajan_bellek "bilirkisi_alan_turu" anahtarında.
+  · TUR SINIRI 2 (ALAN_TUR_SINIRI): üçüncüde kendiliğinden "tur_siniri"
+    ertelemesi yazılıyor.
+  · YENİ ADIM `ertele` (sebep: vazgecildi | ortak_irade_yok | tur_siniri):
+    ajan_bellek "bilirkisi_ertelendi" anahtarına yazıyor, dosyaya tek satır
+    bildirim düşüyor. Kayıt düşmezse sebep koşum özetine geçiyor (sessiz atlama yok).
+  · ERTELEME KAPISI: `aday_cikar`, `ikinci_tur`, `alan_tara` ve `ilerlet`
+    ertelenmiş dosyada hiçbir şey sormuyor/yazmıyor. Aşama ilerletme motoruna
+    DOKUNULMADI.
+  · AjanPenceresi.tsx: bekleyen soru "[bilirkisi:aday-yok:<alan>]" ise
+    arabulucunun yazdığı metin taraf-cevap'a değil bilirkisi-secim `alan_tara`
+    adımına gidiyor; pencere kapanmıyor.
+- BÖLÜM 4 · DIŞARIDAN UZMAN:
+  · YENİ ADIM `dis_uzman_gundem` (arabulucu): iki tarafın ajanına YALNIZ tek
+    satır usul bilgisi + uzmanlık alanı gidiyor. Kişi adı, arabulucunun metni,
+    dosya içeriği, karşı tarafın verisi GEÇMİYOR.
+  · BilirkisiAlanlari.tsx'e "Dışarıdan uzman gündeme gelsin" düğmesi eklendi.
+  · BilirkisiTarafPaneli.tsx'e "Bilirkişiden vazgeç" düğmesi eklendi
+    (ertele · vazgecildi). Gerekçe sorulmuyor.
+  · ORTAK İRADE: atama zaten iki tarafın yanıtından sunucuda türetiliyor
+    (`ata` adımı) — dokunulmadı.
+- BÖLÜM 6 · DİL DENETİMİ (değişen metinler tek tek):
+  · AjanPenceresi.tsx: "Beğenmedim, yeniden" → "Yeniden öner" · "Yeniden yap"
+    (düğme) kaldırıldı · "arabulucu beğenmedi" (sonuc kaydı) → "arabulucu
+    yeniden öneri istedi" · "Anladım, yeniden yapacağım…" → "Yeniden
+    önereceğim…" · kod yorumundaki "Beğenmedim, yeniden" başlığı güncellendi.
+  · IntakeChat.tsx:153 "Üzgünüm, bir hata oluştu…" → "Şu an cevap veremiyorum.
+    Birazdan tekrar deneyin." (EN karşılığı da nötrleştirildi.)
+  · Ürün genelinde tarama yapıldı: "beğen/maalesef/üzgün/hoşuma" başka yerde
+    kullanıcıya görünen metinde YOK.
+- Tip denetimi: `npx tsc --noEmit -p tsconfig.app.json` temiz (0 hata).
+
+KALDIRILMADI — BÖLÜM 2 (kurucu kararına bırakıldı)
+- Durdur · Değiştir · Talimat ver üçünün de ARABULUCU PANELİNDE KARŞILIĞI YOK.
+  Doğrulama: AgentControlPanel.tsx (864 satır) içinde "Durdur/Değiştir/Talimat"
+  geçmiyor (grep boş döndü); akis_duraklatma'yı okuyan/yazan tek yüzey
+  AjanPenceresi.tsx (361, 569, 588); arabulucu_talimatlari'na yazan ikinci yer
+  MediationEngine.tsx:2653 ama o dosya kapanışındaki "eksik notu" akışıdır,
+  genel talimat yüzeyi değildir.
+  KOMUT GEREĞİ KALDIRILMADI, oldukları yerde duruyor. Kurucu ayrı karar verecek.
+- "Vazgeç" düğmesi AjanPenceresi.tsx:1107'de DURUYOR (cevap kipinden çıkış).
+  Sebep: kaldırılırsa "Cevap yaz"a basan kullanıcı cevap kipinden çıkamaz,
+  çalışan yol kırılır. Kurucu isterse tek satırla kaldırılır.
+
+AÇIK KALEMLER
+- Havuz yönetim ekranı yok (gundem_kalem_havuzu, 70 başlık) — kurucu kararı:
+  şimdi değil.
+- İLERİYE KALEM (kurucu fikri, yapılmayacak — kayıt için): risk ve finansal
+  analiz ajanı. Her tarafın kendi ajanı YALNIZ kendi tarafının evrakını
+  inceler, riski ve hesabı çıkarır, kendi tarafına sunar; evrak karşı tarafa
+  geçmez. Taraflar masaya bu hesapla oturur.
+- Kurucu pilotta ürünün tamamını gezip benzer dil/bütünlük kusurlarını
+  ayrıca bildirecek.
+- CANLI TEST YAPILMADI (kurucuda): tükenme → alan yazma → ikinci tur → üçüncüde
+  erteleme zinciri ve "Bilirkişiden vazgeç" düğmesi canlıda denenmeli.
+
 ## Nerede kaldık — 21.08.2026 (106) · CLAUDE BÖLGESİ DENETİMİ 1. TUR KAPANDI
 
 Üç açık kalemin de sonucu okunarak belirlendi. İKİSİNDE İŞ ÇIKMADI, BİRİ CANLI
