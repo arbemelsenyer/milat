@@ -986,7 +986,11 @@ async function teklifDegerlendirYurut(admin: any, dosya: any, gerekce: string, p
   const { data: altSatir } = await admin.from("ajan_gorevleri")
     .select("id, gerekce").eq("case_id", dosya.id).eq("gorev_tipi", "taraf_alternatif_saat")
     .eq("hedef_party_id", partyId).limit(50);
-  const hedefSatir = ((altSatir ?? []) as any[]).find((r) => String(r?.gerekce ?? "").startsWith(`[alternatif:${teklifId}]`));
+  // ONARIM (21.08.2026): startsWith → includes. Satır gorevAc üzerinden yazılıyor ve
+  // anaAjanaBildir geçidi gerekçenin BAŞINA "[kaynak:…]" koyuyor; "[alternatif:…]"
+  // etiketi ortada kaldığı için startsWith hiçbir satırı bulamıyordu ve alternatif
+  // saatler `sonuc` alanına HİÇ YAZILMIYORDU (randevu-teklif de okuyamıyordu).
+  const hedefSatir = ((altSatir ?? []) as any[]).find((r) => String(r?.gerekce ?? "").includes(`[alternatif:${teklifId}]`));
   if (hedefSatir?.id) {
     await admin.from("ajan_gorevleri")
       .update({ sonuc: JSON.stringify({ alternatifler: adaylar }) }).eq("id", hedefSatir.id);
@@ -1753,7 +1757,11 @@ async function ekOturumKararlariniIsle(admin: any, dosya: any): Promise<{ acilan
   let acilan = 0;
   for (const g of (gorevler ?? []) as any[]) {
     const gerekce = String(g?.gerekce ?? "");
-    if (!gerekce.startsWith("[onay:ek_oturum:")) continue;
+    // ONARIM (21.08.2026): startsWith → includes. Aynı kayma: anaAjanaBildir geçidi
+    // gerekçenin başına "[kaynak:…]" koyunca "[onay:ek_oturum:…]" ortada kaldı ve bu
+    // döngü hiçbir onay satırını görmedi; arabulucunun "ikinci oturum gerekli" kararı
+    // İŞLENMİYORDU, randevu hattı yeniden başlamıyordu.
+    if (!gerekce.includes("[onay:ek_oturum:")) continue;
     // Karar bir kez uygulanır: uygulandığında sonuc alanına işaret düşer.
     if (String(g?.sonuc ?? "").includes("randevu hattı yeniden başlatıldı")) continue;
 

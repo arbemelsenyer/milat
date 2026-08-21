@@ -37,8 +37,14 @@ EKSİK KALDI / DOKUNULMADI
     alternatif saatleri `sonuc` alanına YAZILAMIYOR; randevu-teklif okuyamıyor.
   · index.ts:1756 — `[onay:ek_oturum:<id>]` satırı bulunamıyor, arabulucunun
     "ikinci oturum gerekli" onayı İŞLENMİYOR, randevu hattı yeniden başlamıyor.
-  GİDERMEK İÇİN: iki satırdaki startsWith → includes (Code, tek turluk iş) —
-  kurucu onayı bekliyor.
+  [x] 21.08.2026 ONARILDI (kurucu onayı alındı): iki satır da startsWith →
+  includes oldu, sebep kod yorumuna yazıldı.
+  · index.ts:993 — `[alternatif:<teklifId>]` satırı artık bulunuyor, alternatif
+    saatler `sonuc` alanına JSON olarak yazılabiliyor.
+  · index.ts:1764 — `[onay:ek_oturum:<id>]` satırı artık bulunuyor, arabulucunun
+    "ikinci oturum gerekli" onayı işleniyor ve randevu hattı yeniden başlıyor.
+  · ajan-nobetci'de başka startsWith KALMADI (grep: yalnız yorum satırlarında
+    geçiyor — 139, 989, 991, 2390). _shared/ DEĞİŞMEDİ, fan-out gerekmiyor.
 - akis-yurut'taki startsWith'ler SAĞLAM, dokunulmadı: `[gecis:]` (index.ts:338),
   `[akis:]` (761 ve 792) doğrudan insert ile yazılıyor, geçitten geçmiyor.
 
