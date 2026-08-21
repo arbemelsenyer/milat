@@ -83,6 +83,17 @@ KALDIRILMADI — BÖLÜM 2 (kurucu kararına bırakıldı)
   Sebep: kaldırılırsa "Cevap yaz"a basan kullanıcı cevap kipinden çıkamaz,
   çalışan yol kırılır. Kurucu isterse tek satırla kaldırılır.
 
+YAYIN (21.08, Code — "medipact devam")
+- [x] REDEPLOY: bilirkisi-secim, Lovable'dan commit cf38ef2 ile yayına alındı
+  ("başarılı — cf38ef2"). _shared/ değişmediği için fan-out redeploy gerekmedi.
+- [x] PUBLISH BAŞLATILDI: deploy_project çağrıldı, deployment_id
+  b22915a1-e4f2-471f-ae9d-244fe9d9e5d0, dönüş "pending". Ardından get_project
+  latest_commit_sha=cf38ef2 ve status=ready gösterdi. TAMAMLANDIĞI AYRICA
+  DOĞRULANMADI — kurucu medipact-ai.lovable.app'i sert yenileyip görmeli.
+  Bu publish aynı zamanda 20.08'den beri yayına girmemiş ön yüzü de taşır:
+  BilirkisiAlanlari ("Alan satırı ekle") canlıda bundan sonra görünmeli
+  (106/teşhis turunun 5. maddesi).
+
 AÇIK KALEMLER
 - Havuz yönetim ekranı yok (gundem_kalem_havuzu, 70 başlık) — kurucu kararı:
   şimdi değil.
