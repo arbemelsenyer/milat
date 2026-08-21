@@ -299,3 +299,14 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   YAPILIR (constitution m.12 v3.4 eklemesi: tek kapı Lovable). CLI ile edge fonksiyon
   deploy edilmez, migration/SQL çalıştırılmaz, proje link'lenmez, giriş yapılıp
   anahtar istenmez. akis_kurallari/politika satırları zaten Code tarafından yazılmaz.
+- DERS (21.08.2026) — KURALIN GEREKÇESİNDE "KAPALI" YAZMASI ONU KAPATMAZ. akis_kurallari'nda
+  ÜÇ satırın gerekçesinde "KAPALI" notu duruyordu ama etkin alanı true'ydu; koşucu yalnız
+  etkin alanına bakıyor (akis-yurut/index.ts:657). Sonuç: belge_yuklendi__analiz açık
+  kaldığı için belge yüklenince analiz zinciri, ön yüzdeki 30 saniyelik sayaçla birlikte
+  İKİ KEZ koştu ve OpenAI bakiyesinden iki kat harcadı; foy_onaylandi__gonder açık kaldığı
+  için föy hem "Yalnız onayla" düğmesinden hem kuraldan gidebilir hâldeydi. Ayrıca todo.md
+  bunu İKİ kural diye kaydetmişti, canlıda SQL ile bakılınca ÜÇ çıktı — kural sayısı bile
+  belgeden değil canlıdan okunur. Kural: bir kural kapatılırken `etkin` alanı ile gerekçe
+  AYNI SQL'de değiştirilir; not ile alan ayrışırsa kural sessizce çalışmaya devam eder ve
+  sessiz çalışan kural para ve mükerrer gönderim üretir. Denetim tek sorgudur: etkin=true
+  olan hiçbir satırın gerekçesinde "KAPALI" geçmemeli.

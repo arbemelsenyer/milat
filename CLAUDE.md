@@ -5,12 +5,13 @@
 1. `constitution.md` — tam oku. Kısadır; değişmez ilkeler.
 2. `mimari/00-INDEX.md` — tam oku. Bölüm haritasıdır.
 3. Yalnızca işine karşılık gelen `mimari/` bölüm dosyası.
-4. `tasks/todo.md` ve `tasks/lessons.md` — tam oku.
+4. `tasks/todo.md` — yalnız en üstteki "Nerede kaldık" bloğu (alt kısmı bayattır) ·
+   `tasks/lessons.md` — tam oku.
 5. `medipact-komut.md` — yalnızca ürünün niyeti tartışılıyorsa.
 6. `tasks/yol-haritasi.md` — yalnızca sıra/öncelik sorusu varsa.
 
 Çelişki hâlinde üst sıradaki kazanır:
-constitution > komut > mimari > tasks.
+constitution.md > medipact-komut.md > mimari/ > tasks/.
 
 ## Bayat liste uyarısı (bağlayıcı)
 tasks/todo.md'nin alt kısmındaki işaretlenmemiş maddeler (A/B/C/D grupları,

@@ -1,3 +1,94 @@
+## Nerede kaldık — 21.08.2026 (105) · CLAUDE BÖLGESİ DENETİMİ (1. tur) + KURAL TABLOSU DÜZELTİLDİ
+
+YAPILDI (Claude, SQL — kanıt aşağıda)
+- [x] KURAL TABLOSU ÇELİŞKİSİ KAPANDI. Notunda "KAPALI" yazan ama etkin=true olan
+      ÜÇ satır (notta iki diye kayıtlıydı, canlıda üç çıktı) gerçekten kapatıldı:
+      · belge_yuklendi__analiz (sıra 10) → etkin=false
+      · kalem_guncellendi__karsilastir (sıra 25) → etkin=false
+      · foy_onaylandi__gonder (sıra 30) → etkin=false
+      Üçünün gerekçesine "[21.08 DUZELTME: etkin alani gercekten false yapildi;
+      not KAPALI diyordu ama kural acikti, kosucu etkin alanina bakiyor.]" eklendi.
+      DOĞRULAMA (update sonrası SELECT, 9 satırın tamamı): etkin=true olan hiçbir
+      satırın gerekçesinde artık "KAPALI" geçmiyor. Çelişki sıfır.
+      ETKİSİ: belge yüklenince analiz zinciri artık TEK koşuyor (ön yüzdeki 30 sn'lik
+      sayaç). Çift OpenAI harcaması durdu. Föy çift gönderim yolu kapandı.
+      SQL: yapıldı · redeploy: gerekmedi · publish: gerekmedi.
+- [x] DÖNGÜ ONARIMI CANLIDA DOĞRULANDI (SELECT). akis_olaylari'nda
+      bilirkisi_durumu_degisti üç satır: 20.08 17:44:43, 20.08 17:45:15 ve
+      21.08 01:59:37 ("dongu_testi — kural yeniden acildi, dongu var mi").
+      Sonuncusu islendi=true ve ARKASINDAN YENİ SATIR DÜŞMEMİŞ. Döngü yok.
+      Ayrıca bilirkisi_durum__ilerlet kuralı canlıda etkin=true, gerekçesinde
+      "21.08 ACILDI" notu var. todo.md'de "yapılacak" diye duruyordu, yapılmıştı.
+
+AÇIK KALEMLER — CLAUDE BÖLGESİ DENETİMİ 1. TUR BULGULARI (hiçbiri giderilmedi)
+1. TABLO KİLİTLİ — gundem_kalem_havuzu. RLS açık ama POLİTİKA SAYISI SIFIR
+   (pg_policies taraması, public şemada politikasız tek tablo). Postgres'te bu
+   "service_role dışında kimse okuyamaz" demek. İçinde 70 satır var; kolonlar:
+   kategori, baslik, kaynak_source_title, kaynak_alinti, durum, ipuclari.
+   Taraf verisi YOK, kaynak künyeli gündem kalemi şablonları var — yani sızıntı
+   değil, TERS yönde kusur: bu havuzdan ekrana öneri çıkacaksa ÇIKMIYOR.
+   GİDERMEK İÇİN: okuma politikası yazılacak. Kimde: Claude (politika = Claude).
+   ÖNCE OKUNACAK: bu havuzu hangi ekran/fonksiyon çağırıyor, kime görünmeli.
+2. HİÇ ÇALIŞMAMIŞ KURAL — bilirkisi_beyani__ilerlet (sıra 50, etkin=true).
+   Tetikleyicisi bilirkisi_beyani_verildi olayı akis_olaylari'nda BİR KEZ BİLE
+   yazılmamış (olay kodu bazında sayım: o kod listede yok).
+   GİDERMEK İÇİN: sebebi okunacak — beyan ekranı olayı yazmıyor mu, yoksa o yol
+   hiç kullanılmadı mı. Kimde: önce Claude okur, kod kusuruysa Code'a geçer.
+3. DİNLEYİCİSİ OLMAYAN DÖRT OLAY — yazılıyor, hiçbir kural dinlemiyor:
+   soru_cevaplandi (7 satır) · foy_taslagi_hazirlandi (5) · foy_gonderildi (2) ·
+   belge_ozeti_uretildi (1). CLAUDE.md 120-126: her yetenek ya olaya bağlanır ya
+   gerekçesi yazılır. Bu dördünün gerekçesi belgede var mı BAKILMADI.
+   GİDERMEK İÇİN: ya kural satırı yazılacak ya gerekçe belgeye düşecek. Kimde: Claude.
+4. BAYAT YORUM — ajan-nobetci/index.ts:2390 hâlâ "KAPSAM DIŞI, raporlandı" diyor,
+   oysa o kapı 21.08'de onarıldı. Yorum yanlış, kod doğru. Tek satırlık düzeltme.
+   Kimde: Code. Kurucu onayı bekliyor.
+
+DENETİMİN BAKMADIĞI YERLER (2. tur, dürüstlük kaydı)
+- cron.job kayıtları · migration geçmişi · politikası VAR ama içeriği yanlış
+  olabilecek tablolar (yalnız "politika sayısı sıfır mı" bakıldı, içerik okunmadı)
+- constitution.md, mimari/00-INDEX.md, mimari/06-ajan-mimarisi.md bu oturumda
+  OKUNMADI (COWORK.md "Yeni oturum" listesi eksik uygulandı — Claude hatası).
+  Sonradan okunanlar: medipact-komut.md TAMAMI (441 satır) · tasks/lessons.md
+  TAMAMI (302 satır) · CLAUDE.md TAMAMI (196 satır) · COWORK.md TAMAMI (144 satır).
+
+KURAL KİTABI
+- Cowork tarafındaki "medipact-calisma-duzeni" özeti ESKİMİŞ: kapı satırını dört
+  alan sanıyordu, COWORK.md beş alan istiyor (uydurma alanı eksikti). İki nüsha
+  çeliştiğinde yakındaki kazandı, kurucunun kitabı çiğnendi.
+  YAPILAN: içinde hiç kural olmayan, yalnız "COWORK.md'yi oku ve ona uy" diyen yeni
+  SKILL.md kurucuya dosya olarak gönderildi. KAYDEDİLDİ Mİ BİLİNMİYOR — Claude
+  göremiyor, kurucu bildirecek.
+- [x] 21.08 · COWORK.md GÜNCELLENDİ (kurucu onayıyla, Claude yazdı). Yalnız en
+  sondaki "Yeni oturum" bölümü değişti; kalan 137 satıra dokunulmadı. Okuma listesi
+  tek satırdan altı maddeye açıldı ve her maddenin yanına NE KADAR okunacağı yazıldı:
+  1 medipact-komut.md (Tam okunur — listeye YENİ girdi, bugüne dek hiç okunmuyordu) ·
+  2 constitution.md · 3 mimari/00-INDEX.md · 4 mimari/06-ajan-mimarisi.md (üçü tam) ·
+  5 tasks/todo.md (YALNIZ en üstteki blok; dosya 200 KB'ı aştı, altı bayat) ·
+  6 tasks/lessons.md (Tam okunur).
+  KÖK SEBEP: kurucu komutu Claude'un açılış listesinde hiç yoktu; ürünün en üst
+  belgesi okunmadan çalışılıyordu. 21.08'deki kural ihlallerinin kaynağı budur.
+- [x] 21.08 · CLAUDE.md GÜNCELLENDİ (kurucu onayıyla, Claude yazdı). TEK SATIR:
+  satır 13 "constitution > komut > mimari > tasks." →
+  "constitution.md > medipact-komut.md > mimari/ > tasks/." Sebep: "komut" kelimesi
+  tek başına yapıştırılan komut sanılabiliyordu. Başka hiçbir satırına dokunulmadı.
+  Code'un listesinde medipact-komut.md zaten vardı (satır 9, şartlı) — eklenmedi.
+- GEREKEN: bu iki dosya DEPOYA İŞLENMEDİ. `git add . && git commit && git push`
+  kurucunun terminalinden yapılacak; Claude'un o makinede kabuğu yok.
+- [x] 21.08 · CLAUDE.md SATIR 8 DÜZELTİLDİ (kurucu onayıyla, Claude yazdı).
+  Eski: "`tasks/todo.md` ve `tasks/lessons.md` — tam oku."
+  Yeni: "`tasks/todo.md` — yalnız en üstteki 'Nerede kaldık' bloğu (alt kısmı
+  bayattır) · `tasks/lessons.md` — tam oku."
+  Sebep: eski satır aynı dosyanın iki bölümüyle çelişiyordu — "Bayat liste uyarısı"
+  (satır 15-20) todo.md'nin altına bakılmamasını, "Okuma sınırı" (satır 22-31)
+  dosyaların tamamının okunmamasını söylüyor. Code hangisine uysa bir kuralı
+  çiğniyordu. Artık her dosyanın yanında NE KADAR okunacağı yazılı (COWORK.md ile aynı).
+- [x] 21.08 · DERS lessons.md'ye YAZILDI: "Kuralın gerekçesinde KAPALI yazması onu
+  kapatmaz — koşucu yalnız etkin alanına bakar." Dosyanın en sonuna, kendi biçimiyle.
+- (kapandı) DEFTERE GİRMEYİ BEKLEYEN DERS: "Bir akış kuralının
+  gerekçesinde KAPALI yazması onu kapatmaz — koşucu yalnız etkin alanına bakar.
+  Kural kapatılırken iki alan birlikte değiştirilir; not ile alan ayrışırsa kural
+  sessizce çalışmaya devam eder ve para/çift gönderim üretir." (21.08 bulgusu)
+
 ## Nerede kaldık — 21.08.2026 (105) · DÖNGÜ KUSURU + NÖBETÇİ MÜKERRER YAZIM KAPISI
 
 YAPILDI
