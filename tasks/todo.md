@@ -1,3 +1,75 @@
+## Nerede kaldık — 21.08.2026 (106) · CLAUDE BÖLGESİ DENETİMİ 1. TUR KAPANDI
+
+Üç açık kalemin de sonucu okunarak belirlendi. İKİSİNDE İŞ ÇIKMADI, BİRİ CANLI
+TESTLE KAPANDI. Politika ve kural satırı YAZILMADI — gerekmediği için.
+
+1. [x] gundem_kalem_havuzu — POLİTİKA GEREKMİYOR, BULGU YANLIŞ ALARMDI.
+   Denetim notu "havuzdan ekrana öneri çıkacaksa ÇIKMIYOR" diyordu. Okundu:
+   havuzu ekrana çıkaran hiçbir yer YOK. Tabloya dokunan tek kod hazirlik-foyu
+   ve servis anahtarıyla okuyor (index.ts:794 `createClient(SUPABASE_URL,
+   SERVICE_KEY)`; HAVUZ_TABLOSU geçişleri 475 ve 586). Servis anahtarı RLS'i
+   atlar — föy gündemi normal kuruluyor.
+   src altında tabloyu okuyan tek satır yok (grep: yalnız types.ts:2737, o da
+   üretilen şema dosyası).
+   CANLI DOĞRULAMA (SELECT): RLS açık · politika 0 · 70 satır · hepsi etkin ·
+   2 kategori (tüketici 45, kira 25). Örnek başlıklar: "Kira bedeli tespiti",
+   "İhtiyaç sebebi tahliyesi", "Kefil sorumluluğu", "İhtarname gönderimi".
+   SONUÇ: politikasız RLS bu tablo için DOĞRU kurulum. SQL yazılmadı.
+
+   AÇIK KALEM (kurucu kararı 21.08: "şimdi değil") — HAVUZUN YÖNETİM EKRANI YOK.
+   Kurucu 70 başlığı hiçbir yerden göremiyor, düzeltemiyor, kapatamıyor.
+   hazirlik-foyu/index.ts:469-471 "kurucunun kalemleri BİLEREK kapattığı"
+   durumu tanıyor ve o hâlde yeniden türetme yapmıyor — ama kapatma yüzeyi
+   üründe yok. Gerekirse: kategori · başlık · kaynak künyesi · alıntı listesi
+   ve etkin/pasif düğmesi.
+
+2. [x] bilirkisi_beyani__ilerlet — KOD KUSURU YOK, CANLI TESTLE KAPANDI.
+   Zincirin dört halkası da okunarak doğrulandı:
+   · BilirkisiTarafPaneli.tsx:97-98 — "beyan_yaz" adımını secim_yontemi ile
+     çağırıyor; ekran CaseRoom.tsx:859'da taraf sekmesinde çizili.
+   · bilirkisiCagri.ts:35 gövdeyi doğrudan body olarak gönderiyor;
+     bilirkisi-secim/index.ts:260 gövdeyi doğrudan okuyor — alan adları uyuyor,
+     kopukluk yok.
+   · index.ts:304-310 — beyan GERÇEKTEN değiştiyse bilirkisi_beyani_verildi
+     yazılıyor (21.08 döngü onarımının kapısı).
+   · Kural sıra 50, etkin=true, sonraki adım bilirkisi-secim.
+   HİÇ ÇALIŞMAMASININ SEBEBİ: beyan hiç verilmemişti — bilirkisi_secim_beyani
+   0 satırdı. Kusur değil, denenmemiş yol.
+   CANLI TEST (21.08, kurucu taraf ekranından "Biz seçelim" ile kaydetti):
+   beyan 1 satır · bilirkisi_beyani_verildi 1 satır · islendi=true. KURAL ÇALIŞTI.
+   Aday öneri 0 kaldı — adaylar arabulucu tarafında aday_cikar ile çıkar,
+   bu testin kapsamı değildi.
+
+3. [x] DİNLEYİCİSİ OLMAYAN DÖRT OLAY — KURAL YAZILMADI, DÖRDÜNÜN DE GEREKÇESİ VAR.
+   CLAUDE.md 120-126 "her yetenek ya olaya bağlanır ya gerekçesi yazılır"
+   gereği gerekçeler buraya yazıldı:
+   · foy_gonderildi (2 satır) — zincirin sonu. Föy tarafa gitti, arkasından
+     çalışacak adım yok.
+   · foy_taslagi_hazirlandi (5) — sıradaki adım ARABULUCUNUN ONAYI. Onay insan
+     kapısıdır; ajanın kendiliğinden ilerletmemesi doğrudur.
+   · belge_ozeti_uretildi (1) — zincirin sonu. Özet belge_ozetleri'ne yazıldı.
+   · soru_cevaplandi (7) — DEVAMI VAR, ama kural tablosundan değil:
+     ajan-nobetci/index.ts:1139-1143 cevaplanmış ('yapildi') görevin
+     gerekçesindeki "[kol:<fonksiyon>]" etiketinden ilgili kolu BİR KEZ yeniden
+     uyandırıyor (yasa-1 madde 5'in karşılığı). Kural satırı yazılırsa aynı iş
+     iki koldan tetiklenir.
+   SONUÇ: dördü için de akis_kurallari'na satır YAZILMADI.
+
+YAN BULGU (giderilmedi, kayıt için)
+- case_expert_assignments'ta 1 atama var ama bilirkisi_onerileri 0 satır. Yani
+  o atama yeni bilirkişi akışından değil, eski ekrandan yapılmış. Yeni akışın
+  aday çıkarma kolu bugüne dek hiç koşmamış.
+
+DENETİMİN HÂLÂ BAKMADIĞI YERLER (2. tur, dürüstlük kaydı — değişmedi)
+- cron.job kayıtları · migration geçmişi · politikası VAR ama içeriği yanlış
+  olabilecek tablolar (yalnız "politika sayısı sıfır mı" bakıldı, içerik okunmadı)
+
+AÇILIŞ OKUMASI (21.08, Claude — geçen oturumun eksiği kapatıldı)
+- COWORK.md'nin altı maddelik listesi bu kez EKSİKSİZ uygulandı: medipact-komut.md
+  (441 satır) · constitution.md (218) · mimari/00-INDEX.md (98) ·
+  mimari/06-ajan-mimarisi.md (843) · tasks/lessons.md (312) tamamı, tasks/todo.md
+  yalnız en üstteki blok. Geçen oturumda okunmayan üç dosya artık okundu.
+
 ## Nerede kaldık — 21.08.2026 (105) · CLAUDE BÖLGESİ DENETİMİ (1. tur) + KURAL TABLOSU DÜZELTİLDİ
 
 YAPILDI (Claude, SQL — kanıt aşağıda)
