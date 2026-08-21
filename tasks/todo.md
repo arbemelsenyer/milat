@@ -43,8 +43,11 @@ EKSİK KALDI / DOKUNULMADI
   `[akis:]` (761 ve 792) doğrudan insert ile yazılıyor, geçitten geçmiyor.
 
 GİDERMEK İÇİN (bu turun kalanı)
-- REDEPLOY: bilirkisi-secim · ajan-nobetci (Claude). _shared/anlatim.ts
-  DEĞİŞMEDİ — yalnız iki yeni ad içe aktarıldı, fan-out redeploy gerekmiyor.
+- [x] REDEPLOY YAPILDI (21.08.2026): bilirkisi-secim · ajan-nobetci, Lovable
+  üzerinden commit 22dc27ef ile yayına alındı (ikisi de "başarılı" döndü).
+  Push kontrolü önce yapıldı: origin/main == HEAD == 22dc27ef, çalışma ağacı
+  temiz. _shared/anlatim.ts DEĞİŞMEDİ — yalnız iki yeni ad içe aktarıldı,
+  fan-out redeploy gerekmedi. Ön yüz değişmediği için publish yapılmadı.
 - AKIŞ KURALI: bilirkisi_durumu_degisti → bilirkisi-secim kuralı yeniden
   AÇILABİLİR (Claude). Döngü kapısı kuruldu.
 - CANLI TEST (kurucu): aynı dosyada ilerlet'i iki kez koştur — ikinci koşumda
