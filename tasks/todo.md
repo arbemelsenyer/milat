@@ -50,6 +50,16 @@ GİDERMEK İÇİN (bu turun kalanı)
   fan-out redeploy gerekmedi. Ön yüz değişmediği için publish yapılmadı.
 - AKIŞ KURALI: bilirkisi_durumu_degisti → bilirkisi-secim kuralı yeniden
   AÇILABİLİR (Claude). Döngü kapısı kuruldu.
+  · 21.08 DURUM TESPİTİ (Code, yalnız SELECT): kural canlıda hâlâ KAPALI.
+    akis_kurallari id=c843ac2a-07c7-4af7-82e3-2c84737ed06d ·
+    kod=bilirkisi_durum__ilerlet · olay_kodu=bilirkisi_durumu_degisti ·
+    sonraki_adim=bilirkisi-secim · sahip=masa_ajani · sira=55 · etkin=false.
+    Gerekçe alanında 20.08 "GEÇİCİ KAPALI" notu duruyor.
+  · Döngünün canlı izi: akis_olaylari'nda bilirkisi_durumu_degisti yalnız 2 satır,
+    20.08 17:44:43 ve 17:45:15 (kural o gün kapatıldı); sonrasında yeni satır yok.
+  · SQL: var — o satırın etkin alanı true yapılacak ve gerekçedeki "GEÇİCİ KAPALI"
+    notu "21.08'de döngü kapısı kuruldu, açıldı" diye güncellenecek. YAZAN: Claude.
+    Code yazmadı — CLAUDE.md gereği akis_kurallari satırı Code tarafından yazılmaz.
 - CANLI TEST (kurucu): aynı dosyada ilerlet'i iki kez koştur — ikinci koşumda
   dönüşte `olay: "durum değişmedi (…) — olay yazılmadı"` görünmeli ve
   akis_olaylari'na yeni satır DÜŞMEMELİ.
