@@ -287,3 +287,9 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   bulamaz oldu. Kural: metnin başına yazan ortak bir katman eklendiğinde, o metni
   DESENLE arayan bütün yerler aynı turda taranır (grep startsWith); ortak geçitten
   geçen metinlerde startsWith değil includes kullanılır.
+- DERS (21.08.2026) — DAİMİ PUSH YETKİSİ: kurucu her komutun sonunda push yetkisi
+  verdi ("push et sorma"). İş bitip kayıt düşürülüp commit atıldıktan sonra
+  `git push origin main` SORULMADAN yapılır; ayrıca onay beklenmez. Push hata
+  verirse hata metni AYNEN, kısaltmadan ve yorumlamadan cevaba yazılır. Gerekçe:
+  push edilmemiş commit yüzünden Lovable eski dosyayı görüp eski sürümü yayına
+  aldı (15.08 ve 17.08), iki teşhis turu boşa gitti.
