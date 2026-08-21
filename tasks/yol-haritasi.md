@@ -830,3 +830,16 @@ oturumuyla; iç çağrı kapısından çalışmıyor. Yapay zekâ tek başına b
 atamıyor. REDEPLOY GEREKLİ: bilirkisi-secim · bilirkisi-ekranim ·
 bilirkisi-belge-baglantisi · bilirkisi-davet · ajan-nobetci + _shared/anlatim.ts
 kullanan bütün fonksiyonlar. PUBLISH: evet. SQL: yok.
+
+21.08.2026 — DÖNGÜ KUSURU VE NÖBETÇİ MÜKERRER YAZIM KAPISI.
+bilirkisi-secim artık "gerçek değişiklik yoksa olay yazma" kuralıyla çalışıyor:
+durumIzi() (öneri durum dağılımı + atama sayısı + onaylı evrak sayısı) ajan_bellek'te
+tutuluyor, olayYazDegistiyse() tek kapı. ilerlet hiçbir aday sunmadıysa olayı hiç
+denemiyor. beyan_yaz/yanit_yaz satır karşılaştırmasıyla, evrak_onayla gerçekten
+güncellenen satır sayısıyla karar veriyor; sebep her dönüşte "olay" alanında.
+ajan-nobetci'de gorevEtiketiVarMi startsWith → includes (etiket artık gerekçenin
+başında değil, anaAjanaBildir "[kaynak:…]" önekini koyuyor).
+Aynı hatanın iki kardeşi (index.ts:989 `[alternatif:]`, index.ts:1756
+`[onay:ek_oturum:]`) KAPSAM DIŞI olduğu için düzeltilmedi, todo.md'ye yazıldı.
+REDEPLOY GEREKLİ: bilirkisi-secim · ajan-nobetci. _shared/anlatim.ts DEĞİŞMEDİ.
+PUBLISH: hayır. SQL: yok. Akış kuralı yeniden açılabilir (Claude).

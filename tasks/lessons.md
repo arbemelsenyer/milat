@@ -272,3 +272,18 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   yazmadan önce o verinin ilgili ROLE açık olup olmadığı politikadan
   doğrulanır; açık değilse veri sunucudan (edge fonksiyon) verilir ve süzme
   sorguda yapılır. Ekranda gizlemek yetki değildir.
+- DERS (21.08.2026) — KENDİ OLAYINI YAZAN KOL KENDİ KENDİNİ UYANDIRIR. bilirkisi-secim
+  'ilerlet' adımı her koşumda koşulsuz bilirkisi_durumu_degisti yazıyordu; akış kuralı
+  aynı olayla yine bu kolu çağırdığı için kol kendini besleyen döngüye girdi ve kural
+  canlıda kapatılmak zorunda kaldı. Kural: olayla uyanan bir fonksiyon, uyandığı olayın
+  AYNISINI koşulsuz yazamaz. Yazmadan önce "gerçekten bir şey değişti mi" NESNEL olarak
+  ölçülür (sayı ve durum kodundan kurulu bir parmak izi), değişmediyse olay yazılmaz ve
+  sebep dönüş gövdesine yazılır. Kullanıcı eylemiyle doğan olaylar bu kapıya
+  BAĞLANMAZ — parmak izini değiştirmedikleri için sessizce elenirlerdi.
+- DERS (21.08.2026) — ORTAK GEÇİT EKLENİNCE ETİKET ARAYAN HER KAPI KIRILIR. anaAjanaBildir
+  gerekçenin başına "[kaynak:…]" koymaya başlayınca, gerekçeyi startsWith ile arayan
+  bütün mükerrer yazım kapıları sessizce açıldı (ajan-nobetci: gorevEtiketiVarMi,
+  `[alternatif:]`, `[onay:ek_oturum:]`). Kapılar hata vermedi — sadece hiçbir satırı
+  bulamaz oldu. Kural: metnin başına yazan ortak bir katman eklendiğinde, o metni
+  DESENLE arayan bütün yerler aynı turda taranır (grep startsWith); ortak geçitten
+  geçen metinlerde startsWith değil includes kullanılır.

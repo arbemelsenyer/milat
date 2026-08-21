@@ -823,3 +823,20 @@ DEĞİŞMEZ SINIR
 · Yapay zekâ tek başına bilirkişi ATAMAZ. 'sistem_oneri' beyanı verilse bile son
   dokunuş arabulucudadır; 'ata' ve 'evrak_onayla' iç çağrı kapısından çalışmaz.
 · Ajan "bu uzman daha iyidir" demez; "şu alanla örtüşüyor" der.
+
+[EKLEME 21.08.2026 — BİLİRKİŞİ KOLUNDA OLAY YAZMA KAPISI]
+● KOD CANLI KOLDA (redeploy sonrası doğrulanacak).
+· KURAL: olayla uyanan bir kol, uyandığı olayın aynısını KOŞULSUZ yazamaz.
+  bilirkisi-secim 'ilerlet' adımı bunu yapıyordu ve kendi kendini besleyen bir
+  döngü kurdu; akış kuralı bu yüzden geçici olarak kapatılmıştı.
+· ÖLÇÜT NESNELDİR: durumIzi() — öneri durumlarının dağılımı + atama sayısı +
+  onaylı evrak sayısı. Üçü de aynıysa "değişiklik yok" demektir, olay yazılmaz.
+  İz ajan_bellek'te "bilirkisi_izi" anahtarında durur; yalnız sayı ve durum kodu
+  taşır (öğrenme sınırı §4), sayılar 999'da sınırlanır.
+· KAPIDAN GEÇENLER: ilerlet · aday_cikar · arabulucu_ekle · taraf_aday_oner ·
+  ata · evrak_onayla. GEÇMEYENLER (bilerek): beyan_yaz ve yanit_yaz kendi
+  satırlarının gerçekten değişip değişmediğine bakar; rapor_yorumu doğrudan
+  yazar — üçü de insan eylemidir, parmak izini değiştirmedikleri için kapıya
+  bağlansalardı sessizce elenirlerdi.
+· SESSİZ ATLAMA YOK: olay yazılmadıysa sebebi dönüş gövdesinin "olay" alanında
+  görünür.

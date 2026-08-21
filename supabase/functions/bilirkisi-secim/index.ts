@@ -27,7 +27,9 @@
 // Ajan "bu uzman daha iyidir" DEMEZ; "şu alanla örtüşüyor" der. Ücret yorumu,
 // tarafgirlik yorumu, kişilik yorumu üretilmez.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { anlatimAc, anaAjanaBildir, sinirdanGecir, devirYaz } from "../_shared/anlatim.ts";
+import {
+  anlatimAc, anaAjanaBildir, sinirdanGecir, devirYaz, bellekOku, bellekYaz,
+} from "../_shared/anlatim.ts";
 import { olayYaz } from "../_shared/olay.ts";
 
 const corsHeaders = {
@@ -194,6 +196,60 @@ async function beyanlariOku(admin: any, caseId: string) {
   return { taraflar: liste, hepsiArabulucu, tikanmaYetkisi };
 }
 
+/* ── OLAY YAZMA KAPISI (döngü kusuru onarımı · 21.08.2026) ───────────────────
+   BULGU (canlı): 'ilerlet' adımı her koşumda KOŞULSUZ bilirkisi_durumu_degisti
+   yazıyordu. Akış kuralı aynı olayla yine bu kolu uyandırdığı için kol kendi
+   kendini besleyen bir döngüye giriyordu; kural bu yüzden kapatıldı.
+
+   KURAL: GERÇEK BİR DEĞİŞİKLİK YOKSA OLAY YAZILMAZ. "Gerçek değişiklik" nesnel
+   olarak ölçülür — öneri durumlarının dağılımı (aday sayısı dahil), atama sayısı
+   ve açılmış (onaylı) evrak sayısı. Bu üçü aynıysa ortada olay yoktur.
+
+   Parmak izi ajan_bellek'te "bilirkisi_izi" anahtarında durur ve YALNIZ sayı ile
+   durum kodu taşır — ad, beyan, tutar, serbest metin yazılmaz (öğrenme sınırı §4).
+   Sayılar 999'da sınırlanır çünkü öğrenme süzgeci 4+ basamaklı rakam yığınını
+   tutar sanıp reddediyor (20.08 dersi).
+
+   SESSİZ ATLAMA YOK: olay yazılmadıysa sebebi çağırana döner ve dönüş gövdesine
+   "olay" alanı olarak yazılır. */
+function izSayisi(n: unknown): number {
+  return Math.min(999, Number(n ?? 0) || 0);
+}
+
+async function durumIzi(admin: any, caseId: string): Promise<string> {
+  const { data: oneriler } = await admin.from("bilirkisi_onerileri")
+    .select("durum").eq("case_id", caseId).limit(500);
+  const sayac: Record<string, number> = {};
+  for (const r of (oneriler ?? []) as any[]) {
+    const d = metin(r.durum) || "yok";
+    sayac[d] = (sayac[d] ?? 0) + 1;
+  }
+  const { count: atama } = await admin.from("case_expert_assignments")
+    .select("id", { count: "exact", head: true }).eq("case_id", caseId);
+  const { count: evrak } = await admin.from("bilirkisi_evrak_kumesi")
+    .select("id", { count: "exact", head: true })
+    .eq("case_id", caseId).eq("onaylandi", true);
+  const durumlar = Object.keys(sayac).sort()
+    .map((d) => `${d.slice(0, 3)}${izSayisi(sayac[d])}`).join("-");
+  return `${durumlar || "bos"}|a${izSayisi(atama)}|e${izSayisi(evrak)}`;
+}
+
+/** Değişiklik varsa olayı yazar; yoksa YAZMAZ ve sebebini döner. */
+async function olayYazDegistiyse(
+  admin: any, caseId: string, olayKodu: string, veri: Record<string, unknown>,
+): Promise<{ yazildi: boolean; sebep: string; iz: string }> {
+  const iz = await durumIzi(admin, caseId);
+  const kayitlar = await bellekOku(admin, caseId, "bilirkisi_izi");
+  const onceki = metin((kayitlar.find((x) => x.anahtar === "bilirkisi_izi")?.deger as any)?.iz);
+  if (onceki && onceki === iz) {
+    return { yazildi: false, sebep: `durum değişmedi (${iz}) — olay yazılmadı`, iz };
+  }
+  const bellekNotu = await bellekYaz(admin, caseId, null, "bilirkisi_izi", { iz });
+  const olayNotu = await olayYaz(admin, { case_id: caseId, olay_kodu: olayKodu, veri });
+  const notlar = [bellekNotu, olayNotu].filter(Boolean).join(" | ");
+  return { yazildi: !olayNotu, sebep: notlar || `yazıldı (${onceki || "ilk"} → ${iz})`, iz };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -232,17 +288,27 @@ Deno.serve(async (req) => {
         masraf_kabul: (govde as any)?.masraf_kabul === true,
       };
       const { data: mevcut } = await admin.from("bilirkisi_secim_beyani")
-        .select("id").eq("case_id", case_id).eq("party_id", k.party_id).maybeSingle();
+        .select("id, secim_yontemi, tikanma_halinde_arabulucu, masraf_kabul")
+        .eq("case_id", case_id).eq("party_id", k.party_id).maybeSingle();
+      /* Aynı formu ikinci kez kaydetmek OLAY DEĞİLDİR: üç alan da aynıysa satır
+         yine yazılır ama akışa olay düşmez (döngü kapısı). */
+      const beyanAyni = !!mevcut
+        && (mevcut as any).secim_yontemi === satir.secim_yontemi
+        && (mevcut as any).tikanma_halinde_arabulucu === satir.tikanma_halinde_arabulucu
+        && (mevcut as any).masraf_kabul === satir.masraf_kabul;
       const { error } = mevcut
         ? await admin.from("bilirkisi_secim_beyani").update(satir).eq("id", (mevcut as any).id)
         : await admin.from("bilirkisi_secim_beyani").insert(satir);
       if (error) return json({ error: `Beyan yazılamadı: ${error.message}` }, 500);
 
-      await olayYaz(admin, {
-        case_id, party_id: k.party_id, olay_kodu: "bilirkisi_beyani_verildi",
-        veri: { secim_yontemi: yontem },
-      });
-      return json({ ok: true, beyan: satir });
+      let olayNotu = "beyan değişmedi — olay yazılmadı";
+      if (!beyanAyni) {
+        olayNotu = (await olayYaz(admin, {
+          case_id, party_id: k.party_id, olay_kodu: "bilirkisi_beyani_verildi",
+          veri: { secim_yontemi: yontem },
+        })) ?? "yazıldı";
+      }
+      return json({ ok: true, beyan: satir, degisti: !beyanAyni, olay: olayNotu });
     }
 
     if (adim === "beyanim") {
@@ -323,15 +389,14 @@ Deno.serve(async (req) => {
         return json({ error: `Aday listesi yazılamadı: ${iErr.message}` }, 500);
       }
 
-      await olayYaz(admin, {
-        case_id, olay_kodu: "bilirkisi_onerildi",
-        veri: { alan, aday_sayisi: yazilacak.length, tur: adim === "ikinci_tur" ? 2 : 1 },
+      const adayOlay = await olayYazDegistiyse(admin, case_id, "bilirkisi_onerildi", {
+        alan, aday_sayisi: yazilacak.length, tur: adim === "ikinci_tur" ? 2 : 1,
       });
       await anlatim.bitti({ yapildi: `"${alan}" alanı için ${yazilacak.length} aday çıkarıldı` });
       return json({
         ok: true, alan, tur: adim === "ikinci_tur" ? 2 : 1,
         adaylar: adaylar.map((a) => ({ ...profilKarti(a.uzman), eslesme_gerekcesi: a.gerekce })),
-        defter_notu: anlatim.defter_notu,
+        olay: adayOlay.sebep, defter_notu: anlatim.defter_notu,
       });
     }
 
@@ -388,8 +453,9 @@ Deno.serve(async (req) => {
         arabulucu_secimi: adim === "arabulucu_ekle",
       });
       if (error) return json({ error: `Aday eklenemedi: ${error.message}` }, 500);
-      await olayYaz(admin, { case_id, olay_kodu: "bilirkisi_onerildi", veri: { alan, kaynak: adim } });
-      return json({ ok: true });
+      const ekleOlay = await olayYazDegistiyse(admin, case_id, "bilirkisi_onerildi",
+        { alan, kaynak: adim });
+      return json({ ok: true, olay: ekleOlay.sebep });
     }
 
     // ─────────────────────────────────────────── 3) TARAFLARA SUNUM / İLERLET
@@ -447,14 +513,23 @@ Deno.serve(async (req) => {
         notlar.push(`${a}: ${satirlar.length} aday taraflara sunuldu`);
       }
 
-      await olayYaz(admin, {
-        case_id, olay_kodu: "bilirkisi_durumu_degisti",
-        veri: { adim: "taraflara_sunuldu", alan_sayisi: alanlar.length, aday_sayisi: sunulan },
-      });
+      /* DÖNGÜ KAPISI (21.08): bu kol kendi kendini uyandıramaz.
+         Hiçbir aday sunulmadıysa olay HİÇ DENENMEZ; sunulduysa da olay ancak
+         durum parmak izi değiştiyse yazılır. Sebep her hâlde dönüş gövdesinde
+         görünür — sessiz atlama yok. */
+      let olayNotu = "sunulacak yeni aday yoktu — olay yazılmadı";
+      if (sunulan > 0) {
+        const r = await olayYazDegistiyse(admin, case_id, "bilirkisi_durumu_degisti", {
+          adim: "taraflara_sunuldu", alan_sayisi: alanlar.length, aday_sayisi: sunulan,
+        });
+        olayNotu = r.sebep;
+      }
       await anlatim.bitti({
         yapildi: alanlar.length ? notlar.join(" · ") : "sunulacak yeni aday yok",
       });
-      return json({ ok: true, sunulan, alanlar, notlar, defter_notu: anlatim.defter_notu });
+      return json({
+        ok: true, sunulan, alanlar, notlar, olay: olayNotu, defter_notu: anlatim.defter_notu,
+      });
     }
 
     // ────────────────────────────────────────────── 3b) LİSTE (KÖR PERDELİ)
@@ -543,8 +618,15 @@ Deno.serve(async (req) => {
         gosterim_izni: (govde as any)?.gosterim_izni === true,
       };
       const { data: mevcut } = await admin.from("bilirkisi_taraf_yanitlari")
-        .select("id").eq("case_id", case_id).eq("party_id", k.party_id)
+        .select("id, yanit, not_metni, gosterim_izni, alan")
+        .eq("case_id", case_id).eq("party_id", k.party_id)
         .eq("expert_id", expert_id).maybeSingle();
+      /* Aynı işaretlemeyi yeniden kaydetmek OLAY DEĞİLDİR (döngü kapısı). */
+      const yanitAyni = !!mevcut
+        && (mevcut as any).yanit === satir.yanit
+        && ((mevcut as any).not_metni ?? null) === satir.not_metni
+        && (mevcut as any).gosterim_izni === satir.gosterim_izni
+        && ((mevcut as any).alan ?? null) === satir.alan;
       const { error } = mevcut
         ? await admin.from("bilirkisi_taraf_yanitlari").update(satir).eq("id", (mevcut as any).id)
         : await admin.from("bilirkisi_taraf_yanitlari").insert(satir);
@@ -560,11 +642,14 @@ Deno.serve(async (req) => {
             .update({ durum: "yapildi", sonuc: "taraf işaretlemesini yaptı" }).eq("id", g.id);
         }
       }
-      await olayYaz(admin, {
-        case_id, party_id: k.party_id, olay_kodu: "bilirkisi_durumu_degisti",
-        veri: { adim: "taraf_yaniti", alan: alan || null },
-      });
-      return json({ ok: true });
+      let yanitOlayNotu = "yanıt değişmedi — olay yazılmadı";
+      if (!yanitAyni) {
+        yanitOlayNotu = (await olayYaz(admin, {
+          case_id, party_id: k.party_id, olay_kodu: "bilirkisi_durumu_degisti",
+          veri: { adim: "taraf_yaniti", alan: alan || null },
+        })) ?? "yazıldı";
+      }
+      return json({ ok: true, degisti: !yanitAyni, olay: yanitOlayNotu });
     }
 
     // ─────────────────────────────────────────────────────── 3d) TIKANMA
@@ -651,11 +736,11 @@ Deno.serve(async (req) => {
           + `kabulünden sonra evrak kümesini onaya alabilirsiniz.`,
         kaynak: "sistem", bekleyen: null, durum: "yapildi",
       });
-      await olayYaz(admin, {
-        case_id, olay_kodu: "bilirkisi_durumu_degisti",
-        veri: { adim: "atandi", alan },
+      const atamaOlay = await olayYazDegistiyse(admin, case_id, "bilirkisi_durumu_degisti",
+        { adim: "atandi", alan });
+      return json({
+        ok: true, assignment_id: (atama as any)?.id ?? null, olay: atamaOlay.sebep,
       });
-      return json({ ok: true, assignment_id: (atama as any)?.id ?? null });
     }
 
     // ─────────────────────────── 6) EVRAK KÜMESİ — AJAN HAZIRLAR, İNSAN ONAYLAR
@@ -757,29 +842,35 @@ Deno.serve(async (req) => {
       const idler = Array.isArray((govde as any)?.ids) ? (govde as any).ids.map(String) : [];
       const onayla = (govde as any)?.onaylandi !== false;
       if (idler.length === 0) return json({ error: "ids gerekli" }, 400);
-      const { error } = await admin.from("bilirkisi_evrak_kumesi").update({
+      /* Gerçekten kaç satır güncellendiği SAYILIR: geçersiz kimlikle çağrı
+         yapıldıysa hiçbir şey değişmemiştir ve olay yazılmaz (döngü kapısı). */
+      const { data: guncellenenler, error } = await admin.from("bilirkisi_evrak_kumesi").update({
         onaylandi: onayla,
         onaylayan: onayla ? k.user_id : null,
         onay_zamani: onayla ? new Date().toISOString() : null,
-      }).in("id", idler).eq("case_id", case_id);
+      }).in("id", idler).eq("case_id", case_id).select("id");
       if (error) return json({ error: `Onay yazılamadı: ${error.message}` }, 500);
+      const guncellenen = ((guncellenenler ?? []) as any[]).length;
+      if (guncellenen === 0) {
+        return json({ ok: true, guncellenen: 0, olay: "hiçbir satır değişmedi — olay yazılmadı" });
+      }
 
+      let evrakOlayNotu = "onay geri alındı — akış olayı yazılmadı";
       if (onayla) {
         const { taraflar } = await beyanlariOku(admin, case_id);
         for (const t of taraflar) {
           await anaAjanaBildir(admin, {
             case_id, gorev_tipi: "bilirkisi_secimi", hedef_party_id: t.party_id,
-            gerekce: `[bilirkisi:evrak-bilgi] Bilirkişiye ${idler.length} belge açıldı. `
+            gerekce: `[bilirkisi:evrak-bilgi] Bilirkişiye ${guncellenen} belge açıldı. `
               + `Belge içerikleri karşı tarafa gösterilmez; yalnız açılan kümenin başlıkları bildirilir.`,
             kaynak: "taraf_ajani", bekleyen: null, durum: "yapildi",
           });
         }
-        await olayYaz(admin, {
-          case_id, olay_kodu: "bilirkisi_durumu_degisti",
-          veri: { adim: "evrak_acildi", belge_sayisi: idler.length },
-        });
+        const r = await olayYazDegistiyse(admin, case_id, "bilirkisi_durumu_degisti",
+          { adim: "evrak_acildi", belge_sayisi: guncellenen });
+        evrakOlayNotu = r.sebep;
       }
-      return json({ ok: true, guncellenen: idler.length });
+      return json({ ok: true, guncellenen, olay: evrakOlayNotu });
     }
 
     // ───────────────────────────────────────── 6b) DIŞ ADAY — AJAN KAYDETMEZ

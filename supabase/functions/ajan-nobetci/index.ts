@@ -135,10 +135,19 @@ function metin(v: unknown): string {
      onay_bekliyor → ARABULUCU yürütecek; nöbetçi dokunmaz (zorunlu insan noktası)
      yapildi / atlandi → kapanmış
    ──────────────────────────────────────────────────────────────────────────── */
+/* ONARIM (21.08.2026) — ETİKET ARTIK METNİN BAŞINDA DEĞİL, İÇİNDE.
+   Bu kapı eskiden startsWith ile bakıyordu ve gerekçenin iş etiketiyle
+   BAŞLADIĞINI varsayıyordu. Bildirimler anaAjanaBildir geçidinden geçmeye
+   başlayınca geçit gerekçenin başına "[kaynak:nobetci]" (ve varsa
+   "[bekleyen:…]") etiketini koydu; iş etiketi ortada kaldı ve kapı hiçbir
+   satırı bulamaz oldu. Sonuç: mükerrer yazım kapısı FİİLEN AÇIKTI, nöbetçi
+   aynı görevi her turda yeniden yazabiliyordu.
+   includes hem eski (etiketle başlayan) hem yeni (etiketi içeren) satırları
+   bulur; kapı yalnızca daralır, hiçbir satırı gözden kaçırmaz. */
 async function gorevEtiketiVarMi(admin: any, caseId: string, gorevTipi: string, etiket: string): Promise<boolean> {
   const { data } = await admin.from("ajan_gorevleri")
     .select("id, gerekce").eq("case_id", caseId).eq("gorev_tipi", gorevTipi).limit(200);
-  return ((data ?? []) as any[]).some((r) => String(r?.gerekce ?? "").startsWith(etiket));
+  return ((data ?? []) as any[]).some((r) => String(r?.gerekce ?? "").includes(etiket));
 }
 
 async function gorevAc(

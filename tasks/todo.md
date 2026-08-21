@@ -1,3 +1,56 @@
+## Nerede kaldık — 21.08.2026 (105) · DÖNGÜ KUSURU + NÖBETÇİ MÜKERRER YAZIM KAPISI
+
+YAPILDI
+- [x] 1 · DÖNGÜ KUSURU KAPANDI (bilirkisi-secim). "Gerçek değişiklik yoksa olay
+      yazma" kuralı tek yere kondu: durumIzi() + olayYazDegistiyse()
+      (supabase/functions/bilirkisi-secim/index.ts:213-262). Parmak izi ÜÇ nesnel
+      sayıdan kurulur — öneri durum dağılımı, atama sayısı, onaylı evrak sayısı;
+      ajan_bellek'te "bilirkisi_izi" anahtarında durur, yalnız sayı ve durum kodu
+      taşır (sayılar 999'da sınırlı, öğrenme süzgeci 4+ basamağı reddediyor).
+      · ilerlet: sunulan=0 ise olay HİÇ DENENMEZ; sunulduysa yalnız iz değiştiyse
+        yazılır (index.ts:519-531). Asıl döngü buradaydı.
+      · aday_cikar · arabulucu_ekle/taraf_aday_oner · ata · evrak_onayla: hepsi
+        aynı kapıdan geçiyor, böylece kayıtlı iz güncel kalıyor.
+      · beyan_yaz ve yanit_yaz: kapı yerine "satır gerçekten değişti mi"
+        karşılaştırması (aynı formu ikinci kez kaydetmek olay değildir).
+      · evrak_onayla artık gerçekten güncellenen satırı SAYIYOR (.select("id"));
+        geçersiz kimlikle çağrıda olay yazılmıyor.
+      · Sessiz atlama yok: her adımın dönüş gövdesinde "olay" alanı sebebi yazıyor.
+- [x] 2 · NÖBETÇİ MÜKERRER YAZIM KAPISI ONARILDI: gorevEtiketiVarMi startsWith →
+      includes (supabase/functions/ajan-nobetci/index.ts:129-150). Sebep kod
+      yorumuna yazıldı: anaAjanaBildir gerekçenin başına "[kaynak:nobetci]"
+      koyduğu için iş etiketi ortada kalıyordu, kapı hiçbir satırı bulamıyordu.
+      includes hem eski hem yeni satırı bulur; kapı yalnızca daralır.
+
+EKSİK KALDI / DOKUNULMADI
+- rapor_yorumu olayı kapıya BAĞLANMADI (bilirkisi-secim/index.ts:918). Sebep:
+  tarafın yazdığı görüş parmak izini değiştirmez, kapıya bağlansaydı gerçek bir
+  insan eylemi SESSİZCE elenirdi. Kendi kendini besleyemez — uyandırdığı ilerlet
+  artık olay yazmıyor, zincir orada bitiyor.
+- PARMAK İZİNİN SINIRI: birbirini götüren iki değişiklik (bir öneri taslak→ret
+  olurken başkası ret→taslak olması) aynı izi üretir ve olay yazılmaz. Bugünkü
+  durum geçişleri tek yönlü olduğu için pratikte oluşmuyor; oluşursa iz alanına
+  geçiş sayacı eklenmeli.
+- KAPSAM DIŞI, DÜZELTİLMEDİ — AYNI HATANIN İKİ KARDEŞİ ajan-nobetci'de duruyor
+  (ikisi de anaAjanaBildir'den geçen satırı startsWith ile arıyor, bulamıyor):
+  · index.ts:989 — `[alternatif:<teklifId>]` satırı bulunamıyor, tarafın
+    alternatif saatleri `sonuc` alanına YAZILAMIYOR; randevu-teklif okuyamıyor.
+  · index.ts:1756 — `[onay:ek_oturum:<id>]` satırı bulunamıyor, arabulucunun
+    "ikinci oturum gerekli" onayı İŞLENMİYOR, randevu hattı yeniden başlamıyor.
+  GİDERMEK İÇİN: iki satırdaki startsWith → includes (Code, tek turluk iş) —
+  kurucu onayı bekliyor.
+- akis-yurut'taki startsWith'ler SAĞLAM, dokunulmadı: `[gecis:]` (index.ts:338),
+  `[akis:]` (761 ve 792) doğrudan insert ile yazılıyor, geçitten geçmiyor.
+
+GİDERMEK İÇİN (bu turun kalanı)
+- REDEPLOY: bilirkisi-secim · ajan-nobetci (Claude). _shared/anlatim.ts
+  DEĞİŞMEDİ — yalnız iki yeni ad içe aktarıldı, fan-out redeploy gerekmiyor.
+- AKIŞ KURALI: bilirkisi_durumu_degisti → bilirkisi-secim kuralı yeniden
+  AÇILABİLİR (Claude). Döngü kapısı kuruldu.
+- CANLI TEST (kurucu): aynı dosyada ilerlet'i iki kez koştur — ikinci koşumda
+  dönüşte `olay: "durum değişmedi (…) — olay yazılmadı"` görünmeli ve
+  akis_olaylari'na yeni satır DÜŞMEMELİ.
+
 ## Nerede kaldık — 20.08.2026 (104) · BİLİRKİŞİ KATMANI (yedi bölüm)
 
 - [x] 1 · BEYAN: taraf kendi beyanını verir (biz seçelim / arabulucu seçsin /
