@@ -2389,7 +2389,8 @@ const GUN_MS = 24 * 60 * 60 * 1000;
    "[kaynak:…]" etiketini koyuyor. Bu yüzden gerekçe artık iş etiketiyle
    BAŞLAMIYOR, onu İÇERİYOR. Bu kol o yüzden startsWith yerine includes ile
    bakar; yoksa aynı hatırlatma her turda yeniden yazılırdı.
-   (Aynı kayma gorevEtiketiVarMi'yi de etkiliyor — KAPSAM DIŞI, raporlandı.) */
+   (Aynı kayma gorevEtiketiVarMi'yi de etkiliyordu; 21.08.2026'da o kapı da
+   includes'a çevrildi — dosyada çalışan startsWith kalmadı.) */
 async function bilirkisiEtiketiVarMi(
   admin: any, caseId: string, gorevTipi: string, etiket: string,
 ): Promise<boolean> {

@@ -39,9 +39,12 @@ AÇIK KALEMLER — CLAUDE BÖLGESİ DENETİMİ 1. TUR BULGULARI (hiçbiri gideri
    belge_ozeti_uretildi (1). CLAUDE.md 120-126: her yetenek ya olaya bağlanır ya
    gerekçesi yazılır. Bu dördünün gerekçesi belgede var mı BAKILMADI.
    GİDERMEK İÇİN: ya kural satırı yazılacak ya gerekçe belgeye düşecek. Kimde: Claude.
-4. BAYAT YORUM — ajan-nobetci/index.ts:2390 hâlâ "KAPSAM DIŞI, raporlandı" diyor,
-   oysa o kapı 21.08'de onarıldı. Yorum yanlış, kod doğru. Tek satırlık düzeltme.
-   Kimde: Code. Kurucu onayı bekliyor.
+4. [x] BAYAT YORUM GİDERİLDİ (21.08, Code — "medipact devam" komutuyla).
+   ajan-nobetci/index.ts:2393 artık "gorevEtiketiVarMi'yi de etkiliyordu;
+   21.08.2026'da o kapı da includes'a çevrildi — dosyada çalışan startsWith
+   kalmadı" diyor. YALNIZ YORUM değişti, tek satır; çalışan kod dokunulmadı
+   (grep: startsWith'in altı geçişi de yorum içinde). Redeploy GEREKMEZ —
+   davranış değişmedi; yayındaki sürümle fark yalnız yorumdur.
 
 DENETİMİN BAKMADIĞI YERLER (2. tur, dürüstlük kaydı)
 - cron.job kayıtları · migration geçmişi · politikası VAR ama içeriği yanlış
