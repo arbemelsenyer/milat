@@ -60,6 +60,10 @@ GİDERMEK İÇİN (bu turun kalanı)
   · SQL: var — o satırın etkin alanı true yapılacak ve gerekçedeki "GEÇİCİ KAPALI"
     notu "21.08'de döngü kapısı kuruldu, açıldı" diye güncellenecek. YAZAN: Claude.
     Code yazmadı — CLAUDE.md gereği akis_kurallari satırı Code tarafından yazılmaz.
+- [x] ARAÇ KURULUMU (21.08.2026, kurucu komutu): Supabase CLI Windows'a kuruldu —
+  v2.115.0, GitHub sürüm zip'inden C:\Users\ASUS\tools\supabase (winget'te paket
+  yok, scoop/choco kurulu değil). Kullanıcı PATH'ine eklendi. GİRİŞ YAPILMADI,
+  proje bağlanmadı, anahtar istenmedi. Depoya dosya girmedi.
 - CANLI TEST (kurucu): aynı dosyada ilerlet'i iki kez koştur — ikinci koşumda
   dönüşte `olay: "durum değişmedi (…) — olay yazılmadı"` görünmeli ve
   akis_olaylari'na yeni satır DÜŞMEMELİ.
