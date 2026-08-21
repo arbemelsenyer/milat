@@ -26,3 +26,4 @@ dist-ssr
 # UDF diagnostic/test samples (local only)
 *.udf.udf
 .env.scraper
+supabase/.temp/

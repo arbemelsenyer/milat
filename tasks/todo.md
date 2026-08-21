@@ -72,8 +72,14 @@ KURAL KİTABI
   "constitution.md > medipact-komut.md > mimari/ > tasks/." Sebep: "komut" kelimesi
   tek başına yapıştırılan komut sanılabiliyordu. Başka hiçbir satırına dokunulmadı.
   Code'un listesinde medipact-komut.md zaten vardı (satır 9, şartlı) — eklenmedi.
-- GEREKEN: bu iki dosya DEPOYA İŞLENMEDİ. `git add . && git commit && git push`
-  kurucunun terminalinden yapılacak; Claude'un o makinede kabuğu yok.
+- [x] 21.08 · COWORK.md ve CLAUDE.md depoya işlendi ve push edildi
+  (39821b4..8dd94ab). Claude depodan OKUYARAK doğruladı: COWORK.md'nin altı
+  maddelik yeni okuma listesi ve CLAUDE.md'nin 8. ve 13. satırları depoda güncel.
+- [x] 21.08 · supabase/.temp/ DEPODAN ÇIKARILDI (Code). .gitignore'un sonuna tek
+  satır eklendi (`supabase/.temp/`, mevcut 28 satıra dokunulmadı);
+  `git rm -r --cached supabase/.temp` ile takipten düşürüldü — dosya diskte duruyor,
+  silinmedi. Sebep: Supabase CLI'nin kendi önbelleği (içi: `v2.115.0`), her koşumda
+  yeniden yazılıp depoda gürültü yapıyordu.
 - [x] 21.08 · CLAUDE.md SATIR 8 DÜZELTİLDİ (kurucu onayıyla, Claude yazdı).
   Eski: "`tasks/todo.md` ve `tasks/lessons.md` — tam oku."
   Yeni: "`tasks/todo.md` — yalnız en üstteki 'Nerede kaldık' bloğu (alt kısmı
