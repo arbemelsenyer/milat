@@ -80,6 +80,61 @@ GİDERMEK İÇİN (bu turun kalanı)
   dönüşte `olay: "durum değişmedi (…) — olay yazılmadı"` görünmeli ve
   akis_olaylari'na yeni satır DÜŞMEMELİ.
 
+## Nerede kaldık — 20.08.2026 (105) · GÜN SONU DURUMU (Claude tarafı)
+
+CANLIDA DOĞRULANANLAR (bugün, SQL ile görüldü):
+- Deneyim defteri açıldı: ajan_deneyim'e satır düşüyor. Sebep bulunmuştu —
+  deneme_no sütunu NOT NULL'dı, fonksiyon boş gönderiyordu; kısıt SQL ile
+  kaldırıldı, varsayılanı 1 yapıldı.
+- "tamamlandi:<adım>" bellek işareti yazılıyor. Öncesinde yazılamıyordu: öğrenme
+  süzgeci (ogrenmeGirdisiUygunMu) ISO saat damgasındaki "2026"yı tutar sanıp
+  reddediyordu; da30314 ile saat damgası ve UUID muafiyeti eklendi.
+- Bilirkişi kolu (bilirkisi-secim) canlıda koştu ve düzgün kapandı:
+  "sunulacak yeni aday yok" — beyan ve alan satırı olmadığı için doğru davranış.
+- 39 edge fonksiyon yayına alındı (_shared/anlatim.ts değiştiği için tamamı),
+  publish yapıldı.
+
+CLAUDE'UN YAPTIĞI VERİ İŞLERİ:
+- ajan_gorevleri tablosuna kaynak ve bekleyen kolonları eklendi (anaAjanaBildir
+  için).
+- ajan_deneyim.deneme_no NOT NULL kısıtı kaldırıldı, varsayılan 1.
+- akis_kurallari'na iki satır yazıldı:
+  · bilirkisi_beyani__ilerlet (olay: bilirkisi_beyani_verildi → bilirkisi-secim) AÇIK
+  · bilirkisi_durum__ilerlet (olay: bilirkisi_durumu_degisti → bilirkisi-secim) KAPALI
+
+AÇIK KUSURLAR (giderilmesi gereken):
+1. DÖNGÜ KUSURU — bilirkisi-secim her koşumunda kendine bilirkisi_durumu_degisti
+   olayı yazıyor (canlıda görüldü: olay 948ddbca, aday_sayisi 0, alan_sayisi 0).
+   Kural bu yüzden KAPATILDI. Kol "gerçek değişiklik yoksa olay yazma" hâline
+   gelmeli; sonra Claude kuralı yeniden açacak.
+   GİDERMEK İÇİN: supabase/functions/bilirkisi-secim — olay yazımı yalnız aday
+   sayısı, durum ya da atama gerçekten değiştiyse. Kimde: Code.
+2. NÖBETÇİ MÜKERRER YAZIM KAPISI — ajan-nobetci'deki gorevEtiketiVarMi, gerekçenin
+   iş etiketiyle BAŞLADIĞINI varsayıyor (startsWith). anaAjanaBildir artık gerekçenin
+   başına "[kaynak:…]" koyduğu için etiket içeride kaldı; kapı fiilen açık, nöbetçi
+   görevleri her turda yeniden yazabilir.
+   GİDERMEK İÇİN: startsWith → includes (bilirkisiEtiketiVarMi deseni). Kimde: Code.
+3. KURAL TABLOSU ÇELİŞKİSİ — iki kuralın gerekçesinde "KAPALI" yazıyor ama etkin
+   alanı true (belge_yuklendi__analiz ve kalem_guncellendi__karsilastir). Koşucu
+   etkin alanına bakıyor (akis-yurut/index.ts:657). Birincisi belge yüklenince
+   analiz zincirini çağırıyor; ön yüzdeki 30 saniyelik sayaç da aynı zinciri
+   çağırıyor — doğruysa her belgede iki kat OpenAI harcanıyor.
+   GİDERMEK İÇİN: önce ön yüzdeki sayacın hâlâ çağırıp çağırmadığı kontrol edilecek,
+   sonra karar. Kimde: Claude (veri) + kurucu (karar).
+4. AŞAMA 7 SUNUCUYA İZ BIRAKMIYOR — belgeler ve imza tarafında bütün yazım ön yüzde;
+   ajan orada olan biteni göremiyor. Kimde: Code.
+5. TODO.MD'DEKİ 41 AÇIK MADDE BAYAT — bir kısmı yapılmış ama kutusu işaretlenmemiş.
+   GİDERMEK İÇİN: tasks/durum-ayiklama.md — her madde için BİTTİ / YARIM / YOK,
+   dosya referansıyla. Kimde: Code.
+6. DEVİR ZİNCİRİ KAYDI CANLIDA GÖRÜLMEDİ — kod yerinde ama gerçek bir devir
+   olmadığı için hiç yazılmadı. Kimde: canlı test (Claude).
+7. UZMAN HAVUZU 6 KAYIT — bilirkişi seçiminin gerçek testi için dar. Kimde: kurucu (veri).
+8. DEĞERLENDİRME SETİ YOK — 10 uydurma test dosyası, her birinin beklenen çıktısıyla.
+   Öğrenmenin işe yarayıp yaramadığı ancak bununla ölçülür. Kimde: sonraki iş.
+
+SIRADAKİ (Code kapsamı): 1 → 2 → 5 → 4
+SIRADAKİ (Claude kapsamı): 3'ün veri kontrolü, 6'nın canlı testi, kuralın yeniden açılması
+
 ## Nerede kaldık — 20.08.2026 (104) · BİLİRKİŞİ KATMANI (yedi bölüm)
 
 - [x] 1 · BEYAN: taraf kendi beyanını verir (biz seçelim / arabulucu seçsin /
