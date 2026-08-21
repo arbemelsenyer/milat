@@ -45,6 +45,12 @@ EKSİK KALDI / DOKUNULMADI
     "ikinci oturum gerekli" onayı işleniyor ve randevu hattı yeniden başlıyor.
   · ajan-nobetci'de başka startsWith KALMADI (grep: yalnız yorum satırlarında
     geçiyor — 139, 989, 991, 2390). _shared/ DEĞİŞMEDİ, fan-out gerekmiyor.
+  · YAYIN: commit fe0f189 push edildi, ajan-nobetci Lovable'dan redeploy edildi
+    ("başarılı — fe0f189"). Ön yüz değişmediği için publish yapılmadı.
+  · KAPSAM DIŞI, DOKUNULMADI: index.ts:2390'daki yorum hâlâ "Aynı kayma
+    gorevEtiketiVarMi'yi de etkiliyor — KAPSAM DIŞI, raporlandı" diyor; oysa o
+    kapı 21.08'de onarıldı. Yorum bayat, kod doğru. GİDERMEK İÇİN: tek satırlık
+    yorum düzeltmesi (Code) — kurucu onayı bekliyor.
 - akis-yurut'taki startsWith'ler SAĞLAM, dokunulmadı: `[gecis:]` (index.ts:338),
   `[akis:]` (761 ve 792) doğrudan insert ile yazılıyor, geçitten geçmiyor.
 
