@@ -293,3 +293,9 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   verirse hata metni AYNEN, kısaltmadan ve yorumlamadan cevaba yazılır. Gerekçe:
   push edilmemiş commit yüzünden Lovable eski dosyayı görüp eski sürümü yayına
   aldı (15.08 ve 17.08), iki teşhis turu boşa gitti.
+- KURAL (21.08.2026, kurucu kararı) — SUPABASE CLI YALNIZ OKUMA VE İNCELEME İÇİNDİR.
+  CLI makineye kuruldu (v2.115.0, C:\Users\ASUS\tools\supabase) ama yetkisi dardır:
+  yalnız canlı durumu okumak/incelemek için kullanılır. DEPLOY VE YAYIN LOVABLE'DAN
+  YAPILIR (constitution m.12 v3.4 eklemesi: tek kapı Lovable). CLI ile edge fonksiyon
+  deploy edilmez, migration/SQL çalıştırılmaz, proje link'lenmez, giriş yapılıp
+  anahtar istenmez. akis_kurallari/politika satırları zaten Code tarafından yazılmaz.
