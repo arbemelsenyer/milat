@@ -6,7 +6,37 @@
 - Son tamamlanan iş: üç fonksiyon deploy edildi + B18 teşhisi tamamlandı
 - Doğrulama sonucu: `npm run test` 34/34 · tsc hatasız · build hatasız · bekçi 54/54 · lint 2367
 - Açık blokaj: **İKİ HUMAN GATE** (gizli dosya · B18 veri modeli) — ikisi de aşağıda
-- Sıradaki uygulanabilir iş: A5/İBA-2 iletişim tercihi (ekran var, TÜKETEN YOK — 18.08 dersi)
+- Sıradaki uygulanabilir iş: P1 · A5 · ölü bildirim ayarları ekranı (teşhis bitti, aşağıda)
+
+### TEŞHİS BİTTİ — 23.08.2026 · A5 iletişim tercihi (Human Gate DEĞİL, kusur)
+`durum-ayiklama.md:47` "ekran var, tüketen yok" diyor. Doğru ama eksik: ortada
+**AYNI İŞİ İDDİA EDEN İKİ AYRI TABLO** var ve biri ölü.
+
+| | Çalışan katman | Ölü katman |
+|---|---|---|
+| Tablo | `iletisim_tercihleri` (UNIQUE `party_id`) | `notification_preferences` (`user_id`) |
+| Kolonlar | kanal · siklik · sessiz_baslangic · sessiz_bitis | 10 adet e-posta/uygulama içi anahtarı |
+| Yazan yüzey | `CaseRoom.tsx:1809` ("İletişim Tercihlerim") | `NotificationSettings.tsx:72` |
+| Okuyan yüzey | `MediationEngine.tsx:4617` | `NotificationSettings.tsx:57` (yalnız kendisi) |
+| Sunucu tüketicisi | `gonderilsinMi` — `ajan-nobetci` (3 yer) · `cancel-meeting-invite` · `hazirlik-foyu-gonder` | **HİÇBİRİ** |
+
+KARAR ZATEN VERİLMİŞ (§7-B/1, §14): `mimari/05-yetenek-envanteri.md:580` →
+"(public.iletisim_tercihleri, UNIQUE party_id) ve tarafın kendi ekranından
+yazılır." `yol-haritasi.md:770` aynı şeyi söylüyor. Yani iletişim tercihi
+katmanı = `iletisim_tercihleri`. Bu katman ÇALIŞIYOR.
+
+KUSUR: `NotificationSettings.tsx` kullanıcıya on adet anahtar sunuyor,
+"Tercihler kaydediliyor" diyor ve **hiçbir gönderim yolu o satırı okumuyor**.
+Kullanıcı kapattığı bildirimi almaya devam eder. Bu bir ürün kararı değil,
+yaptığı işi yanlış anlatan bir yüzeydir (§7-B/2).
+
+YAPILACAK (kod işi, onay gerekmez): sayfa yalan söylemeyi bıraksın. Gerçek
+denetim dosya başına olduğu için (`iletisim_tercihleri` party_id'ye bağlı, bir
+kullanıcı birden çok dosyada taraf olabilir) kullanıcı düzeyinde küresel bir
+anahtar kümesi bu modele oturmuyor. Sayfa, tercihlerin dosya içinden
+("İletişim Tercihlerim") ayarlandığını söyleyen dürüst bir yönlendirmeye
+dönüştürülecek; işlemeyen anahtarlar kaldırılacak.
+NOT: `notification_preferences` tablosu SİLİNMEYECEK (veri silme = §7.3).
 
 ### HUMAN GATE — 23.08.2026 · B18 kayıt kapısı hangi işarete bakacak? (P1)
 
