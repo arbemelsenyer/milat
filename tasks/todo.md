@@ -1,11 +1,18 @@
 ## Nerede kaldık
 
-- Tarih: 23.08.2026 (akşam oturumu · 3. blok)
+- Tarih: 23.08.2026 (akşam oturumu · 3. blok) — **`medipact dur` ile GÜVENLİ DURAK**
 - Aşama: DAOS · canlı doğrulama döngüsü
-- Aktif görev: yok
-- Son tamamlanan iş: üç fonksiyon deploy edildi + B18 teşhisi tamamlandı
+- Aktif görev: yok — yarım iş yok, commit edilmemiş değişiklik yok
+- Son tamamlanan iş: üç fonksiyon deploy edildi + B18 ve A5 teşhisleri tamamlandı
 - Doğrulama sonucu: `npm run test` 34/34 · tsc hatasız · build hatasız · bekçi 54/54 · lint 2367
 - Açık blokaj: **İKİ HUMAN GATE** (gizli dosya · B18 veri modeli) — ikisi de aşağıda
+
+> **DURAK NOTU (23.08.2026, `medipact dur`).** Çalışma ağacı temiz; `main` ile
+> `origin/main` aynı commit'te: `e69f3d5`. İzlenmeyen iki dosya oturum başından
+> beri duruyordu, dokunulmadı (`Yeni XLSX Worksheet.xlsx`, `repomix-output.xml`).
+> Bu turda dokuz commit atıldı, hepsi push edildi. Canlı ortam bu turda
+> yayınlanan sürümdedir; geri alınması gereken bir şey YOK.
+> Yeni oturum: `medipact devam` → aşağıdaki "Sıradaki uygulanabilir iş"ten sürer.
 - Sıradaki uygulanabilir iş: P1 · A5 · ölü bildirim ayarları ekranı (teşhis bitti, aşağıda)
 
 ### TEŞHİS BİTTİ — 23.08.2026 · A5 iletişim tercihi (Human Gate DEĞİL, kusur)
