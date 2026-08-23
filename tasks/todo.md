@@ -1,5 +1,65 @@
 ## Nerede kaldık
 
+- Tarih: 23.08.2026 (akşam oturumu · 3. blok)
+- Aşama: DAOS · canlı doğrulama döngüsü
+- Aktif görev: yok
+- Son tamamlanan iş: üç fonksiyon deploy edildi + B18 teşhisi tamamlandı
+- Doğrulama sonucu: `npm run test` 34/34 · tsc hatasız · build hatasız · bekçi 54/54 · lint 2367
+- Açık blokaj: **İKİ HUMAN GATE** (gizli dosya · B18 veri modeli) — ikisi de aşağıda
+- Sıradaki uygulanabilir iş: A5/İBA-2 iletişim tercihi (ekran var, TÜKETEN YOK — 18.08 dersi)
+
+### HUMAN GATE — 23.08.2026 · B18 kayıt kapısı hangi işarete bakacak? (P1)
+
+TEŞHİS TAMAMLANDI, KOD YAZILMADI. Sorun teknik değil, VERİ MODELİ kararıdır.
+
+Kural (kurucu, 16.08 · `mimari/12-taksonomi-ve-modeller.md:249-264`) net:
+kayıtlı oturum onay formu açıldıktan 48 saat geçmeden planlanamaz · taraf, vekil
+ve varsa uzman ayrı ayrı onaylar · bir ret kapıyı kapatır. Kural tartışmalı değil.
+
+EKSİK OLAN ŞU: **bir oturumun "kayıtlı oturum" olduğunu söyleyen işaret YOK.**
+- `case_sessions` kolonları: id · case_id · session_type · scheduled_at ·
+  participants · video_link · notes · status · created_at · updated_at ·
+  meeting_type · prep_notes_generated · invite_sent_at. **Kayıt işareti yok.**
+- `kayit_onay_talepleri` **case_id** taşıyor, session_id TAŞIMIYOR → onay
+  dosya düzeyinde, oturum düzeyinde değil.
+- `oturum_kayitlari` (session_id + talep_id) ancak kayıt ALINDIKTAN sonra doğar;
+  kapı ondan önce çalışmak zorunda.
+- `create-video-room/index.ts` (178 satır) şu an hiçbir onay kontrolü yapmıyor.
+
+NEDEN KENDİM SEÇMEDİM — canlı veri kanıtı:
+`kayit_onay_talepleri` 2 satır · `kayit_onaylari` 1 satır · `oturum_kayitlari`
+0 satır · `case_sessions` 31 satır (4'ünde video bağlantısı var).
+"Dosyada onay talebi varsa o dosyanın oturumları kayıtlıdır" diye türetirsem,
+o dosyadaki BÜTÜN video odaları kapanır (1 onay var, oybirliği yok). Yani
+çalışan bir yolu kırardım. Bu yüzden türetme yapmadım.
+
+SEÇENEKLER
+(a) `case_sessions`'a `kayitli` (boolean, varsayılan false) kolonu eklenir.
+    Kapı yalnız `kayitli = true` oturumlarda çalışır. Arabulucu oturumu
+    planlarken işaretler. — **ÖNERİM.** Etkisi: mevcut 31 oturumun hiçbiri
+    etkilenmez (varsayılan false), çalışan yol kırılmaz, kapı tam da kuralın
+    tarif ettiği yerde durur. Bedeli: bir migration + planlama ekranında bir
+    işaret kutusu.
+(b) `kayit_onay_talepleri`'ne `session_id` eklenir; onay oturum başına alınır.
+    Kurala daha sadık ("hangi oturum için onay verdi") ama mevcut 2 talep
+    satırının hangi oturuma ait olduğu bilinmiyor → veri taşıma kararı gerekir.
+(c) Kapı `create-video-room`'a değil, kayıt ALMA hattına konur (o hat henüz
+    yazılmadı, belgede "○ planlı"). Bugün hiçbir şey değişmez; risk, kayıt
+    hattı yazılırken kapının unutulmasıdır.
+
+KARARIN ETKİSİ: (a) ve (b) migration ister → SQL'i ben yazarım, **çalıştırmak
+Cowork'tedir** (§10). (c) bugün kod istemez ama B18 açık kalır.
+
+Bu karar gelene kadar `create-video-room` DEĞİŞTİRİLMEDİ.
+
+B18'in kalan iki parçası bu karardan BAĞIMSIZ ve ayrı iş kalemidir:
+- [ ] P2 · Harici araç yasağı metni iki ekranda da yazılı olmalı (taraf + arabulucu)
+- [ ] P2 · Silme kuralı: ses süreç bitiminden 24 saat sonra, döküm süreç sonunda;
+      nöbetçi turunda otomatik, satıra silme zamanı + notu yazılarak
+
+---
+## Nerede kaldık
+
 - Tarih: 23.08.2026 (akşam oturumu · 2. blok)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok — `akis-yurut` redeploy'u bekleniyor, sonrası kuyruktan
