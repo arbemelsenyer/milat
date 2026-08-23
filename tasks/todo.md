@@ -51,6 +51,25 @@ Doğrulama — tezgâh `scratchpad/test_guard.py`, 25/25 doğru:
 - Canlı doğrulama: `git status --porcelain; git ls-files --error-unmatch <gizli>;
   git check-ignore` gerçek bekçiden onay sorulmadan geçti.
 
+İKİNCİ TUR (aynı gün, kurucunun bildirdiği iki yanlış alarm):
+- `git commit -m "..."` içindeki insan yazısı mesaj metni komut sayılıyordu; mesajda
+  geçen DROP/TRUNCATE/silme kelimeleri onay sordurtuyordu. Artık `-m` / `--message`
+  değeri değerlendirmeden çıkarılıyor.
+- `--no-rebase`, `--rebase=false` gibi olumsuz bayraklar "rebase" sanılıyordu. Artık
+  yalnız gerçek `git rebase`, `--force`, `--force-with-lease`, `push --delete`,
+  `reset --hard`, `filter-branch`, `filter-repo`, `reflog expire`, `update-ref -d`,
+  `branch -D`, `clean -f/-d/-x` yakalanıyor.
+- Dört kuralın dördü de (silme · git geçmişi · SQL · gizli dosya) artık komut
+  metnine değil, çalıştırılan komuta bakıyor. `bash -c "..."` gibi iç içe komutlar
+  da açılıp denetleniyor (derinlik 3).
+- Tezgâh genişletildi: 39 senaryo, 39/39 doğru.
+
+BEKÇİ DOSYALARI (depo dışında, kullanıcı profilinde):
+- `~/.claude/hooks/guard-shell.sh` — yorumlayıcı seçer, sonucu bildirir
+- `~/.claude/hooks/guard_secret_operands.py` — dört kuralın ayrıştırıcısı
+- `~/.claude/hooks/guard-shell.sh.bak` — eski kelime tabanlı sürümün yedeği
+- Tezgâh: `scratchpad/test_guard.py` (39 senaryo)
+
 ### HUMAN GATE — 23.08.2026 · gizli dosya deposa girmiş (P0, kurucu kararı bekliyor)
 `git ls-files --error-unmatch` ilgili dosyayı LİSTELEDİ → dosya git'te izleniyor.
 - Girdiği commit: `051779e` ("Changes"), tek commit.
