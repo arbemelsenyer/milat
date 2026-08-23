@@ -3,8 +3,13 @@
 - Tarih: 24.08.2026 (gece oturumu · 5. blok)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok
-- Son tamamlanan iş: aşama geçişi sunucuya iz bırakıyor (`c048030`) + `girdiTamamla` eksik alan denetimi (`124e6cb`)
-- Doğrulama sonucu: `npm run test` 58/58 · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
+- Son tamamlanan iş: `ZORUNLU_GIRDI` sözleşmesi tamamlandı (`618fb74`, 36 fonksiyon fan-out)
+- Doğrulama sonucu: `npm run test` **64/64** · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
+- **KURUCUDAN TEK SOMUT KONTROL** (§11-B — benim yapamadığım tek şey): bir dosyada
+  arabulucu hesabıyla "Aşama N+1'e Geç →" düğmesine bas, sayfayı yenile. Dosya yeni
+  aşamada KALMALI (eskiden geri düşüyordu). Sunucu tarafını ben doğrularım:
+  `select gerekce, sonuc from ajan_gorevleri where gorev_tipi='asama_gecisi' order by created_at desc limit 3;`
+  → `[gecis:X->Y] arabulucu elle ilerletti` satırı doğmuş olmalı.
 - Açık blokaj: **P0 · üç cron kusuru** — tek Cowork paketi aşağıdaki blokta.
   (1) jobid 1 `send-session-reminders` 401 SÜRÜYOR · (2) jobid 2
   `dual-ai-validate` YENİ: hiç yetki başlığı yok, kesin 401 · (3) jobid 7
@@ -16,6 +21,7 @@
 |---|---|---|
 | P1 · `girdiTamamla` eksik alanı örtmüyor | `124e6cb` | **36 fonksiyon fan-out** — "hepsi başarılı, başarısız yok" |
 | P1 · aşama geçişi sunucuya iz bırakıyor | `c048030` | publish |
+| P1 · `ZORUNLU_GIRDI` sözleşmesi tamamlandı | `618fb74` | **36 fonksiyon fan-out** — "hepsi başarılı, başarısız yok" |
 
 **CANLI KANIT (publish):** paket `index-B7Onz7o6.js` → **`index-DThEJGGi.js`**.
 Yeni pakette `"arabulucu elle ilerletti"` VAR (1 kez) ve `"iz yazılamadı"` VAR
@@ -59,6 +65,46 @@ DEĞİŞMEDİ, düğme onda yalnız ekranı taşır. Sol menüdeki gezinme (`got
 DEĞİŞMEDİ: bakmak için aşamaya geçmek dosyayı ilerletmez. Yeni bir yetki
 icat edilmedi; RLS zaten bu ölçütü taşıyor (yönetici · görevli arabulucu · dosya
 sahibi) — `akis-onayla` düzeltmesiyle aynı ölçüt.
+
+### KAPANDI — 24.08 · P1 · `ZORUNLU_GIRDI` sözleşmesi eksikti (üç GİZLİ kusur, `618fb74`)
+`girdiTamamla` düzeltmesini yaparken sözleşmenin kendisi denetlendi: `MOTORA_BAGLI`
+listesindeki her kolun `ZORUNLU_GIRDI` tanımı var mı? Üçünde YOKTU; varsayılan
+`["case_id"]` uygulanıyordu. Oysa kendi kapıları daha fazlasını istiyor:
+| kol | kendi kapısı | 400 metni |
+|---|---|---|
+| `classify-dispute` | metin ≥ 5 karakter | "Metin çok kısa" |
+| `detect-legal-deadlines` | `case_id` + `dispute_type` | "case_id ve dispute_type gerekli" |
+| `analyze-meeting-notes` | `case_id` + `newNote` | "newNote required" |
+Yani bu kollara bir akış kuralı yazıldığı an koşucu eksik gövdeyle çağırıp 400
+alacaktı — `124e6cb`'de düzeltilenin aynı sınıfı.
+
+**GİZLİ, HENÜZ CANLI DEĞİL — bu ölçüldü:** canlı `akis_kurallari` tablosu okundu
+(9 kural: 6 etkin, 3 kapalı); üç kola işaret eden kural YOK. Nöbetçinin
+`OTOMATIK_KOLLAR` listesinde de yoklar. Bu yüzden bugün hata doğurmuyorlar.
+DÜZELTME: üçü de `ZORUNLU_GIRDI`ye yazıldı. Bu alanlar dosyadan TÜRETİLEMEZ
+(`girdiTamamla` yalnız case/session/party/document çözer); olayın `veri`
+alanında gelmeleri gerekir. Gelmezlerse iş kurulmaz ve eksik açıkça bildirilir —
+uydurulmaz (constitution m.2). Sınır kodda yazılı: bu liste "alan dolu mu"
+denetler; `classify-dispute`ın 5 karakter ölçütü kendi kapısında kalır.
+Tezgâh (`tests/girdi-tamamla-eksik-alan.test.ts`, 9 durum) **kanıtlandı**:
+düzeltme geçici geri alınıp koşuldu → 3 test DÜŞTÜ; geri alınınca 9/9 geçti.
+
+### AKIŞ KURALI DENETİMİ — 24.08 (salt okuma, kusur çıkmadı)
+Canlı `akis_kurallari` × kod sözleşmesi karşılaştırıldı:
+- 6 ETKİN kuralın altısının hedef fonksiyonu da `MOTORA_BAGLI` listesinde. ✓
+- 3 KAPALI kural: `belge_yuklendi__analiz`, `kalem_guncellendi__karsilastir`,
+  `foy_onaylandi__gonder` — üçü de bilerek kapalı (çift koşum / çift gönderim).
+- KURALI OLMAYAN OLAYLAR (kusur değil, kayda geçti): `soru_cevaplandi` (10 satır,
+  en yenisi 23.08 22:35 — sistemin en yeni olayı), `taraf_analizi_tamamlandi`,
+  `foy_taslagi_hazirlandi`, `foy_gonderildi`, `belge_ozeti_uretildi`.
+  `soru_cevaplandi` kodda HİÇ geçmiyor — bir veritabanı tetikleyicisi yazıyor,
+  kimse okumuyor. Motorun 5. maddesi ("cevap gelince kol yeniden uyanır") yine de
+  SAĞLANIYOR: uyandırma `ajan-nobetci/index.ts:1141`'de sorunun gerekçesindeki
+  `[kol:<fonksiyon>]` etiketiyle yapılıyor, olay üzerinden değil.
+  Bu olaylar "oldu" işaretidir, akış tetiği değil. İşlenmemiş olay sayısı 0.
+- [ ] P3 · `soru_cevaplandi` olayını yazan tetikleyici ile onu okuyan kimse yok ·
+      Kabul: ya bir tüketici tanımlanır ya da tetikleyici kaldırılır; her iki
+      hâlde `akis_olaylari`da tüketicisiz olay birikmez.
 
 ### P0/P1 — CRON DENETİMİ 24.08: ÜÇ KUSUR, TEK COWORK PAKETİ (canlı, kanıtlı)
 
@@ -644,8 +690,14 @@ edge function deploy etmiyor — CLAUDE.md §11-B tablosu).
       koştuğunda `akis_hatasi` doğmamalı).
 - [x] P1 · `hazirlik-foyu` HTTP 400 · Kayıt 19.08 08:27, `girdiTamamla`
       (`_shared/anlatim.ts` ZORUNLU_GIRDI + session_id/party_id merdiveni) bunu
-      kapatıyor · DEPLOY EDİLDİ · **CANLI DOĞRULAMA BEKLİYOR**.
-- [!] P1 · `bilirkisi_durum__ilerlet` · SEBEBİ ARTIK ÖĞRENİLEMİYOR.
+      kapatıyor · DEPLOY EDİLDİ · **CANLI DOĞRULANDI 24.08**: aynı kural 19.08
+      11:48'de `hazirlik-foyu çalıştırıldı (2 taraf)` yazmış; o tarihten sonra
+      bu kural için `akis_hatasi` yok. Ayrıca erken dönüş kusuru `124e6cb`.
+- [x] P1 · `bilirkisi_durum__ilerlet` · DONE 24.08.2026 · Doğrulama: kural canlıda
+      20.08 17:45 ve 21.08 02:00'de `akis_kosuldu` yazmış; `bilirkisi_onerileri`
+      2 satır (son 23.08 21:55); 20.08 17:48'den sonra `akis_hatasi` yok.
+      (Aşağıdaki not o tarihteki teşhis durumudur, artık geçerli değildir.)
+      SEBEBİ ARTIK ÖĞRENİLEMİYOR.
       Olay `948ddbca` iki denemede de başarısız oldu ve 20.08 17:50:12'de
       İŞLENDİ olarak kapandı (`akis_olaylari.islendi = true`); bir daha
       denenmeyecek. Tek kalan iz, sınır katmanının sildiği metin.
