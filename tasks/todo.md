@@ -68,6 +68,45 @@ DEĞİŞMEDİ: bakmak için aşamaya geçmek dosyayı ilerletmez. Yeni bir yetki
 icat edilmedi; RLS zaten bu ölçütü taşıyor (yönetici · görevli arabulucu · dosya
 sahibi) — `akis-onayla` düzeltmesiyle aynı ölçüt.
 
+### TETİKLEYİCİ DENETİMİ — 24.08 (salt okuma · `closed_at` kusurunun sınıfı tarandı)
+`closed_at` kusuru şu sınıftandı: **tetikleyicinin beklediği sütunu uygulama hiç
+yazmıyor.** Aynı sınıftan başka var mı diye bütün tetikleyiciler tarandı
+(24 tetikleyici; `update_updated_at_column` hariç).
+
+`akis_olay_yaz()` dokuz olay kodu üretebiliyor. Canlıda hangileri doğmuş:
+| olay kodu | koşul | canlı |
+|---|---|---|
+| `belge_yuklendi` | `case_documents` INSERT | 4 ✓ |
+| `oturum_planlandi` | `case_sessions` INSERT | 1 ✓ |
+| `foy_onaylandi` | `durum` → `onaylandi` | 3 ✓ |
+| `foy_gonderildi` | `durum` → `gonderildi` | 2 ✓ |
+| `anlasma_taslagi_uretildi` | `agreement_documents` INSERT | 1 ✓ |
+| `oturum_iptal_edildi` | `status` → `cancelled` | 0 — durum oluşmamış |
+| `oturum_degistirildi` | `status`/`scheduled_at` değişimi | 0 — durum oluşmamış |
+| `gorusme_notu_eklendi` | `case_notes` INSERT | 0 — tetikleyiciden sonra not eklenmemiş (yazan iki yüzey VAR: `CaseNotesFAB`, `MeetingNotesPanel`) |
+| `anlasma_belgesi_imzalandi` | `signed_by` değişimi | **0 — YAPISAL** |
+
+**TEK YAPISAL BULGU:** `anlasma_belgesi_imzalandi` olayı **hiç doğamaz**, çünkü
+`agreement_documents.signed_by` sütununu **uygulamada yazan hiçbir yer yok**
+(tarandı; eşleşenlerin hepsi farklı bir sütun olan `assigned_by`). Yani imza
+akışı henüz KURULMAMIŞ; şema ve tetikleyici hazır, yüzey yok.
+Bu bir kusur DEĞİL, eksik özelliktir: imza ürünün beş insan kapısından biridir
+(§13 · constitution) ve yapılması ürün kararıdır — kendiliğinden eklenmez.
+- [ ] P2 · İmza akışı yok: `agreement_documents.signed_by` hiçbir yüzeyden
+      yazılmıyor, bu yüzden `anlasma_belgesi_imzalandi` olayı hiç doğmuyor ve
+      ona bağlanacak hiçbir akış çalışamaz · Kabul: imzalayan kişi ve zaman
+      `signed_by` üzerine yazılıyor, olay doğuyor, `akis_olaylari`da görünüyor ·
+      **ÖNCE KURUCU KARARI** (imza kapısının ürün davranışı — §7.1/§7.5).
+
+`akis_olay_yaz_dongu()` iki tabloda: `taraf_kalemleri` (I+U →
+`taraf_kalemleri_guncellendi`, 35 olay) ve `ajan_gorevleri` (**yalnız U** →
+`soru_cevaplandi`). Diğer tetikleyiciler koruma/bakım işidir
+(`enforce_*_guard`, `protect_delete`, `handle_new_user`, `set_*_updated_at`) ve
+olay üretmez.
+ETKİ ALANI NOTU: bu turda `ajan_gorevleri`ne `asama_gecisi` satırı eklendi.
+Oradaki tek tetikleyici **AFTER UPDATE**tir; INSERT onu ateşlemez, yani yeni
+satırlar olay üretmiyor. Kontrol edildi, temiz.
+
 ### KAPANDI — 24.08 · P1 · dosya kapanışı `closed_at`i gerçekten dolduruyor (`aef716e`, publish)
 Kayıt silme maddesini araştırırken çıktı ve ondan daha ağır bir kusur.
 KÖK NEDEN: `closed_at`i dolduran şey bir **veritabanı tetikleyicisidir** ve
@@ -182,6 +221,15 @@ Canlı `akis_kurallari` × kod sözleşmesi karşılaştırıldı:
   `[kol:<fonksiyon>]` etiketiyle yapılıyor, olay üzerinden değil.
   Bu olaylar "oldu" işaretidir, akış tetiği değil. İşlenmemiş olay sayısı 0.
 - [ ] P3 · `soru_cevaplandi` olayını yazan tetikleyici ile onu okuyan kimse yok ·
+      **Kaynak bulundu (24.08):** `trg_akis_gorev_cevap` → `akis_olay_yaz_dongu()`,
+      `ajan_gorevleri` üzerinde **AFTER UPDATE**; `durum` `'yapildi'`ya döndüğünde
+      `soru_cevaplandi` yazıyor (`veri`: `gorev_id`, `gorev_tipi`).
+      Çözüm SQL'dir → Cowork; ama önce ürün kararı gerekir: olay tüketilecek mi
+      (kural yazılıp uyandırma olaya bağlanacak mı) yoksa tetikleyici mi kalkacak?
+      Bugün uyandırma `ajan-nobetci:1141`'de `[kol:…]` etiketiyle çalışıyor ve
+      motorun 5. maddesi SAĞLANIYOR — yani acil değil.
+      NOT: tetikleyici yalnız UPDATE'te ateşliyor; `akis_kosuldu`/`asama_gecisi`
+      satırları INSERT ile yazıldığı için olay üretmiyorlar (etki alanı temiz). ·
       Kabul: ya bir tüketici tanımlanır ya da tetikleyici kaldırılır; her iki
       hâlde `akis_olaylari`da tüketicisiz olay birikmez.
 
