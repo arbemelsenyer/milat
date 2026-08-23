@@ -1935,6 +1935,7 @@ export type Database = {
           created_at: string
           id: string
           invite_sent_at: string | null
+          kayitli: boolean
           meeting_type: string
           notes: string | null
           participants: Json
@@ -1950,6 +1951,7 @@ export type Database = {
           created_at?: string
           id?: string
           invite_sent_at?: string | null
+          kayitli?: boolean
           meeting_type?: string
           notes?: string | null
           participants?: Json
@@ -1965,6 +1967,7 @@ export type Database = {
           created_at?: string
           id?: string
           invite_sent_at?: string | null
+          kayitli?: boolean
           meeting_type?: string
           notes?: string | null
           participants?: Json
