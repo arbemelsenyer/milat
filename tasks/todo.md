@@ -3,8 +3,8 @@
 - Tarih: 24.08.2026 (gece oturumu · 5. blok)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok
-- Son tamamlanan iş: kayıt protokolü tek kaynağa alındı (`7032284`, publish)
-- Doğrulama sonucu: `npm run test` **70/70** · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
+- Son tamamlanan iş: dosya kapanışı `closed_at`i gerçekten dolduruyor (`aef716e`, publish)
+- Doğrulama sonucu: `npm run test` **74/74** · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
 - **KURUCUDAN TEK SOMUT KONTROL** (§11-B — benim yapamadığım tek şey): bir dosyada
   arabulucu hesabıyla "Aşama N+1'e Geç →" düğmesine bas, sayfayı yenile. Dosya yeni
   aşamada KALMALI (eskiden geri düşüyordu). Sunucu tarafını ben doğrularım:
@@ -23,6 +23,7 @@
 | P1 · aşama geçişi sunucuya iz bırakıyor | `c048030` | publish |
 | P1 · `ZORUNLU_GIRDI` sözleşmesi tamamlandı | `618fb74` | **36 fonksiyon fan-out** — "hepsi başarılı, başarısız yok" |
 | P2 · kayıt protokolü tek kaynak | `7032284` | publish |
+| P1 · dosya kapanışı `closed_at` | `aef716e` | publish |
 
 **CANLI KANIT (publish):** paket `index-B7Onz7o6.js` → **`index-DThEJGGi.js`**.
 Yeni pakette `"arabulucu elle ilerletti"` VAR (1 kez) ve `"iz yazılamadı"` VAR
@@ -66,6 +67,55 @@ DEĞİŞMEDİ, düğme onda yalnız ekranı taşır. Sol menüdeki gezinme (`got
 DEĞİŞMEDİ: bakmak için aşamaya geçmek dosyayı ilerletmez. Yeni bir yetki
 icat edilmedi; RLS zaten bu ölçütü taşıyor (yönetici · görevli arabulucu · dosya
 sahibi) — `akis-onayla` düzeltmesiyle aynı ölçüt.
+
+### KAPANDI — 24.08 · P1 · dosya kapanışı `closed_at`i gerçekten dolduruyor (`aef716e`, publish)
+Kayıt silme maddesini araştırırken çıktı ve ondan daha ağır bir kusur.
+KÖK NEDEN: `closed_at`i dolduran şey bir **veritabanı tetikleyicisidir** ve
+`outcome` değişimini izler:
+```
+set_case_closed_at → IF NEW.outcome IS NOT NULL
+                     AND OLD.outcome IS DISTINCT FROM NEW.outcome
+                     THEN NEW.closed_at := COALESCE(NEW.closed_at, now());
+```
+Kapanış ekranı (`Phase9Closing.closeCase`) ise **yalnız `status`** yazıyordu.
+İkisi hiç buluşmuyor → `closed_at` BOŞ kalıyordu.
+CANLI KANIT: `outcome` dolu 5 dosyanın beşinde de `closed_at` dolu; bu ekrandan
+kapatılan **1 dosyada ikisi de boş** (`status='agreed'`, `outcome=null`).
+
+BOŞ `closed_at`in dört bedeli — hepsi kodda okunuyor:
+| nerede | ne olurdu |
+|---|---|
+| `ajan-nobetci:1954` | 24 saatlik ses silme sayacı BAŞLAMIYOR |
+| `dosya-verilerini-sil:145` | 5 yıllık saklama sayacı `now()`a düşüyor, her çağrıda baştan |
+| `generate-official-document:230` | resmî belgeye "Sürecin Bitiş Tarihi" yazılmıyor |
+| `OutcomeAnalytics:126` | `outcome`u boş dosya sonuç istatistiğine hiç girmiyor |
+
+En ağırı birincisi: **tarafa onay metninde "ses kaydı süreç bitiminden 24 saat
+sonra kalıcı olarak silinir" sözü veriliyor.** Sayaç hiç başlamadığı için bu söz
+tutulamazdı — constitution m.10 (süresiz saklama yasağı) ve KVKK kapsamında.
+
+EKRAN KUSURU GİZLİYORDU: kapanış tarihi `closed_at` yerine `updated_at`ten
+okunuyordu. `updated_at` sonraki her düzenlemede değiştiği için gösterilen
+"kapanış tarihi" zamanla kayıyordu — semptomu örten bir yama.
+DÜZELTME: kapanış hem `status` (`agreed`/`failed`) hem `outcome`
+(`anlasma`/`anlasamama`) yazıyor; tarih `closed_at`ten okunuyor. İki sütun ayrı
+sözlük taşır, karıştırılmadı.
+Tezgâh (`tests/dosya-kapanis-closed-at.test.ts`, 4 durum) **kanıtlandı**: kusur
+geri getirilip koşuldu → 3 test DÜŞTÜ; geri alınınca 4/4 geçti.
+
+### KAPANDI — 24.08 · P2 · kayıt silme kuralı ZATEN KURULU (kod işi çıkmadı)
+Kuyruktaki madde "ses süreç bitiminden 24 saat sonra, döküm süreç sonunda;
+nöbetçi turunda otomatik, satıra silme zamanı + notu yazılarak" diyordu.
+OKUNDU: `ajan-nobetci/index.ts:1930 kayitSilmeKollari` bunu **tam olarak**
+yapıyor ve `index.ts:3046`'da nöbetçi turuna bağlı. Şema da hazır
+(`ses_silindi_at` · `dokum_silindi_at` · `ses_silme_notu` · `dokum_silme_notu`).
+Ses için depodaki dosya da siliniyor, satır da boşaltılıyor; bitiş zamanı yoksa
+tahmin ÜRETİLMİYOR, gerekçe yazılıyor. Yani madde bayat.
+AMA kol sessizce hiç çalışmıyordu — sebebi yukarıdaki `closed_at` kusuru.
+`oturum_kayitlari` bugün **0 satır** (kayıt hattı henüz kurulmadı), o yüzden
+zarar doğmamıştı; hat açılsaydı kayıtlar süresiz kalırdı.
+- [x] P2 · Silme kuralı · DONE 24.08.2026 · Doğrulama: kol kurulu ve bağlı;
+      çalışmasını engelleyen `closed_at` kusuru `aef716e` ile giderildi.
 
 ### KAPANDI — 24.08 · P2 · kayıt protokolü iki ekranda tek kaynaktan okunuyor (`7032284`, publish)
 Kuyruk maddesi "harici araç yasağı metni taraf ekranında YOK" diyordu. **Ölçüm
@@ -201,6 +251,19 @@ yalnız bir kol koştuğunda/atlandığında yazılır, yeni dosya işi yoksa se
    hatırlatma gönderilen oturumu doğrulayıp maddeleri DONE yazacağım; 401 ya da
    zaman aşımı sürerse ilgili fonksiyonun kapısını yeniden okuyup ikinci turu
    koşacağım.
+
+#### COWORK — GERİYE DÖNÜK TEK SATIR (yukarıdaki `closed_at` kusurunun kalıntısı)
+1. **Ne yapılacak:** `outcome`u ve `closed_at`i boş kalmış **1 dosya** için
+   `outcome` yazılsın; tetikleyici `closed_at`i kendisi dolduracaktır.
+   `update public.cases set outcome = 'anlasma' where status = 'agreed' and outcome is null;`
+   (Bu dosyanın `status`u zaten `agreed`; başka dosya etkilenmez.)
+2. **Neden gerekli:** o dosyanın kapanış tarihi hiçbir yerde yok; saklama ve
+   silme sayaçları başlamıyor, resmî belgesine bitiş tarihi yazılamıyor.
+3. **Çalıştırılacak işlem:** yukarıdaki tek `update`.
+4. **Başarı kontrolü:** `select count(*) from cases where status in ('agreed','failed') and closed_at is null;` → **0**.
+5. **Sonuç gelince ben ne yapacağım:** 0 görülürse maddeyi DONE yazacağım.
+> Kod tarafı `aef716e` ile kapandı; bundan sonra kapatılan dosyalarda bu durum
+> tekrarlanmaz. Bu madde yalnız mevcut tek satırın onarımıdır.
 
 > P1 · CRON SIRRI VERİTABANINDA AÇIK METİN maddesi DEĞİŞMEDİ, hâlâ açık
 > (aşağıdaki blokta). Bu paket sırrı yenilemez, yalnız mevcut değeri kullanır.
@@ -584,7 +647,7 @@ Sonuç değişmiyor: canlı şema, kararı (a) birebir karşılıyor.
 ### AÇIK — B18'in kalan iki parçası (bu karardan bağımsız)
 - [x] P2 · Harici araç yasağı metni iki ekranda da yazılı olmalı (taraf + arabulucu) · DONE 24.08.2026 · Metin zaten iki ekrandaydı; gerçek kusur ikizlenmeydi, `src/lib/kayitProtokolu.ts` ile tekleştirildi (`7032284`, 70/70 test).
       Arabulucu tarafında `KAYIT_TEK_KAPI_UYARISI` var; taraf ekranında yok.
-- [ ] P2 · Silme kuralı: ses süreç bitiminden 24 saat sonra, döküm süreç sonunda;
+- [x] P2 · Silme kuralı (DONE 24.08.2026 — kol zaten kuruluydu; onu engelleyen `closed_at` kusuru `aef716e` ile giderildi): ses süreç bitiminden 24 saat sonra, döküm süreç sonunda;
       nöbetçi turunda otomatik, satıra silme zamanı + notu yazılarak.
 
 ### NOT — commit edilmemiş yabancı değişiklik (dokunulmadı)
@@ -685,7 +748,7 @@ Bu karar gelene kadar `create-video-room` DEĞİŞTİRİLMEDİ.
 
 B18'in kalan iki parçası bu karardan BAĞIMSIZ ve ayrı iş kalemidir:
 - [x] P2 · Harici araç yasağı metni iki ekranda da yazılı olmalı — DONE 24.08.2026, bkz. `7032284`
-- [ ] P2 · Silme kuralı: ses süreç bitiminden 24 saat sonra, döküm süreç sonunda;
+- [x] P2 · Silme kuralı (DONE 24.08.2026 — kol zaten kuruluydu; onu engelleyen `closed_at` kusuru `aef716e` ile giderildi): ses süreç bitiminden 24 saat sonra, döküm süreç sonunda;
       nöbetçi turunda otomatik, satıra silme zamanı + notu yazılarak
 
 ---
