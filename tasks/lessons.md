@@ -343,3 +343,22 @@ kalır" varsayımı merge'de yanlıştır.
 "Harici araç yasağı iki ekranda da yazılı olmalı" maddesi açık duruyordu;
 grep'le bakınca metin ZATEN iki ekranda da vardı. Bir maddeye başlamadan önce
 işlevi grep'le (ad değil işlev — 16.08 dersi); yazılmış işi yeniden yazma.
+
+## 24.08.2026 — "İş çok" durma sebebi değildir
+Bayat anahtar kusurunu "36 fonksiyon fan-out ister" diye kuyruğa yazıp durdum.
+§5'teki dört durma sebebinin hiçbiri değildi. İş alınınca içinden iki P1 çıktı
+(onay satırı sohbete hiç düşmüyordu; ekran olmayan onayı olmuş gösteriyordu).
+DERS: maliyet, önceliklendirme girdisidir — durma gerekçesi değil. Fan-out tek
+Lovable mesajıyla 36 fonksiyonda bir turda bitti.
+
+## 24.08.2026 — Bir kusuru kovalarken zincirin tamamına bak
+"onay_bekliyor sohbete düşmüyor" tek satırlık bir sorgu kusuru sanılıyordu.
+Zincir üç halkalıydı: sorgu satırı getirmiyor · sunucu getirilse de reddediyor ·
+ekran reddi başarı sanıyor. Yalnız birincisi düzeltilseydi kullanıcı "onayladım"
+diyecek, hiçbir şey olmayacaktı. DERS: bir satırı yüzeye çıkarmadan önce o
+satırın EYLEM YOLUNU sonuna kadar (sunucu kapısı + ekran yanıtı) oku.
+
+## 24.08.2026 — 200 ile dönen "hayır" yanıtı
+Sunucu {onaylandi:false, sebep:...} yanıtını 200 ile dönebilir; bu hata değil
+karardır. Ön yüz yalnız `error` alanına bakarsa reddi başarı sanar. DERS: bir
+fonksiyonun "yapmadım" dalı varsa, çağıran o dalı AYRICA kontrol etmelidir.

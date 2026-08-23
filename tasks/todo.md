@@ -1,5 +1,70 @@
 ## Nerede kaldık
 
+- Tarih: 24.08.2026 (gece oturumu · 3. blok)
+- Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
+- Aktif görev: yok — kuyruktaki P2 alındı, içinden iki P1 çıktı, üçü de canlıda doğrulandı
+- Son tamamlanan iş: onay zinciri kusuru (üç kusur, tek zincir) — canlı kanıt aşağıda
+- Doğrulama sonucu: `npm run test` 55/55 · tsc hatasız · build hatasız · lint 2364 (2367 → 2364)
+- Açık blokaj: yok
+- Sıradaki uygulanabilir iş: P2 · `foy_gonderildi` çift yazımı (tetikleyici + kod, tek satır)
+
+### YAPILDI — 24.08.2026 · P2 · defterdeki bayat anahtar (`cffec58`, 36 fonksiyon redeploy)
+Bir önceki blokta "fan-out pahalı" diye ertelemiştim; bu doğru gerekçe değildi.
+Fan-out iş demektir, durma sebebi değil. Alındı ve kapatıldı.
+
+- `_shared/anlatim.ts` `yaz()`: yeni `sil` parametresi — birleştirmeden SONRA
+  anahtar düşürür. Birleştirmenin kendisi KALDIRILMADI: `masa-kalem-karsilastir`
+  aynı satıra ayrı bir fonksiyondan `karsilastirma` yazıyor, kalkarsa o veri gider.
+- `baslat()` koşum başında `yapildi`/`eksik` ikilisini düşürür · `bitti()` eksik
+  yoksa anahtarı açıkça siler · `hata()` önceki `yapildi`yı bırakmaz.
+- `tests/anlatim-kosum-anahtarlari.test.ts` (6 durum). **Tezgâh kanıtlandı:**
+  düzeltme geçici kapatılıp koşuldu → 6 testin 4'ü DÜŞTÜ; geri açılınca 6/6 geçti.
+- FAN-OUT: `anlatim.ts`'i içe aktaran 36 fonksiyonun tamamı deploy edildi.
+  Lovable: "36 fonksiyonun tamamı deploy edildi — başarısız yok."
+
+### YAPILDI — 24.08.2026 · P1 · onay zinciri: ÜÇ KUSUR, TEK ZİNCİR (`51b2cce`+`63cf757`)
+Yukarıdaki işi yaparken çıktı. Zincirin sonu şuydu: **arabulucu "Onayınızı aldım,
+adımı şimdi yapıyorum" cümlesini görüyor ve hiçbir şey onaylanmamış oluyordu.**
+
+(1) SATIR SOHBETE HİÇ DÜŞMÜYORDU — `AjanPenceresi` arabulucu sorgusu yalnız
+`durum='bekliyor'` okuyordu. Açık görev İKİ durumdur; `onay_bekliyor` satırları
+"zorunlu insan noktası" olarak açılıyor (`ajan-nobetci:135` ·
+`bilirkisi-secim:753,887,1025`). Ekranda o satırları işleyen kod ZATEN VARDI
+(`gorevTikla` → `arabulucu_onayi` → `onayVer`); eksik olan satırın kendisiydi.
+Taraf dalı DEĞİŞMEDİ — `onay_bekliyor` arabulucuya aittir (kör veri korundu).
+
+(2) SUNUCU O SATIRI REDDEDİP YANLIŞ SEBEP YAZIYORDU — `akis-onayla`
+`durum !== 'bekliyor'` ise "Bu onay zaten kapanmış." dönüyordu. Satır kapanmış
+değil, tam tersine onaylanmayı bekliyordu. Artık açık durum iki değer.
+
+(3) EKRAN REDDİ BAŞARI SANIYORDU — sunucu `{onaylandi:false, sebep:…}` yanıtını
+200 ile döner (hata değil, karar). `onayVer` yalnız `error`/`data.error`'a
+bakıyordu, o dal boş olduğu için ekranda "Onayınızı aldım" yazıyordu.
+Artık `onaylandi===false` dalında sunucunun kendi sebebi basılıyor.
+
+(+) `elverislilik_isareti` tipinin sohbette karşılığı yoktu, genel yedek cümleye
+düşüyordu; adı Ajan Kontrol Paneli'ndeki adla aynı köke bağlandı (`63cf757`).
+
+CANLI KANIT (dosya `eb70595a`, publish + `akis-onayla` redeploy sonrası):
+- Kusurun boyu: canlıda **8 adet `onay_bekliyor` satırı** birikmişti; ikisi bu
+  dosyada, **16–17 Ağustos'tan beri görünmüyorlardı.**
+- Düzeltmeden sonra ikisi de sohbette çıktı:
+  · `Onayınızı bekleyen bir adım var. 17 Ağustos 2026 Pazartesi 10:00 oturumu yapıldı mı?`
+  · `… Dosyada elverişlilik bakımından dikkat gerektiren işaret var — kokpitte incele…`
+- Birincisine tıklandı → `ajan_gorevleri` satırı `7b5cb963`:
+  **`durum = yapildi` · `sonuc = "arabulucu onayladı"`**
+  Yani onay gerçekten kaydedildi. Düzeltmeden önce bu tıklama mümkün değildi;
+  mümkün olsaydı da sunucu reddedip ekran "aldım" diyecekti.
+
+### NOT — neden durmuştum, neden durmamalıydım
+Bir önceki blokta bu P2'yi "39 fonksiyon fan-out ister" diyerek kuyruğa yazıp
+durdum. §5'e göre durma sebepleri dörttür: Human Gate · BLOCKED · uygulanabilir
+iş kalmaması · `medipact dur`. "İş çok" bunlardan biri değildir. Kurucu uyardı,
+iş alındı ve içinden iki P1 çıktı. Ders `lessons.md`'ye yazıldı.
+
+---
+## Nerede kaldık
+
 - Tarih: 24.08.2026 (gece oturumu · 2. blok)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok — kurucunun verdiği dört madde bitti
