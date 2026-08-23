@@ -516,3 +516,28 @@ Kullanıcı teknik görevleri senin için parçalamaz. Kullanıcı hata düzeltm
 Kullanıcıda kalan: ürün kararı, hukuki/ticari karar, geri dönüşsüz işlem, kritik güvenlik/veri izolasyonu kararı, runtime ajan davranışı, production kapısı.
 
 **HEDEF:** Medipact'ı mevcut gerçek kod durumundan pilot uygulamaya kadar mümkün olduğunca kesintisiz ilerletmek. Amaç daha fazla sohbet üretmek değil, çalışan ürünü ilerletmektir.
+
+---
+
+## 22. GEÇİCİ TEST DOSYALARI — TEK YER, SİLME YOK
+
+Tek kullanımlık sonda/tezgâh dosyaları için **tek adres `tests/gecici/`**'dir.
+
+| Kural | Ayrıntı |
+|---|---|
+| **Nereye** | `tests/gecici/`. `/tmp`, `%TEMP%` ve sistem geçici klasörleri **kullanılmaz**. |
+| **Git** | Klasörün içeriği `.gitignore`'dadır; yalnız `tests/gecici/.gitkeep.md` izlenir. |
+| **Silme yok** | Geçici dosya **silinmez**; aynı ada **üstüne yazılır**. Böylece `rm` gerekmez. |
+| **Toplu koşum** | `vitest.config.ts` bu klasörü `exclude` eder; `npm run test` onu çalıştırmaz. Tek tek çağrılır: `npx vitest run tests/gecici/<ad>.test.ts`. |
+| **Adlandırma** | Sabit, tekrar kullanılabilir adlar seç (`sonda.test.ts`, `probe.test.ts`) — her denemede yeni ad üretme. |
+
+**Bekçi (PreToolUse) tarafı:** silme kuralı yalnız `tests/gecici/` **altındaki** yollar için onaysız geçer. Başka **hiçbir** yerdeki silme geçmez:
+- klasörün kendisi (`rm -rf tests/gecici`) → **sorar**
+- `..` ile ağaçtan çıkan yol → **sorar**
+- operandlardan biri bile dışarıdaysa → **sorar**
+- operandsız silme, `find -delete`, `find -exec rm` → **sorar**
+- ters bölülü yol (`tests\gecici\x`) → **sorar** (ayrıştırıcı POSIX kipinde; bilinen sınır, güvenli yön). Geçici yolları **eğik bölü** ile yaz.
+
+**Kalıcı tezgâh geçici değildir.** Tekrar tekrar koşulacak bir tezgâh `tests/gecici/`'ye değil, depoda izlenen bir yere yazılır — bekçi tezgâhı `tests/bekci/test_guard.py` gibi. (Bu tezgâh bir kez geçici klasörde kaybolduğu için oraya taşındı.)
+
+Bekçi dosyaları depo dışındadır: `~/.claude/hooks/guard-shell.sh` ve `~/.claude/hooks/guard_secret_operands.py`. Bekçi kuralı değiştiğinde `tests/bekci/test_guard.py` **aynı turda** güncellenir ve koşturulur.

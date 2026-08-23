@@ -9,8 +9,9 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\" --exclude \"tests/gecici/**\"",
+    "test:watch": "vitest --exclude \"**/node_modules/**\" --exclude \"**/dist/**\" --exclude \"tests/gecici/**\"",
+    "sonda": "vitest run tests/gecici"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

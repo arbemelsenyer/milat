@@ -27,3 +27,7 @@ dist-ssr
 *.udf.udf
 .env.scraper
 supabase/.temp/
+
+# Gecici test dosyalari (CLAUDE.md 22): icerik git'e girmez, klasor notu girer
+tests/gecici/*
+!tests/gecici/.gitkeep.md
