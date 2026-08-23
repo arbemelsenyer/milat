@@ -6,8 +6,38 @@
 - Son tamamlanan iş: P1 · akış hatası artık hangi adımın neden çalışmadığını söylüyor (`d1d0d9f`)
 - Doğrulama sonucu: yeni tezgâh 7/7 · `npm run test` 34/34 · tsc hatasız · build hatasız · lint 2367 (değişmedi) · bekçi tezgâhı 54/54
 - Açık blokaj: HUMAN GATE — gizli dosya kararı (değişmedi, aşağıda)
-- Sıradaki uygulanabilir iş: P1 · `hazirlik-foyu` iç çağrısı eksik parametreyle gidiyor
-  (`oturum_planlandi__foy_hazirla` → HTTP 400 "case_id, session_id ve party_id gerekli")
+- Sıradaki uygulanabilir iş: kuyruk taraması (aşağıdaki üç madde canlı olaya bağlandı)
+
+### YAPILDI — 23.08.2026 · Deploy turu (üç fonksiyon)
+- `taraf-cevap` → deploy edildi (16:35). Deploy edilen sürümde `cases` okuması +
+  `has_role` RPC var.
+- `akis-yurut` → deploy edildi (17:28), `d1d0d9f` canlıda. `hata-metni.ts` yerinde,
+  içe aktarım `index.ts:26`, kullanım 227 ve 846.
+  NOT: MCP çağrısı istemci tarafında 300 sn'de zaman aşımına uğradı ama deploy
+  SUNUCUDA BAŞARILI oldu — `list_messages` ile doğrulandı. Zaman aşımı = başarısızlık
+  DEĞİL; bir daha olursa önce `list_messages`'a bak, işi tekrarlama.
+- `hazirlik-foyu` + `hazirlik-foyu-gonder` → deploy edildi (17:33).
+  Doğrulama: `hazirlik-foyu-gonder/index.ts:275-276` `x-cron-secret` / `isCron` kapısı canlıda.
+- `_shared/**` bu turda DEĞİŞMEDİ → fan-out yapılmadı.
+
+### KUYRUK GÜNCELLEMESİ — üç akış hatası maddesi
+Üçünün de DÜZELTMESİ KODDA ZATEN VARDI; eksik olan DEPLOY'du (GitHub senkronu
+edge function deploy etmiyor — CLAUDE.md §11-B tablosu).
+- [x] P2 · `hazirlik-foyu-gonder` 401 · Düzeltme `8045e86` (20.08 04:28) ·
+      DEPLOY EDİLDİ 23.08 17:33 · **CANLI DOĞRULAMA BEKLİYOR** (akış bir daha
+      koştuğunda `akis_hatasi` doğmamalı).
+- [x] P1 · `hazirlik-foyu` HTTP 400 · Kayıt 19.08 08:27, `girdiTamamla`
+      (`_shared/anlatim.ts` ZORUNLU_GIRDI + session_id/party_id merdiveni) bunu
+      kapatıyor · DEPLOY EDİLDİ · **CANLI DOĞRULAMA BEKLİYOR**.
+- [!] P1 · `bilirkisi_durum__ilerlet` · SEBEBİ ARTIK ÖĞRENİLEMİYOR.
+      Olay `948ddbca` iki denemede de başarısız oldu ve 20.08 17:50:12'de
+      İŞLENDİ olarak kapandı (`akis_olaylari.islendi = true`); bir daha
+      denenmeyecek. Tek kalan iz, sınır katmanının sildiği metin.
+      `bilirkisi-secim` iç kapıyı KABUL EDİYOR (`kimlikCoz`, satır 150-152),
+      yani 401 değil — hangi kod olduğu bilinmiyor.
+      KAPANIŞ: `d1d0d9f` ile aynı kusur bir daha yaşanamaz; olay tekrarlarsa
+      panoda `bilirkisi-secim çalıştırılamadı (HTTP xxx).` yazacak.
+      Bu madde kod işi olarak KAPANDI; teşhis, olay bir daha doğduğunda gelir.
 
 ### YAPILDI — 23.08.2026 · P1 · Akış hatası metni (`d1d0d9f`)
 
