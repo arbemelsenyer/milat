@@ -83,3 +83,37 @@ describe("girdiTamamla — taraf fan-out'u eksik alanı örtmez", () => {
     expect(r.eksik).toContain("taraf");
   });
 });
+
+/* ZORUNLU_GIRDI SÖZLEŞMESİ TAM MI (24.08.2026 · gizli kusur)
+   `classify-dispute`, `detect-legal-deadlines` ve `analyze-meeting-notes`
+   MOTORA_BAGLI listesindeydi ama ZORUNLU_GIRDI'de tanımı YOKTU; varsayılan
+   ["case_id"] uygulanıyordu. Kendi kapıları daha fazlasını istiyor:
+     classify-dispute        → metin 5 karakterden kısaysa 400 ("Metin çok kısa")
+     detect-legal-deadlines  → 400 "case_id ve dispute_type gerekli"
+     analyze-meeting-notes   → 400 "newNote required"
+   Yani bu kollara bir akış kuralı yazıldığı an koşucu eksik gövdeyle çağırıp
+   400 alacaktı. Bu tezgâh sözleşmenin tam kalmasını sabitler. */
+describe("girdiTamamla — ZORUNLU_GIRDI sözleşmesi tam", () => {
+  const kollar: [string, string][] = [
+    ["classify-dispute", "text"],
+    ["detect-legal-deadlines", "dispute_type"],
+    ["analyze-meeting-notes", "newNote"],
+  ];
+
+  for (const [kol, alan] of kollar) {
+    it(`${kol}: '${alan}' gelmezse iş KURULMAZ, eksik bildirilir`, async () => {
+      const { admin } = sahteAdmin({ taraflar: [{ id: TARAF_A }] });
+      const r = await girdiTamamla(admin, kol, { case_id: DOSYA });
+      expect(r.govdeler).toHaveLength(0);
+      expect(r.eksik).toContain(alan);
+    });
+
+    it(`${kol}: '${alan}' olayın verisiyle gelirse iş kurulur`, async () => {
+      const { admin } = sahteAdmin({ taraflar: [{ id: TARAF_A }] });
+      const r = await girdiTamamla(admin, kol, { case_id: DOSYA, [alan]: "yeterince uzun bir metin" });
+      expect(r.govdeler).toHaveLength(1);
+      expect(r.govdeler[0][alan]).toBe("yeterince uzun bir metin");
+      expect(r.eksik).toHaveLength(0);
+    });
+  }
+});

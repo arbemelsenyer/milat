@@ -544,6 +544,23 @@ const ZORUNLU_GIRDI: Record<string, string[]> = {
   "bilirkisi-sorulari": ["case_id"],
   "taslak-denetim": ["case_id"],
   "bilirkisi-secim": ["case_id"],
+  /* 24.08 · GİZLİ KUSUR: bu üç kol MOTORA_BAGLI listesinde ama burada tanımı
+     yoktu; varsayılan ["case_id"] uygulanıyordu. Oysa kendi kapıları daha
+     fazlasını istiyor, yani onlara bir akış kuralı yazıldığı an koşucu eksik
+     gövdeyle çağırıp 400 alacaktı. Bugün canlıda hiçbir kural onlara işaret
+     etmiyor (kural tablosu okundu) — kusur gizli, o yüzden şimdi kapatıldı.
+     Bu alanlar dosyadan TÜRETİLEMEZ (girdiTamamla yalnız case/session/party/
+     document çözer); olayın `veri` alanında gelmeleri gerekir. Gelmezlerse iş
+     kurulmaz ve eksik açıkça bildirilir — uydurulmaz (constitution m.2).
+     SINIR: burada yalnız "alan dolu mu" denetlenir. `classify-dispute`ın
+     "en az 5 karakter" ölçütü kendi kapısında kalır; boş metni bu liste
+     yakalar, 3 karakterlik metni kapının kendisi yakalar. */
+  // classify-dispute/index.ts:86 → metin 5 karakterden kısaysa 400.
+  "classify-dispute": ["case_id", "text"],
+  // detect-legal-deadlines/index.ts:83 → "case_id ve dispute_type gerekli".
+  "detect-legal-deadlines": ["case_id", "dispute_type"],
+  // analyze-meeting-notes/index.ts:48 → "newNote required" (dize olmalı).
+  "analyze-meeting-notes": ["case_id", "newNote"],
 };
 
 function dolu(v: unknown): boolean {
