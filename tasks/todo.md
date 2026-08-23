@@ -1,5 +1,90 @@
 ## Nerede kaldık
 
+- Tarih: 23.08.2026 (akşam oturumu)
+- Aşama: DAOS · canlı doğrulama döngüsü (§11-B) işliyor
+- Aktif görev: yok — sıradaki iş seçildi (aşağıda)
+- Son tamamlanan iş: P1 · cevap kapısının üç ayrı sonucu doğru cümleyle söyleniyor (`8adc3b9`)
+- Doğrulama sonucu: tsc temiz · build hatasız · test 27/27 · lint 2369→2367 · **canlı kanıt alındı**
+- Açık blokaj: (1) HUMAN GATE — gizli dosya kararı hâlâ bekliyor (aşağıda, değişmedi)
+  (2) Bilirkişi "Yeniden öner" canlıda TEST EDİLEMEDİ — sebebi aşağıda, kusur bulundu
+- Sıradaki uygulanabilir iş: P1 · `bilirkisi_durum__ilerlet` adımının canlıda boş dönmesi
+  (bilirkişi akışı hiç aday üretmemiş: `bilirkisi_onerileri` 0 satır, `experts` 6 aktif kayıt)
+
+### YAPILDI — 23.08.2026 · taraf-cevap redeploy + publish + canlı test (P1)
+
+DEPLOY
+- `taraf-cevap` edge function REDEPLOY EDİLDİ (Lovable MCP, `supabase--deploy_edge_functions`).
+  Deploy edilen sürümde `cases.assigned_mediator_id, user_id` okuması ve `has_role`
+  RPC çağrısı var — yani ded25b4 canlıda. Ajan koda DOKUNMADI (commit değişmedi).
+- Ön yüz iki kez publish edildi (`f00363b` sonrası ve `8adc3b9` sonrası).
+- `_shared/anlatim.ts` değişmedi → fan-out YOK, başka fonksiyon deploy edilmedi.
+
+TEŞHİS — bildirilen belirtinin kök nedeni ded25b4 DEĞİLMİŞ
+- Veritabanı kanıtı: `select count(*) from cases where assigned_mediator_id is null` → **0**;
+  dokuz dosyanın dokuzunda da `user_id = assigned_mediator_id`. Yani eski `taraf-cevap`
+  kodu (yalnız `assigned_mediator_id`e bakan) arabulucuyu ZATEN tanıyordu ve 403 vermiyordu.
+  ded25b4'teki ölçüt eşitlemesi doğru bir iş ama "Cevabınızı şu an kaydedemedim"i açıklamıyor.
+- Gerçek kök neden ÖN YÜZDE: `src/components/AjanPenceresi.tsx` cevap kapısının **üç ayrı
+  sonucunu tek bir "birazdan tekrar deneyin" cümlesine** düşürüyordu:
+  · 200 + `yazildi:false` → soru bu arada kapanmış. Bekleyen soru listesi anlık yayında
+    DEĞİL, dakikada bir tazeleniyor (aynı dosya, satır 428). Kapanmış kart ekranda
+    kalabiliyor; ona yazılan her cevap "tekrar deneyin" alıyor ama hiçbir tekrar tutmuyor.
+    Canlı veri bunu destekliyor: `ajan_gorevleri` durumları → atlandi 182 · yapildi 100 ·
+    bekliyor 21 · onay_bekliyor 8. 182 "atlandi" satırı bu tuzağın malzemesi.
+  · 403 → "Bu soruya cevap yazma yetkiniz yok". Bu da tekrar denemekle değişmez.
+  · Yalnız üçüncüsü (taşıma/500) gerçekten tekrar denenebilir.
+
+YAPILAN DÜZELTME — `8adc3b9`, tek dosya (`src/components/AjanPenceresi.tsx`)
+- Her sonuç kendi cümlesiyle söyleniyor. 2xx dışında `supabase.functions.invoke` `data`
+  vermediği için sunucunun gerekçesi `error.context` gövdesinden okunuyor.
+- Başarısız yolda da `yukle()` çağrılıyor → kapanmış soru kartı listeden düşüyor.
+- Yeni `any` EKLENMEDİ; mevcut iki `(data as any)` kullanımı da tipli hale getirildi
+  (lint temel çizgisi 2369 → 2367 hata).
+
+DOĞRULAMA
+- `npx tsc --noEmit -p tsconfig.app.json` → çıktı yok, hatasız.
+- `npm run build` → `✓ built in 23.56s`, hata yok.
+- `npm run test` → `Test Files 6 passed (6) · Tests 27 passed (27)`.
+- `npm run lint` → 2367 hata; değişiklikten ÖNCEKİ temel çizgi 2369 (stash ile ölçüldü).
+- **CANLI KANIT:** `https://medipact-ai.lovable.app/assets/index-xiuwp065.js` indirildi
+  (3.412.310 bayt). Yeni cümle "Bu soru zaten kapanmış" pakette VAR (1 kez); gerçek
+  taşıma hatası için duran "Cevabınızı şu an kaydedemedim" de yerinde (1 kez).
+  Publish öncesi paket `index-BGMo6Dt-.js` idi ve yeni cümleyi İÇERMİYORDU (0 kez) —
+  yani fark yayının kendisinden geliyor, önbellekten değil.
+
+### CANLIDA TEST EDİLEMEDİ — bilirkişi "Yeniden öner" (kusur bulundu, iş kuyrukta)
+Devir notundaki üç test maddesinden ikisi (yeni aday çıkıyor mu · aday yoksa
+"Bu alanda kayıtlı başka uzman yok" geliyor mu) **yürütülemedi**, çünkü canlıda
+tıklanacak bir bilirkişi bildirimi YOK. Sebep uydurma değil, ölçülmüş:
+- `select count(*) from experts where active` → **6** (uzman kaydı var)
+- `select count(*) from bilirkisi_onerileri` → **0** (hiç aday üretilmemiş)
+- `ajan_gorevleri` içinde `[bilirkisi:` işaretli TEK satır yok.
+- Buna karşılık bekleyen bir akış hatası var:
+  `[akis:948ddbca-…:bilirkisi_durum__ilerlet] Bu konuda size yazabileceğim bir şey bulamadım.`
+  (dosya `eb70595a-…`, 20.08.2026 17:48)
+SONUÇ: bilirkişi akışı canlıda hiç aday üretmemiş; "Yeniden öner"in üstünde duracağı
+bildirim de bu yüzden hiç doğmamış. Önce o adım onarılmalı, test ondan sonra anlamlı.
+`ded25b4`'ün ön yüz tarafı (Yeniden öner ↔ ikinci tur bağı, ayrı reddetme düğmesi,
+panelde tek ad) KOD OLARAK yerinde ve yayında; canlı davranış kanıtı yok.
+
+### KUYRUĞA EKLENDİ — canlı veride görülen üç akış hatası
+- [ ] P1 · `bilirkisi_durum__ilerlet` canlıda boş dönüyor · Kabul: bir dosyada bilirkişi
+      adımı çalıştığında `bilirkisi_onerileri`ne satır yazılıyor VEYA `[bilirkisi:aday-yok:…]`
+      bildirimi doğuyor; `akis_hatasi` satırı doğmuyor.
+- [ ] P1 · `hazirlik-foyu` iç çağrısı eksik parametreyle gidiyor · Kanıt:
+      `oturum_planlandi__foy_hazirla` → `HTTP 400 {"error":"case_id, session_id ve party_id gerekli"}`
+      · Kabul: adım hatasız tamamlanıyor, `akis_hatasi` doğmuyor.
+- [ ] P2 · `hazirlik-foyu-gonder` iç çağrısı 401 alıyor (kapı/anahtar kontrolü) · Kanıt:
+      `foy_onaylandi__gonder` → `HTTP 401 {"error":"Oturum doğrulanamadı"}` · Kabul: iç çağrı
+      yetkilendirmesi geçiyor, adım tamamlanıyor.
+
+### HUMAN GATE — 23.08.2026 · gizli dosya deposa girmiş (P0, kurucu kararı bekliyor)
+DEĞİŞMEDİ, hâlâ açık. Ayrıntı ve seçenekler bir önceki blokta duruyor (aşağıda).
+Bu turda dosyaya ve `.gitignore`'a DOKUNULMADI.
+
+---
+## Nerede kaldık
+
 - Tarih: 23.08.2026
 - Aşama: DAOS düzenine geçiş · başlangıç paketi (MEDIPACT-BASLANGIC.md §B) yürütülüyor
 - Aktif görev: B bölümü kontrol listesi
