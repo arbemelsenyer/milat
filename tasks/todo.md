@@ -5,7 +5,10 @@
 - Aktif görev: yok
 - Son tamamlanan iş: aşama geçişi sunucuya iz bırakıyor (`c048030`) + `girdiTamamla` eksik alan denetimi (`124e6cb`)
 - Doğrulama sonucu: `npm run test` 58/58 · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
-- Açık blokaj: **P0 · oturum hatırlatma cron'u 401** — Cowork paketi aşağıdaki blokta, DEĞİŞMEDİ
+- Açık blokaj: **P0 · üç cron kusuru** — tek Cowork paketi aşağıdaki blokta.
+  (1) jobid 1 `send-session-reminders` 401 SÜRÜYOR · (2) jobid 2
+  `dual-ai-validate` YENİ: hiç yetki başlığı yok, kesin 401 · (3) jobid 7
+  `ajan-nobetci` her çağrıda 5000 ms zaman aşımı — iş koşuyor ama denetim kanalı kör.
 - Sıradaki uygulanabilir iş: Cowork cron cevabı → gelmezse kuyruktaki bağımsız P1/P2
 
 ### BU TURDA CANLIYA ÇIKANLAR
@@ -56,6 +59,76 @@ DEĞİŞMEDİ, düğme onda yalnız ekranı taşır. Sol menüdeki gezinme (`got
 DEĞİŞMEDİ: bakmak için aşamaya geçmek dosyayı ilerletmez. Yeni bir yetki
 icat edilmedi; RLS zaten bu ölçütü taşıyor (yönetici · görevli arabulucu · dosya
 sahibi) — `akis-onayla` düzeltmesiyle aynı ölçüt.
+
+### P0/P1 — CRON DENETİMİ 24.08: ÜÇ KUSUR, TEK COWORK PAKETİ (canlı, kanıtlı)
+
+`cron.job` yapısı ve `net._http_response` son 7 saati okundu. **Sır hiçbir yere
+yazılmadı** — komut yalnız yapısal olarak sorgulandı (`command like '%…%'`).
+
+SAATLİK DAĞILIM (`net._http_response`, 23.08 17:00–23:15 UTC):
+| saat | toplam | yanıt gelen | 200 | 401 | zaman aşımı |
+|---|---|---|---|---|---|
+| 23:00 | 7 | 0 | 0 | 0 | **7** |
+| 22:00 | 21 | 1 | 0 | **1** | **20** |
+| 21:00 | 23 | 3 | 2 | **1** | **20** |
+| 20:00 | 21 | 1 | 0 | **1** | **20** |
+| 19:00 | 21 | 0 | 0 | 0 | **21** |
+| 18:00 | 21 | 1 | 0 | **1** | **20** |
+Saatte ~20 zaman aşımı = 3 dakikalık nöbetçi. Saatte 1 gerçek durum kodu =
+saatlik hatırlatma cron'u ve o **hâlâ 401**. 21:00'daki iki 200 elle çağrıdır.
+
+**(1) P0 · jobid 1 `send-session-reminders-hourly` — 401 SÜRÜYOR, DÜZELMEDİ.**
+Yapısal kanıt: komutta `Authorization` VAR, `x-cron-secret` **YOK**. Bir önceki
+oturumun teşhisi birebir doğrulandı; Cowork düzeltmesi henüz uygulanmamış.
+
+**(2) P0 · jobid 2 `dual-ai-validate-nightly` — YENİ BULGU, aynı sınıf hata.**
+Komutta **ne `Authorization` ne `x-cron-secret` var**. Fonksiyonun kapısı
+(`dual-ai-validate/index.ts:42-63`) iki yoldan yetki arıyor: cron sırrı ya da
+YÖNETİCİ kullanıcı. İkisi de gelmediği için çağrı **kesin 401** alır. Gecelik
+02:00 işi olduğu için yanıt tablosunun 7 saatlik penceresinde görünmüyor, ama
+kusur yapısal ve kesindir: bu doğrulama işi hiç koşmamıştır.
+
+**(3) P1 · jobid 7 `ajan-nobetci-5dk` (`*/3 * * * *`) — DENETİM KANALI KÖR.**
+Yetki doğru (`x-cron-secret` var), ama komutta `timeout_milliseconds` YOK →
+pg_net varsayılanı **5000 ms** ve çağrıların **%100'ü** bu sınırda düşüyor
+(`error_msg: "Timeout of 5000 ms reached … HTTP Request/Response time: ~4,8 s"`).
+İŞ DURMUYOR — bu ölçüldü: `akis_olaylari`da işlenmemiş olay **0**, en yeni olay
+23.08 22:35 işlenmiş (zaman aşımı penceresinin içinde). Yani istek gidiyor,
+fonksiyon koşuyor; yalnız **yanıt kaydedilmiyor**.
+NEDEN ÖNEMLİ: 24.08 dersi "`cron.job_run_details` 'succeeded' hiçbir şey
+kanıtlamaz, tek gerçek `net._http_response`" diyordu. Bu iş için o tek gerçek
+kanal da körelmiş durumda — gerçek bir 500 ya da 401 zaman aşımından
+ayırt edilemez. Sessiz arıza riski.
+(`ajan_kosum_izi` son yazım 19.08 11:48 — bu bir arıza kanıtı DEĞİL: o tablo
+yalnız bir kol koştuğunda/atlandığında yazılır, yeni dosya işi yoksa sessizdir.)
+
+#### COWORK PAKETİ — üç cron işi tek turda düzeltilsin
+1. **Ne yapılacak:**
+   (a) jobid 1 (`send-session-reminders-hourly`) komutundaki `headers` nesnesine
+       `x-cron-secret` eklensin. Değer **jobid 3 ya da jobid 7'nin komutunda
+       zaten yazılı olan değerin aynısıdır** — oradan kopyalanır, hiçbir yere
+       ayrıca yazılmaz.
+   (b) jobid 2 (`dual-ai-validate-nightly`) komutuna aynı `x-cron-secret`
+       başlığı eklensin (şu an hiç yetki başlığı yok).
+   (c) jobid 7 (`ajan-nobetci-5dk`) `net.http_post` çağrısına
+       `timeout_milliseconds := 30000` eklensin.
+   Üçü de `cron.schedule('<işin adı>', '<mevcut zamanlama>', $$ … $$)` ile
+   yeniden tanımlanır. URL, gövde ve zamanlama DEĞİŞMEZ.
+2. **Neden gerekli:** (a) oturum hatırlatmaları hiç gitmiyor — taraflar 24 saat
+   kala hatırlatma almıyor. (b) gecelik çift-yapay-zekâ doğrulaması hiç koşmuyor.
+   (c) ürünün ana koşucusunun sonucu hiçbir yerde görünmüyor; sessiz arıza riski.
+3. **Çalıştırılacak işlem:** yukarıdaki üç `cron.schedule` çağrısı.
+4. **Başarı kontrolü:** bir sonraki tam saatten sonra
+   `select jobid, status_code, error_msg, created from net._http_response order by created desc limit 10;`
+   → saatlik satır **200** olmalı (401 değil); 3 dakikalık satırlarda
+   `status_code` **dolu** olmalı (Timeout değil). jobid 2 için ertesi gün 02:00.
+5. **Sonuç gelince ben ne yapacağım:** 200 görülürse `case_sessions` üzerinden
+   hatırlatma gönderilen oturumu doğrulayıp maddeleri DONE yazacağım; 401 ya da
+   zaman aşımı sürerse ilgili fonksiyonun kapısını yeniden okuyup ikinci turu
+   koşacağım.
+
+> P1 · CRON SIRRI VERİTABANINDA AÇIK METİN maddesi DEĞİŞMEDİ, hâlâ açık
+> (aşağıdaki blokta). Bu paket sırrı yenilemez, yalnız mevcut değeri kullanır.
 
 ### KAPANDI — 24.08 · kuyruktaki üç akış hatası CANLIDA ZATEN ÇÖZÜLMÜŞ (kanıtla)
 Kuyruktaki üç madde 19–20.08 kanıtıyla yazılmıştı. Canlı kayıt sırayla okundu:
