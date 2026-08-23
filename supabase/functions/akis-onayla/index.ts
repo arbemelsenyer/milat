@@ -68,7 +68,13 @@ Deno.serve(async (req) => {
       const m = /\[talimat:([0-9a-f-]{6,})\]/i.exec(String((gorev as any).gerekce ?? ""));
       if (m) talimat_id = m[1];
     }
-    if (String((gorev as any).durum) !== "bekliyor") {
+    /* AÇIK ONAY İKİ DURUMDUR: 'bekliyor' ve 'onay_bekliyor'. İkincisi
+       "zorunlu insan noktası" olarak açılır (ajan-nobetci/index.ts:135,
+       bilirkisi-secim/index.ts:753·887·1025) — yani onaylanmayı BEKLEYEN
+       satırın ta kendisi. Eskiden bu satır reddediliyor ve üstüne
+       "zaten kapanmış" deniyordu; ne doğruydu ne de kapanmıştı. */
+    const durum = String((gorev as any).durum);
+    if (durum !== "bekliyor" && durum !== "onay_bekliyor") {
       return json({ onaylandi: false, sebep: "Bu onay zaten kapanmış." });
     }
 

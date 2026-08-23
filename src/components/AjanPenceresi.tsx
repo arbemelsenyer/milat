@@ -358,9 +358,16 @@ export function AjanPenceresi({
           .select("id, agent_type, party_id, status, updated_at")
           .eq("case_id", caseId).eq("tarafa_gorunur", true)
           .order("updated_at", { ascending: false }).limit(10),
+        /* AÇIK GÖREV İKİ DURUMDUR. 'onay_bekliyor' satırları ZORUNLU İNSAN
+           NOKTASIDIR (ajan-nobetci/index.ts:135) — yani tam da arabulucunun
+           yapması gereken iş. Sorgu yalnız 'bekliyor' okuduğu için
+           `bilirkisi-secim`in tıkanma · evrak_oner · dis_aday bildirimleri
+           sohbete HİÇ düşmüyordu; ekranda onları işleyen kod (gorevTikla →
+           'arabulucu_onayi') zaten vardı, satır hiç gelmiyordu.
+           Taraf dalı DEĞİŞMEDİ: 'onay_bekliyor' arabulucuya aittir. */
         supabase.from("ajan_gorevleri")
           .select("id, gorev_tipi, hedef_party_id, gerekce, durum, sonuc, created_at")
-          .eq("case_id", caseId).eq("durum", "bekliyor")
+          .eq("case_id", caseId).in("durum", ["bekliyor", "onay_bekliyor"])
           .order("created_at", { ascending: false }).limit(20),
         supabase.from("ajan_gorevleri")
           .select("id, gorev_tipi, hedef_party_id, gerekce, durum, sonuc, created_at")
@@ -779,7 +786,17 @@ export function AjanPenceresi({
       const { data, error } = await supabase.functions.invoke("akis-onayla", {
         body: { gorev_id: g.id },
       });
-      if (error || (data as any)?.error) throw new Error("olmadi");
+      const yanit = (data ?? {}) as { error?: string; onaylandi?: boolean; sebep?: string };
+      if (error || yanit.error) throw new Error("olmadi");
+      /* SUNUCU "ONAYLAMADIM" DİYEBİLİR ve bunu 200 ile döner (hata değil, karar).
+         Eskiden bu dal kontrol edilmiyordu: sunucu onayı reddetse bile ekranda
+         "Onayınızı aldım" yazıyordu. Ekran, olmayan bir işi olmuş göstermez. */
+      if (yanit.onaylandi === false) {
+        setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+          metin: yanit.sebep ?? "Bu onayı şimdi işleyemedim." }]);
+        await yukle();
+        return;
+      }
       setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
         metin: "Onayınızı aldım, adımı şimdi yapıyorum." }]);
       await yukle();
