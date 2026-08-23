@@ -112,6 +112,10 @@ const GOREV_BASLIGI: Record<string, string> = {
   arabulucu_sorusu: "Ajanın size bir sorusu var.",
   // 20.08 · bilirkişi seçim akışı: aday sunumu, hatırlatma, atama bilgisi.
   bilirkisi_secimi: "Bilirkişi seçimiyle ilgili bir adım var.",
+  // 24.08 · 'onay_bekliyor' satırları sohbete düşmeye başlayınca ortaya çıktı:
+  // bu tipin burada karşılığı yoktu, genel yedek cümleye düşüyordu. Ad,
+  // Ajan Kontrol Paneli'ndeki adla aynı olsun diye oradan alındı (tek ad kuralı).
+  elverislilik_isareti: "Elverişlilik bakımından bakılmayı bekleyen bir işaret var.",
 };
 
 /* Taraf sohbetinde YALNIZ bu tipler görünür; arabulucuya ait tipler sorguya
