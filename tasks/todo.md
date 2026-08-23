@@ -1,3 +1,38 @@
+## Nerede kaldık — 23.08.2026 (110) · 48 BAYAT MADDENİN DÖKÜMÜ ÇIKTI (kuyruk maddesi 5)
+
+Blok 105'teki "SIRADAKİ (Code kapsamı): 1 → 2 → 5 → 4" sırasında 1 ve 2 kapanmıştı;
+bu turda 5 yapıldı. Kod değişmedi, yalnız döküm çıkarıldı.
+
+YAPILDI
+- [x] YENİ DOSYA: tasks/durum-ayiklama.md (117 satır). todo.md'deki İŞARETSİZ her
+  madde için BİTTİ / YARIM / YOK + dosya referansı. Arama AD DEĞİL İŞLEV üzerinden
+  yapıldı (16.08 dersi): her madde için edge fonksiyon + tablo + ekran yüzeyi ayrı
+  grep'lendi.
+- [x] SAYI DÜZELTİLDİ: todo.md "41 açık madde" diyordu; işaretsiz madde sayısı
+  gerçekte 48. Döküm 48 maddeyi kapsıyor.
+- [x] SONUÇ: BİTTİ 26 · YARIM 13 · YOK 8 · canlı test bekleyen 1.
+  · YOK çıkanlar: A6 (PWA+SMS) · A9 (sessiz canlı kokpit) · A12 (erteleme tutanağı) ·
+    B20 (tıkanma çözücü) · C26 (vekil ekranı, kararla) · D28 (tanıtım ekranı) ·
+    İBA-1 (BATNA taraf yüzü) · İBA-6b (ses/döküm saklama ayrımı).
+  · En kritik YARIM'lar: A5/İBA-2 iletişim tercihi (ekran var, TÜKETEN YOK — 18.08
+    dersi hâlâ geçerli) · B18 kayıt protokolü (onay tablosu var, 48 saat kuralı ve
+    "onay yoksa kayıt açılmaz" kapısı create-video-room'da YOK) · İBA-6 görüşme kaydı
+    (yazıya dökme ve otomatik silme yok) · A2 kaynak künyesi (ürün genelinde zorunlu
+    değil).
+- [x] TODO.MD KUTULARINA DOKUNULMADI — işaretleme kurucunun kararı.
+
+EKSİK KALDI
+1. Kutular işaretlenmedi, yol haritasına sıra yazılmadı. Karar kurucunundur:
+   26 BİTTİ maddesinin kutusu işaretlensin mi, 8 YOK maddesi yol haritasına hangi
+   sırayla girsin, 13 YARIM maddesinin eksik parçası ayrı iş kalemi olsun mu.
+   GİDERMEK İÇİN: kurucu kararı, sonra Code (todo.md + yol-haritasi.md).
+2. DÖKÜM CANLIYA BAKMADI. "BİTTİ" burada KODUN VARLIĞIDIR, canlıda çalıştığının
+   kanıtı değildir. Veritabanı tarafı (tetikleyici, politika, cron) dökümün dışında.
+   GİDERMEK İÇİN: canlı doğrulama — kimde: Claude (SQL) + kurucu (ekran).
+3. Kuyrukta kalan Code maddesi: blok 105 · madde 4 — AŞAMA 7 SUNUCUYA İZ BIRAKMIYOR
+   (belge ve imza yazımı tamamen ön yüzde, ajan orada olan biteni göremiyor).
+   Bu iş kullanıcıya görünen akışı ve veri modelini değiştirir; ONAY BEKLİYOR,
+   kendiliğinden başlanmadı. Kimde: kurucu kararı, sonra Code.
 ## Nerede kaldık — 23.08.2026 (109) · ÜÇ KARAR UYGULANDI · "YENİDEN ÖNER" BAĞLANDI
 
 KURUCU KARARI (23.08): (a) sohbetteki "Yeniden öner" ikinci tur aday taramasına
