@@ -7,7 +7,39 @@ KURAL: Altyapı (cron, veritabanı ayarı, politika, gizli anahtar) kurmadan ÖN
 okunacak; ayrıca canlıda `SELECT jobid, jobname, schedule FROM cron.job;` ile
 doğrulanacak. Doğrulamadan kurulum yapılmayacak.
 
-## ZAMANLANMIŞ İŞLER (pg_cron) — 15.08.2026 doğrulandı
+## ZAMANLANMIŞ İŞLER (pg_cron) — 24.08.2026 CANLIDAN DOĞRULANDI
+
+Aşağıdaki 15.08 tablosu jobid 5/6 satırlarında BAYAT kalmıştı. Canlı durum (24.08):
+
+| jobid | fonksiyon | sıklık | durum (24.08) |
+|---|---|---|---|
+| 1 | `send-session-reminders` | `0 * * * *` | **ARIZALI — her saat HTTP 401** (aşağıda) |
+| 2 | `dual-ai-validate` | `0 2 * * *` | çalışıyor |
+| 3 | `deadline-reminder-cron` | `0 8 * * *` | çalışıyor (`x-cron-secret` gönderiyor) |
+| 4 | `notify_admins_new_tariff()` (SQL) | `0 9 1 12 *` | yıllık |
+| 7 | `ajan-nobetci` | `*/3 * * * *` | çalışıyor |
+| 9 | `check-new-tariff` | `0 9 1 12 *` | yıllık (eski jobid 5'in yerine) |
+| 10 | `check-new-tariff` | `0 9 5 1 *` | yıllık (eski jobid 6'nın yerine) |
+
+**CRON DOĞRULAMASI `job_run_details` İLE YAPILMAZ.** `net.http_post` isteği
+kuyruğa alır ve SQL başarıyla döner; `cron.job_run_details.status='succeeded'`
+fonksiyonun çalıştığını SÖYLEMEZ. Gerçek sonuç:
+
+```sql
+SELECT status_code, count(*), max(created)
+FROM net._http_response
+WHERE created > now() - interval '2 days'
+GROUP BY status_code;
+```
+
+jobid 1 bu sorguda saat başı **401** dönüyor: iş yalnız `Authorization` başlığı
+gönderiyor, fonksiyonun kabul ettiği `x-cron-secret` başlığını göndermiyor
+(`send-session-reminders/index.ts:136-159`). jobid 3 doğru kalıbı kullanıyor.
+Aynı kusur 15.08'de jobid 5/6'da yaşandı ve orada düzeltildi — jobid 1 atlanmış.
+
+---
+
+### 15.08.2026 tablosu (tarihsel kayıt, jobid 5/6 artık yok)
 
 | jobid | ad | sıklık | ne yapar |
 |---|---|---|---|
@@ -123,6 +155,70 @@ ile doğrulanır.
 - (daha önce kurulanlar buraya eklenecek: mediator_reads_offers,
   mediator_writes_discovery, mediator_updates_discovery, ajan_gorevleri politikaları,
   taraf_musaitlik RLS)
+
+## VERİTABANI TETİKLEYİCİLERİ — 24.08.2026 canlıdan çıkarıldı
+
+Bu tetikleyiciler **depodaki migration dosyalarında görünmüyor**; canlıda kurulular.
+Envantere girmedikleri için "yok sanıp ikinci kez kurma" riski taşıyorlardı.
+Kaynak: `pg_trigger` + `pg_class` sorgusu (24.08.2026). Kurmadan önce şununla doğrula:
+
+```sql
+SELECT c.relname AS tablo, t.tgname AS tetikleyici, p.proname AS fonksiyon
+FROM pg_trigger t
+JOIN pg_class c ON c.oid = t.tgrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+JOIN pg_proc p ON p.oid = t.tgfoid
+WHERE NOT t.tgisinternal AND n.nspname = 'public'
+ORDER BY c.relname, t.tgname;
+```
+
+### (a) AKIŞ OLAYI YAZAN 11 TETİKLEYİCİ — akış omurgasının görünmeyen yarısı
+`akis_olaylari` satırları iki yerden doğar: kod (`_shared/olay.ts` · `olayYaz`)
+**ve** aşağıdaki tetikleyiciler. Bir olay noktasını koda eklemeden önce buraya bak;
+aksi hâlde tek eylem iki olay doğurur (24.08'de `foy_gonderildi` tam olarak
+bu yüzden mükerrerdi).
+
+| tablo | tetikleyici | ne zaman | olay | tetikleyici fonksiyonu |
+|---|---|---|---|---|
+| `agreement_documents` | `trg_akis_anlasma_ins` | AFTER | INSERT | `akis_olay_yaz` |
+| `agreement_documents` | `trg_akis_anlasma_upd` | AFTER | UPDATE | `akis_olay_yaz` |
+| `ajan_gorevleri` | `trg_akis_gorev_cevap` | AFTER | UPDATE | `akis_olay_yaz_dongu` |
+| `case_documents` | `trg_akis_belge` | AFTER | INSERT | `akis_olay_yaz` |
+| `case_expert_assignments` | `trg_akis_bilirkisi_ins` | AFTER | INSERT | `akis_olay_yaz_bilirkisi` |
+| `case_expert_assignments` | `trg_akis_bilirkisi_upd` | AFTER | UPDATE | `akis_olay_yaz_bilirkisi` |
+| `case_notes` | `trg_akis_not` | AFTER | INSERT | `akis_olay_yaz` |
+| `case_sessions` | `trg_akis_oturum_ins` | AFTER | INSERT | `akis_olay_yaz` |
+| `case_sessions` | `trg_akis_oturum_upd` | AFTER | UPDATE | `akis_olay_yaz` |
+| `oturum_hazirlik_foyleri` | `trg_akis_foy` | AFTER | UPDATE | `akis_olay_yaz` |
+| `taraf_kalemleri` | `trg_akis_kalem` | AFTER | INSERT/UPDATE | `akis_olay_yaz_dongu` |
+
+`akis_olay_yaz()` hangi tablodan geldiğine bakıp olay kodunu kendisi seçer
+(`oturum_hazirlik_foyleri` → durum 'gonderildi' ise `foy_gonderildi`, 'onaylandi'
+ise `foy_onaylandi`; `case_sessions` INSERT → `oturum_planlandi`; vb.).
+**Durum DEĞİŞMEDİYSE olay yazmaz** (`NEW.durum IS DISTINCT FROM OLD.durum`).
+
+### (b) KURAL ZORLAYAN / İZ YAZAN 7 TETİKLEYİCİ
+| tablo | tetikleyici | ne zaman | olay | fonksiyon |
+|---|---|---|---|---|
+| `case_expert_assignments` | `trg_cea_party_update_guard` | BEFORE | UPDATE | `enforce_case_expert_assignment_party_update` |
+| `case_parties` | `trg_case_parties_self_update_guard` | BEFORE | UPDATE | `enforce_case_parties_self_update` |
+| `negotiation_rounds` | `trg_negotiation_rounds_party_update_guard` | BEFORE | UPDATE | `enforce_negotiation_rounds_party_update` |
+| `cases` | `trg_cases_set_closed_at` | BEFORE | UPDATE | `set_case_closed_at` |
+| `case_payments` | `trg_case_payments_updated_at` | BEFORE | UPDATE | `set_case_payments_updated_at` |
+| `teklif_braketleri` | `trg_braket_izi` | AFTER | INSERT/UPDATE | `braket_izi_yaz` |
+| `pending_pool` | `trg_notify_admins_new_mevzuat` | AFTER | INSERT | `notify_admins_new_mevzuat` |
+
+### (c) `updated_at` KALIBI — 25 tetikleyici, hepsi `update_updated_at_column`
+Tek işi `updated_at` alanını tazelemek. Yeni tablo açılınca aynı kalıp kurulur.
+Kurulu olduğu tablolar: `agent_states` · `agreement_documents` · `blind_bids` ·
+`case_discovery_questions` · `case_expert_assignments` · `case_fees` · `case_notes` ·
+`case_process_tracker` · `case_sessions` · `cases` · `common_ground_reports` ·
+`document_templates` · `experts` · `fee_tariffs` · `knowledge_base_jobs` ·
+`mediator_blocked_dates` · `mediator_requests` · `mediators` · `negotiation_rounds` ·
+`notification_preferences` · `party_analyses` · `pending_pool` · `profiles` ·
+`reschedule_requests` · `teklif_braketleri`.
+
+TOPLAM: 43 tetikleyici (11 akış olayı + 7 kural/iz + 25 `updated_at`).
 
 ## NASIL GÜNCELLENİR
 
