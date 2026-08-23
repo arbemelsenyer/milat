@@ -376,3 +376,31 @@ jobid 3 `x-cron-secret` gönderiyor ve çalışıyor; jobid 1 yalnız `Authoriza
 gönderiyor ve 401 alıyor. Doğru kalıp aynı veritabanında zaten vardı.
 DERS: bir uç nokta 401 veriyorsa, önce AYNI kapıdan geçen çalışan bir çağrıyı
 bul ve iki isteğin başlıklarını karşılaştır.
+
+## 24.08.2026 — Yeşil tezgâh kanıt değildir; düşen tezgâh kanıttır
+
+`kayit-protokolu-tek-kaynak.test.ts` ilk yazımda sabitin yeniden tanımlanmasını
+şu desenle arıyordu:
+
+```ts
+.not.toMatch(new RegExp(`const\s+${ad}\s*=`));   // ŞABLON DİZESİ İÇİNDE
+```
+
+Şablon dizesinde `\s` tanınmayan bir kaçıştır ve **sadece `s`**'ye indirgenir.
+Desen sessizce `consts+KAYIT_ONAY_SAATs*=` oluyor ve hiçbir zaman eşleşmiyor.
+Test yeşil yanıyordu ama denetlediği kusuru **kaçırıyordu**.
+
+NASIL YAKALANDI: kusur (ikizlenme) `git stash` ile geri getirilip koşuldu.
+Diğer üç test düştü, bu test GEÇTİ. Geçmemesi gerekiyordu — kusurun kendisi
+oradaydı. Fark buradan çıktı.
+
+KURAL: Bir tezgâh "geçti" demeden önce, **kusur geri getirildiğinde düştüğü
+görülmelidir.** Bu oturumda üç tezgâhın üçü de böyle sınandı:
+- `girdi-tamamla-eksik-alan.test.ts` → düzeltme geri alındı, 1 test düştü ✓
+- `ZORUNLU_GIRDI` bölümü → düzeltme geri alındı, 3 test düştü ✓
+- `kayit-protokolu-tek-kaynak.test.ts` → ikizlenme geri getirildi, 3 test düştü
+  ama 4. test geçti → **tezgâh kusuru bulundu**, düzeltildi, sonra 4/4 düştü ✓
+
+YAN KURAL: kaynak dosyada desen aramak için regex şart değil. Kesin dize
+(`includes`) hem okunur hem de kaçış tuzağı taşımaz. Regex ancak gerçekten
+gerekliyse kullanılır ve o zaman `String.raw` ya da düz dize tercih edilir.

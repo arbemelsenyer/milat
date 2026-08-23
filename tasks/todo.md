@@ -3,8 +3,8 @@
 - Tarih: 24.08.2026 (gece oturumu · 5. blok)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok
-- Son tamamlanan iş: `ZORUNLU_GIRDI` sözleşmesi tamamlandı (`618fb74`, 36 fonksiyon fan-out)
-- Doğrulama sonucu: `npm run test` **64/64** · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
+- Son tamamlanan iş: kayıt protokolü tek kaynağa alındı (`7032284`, publish)
+- Doğrulama sonucu: `npm run test` **70/70** · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
 - **KURUCUDAN TEK SOMUT KONTROL** (§11-B — benim yapamadığım tek şey): bir dosyada
   arabulucu hesabıyla "Aşama N+1'e Geç →" düğmesine bas, sayfayı yenile. Dosya yeni
   aşamada KALMALI (eskiden geri düşüyordu). Sunucu tarafını ben doğrularım:
@@ -22,6 +22,7 @@
 | P1 · `girdiTamamla` eksik alanı örtmüyor | `124e6cb` | **36 fonksiyon fan-out** — "hepsi başarılı, başarısız yok" |
 | P1 · aşama geçişi sunucuya iz bırakıyor | `c048030` | publish |
 | P1 · `ZORUNLU_GIRDI` sözleşmesi tamamlandı | `618fb74` | **36 fonksiyon fan-out** — "hepsi başarılı, başarısız yok" |
+| P2 · kayıt protokolü tek kaynak | `7032284` | publish |
 
 **CANLI KANIT (publish):** paket `index-B7Onz7o6.js` → **`index-DThEJGGi.js`**.
 Yeni pakette `"arabulucu elle ilerletti"` VAR (1 kez) ve `"iz yazılamadı"` VAR
@@ -65,6 +66,34 @@ DEĞİŞMEDİ, düğme onda yalnız ekranı taşır. Sol menüdeki gezinme (`got
 DEĞİŞMEDİ: bakmak için aşamaya geçmek dosyayı ilerletmez. Yeni bir yetki
 icat edilmedi; RLS zaten bu ölçütü taşıyor (yönetici · görevli arabulucu · dosya
 sahibi) — `akis-onayla` düzeltmesiyle aynı ölçüt.
+
+### KAPANDI — 24.08 · P2 · kayıt protokolü iki ekranda tek kaynaktan okunuyor (`7032284`, publish)
+Kuyruk maddesi "harici araç yasağı metni taraf ekranında YOK" diyordu. **Ölçüm
+bunu yalanladı:** metin `CaseRoom.tsx:1293`'te zaten vardı ve arabulucudakiyle
+**birebir aynıydı** (iki dize karşılaştırıldı, eşit). Maddenin öncülü bayattı.
+
+GERÇEK KUSUR İKİZLENMEYDİ: `KAYIT_ONAY_SAAT`, `KAYIT_ONAY_SURUMU` ve yasak
+cümlesi **iki dosyada ayrı ayrı** gömülüydü. O gün aynıydılar; biri değişince
+öteki sessizce eski kalırdı. En tehlikelisi **sürüm sapması**: taraf `"v1"`
+onayı verirken arabulucu `"v2"` yazsa, kayıtta hangi metne onay verildiği
+belirsizleşirdi — B18'in dayanağı çürürdü.
+CANLI KANIT: yayındaki eski pakette (`index-DThEJGGi.js`) yasak cümlesi
+**2 kez** geçiyordu; yani ikizlenme canlıda da vardı.
+DÜZELTME: `src/lib/kayitProtokolu.ts` açıldı, iki yüzey de oradan okuyor.
+`KAYIT_ONAY_METNI` yasak cümlesini ve süreyi tek kaynaktan interpole ediyor →
+sapma yapısal olarak imkânsız. Ekranda gösterilen "48 saat" metinleri de
+sabitten türetildi (sabit değişirse ekran yalan söylemesin).
+Tezgâh (`tests/kayit-protokolu-tek-kaynak.test.ts`, 6 durum) **kanıtlandı**:
+ikizlenme geri getirilip koşuldu → 4 test DÜŞTÜ; geri alınınca 6/6 geçti.
+
+> DERS — TEZGÂHIN KENDİSİ KUSURLU ÇIKTI. İlk yazımda sabitin yeniden
+> tanımlanmasını `new RegExp(\`const\s+${'{'}ad{'}'}\s*=\`)` ile arıyordum. Şablon
+> dizesinde `\s` bir kaçış olarak yeniyor; desen sessizce `consts+…` oluyor ve
+> **hiçbir zaman eşleşmiyor**. Tezgâh yeşil yanıyordu ama kusuru KAÇIRIYORDU.
+> Fark edilme yolu: ikizlenme geri getirilip koşulduğunda o testin de düşmesi
+> gerekirken geçmesi. Regex kaldırıldı, kesin dize aramasına çevrildi.
+> KURAL: bir tezgâh "geçti" demeden önce, kusur geri getirildiğinde DÜŞTÜĞÜ
+> görülmelidir. Yeşil tezgâh kanıt değildir; düşen tezgâh kanıttır.
 
 ### KAPANDI — 24.08 · P1 · `ZORUNLU_GIRDI` sözleşmesi eksikti (üç GİZLİ kusur, `618fb74`)
 `girdiTamamla` düzeltmesini yaparken sözleşmenin kendisi denetlendi: `MOTORA_BAGLI`
@@ -553,7 +582,7 @@ Sonuç değişmiyor: canlı şema, kararı (a) birebir karşılıyor.
   commit'i fast-forward ile aldı. Kod değişikliği yok, yalnız üretilen tip dosyası.
 
 ### AÇIK — B18'in kalan iki parçası (bu karardan bağımsız)
-- [ ] P2 · Harici araç yasağı metni iki ekranda da yazılı olmalı (taraf + arabulucu).
+- [x] P2 · Harici araç yasağı metni iki ekranda da yazılı olmalı (taraf + arabulucu) · DONE 24.08.2026 · Metin zaten iki ekrandaydı; gerçek kusur ikizlenmeydi, `src/lib/kayitProtokolu.ts` ile tekleştirildi (`7032284`, 70/70 test).
       Arabulucu tarafında `KAYIT_TEK_KAPI_UYARISI` var; taraf ekranında yok.
 - [ ] P2 · Silme kuralı: ses süreç bitiminden 24 saat sonra, döküm süreç sonunda;
       nöbetçi turunda otomatik, satıra silme zamanı + notu yazılarak.
@@ -655,7 +684,7 @@ Cowork'tedir** (§10). (c) bugün kod istemez ama B18 açık kalır.
 Bu karar gelene kadar `create-video-room` DEĞİŞTİRİLMEDİ.
 
 B18'in kalan iki parçası bu karardan BAĞIMSIZ ve ayrı iş kalemidir:
-- [ ] P2 · Harici araç yasağı metni iki ekranda da yazılı olmalı (taraf + arabulucu)
+- [x] P2 · Harici araç yasağı metni iki ekranda da yazılı olmalı — DONE 24.08.2026, bkz. `7032284`
 - [ ] P2 · Silme kuralı: ses süreç bitiminden 24 saat sonra, döküm süreç sonunda;
       nöbetçi turunda otomatik, satıra silme zamanı + notu yazılarak
 
