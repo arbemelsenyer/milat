@@ -1,5 +1,91 @@
 ## Nerede kaldık
 
+- Tarih: 24.08.2026 (gece oturumu · 5. blok)
+- Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
+- Aktif görev: yok
+- Son tamamlanan iş: aşama geçişi sunucuya iz bırakıyor (`c048030`) + `girdiTamamla` eksik alan denetimi (`124e6cb`)
+- Doğrulama sonucu: `npm run test` 58/58 · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
+- Açık blokaj: **P0 · oturum hatırlatma cron'u 401** — Cowork paketi aşağıdaki blokta, DEĞİŞMEDİ
+- Sıradaki uygulanabilir iş: Cowork cron cevabı → gelmezse kuyruktaki bağımsız P1/P2
+
+### BU TURDA CANLIYA ÇIKANLAR
+| iş | commit | deploy |
+|---|---|---|
+| P1 · `girdiTamamla` eksik alanı örtmüyor | `124e6cb` | **36 fonksiyon fan-out** — "hepsi başarılı, başarısız yok" |
+| P1 · aşama geçişi sunucuya iz bırakıyor | `c048030` | publish |
+
+**CANLI KANIT (publish):** paket `index-B7Onz7o6.js` → **`index-DThEJGGi.js`**.
+Yeni pakette `"arabulucu elle ilerletti"` VAR (1 kez) ve `"iz yazılamadı"` VAR
+(1 kez); publish öncesi pakette ikisi de 0 idi. Fark yayının kendisinden geliyor.
+
+### KAPANDI — 24.08 · P1 · `girdiTamamla` taraf fan-out'u eksik alanı örtüyordu (`124e6cb`)
+KÖK NEDEN: `girdiTamamla` `party_id`yi dosyanın taraflarından tamamlarken
+**erken dönüyor** ve sondaki "zorunlu alan hâlâ eksik mi" denetimini atlıyordu.
+Oturum bulunamadığı hâlde iş kuruluyor, koşucu adımı eksik gövdeyle çağırıyor,
+adım 400 dönüyordu.
+- Düzeltme: fan-out öncesi `party_id` dışındaki zorunlu alanlar denetleniyor;
+  biri eksikse iş kurulmuyor, eksik olarak dönüyor. Eksik alan UYDURULMUYOR.
+- `tests/girdi-tamamla-eksik-alan.test.ts` (3 durum). **Tezgâh kanıtlandı:**
+  düzeltme geçici geri alınıp koşuldu → 1 test DÜŞTÜ (2 gövde kuruldu — canlıdaki
+  400'ün tam sebebi); geri alınınca 3/3 geçti.
+- FAN-OUT: `_shared/anlatim.ts` değişti → 36 fonksiyonun tamamı deploy edildi.
+
+### KAPANDI — 24.08 · P1 · aşama geçişi sunucuya iz bırakıyor (`c048030`, publish)
+Devir notundaki "Aşama 7'nin sunucuya iz bırakması" maddesi budur.
+KÖK NEDEN: "Aşama N+1'e Geç →" düğmesi (`NextPhaseButton`) `onAdvance` üzerinden
+YALNIZ adres çubuğundaki `phase` parametresini değiştiriyordu; `bumpPhase`
+çağrılmıyordu, yani `cases.current_phase` GÜNCELLENMİYORDU. Düğmenin kendi
+açıklaması "manuel geçiş kapısı" diyor — etiket ile işlev çelişiyordu (§7-B.2
+gereği bu bir kusurdur, ürün kararı değildir).
+Dört sonucu vardı:
+- dosya sunucuda eski aşamada kalıyordu (Dashboard ve kokpit bayat);
+- koşucunun aşama değerlendirmesi (`akis-yurut` → `asamaIlerlet`) bayat numaradan
+  koşuyordu;
+- `asamaIlerlet`'in **"arabulucu elle geri aldıysa ajan aynı geçişi tekrar
+  denemez"** güvencesi BOŞTU: elle geçiş iz bırakmadığı için `[gecis:X->Y]`
+  satırı hiç doğmuyor, dedupe hep boş küme üzerinde çalışıyordu;
+- Aşama 7 (Belgeler & Kapanış) sunucuda hiç görünmüyordu.
+CANLI KANIT: `asama_gecisi` satırlarının TAMAMI ajan yazımı; elle geçişten
+doğmuş tek satır yok. Faz 7'deki 6 dosyanın geçiş izi 0 — hepsi 14.08 tohum
+partisi (`otomatik_akis=false`, aynı `updated_at`), gerçek elle geçiş değil.
+DÜZELTME: `bumpPhase` geçişi yazar **ve** koşucununkiyle AYNI etiketli
+`[gecis:X->Y]` iz satırını `ajan_gorevleri`ne düşürür (`sonuc: "arabulucu
+ilerletti"`). Böylece dedupe gerçekten çalışır. İz yazılamazsa sessiz düşmez.
+KAPSAM SINIRI (bilerek): **kapı arabulucunundur** — taraf için davranış
+DEĞİŞMEDİ, düğme onda yalnız ekranı taşır. Sol menüdeki gezinme (`gotoPhase`) da
+DEĞİŞMEDİ: bakmak için aşamaya geçmek dosyayı ilerletmez. Yeni bir yetki
+icat edilmedi; RLS zaten bu ölçütü taşıyor (yönetici · görevli arabulucu · dosya
+sahibi) — `akis-onayla` düzeltmesiyle aynı ölçüt.
+
+### KAPANDI — 24.08 · kuyruktaki üç akış hatası CANLIDA ZATEN ÇÖZÜLMÜŞ (kanıtla)
+Kuyruktaki üç madde 19–20.08 kanıtıyla yazılmıştı. Canlı kayıt sırayla okundu:
+`ajan_gorevleri` tablosunda **toplam 5 `akis_hatasi` satırı var, en yenisi
+20.08 17:48**; buna karşılık **43 `akis_kosuldu`, en yenisi 23.08 21:57**.
+- P1 · `hazirlik-foyu` 400 → hata 19.08 08:27; **aynı gün 11:48'de
+  `[akis:65a31953…:oturum_planlandi__foy_hazirla] hazirlik-foyu çalıştırıldı
+  (2 taraf)`** yazılmış. Kapandı. (Altındaki yapısal kusur ayrıca giderildi —
+  yukarıdaki `girdiTamamla` maddesi.)
+- P2 · `hazirlik-foyu-gonder` 401 → hata 20.08 00:48; **20.08 01:33'te
+  `hazirlik-foyu-gonder çalıştırıldı`** yazılmış. Kapandı. Not: kuralın kendisi
+  (`foy_onaylandi__gonder`) canlıda `etkin=false` — çift gönderim yolu kapalı.
+- P1 · `bilirkisi_durum__ilerlet` boş dönüyor → tek hata 20.08 17:48, olayın
+  verisi `aday_sayisi:0, alan_sayisi:0` idi. **Aynı kural 20.08 17:45 ve 21.08
+  02:00'de başarıyla koşmuş**; `bilirkisi_onerileri` bugün **2 satır** taşıyor
+  (son 23.08 21:55), `bilirkisi_onerildi` olayı 4 kez doğmuş. Kabul kriteri
+  ("`bilirkisi_onerileri`ne satır yazılıyor … `akis_hatasi` doğmuyor") SAĞLANDI.
+- Ayrıca: 20.08'deki "Bu konuda size yazabileceğim bir şey bulamadım." metni
+  hatanın kendisi değil, o tarihte sınır katmanının hata metnini tümüyle elemesi
+  yüzünden kalan artıktır; `akis-yurut/hata-metni.ts` ile zaten giderilmişti.
+- Bu üç madde kuyrukta artık AÇIK DEĞİLDİR; bayat kanıtla yazılmışlardı.
+
+### KRİTİK KARAR — 24.08
+- Aşama geçiş kapısı **arabulucunundur**; taraf yüzeyinde düğme yalnız gezinir.
+  Gerekçe: düğmenin kendi açıklaması ve RLS ölçütü zaten bunu söylüyor; yeni
+  davranış icat edilmedi, mevcut çelişki giderildi.
+
+---
+## Nerede kaldık
+
 - Tarih: 24.08.2026 (gece oturumu · KAPANIŞ — bağlam şişti, `medipact dur` kapanışı kendiliğinden yapıldı)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok — yarım iş yok, commit edilmemiş kendi değişikliğim yok
@@ -625,13 +711,13 @@ bildirim de bu yüzden hiç doğmamış. Önce o adım onarılmalı, test ondan 
 panelde tek ad) KOD OLARAK yerinde ve yayında; canlı davranış kanıtı yok.
 
 ### KUYRUĞA EKLENDİ — canlı veride görülen üç akış hatası
-- [ ] P1 · `bilirkisi_durum__ilerlet` canlıda boş dönüyor · Kabul: bir dosyada bilirkişi
+- [x] P1 · `bilirkisi_durum__ilerlet` canlıda boş dönüyor · DONE 24.08.2026 · Doğrulama: canlı `bilirkisi_onerileri` 2 satır (son 23.08 21:55), kural 20.08 17:45 ve 21.08 02:00'de `akis_kosuldu` yazmış, 20.08 17:48'den sonra `akis_hatasi` yok · Kabul: bir dosyada bilirkişi
       adımı çalıştığında `bilirkisi_onerileri`ne satır yazılıyor VEYA `[bilirkisi:aday-yok:…]`
       bildirimi doğuyor; `akis_hatasi` satırı doğmuyor.
-- [ ] P1 · `hazirlik-foyu` iç çağrısı eksik parametreyle gidiyor · Kanıt:
+- [x] P1 · `hazirlik-foyu` iç çağrısı eksik parametreyle gidiyor · DONE 24.08.2026 · Doğrulama: canlı `[akis:65a31953…] hazirlik-foyu çalıştırıldı (2 taraf)` 19.08 11:48; yapısal kök neden `124e6cb` ile giderildi (58/58 test) · Kanıt:
       `oturum_planlandi__foy_hazirla` → `HTTP 400 {"error":"case_id, session_id ve party_id gerekli"}`
       · Kabul: adım hatasız tamamlanıyor, `akis_hatasi` doğmuyor.
-- [ ] P2 · `hazirlik-foyu-gonder` iç çağrısı 401 alıyor (kapı/anahtar kontrolü) · Kanıt:
+- [x] P2 · `hazirlik-foyu-gonder` iç çağrısı 401 alıyor (kapı/anahtar kontrolü) · DONE 24.08.2026 · Doğrulama: canlı `hazirlik-foyu-gonder çalıştırıldı` 20.08 01:33; kural `foy_onaylandi__gonder` zaten `etkin=false` · Kanıt:
       `foy_onaylandi__gonder` → `HTTP 401 {"error":"Oturum doğrulanamadı"}` · Kabul: iç çağrı
       yetkilendirmesi geçiyor, adım tamamlanıyor.
 
