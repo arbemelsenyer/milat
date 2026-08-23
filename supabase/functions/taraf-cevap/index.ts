@@ -14,7 +14,8 @@
 // yüzeyleriyle aynı gerekçe).
 //
 // KÖR VERİ (constitution m.1): cevap yazan kişi ya sorunun hedefi olan TARAFTIR
-// ya da dosyanın görevli arabulucusudur. Başkasının sorusuna cevap yazılamaz;
+// ya da dosyanın arabulucusudur (görevli arabulucu / dosya sahibi / yönetici —
+// bilirkisi-secim ile AYNI üç ölçüt). Başkasının sorusuna cevap yazılamaz;
 // yetki kontrolü sunucuda yapılır, ekrandan gelen bilgiye güvenilmez.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { ajanaTalimatMi } from "../_shared/anlatim.ts";
@@ -71,10 +72,22 @@ Deno.serve(async (req) => {
         && String((taraf as any).user_id ?? "") === userId
         && String((taraf as any).case_id) === String((gorev as any).case_id);
     }
+    /* ARABULUCU KİMLİĞİ TEK ÖLÇÜTLE (23.08 kurucu kararı): bilirkisi-secim
+       (index.ts:161-166) arabulucuyu ÜÇ yoldan tanıyor; burası yalnız
+       assigned_mediator_id'ye bakıyordu ve o alan her dosyada dolu olmadığı için
+       (13.08 dersi) arabulucu kendi dosyasında 403 alıp ekranda "Cevabınızı şu an
+       kaydedemedim" görüyordu. Ölçüt GENİŞLETİLMEDİ, ürünün geri kalanıyla
+       EŞİTLENDİ: yönetici · görevli arabulucu · dosya sahibi. RLS'e dokunulmadı;
+       taraf yolu (yukarısı) aynen duruyor. */
     if (!yetkili) {
       const { data: dosya } = await admin.from("cases")
-        .select("assigned_mediator_id").eq("id", (gorev as any).case_id).maybeSingle();
-      yetkili = String((dosya as any)?.assigned_mediator_id ?? "") === userId;
+        .select("assigned_mediator_id, user_id").eq("id", (gorev as any).case_id).maybeSingle();
+      yetkili = String((dosya as any)?.assigned_mediator_id ?? "") === userId
+        || String((dosya as any)?.user_id ?? "") === userId;
+      if (!yetkili) {
+        const { data: yonetici } = await admin.rpc("has_role", { _user_id: userId, _role: "admin" });
+        yetkili = !!yonetici;
+      }
     }
     if (!yetkili) return json({ error: "Bu soruya cevap yazma yetkiniz yok" }, 403);
 

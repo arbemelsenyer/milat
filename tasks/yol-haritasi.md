@@ -843,3 +843,16 @@ Aynı hatanın iki kardeşi (index.ts:989 `[alternatif:]`, index.ts:1756
 `[onay:ek_oturum:]`) KAPSAM DIŞI olduğu için düzeltilmedi, todo.md'ye yazıldı.
 REDEPLOY GEREKLİ: bilirkisi-secim · ajan-nobetci. _shared/anlatim.ts DEĞİŞMEDİ.
 PUBLISH: hayır. SQL: yok. Akış kuralı yeniden açılabilir (Claude).
+
+
+23.08.2026 — "YENİDEN ÖNER" BİLİRKİŞİ KOLUNA BAĞLANDI + AD BİRLİĞİ + YETKİ EŞİTLEMESİ.
+Sohbetteki "Yeniden öner" artık bilirkisi-secim `ikinci_tur` adımını çağırıyor
+(yalnız [bilirkisi:arabulucu-secsin|tikanma|aday-yok:<alan>] işaretli bildirimlerde);
+talimat reddi silinmedi, "Talimatı reddet" adıyla ayrı düğme oldu. Bilirkişi
+panelindeki "İkinci tur" düğmesinin adı "Yeniden öner" yapıldı (adım değişmedi).
+taraf-cevap arabulucuyu bilirkisi-secim ile aynı üç ölçütle tanıyor
+(yönetici · görevli arabulucu · dosya sahibi); RLS ve politika değişmedi.
+Değişen: src/components/AjanPenceresi.tsx · src/components/bilirkisi/BilirkisiAlanlari.tsx ·
+supabase/functions/taraf-cevap/index.ts.
+REDEPLOY GEREKLİ: taraf-cevap (yalnız o — _shared/anlatim.ts DEĞİŞMEDİ, fan-out yok).
+PUBLISH: evet (iki ön yüz dosyası). SQL: yok.

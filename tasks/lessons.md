@@ -310,3 +310,17 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   AYNI SQL'de değiştirilir; not ile alan ayrışırsa kural sessizce çalışmaya devam eder ve
   sessiz çalışan kural para ve mükerrer gönderim üretir. Denetim tek sorgudur: etkin=true
   olan hiçbir satırın gerekçesinde "KAPALI" geçmemeli.
+
+- DERS (23.08.2026) — AYNI DOSYAYA İKİ FONKSİYON İKİ FARKLI YETKİ ÖLÇÜTÜYLE BAKARSA
+  BİRİ SESSİZCE 403 DÖNER. bilirkisi-secim arabulucuyu üç yoldan tanıyor
+  (admin / assigned_mediator_id / cases.user_id — index.ts:161-166), taraf-cevap
+  yalnız assigned_mediator_id'den (index.ts:74-78). Aynı ekranda bir düğme
+  çalışıp öteki "kaydedemedim" diyor ve kusur koda değil veriye benziyor.
+  Kural: dosya yetkisi TEK ölçütle, ortak yardımcıdan sorulur; yeni bir kapı
+  yazarken mevcut kapıların ölçütü grep'lenip aynısı kullanılır.
+- DERS (23.08.2026) — AYNI İŞİ İKİ AD TAŞIYORSA KUSUR "ÇALIŞMIYOR" DİYE RAPOR EDİLİR.
+  Aday yenileme bilirkişi panelinde "İkinci tur", sohbette ise "Yeniden öner"
+  (ki o düğme talimat reddidir, bilirkişi koluna hiç bağlı değil). Kurucu
+  sohbetteki düğmeye basıp "yeni aday üretmiyor" dedi. Kural: bir yetenek iki
+  yüzeyde görünüyorsa adı da, bağlandığı adım da tek olur; ad birliği yapılmadan
+  "kusur" teşhisi konmadan önce düğmenin hangi fonksiyonu çağırdığı okunur.

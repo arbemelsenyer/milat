@@ -452,3 +452,11 @@ ekranlarına hiçbir iz düşmez (sorgular arabulucu dalında çalışır).
       listesi + kalem dökümü + süreç özeti) ve UYAP rehberi,
   (3) paket alındıktan sonra iki onaylı silme: uyarı ekranı + elle "SİL" yazımı.
   Mevcut kapanış düğmeleri ve kartı YERİNDE; bu kart onların üstüne eklendi.
+
+
+[EKLEME 23.08.2026 — TEK AD KURALININ İKİ YÜZEYE UYGULANMASI]
+● CANLI. Aynı işi yapan düğme metni üründe TEKtir: aday yenileme her yüzeyde
+"Yeniden öner"dir (sohbet penceresi + Bilirkişi paneli). Eski "İkinci tur" adı
+kaldırıldı, çağrılan adım değişmedi. Farklı işi yapan düğme kendi adını taşır:
+talimat reddi artık "Talimatı reddet". Kural: bir düğmenin adı, çağırdığı
+fonksiyonu tarif eder; iki ayrı iş aynı adı taşıyamaz.

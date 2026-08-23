@@ -204,6 +204,18 @@ function gerekceTemizle(v: string | null): string {
   return t.trim();
 }
 
+/* BİLİRKİŞİ ADAY BİLDİRİMİ (23.08): gerekçedeki "[bilirkisi:<ne>:<alan>]"
+   etiketinden uzmanlık ALANINI çıkarır. Yalnız aday masadayken geçerli olan üç
+   işaret sayılır; atama, erteleme, evrak ve davet satırlarında yeniden öneri
+   istenmez (o satırlarda üçüncü parça alan değildir). */
+const BILIRKISI_ADAY_ISARETLERI = ["arabulucu-secsin", "tikanma", "aday-yok"];
+
+function bilirkisiAlani(g?: GorevSatiri | null): string | null {
+  const m = /\[bilirkisi:([a-z-]+):([^\]]+)\]/.exec(String(g?.gerekce ?? ""));
+  if (!m || !BILIRKISI_ADAY_ISARETLERI.includes(m[1])) return null;
+  return m[2].trim() || null;
+}
+
 /* TEK ANA AJAN: bildirimin muhatabı her zaman ana ajandır; hangi KOLUN ürettiği
    yalnız kaynak etiketiyle gösterilir. Kolon henüz yoksa gerekçedeki
    "[kaynak:…]" etiketinden okunur. Yeni ekran/kart açılmadı. */
@@ -619,8 +631,11 @@ export function AjanPenceresi({
     await yukle();
   }
 
-  /* "Yeniden öner": talimat reddedilir. 21.08 kararı — gerekçe SORULMAZ; sohbet
-     anket ekranı değildir. red_sebebi kolonu YERİNDE DURUR, yalnız boş geçilir. */
+  /* "Talimatı reddet": verilen talimat reddedilir ve yeni talimat yazılabilir.
+     21.08 kararı — gerekçe SORULMAZ; sohbet anket ekranı değildir. red_sebebi
+     kolonu YERİNDE DURUR, yalnız boş geçilir.
+     23.08 kararı — bu işlev KALDIRILMADI, yalnız adı ayrıldı: "Yeniden öner"
+     artık bilirkişi aday taramasının adıdır (bkz. bilirkisiYenidenOner). */
   async function talimatReddet(g: GorevSatiri, sebep: string) {
     const m = /\[talimat:([0-9a-f-]{6,})\]/i.exec(String(g.gerekce ?? ""));
     if (m) {
@@ -630,12 +645,46 @@ export function AjanPenceresi({
       }).eq("id", m[1]);
     }
     await supabase.from("ajan_gorevleri")
-      .update({ durum: "atlandi", sonuc: "arabulucu yeniden öneri istedi" }).eq("id", g.id);
+      .update({ durum: "atlandi", sonuc: "arabulucu talimatı reddetti" }).eq("id", g.id);
     setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
-      metin: "Yeniden önereceğim. Yeni talimatınızı yazabilirsiniz." }]);
+      metin: "Talimatı reddettim. Yeni talimatınızı yazabilirsiniz." }]);
     setDuzeltmeAdimi("talimat");   // B5 — tek soru: neyi düzelttiniz?
     setTalimatKipi(true);
     await yukle();
+  }
+
+  /* "YENİDEN ÖNER" (23.08 kurucu kararı): bilirkişi aday bildiriminde bu düğme
+     ARTIK bilirkişi koluna bağlıdır — `ikinci_tur` adımını çağırır ve o alan
+     için yeni aday tarar. Tur sınırı, tükenme cümlesi ve erteleme kararı
+     SUNUCUDA verilir; burada yalnız sonuç yazılır. Ekran sekmesi değişmez,
+     hiçbir satır silinmez. */
+  async function bilirkisiYenidenOner(alan: string) {
+    if (bekliyor) return;
+    setBekliyor(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("bilirkisi-secim", {
+        body: { case_id: caseId, adim: "ikinci_tur", alan },
+      });
+      if (error || (data as any)?.error) throw new Error("taranamadi");
+      const d = data as any;
+      const cevapMetni = d?.ertelendi
+        ? String(d?.mesaj ?? "Bilirkişi seçilmedi — bu aşama ertelendi.")
+        : d?.bulunamadi
+          ? String(d?.sebep ?? "Bu alanda kayıtlı başka uzman yok.")
+          : `"${alan}" alanı için ${Number(d?.adaylar?.length ?? 0)} yeni aday çıkardım; `
+            + `Bilirkişi sekmesinde onayınıza sundum.`;
+      setYazisma((o) => [...o, {
+        id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan", metin: cevapMetni,
+      }]);
+      await yukle();
+    } catch {
+      setYazisma((o) => [...o, {
+        id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+        metin: "Yeni aday taramasını şu an yapamadım. Birazdan tekrar deneyin.",
+      }]);
+    } finally {
+      setBekliyor(false);
+    }
   }
 
   /* ÖNERİYİ UYGULA: 'talimat' ise mevcut talimat düzenine satır yazılır,
@@ -1011,6 +1060,9 @@ export function AjanPenceresi({
             if (m.tip === "bildirim") {
               const onayMi = m.gorev?.gorev_tipi === "arabulucu_onayi"
                 || m.gorev?.gorev_tipi === "akis_onay_bekliyor";
+              /* 23.08: bildirim bir bilirkişi aday satırıysa "Yeniden öner"
+                 bilirkişi koluna gider; değilse eski talimat reddi kalır. */
+              const bilAlan = bilirkisiAlani(m.gorev);
               return (
                 <div key={m.id} className="rounded-lg border px-2.5 py-1.5">
                   <button type="button" onClick={() => gorevTikla(m.gorev)} className="w-full text-left">
@@ -1026,14 +1078,24 @@ export function AjanPenceresi({
                       {!onayMi && <ArrowRight className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />}
                     </div>
                   </button>
-                  {onayMi && !tarafModu && (
+                  {(onayMi || bilAlan) && !tarafModu && (
                     <div className="flex items-center gap-1.5 mt-1.5">
-                      <Button size="sm" className="h-6 px-2 text-[11px]"
-                        onClick={() => m.gorev && onayVer(m.gorev)}>Onayla</Button>
-                      <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]"
-                        onClick={() => m.gorev && talimatReddet(m.gorev, "")}>
-                        Yeniden öner
-                      </Button>
+                      {onayMi && (
+                        <Button size="sm" className="h-6 px-2 text-[11px]"
+                          onClick={() => m.gorev && onayVer(m.gorev)}>Onayla</Button>
+                      )}
+                      {bilAlan ? (
+                        <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]"
+                          disabled={bekliyor}
+                          onClick={() => bilirkisiYenidenOner(bilAlan)}>
+                          Yeniden öner
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]"
+                          onClick={() => m.gorev && talimatReddet(m.gorev, "")}>
+                          Talimatı reddet
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>

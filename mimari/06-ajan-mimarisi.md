@@ -840,3 +840,27 @@ DEĞİŞMEZ SINIR
   bağlansalardı sessizce elenirlerdi.
 · SESSİZ ATLAMA YOK: olay yazılmadıysa sebebi dönüş gövdesinin "olay" alanında
   görünür.
+
+[EKLEME 23.08.2026 — "YENİDEN ÖNER" TEK ADA İNDİ VE BİLİRKİŞİ KOLUNA BAĞLANDI]
+● KOD CANLI KOLDA (redeploy + publish sonrası doğrulanacak).
+· KUSUR: sohbetteki "Yeniden öner" düğmesi TALİMAT REDDİNE bağlıydı
+  (AjanPenceresi.tsx talimatReddet); bilirkisi-secim'i hiç çağırmıyordu. Arabulucu
+  aday beklerken bu düğmeye bastı, hiçbir aday üretilmedi ve "Bu alanda kayıtlı
+  başka uzman yok" cümlesi de çıkmadı — çünkü aday tarama adımı hiç koşmadı.
+· BAĞ: bildirimin gerekçesinde "[bilirkisi:<ne>:<alan>]" işareti varsa (yalnız
+  arabulucu-secsin · tikanma · aday-yok) "Yeniden öner" artık bilirkisi-secim
+  `ikinci_tur` adımını o ALANLA çağırır. Tur sınırı, tükenme cümlesi ve erteleme
+  kararı SUNUCUDA verilir; ön yüz yalnız dönen cümleyi yazar.
+· AD BİRLİĞİ: aynı işi yapan metin üründe TEKtir. Bilirkişi panelindeki eski
+  "İkinci tur" düğmesinin adı da "Yeniden öner" oldu; çağırdığı adım (ikinci_tur)
+  DEĞİŞMEDİ.
+· TALİMAT REDDİ SİLİNMEDİ: kendi adıyla ayrı düğme olarak duruyor —
+  "Talimatı reddet". red_sebebi kolonu yerinde, boş geçiliyor.
+· YETKİ EŞİTLENDİ: taraf-cevap arabulucuyu artık bilirkisi-secim ile AYNI üç
+  ölçütle tanıyor (yönetici · görevli arabulucu · dosya sahibi). Ölçüt
+  genişletilmedi, ürünün geri kalanıyla eşitlendi; RLS'e dokunulmadı. Eskiden
+  yalnız assigned_mediator_id'ye bakılıyordu ve o alan boş olan dosyada arabulucu
+  kendi sorusuna cevap yazamayıp "Cevabınızı şu an kaydedemedim" görüyordu.
+· AÇIK KALEM: arabulucunun sohbet listesi yalnız durum='bekliyor' satırlarını
+  okuyor; 'onay_bekliyor' yazılan bildirimler (tikanma · evrak · dis-aday) o
+  listeye hiç girmiyor. Kapsam dışı, düzeltilmedi — todo.md'ye yazıldı.
