@@ -659,6 +659,15 @@ export async function girdiTamamla(
           .select("id").eq("case_id", caseId).limit(10);
         const liste = ((taraflar ?? []) as any[]).map((t) => String(t.id)).filter(Boolean);
         if (liste.length > 0) {
+          /* Taraf bulundu; ama BAŞKA bir zorunlu alan (ör. oturum) hâlâ eksikse
+             iş kurulmaz. Bu erken dönüş sondaki eksik denetimini atlıyordu ve
+             adım eksik gövdeyle çağrılıp 400 alıyordu (24.08 canlı kusuru:
+             oturum_planlandi__foy_hazirla → "case_id, session_id ve party_id
+             gerekli"). Eksik olan uydurulmaz; iş kurulmadan eksik döner. */
+          const tarafDisiEksik = gerekli.filter((a) => a !== "party_id" && !dolu(temel[a]));
+          if (tarafDisiEksik.length > 0) {
+            return { govdeler: [], tamamlanan, eksik: [...eksik, ...tarafDisiEksik] };
+          }
           return {
             govdeler: liste.map((pid) => ({ ...temel, party_id: pid })),
             tamamlanan: [...tamamlanan, `iş dosyadaki ${liste.length} taraf için ayrı ayrı kuruldu`],
