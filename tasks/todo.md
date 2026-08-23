@@ -1,5 +1,75 @@
 ## Nerede kaldık
 
+- Tarih: 23.08.2026 (akşam oturumu · 2. blok)
+- Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
+- Aktif görev: yok — `akis-yurut` redeploy'u bekleniyor, sonrası kuyruktan
+- Son tamamlanan iş: P1 · akış hatası artık hangi adımın neden çalışmadığını söylüyor (`d1d0d9f`)
+- Doğrulama sonucu: yeni tezgâh 7/7 · `npm run test` 34/34 · tsc hatasız · build hatasız · lint 2367 (değişmedi) · bekçi tezgâhı 54/54
+- Açık blokaj: HUMAN GATE — gizli dosya kararı (değişmedi, aşağıda)
+- Sıradaki uygulanabilir iş: P1 · `hazirlik-foyu` iç çağrısı eksik parametreyle gidiyor
+  (`oturum_planlandi__foy_hazirla` → HTTP 400 "case_id, session_id ve party_id gerekli")
+
+### YAPILDI — 23.08.2026 · P1 · Akış hatası metni (`d1d0d9f`)
+
+BELİRTİ (canlı, dosya `eb70595a`): panoda bekleyen akış hatası satırı
+`[akis:948ddbca-…:bilirkisi_durum__ilerlet] Bu konuda size yazabileceğim bir şey
+bulamadım.` Hangi adım, neden çalışmadı — hiçbiri yoktu.
+
+KÖK NEDEN: `akis-yurut` `hataYaz()` metnin TAMAMINI ortak sınır katmanından
+geçiriyordu. Sınırın `dayanaksizRakamMi` kuralı, içinde rakam olup
+"dosya/kayıt/belge" gibi bir dayanak kelimesi olmayan cümleyi eliyor.
+`<fonksiyon> çalıştırılamadı: HTTP 500: {…}` tam olarak bu tarife uyuyor; tek
+cümle olduğu için metnin tamamı elenip geriye "bulamadım" fallback'i kalıyordu.
+
+ZAMAN ÇİZGİSİ KANITI (bu iş neden acildi):
+- Ortak sınır katmanı `0026a01` ile **20.08.2026 09:04**'te devreye girdi.
+- Panodaki `hazirlik-foyu` hata satırları (19.08 08:27 · 20.08 00:36 · 00:48)
+  içeriğini KORUYOR — çünkü sınır katmanından ÖNCE yazıldılar.
+- `bilirkisi` satırı (20.08 17:48) sınırdan SONRA yazılan **tek** satır ve
+  içeriğini kaybeden **tek** satır.
+- Yani düzeltme olmadan BUNDAN SONRAKİ HER akış hatası panoda boş görünecekti.
+- Sonda ile ölçüldü (`npm run sonda`): dört HTTP teşhis metninin DÖRDÜ de
+  `dayanaksiz_rakam` olarak eleniyor; rakamsız iki metin geçiyor.
+
+ÇÖZÜM — sınır katmanı GEVŞETİLMEDİ, metin ikiye ayrıldı:
+- YENİ DOSYA `supabase/functions/akis-yurut/hata-metni.ts` (saf işlev).
+  · BAŞLIK koddan üretilir: kural tanımındaki fonksiyon adı + YALNIZ `\d{3}` ile
+    yakalanmış HTTP durum kodu. Taraf verisi taşıması yapısal olarak mümkün değil.
+  · SEBEP iç çağrının cevap gövdesidir, taraf verisi TAŞIYABİLİR: eskisi gibi
+    sınırdan geçer, geçemezse metne KONMAZ ve hangi türün elediği yazılır.
+- `akis-yurut/index.ts`: `hataYaz()` (başlık, sebep) alıyor; dört çağrı yeri
+  bu ayrıma geçirildi.
+- `_shared/**` DEĞİŞMEDİ → fan-out YOK. Yalnız `akis-yurut` redeploy edilir.
+- Ayrı dosya olmasının sebebi test edilebilirlik: `index.ts` `npm:` içe aktarımı
+  taşıdığı için tezgâhtan çağrılamıyor.
+
+DOĞRULAMA: `tests/akis-hata-metni.test.ts` 7/7 — kusurun kendisi · başlık
+korunuyor · elenen sebebin gövdesi SIZMIYOR · geçen sebep aynen kalıyor · üç
+haneli olmayan rakam başlığa girmiyor. `npm run test` 34/34, tsc hatasız,
+build hatasız, lint 2367 (değişmedi).
+
+### YAPILDI — 23.08.2026 · Geçici test dosyaları düzeni (`a462dc2`, kurucu talebi)
+- `tests/gecici/` açıldı: tek kullanımlık sonda dosyaları oraya yazılır,
+  **silinmez**, aynı ada üstüne yazılır. `/tmp` kullanılmaz.
+- `.gitignore`: klasör içeriği izlenmez, yalnız `tests/gecici/.gitkeep.md` izlenir.
+- `package.json`: `npm run test` klasörü `--exclude` ile dışarıda bırakır; yeni
+  `npm run sonda` yalnız o klasörü çalıştırır.
+  NOT: `vitest.config.ts`'e `exclude` YAZILMADI — config'teki exclude komut
+  satırından gevşetilemiyor ve o zaman sonda dosyası hiç çalıştırılamıyor (denendi).
+- Bekçi silme kuralı daraltıldı (`~/.claude/hooks/guard_secret_operands.py`):
+  yalnız `tests/gecici/` ALTINDAKİ yollar onaysız geçer. Geçmeyenler: klasörün
+  kendisi · `..` ile ağaçtan çıkan yol · operandlardan biri dışarıdaysa ·
+  operandsız silme · `find -delete` · `find -exec rm`.
+  BİLİNEN SINIR: ayrıştırıcı POSIX kipinde, ters bölülü yol istisnaya girmez ve
+  SORULUR (güvenli yön). Giriş noktasını PowerShell'e göre ayarlamak denendi,
+  otomatik kip sınıflandırıcısı engelledi; ölü kod bırakılmadı, sınır belgelendi.
+- Bekçi tezgâhı DEPOYA alındı: `tests/bekci/test_guard.py` (önceki kopya oturum
+  scratchpad'inde kaybolmuştu). 54/54 doğru — 6 yeni istisna, 9 yeni kaçak denemesi.
+- Kural `CLAUDE.md §22` olarak yazıldı.
+
+---
+## Nerede kaldık
+
 - Tarih: 23.08.2026 (akşam oturumu)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) işliyor
 - Aktif görev: yok — sıradaki iş seçildi (aşağıda)
