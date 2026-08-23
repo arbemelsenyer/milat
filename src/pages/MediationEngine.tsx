@@ -13033,21 +13033,46 @@ function Phase9Closing({ caseRow, reload }: { caseRow: CaseRow; reload: () => vo
     setStatus(caseRow.status);
     if (caseRow.status === "agreed" || caseRow.status === "failed") {
       (async () => {
-        const { data } = await supabase.from("cases").select("updated_at").eq("id", caseRow.id).maybeSingle();
-        setClosedAt((data as any)?.updated_at ?? null);
+        /* Kapanış tarihi `closed_at`ten okunur. Eskiden `updated_at` okunuyordu;
+           o alan sonraki her düzenlemede değiştiği için ekrandaki "kapanış
+           tarihi" zamanla kayıyordu — kusuru gizleyen bir yama idi. */
+        const { data } = await supabase.from("cases").select("closed_at").eq("id", caseRow.id).maybeSingle();
+        setClosedAt((data as any)?.closed_at ?? null);
       })();
     } else {
       setClosedAt(null);
     }
   }, [caseRow.id, caseRow.status]);
 
+  /* KAPANIŞ HEM `status` HEM `outcome` YAZAR (24.08.2026 kusuru).
+     Eskiden yalnız `status` yazılıyordu. Oysa `closed_at`i dolduran veritabanı
+     tetikleyicisi (`set_case_closed_at`) **`outcome` değişimini** izliyor:
+       IF NEW.outcome IS NOT NULL AND OLD.outcome IS DISTINCT FROM NEW.outcome
+     Yani kapanış düğmesi ile tetikleyici hiç buluşmuyordu; `closed_at` BOŞ
+     kalıyordu. CANLI KANIT: `outcome` dolu 5 dosyanın beşinde de `closed_at`
+     dolu; bu ekrandan kapatılan 1 dosyada ikisi de boş.
+     Boş `closed_at`in dört sonucu vardı:
+       · `ajan-nobetci` kayıt silme kolu 24 saatlik sayacı BAŞLATAMIYOR
+         ("closed_at boş" gerekçesi yazılıyor) → tarafa verilen "ses kaydı
+         süreç bitiminden 24 saat sonra silinir" sözü tutulamazdı
+         (constitution m.10 · süresiz saklama yasağı);
+       · `dosya-verilerini-sil` bitiş zamanını `now()`a düşürüyor → 5 yıllık
+         saklama sayacı her çağrıda baştan başlıyordu;
+       · resmî belgeye "Sürecin Bitiş Tarihi" satırı hiç yazılmıyordu;
+       · `OutcomeAnalytics` `outcome`u boş dosyaları eliyor → kapanan dosya
+         istatistiğe hiç girmiyordu.
+     `outcome` sözlüğü Türkçedir (`anlasma` / `anlasamama`); `status` İngilizce
+     (`agreed` / `failed`). İkisi ayrı sütun, ayrı sözlük — karıştırılmaz. */
   async function closeCase(agreed: boolean) {
-    const outcome = agreed ? "agreed" : "failed";
-    setBusy(outcome);
+    const yeniDurum = agreed ? "agreed" : "failed";
+    const yeniSonuc = agreed ? "anlasma" : "anlasamama";
+    setBusy(yeniDurum);
     try {
-      const { error } = await supabase.from("cases").update({ status: outcome, current_phase: 9 } as any).eq("id", caseRow.id);
+      const { error } = await supabase.from("cases")
+        .update({ status: yeniDurum, outcome: yeniSonuc, current_phase: 9 } as any)
+        .eq("id", caseRow.id);
       if (error) throw error;
-      setStatus(outcome);
+      setStatus(yeniDurum);
       setClosedAt(new Date().toISOString());
       toast({ title: agreed ? "Dosya anlaşma ile kapatıldı" : "Dosya anlaşamama ile kapatıldı" });
       reload();
