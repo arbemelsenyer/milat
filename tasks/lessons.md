@@ -324,3 +324,22 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   sohbetteki düğmeye basıp "yeni aday üretmiyor" dedi. Kural: bir yetenek iki
   yüzeyde görünüyorsa adı da, bağlandığı adım da tek olur; ad birliği yapılmadan
   "kusur" teşhisi konmadan önce düğmenin hangi fonksiyonu çağırdığı okunur.
+
+## 24.08.2026 — Lovable MCP `send_message` zaman aşımı (İKİNCİ KEZ)
+`send_message` istemci tarafında 300 sn'de "failed" döndü; deploy SUNUCUDA
+BAŞARILI olmuştu. `list_messages` ile doğrulandı ("create-video-room yeniden
+deploy edildi"). **Zaman aşımı = başarısızlık DEĞİL.** Bir daha olursa: önce
+`list_messages`, sonra karar. İşi tekrarlama — ikinci bir deploy tetiklersin.
+
+## 24.08.2026 — Ortak yardımcıda birleştirme (merge) bayat veri taşır
+`_shared/anlatim.ts` `yaz()` `last_output`'u ÜSTÜNE YAZMAZ, BİRLEŞTİRİR.
+Bu bilerek böyle (başka fonksiyon aynı satıra `karsilastirma` yazıyor), ama
+yeni koşumun yazmadığı anahtar (`eksik`) önceki koşumdan sağ kalıyor ve defter
+kendi içinde çelişiyor. DERS: birleştiren bir yazıcıda, koşum başına ait
+anahtarlar HER koşumda açıkça yazılmalı (yoksa temizlenmeli); "yazmazsam boş
+kalır" varsayımı merge'de yanlıştır.
+
+## 24.08.2026 — Bayat todo maddesi kod işi sanılmasın
+"Harici araç yasağı iki ekranda da yazılı olmalı" maddesi açık duruyordu;
+grep'le bakınca metin ZATEN iki ekranda da vardı. Bir maddeye başlamadan önce
+işlevi grep'le (ad değil işlev — 16.08 dersi); yazılmış işi yeniden yazma.

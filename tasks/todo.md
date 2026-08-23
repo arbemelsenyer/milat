@@ -1,5 +1,88 @@
 ## Nerede kaldık
 
+- Tarih: 24.08.2026 (gece oturumu · 2. blok)
+- Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
+- Aktif görev: yok — kurucunun verdiği dört madde bitti
+- Son tamamlanan iş: bilirkişi "Yeniden öner" CANLI TESTİ — geçti (kanıt aşağıda)
+- Doğrulama sonucu: `npm run test` 49/49 · tsc hatasız · build hatasız · lint 2365
+- Açık blokaj: yok
+- Sıradaki uygulanabilir iş: P2 · `agent_states.last_output` bayat anahtar kusuru (aşağıda, teşhis bitti)
+
+### CANLI TEST GEÇTİ — 24.08.2026 · bilirkişi "Yeniden öner"
+Kurucu talimatı: kendim başlat, aday üretimini tetikle, sonucu canlıda gör.
+Kullanılan dosya: **MP-2026-1018 · `eb70595a`** — başlığında "(farazi test)" yazan
+TEST dosyası. Gerçek uyuşmazlık dosyasına dokunulmadı.
+
+**1. Düğme canlıda ve doğru kola bağlı.** Ajan penceresinde "Yeniden öner"
+düğmesi göründü (23.08'de kodlanmıştı, bu turda publish ile canlıya çıktı).
+Tıklandı → `bilirkisi-secim` `ikinci_tur` koştu.
+KANIT (`agent_states`, mediator, 21:51:38Z):
+  adım 1: `"Sağlık Hukuku" alanı için uzman kayıtlarını tarıyorum.`
+  adım 2: `Yapıldı: "Sağlık Hukuku" alanı tarandı`
+  eksik:  `yeni aday kalmadı`
+Bu, düğmenin artık talimat reddine değil bilirkişi koluna bağlı olduğunun
+canlı kanıtıdır (23.08 kusuru kapandı).
+
+**2. "Aday yok" cümlesi dürüst.** Havuzda "Sağlık Hukuku" alanında kayıtlı tek
+uzman var; ikinci tur yeni aday bulamadı ve bunu uydurmadan söyledi.
+`bilirkisi_onerileri` sayısı değişmedi (1) — yani sahte aday yazılmadı.
+
+**3. Sohbetten cevap yazma çalışıyor — "Cevabınızı şu an kaydedemedim" YOK.**
+Ajanın sorusuna ("başka bir uzmanlık alanı yazarsanız o alanla tararım")
+sohbet kutusundan `Tıp Hukuku` yazılıp gönderildi.
+KANIT (`agent_states`, mediator, 21:55:00–21:55:01Z):
+  adım 1: `"Tıp Hukuku" alanı için uzman kayıtlarını tarıyorum.`
+  adım 2: `Yapıldı: "Tıp Hukuku" alanı için 1 aday çıkarıldı`
+KANIT (`bilirkisi_onerileri`, YENİ satır 21:55:00.876Z):
+  `alan = Tıp Hukuku · sira = 1 · durum = taslak · oneren = masa_ajani`
+Yani cevap kaydedildi, tarama koştu, aday üretildi. Üç maddenin üçü de geçti.
+
+TARAYICI NOTU: sekme açık bırakıldı (kurucu isterse ekranda görebilsin).
+Chrome ekran görüntüsü aracı iki kez 30 sn'de zaman aşımına uğradı, ikinci
+denemede döndü — sayfa donmuş değil, araç yavaş. İşi tekrarlatmadı.
+
+### BULUNDU — P2 · `agent_states.last_output` bayat anahtar taşıyor (teşhis bitti, kod yazılmadı)
+Canlı testte çıktı. `_shared/anlatim.ts:95`:
+`last_output: { ...eskiCikti, adimlar, ...(ek ?? {}) }` — yani ÖNCEKİ koşumun
+anahtarları, yeni koşum onları yazmasa bile SAĞ KALIYOR.
+CANLI KANIT (21:55 koşumu):
+  `yapildi = "Tıp Hukuku" alanı için 1 aday çıkarıldı`  ← yeni
+  `eksik   = ["yeni aday kalmadı"]`                     ← 21:51 koşumundan BAYAT
+  `adimlar` = 2 adım, ikisi de 21:55                    ← doğru
+Yani defter kaydı kendi içinde çelişiyor: "1 aday çıkardım" + "yeni aday kalmadı".
+
+EKRANDA GÖRÜNMÜYOR: `AjanPenceresi` yalnız `last_output.adimlar`'ı basıyor
+(`AjanPenceresi.tsx:4`), "Eksik:" satırı da adımlara koşum başına yazılıyor.
+Bu yüzden kullanıcıya yansıyan bir yalan YOK — kusur çalışma defterinde
+(constitution m.2/m.6 denetim izi) kalıyor. P1 değil, P2.
+
+BİRLEŞTİRME LOAD-BEARING'DİR, TOPTAN SİLİNEMEZ: `masa-kalem-karsilastir/index.ts:256`
+aynı satıra `karsilastirma` anahtarını AYRI bir fonksiyondan yazıyor; `yaz()`
+birleştirmeyi kaldırırsa o veri kaybolur.
+ÖNERİLEN ÇÖZÜM: `bitti()` kendi sahibi olduğu anahtarları HER SEFERİNDE yazsın
+(`eksik` yoksa açıkça temizlensin), `baslat()` koşum başında `yapildi`/`eksik`
+ikilisini sıfırlasın. Başka yazıcıların anahtarlarına dokunulmaz.
+BEDELİ: `_shared/anlatim.ts` değişir → **39 fonksiyon fan-out redeploy** (§11-B).
+Bu yüzden kendiliğinden yapılmadı; ekranda görünmeyen bir kusur için 39
+fonksiyon yeniden yayına alınmıyor. Sıradaki `_shared` turunda birlikte gider.
+
+### KAPANDI — B18 P2 · harici araç yasağı metni (kod işi ÇIKMADI)
+todo maddesi "iki ekranda da yazılı olmalı" diyordu; **ikisinde de zaten yazılı.**
+- Taraf ekranı: `CaseRoom.tsx:1291` `KAYIT_ONAY_METNI` →
+  "Kayıt yalnız MediPact oturum ekranından alınır. Harici araçlarla … kayıt yapılamaz."
+- Arabulucu ekranı: `MediationEngine.tsx` `KAYIT_TEK_KAPI_UYARISI` (aynı cümle).
+Madde bayattı, kapatıldı.
+
+### AÇIK — B18 P2 · silme kuralı (bağımlı iş)
+Ses süreç bitiminden 24 saat sonra, döküm süreç sonunda silinecek; nöbetçi
+turunda otomatik, satıra silme zamanı + notu yazılarak.
+BAĞIMLILIK: silinecek bir şey doğuran **kayıt ALMA / DÖKÜM hattı henüz yok**
+(mimari/12'de "○ planlı"; `oturum_kayitlari` canlıda 0 satır). Hat yazılmadan
+silme kuralı yazılamaz. Hat işine başlanınca bu madde onunla birlikte alınır.
+
+---
+## Nerede kaldık
+
 - Tarih: 24.08.2026 (gece oturumu)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: bilirkişi "Yeniden öner" CANLI TESTİ (kurucu talimatı: test dosyasıyla, kendim başlatarak)
