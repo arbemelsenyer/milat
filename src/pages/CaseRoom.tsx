@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { AppNavbar } from "@/components/AppNavbar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -105,6 +105,24 @@ const PROCESS_STEPS = [
   { key: "agreement", label: "Belgeler" },
 ];
 
+// Taraf görünümündeki sekme adları. `?sekme=<ad>` bağlantılarının yalnız gerçekten
+// var olan bir sekmeyi açabilmesi için burada tutuluyor; liste aşağıdaki
+// <TabsTrigger value=...> değerleriyle birebir aynıdır.
+const TARAF_SEKMELERI = [
+  "documents",
+  "analysis",
+  "discovery",
+  "experts",
+  "payment",
+  "randevu",
+  "iletisim",
+  "braket",
+  "ajanim",
+  "agents",
+  "hazirligim",
+  "kalemlerim",
+];
+
 export default function CaseRoom() {
   const { id: caseId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -134,7 +152,13 @@ export default function CaseRoom() {
   // Taraf sekmelerinde AÇIK OLAN sekme. Varsayılan eskisiyle aynı ("analysis");
   // ajan penceresi bekleyen bir işe basılınca ilgili sekmeyi açabilsin diye durum
   // olarak tutuluyor. Sekme listesi, sırası ve adları değişmedi.
-  const [partySekme, setPartySekme] = useState("analysis");
+  // `?sekme=<ad>` ile dışarıdan doğrudan bir sekme açılabilir (İletişim Tercihleri
+  // sayfası buraya bağlanıyor). Bilinmeyen değer yok sayılır — boş sekme çıkmaz.
+  const [aramaParametreleri] = useSearchParams();
+  const [partySekme, setPartySekme] = useState(() => {
+    const istenen = aramaParametreleri.get("sekme");
+    return istenen && TARAF_SEKMELERI.includes(istenen) ? istenen : "analysis";
+  });
 
   const myParty = parties.find((p) => p.user_id === user?.id) ?? null;
   const isOwner = !!(caseRow && user && caseRow.user_id === user.id);

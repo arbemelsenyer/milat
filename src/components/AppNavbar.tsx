@@ -48,7 +48,7 @@ export function AppNavbar() {
           )}
 
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/notification-settings" title={language === 'tr' ? 'Bildirim Ayarları' : 'Notification Settings'}>
+            <Link to="/notification-settings" title={language === 'tr' ? 'İletişim Tercihleri' : 'Communication Preferences'}>
               <Bell className="w-4 h-4" />
             </Link>
           </Button>

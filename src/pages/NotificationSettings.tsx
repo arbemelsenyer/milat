@@ -1,84 +1,78 @@
 import { useEffect, useState } from "react";
 import { AppNavbar } from "@/components/AppNavbar";
 import { Card } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Loader2, Bell, Mail, Send } from "lucide-react";
+import { Loader2, Bell, Mail, Send, ArrowRight, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/components/ui/use-toast";
-import { Navigate } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 
-type Prefs = {
-  email_session_invite: boolean;
-  email_session_reminder: boolean;
-  email_expert_updates: boolean;
-  email_mediator_assignment: boolean;
-  email_negotiation_updates: boolean;
-  inapp_session_invite: boolean;
-  inapp_session_reminder: boolean;
-  inapp_expert_updates: boolean;
-  inapp_mediator_assignment: boolean;
-  inapp_negotiation_updates: boolean;
-};
+// Bu sayfa TERCİH TUTMAZ. İletişim tercihi dosya kapsamlıdır: bütün gönderim
+// yolları `iletisim_tercihleri` satırını party_id ile okur (ajan-nobetci,
+// hazirlik-foyu-gonder, send-meeting-invite, send-session-reminders,
+// send-session-notification, send-reschedule-notification, randevu-teklif,
+// cancel-meeting-invite). Bir kullanıcı birden çok dosyada taraf olabildiği için
+// kullanıcı düzeyinde tek bir anahtar kümesi bu modele oturmuyor.
+// Sayfa, tercihin gerçekten ayarlandığı yüzeye (dosya içi "İletişim Tercihlerim")
+// götüren dürüst bir yönlendirmedir. Eski `notification_preferences` anahtarları
+// hiçbir gönderim yolu tarafından okunmuyordu; kaldırıldı. Tablo SİLİNMEDİ.
 
-const DEFAULTS: Prefs = {
-  email_session_invite: true,
-  email_session_reminder: true,
-  email_expert_updates: true,
-  email_mediator_assignment: true,
-  email_negotiation_updates: true,
-  inapp_session_invite: true,
-  inapp_session_reminder: true,
-  inapp_expert_updates: true,
-  inapp_mediator_assignment: true,
-  inapp_negotiation_updates: true,
-};
-
-const ROWS: Array<{ key: keyof Prefs extends string ? string : never; label: string; email: keyof Prefs; inapp: keyof Prefs }> = [
-  { key: "session_invite", label: "Toplantı davetleri", email: "email_session_invite", inapp: "inapp_session_invite" },
-  { key: "session_reminder", label: "Toplantı hatırlatmaları", email: "email_session_reminder", inapp: "inapp_session_reminder" },
-  { key: "expert_updates", label: "Bilirkişi atama / onay / red", email: "email_expert_updates", inapp: "inapp_expert_updates" },
-  { key: "mediator_assignment", label: "Arabulucu ataması", email: "email_mediator_assignment", inapp: "inapp_mediator_assignment" },
-  { key: "negotiation_updates", label: "Müzakere turu güncellemeleri", email: "email_negotiation_updates", inapp: "inapp_negotiation_updates" },
-];
+type DosyaSatiri = { id: string; baslik: string; basvuruNo: string | null };
 
 export default function NotificationSettings() {
   const { user, isLoading } = useAuth();
-  const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
-  const [busy, setBusy] = useState(false);
+  const [dosyalar, setDosyalar] = useState<DosyaSatiri[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     if (!user) return;
+    let iptal = false;
     (async () => {
-      const { data } = await supabase
-        .from("notification_preferences")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (data) setPrefs({ ...DEFAULTS, ...(data as any) });
+      // Taraf olunan dosyalar. RLS: "Party can view case_parties" → user_id = auth.uid().
+      const { data: taraflar, error: tarafHata } = await supabase
+        .from("case_parties")
+        .select("case_id")
+        .eq("user_id", user.id);
+      if (iptal) return;
+      if (tarafHata) {
+        setHata(`Dosyalarınız okunamadı: ${tarafHata.message}`);
+        setLoaded(true);
+        return;
+      }
+      const idler = Array.from(new Set((taraflar ?? []).map((t) => t.case_id).filter(Boolean)));
+      if (idler.length === 0) {
+        setDosyalar([]);
+        setLoaded(true);
+        return;
+      }
+      const { data: dosyaVerisi, error: dosyaHata } = await supabase
+        .from("cases")
+        .select("id,title,application_no,updated_at")
+        .in("id", idler)
+        .order("updated_at", { ascending: false });
+      if (iptal) return;
+      if (dosyaHata) {
+        setHata(`Dosyalarınız okunamadı: ${dosyaHata.message}`);
+        setLoaded(true);
+        return;
+      }
+      setDosyalar(
+        (dosyaVerisi ?? []).map((d) => ({
+          id: d.id as string,
+          baslik: (d.title as string | null) ?? "Başlıksız dosya",
+          basvuruNo: (d.application_no as string | null) ?? null,
+        }))
+      );
       setLoaded(true);
     })();
+    return () => {
+      iptal = true;
+    };
   }, [user]);
 
-  if (isLoading) return null;
-  if (!user) return <Navigate to="/auth" replace />;
-
-  const save = async () => {
-    setBusy(true);
-    const { error } = await supabase
-      .from("notification_preferences")
-      .upsert({ user_id: user.id, ...prefs }, { onConflict: "user_id" });
-    setBusy(false);
-    if (error) toast({ title: "Hata", description: error.message, variant: "destructive" });
-    else toast({ title: "Tercihler kaydedildi" });
-  };
-
-  const toggle = (k: keyof Prefs) => setPrefs((p) => ({ ...p, [k]: !p[k] }));
-
-  const [testing, setTesting] = useState(false);
   const sendTest = async (channels: { email?: boolean; inapp?: boolean }) => {
     setTesting(true);
     try {
@@ -103,55 +97,121 @@ export default function NotificationSettings() {
     }
   };
 
+  if (isLoading) return null;
+  if (!user) return <Navigate to="/auth" replace />;
+
   return (
     <div className="min-h-screen bg-background">
       <AppNavbar />
       <main className="container max-w-3xl py-8 px-4">
-        <h1 className="text-2xl font-display font-semibold mb-2">Bildirim Tercihleri</h1>
+        <h1 className="text-2xl font-display font-semibold mb-2">İletişim Tercihleri</h1>
         <p className="text-sm text-muted-foreground mb-6">
-          Hangi olaylar için e-posta ve uygulama içi bildirim almak istediğinizi seçin.
+          Bildirimlerin sıklığını ve sessiz saatlerinizi <strong>her dosyada ayrı</strong> belirlersiniz.
         </p>
 
+        <Card className="p-5 mb-6">
+          <div className="flex gap-3">
+            <Info className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p>
+                Tercihiniz, o dosyadaki taraf kaydınıza bağlıdır. Bir kişi birden çok dosyada taraf
+                olabildiği için bütün dosyalar için geçerli tek bir ayar tutulmaz.
+              </p>
+              <p>
+                Ayarlamak istediğiniz dosyayı aşağıdan açın: dosya ekranındaki{" "}
+                <strong>“İletişim Tercihlerim”</strong> sekmesinde bildirim sıklığını, sessiz saatleri
+                ve kanalı seçersiniz.
+              </p>
+            </div>
+          </div>
+        </Card>
+
         <Card className="p-5">
+          <h2 className="font-semibold mb-1">Taraf olduğunuz dosyalar</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            Tercihlerinizi düzenlemek istediğiniz dosyayı seçin.
+          </p>
+
+          {hata && (
+            <div className="text-sm rounded border border-destructive/40 bg-destructive/10 text-destructive p-3 mb-3">
+              {hata}
+            </div>
+          )}
+
           {!loaded ? (
-            <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin" /></div>
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : dosyalar.length === 0 ? (
+            <div className="text-sm text-muted-foreground space-y-3 py-2">
+              <p>
+                Taraf olduğunuz bir dosya bulunamadı. İletişim tercihi yalnız taraf olduğunuz
+                dosyalarda ayarlanır.
+              </p>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/cases">Dosyalarım</Link>
+              </Button>
+            </div>
           ) : (
             <div className="space-y-1">
-              <div className="grid grid-cols-[1fr_auto_auto] gap-6 px-2 py-2 text-xs text-muted-foreground border-b">
-                <span>Olay</span>
-                <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> E-posta</span>
-                <span className="flex items-center gap-1"><Bell className="h-3 w-3" /> Uygulama</span>
-              </div>
-              {ROWS.map((row) => (
-                <div key={row.key} className="grid grid-cols-[1fr_auto_auto] gap-6 px-2 py-3 items-center border-b last:border-0">
-                  <Label className="text-sm">{row.label}</Label>
-                  <Switch checked={prefs[row.email]} onCheckedChange={() => toggle(row.email)} />
-                  <Switch checked={prefs[row.inapp]} onCheckedChange={() => toggle(row.inapp)} />
+              {dosyalar.map((d) => (
+                <div
+                  key={d.id}
+                  className="flex items-center justify-between gap-4 px-2 py-3 border-b last:border-0"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{d.baslik}</p>
+                    {d.basvuruNo && (
+                      <p className="text-xs text-muted-foreground">Başvuru no: {d.basvuruNo}</p>
+                    )}
+                  </div>
+                  <Button variant="outline" size="sm" asChild className="shrink-0">
+                    <Link to={`/case-room/${d.id}?sekme=iletisim`}>
+                      İletişim tercihlerim <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                    </Link>
+                  </Button>
                 </div>
               ))}
             </div>
           )}
-          <div className="flex flex-wrap gap-2 mt-6">
-            <Button onClick={save} disabled={busy || !loaded}>
-              {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Kaydet
-            </Button>
-            <Button type="button" variant="outline" disabled={testing} onClick={() => sendTest({ email: true, inapp: true })}>
+        </Card>
+
+        <Card className="p-5 mt-6">
+          <h2 className="font-semibold mb-1">Bildirim kanalınızı deneyin</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            Deneme bildirimi seçili kanallara anlık tek bir test mesajı gönderir; hiçbir tercihi
+            değiştirmez.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={testing}
+              onClick={() => sendTest({ email: true, inapp: true })}
+            >
               {testing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
               Deneme bildirimi gönder
             </Button>
-            <Button type="button" variant="ghost" size="sm" disabled={testing} onClick={() => sendTest({ inapp: true, email: false })}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={testing}
+              onClick={() => sendTest({ inapp: true, email: false })}
+            >
               <Bell className="h-4 w-4 mr-1" /> Sadece uygulama içi
             </Button>
-            <Button type="button" variant="ghost" size="sm" disabled={testing} onClick={() => sendTest({ email: true, inapp: false })}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={testing}
+              onClick={() => sendTest({ email: true, inapp: false })}
+            >
               <Mail className="h-4 w-4 mr-1" /> Sadece e-posta
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-3">
-            Deneme bildirimi seçili kanallara anlık tek bir test mesajı gönderir; tercihleri değiştirmez.
-          </p>
         </Card>
-
       </main>
     </div>
   );
