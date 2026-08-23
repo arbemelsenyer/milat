@@ -1,5 +1,98 @@
 ## Nerede kaldık
 
+- Tarih: 24.08.2026 (gece oturumu · 4. blok)
+- Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
+- Aktif görev: yok
+- Son tamamlanan iş: `akis-onayla` yetki ölçütü eşitlendi + `foy_gonderildi` mükerrer yazımı kalktı
+- Doğrulama sonucu: `npm run test` 55/55 · tsc hatasız · build hatasız · lint 2361
+- Açık blokaj: **P0 · oturum hatırlatma cron'u canlıda 401 dönüyor** — düzeltme SQL, Cowork paketi aşağıda
+- Sıradaki uygulanabilir iş: Cowork cevabı gelene kadar → tetikleyici envanteri (`kurulu-envanter.md`)
+
+### P0 — CANLI ARIZA · oturum hatırlatmaları GÖNDERİLMİYOR (24.08 teşhis, kanıtlı)
+
+BELİRTİ: `send-session-reminders` cron'u (jobid 1, `0 * * * *`) her saat başı
+**HTTP 401 `{"error":"Unauthorized"}`** dönüyor.
+
+KANIT (canlı, `net._http_response`): son 7 günde 401 dönen 5 yanıt; hepsi tam
+saat başında (17:00 · 18:00 · 20:00 · 21:00 · 22:00 — o saatte koşan tek iş bu).
+200 dönen tek iki yanıt bu turdaki elle işlerimiz. Yani hatırlatma e-postaları
+en az yanıt tablosunun tuttuğu süre boyunca HİÇ gitmedi.
+
+NEDEN DENETİMDEN KAÇTI — `cron.job_run_details` **"succeeded"** diyor.
+`net.http_post` isteği KUYRUĞA ALIR; SQL başarıyla döner. Cron'un "başarılı"
+kaydı, fonksiyonun çalıştığı anlamına GELMİYOR. Gerçek sonuç yalnız
+`net._http_response`ta. Bu, "cron kayıtlarına bakılmadı" maddesinin karşılığıdır.
+
+KÖK NEDEN: fonksiyon iki yoldan yetki kabul ediyor
+(`send-session-reminders/index.ts:136-159`):
+  (a) `x-cron-secret` başlığı `CRON_SECRET` ile eşleşirse, ya da
+  (b) `Authorization: Bearer <kullanıcı JWT>` sahibi YÖNETİCİ ise.
+Cron işi (jobid 1) yalnız `Authorization` gönderiyor, `x-cron-secret`
+GÖNDERMİYOR. Gönderilen jeton bir kullanıcıya ait olmadığı için `getUser()`
+kullanıcı döndürmüyor → yetki yok → 401.
+Karşılaştırma: jobid 3 (`deadline-reminder-cron`) `x-cron-secret` gönderiyor ve
+401 dönmüyor. Yani doğru kalıp aynı veritabanında zaten var.
+
+KODDA DÜZELTİLMEZ: anon jetonunu kabul etmek uç noktayı herkese açardı.
+Düzeltme cron işinin başlığında; SQL çalıştırmak §10'a göre Cowork'tedir.
+
+#### COWORK PAKETİ — jobid 1'in başlığına cron sırrı eklensin
+1. **Ne yapılacak:** `cron.job` jobid 1 (`send-session-reminders`) komutundaki
+   `headers` nesnesine `x-cron-secret` başlığı eklensin. Değeri **jobid 3'ün
+   komutunda zaten yazılı olan değerin aynısıdır** — oradan kopyalanır, hiçbir
+   yere ayrıca yazılmaz. `cron.schedule('<işin adı>', '0 * * * *', $$ … $$)` ile
+   iş yeniden tanımlanır; URL, gövde ve zamanlama DEĞİŞMEZ.
+2. **Neden gerekli:** oturum hatırlatmaları şu anda hiç gönderilmiyor; taraflar
+   24 saat kala hatırlatma almıyor.
+3. **Çalıştırılacak işlem:** yukarıdaki `cron.schedule` çağrısı (tek ifade).
+4. **Başarı kontrolü:** bir sonraki tam saatten sonra
+   `SELECT status_code, created FROM net._http_response ORDER BY created DESC LIMIT 5;`
+   → o saate ait satır **200** olmalı, 401 olmamalı.
+5. **Sonuç gelince ben ne yapacağım:** 200 görülürse `case_sessions` üzerinden
+   hatırlatma gönderilen oturumu doğrulayıp maddeyi DONE yazacağım; 401 sürerse
+   fonksiyonun kendi kapısını yeniden okuyup ikinci turu koşacağım.
+
+### P1 — CRON SIRRI VERİTABANINDA AÇIK METİN (aynı incelemede çıktı)
+`cron.job.command` içinde `x-cron-secret` değeri **düz metin** duruyor (jobid 3).
+`cron` şemasını okuyabilen herkes sırrı görür; sır ayrıca `pg_dump`'a ve
+yedeklere düşer. Değer bu belgeye YAZILMADI ve sohbete kopyalanmadı (§12).
+ÖNERİ: sır Vault'a alınsın ve komut değeri `vault.decrypted_secrets`ten okusun;
+ardından `CRON_SECRET` yenilensin. İşlem SQL'dir → Cowork. Kurucu kararı gerekir
+(sır yenileme çalışan iki cron'u da etkiler), o yüzden ayrı madde yazıldı.
+
+### YAPILDI — 24.08 · P1 · `akis-onayla` yetki ölçütü eşitlendi (`68eac7b`, redeploy)
+Yalnız `assigned_mediator_id`ye bakıyordu; o alan her dosyada dolu değil
+(13.08 dersi) → dosya sahibi arabulucu onay verirken 403 alıyordu. Ölçüt
+`taraf-cevap/index.ts:75-89` ile aynı: yönetici · görevli arabulucu · dosya
+sahibi. RLS'e dokunulmadı.
+SÜPÜRME: `assigned_mediator_id` okuyan 30 fonksiyon tarandı; `user_id`siz üç
+tanesi BİLEREK dar ve öyle kalmalı:
+- `hazirlik-foyu-gonder` — kodda gerekçesi yazılı (gönderim kararı arabulucunun).
+- `revoke-party-invite` — daveti iptal arabulucu işi; dosya sahibi çoğu dosyada
+  TARAFTIR, eklemek genişletme olurdu.
+- `dosya-verilerini-sil` — VERİ SİLME. Yetki genişletmek §7.3/§7.4 gereği
+  Human Gate. Dokunulmadı; kurucu isterse ayrıca konuşulur.
+
+### YAPILDI — 24.08 · P2 · `foy_gonderildi` mükerrer yazımı (`2f3173c`, redeploy)
+Tek gönderimde iki olay doğuyordu (tetikleyici + kod). Koddaki satır kalktı;
+kullanılmayan `olayYaz` içe aktarımı da düştü. Kanıt: föy ikinci kez
+gönderilemiyor, yani tetikleyici her zaman çalışıyor — koddaki satırın tek
+başına kapsadığı durum yoktu. Canlıda bu koda bağlı akış kuralı YOK, yani bugün
+zararsızdı; kural bağlandığı gün adım iki kez koşacaktı.
+
+### CRON DURUMU — tam döküm (24.08, canlı)
+| iş | zamanlama | durum |
+|---|---|---|
+| 1 · `send-session-reminders` | saat başı | **401 — ARIZALI** (yukarıda) |
+| 2 · `dual-ai-validate` | 02:00 | çalışıyor |
+| 3 · `deadline-reminder-cron` | 08:00 | çalışıyor (`x-cron-secret` gönderiyor) |
+| 4 · `notify_admins_new_tariff` | 1 Aralık | yıllık, sırası gelmedi |
+| 7 · `ajan-nobetci` | 3 dakikada bir | çalışıyor — `ajan_gorevleri` satırları 3 dk aralıkla düşüyor |
+| 9,10 · `check-new-tariff` | 1 Ara / 5 Oca | yıllık, sırası gelmedi |
+
+---
+## Nerede kaldık
+
 - Tarih: 24.08.2026 (gece oturumu · 3. blok)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok — kuyruktaki P2 alındı, içinden iki P1 çıktı, üçü de canlıda doğrulandı

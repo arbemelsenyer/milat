@@ -362,3 +362,17 @@ satırın EYLEM YOLUNU sonuna kadar (sunucu kapısı + ekran yanıtı) oku.
 Sunucu {onaylandi:false, sebep:...} yanıtını 200 ile dönebilir; bu hata değil
 karardır. Ön yüz yalnız `error` alanına bakarsa reddi başarı sanar. DERS: bir
 fonksiyonun "yapmadım" dalı varsa, çağıran o dalı AYRICA kontrol etmelidir.
+
+## 24.08.2026 — cron "succeeded" fonksiyonun çalıştığı anlamına GELMEZ
+`cron.job_run_details.status='succeeded'`, yalnız SQL'in başarıyla koştuğunu
+söyler. `net.http_post` isteği KUYRUĞA ALIR ve hemen döner. Fonksiyonun gerçek
+cevabı `net._http_response`tadır. `send-session-reminders` bu yüzden aylarca
+"başarılı" görünürken her saat 401 dönüyordu ve hiçbir hatırlatma gitmedi.
+DERS: bir cron'u doğrularken `job_run_details`e DEĞİL, `net._http_response`
+status_code'una bak.
+
+## 24.08.2026 — İki cron aynı fonksiyon ailesine iki farklı başlıkla gidiyorsa biri ölüdür
+jobid 3 `x-cron-secret` gönderiyor ve çalışıyor; jobid 1 yalnız `Authorization`
+gönderiyor ve 401 alıyor. Doğru kalıp aynı veritabanında zaten vardı.
+DERS: bir uç nokta 401 veriyorsa, önce AYNI kapıdan geçen çalışan bir çağrıyı
+bul ve iki isteğin başlıklarını karşılaştır.
