@@ -18,7 +18,6 @@
 // süzgeçten geçer. Tür "belge_talebi" — önemli listesindedir. Süzgeç "gönderme"
 // derse durum DEĞİŞMEZ; sebep dönüş gövdesine yazılır ve arabulucu görür.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { olayYaz } from "../_shared/olay.ts";
 import { anlatimAc, zatenCalisiyorMu } from "../_shared/anlatim.ts";
 
 /* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
@@ -444,12 +443,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // AKIŞ OLAYI (best-effort): föy tarafına gönderildi. Föy metni ve adres yazılmaz.
-    await olayYaz(admin, {
-      case_id: String((foy as any).case_id), party_id: String((foy as any).party_id),
-      olay_kodu: "foy_gonderildi",
-      veri: { foy_id: String((foy as any).id), session_id: (foy as any).session_id ?? null },
-    });
+    /* AKIŞ OLAYI BURADAN YAZILMAZ — MÜKERRER YAZIM KALDIRILDI (24.08.2026).
+       Yukarıdaki `durum = 'gonderildi'` güncellemesi `trg_akis_foy`
+       tetikleyicisini çalıştırıyor; tetikleyici `akis_olay_yaz()` içinde
+       `foy_gonderildi` olayını AYNI veriyle (`foy_id`, `session_id`) zaten
+       yazıyor. Buradaki `olayYaz` çağrısı tek gönderimde ikinci bir olay
+       doğuruyordu; bugün `akis_kurallari`'nda bu koda bağlı kural olmadığı
+       için zararsızdı, kural bağlandığı gün adım iki kez koşacaktı.
+       TEK BAŞINA KAPSADIĞI DURUM YOK: föy ikinci kez gönderilemiyor
+       (yukarıda satır ~339: "Bu föy zaten gönderildi; ikinci kez gönderilmez"),
+       yani `durum` her zaman gerçek geçişte değişir ve tetikleyici her zaman
+       çalışır. Olay noktası tetikleyicide tektir. */
 
     await anlatim.bitti({
       yapildi: "Onaylanan hazırlık föyünü tarafına e-postayla gönderdim.",
