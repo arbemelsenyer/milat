@@ -461,6 +461,20 @@ Bu tanımlar Cowork döneminden kalan eski anlamların yerine geçer; tek geçer
 - Bir işlem gerçekten senin erişemediğin bir dış sistemde ise (§10 tablosu) bu bir **yetki eksiği değil, iş bölümüdür**: beş satırlık Cowork paketini üret, sonucu bekle, sonucu alınca kendin devam et.
 - Bir aracın engellenmesi teknik bir engeldir, Human Gate değildir. Human Gate listesi §7'dedir ve o listedeki yedi maddeyle sınırlıdır.
 
+### 18-A. YANLIŞ ALARM DÖNGÜSÜ — KULLANICIYA TEKRAR SORMA
+
+Bir bekçi (PreToolUse hook) veya izin ekranı, komutun **gerçekte yapmadığı** bir şey yüzünden tetikleniyorsa bu bir **kusurdur**, onay konusu değildir.
+
+- Aynı yanlış alarm **ikinci kez** çıktıysa: artık sorma. Bekçi kuralını daralt, testini yaz, doğrula, commit et, devam et.
+- Karar **komut metninde geçen kelimeye** göre değil, komutun **gerçekten hedeflediği dosya/işleme** göre verilir. Tipik yanlış alarmlar: commit mesajının içindeki kelimeler · `--no-rebase` gibi olumsuz bayraklar · bekçinin kendi kaynak kodunu yazarken içindeki desenler · sahte test yükleri.
+- Bekçiyi düzeltirken kendi test komutların onu tetikliyorsa: yedeğini al, **geçici kapat**, düzelt, geri aç, tek bir doğrulama çalıştır. Bunun için izin isteme.
+- Testleri tek tek değil **tek komutta toplu** çalıştır; kullanıcıyı arka arkaya onay ekranına düşürme.
+- Sonucu `tasks/todo.md`'ye yaz.
+
+**Bu kural gerçek tehlikeyi kapsamaz.** Gerçek bir silme, gerçek `--force` push, gerçek `reset --hard`, gerçek `DROP`/`TRUNCATE`, `.env` içeriğinin okunması — bunlarda bekçi sormaya **devam eder** ve sen de sorarsın. Kapatılan şey yalnızca yanlış alarmdır.
+
+**Genel ilke:** Tekrar eden her engelde çözüm senin işindir. "Yine sordu", "yine takıldı" diye kullanıcıya dönme — kalıcı çözümü bul, uygula, doğrula, devam et.
+
 ---
 
 ## 19. CODEX YOKSA DURMA
