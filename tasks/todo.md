@@ -1,5 +1,46 @@
 ## Nerede kaldık
 
+- Tarih: 24.08.2026 (gece oturumu · KAPANIŞ — bağlam şişti, `medipact dur` kapanışı kendiliğinden yapıldı)
+- Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
+- Aktif görev: yok — yarım iş yok, commit edilmemiş kendi değişikliğim yok
+- Son tamamlanan iş: tetikleyici envanteri + cron tablosu canlıyla eşitlendi (`6664839`)
+- Doğrulama sonucu: `npm run test` 55/55 · tsc hatasız · build hatasız · lint 2361 (oturum başı 2367)
+- Açık blokaj: **P0 · oturum hatırlatma cron'u 401** — Cowork paketi hazır (aşağıdaki blokta)
+- Sıradaki uygulanabilir iş: Cowork cron düzeltmesi → sonra Aşama 7'nin sunucuya iz bırakması
+
+> **DURAK NOTU (24.08.2026).** Çalışma ağacı temiz; `main` ile `origin/main` aynı
+> commit'te. Bu turda dokuz commit atıldı, hepsi push edildi ve canlıya çıktı.
+> `CLAUDE.md` ve `COWORK.md` kurucunun kendi düzenlemesiyle değişik duruyor —
+> §11 gereği ellenmedi, commit'lenmedi. İzlenmeyen iki dosya (xlsx, repomix)
+> oturum başından beri duruyor, dokunulmadı.
+> Yeni oturum: `medipact devam` → "Sıradaki uygulanabilir iş"ten sürer.
+
+### BU TURDA CANLIYA ÇIKANLAR (hepsi doğrulandı)
+| iş | commit | deploy |
+|---|---|---|
+| P1 · A5 iletişim tercihi sayfası | `469e0b2` | publish |
+| P1 · B18 kayıt izni kapısı | `71774b8` | publish + `create-video-room` |
+| P2 · defterdeki bayat anahtar | `cffec58` | **36 fonksiyon fan-out** |
+| P1 · onay zinciri (üç kusur) | `51b2cce` `63cf757` | publish + `akis-onayla` |
+| P2 · `foy_gonderildi` mükerrer | `2f3173c` | `hazirlik-foyu-gonder` |
+| P1 · `akis-onayla` yetki ölçütü | `68eac7b` | `akis-onayla` |
+| kayıt · tetikleyici envanteri | `6664839` | — |
+
+### KAPANDI — P2 · `config.toml`'da eksik fonksiyon blokları (kod işi ÇIKMADI)
+Kuyrukta "`config.toml`'da `bilirkisi-secim` bloğu yok" maddesi vardı. 16
+fonksiyonun bloğu yok. AMA blok eklemek bir şeyi düzeltmiyor:
+KANIT — `deadline-reminder-cron` `config.toml`'da YOK, cron'u JWT göndermiyor
+(yalnız `x-cron-secret`), ve **401 almıyor, çalışıyor**. Dosyada olsaydı
+`verify_jwt` varsayılanı `true` olacak, geçit isteği içeri almayacaktı.
+SONUÇ: Lovable üzerinden deploy edilen fonksiyonlarda canlı `verify_jwt` ayarı
+sunucu tarafında tutuluyor; `config.toml` bu yolda **doğruluk kaynağı değil**.
+YENİ MADDE (P2, kod değil belge): `config.toml` gerçeği anlatmıyor — dosya ya
+canlı ayarla eşitlenmeli ya da başına "bu dosya Lovable deploy'unda etkisizdir"
+notu düşülmeli. Eşitleme için canlı ayarın okunabilmesi gerekiyor (panel işi).
+Bu tespit yapılmadan blok eklemek, yanlış belgeyi büyütmek olurdu.
+
+## Nerede kaldık
+
 - Tarih: 24.08.2026 (gece oturumu · 4. blok)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok
