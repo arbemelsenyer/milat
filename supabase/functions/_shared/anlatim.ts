@@ -67,11 +67,23 @@ export type Anlatim = {
   hata: (sebep: string) => Promise<void>;
 };
 
+/* KOŞUMA AİT ANAHTARLAR — her koşumda yeniden yazılır ya da silinir.
+   `last_output` BİLEREK birleştiriliyor (aşağıya bak): aynı satıra başka
+   fonksiyonlar da yazıyor — `masa-kalem-karsilastir/index.ts:256` oraya
+   `karsilastirma` koyuyor. Birleştirme kalkarsa o veri kaybolur.
+   AMA birleştirme, koşumun KENDİ sonucunu da taşıyordu: yeni koşum `eksik`
+   yazmayınca ÖNCEKİ koşumun `eksik`i sağ kalıyor ve defter kendi içinde
+   çelişiyordu ("1 aday çıkardım" + "yeni aday kalmadı" — 24.08 canlı kanıt).
+   Çözüm: yalnız bu iki anahtar koşuma aittir; koşum başında silinir, kapanışta
+   açıkça yazılır. Başka yazıcıların anahtarlarına DOKUNULMAZ. */
+const KOSUM_ANAHTARLARI = ["yapildi", "eksik"] as const;
+
 /* Satırı bulur/açar ve last_output'u KORUYARAK günceller. Hiçbir hata dışarı
-   sızmaz; anlatım yazılamazsa çağıran işlem etkilenmez. */
+   sızmaz; anlatım yazılamazsa çağıran işlem etkilenmez.
+   `sil`: birleştirmeden SONRA düşürülecek anahtarlar. */
 async function yaz(
   admin: any, sahip: AnlatimSahibi, status: string,
-  adimlar: Adim[], ek?: Record<string, unknown>,
+  adimlar: Adim[], ek?: Record<string, unknown>, sil?: readonly string[],
 ): Promise<void> {
   try {
     let sorgu = admin.from("agent_states").select("id, last_output")
@@ -89,10 +101,13 @@ async function yaz(
       } catch { /* okunamayan eski çıktı korunmaz, üstüne yazılmaz */ }
     }
 
+    const cikti: Record<string, unknown> = { ...eskiCikti, adimlar, ...(ek ?? {}) };
+    for (const anahtar of sil ?? []) delete cikti[anahtar];
+
     const govde: Record<string, unknown> = {
       status,
       updated_at: simdi(),
-      last_output: { ...eskiCikti, adimlar, ...(ek ?? {}) },
+      last_output: cikti,
     };
     // Bayrak yalnız AÇIKÇA istendiğinde yazılır; masa ajanının satırı tarafa açılmaz.
     if (sahip.tarafaGorunur === true) govde.tarafa_gorunur = true;
@@ -136,7 +151,9 @@ export function anlatimAc(admin: any, sahip: AnlatimSahibi): Anlatim {
     defter_notu: null,
     async baslat(ilkAdim?: string) {
       if (ilkAdim) ekle(ilkAdim);
-      await yaz(admin, sahip, "running", adimlar);
+      // Koşum başlıyor: önceki koşumun sonucu (yapildi/eksik) burada düşer.
+      // Koşan bir ajanın satırında eski koşumun sonucu asılı kalmaz.
+      await yaz(admin, sahip, "running", adimlar, undefined, KOSUM_ANAHTARLARI);
     },
     async adim(metin: string) {
       ekle(metin);
@@ -147,10 +164,12 @@ export function anlatimAc(admin: any, sahip: AnlatimSahibi): Anlatim {
       ekle(`Yapıldı: ${kisalt(yapildi)}`);
       // "Eksik" satırı YALNIZ gerçekten eksik varsa yazılır.
       for (const e of eksikler) ekle(`Eksik: ${kisalt(e)}`);
+      // "eksik" YOKSA anahtar SİLİNİR. Yazmamak yetmiyordu: birleştirme önceki
+      // koşumun "eksik"ini sağ bırakıyordu (24.08 kusuru).
       await yaz(admin, sahip, "completed", adimlar, {
         yapildi: kisalt(yapildi),
         ...(eksikler.length ? { eksik: eksikler.map((x) => kisalt(x)) } : {}),
-      });
+      }, eksikler.length ? undefined : ["eksik"]);
       notEkle(await deneyimYaz(admin, {
         case_id: sahip.case_id, adim: sahip.agent_type, sonuc: "basarili",
         sure_ms: Date.now() - baslangic,
@@ -170,7 +189,9 @@ export function anlatimAc(admin: any, sahip: AnlatimSahibi): Anlatim {
     },
     async hata(sebep: string) {
       ekle(`Bu işi tamamlayamadım: ${kisalt(sebep, 200)}`);
-      await yaz(admin, sahip, "failed", adimlar);
+      // Koşum hata ile bitti: "yapildi" satırı yazılmaz ve ÖNCEKİ koşumdan
+      // kalan da bırakılmaz — başarısız koşum başarılı görünmez.
+      await yaz(admin, sahip, "failed", adimlar, undefined, KOSUM_ANAHTARLARI);
       notEkle(await deneyimYaz(admin, {
         case_id: sahip.case_id, adim: sahip.agent_type, sonuc: "hata",
         hata_kodu: kisalt(sebep, 80), sure_ms: Date.now() - baslangic,
