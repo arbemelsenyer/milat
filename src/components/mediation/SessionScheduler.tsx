@@ -57,6 +57,11 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
   const [date, setDate] = useState("");
   const [time, setTime] = useState("10:00");
   const [notes, setNotes] = useState("");
+  // B18: oturum kayda alınacak mı. Varsayılan false — işaretlenmeyen oturumda
+  // kayıt izni kapısı hiç çalışmaz.
+  const [kayitli, setKayitli] = useState(false);
+  // Kapı odayı açmazsa arabulucuya sebebi yazılır; sessizce bağlantısız kalmaz.
+  const [kayitEngeli, setKayitEngeli] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState(false);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [selectedPartyIds, setSelectedPartyIds] = useState<string[]>([]);
@@ -289,8 +294,16 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
     const { data, error } = await supabase.functions.invoke("create-video-room", {
       body: { sessionId },
     });
-    if (error || !data?.room_url) return null;
-    return data.room_url as string;
+    // B18: kayıtlı oturumda izin tamam değilse fonksiyon oda AÇMAZ ve sebebini
+    // yazar. Sebep ekrana konur — oturum "bağlantısız" görünüp neden olduğu
+    // anlaşılmaz halde kalmaz.
+    const yanit = (data ?? {}) as { room_url?: string; kayit_engeli?: boolean; error?: string };
+    if (yanit.kayit_engeli) {
+      setKayitEngeli(yanit.error ?? "Kayıt izni tamamlanmadığı için görüşme odası açılmadı.");
+      return null;
+    }
+    if (error || !yanit.room_url) return null;
+    return yanit.room_url;
   };
 
   const add = async () => {
@@ -302,6 +315,7 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
     const participants = parties
       .filter((p) => selectedPartyIds.includes(p.id))
       .map((p) => ({ party_id: p.id, user_id: p.user_id, role: p.party_role }));
+    setKayitEngeli(null);
     const { data: inserted, error } = await supabase.from("case_sessions").insert({
       case_id: caseId,
       session_type: type,
@@ -309,6 +323,10 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
       notes,
       status: "scheduled",
       participants,
+      // `kayitli` YALNIZ işaretliyken gönderilir. Sütun B18 göçüyle geliyor;
+      // her insert'e konursa göç çalıştırılmadan önce oturum planlama tümden
+      // kırılırdı. İşaretlenmemiş oturum (varsayılan yol) göçten bağımsız çalışır.
+      ...(kayitli ? { kayitli: true } : {}),
     } as any).select().maybeSingle();
     if (error) {
       toast({ title: "Toplantı kaydedilemedi", description: error.message, variant: "destructive" });
@@ -339,6 +357,8 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
     }
     setDate("");
     setNotes("");
+    // Kayıt işareti sonraki oturuma taşınmaz; her oturumda bilerek işaretlenir.
+    setKayitli(false);
     load();
   };
 
@@ -641,6 +661,38 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
           />
         </div>
 
+        {/* B18 · KAYITLI OTURUM İŞARETİ. İşaretlenirse görüşme odası ancak kayıt
+            izni tamamsa açılır: onay formunun açılmasından 48 saat geçmiş ve
+            bütün katılımcılar (taraf · vekil · varsa uzman) onay vermiş olmalı.
+            İşaretlenmemiş oturumda kapı hiç çalışmaz — eski davranış aynen sürer. */}
+        <div className="rounded-md border p-3 space-y-2">
+          <div className="flex items-start gap-2">
+            <Checkbox
+              id="oturum-kayitli"
+              checked={kayitli}
+              onCheckedChange={(v) => setKayitli(v === true)}
+              className="mt-0.5"
+            />
+            <div className="space-y-1">
+              <Label htmlFor="oturum-kayitli" className="text-sm font-medium cursor-pointer">
+                Bu oturum kayda alınacak
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                İşaretlerseniz görüşme odası, kayıt izni tamamlanmadan açılmaz: onay formunun
+                açılmasından 48 saat geçmiş ve taraf, vekil ile varsa uzman ayrı ayrı onay vermiş
+                olmalıdır. Bir ret kapıyı kapatır. İzin durumunu Aşama 4'teki “Kayıt protokolü”
+                kartından yönetirsiniz.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {kayitEngeli && (
+          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+            {kayitEngeli}
+          </div>
+        )}
+
         {conflicts.length > 0 && (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm space-y-2">
             <div className="font-medium text-destructive">Çakışma tespit edildi</div>
@@ -710,6 +762,13 @@ export function SessionScheduler({ caseId, niche, context, parties = [], mediato
                         </Badge>
                       ))}
                     </div>
+                  )}
+                  {s.kayitli === true && (
+                    /* B18: kayıt işareti listede de görünür — hangi oturumun kapıya
+                       tabi olduğu ekranda yazılı olmadan bilinmez. */
+                    <Badge variant="outline" className="text-[10px] mt-1 gap-1 border-primary/50 text-primary">
+                      <Circle className="h-2 w-2 fill-current" /> Kayda alınacak oturum
+                    </Badge>
                   )}
                   {s.invite_sent_at && (
                     <Badge variant="secondary" className="text-[10px] mt-1 gap-1">

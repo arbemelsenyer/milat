@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { kayitIzni, kayitIzniHataMetni } from "./kayit-izni.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,7 +53,11 @@ serve(async (req) => {
 
     const { data: session, error: sessionError } = await supabase
       .from('case_sessions')
-      .select('id, case_id, video_link')
+      // `*` bilerek: `kayitli` sütunu B18 göçüyle geliyor. Sütun adı listelenirse
+      // göç çalıştırılmadan önce yapılan HER çağrı hata döner ve çalışan video
+      // odası yolu kırılır. `*` ile sütun yoksa alan yalnızca undefined olur ve
+      // aşağıdaki kapı (=== true) hiç çalışmaz — eski davranış aynen sürer.
+      .select('*')
       .eq('id', sessionId)
       .single();
 
@@ -96,6 +101,78 @@ serve(async (req) => {
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // ---- B18: KAYIT İZNİ KAPISI ----------------------------------------
+    // Yalnız `kayitli = true` işaretli oturumlarda çalışır. İşaret varsayılan
+    // false olduğu için göç öncesinden gelen oturumların hiçbiri etkilenmez.
+    // Kapı YENİ oda açmadan önce durur; hâlihazırda odası olan bir oturum
+    // yukarıda zaten dönmüştür — çalışan bir görüşmeyi kapatmayız, kural
+    // "onay yoksa kayıt AÇILMAZ" der, "süren toplantıyı kapat" demez.
+    if (session.kayitli === true) {
+      const [talepCevap, tarafCevap, uzmanCevap] = await Promise.all([
+        supabase
+          .from('kayit_onay_talepleri')
+          .select('id, gonderim_zamani')
+          .eq('case_id', session.case_id)
+          .is('iptal_zamani', null)
+          .order('gonderim_zamani', { ascending: false })
+          .limit(1),
+        supabase
+          .from('case_parties')
+          .select('id, vekil_ad_soyad')
+          .eq('case_id', session.case_id),
+        supabase
+          .from('case_expert_assignments')
+          .select('id, status')
+          .eq('case_id', session.case_id),
+      ]);
+
+      if (talepCevap.error || tarafCevap.error || uzmanCevap.error) {
+        const neden = talepCevap.error?.message ?? tarafCevap.error?.message ?? uzmanCevap.error?.message;
+        console.error('Kayıt izni okunamadı:', neden);
+        throw new Error(`Kayıt izni okunamadı: ${neden}`);
+      }
+
+      const talep = Array.isArray(talepCevap.data) && talepCevap.data.length > 0 ? talepCevap.data[0] : null;
+      let onaylar: Array<{ katilimci_anahtari: string; durum: string }> = [];
+      if (talep) {
+        const { data: onayVerisi, error: onayHatasi } = await supabase
+          .from('kayit_onaylari')
+          .select('katilimci_anahtari, durum')
+          .eq('talep_id', talep.id);
+        if (onayHatasi) {
+          console.error('Kayıt onayları okunamadı:', onayHatasi.message);
+          throw new Error(`Kayıt onayları okunamadı: ${onayHatasi.message}`);
+        }
+        onaylar = (onayVerisi ?? []) as Array<{ katilimci_anahtari: string; durum: string }>;
+      }
+
+      const izin = kayitIzni({
+        talep: talep as { id: string; gonderim_zamani: string } | null,
+        taraflar: (tarafCevap.data ?? []) as Array<{ id: string; vekil_ad_soyad?: string | null }>,
+        uzmanAtamalari: (uzmanCevap.data ?? []) as Array<{ id: string; status?: string | null }>,
+        onaylar,
+        simdiMs: Date.now(),
+      });
+
+      if (!izin.izinli) {
+        // Günlüğe yalnız sayı yazılır; katılımcı adı/verisi yazılmaz (m.1, KVKK).
+        console.log(
+          `Kayıt izni yok (session ${sessionId}): ${izin.engeller.join(' · ')} ` +
+          `[katılımcı ${izin.katilimciSayisi} · onay ${izin.onayVeren} · ret ${izin.retVeren} · bekleyen ${izin.bekleyen}]`
+        );
+        return new Response(
+          JSON.stringify({
+            success: false,
+            kayit_engeli: true,
+            error: kayitIzniHataMetni(izin),
+            engeller: izin.engeller,
+            kalan_dakika: izin.kalanDakika,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Jitsi rooms are public to anyone who knows the name, so the suffix must be

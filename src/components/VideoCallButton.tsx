@@ -64,6 +64,18 @@ export function VideoCallButton({ sessionId, existingRoomUrl }: VideoCallButtonP
         throw error;
       }
 
+      // B18: kayıtlı oturumda kayıt izni tamam değilse oda açılmaz. Sebep
+      // fonksiyondan geliyor; genel "hata" yerine gerçek engeli göster.
+      const yanit = (data ?? {}) as { room_url?: string; kayit_engeli?: boolean; error?: string };
+      if (yanit.kayit_engeli) {
+        toast({
+          title: 'Görüşme odası açılmadı',
+          description: yanit.error ?? 'Kayıt izni tamamlanmadı.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       if (data?.room_url) {
         setRoomUrl(data.room_url);
         setDialogOpen(true);
