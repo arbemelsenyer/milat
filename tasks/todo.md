@@ -1,3 +1,80 @@
+## Nerede kaldık — 23.08.2026 (108) · "YENİDEN ÖNER" KUSURUNUN TEŞHİSİ (yalnız inceleme, kod değişmedi)
+
+İŞ: PROJE_OZETI.md "Sıradaki adım 1" — canlı kusurun teşhisi. Kod YAZILMADI;
+üç bulgunun üçü de kullanıcıya görünen akışı/yetkiyi değiştirir, kurucu onayı şart.
+
+OKUNAN DOSYALAR: src/components/AjanPenceresi.tsx (300-1060) ·
+src/components/bilirkisi/BilirkisiAlanlari.tsx (1-270) ·
+src/components/bilirkisi/BilirkisiTarafPaneli.tsx (düğme dökümü) ·
+supabase/functions/bilirkisi-secim/index.ts (1-500, adım listesi) ·
+supabase/functions/taraf-cevap/index.ts (tam, 101 satır) ·
+supabase/functions/bilirkisi-sorulari/index.ts (140-170) ·
+supabase/functions/_shared/anlatim.ts (1044-1317: sinirDenetle · anaAjanaBildir)
+
+YAPILDI — BULGU 1: SOHBETTEKİ "YENİDEN ÖNER" BİLİRKİŞİ KOLUNA HİÇ BAĞLI DEĞİL.
+- AjanPenceresi.tsx:1030-1036 — "Yeniden öner" düğmesi YALNIZ `arabulucu_onayi`
+  ve `akis_onay_bekliyor` tipindeki bildirimlerde çiziliyor (onayMi kapısı,
+  satır 1011-1013) ve `talimatReddet(g, "")` çağırıyor.
+- talimatReddet (AjanPenceresi.tsx:624-638) şunu yapar: arabulucu_talimatlari
+  satırını 'reddedildi' yapar · ajan_gorevleri satırını 'atlandi' yapar ·
+  sohbete "Yeniden önereceğim. Yeni talimatınızı yazabilirsiniz." yazar ·
+  talimat kipini açar. bilirkisi-secim HİÇ ÇAĞRILMAZ.
+- SONUÇ: bu düğme hiçbir koşulda yeni bilirkişi adayı üretmez. Kusur "aday
+  üretmiyor" değil, "bu düğmenin işi bu değil".
+
+YAPILDI — BULGU 2: EKRANDA GÖRÜLEN METİN BAŞKA FONKSİYONUN ÇIKTISI.
+- "Yapıldı: … soru başlığı hazırladım / Eksik: … tarafın bilirkişi onayı
+  bekleniyor / Eksik: Bilirkişi görevlendirme kararı sizde" cümlelerinin
+  kaynağı bilirkisi-sorulari/index.ts:152-161 (anlatim.bitti). Bu satırlar
+  agent_states'e yazılır ve sohbette "adım" satırı olarak görünür.
+- Beklenen "Bu alanda kayıtlı başka uzman yok." cümlesi ise YALNIZCA
+  bilirkisi-secim/index.ts:424-448'de, `aday_cikar` / `ikinci_tur` / `alan_tara`
+  adımı sıfır aday döndürdüğünde yazılır. Bu adımlara çağrı gelmediği için
+  cümle hiç üretilmemiştir — kod kusuru değil, çağrı yokluğu.
+- Aynı işi yapan düğmenin adı iki yüzeyde AYRI: sohbette "Yeniden öner"
+  (talimat reddi), bilirkişi panelinde "İkinci tur"
+  (BilirkisiAlanlari.tsx:253-255 → adim "ikinci_tur"). 21.08 kararı "aynı işi
+  yapan metin üründe TEK" idi; panel eski adıyla duruyor.
+
+YAPILDI — BULGU 3: "CEVABINIZI ŞU AN KAYDEDEMEDİM" — YETKİ KONTROLÜ AYRIŞMIŞ.
+- Sohbetten cevap yazınca AjanPenceresi.tsx:790-804 `taraf-cevap` çağırıyor;
+  403/hata dönerse ekrana AYNEN "Cevabınızı şu an kaydedemedim." yazılıyor.
+- taraf-cevap/index.ts:74-78 arabulucuyu YALNIZ `cases.assigned_mediator_id`
+  üzerinden tanıyor.
+- bilirkisi-secim/index.ts:161-166 ise arabulucuyu ÜÇ yoldan tanıyor:
+  admin rolü VEYA `assigned_mediator_id` VEYA `cases.user_id`.
+- 13.08 dersi: `assigned_mediator_id` her dosyada arabulucunun kimliğini
+  taşımıyor; dosya sahibi `cases.user_id`de duruyor. Test dosyasında bu alan
+  boş ya da farklıysa taraf-cevap 403 döner ve ekranda tam olarak o cümle çıkar.
+- DOĞRULANMADI: MP-2026-1016 dosyasının assigned_mediator_id / user_id
+  değerleri canlıda okunmadı (SQL Code'da değil). Bulgu koddan kesin,
+  canlı eşleşme kesin değil.
+
+EKSİK KALDI
+1. Ekranın kendiliğinden tazelenmemesi doğrulanamadı. AjanPenceresi.tsx:401-421
+   `agent_states` ve `ajan_gorevleri` için postgres_changes aboneliği kuruyor,
+   ayrıca 60 saniyede bir yukle() çağırıyor. İki tablonun realtime yayınında
+   (supabase_realtime publication) olup olmadığı DEPODAN GÖRÜLMEZ.
+   GİDERMEK İÇİN: canlıda publication sorgusu — kimde: Claude (SQL).
+2. Üç bulgunun hiçbiri düzeltilmedi. Üçü de kullanıcıya görünen akışı ya da
+   yetki sınırını değiştirir; CLAUDE.md "önceden onay alınmadan yapılmaz".
+   GİDERMEK İÇİN — kurucunun seçeceği üç ayrı karar:
+   (a) BULGU 1: sohbetteki "Yeniden öner", bilirkişi aday bildirimi üzerinde
+       bilirkisi-secim `ikinci_tur` adımına bağlansın mı? Kimde: kurucu kararı,
+       sonra Code (AjanPenceresi.tsx, tek dal).
+   (b) BULGU 2: bilirkişi panelindeki "İkinci tur" düğmesinin adı "Yeniden öner"
+       olsun mu? Kimde: kurucu kararı, sonra Code (BilirkisiAlanlari.tsx:254).
+   (c) BULGU 3: taraf-cevap arabulucuyu bilirkisi-secim ile AYNI ölçütle mi
+       tanısın (admin / assigned_mediator_id / cases.user_id)? Bu bir YETKİ
+       genişletmesidir, anayasa m.1 gereği kurucu onayı olmadan yazılmaz.
+       Kimde: kurucu kararı, sonra Code (taraf-cevap/index.ts:74-78) + redeploy.
+3. KAPSAM DIŞI, DÜZELTİLMEDİ (rapor): `akis-onayla` çağrısının yetki ölçütü
+   ayrıca okunmadı; "Onayı şu an kaydedemedim" (AjanPenceresi.tsx:739) aynı
+   kökten geliyor olabilir. Kimde: ayrı iş kalemi.
+
+BLOK DIŞI NOT: Bu turda kod değişmediği için mimari/ ve yol-haritasi.md
+güncellenmedi (CLAUDE.md belge güncelleme kuralı: yalnız inceleme turunda atlanır).
+
 ## Nerede kaldık — 21.08.2026 (107) · AJAN SORU KALIBI VE BİLİRKİŞİ TÜKENME AKIŞI
 
 KURUCU KARARI (21.08, sohbet ekranı incelemesi)
