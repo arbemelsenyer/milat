@@ -78,15 +78,21 @@ Deno.serve(async (req) => {
       return json({ onaylandi: false, sebep: "Bu onay zaten kapanmış." });
     }
 
-    // YETKİ: yalnız görevli arabulucu ya da yönetici.
+    /* YETKİ TEK ÖLÇÜTLE (23.08 kurucu kararı — `taraf-cevap/index.ts:75-89`
+       ile AYNI blok): yönetici · görevli arabulucu · dosya sahibi.
+       Burası yalnız `assigned_mediator_id`ye bakıyordu; o alan her dosyada dolu
+       değil (13.08 dersi), yani kendi dosyasının sahibi olan arabulucu onayı
+       verirken 403 alıyordu. 23.08 dersi tam da bunu söylüyor: iki fonksiyon
+       iki farklı ölçütle bakarsa biri sessizce 403 döner.
+       ÖLÇÜT GENİŞLETİLMEDİ, ürünün geri kalanıyla EŞİTLENDİ. RLS'e dokunulmadı. */
     const caseId = String((gorev as any).case_id);
     const { data: dosya } = await admin.from("cases")
-      .select("assigned_mediator_id").eq("id", caseId).maybeSingle();
-    let yetkili = String((dosya as any)?.assigned_mediator_id ?? "") === userId;
+      .select("assigned_mediator_id, user_id").eq("id", caseId).maybeSingle();
+    let yetkili = String((dosya as any)?.assigned_mediator_id ?? "") === userId
+      || String((dosya as any)?.user_id ?? "") === userId;
     if (!yetkili) {
-      const { data: roleRow } = await admin.from("user_roles")
-        .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
-      yetkili = !!roleRow;
+      const { data: yonetici } = await admin.rpc("has_role", { _user_id: userId, _role: "admin" });
+      yetkili = !!yonetici;
     }
     if (!yetkili) return json({ error: "Bu onayı verme yetkiniz yok" }, 403);
 
