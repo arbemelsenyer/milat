@@ -45,6 +45,7 @@ import { ExpertSelector } from "@/components/mediation/ExpertSelector";
 import { Phase3ErrorBoundary } from "@/components/mediation/Phase3ErrorBoundary";
 import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 import { ProcessTrackerPanel } from "@/components/mediation/ProcessTrackerPanel";
+import { KAYIT_ONAY_SAAT, KAYIT_ONAY_SURUMU, KAYIT_TEK_KAPI_UYARISI } from "@/lib/kayitProtokolu";
 import { AgentControlPanel } from "@/components/mediation/AgentControlPanel";
 import { AjanPenceresi } from "@/components/AjanPenceresi";
 import { CaseQaPanel } from "@/components/mediation/CaseQaPanel";
@@ -1942,11 +1943,7 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik, isMediato
    kaydeder; dayanağı (nasıl alındığı) zorunlu alandır — kayıtsız onay yazılmaz.
    Not (constitution m.11): ekran metninde dış ürün adı kullanılmaz; yasak,
    araç adı verilmeden tarif edilir. */
-const KAYIT_ONAY_SAAT = 48;
-const KAYIT_ONAY_SURUMU = "v1";
-const KAYIT_TEK_KAPI_UYARISI =
-  "Kayıt yalnız MediPact oturum ekranından alınır. Harici araçlarla (dış kayıt veya döküm " +
-  "uygulamaları, görüntülü görüşme aracının kendi kayıt özelliği, telefonla ses alma) kayıt yapılamaz.";
+// Kayıt protokolü sabitleri src/lib/kayitProtokolu.ts'te — iki ekranın tek kaynağı.
 
 type KayitKatilimci = {
   anahtar: string;
@@ -1965,7 +1962,7 @@ function kayitZaman(iso?: string | null): string {
 
 function kalanSureMetni(hedefMs: number, simdiMs: number): string {
   const fark = hedefMs - simdiMs;
-  if (fark <= 0) return "48 saat doldu";
+  if (fark <= 0) return `${KAYIT_ONAY_SAAT} saat doldu`;
   const saat = Math.floor(fark / 3600000);
   const dakika = Math.floor((fark % 3600000) / 60000);
   return `Kalan süre: ${saat} saat ${dakika} dakika`;
@@ -2055,7 +2052,7 @@ function KayitProtokoluKarti({ caseRow }: { caseRow: CaseRow }) {
       metin_surumu: KAYIT_ONAY_SURUMU,
     });
     if (error) setHata(`Onay formu açılamadı: ${error.message}`);
-    else { toast({ title: "Onay formu açıldı", description: "48 saatlik süre başladı." }); await yukle(); }
+    else { toast({ title: "Onay formu açıldı", description: `${KAYIT_ONAY_SAAT} saatlik süre başladı.` }); await yukle(); }
     setBusy(null);
   }
 
@@ -2092,7 +2089,7 @@ function KayitProtokoluKarti({ caseRow }: { caseRow: CaseRow }) {
   const acilabilir = !!talep && sureDoldu && katilimcilar.length > 0 && onayVeren === katilimcilar.length;
   const engeller: string[] = [];
   if (!talep) engeller.push("onay formu henüz açılmadı");
-  if (talep && !sureDoldu) engeller.push("48 saatlik süre dolmadı");
+  if (talep && !sureDoldu) engeller.push(`${KAYIT_ONAY_SAAT} saatlik süre dolmadı`);
   if (katilimcilar.length === 0) engeller.push("dosyada katılımcı kaydı yok");
   if (retVeren > 0) engeller.push(`${retVeren} katılımcı onay vermedi`);
   if (bekleyen > 0) engeller.push(`${bekleyen} katılımcı henüz cevap vermedi`);
@@ -2103,7 +2100,7 @@ function KayitProtokoluKarti({ caseRow }: { caseRow: CaseRow }) {
         <div>
           <h3 className="font-semibold">Kayıt protokolü</h3>
           <p className="text-xs text-muted-foreground">
-            Oturum kaydı ancak tüm katılımcıların yazılı onayıyla ve onay formunun açılmasından 48 saat sonrası için planlanabilir.
+            Oturum kaydı ancak tüm katılımcıların yazılı onayıyla ve onay formunun açılmasından {KAYIT_ONAY_SAAT} saat sonrası için planlanabilir.
           </p>
         </div>
         {talep && (
@@ -2124,7 +2121,7 @@ function KayitProtokoluKarti({ caseRow }: { caseRow: CaseRow }) {
       ) : !talep ? (
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">
-            Onay formu açılmadı. Form açıldığında taraf ekranında kayıt onay kartı görünür ve 48 saatlik süre başlar.
+            Onay formu açılmadı. Form açıldığında taraf ekranında kayıt onay kartı görünür ve {KAYIT_ONAY_SAAT} saatlik süre başlar.
           </p>
           <Button onClick={formuAc} disabled={busy === "form"}>
             {busy === "form" ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
@@ -2195,7 +2192,7 @@ function KayitProtokoluKarti({ caseRow }: { caseRow: CaseRow }) {
 
           <div className={`text-sm rounded border p-3 ${acilabilir ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
             {acilabilir
-              ? "Kayıt açılabilir: tüm katılımcılar onay verdi ve 48 saatlik süre doldu."
+              ? `Kayıt açılabilir: tüm katılımcılar onay verdi ve ${KAYIT_ONAY_SAAT} saatlik süre doldu.`
               : `Kayıt açılamaz — ${engeller.join(" · ")}.`}
           </div>
           <p className="text-xs text-muted-foreground">

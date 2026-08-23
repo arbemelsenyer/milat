@@ -37,6 +37,7 @@ import { formatDisputeType } from "@/lib/disputeLabels";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { KAYIT_ONAY_SAAT, KAYIT_ONAY_SURUMU, KAYIT_ONAY_METNI } from "@/lib/kayitProtokolu";
 
 // YZ kullanım beyanı — metin ve sürümü tek yerde; sürüm değişirse onay yeniden istenir.
 const YZ_BEYAN_SURUMU = "v1";
@@ -1286,16 +1287,7 @@ function BraketTarafBolumu({ caseId, partyId }: { caseId: string; partyId: strin
    Kör veri (m.1): kart yalnız tarafın KENDİ kararını gösterir; karşı tarafın
    onay verip vermediği bu ekrana hiçbir yoldan yazılmaz.
    Kayıt/döküm yalnız arabulucuya görünür; bu ekranda kayıt dinleme/okuma yoktur. */
-const KAYIT_ONAY_SURUMU = "v1";
-const KAYIT_ONAY_SAAT = 48;
-const KAYIT_ONAY_METNI = `Oturumun ses kaydının alınabilmesi için her katılımcının (taraflar, vekiller ve varsa uzman) ayrı ayrı yazılı onayı gerekir. Bir katılımcı bile onay vermezse kayıt alınmaz.
-
-· Kayıt yalnız MediPact oturum ekranından alınır. Harici araçlarla (dış kayıt veya döküm uygulamaları, görüntülü görüşme aracının kendi kayıt özelliği, telefonla ses alma) kayıt yapılamaz.
-· Kayıt ve dökümü yalnız arabulucu görür; karşı tarafa hiçbir ekrandan açılmaz.
-· Ses kaydı, süreç bitiminden 24 saat sonra kalıcı olarak silinir. Döküm süreç sonuna kadar durur ve son tutanakla birlikte silinir.
-· Kayıtlı oturum, bu form gönderildikten en erken 48 saat sonrası için planlanabilir.
-· Onay vermek zorunlu değildir: onay vermemeniz süreci durdurmaz, yalnız kayıt alınmaz. Verdiğiniz onayı istediğiniz zaman geri alabilirsiniz.
-· Kararınız (onay ya da ret) tutanağa işlenmek üzere kayda geçer.`;
+// Kayıt protokolü sabitleri src/lib/kayitProtokolu.ts'te — iki ekranın tek kaynağı.
 
 function kayitZamanMetni(iso?: string | null): string {
   if (!iso) return "—";
