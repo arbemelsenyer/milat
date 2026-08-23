@@ -14,7 +14,11 @@
   (1) jobid 1 `send-session-reminders` 401 SÜRÜYOR · (2) jobid 2
   `dual-ai-validate` YENİ: hiç yetki başlığı yok, kesin 401 · (3) jobid 7
   `ajan-nobetci` her çağrıda 5000 ms zaman aşımı — iş koşuyor ama denetim kanalı kör.
-- Sıradaki uygulanabilir iş: Cowork cron cevabı → gelmezse kuyruktaki bağımsız P1/P2
+- Sıradaki uygulanabilir iş: **kuyrukta açık P0/P1/P2 teknik iş KALMADI.**
+  Bekleyenler: (a) Cowork — üç cron + geriye dönük tek satır · (b) kurucu — aşama
+  düğmesinin canlı kontrolü · (c) kurucu kararı — imza akışı (P2, §7.1/§7.5) ·
+  (d) P3 `soru_cevaplandi`. Kuyruğun geri kalanı ürün özelliği maddeleridir
+  (A1–A12 · B13–B22 · C23–C26 · D27–D29) ve §7.1 gereği ürün kararı ister.
 
 ### BU TURDA CANLIYA ÇIKANLAR
 | iş | commit | deploy |
@@ -24,6 +28,12 @@
 | P1 · `ZORUNLU_GIRDI` sözleşmesi tamamlandı | `618fb74` | **36 fonksiyon fan-out** — "hepsi başarılı, başarısız yok" |
 | P2 · kayıt protokolü tek kaynak | `7032284` | publish |
 | P1 · dosya kapanışı `closed_at` | `aef716e` | publish |
+
+**CANLI KANIT (publish zinciri):** `index-B7Onz7o6` → `DThEJGGi` → `Pq-m5pGk` → **`DOQRydpB`**.
+Son pakette: `"arabulucu elle ilerletti"` 1 · `select("closed_at")` 1 ·
+`"Harici araçlarla"` **1** (publish öncesi 2 idi) · `anlasamama` var.
+`select("updated_at")` kalan tek kullanım BAŞKA bir yerdir (dosya durgunluk
+göstergesi, `MediationEngine:10271`) ve doğru hâliyle durur.
 
 **CANLI KANIT (publish):** paket `index-B7Onz7o6.js` → **`index-DThEJGGi.js`**.
 Yeni pakette `"arabulucu elle ilerletti"` VAR (1 kez) ve `"iz yazılamadı"` VAR
