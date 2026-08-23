@@ -23,6 +23,7 @@ import {
   motoraBagliMi, girdiTamamla, talimatiDenetle, TALIMAT_ALMAYAN, talimatOzeti,
   devirHedefi, bellekVarMi, bellekYaz, sinirdanGecir, anaAjanaBildir, devirYaz,
 } from "../_shared/anlatim.ts";
+import { akisHataBasligi, akisHataMetni } from "./hata-metni.ts";
 
 /* BÖLÜM 1 — DEFTER NOTU NEREYE YAZILIR:
    akis_olaylari tablosunda not/sonuc diye bir KOLON YOKTUR. Kolonlar:
@@ -214,11 +215,16 @@ async function onayIsteyenAdimlar(admin: any, caseId: string): Promise<string[]>
 
 /* Akış hatası kaydı. Deneme sayısı bu satırlardan okunduğu için HER DENEME
    kendi satırını bırakır; ama AYNI ETİKET + AYNI METİN üst üste yazılmaz. */
+/* `baslik` KODDAN üretilir (fonksiyon adı + HTTP durum kodu), taraf verisi
+   taşıyamaz ve olduğu gibi kalır. `sebep` iç çağrının cevap gövdesidir; taraf
+   verisi taşıyabildiği için sınır katmanından geçer, geçemezse metne konmaz.
+   Gerekçesi ve canlı kanıtı: ./hata-metni.ts */
 async function hataYaz(
-  admin: any, caseId: string, partyId: string | null, etiket: string, mesaj: string,
+  admin: any, caseId: string, partyId: string | null, etiket: string,
+  baslik: string, sebep = "",
 ): Promise<void> {
   try {
-    const gerekce = `${etiket} ${sinirdanGecir(mesaj, "akis-yurut.hata")}`.slice(0, 500);
+    const gerekce = `${etiket} ${akisHataMetni(baslik, sebep)}`.slice(0, 500);
     const { data: mevcut } = await admin.from("ajan_gorevleri")
       .select("id, gerekce").eq("case_id", caseId).eq("gorev_tipi", "akis_hatasi").limit(300);
     if (((mevcut ?? []) as any[]).some((r) => String(r?.gerekce ?? "") === gerekce)) return;
@@ -684,7 +690,7 @@ Deno.serve(async (req) => {
         const sebep = dosyaDuraklatmasi.sebep || "sebep yazılmadı";
         ozet.notlar.push(`${caseId}: arabulucu akışı durdurdu — ${sebep}`);
         await hataYaz(admin, caseId, partyId, `[dur:${caseId}]`,
-          `Arabulucu akışı durdurdu: ${sebep}`);
+          "Arabulucu akışı durdurdu.", sebep);
         continue;
       }
       const adimDuraklatmalari = duraklatmalar
@@ -805,7 +811,7 @@ Deno.serve(async (req) => {
           const eksikMetni = girdi.eksik.length ? girdi.eksik.join(", ") : "gerekli bilgi";
           ozet.notlar.push(`${kuralKodu}: ${eksikMetni} dosyada bulunamadı`);
           await hataYaz(admin, caseId, partyId, etiket,
-            `${fonksiyon} çalıştırılamadı: ${eksikMetni} dosyada bulunamadı.`);
+            `${fonksiyon} çalıştırılamadı.`, `${eksikMetni} dosyada bulunamadı.`);
           continue;
         }
         if (girdi.tamamlanan.length > 0) {
@@ -837,7 +843,7 @@ Deno.serve(async (req) => {
           ozet.hatali_kural++;
           ozet.notlar.push(`${kuralKodu}: çalıştırılamadı — ${sonSebep}`);
           await hataYaz(admin, caseId, partyId, etiket,
-            `${fonksiyon} çalıştırılamadı: ${sonSebep}`);
+            akisHataBasligi(fonksiyon, sonSebep), sonSebep);
         }
       }
 
