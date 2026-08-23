@@ -1,5 +1,83 @@
 ## Nerede kaldık
 
+- Tarih: 24.08.2026 (gece oturumu)
+- Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
+- Aktif görev: bilirkişi "Yeniden öner" CANLI TESTİ (kurucu talimatı: test dosyasıyla, kendim başlatarak)
+- Son tamamlanan iş: A5 (iletişim tercihi sayfası) + B18 (kayıt izni kapısı) — ikisi de canlıda
+- Doğrulama sonucu: `npm run test` 49/49 (yeni B18 tezgâhı 15/15) · tsc hatasız · build hatasız · lint 2365 (2367'den düştü)
+- Açık blokaj: yok
+- Sıradaki uygulanabilir iş: bilirkişi "Yeniden öner" canlı testi → sonra B18'in iki P2 parçası
+
+### YAPILDI — 24.08.2026 · P1 · A5 iletişim tercihi (`469e0b2`, PUBLISH edildi)
+Teşhis 23.08'de bitmişti; bu turda uygulandı.
+- `NotificationSettings.tsx`: hiçbir gönderim yolunun okumadığı on anahtar kaldırıldı.
+  Sayfa artık taraf olunan dosyaları listeleyip dosya içi "İletişim Tercihlerim"
+  sekmesine götürüyor. Çalışan "Deneme bildirimi" korundu.
+  Yan fayda: koşullu `useState` (eski satır 81) düzeldi — hook sırası sabitlendi.
+- `CaseRoom.tsx`: `?sekme=<ad>` ile taraf sekmesi dışarıdan açılabiliyor
+  (`TARAF_SEKMELERI` beyaz listesi; bilinmeyen değer yok sayılır, boş sekme çıkmaz).
+- `AppNavbar.tsx`: "Bildirim Ayarları" → "İletişim Tercihleri" (tek ad kuralı).
+- `notification_preferences` tablosu SİLİNMEDİ (§7.3).
+
+### YAPILDI — 24.08.2026 · P1 · B18 kayıt izni kapısı (`71774b8`, DEPLOY edildi)
+KURUCU KARARI: seçenek (a) — `case_sessions.kayitli` boolean, varsayılan false.
+Şart: çalışan hiçbir yol bozulmayacak.
+
+- `supabase/migrations/20260824090000_b18_kayitli_oturum.sql` yazıldı (idempotent).
+- `create-video-room/kayit-izni.ts` (YENİ, saf işlev): 48 saat + oybirliği hesabı.
+  Ölçüt, arabulucu panelindeki `KayitProtokoluKarti` hesabının BİREBİR aynısı
+  (23.08 dersi: iki ölçüt = sessiz yanlış cevap). Engel metni sayı taşır, isim taşımaz (m.1).
+- `tests/b18-kayit-izni.test.ts`: 15 durum — 48 saat dolmadı · tek ret · sessiz
+  katılımcı · vekil/uzman ayrı onay · boş katılımcı listesi · bozuk tarih.
+- `create-video-room/index.ts`: kapı YALNIZ `kayitli === true` iken ve YENİ oda
+  açmadan önce çalışır. Odası olan oturum yukarıda zaten dönüyor — kural
+  "onay yoksa kayıt AÇILMAZ" der, "süren toplantıyı kapat" demez.
+- `SessionScheduler.tsx`: "Bu oturum kayda alınacak" kutusu · listede rozet ·
+  kapı odayı açmazsa sebebi ekranda yazılı.
+- `VideoCallButton.tsx`: genel "hata" yerine gerçek engel metni.
+
+ÇALIŞAN YOLU KORUMA (kurucunun şartı — CANLI KANITLA doğrulandı):
+- Fonksiyon oturum satırını `select('*')` ile okur; sütun adı listelenseydi göç
+  öncesi HER çağrı hata dönerdi.
+- Ön yüz insert'e `kayitli` YALNIZ işaretliyken eklenir.
+- CANLI SORGU (24.08): `case_sessions` 31 satır · `kayitli IS DISTINCT FROM false` = **0**
+  · `kayitli = true` = **0** · `video_link` dolu olan 4 satır etkilenmedi.
+  Yani mevcut 31 oturumun hiçbirinde kapı çalışmıyor. Şart sağlandı.
+
+### GÖÇ DURUMU — sütun CANLIDA ZATEN VAR (24.08)
+`information_schema` sorgusu: `kayitli boolean NOT NULL DEFAULT false` mevcut.
+Sütunun açıklama metni benim göç dosyamdakinden FARKLI — yani sütunu benim
+dosyam değil, başka bir el (kurucu/Cowork) oluşturmuş. Buradan kimin çalıştırdığı
+tespit edilemiyor; tespit edilemeyeni "ben yaptım" diye yazmıyorum.
+Sonuç değişmiyor: canlı şema, kararı (a) birebir karşılıyor.
+`20260824090000_b18_kayitli_oturum.sql` `ADD COLUMN IF NOT EXISTS` olduğu için
+çalıştırılırsa NO-OP'tur; yalnız `COMMENT` satırı açıklamayı tazeler.
+**Cowork paketi GEREKMİYOR** — çalıştırılacak bir şey kalmadı.
+
+### DEPLOY KAYDI — 24.08.2026
+- PUBLISH (ön yüz): iki kez — `469e0b2` sonrası ve `71774b8` sonrası. Lovable
+  `latest_commit_sha` her ikisinde de push'u görmüş.
+- REDEPLOY: `create-video-room` (yalnız o; `_shared/**` değişmedi → fan-out yok).
+  Lovable ajanı doğruladı: "71774b8 sürümü canlıda (`kayit-izni.ts` dahil)".
+  NOT: MCP çağrısı yine istemci tarafında 300 sn'de zaman aşımına uğradı, deploy
+  SUNUCUDA BAŞARILI oldu. 23.08 dersi tekrar geçerli: **zaman aşımı = başarısızlık
+  DEĞİL; önce `list_messages`'a bak, işi tekrarlama.**
+- Lovable ajanı `types.ts`'i tazeledi (`2eb5a40` + `0a35de0`); yerel `main` bu iki
+  commit'i fast-forward ile aldı. Kod değişikliği yok, yalnız üretilen tip dosyası.
+
+### AÇIK — B18'in kalan iki parçası (bu karardan bağımsız)
+- [ ] P2 · Harici araç yasağı metni iki ekranda da yazılı olmalı (taraf + arabulucu).
+      Arabulucu tarafında `KAYIT_TEK_KAPI_UYARISI` var; taraf ekranında yok.
+- [ ] P2 · Silme kuralı: ses süreç bitiminden 24 saat sonra, döküm süreç sonunda;
+      nöbetçi turunda otomatik, satıra silme zamanı + notu yazılarak.
+
+### NOT — commit edilmemiş yabancı değişiklik (dokunulmadı)
+`CLAUDE.md` ve `COWORK.md` çalışma ağacında değişik duruyor; kurucunun kendi
+düzenlemesi. §11 gereği ellenmedi, commit'lenmedi.
+
+---
+## Nerede kaldık
+
 - Tarih: 23.08.2026 (akşam oturumu · 3. blok) — **`medipact dur` ile GÜVENLİ DURAK**
 - Aşama: DAOS · canlı doğrulama döngüsü
 - Aktif görev: yok — yarım iş yok, commit edilmemiş değişiklik yok
