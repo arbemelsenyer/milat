@@ -1299,27 +1299,64 @@ function PhaseRenderer({ phase, caseRow, reload, isMediator, userId, onAdvance, 
   randevuTetik?: { nonce: number } | null;
   onRandevuAyarla?: () => void;
 }) {
+  /* AŞAMA GEÇİŞİ SUNUCUYA İZ BIRAKIR (24.08.2026 kusuru).
+     "Aşama N+1'e Geç →" düğmesi `onAdvance` üzerinden YALNIZ adres çubuğundaki
+     `phase` parametresini değiştiriyordu; `cases.current_phase` güncellenmiyordu.
+     Dört sonucu vardı:
+       · dosya sunucuda eski aşamada kalıyordu (Dashboard ve kokpit bayat),
+       · koşucunun aşama değerlendirmesi (akis-yurut → asamaIlerlet) bayat
+         numaradan koşuyordu,
+       · asamaIlerlet'in "arabulucu elle geri aldıysa ajan aynı geçişi tekrar
+         denemez" güvencesi BOŞTU: elle geçiş iz bırakmadığı için `[gecis:X->Y]`
+         satırı hiç doğmuyor, dedupe hep boş küme üzerinde çalışıyordu,
+       · Aşama 7 (Belgeler & Kapanış) sunucuda hiç görünmüyordu — kapanışa gelen
+         dosyanın sunucuda izi yoktu.
+     İz, koşucunun yazdığıyla AYNI etiketi taşır (`[gecis:X->Y]`); dedupe ancak
+     böyle gerçekten çalışır. Sol menüdeki gezinme (gotoPhase) DEĞİŞMEDİ: bakmak
+     için aşamaya geçmek dosyayı ilerletmez. */
   async function bumpPhase(next: number) {
-    if ((caseRow.current_phase ?? 1) < next) {
-      await supabase.from("cases").update({ current_phase: next } as any).eq("id", caseRow.id);
-      reload();
+    const mevcut = caseRow.current_phase ?? 1;
+    if (mevcut >= next) return;
+    const { error } = await supabase.from("cases")
+      .update({ current_phase: next } as any).eq("id", caseRow.id);
+    if (error) {
+      toast({ title: "Aşama kaydedilemedi", description: error.message });
+      return;
     }
+    /* SESSİZ DÜŞME YOK: geçiş yazıldı, iz yazılamazsa geri alınmaz ama söylenir. */
+    const { error: izErr } = await supabase.from("ajan_gorevleri").insert({
+      case_id: caseRow.id, gorev_tipi: "asama_gecisi", durum: "yapildi",
+      hedef_party_id: null,
+      gerekce: `[gecis:${mevcut}->${next}] arabulucu elle ilerletti`,
+      sonuc: "arabulucu ilerletti",
+    });
+    if (izErr) toast({ title: "Aşama geçti, iz yazılamadı", description: izErr.message });
+    reload();
+  }
+
+  /* Düğmenin ADI ne diyorsa onu yapar: önce dosyayı ilerletir, sonra ekranı
+     o aşamaya taşır. KAPI ARABULUCUNUNDUR — düğmenin kendi açıklaması da
+     "arabulucunun ne zaman geçeceğine kendisinin karar verdiği" diyor. Taraf
+     için davranış DEĞİŞMEDİ: onda düğme eskisi gibi yalnız ekranı taşır. */
+  async function ilerlet(next: number) {
+    if (isMediator) await bumpPhase(next);
+    onAdvance(next);
   }
   // Aşama eşlemesi (14.08): 1 = tek giriş kapısı (başvuru + süre + taraflar + belgeler),
   // 2 = taraf analizi (eski 3), 3 = arabulucu paneli (eski 4), 4 = toplantı (eski 5),
   // 5 = bilirkişi (eski 6), 6 = görüşme notları (eski 7), 7 = belgeler & kapanış (eski 8).
   switch (phase) {
-    case 1: return <><Phase1Setup caseRow={caseRow} reload={reload} isMediator={isMediator} userId={userId} jump={cockpitJump} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
-    case 2: return <><Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} jump={cockpitJump} /></Phase3ErrorBoundary><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 1: return <><Phase1Setup caseRow={caseRow} reload={reload} isMediator={isMediator} userId={userId} jump={cockpitJump} /><NextPhaseButton phase={phase} onAdvance={ilerlet} /></>;
+    case 2: return <><Phase3ErrorBoundary><Phase3PartyAnalysis caseRow={caseRow} userId={userId} isMediator={isMediator} reload={reload} jump={cockpitJump} /></Phase3ErrorBoundary><NextPhaseButton phase={phase} onAdvance={ilerlet} /></>;
     case 3: return <>
       {isMediator
         ? <Phase4Summary caseRow={caseRow} onSectionsChange={onCockpitSections} jump={cockpitJump} onRandevuAyarla={onRandevuAyarla} />
         : <BlindBidPartyForm caseId={caseRow.id} userId={userId} />}
-      <NextPhaseButton phase={phase} onAdvance={onAdvance} />
+      <NextPhaseButton phase={phase} onAdvance={ilerlet} />
     </>;
-    case 4: return <><Phase5Sessions caseRow={caseRow} bumpPhase={bumpPhase} onAdvance={onAdvance} randevuTetik={randevuTetik} isMediator={isMediator} jump={cockpitJump} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
-    case 5: return <><Phase7Expert caseRow={caseRow} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
-    case 6: return <><Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(7); onAdvance(7); }} /><NextPhaseButton phase={phase} onAdvance={onAdvance} /></>;
+    case 4: return <><Phase5Sessions caseRow={caseRow} bumpPhase={bumpPhase} onAdvance={onAdvance} randevuTetik={randevuTetik} isMediator={isMediator} jump={cockpitJump} /><NextPhaseButton phase={phase} onAdvance={ilerlet} /></>;
+    case 5: return <><Phase7Expert caseRow={caseRow} /><NextPhaseButton phase={phase} onAdvance={ilerlet} /></>;
+    case 6: return <><Phase8Negotiation caseRow={caseRow} userId={userId} onDone={() => { bumpPhase(7); onAdvance(7); }} /><NextPhaseButton phase={phase} onAdvance={ilerlet} /></>;
     case 7: return <Phase9Closing caseRow={caseRow} reload={reload} />;
     default: return null;
   }
