@@ -841,11 +841,36 @@ export function AjanPenceresi({
         const { data, error } = await supabase.functions.invoke("taraf-cevap", {
           body: { gorev_id: hedef.id, cevap: metin },
         });
-        if (error || (data as any)?.error || !(data as any)?.yazildi) throw new Error("yazilamadi");
+        /* SUNUCUNUN SÖYLEDİĞİNİ SÖYLE (23.08): burada üç ayrı sonuç tek bir
+           "birazdan tekrar deneyin" cümlesine düşüyordu. İkisi tekrar denemekle
+           ÇÖZÜLMEZ:
+           · 200 + yazildi:false → soru bu arada kapanmış. Bekleyen soru listesi
+             anlık yayında değil, dakikada bir tazeleniyor (bkz. satır 428);
+             kapanmış bir kart ekranda durabiliyor ve ona yazılan her cevap
+             "tekrar deneyin" alıyor — ama hiçbir tekrar tutmuyor.
+           · 403 → cevap yazma yetkisi yok. Bu da tekrar denemekle değişmez.
+           Yalnız üçüncüsü (taşıma/500 hatası) gerçekten tekrar denenebilir.
+           supabase.functions.invoke 2xx dışında `data` vermez; sunucunun gerekçesi
+           `error.context` gövdesindedir, oradan okunuyor. */
+        type CevapSonucu = { yazildi?: boolean; sebep?: string; error?: string };
+        const sonuc = (data ?? null) as CevapSonucu | null;
+        let sunucuMesaji = "";
+        if (error) {
+          const govde = await (error as { context?: { json?: () => Promise<CevapSonucu> } })
+            ?.context?.json?.().catch(() => null) ?? null;
+          sunucuMesaji = String(govde?.error ?? "").trim();
+          if (!sunucuMesaji) throw new Error("yazilamadi");
+        } else if (sonuc?.error) {
+          sunucuMesaji = String(sonuc.error).trim();
+        } else if (!sonuc?.yazildi) {
+          sunucuMesaji = String(sonuc?.sebep ?? "Bu soru zaten kapanmış.").trim();
+        }
+
         setYazisma((o) => [...o, {
           id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
-          metin: "Cevabınızı aldım, kaldığım yerden devam ediyorum.",
+          metin: sunucuMesaji || "Cevabınızı aldım, kaldığım yerden devam ediyorum.",
         }]);
+        // Kapanmış soru listeden düşsün; kart ekranda kalmasın.
         await yukle();
       } catch {
         setYazisma((o) => [...o, {
