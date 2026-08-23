@@ -4,6 +4,24 @@ Kaynak: medipact 2 → medipact 4 → medipact 3 → medipact 1 (eskiden yeniye)
 
 ---
 
+## Doğrulama Komutları
+
+`package.json` üzerinden tespit edildi (23.08.2026). Bu listede olmayan bir komut
+"herhalde budur" diye çalıştırılmaz; `package.json` değişirse liste güncellenir.
+
+| Amaç | Komut |
+|---|---|
+| Build | `npm run build` |
+| Lint | `npm run lint` |
+| Test | `npm run test` (vitest run) |
+| Type check | `npx tsc --noEmit -p tsconfig.app.json` |
+| Dev sunucu | `npm run dev` |
+
+Depoda `bun.lock` var; bun kullanılıyorsa aynı script'ler `bun run <script>` ile
+çalışır. `package.json` içinde ayrı bir `typecheck` script'i yoktur.
+
+---
+
 ## 1) Anahtar Kavramlar ve Değişkenler
 
 **Yerler**
@@ -112,13 +130,26 @@ Tek ana ajan · beş insan kapısı · kör veri sorguda · devirde içerik geç
 - **Yayın/altyapı:** `ajan-nobetci` redeploy (`65141e7`, 0,5 kredi) · Supabase CLI kuruldu (giriş yapılmadı) · `.gitignore`'a `supabase/.temp/`
 - **Doğrulama:** `bilirkisi_durum__ilerlet` canlıda `etkin=true` (todo.md yanlış biliyordu)
 - **Özet/süreklilik düzeni kuruldu (22.08.2026):** `OZET_KOMUTLARI.md` tam içeriği ve `PROJE_OZETI.md`'nin güncel hâli `COWORK.md` ve `CLAUDE.md`'ye eklendi · "medipact" kısa komutu `PROJE_OZETI.md`'yi zorunlu okuma listesine aldı · oturum-sonu özet kaydı bağlayıcı kural yapıldı · `skills/medipact-calisma-duzeni/SKILL.md` oluşturuldu (Cowork skill)
+- **Çift uzantı düzeltmesi (22.08, Code, `708031c`, push edildi):** `CLAUDE.md.md → CLAUDE.md` · `COWORK.md.md → COWORK.md` · `OZET_KOMUTLARI.md.md → OZET_KOMUTLARI.md` · `PROJE_OZETI.md.md → PROJE_OZETI.md` (`git mv`, geçmiş korundu) + `.claude/skills/medipact-calisma-duzeni/SKILL.md` eklendi
+- **"Yeniden öner" kusuru teşhis edildi (22.08, Cowork)** — kök neden bulundu, düzeltme YAPILMADI (komutlar hazır, kurucuda):
+  - `bilirkisi_onerileri` canlıda **0 satır** — aday listesi hiç üretilmemiş
+  - `case_expert_assignments`'ta test dosyası için `55dd060f…` `pending` satırı var (21.08 11:05); `bilirkisi_onerildi` olayını **veritabanı tetikleyicisi** yazmış (`akis_olay_yaz_bilirkisi`, INSERT dalı — gövde `{assignment_id, expert_id, status}`), edge fonksiyon değil (o `{alan, aday_sayisi, tur, alan_turu}` yazar, `index.ts:468-471`)
+  - Kural sıra 35 (`bilirkisi_onerildi__sorular`) bu olayı "adaylar çıktı" diye okuyup `bilirkisi-sorulari`'nı koşturdu → dört `taraf_sorusu` satırı + devir satırı (11:06)
+  - Ekranda görülen "1 soru başlığı hazırladım / iki tarafın onayı bekleniyor / görevlendirme kararı sizde" metni **soru kolunun** anlatımı, aday kolunun değil
+  - Kurucunun bastığı satır `[konu:devir:bilirkisi-sorulari]` idi (`ajan_gorevleri aa5f02d0`, sonuç "arabulucu yeniden öneri istedi" = `AjanPenceresi.tsx:633`'ün sabit metni)
+  - "Yeniden öner" tek yerde tanımlı (`AjanPenceresi.tsx:1034`) ve `talimatReddet`'i çağırıyor (`624-638`) — `bilirkisi-secim`'e **hiçbir çağrı yok**; `aday_cikar`/`ikinci_tur` yalnız `BilirkisiAlanlari.tsx:80`'de
+  - `aday_cikar`/`ikinci_tur` başarılı dalında **`anaAjanaBildir` yok** (`index.ts:455-477`) — adaylar ajan penceresine hiç düşmüyor; todo.md 107'deki "Aday sunulur → Onayla/Yeniden öner" tasarımı ajan penceresinde hiç kurulmamış
+  - "Bu alanda kayıtlı başka uzman yok" cümlesi (`index.ts:434`) bu yüzden hiç üretilmedi; "Cevabınızı şu an kaydedemedim" ise `762`'deki `[bilirkisi:aday-yok:]` kapısına takılmayıp `taraf-cevap` dalına düşmekten (`792` → `804`)
+  - **Bilinmiyor:** `case_expert_assignments`'a o `pending` satırın nasıl girdiği (öneri tablosu boşken) — doğrulanmadı
 
 ---
 
 ## 4) Mevcut Durum ve Sıradaki Adım
 
-**Açık kusur (canlı, giderilmedi)**
-- "Yeniden öner" yeni aday üretmiyor. Ekrana "Yapıldı: 1 soru başlığı hazırladım / Eksik: iki tarafın onayı bekleniyor / Eksik: görevlendirme kararı sizde" geliyor; "Bu alanda kayıtlı başka uzman yok" satırı gelmiyor. Son denemede "Cevabınızı şu an kaydedemedim" hatası alındı. Ekran kendiliğinden tazelenmiyor
+**Açık kusur (canlı, giderilmedi — teşhis bitti, düzeltme bekliyor)**
+- "Yeniden öner" yeni aday üretmiyor. TEŞHİS TAMAM (bkz. Tamamlanan İşler, 22.08). İki ayrı iş çıktı:
+  1. **Code (ön yüz + fonksiyon) — komut yazıldı, kurucuda:** `bilirkisi-secim/index.ts` aday yazımından sonra arabulucuya `[bilirkisi:aday:<alan>]` bildirimi yazacak · `AjanPenceresi.tsx`'te bu etiketli satırda "Yeniden öner" `talimatReddet` yerine `ikinci_tur` çağıracak (hata dalında `error.context` gövdesi kalıcı satıra) · aynı satırda "Onayla" gösterilmeyecek, "Adayı Bilirkişi bölümünden seçip atayın" satırı olacak · dokunulan fonksiyon redeploy + publish
+  2. **Cowork (SQL) — KURUCU KARARI BEKLİYOR:** `bilirkisi_onerildi` olayını iki yazıcı iki ayrı anlamda yazıyor. (a) tetikleyicinin INSERT dalı `bilirkisi_atamasi_acildi` yazsın, `bilirkisi_onerildi` yalnız gerçek aday listesine kalsın — sorular aday çıkınca hazırlanır; (b) tetikleyici kalsın, sıra 35 kuralı `bilirkisi_atamasi_acildi`'ya taşınsın — sorular atamada hazırlanır (bugünkü fiili davranış)
 - `foy_gonderildi` tek gönderimde iki kez yazılıyor (aynı foy_id, 22 ms arayla) — yazıcılar `trg_akis_foy` + `hazirlik-foyu-gonder/index.ts:448`. Bugün zararsız (dinleyen kural yok); kural bağlanırsa çift koşar. Fikir: tetikleyici kalsın, koddaki satır kalksın (Code, tek satır, onay bekliyor)
 
 **Canlıda denenmemiş olanlar**
@@ -154,7 +185,12 @@ Tek ana ajan · beş insan kapısı · kör veri sorguda · devirde içerik geç
 
 **İleriye kalem**: risk ve finansal analiz ajanı (her taraf kendi evrakıyla, kör veri korunarak). Kurucu pilotta ürünü gezip benzer dil/bütünlük kusurlarını bildirecek.
 
-**Sıradaki adım**
-1. "Yeniden öner" kusuru için teşhis komutu — kurucu onayı bekliyor
-2. `todo.md` üst bloğunun `yol-haritasi.md`'ye göre düzeltilmesi
-3. Kurucunun seçimi: (a) yazılmış yedi özelliği canlıda tek tek denemek, (b) örnek tutanakları verip tutanak otomasyonunu açmak
+**Sıradaki adım (23.08 sabahı buradan devam)**
+1. **Kurucu kararı:** `bilirkisi_onerildi` olayının ikiye ayrılmasında (a) mı (b) mi — bu karar verilmeden SQL yazılmayacak
+2. "Yeniden öner" Code komutu kurucuya verildi; Code'a yapıştırılıp koşturulacak, sonra `bilirkisi-secim` redeploy + publish, ardından canlı test
+3. Canlı test zinciri (hiç denenmedi): tükenme → alan yazma → ikinci tur → üçüncüde erteleme + "Bilirkişiden vazgeç" düğmesi
+4. `todo.md` üst bloğunun `yol-haritasi.md`'ye göre düzeltilmesi
+5. Kurucunun seçimi: (a) yazılmış yedi özelliği canlıda tek tek denemek, (b) örnek tutanakları verip tutanak otomasyonunu açmak
+
+**Masaüstü çalışma kopyası uyarısı**
+`C:\Users\ASUS\Desktop\medipact claude` içindeki dört dosya HÂLÂ çift uzantılı (`CLAUDE.md.md` vb.); milat'ta düzeldi, masaüstünde düzelmedi. Explorer'da "Dosya adı uzantıları" kutusu işaretlenmeden yapılan düzeltme tutmuyor.
