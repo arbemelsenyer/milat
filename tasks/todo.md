@@ -1,3 +1,90 @@
+## Nerede kaldık — 23.08.2026 (109) · ÜÇ KARAR UYGULANDI · "YENİDEN ÖNER" BAĞLANDI
+
+KURUCU KARARI (23.08): (a) sohbetteki "Yeniden öner" ikinci tur aday taramasına
+bağlansın, reddetme işlevi silinmesin — doğru adla ayrı düğme olsun ·
+(b) panelde de tek ad "Yeniden öner" · (c) taraf-cevap arabulucuyu
+yönetici/görevli arabulucu/dosya sahibi olarak tanısın, ölçüt genişletilmesin,
+RLS değişmesin · dal main'e alınsın, bundan sonra main'e push.
+
+YAPILDI
+- [x] (a) BAĞ. src/components/AjanPenceresi.tsx:
+  · YENİ yardımcı `bilirkisiAlani()` (satır 207-217): bildirimin gerekçesindeki
+    "[bilirkisi:<ne>:<alan>]" işaretinden ALANI çıkarır. Sayılan üç işaret:
+    arabulucu-secsin · tikanma · aday-yok. (atandi · ertelendi · evrak ·
+    dis-uzman-gundem satırlarında üçüncü parça alan DEĞİLDİR, bilerek dışarıda.)
+  · YENİ `bilirkisiYenidenOner(alan)`: bilirkisi-secim `ikinci_tur` adımını o
+    alanla çağırır; dönüş ertelendi/bulunamadi/aday sayısı olarak sohbete tek
+    satır yazılır ve yukle() ile liste tazelenir. Tur sınırı ve erteleme kararı
+    SUNUCUDA kalır — ön yüzde karar yok.
+  · Bildirim satırındaki düğme çifti: işaret varsa "Yeniden öner" (bilirkişi
+    koluna gider), yoksa eskisi gibi "Talimatı reddet". "Onayla" düğmesi yalnız
+    onay tipli satırlarda, aynen duruyor.
+- [x] (a-2) REDDETME SİLİNMEDİ. talimatReddet() işlevi aynen yerinde; yalnız adı
+  ayrıldı: düğme "Talimatı reddet", sohbet cümlesi "Talimatı reddettim. Yeni
+  talimatınızı yazabilirsiniz.", görev sonucu "arabulucu talimatı reddetti".
+  red_sebebi ve akis_duraklatma.sebep KOLONLARI YERİNDE, boş geçiliyor.
+- [x] (b) AD BİRLİĞİ. BilirkisiAlanlari.tsx: "İkinci tur" → "Yeniden öner"
+  (Repeat simgesi ve çağrılan adım `ikinci_tur` DEĞİŞMEDİ); durum cümlesi
+  "İkinci tur adayları çıkarıldı." → "Yeniden öneri hazırlandı."
+- [x] (c) YETKİ EŞİTLENDİ. supabase/functions/taraf-cevap/index.ts:74-88 —
+  arabulucu artık üç ölçütle tanınıyor: cases.assigned_mediator_id VEYA
+  cases.user_id VEYA has_role(admin). bilirkisi-secim/index.ts:161-166 ile
+  BİREBİR aynı ölçüt. Taraf yolu (hedef_party_id eşleşmesi) değişmedi, RLS'e ve
+  politikaya DOKUNULMADI, yeni tablo/kolon yok.
+- [x] BELGE KAYDI aynı commit'te: mimari/06-ajan-mimarisi.md (EKLEME 23.08) ·
+  mimari/10-arayuz-katmani.md (tek ad kuralı) · tasks/yol-haritasi.md (tek satır).
+- [x] Dal claude/medipact-uanila main'e alındı; bundan sonra push main'e.
+
+EKSİK KALDI
+1. TİP DENETİMİ ÇALIŞTIRILAMADI. `npx tsc --noEmit -p tsconfig.app.json` bu
+   ortamda node_modules olmadığı için koşmuyor; `bun install` bun.lock'taki özel
+   paket deposuna 403 dönüyor (europe-west4-npm.pkg.dev, oturumun ağ izni yok).
+   Üç dosyanın da SÖZDİZİMİ `bun build --no-bundle` ile ayrı ayrı doğrulandı
+   (PARSE OK), tip denetimi YAPILMADI.
+   GİDERMEK İÇİN: kurucunun kendi makinesinde `npx tsc --noEmit -p
+   tsconfig.app.json` — ya da Lovable derlemesi hatayı gösterir. Kimde: kurucu.
+2. CANLI TEST YAPILMADI. Kimde: kurucu (redeploy + publish sonrası).
+3. KAPSAM DIŞI, DÜZELTİLMEDİ (rapor): arabulucunun sohbet listesi yalnız
+   durum='bekliyor' satırlarını okuyor (AjanPenceresi.tsx:349-351). bilirkisi-secim
+   `tikanma` (749-753), `evrak_oner` (884-887) ve `dis_aday` (1021-1025) satırlarını
+   durum='onay_bekliyor' ile yazıyor — bu üç bildirim sohbete HİÇ DÜŞMÜYOR.
+   Sonuç: yeni "Yeniden öner" düğmesi bugün pratikte yalnız `aday-yok` ve
+   `arabulucu-secsin` satırlarında görünür.
+   GİDERMEK İÇİN: ya sorguya 'onay_bekliyor' eklenir ya da o üç satır 'bekliyor'
+   yazılır. İkisi de ekranı değiştirir → kurucu kararı, sonra Code.
+4. KAPSAM DIŞI, OKUNMADI (rapor): akis-onayla fonksiyonunun yetki ölçütü
+   incelenmedi; "Onayı şu an kaydedemedim" (AjanPenceresi.tsx:739) aynı kökten
+   geliyor olabilir. Kimde: ayrı iş kalemi.
+
+COWORK PAKETİ — EKRAN TAZELENMESİ İÇİN TEK SORGU (Claude çalıştıracak)
+Amaç: sohbet penceresi anlık tazelenmiyor. Ön yüz iki tabloya anlık abone oluyor
+(AjanPenceresi.tsx:401-421) ve ayrıca 60 saniyede bir kendi kendine yeniliyor.
+Aboneliğin çalışması için o iki tablonun `supabase_realtime` yayınında olması ve
+satır kimliğinin yeterli olması gerekir. Tek okuma sorgusu, hiçbir şey yazmaz:
+
+    select c.relname                                as tablo,
+           (p.pubname is not null)                  as anlik_yayinda,
+           case c.relreplident
+                when 'f' then 'full' when 'd' then 'default'
+                when 'i' then 'index' else 'nothing' end as satir_kimligi
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+      left join pg_publication_tables p
+             on p.schemaname = n.nspname
+            and p.tablename  = c.relname
+            and p.pubname    = 'supabase_realtime'
+     where n.nspname = 'public'
+       and c.relname in ('agent_states', 'ajan_gorevleri')
+     order by c.relname;
+
+OKUMA: iki satır da `anlik_yayinda = true` ve `satir_kimligi = full` ise sebep
+yayında değildir, ön yüzde aranır. `anlik_yayinda = false` çıkan tablo için o
+tablonun anlık yayına alınması gerekir (SQL Claude'da). `satir_kimligi` 'default'
+ise INSERT görünür ama UPDATE/DELETE gövdesi eksik gelir — bildirim güncellemeleri
+bu yüzden ekrana düşmemiş olabilir.
+NOT (sapma bildirimi): CLAUDE.md "SQL Code tarafından yazılmaz" der; bu sorgu
+kurucunun 23.08 açık talimatıyla yazıldı ve salt okumadır (migration/politika değil).
+
 ## Nerede kaldık — 23.08.2026 (108) · "YENİDEN ÖNER" KUSURUNUN TEŞHİSİ (yalnız inceleme, kod değişmedi)
 
 İŞ: PROJE_OZETI.md "Sıradaki adım 1" — canlı kusurun teşhisi. Kod YAZILMADI;

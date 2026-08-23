@@ -79,7 +79,7 @@ export function BilirkisiAlanlari({ caseId }: { caseId: string }) {
     const veri = await cagir(
       { adim: ikinciTur ? "ikinci_tur" : "aday_cikar", alan: alan.trim() },
       `aday-${alan}`,
-      ikinciTur ? "İkinci tur adayları çıkarıldı." : "Adaylar çıkarıldı.",
+      ikinciTur ? "Yeniden öneri hazırlandı." : "Adaylar çıkarıldı.",
     );
     if (veri?.bulunamadi) {
       setDurum(veri?.sebep
@@ -250,8 +250,10 @@ export function BilirkisiAlanlari({ caseId }: { caseId: string }) {
               >
                 Taraflara sun
               </Button>
+              {/* 23.08 kurucu kararı: aynı işi yapan metin üründe TEKtir.
+                  Eski ad "İkinci tur" idi; çağrılan adım (ikinci_tur) DEĞİŞMEDİ. */}
               <Button size="sm" variant="outline" disabled={!!isleniyor} onClick={() => adayCikar(alan, true)}>
-                <Repeat className="h-3 w-3 mr-1" /> İkinci tur
+                <Repeat className="h-3 w-3 mr-1" /> Yeniden öner
               </Button>
               <Button
                 size="sm" variant="outline" disabled={!!isleniyor}
