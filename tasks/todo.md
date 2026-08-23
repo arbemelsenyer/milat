@@ -6,7 +6,27 @@
 - Son tamamlanan iş: B.0 Lovable MCP kurulumu + PreToolUse bekçisinin daraltılması
 - Doğrulama sonucu: bekçi tezgâhı 25/25 geçti; canlı komut onaysız geçti
 - Açık blokaj: **HUMAN GATE — gizli dosya** (aşağıda, §12 gereği)
-- Sıradaki uygulanabilir iş: B.2 (PROJE_OZETI.md · Doğrulama Komutları) → B.4 (izin listesi)
+- Sıradaki uygulanabilir iş: `taraf-cevap` redeploy → publish → canlı test
+
+### DEVİR NOTU — 23.08.2026, oturum sonu
+- B.0 · Lovable MCP: BİTTİ. Araçlar bu oturumda ÇALIŞTI (`get_project` cevap verdi),
+  yeniden başlatma gerekmedi. Proje `5ffedb1b-4087-4fe1-a1ef-873c9754f71d`,
+  workspace `Mxc2bXygdkJGAWNSM2i3`, durum `completed`, yayında, canlı
+  https://medipact-ai.lovable.app · Lovable'ın gördüğü son commit `e25f9a7`
+  (main ile aynı). Yani push görülmüş; redeploy/publish yapılmadı.
+- B.1 · `.env` git kontrolü: HUMAN GATE, kurucu kararı bekliyor (yukarıda).
+- B.2 · Doğrulama Komutları: BİTTİ, `PROJE_OZETI.md` içinde.
+- B.3 · "Nerede kaldık" bloğu: BİTTİ (bu blok).
+- B.4 · İzin listesi: ATLANDI — `.claude/settings.local.json`'a izin eklemeyi
+  otomatik kip sınıflandırıcısı engelledi (ajan kendi iznini genişletemiyor).
+  GİDERMEK İÇİN: kurucu `/permissions` ile MEDIPACT-BASLANGIC.md §B.4'teki
+  satırları ekleyecek.
+- Bekçi işi (iki tur) BİTTİ: `4259ad9`. Yanlış alarmlar bundan sonra sorulmadan
+  kapatılacak (CLAUDE.md §18-A).
+- SIRADAKİ İLK İŞ: `supabase/functions/taraf-cevap` redeploy + publish + canlı test
+  (bilirkişi bildiriminde "Yeniden öner" yeni aday çıkarıyor mu · aday yoksa
+  "Bu alanda kayıtlı başka uzman yok" geliyor mu · "Cevabınızı şu an
+  kaydedemedim" hatası bitti mi). `_shared/anlatim.ts` DEĞİŞMEDİ, fan-out yok.
 
 ### YAPILDI — 23.08.2026 · B.0 · Lovable MCP (P0)
 - `claude mcp add --transport http lovable "https://mcp.lovable.dev"` çalıştırıldı.
