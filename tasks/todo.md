@@ -4,7 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok — yarım iş yok
 - Son tamamlanan iş: cron sırrı Vault'a alındı (`a92d488`); oturum hatırlatma zinciri uçtan uca çalışıyor
-- Doğrulama sonucu: `npm run test` **123/123** · tsc hatasız · build hatasız · lint **2358** (oturum başı 2361)
+- Doğrulama sonucu: `npm run test` **133/133** · tsc hatasız · build hatasız · lint **2358** (oturum başı 2361)
 - **CANLI SAĞLIK (04:35):** son 30 dk'da **10 yanıt, hepsi 200** · hatalı 0 · zaman aşımı 0
   · işlenmemiş olay 0 · son 6 saatte `akis_hatasi` 0 · `closed_at` boş kapalı dosya 0
 - Açık blokaj: **yok**
@@ -327,6 +327,33 @@ Yani düğme artık adının söylediği işi yapıyor ve sunucuya iz bırakıyo
 NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
+
+### KAPANDI — 24.08 · P1 · BÜTÜN MÜKERRER KAPILAR ORTAK KALIBA ALINDI (`ba1585e`)
+Dersin dediğini uyguladım ve sözleşmenin **okuyan tarafını** baştan sona taradım
+(`grep "gerekce" | grep -E "exec|match|startsWith|replace|slice"`). Aynı iki
+kusur **beş kapıda daha** çıktı.
+
+**(a) `startsWith`** — geçit gerekçenin başına `[kaynak:…]` koyuyor.
+- `akis-yurut` `asama_gecisi` kapısı: yorumu *"Etiket nöbetçinin kullandığıyla
+  AYNIDIR"* diyordu, ama nöbetçi geçitten yazıyor. Yani **"arabulucu elle geri
+  aldıysa ajan aynı geçişi tekrar denemez" güvencesi, nöbetçinin yaptığı
+  geçişler için boştu.**
+- `akis_kosuldu` / `akis_hatasi` iz kapıları: bugün kırık değil (o satırlar
+  geçitten geçmiyor) ama aynı kırılganlık.
+
+**(b) SIRASIZ `limit`** — dört kapıda daha: `asama_gecisi` (200), akış izi (300),
+`hataYaz` (300), bekleyen soru (200), nöbetçi `bilirkisiEtiketiVarMi` (200).
+
+DÜZELTME — ortak kalıp: sunucuda `like` ile daralt → en yeniden sırala →
+JS'te `includes` ile kesinleştir. `hataYaz`da eşleşme TAM olduğu için
+`.eq("gerekce", …)` kullanıldı: sunucuda çalışır, satır sayısından **tamamen**
+bağımsızdır.
+Tezgâh (`tests/mukerrer-kapilar.test.ts`) iki dosyayı birden denetliyor ve
+kalıbı **değişmez** yapıyor — yeni bir kapı eklenirse aynı kalıbı kullanmak
+zorunda. Kanıtlandı: kusur geri getirilip koşuldu → 6 test düştü; 10/10 geçti.
+
+**CANLI KANIT (publish):** paket `index-OeZSqeAa.js` — yeni etiket ayırıcı
+deseni pakette (2 kez), `[gecis:…]` deseni **çapasız** (çapalı hâli 0 kez).
 
 ### KAPANDI — 24.08 · P1 · AYNI SINIF ÖN YÜZDE DE VARDI (`b53f796`, publish)
 Arka uçtaki üç çapalı okuyucuyu düzelttikten sonra **aynı sınıfı ön yüzde de
