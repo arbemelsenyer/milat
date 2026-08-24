@@ -347,6 +347,16 @@ NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
 
+### KUYRUĞA EKLENDİ — 24.08 · dosyası olmayan iki belge üstverisi (küçük)
+Storage denetimi sırasında çıktı: `case_documents`ta 24 üstveri satırından
+**2'sinin dosyası kovada yok** (`farazi-test/…` yollu, tohum verisi).
+Arabulucu o iki satırda "indir" derse hata alır. Benim politika değişikliğim
+kırmadı — zaten kırıktılar (kovada hiç bulunmuyorlar).
+- [ ] P3 · Dosyası olmayan iki `case_documents` satırı temizlensin ya da
+      arayüzde "dosya yok" olarak işaretlensin · Kabul: `case_documents`ta
+      dosyası bulunmayan satır 0, ya da o satırlarda indirme düğmesi çıkmıyor ·
+      NOT: satır silmek veri silmedir (§7.3) — arayüzde işaretlemek daha güvenli.
+
 ### DENETİM — 24.08 · GİRİŞSİZ TOKEN AKIŞLARI — TEMİZ ÇIKTI
 Taraflar hesapsız işlem yapıyor (`/randevu/:token`, `/katilim/:token`), yani
 token güvenliği kimlik doğrulamanın yerine geçiyor. Dört başlık denetlendi:
@@ -498,6 +508,13 @@ TÜKETİCİLER OKUNDU (geçen turdaki hatamı tekrarlamamak için):
 DÜZELTME: kova okuma politikası veritabanındaki kuralla **birebir** aynı hâle
 getirildi — yönetici hepsi · `admin/` klasörü + mediator rolü (bilgi tabanı) ·
 görevli arabulucu dosyanın hepsi · **diğer herkes yalnız kendi yüklediği dosya**.
+
+**CANLI GERİLEME TESTİ (tarayıcı, 24.08):** en riskli değişiklik buydu, bu
+yüzden meşru erişimi gözle de sınadım. Canlı oturumdan gerçek bir belge
+indirildi → **HTTP 200, 728 bayt**. Erişim bozulmadı.
+(Oturum yönetici olduğu için yönetici dalından geçti; **arabulucu dalı** ayrıca
+SQL ile kanıtlandı: 22 dosya erişilebilir, 21'i kendi yüklemesi, 1'i yalnız
+`is_case_mediator` dalıyla.)
 
 **CANLI KANIT — delik teorik değildi, gerçekti:**
 | ölçüm | değer |
