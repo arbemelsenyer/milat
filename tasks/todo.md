@@ -1,23 +1,23 @@
 ## Nerede kaldık
 
-- Tarih: 24.08.2026 (gece oturumu · 5. blok)
+- Tarih: 24.08.2026 (gece oturumu · 5. blok · KAPANIŞ)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
-- Aktif görev: yok
-- Son tamamlanan iş: oturum hatırlatması zinciri uçtan uca çözüldü (`4456c80`) — canlıda 3 e-posta gönderildi
-- Doğrulama sonucu: `npm run test` **101/101** · lint **2354** (temel çizginin 6 altında) · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
-- **KURUCUDAN TEK SOMUT KONTROL** (§11-B — benim yapamadığım tek şey): bir dosyada
-  arabulucu hesabıyla "Aşama N+1'e Geç →" düğmesine bas, sayfayı yenile. Dosya yeni
-  aşamada KALMALI (eskiden geri düşüyordu). Sunucu tarafını ben doğrularım:
-  `select gerekce, sonuc from ajan_gorevleri where gorev_tipi='asama_gecisi' order by created_at desc limit 3;`
-  → `[gecis:X->Y] arabulucu elle ilerletti` satırı doğmuş olmalı.
-- Açık blokaj: **yok.** Üç cron kusuru da uygulandı ve doğrulandı; geriye dönük
-  tek satır da yazıldı. Kalan tek şey kurucu kararı gerektiren iki madde:
-  `CRON_SECRET` yenileme (acilleşti) ve imza akışı.
-- Sıradaki uygulanabilir iş: **kuyrukta açık P0/P1/P2 teknik iş KALMADI.**
-  Bekleyenler: (a) Cowork — üç cron + geriye dönük tek satır · (b) kurucu — aşama
-  düğmesinin canlı kontrolü · (c) kurucu kararı — imza akışı (P2, §7.1/§7.5) ·
-  (d) P3 `soru_cevaplandi`. Kuyruğun geri kalanı ürün özelliği maddeleridir
-  (A1–A12 · B13–B22 · C23–C26 · D27–D29) ve §7.1 gereği ürün kararı ister.
+- Aktif görev: yok — yarım iş yok
+- Son tamamlanan iş: cron sırrı Vault'a alındı (`a92d488`); oturum hatırlatma zinciri uçtan uca çalışıyor
+- Doğrulama sonucu: `npm run test` **101/101** · tsc hatasız · build hatasız · lint **2354** (oturum başı 2361)
+- **CANLI SAĞLIK (04:35):** son 30 dk'da **10 yanıt, hepsi 200** · hatalı 0 · zaman aşımı 0
+  · işlenmemiş olay 0 · son 6 saatte `akis_hatasi` 0 · `closed_at` boş kapalı dosya 0
+- Açık blokaj: **yok**
+- Sıradaki uygulanabilir iş: kurucu kararı bekleyen üç madde (aşağıda); teknik kuyruk boş
+
+### KURUCUDA KALAN ÜÇ MADDE (hiçbiri beni bloke etmiyor)
+1. **P1 · `CRON_SECRET` değerinin yenilenmesi.** Runbook aşağıda. Bunu ben
+   yapamam: yeni değeri üretsem ya da okusam yine bağlamıma girer ve yenilemeyi
+   boşa çıkarır. Vault taşıması yapıldığı için yenileme artık **tek noktadan**.
+2. **P2 · İmza akışı.** `agreement_documents.signed_by` hiçbir yüzeyden
+   yazılmıyor; imza beş insan kapısından biri (§7.1/§7.5), davranışı ürün kararı.
+3. **P3 · Eski şema adası** (`mediator_requests` · `reschedule_requests` + dört
+   dosya) kaldırılsın mı? Tablo/kod silmek geri dönüşsüzdür (§7.3).
 
 ### BU TURDA CANLIYA ÇIKANLAR
 | iş | commit | deploy |
@@ -27,6 +27,11 @@
 | P1 · `ZORUNLU_GIRDI` sözleşmesi tamamlandı | `618fb74` | **36 fonksiyon fan-out** — "hepsi başarılı, başarısız yok" |
 | P2 · kayıt protokolü tek kaynak | `7032284` | publish |
 | P1 · dosya kapanışı `closed_at` | `aef716e` | publish |
+| P0 · üç cron kusuru + geriye dönük satır | migration | canlı 200 |
+| P0 · oturum hatırlatma zinciri (7 tur) | `e4c788d`→`4b543ac` | fan-out + 2 fonksiyon |
+| P1 · iş etiketi süzgeçten geçmiyor (3 geçit) | `c722026` `97f077d` | **2× 36 fan-out** |
+| P1 · cron sırrı Vault'a | `a92d488` | migration |
+| P3 · eski şema adası işaretlendi | `cf3af01` | publish + 2 fonksiyon |
 
 **CANLI KANIT (publish zinciri):** `index-B7Onz7o6` → `DThEJGGi` → `Pq-m5pGk` → **`DOQRydpB`**.
 Son pakette: `"arabulucu elle ilerletti"` 1 · `select("closed_at")` 1 ·
