@@ -193,7 +193,71 @@ Seçim: A / B / C / (kendi metniniz)
 Not: (varsa)
 ```
 
-_Şu an bekleyen cevap yok._
+### H-1 · CEVAP · 24.08.2026
+Seçim: **A** — runbook ile yenilenir.
+Not: **BU MADDE CODE'A AİT DEĞİLDİR.** Yeni sırrı kurucu üretir ve girer; Code
+değeri görmez, üretmez, okumaz, hiçbir çıktıya yazmaz. Code'un tek işi: kurucu
+"yenilendi" dediğinde 3 dk sonra `net._http_response` son üç satırının 200
+döndüğünü doğrulamak ve sonucu `tasks/todo.md`ye yazmak. Doğrulanana kadar madde
+açık kalır. Kesinti bir nöbetçi turudur, kabul edilmiştir.
+
+### H-2 · CEVAP · 24.08.2026
+Seçim: **A** — ıslak imza.
+Not: Pilot için doğru olan bu. Türk arabuluculuk pratiğinde ıslak imza
+yerleşiktir, hukuki dayanağı tartışmasızdır ve mevcut belge akışına oturur.
+B'nin (uygulama içi tıklama) hukuki değeri tartışmalı; tutanağa ayrı dayanak
+gerektirir ve o dayanak yazılmadan kullanılamaz. C (nitelikli e-imza) pilot
+sonrası kalemidir — kurumsal aşamada yeniden değerlendirilir.
+Uygulama sınırı: `signed_by` yalnız arabulucunun kendi oturumuyla yazılır;
+cron/akış çağrısı reddedilir (imza beş insan kapısından biridir).
+
+### H-3 · CEVAP · 24.08.2026
+Seçim: **A** — kod dosyaları silinir, tablolar durur.
+Not: Tuzağın kaynağı kod; tablo silmenin acelesi yok ve geri dönüşü yok (§7.3).
+Silme öncesi tek şart: dört dosyanın gerçekten hiçbir yerden çağrılmadığı
+taramayla kanıtlansın ve kanıt `tasks/todo.md`ye yazılsın. Silinen dosyalar
+`tasks/lessons.md`ye tek satırla işlensin — 24.08'de üç tur kaybettiren tuzağın
+kaydı kalsın.
+
+### H-4 · CEVAP · 24.08.2026
+Seçim: **A** — kayıt hattı yazılırken yol düzeni belirlenir, sonra dar politika.
+Not: Ama hattı yazan **C'yi varsayılan kabul etsin.** Rıza metni "kayıt ve dökümü
+YALNIZ arabulucu görür" diyor; imzalı bağlantı bu sözü mimariyle tutar, istemci
+politikası ise her genişlemede sözü riske atar. Yani: yol düzeni belirlendiğinde
+önce C denensin, C çalışmıyorsa dar politika yazılsın ve neden C'nin
+yetmediği tek satırla kaydedilsin.
+
+### H-5 · CEVAP · 24.08.2026
+Seçim: **A** — tetikleyici kaldırılır, uyandırma `[kol:…]` yoluyla sürer.
+Not: İki uyandırma yolu birden olması mükerrer koşum riskidir; çalışan olan
+korunur. Kaldırmadan önce `soru_cevaplandi` olayına bağlı gerçekten hiçbir kural
+ve tüketici olmadığı doğrulansın. Birikmiş 10 satır **silinmez** — işlenmiş
+olarak durur.
+
+### H-6 · CEVAP · 24.08.2026
+Seçim: **B** — belirsiz öbeğin tamamına guard uygulanır. (Code'un önerisi A'dır;
+gerekçeyle ayrılıyorum.)
+Not: Soru "tablo `party_id` taşıyor mu" değil, **"bu yüzey arabulucuya mı ait"**
+olmalı. Belirsiz öbekteki 13 tablonun çoğu doğası gereği MEDIATOR_ONLY:
+`arabulucu_talimatlari` (arabulucunun kendi talimatları), `usul_onerileri` ve
+`usul_engelleri` (arabulucuya sunulan usul değerlendirmesi), `dosya_kapanis`,
+`elverislilik_kontrol`, `bilirkisi_evrak_kumesi` (§14: tarafa yalnız BAŞLIK
+düzeyinde açılır), `bilirkisi_raporlari`, `bilirkisi_onerileri`,
+`kayit_onay_talepleri`, `ajan_kosum_izi`, `ajan_onerileri`, `ajan_deneyim`,
+`akis_duraklatma`. Bir tarafın bunları görmesi karşı taraf sızıntısı değildir
+ama **arabulucu-özel yüzeyin tarafa açılmasıdır** — §14'te ayrıca yasaklı.
+
+A'nın bıraktığı 13 açık yüzey, kapattığı 4'ten daha risklidir.
+
+B'nin "self-servis sahip kendi dosyasında ajan kayıtlarını göremez" bedeli bir
+işlev kaybı değil, **doğru davranıştır**: mimaride arabulucu zorunlu kapıdır
+(§2 Aşama 3/4), sahip-taraf hiçbir aşamada arabulucu düzeyi analiz görmemelidir.
+
+Uygulama şartı: B uygulanırken dosya YÖNETİMİ sahipte kalmaya devam eder
+(`case_parties` ekleme/silme, `cases_private_keys`, `cases_vector_pool` —
+dokunma). Bir tabloda guard gerçekten çalışan bir yolu kırıyorsa o tablo
+istisna edilir ve **gerekçesi tek satırla `tasks/todo.md`ye yazılır**; sessiz
+istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edilir.
 
 ---
 
