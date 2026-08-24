@@ -347,6 +347,21 @@ NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
 
+### DENETİM — 24.08 · GİRİŞSİZ TOKEN AKIŞLARI — TEMİZ ÇIKTI
+Taraflar hesapsız işlem yapıyor (`/randevu/:token`, `/katilim/:token`), yani
+token güvenliği kimlik doğrulamanın yerine geçiyor. Dört başlık denetlendi:
+
+| başlık | sonuç |
+|---|---|
+| Entropi | `crypto.randomUUID()` ×2, tireler atılmış → **64 hane / 256 bit**. Tahmin edilemez |
+| Saklama | `case_party_invites` **hash'li** (`token_hash`). `randevu_teklifleri.token` ve `case_parties.katilim_token` düz metin — ama RLS ikisini de istemciye kapatıyor (aşağıda) |
+| RLS maruziyeti | `randevu_teklifleri` yalnız arabulucu/yöneticiye açık. `case_parties`te taraf **yalnız kendi satırını** görür → karşı tarafın token'ı okunamaz |
+| Tek kullanımlık + yarış | **İkisi de doğru:** önce `durum !== 'beklemede'` denetimi (409), sonra **koşul update'in içinde** (`.eq("durum","beklemede")`) ve etkilenen satır sayısı denetleniyor; 0 ise 409. `randevu-teklif:619-624` ve `taraf-katilim:72-78` |
+
+Yarış durumu kalıbı kodda yorumla da belirtilmiş ("Yarış durumunda ikinci
+cevabın yazılmaması için koşul update'in içinde") — yani bilinçli yazılmış.
+KUSUR YOK.
+
 ### KAPANDI — 24.08 · P2 · EKSİK İNDEKSLER (pilot ölçeği için)
 Nöbetçi 3 dakikada bir her dosya için onlarca sorgu koşuyor. `pg_stat_user_tables`
 okundu; **sıralı tarama** sayıları:
