@@ -559,3 +559,23 @@ where n.nspname='storage' and c.relname='objects';
 Ve `can_access_case` gibi "erişebilir mi" yardımcıları GENİŞTİR — dosya
 düzeyinde kullanılırsa kör veriyi kırar. Dar kural için dar yardımcı gerekir
 (`is_case_mediator`, `uploaded_by` eşleşmesi).
+
+## 24.08.2026 — Koruma tezgâhında KAPSAM, geçme durumundan önemlidir
+
+`privacy-leak-suite` ürünün kör veri vaadini koruyor ve bugüne kadar hep yeşildi.
+Yine de gerçek bir sızıntıyı kaçırdı: `case-documents` kovasının okuma politikası
+veritabanındakinden genişti (ölçülen sızıntı 1 çift).
+
+Sebep basit: tezgâh o yüzeyi HİÇ YOKLAMIYORDU.
+- Yalnız 3 tablo kapsamdaydı; hepsi sahipliği kullanıcı kimliğiyle tutuyordu.
+- Sahipliği `party_id` ile tutan tablolar (KÖR TEKLİF dahil) kapsam dışıydı.
+- DEPO hiç yoklanmıyordu — dosya ayrı bir yetki sistemindedir.
+
+KURAL: bir koruma tezgâhını değerlendirirken "geçiyor mu?" değil, **"neyi
+yokluyor?"** diye sor. Somut yöntem:
+1. Korunan vaadin yüzeylerini SAY (tablo, kova, uç nokta).
+2. Tezgâhın kapsadıklarını say.
+3. Farkı kapat, sonra her yüzey için ayrı bir **kapsam bekçisi** testi yaz —
+   biri düşerse sessizce korumasız kalmasın.
+
+Kapsam genişletmesi kanıtlandı: kapsam geri daraltılınca 8+ test düşüyor.

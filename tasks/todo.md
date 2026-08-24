@@ -347,6 +347,41 @@ NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
 
+### KAPANDI — 24.08 · P1 · GİZLİLİK TEZGÂHININ KAPSAM BOŞLUĞU
+Bugünkü storage sızıntısı **neden fark edilmedi** diye tezgâha baktım.
+`privacy-leak-suite` ürünün kör veri vaadini koruyan tezgâhtır ve yalnız
+**3 tabloyu** yokluyordu (`party_analyses`, `case_discovery_questions`,
+`case_documents`) — üçü de sahipliği **kullanıcı kimliğiyle** tutan tablolar.
+
+**BOŞLUK İKİ KATLI:**
+1. Ürünün taraf-gizli yüzeylerinin çoğu sahipliği **`party_id`** ile tutar ve
+   tezgâhın bunu ifade edecek bir kavramı yoktu. Kapsam dışında kalanlar
+   arasında **`teklif_braketleri` — KÖR TEKLİF** de vardı: karşı tarafın bandını
+   görmek kör teklifin tamamını anlamsızlaştırır.
+2. **DEPO hiç yoklanmıyordu.** Belgenin satırı gizlenirken dosyası ayrı bir
+   yetki sistemindedir; bugünkü gerçek sızıntı (1 çift) tam oradaydı ve tablo
+   yoklamaları onu **yapısal olarak göremezdi**.
+
+YAPILAN:
+- `LeakQuery`ye `sahiplik: "kullanici" | "taraf"` eklendi; `countLeaks` /
+  `isLeakFree` artık tek kimlik ya da **kimlik kümesi** kabul ediyor (kullanıcının
+  kendi taraf kayıtları).
+- Kapsam 3 → **9 tabloya** çıktı: `teklif_braketleri`, `taraf_kalemleri`,
+  `oturum_hazirlik_foyleri`, `bilirkisi_secim_beyani`, `bilirkisi_taraf_yanitlari`,
+  `case_payments` eklendi.
+- **Depo yoklaması** eklendi: kullanıcının yüklemediği bir belgenin DOSYASI
+  indirilmeye çalışılır; indirilebiliyorsa **sızıntıdır**. Gizlilik ekranına da
+  kondu.
+- **Kapsam bekçisi**: denetlenen dokuz tablonun her biri için ayrı test —
+  biri kapsamdan düşerse tezgâh düşer, sessizce korumasız kalmaz.
+
+**TEZGÂH KANITLANDI:** kapsam geri daraltılıp koşuldu → **8+ test düştü**
+(kör teklif dahil); geri alınınca 21/21 geçti. Toplam **159/159**.
+
+> DERS: bir koruma tezgâhı YEŞİL olduğu için yeterli sayılmaz. Bu tezgâh
+> bugüne kadar hep yeşildi ve gerçek bir sızıntıyı kaçırdı — çünkü sızıntının
+> olduğu yüzeyi hiç yoklamıyordu. Kapsam, geçme durumundan daha önemlidir.
+
 ### KUYRUĞA EKLENDİ — 24.08 · dosyası olmayan iki belge üstverisi (küçük)
 Storage denetimi sırasında çıktı: `case_documents`ta 24 üstveri satırından
 **2'sinin dosyası kovada yok** (`farazi-test/…` yollu, tohum verisi).

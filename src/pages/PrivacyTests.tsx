@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, ShieldCheck, ShieldAlert, Play, FileDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { LEAK_QUERIES, countLeaks } from "@/lib/privacyQueries";
+import { LEAK_QUERIES, countLeaks, DEPO_YOKLAMASI, depoSizintisiVarMi } from "@/lib/privacyQueries";
 import {
   generatePrivacyReportPdf,
   loadLastRun,
@@ -42,13 +42,26 @@ export default function PrivacyTests() {
     setRunning(true);
     const next: PrivacyResultRow[] = [];
 
+    /* Sahiplik ölçütü iki türlüdür (24.08.2026):
+         · "kullanici" → sütun doğrudan auth uid tutar
+         · "taraf"     → sütun bir case_parties.id tutar; sahiplik kullanıcının
+                         KENDİ taraf kayıtlarıdır. Bu tür eklenmeden önce kör
+                         teklif (teklif_braketleri) gibi en hassas tablolar
+                         hiç yoklanmıyordu. */
+    const { data: kendiTaraflarim } = await supabase
+      .from("case_parties")
+      .select("id")
+      .eq("user_id", user.id);
+    const tarafKimliklerim = ((kendiTaraflarim ?? []) as { id: string }[]).map((t) => String(t.id));
+
     for (const q of LEAK_QUERIES) {
-      const { data, error } = await supabase
-        .from(q.table as any)
-        .select(q.selectColumns)
-        .neq(q.ownerColumn, user.id)
-        .limit(5);
-      const leaks = countLeaks((data ?? []) as any[], q.ownerColumn, user.id);
+      const sahiplik = q.sahiplik === "taraf" ? tarafKimliklerim : user.id;
+      let sorgu = supabase.from(q.table as any).select(q.selectColumns);
+      // Taraf türünde "bana ait olmayan" süzgeci sunucuda kurulamaz (çoklu
+      // kimlik); tüm görünen satırlar çekilir ve JS tarafında ölçülür.
+      if (q.sahiplik === "kullanici") sorgu = sorgu.neq(q.ownerColumn, user.id) as typeof sorgu;
+      const { data, error } = await sorgu.limit(5);
+      const leaks = countLeaks((data ?? []) as any[], q.ownerColumn, sahiplik);
       next.push({
         name: q.name,
         description: q.description,
@@ -58,6 +71,43 @@ export default function PrivacyTests() {
             ? `OK — sızıntı yok (${(data ?? []).length} satır döndü, hepsi yetkili).`
             : `SIZINTI: ${leaks} yetkisiz satır görüldü.`,
       });
+    }
+
+    /* DEPO YOKLAMASI (24.08.2026) — tablo yoklaması bunu GÖREMEZ.
+       Belgenin SATIRI gizlense bile DOSYASI ayrı bir yetki sistemindedir.
+       O gün `case-documents` kovasının okuma politikası veritabanındakinden
+       genişti ve gerçek bir sızıntı ölçüldü (1 çift). Bu yoklama o sınıfı bir
+       daha kaçırmamak içindir: kullanıcının YÜKLEMEDİĞİ bir belgenin dosyası
+       indirilmeye çalışılır; yetki doğruysa indirme BAŞARISIZ olmalıdır. */
+    {
+      const { data: baskasininBelgesi } = await supabase
+        .from("case_documents")
+        .select("file_path, uploaded_by")
+        .neq("uploaded_by", user.id)
+        .not("file_path", "is", null)
+        .limit(1);
+      const hedef = ((baskasininBelgesi ?? []) as { file_path: string }[])[0];
+      if (!hedef) {
+        next.push({
+          name: DEPO_YOKLAMASI.name,
+          description: DEPO_YOKLAMASI.description,
+          status: "pass",
+          detail: "Yoklanacak yabancı belge yok (satır düzeyi zaten engelliyor).",
+        });
+      } else {
+        const { data: dosya, error: dErr } = await supabase.storage
+          .from(DEPO_YOKLAMASI.bucket)
+          .download(hedef.file_path);
+        const indirmeBasarili = !dErr && !!dosya;
+        next.push({
+          name: DEPO_YOKLAMASI.name,
+          description: DEPO_YOKLAMASI.description,
+          status: depoSizintisiVarMi(indirmeBasarili) ? "fail" : "pass",
+          detail: indirmeBasarili
+            ? "SIZINTI: başkasının yüklediği dosya indirilebildi."
+            : "OK — dosya indirilemedi, kova politikası dar.",
+        });
+      }
     }
 
     // common_ground_reports — confirm no error / RLS active
