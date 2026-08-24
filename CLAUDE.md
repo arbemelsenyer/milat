@@ -183,6 +183,35 @@ Durduğunda: neyin bittiğini, neyin beklediğini ve seçenekleri **tek blokta**
 
 ---
 
+### 5-A-1. ZORLAYICI: DEVAM BEKÇİSİ (Stop kancası)
+
+Bu kural artık **metne değil mekanizmaya** bağlıdır. `~/.claude/hooks/devam-bekcisi.sh`
+bir **Stop kancasıdır**; tur kapanmadan önce çalışır ve kuyrukta yapılabilir iş
+varken kapanmayı **engeller**.
+
+| durum | kanca ne yapar |
+|---|---|
+| `tasks/todo.md`ta karar/önkoşul beklemeyen `- [ ] P0–P3` madde var | **ENGELLER** — "sıradaki işe geç" |
+| `tasks/HAT.md`te cevaplanmış ama ARŞİV'e taşınmamış `H-<n>` var | **ENGELLER** — "cevabı uygula" |
+| Cevapta Human Gate · BLOCKED · "kuyrukta iş kalmadı" · `medipact dur` · HAT'a yazıldı | izin verir |
+| Kuyruk boş | izin verir |
+| `stop_hook_active` (kanca zaten engellemiş) | izin verir |
+| Aynı oturumda üst üste **3** engel | dördüncüde bırakır, sayacı sıfırlar |
+
+**Sayaç:** `.claude/devam-sayaci`, oturum kimliğiyle birlikte tutulur; kullanıcı
+yeni mesaj yazınca (oturum değişince) sıfırdan başlar.
+
+**FAIL-OPEN:** kanca python bulamazsa, girdi bozuksa ya da herhangi bir adımı
+patlarsa **engellemeden** çıkar. Bozuk bir bekçi oturumu kilitler; şüphede
+kalırsa geçirir.
+
+**Karar mantığı ayrı dosyadadır** (`devam-bekcisi.py`). Sebebi: `python - <<'EOF'`
+kalıbında heredoc STDIN'i ele geçirir ve kancanın JSON girdisi **hiç okunamaz**
+— ilk yazımda tam bu oldu, kanca test dizini yerine gerçek projeyi okudu ve
+testler sessizce yanlış sonuç verdi.
+
+---
+
 ## 6. GÖREV SEÇİMİ
 
 Kullanıcı yeni görev vermediğinde sıradaki işi **sen** belirlersin. Kaynak: `tasks/todo.md` kuyruğu + kodun gerçek durumu.
