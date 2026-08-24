@@ -4967,6 +4967,10 @@ export type Database = {
         Args: { _case_id: string; _user_id: string }
         Returns: boolean
       }
+      is_case_owner_not_party: {
+        Args: { _case_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_case_owner_safe: {
         Args: { _case_id: string; _user_id: string }
         Returns: boolean
