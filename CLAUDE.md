@@ -539,3 +539,43 @@ Kullanıcı teknik görevleri senin için parçalamaz. Kullanıcı hata düzeltm
 Kullanıcıda kalan: ürün kararı, hukuki/ticari karar, geri dönüşsüz işlem, kritik güvenlik/veri izolasyonu kararı, runtime ajan davranışı, production kapısı.
 
 **HEDEF:** Medipact'ı mevcut gerçek kod durumundan pilot uygulamaya kadar mümkün olduğunca kesintisiz ilerletmek. Amaç daha fazla sohbet üretmek değil, çalışan ürünü ilerletmektir.
+
+---
+
+## 22. GEÇİCİ DOSYALAR — `tests/gecici/`, SİLME YOK, ÜSTÜNE YAZ
+
+Tek kullanımlık her şey (sonda betiği, deneme testi, ayrıştırma kontrolü, ara
+çıktı) **`tests/gecici/` altına** yazılır. Başka hiçbir yere yazılmaz.
+
+**Yasak yerler:** proje kökü · `src/` · `supabase/` · `tests/` kökü · `/tmp` ·
+sistemin geçici klasörü. Kökte `sonda.mjs`, `gecici.ts`, `kontrol.js` gibi bir
+dosya oluşturmak — sonradan silinecek olsa bile — kural ihlalidir.
+
+**Silme yok.** Dosya işi bitince silinmez; **bir sonraki sefer aynı adın üstüne
+yazılır.** Böylece `rm` hiç gerekmez ve bekçi (PreToolUse hook) hiç tetiklenmez.
+Sabit adlar kullan; her seferinde yeni ad üretme:
+
+| amaç | dosya |
+|---|---|
+| canlı davranış sondası | `tests/gecici/sonda.test.ts` |
+| ayrıştırma / sözdizimi kontrolü | `tests/gecici/sozdizim.mjs` |
+| tek seferlik veri/çıktı incelemesi | `tests/gecici/inceleme.mjs` |
+
+Dosyanın başına **ne sorduğunu** tek cümleyle yaz; sonraki oturum üstüne
+yazarken neyi devraldığını bilsin.
+
+**Koşum:** `npm run test` bu klasörü **dışarıda bırakır** (kuyruk yeşil kalır);
+yalnız `npm run sonda` çalıştırır. `vitest.config.ts` içine exclude YAZILMAZ —
+oradaki exclude komut satırından gevşetilemiyor ve sonda hiç koşamıyor (denendi).
+
+**Git:** `tests/gecici/*` `.gitignore`dadır; yalnız `.gitkeep.md` izlenir. Geçici
+dosya commit'lenmez. Node paketi gerektiren bir betik yazacaksan **proje kökünden
+çalıştır** (`node tests/gecici/sozdizim.mjs …`) — `node_modules` böyle çözülür;
+betiği köke taşımak için sebep yoktur.
+
+> Bu bölüm `tests/gecici/sonda.test.ts` başlığındaki "CLAUDE.md §22" atfının
+> karşılığıdır. Kural 23.08'de `a462dc2` ile kuruldu ama bu dosyaya yazılmamıştı;
+> yazılmadığı için 24.08'de çiğnendi (köke `sozdizim-gecici.mjs` yazılıp silindi).
+> **24.08 ikinci kez:** bölüm bir kez yazıldı (`8c603d5`) ama sonraki bir
+> `CLAUDE.md` düzenlemesinde düştü ve kural yine görünmez oldu. Bu dosyayı
+> baştan yazan her düzenleme bu bölümü KORUMALIDIR.
