@@ -10,6 +10,11 @@
   etkin cron 7 · `cron.job`ta düz metin sır **0**
 - **Açık blokaj: P0 · HUMAN GATE — self-servis başvuruda kör veri** (§7.4)
 
+> **KARAR PAKETİ:** karar bekleyen altı maddenin tamamı — sorun · seçenekler ·
+> önerim · kararın etkisi — `tasks/karar-paketi.md` dosyasındadır. O dosya bir
+> durum dosyası DEĞİLDİR; tek doğruluk kaynağı bu dosyadır (§0). Karar verilince
+> madde buraya işlenir ve karar paketinden düşer.
+
 ### TUR NEDEN KAPANDI (§5 · iki sebep birden)
 1. **Gerçek Human Gate** — self-servis başvuruda kör veri (§7.4, üç seçenek aşağıda).
 2. **Kuyrukta uygulanabilir iş kalmadı.** Kalan altı maddenin hepsi tek tek
