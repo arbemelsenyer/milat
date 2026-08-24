@@ -347,6 +347,32 @@ NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
 
+### KAPANDI — 24.08 · P2 · EKSİK İNDEKSLER (pilot ölçeği için)
+Nöbetçi 3 dakikada bir her dosya için onlarca sorgu koşuyor. `pg_stat_user_tables`
+okundu; **sıralı tarama** sayıları:
+
+| tablo | sıralı tarama | indeks taraması | satır | durum |
+|---|---|---|---|---|
+| `ajan_gorevleri` | **142.954** | 470 | 560 | **yalnız birincil anahtar indeksi vardı** |
+| `case_parties` | 124.857 | 1.808 | 16 | `case_id` indeksi yoktu |
+| `case_documents` | 17.910 | 33.298 | 24 | `party_id` var, `case_id` yoktu |
+
+En kritiği `ajan_gorevleri`: ürünün denetim kaydı, **büyüyor** (tek dosyada
+`oturum_hatirlatma` tipinde 411 satır birikmişti) ve bütün mükerrer yazım
+kapıları `case_id` + `gorev_tipi` ile sorguluyor. Kardeş tablolarda
+(`akis_olaylari`, `ajan_kosum_izi`) uygun indeksler var; bu tablo atlanmıştı.
+
+EKLENENLER (davranış değişikliği yok, geri alınabilir):
+- `idx_ajan_gorevleri_case_tip_zaman` → `(case_id, gorev_tipi, created_at DESC)`
+  — kapıların kullandığı sıralamayla **birebir** aynı
+- `idx_case_parties_case` → `(case_id)`
+- `idx_case_documents_case_zaman` → `(case_id, created_at DESC)`
+
+DÜRÜSTLÜK NOTU: tablolar bugün küçük olduğu için gecikme **şu an
+hissedilmiyor**; bu indeksler pilot ölçeği içindir. 9–24 satırlık diğer
+tablolara bilerek indeks EKLENMEDİ — o boyutta Postgres zaten sıralı tarama
+seçer ve indeks ölü yük olur.
+
 ### DENETİM — 24.08 · TARAF YÜZEYİ (kod tarafı) — TEMİZ ÇIKTI
 RLS denetiminden sonra **kodun kendisini** denetledim: taraf yüzeyi
 (`CaseRoom`) dosya kapsamlı sorgular yapıyor mu, yapıyorsa RLS onları gerçekten
