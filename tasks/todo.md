@@ -368,6 +368,12 @@ EKLENENLER (davranış değişikliği yok, geri alınabilir):
 - `idx_case_parties_case` → `(case_id)`
 - `idx_case_documents_case_zaman` → `(case_id, created_at DESC)`
 
+**CANLI KANIT:** eklendikten sonraki dakikalarda
+`idx_ajan_gorevleri_case_tip_zaman` **47 kez** kullanıldı
+(`pg_stat_user_indexes.idx_scan`) — yani gerçekten sıcak yoldaymış, tahmin
+değil. Aynı anda sistem sağlığı yeşil: son 15 dk'da 6 koşum hepsi 200,
+işlenmemiş olay 0, son 3 saatte `akis_hatasi` 0.
+
 DÜRÜSTLÜK NOTU: tablolar bugün küçük olduğu için gecikme **şu an
 hissedilmiyor**; bu indeksler pilot ölçeği içindir. 9–24 satırlık diğer
 tablolara bilerek indeks EKLENMEDİ — o boyutta Postgres zaten sıralı tarama
