@@ -625,7 +625,7 @@ async function oturumHatirlatmaYurut(admin: any, dosya: any, gerekce: string): P
   const sessionId = m[1];
 
   const { data: oturum, error: sErr } = await admin.from("case_sessions")
-    .select("id, scheduled_at, status, participants, video_link").eq("id", sessionId).maybeSingle();
+    .select("id, scheduled_at, status, participants, video_link, session_type").eq("id", sessionId).maybeSingle();
   if (sErr) return { durum: "bekliyor", sonuc: `Oturum okunamadı: ${sErr.message}` };
   if (!oturum) return { durum: "atlandi", sonuc: "Oturum kaydı bulunamadı" };
   if (String((oturum as any).status) !== "scheduled") return { durum: "atlandi", sonuc: "Oturum artık planlı değil" };
@@ -633,12 +633,35 @@ async function oturumHatirlatmaYurut(admin: any, dosya: any, gerekce: string): P
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) return { durum: "bekliyor", sonuc: "RESEND_API_KEY yok, hatırlatma gönderilemedi" };
 
-  const partyIds = (Array.isArray((oturum as any).participants) ? (oturum as any).participants : [])
+  /* ALICI KURALI (24.08.2026) — ÖZEL OTURUM ile ORTAK OTURUM AYRIDIR.
+     Eskiden alıcılar HER ZAMAN `participants` listesinden alınıyordu. Ama
+     `randevu-teklif` oraya YALNIZ saati kabul eden TEK tarafı yazıyor
+     (`randevu-teklif:659-661`). Sonuç: ortak oturumda karşı taraf hiç
+     hatırlatma almıyordu.
+       · `private` (özel/caucus) → YALNIZ `participants`. Özel oturumun varlığı
+         karşı tarafa hiçbir yüzeyden açılmaz (constitution · kör veri);
+         hatırlatma da açamaz. Katılımcı yoksa iş atlanır, genişletilmez.
+       · diğer (ortak/ön görüşme) → dosyanın BÜTÜN tarafları. Ortak oturumu
+         herkesin bilmesi zaten gerekir; `participants` burada eksik bir
+         kayıttır, gizlilik sınırı değildir. */
+  const ozelOturum = String((oturum as any).session_type ?? "") === "private";
+  const katilimciIds = (Array.isArray((oturum as any).participants) ? (oturum as any).participants : [])
     .map((p: any) => String(p?.party_id ?? "")).filter(Boolean);
-  if (partyIds.length === 0) return { durum: "atlandi", sonuc: "Oturumda katılımcı taraf kaydı yok" };
 
-  const { data: taraflar } = await admin.from("case_parties")
-    .select("id, party_type, first_name, last_name, company_name, email").in("id", partyIds);
+  let tarafSorgusu = admin.from("case_parties")
+    .select("id, party_type, first_name, last_name, company_name, email");
+  if (ozelOturum) {
+    if (katilimciIds.length === 0) {
+      return { durum: "atlandi", sonuc: "Özel oturumda katılımcı taraf kaydı yok — alıcı genişletilmedi" };
+    }
+    tarafSorgusu = tarafSorgusu.in("id", katilimciIds);
+  } else {
+    tarafSorgusu = tarafSorgusu.eq("case_id", dosya.id);
+  }
+  const { data: taraflar } = await tarafSorgusu;
+  if (((taraflar ?? []) as any[]).length === 0) {
+    return { durum: "atlandi", sonuc: "Oturum için alıcı taraf bulunamadı" };
+  }
   const { imza, dosyaSatiri } = await imzaBlogu(admin, dosya.id);
   const { gun, saat } = trGunSaat(String((oturum as any).scheduled_at));
   const esc = (t: string) => String(t).replace(/</g, "&lt;");

@@ -64,3 +64,35 @@ describe("send-session-reminders — kopya kol kaldırıldı", () => {
     expect(CRON).toContain('status: 401');
   });
 });
+
+/* ALICI KURALI — ÖZEL OTURUM ile ORTAK OTURUM AYRIDIR (24.08.2026)
+   Nöbetçi alıcıları HER ZAMAN `participants`ten alıyordu. Ama `randevu-teklif`
+   oraya YALNIZ saati kabul eden TEK tarafı yazıyor (randevu-teklif:659-661).
+   Sonuç: ortak oturumda KARŞI TARAF hiç hatırlatma almıyordu.
+   CANLI KANIT (24.08 02:00): eski cron kolu aynı oturum için 3 alıcı buldu
+   (2 taraf + arabulucu); nöbetçi kolu ise `participants` boş olduğu için
+   hiç kimseye gönderemezdi.
+   Ama özel (caucus) oturumda genişletme YASAK: özel oturumun varlığı karşı
+   tarafa hiçbir yüzeyden açılmaz (constitution · kör veri). */
+describe("hatırlatma alıcıları — özel oturum genişletilmez", () => {
+  it("özel oturumda YALNIZ katılımcılar hedeflenir", () => {
+    expect(NOBETCI).toContain('const ozelOturum = String((oturum as any).session_type ?? "") === "private"');
+    expect(NOBETCI).toContain('tarafSorgusu.in("id", katilimciIds)');
+  });
+
+  it("özel oturumda katılımcı yoksa iş ATLANIR, alıcı genişletilmez", () => {
+    expect(NOBETCI).toContain("Özel oturumda katılımcı taraf kaydı yok — alıcı genişletilmedi");
+  });
+
+  it("ortak oturumda dosyanın BÜTÜN tarafları hedeflenir", () => {
+    expect(NOBETCI).toContain('tarafSorgusu.eq("case_id", dosya.id)');
+  });
+
+  it("alıcı bulunamazsa sessizce düşmez, sebebi yazılır", () => {
+    expect(NOBETCI).toContain("Oturum için alıcı taraf bulunamadı");
+  });
+
+  it("session_type sorguda okunur (yoksa kural uygulanamaz)", () => {
+    expect(NOBETCI).toContain("participants, video_link, session_type");
+  });
+});
