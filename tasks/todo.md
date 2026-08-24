@@ -1,18 +1,66 @@
 ## Nerede kaldık
 
-- Tarih: 24.08.2026 (gece oturumu · 7. blok · KAPANIŞ)
-- Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
-- Aktif görev: yok — yarım iş yok, çalışma ağacı temiz
-- Son tamamlanan iş: gizlilik ekranı yönetici oturumunda "belirsiz" diyor (`5ad286c`, publish)
-- Doğrulama: `npm run test` **169/169** · tsc hatasız · build hatasız · lint **2358** (oturum başı 2361)
-- **CANLI SAĞLIK (10:43):** son 20 dk **7 koşum, hepsi 200** · hatalı 0 ·
-  işlenmemiş olay 0 · son 5 saatte `akis_hatasi` 0 · `closed_at` boş kapalı dosya 0 ·
-  `cron.job`ta düz metin sır **0**
-- **Açık blokaj: yok.** P0 kör veri kararı (A) uygulandı ve doğrulandı.
-- **İletişim hattı:** `tasks/HAT.md` (CLAUDE.md §23). Açık maddeler: **H-1…H-5**.
-  Her tur başında `## COWORK → CODE` okunur; cevap gelmişse uygulanır ve madde
-  arşive iner.
-- **Karar bekleyen beş madde:** `tasks/HAT.md` → H-1…H-5 (P0 kapandı)
+- Tarih: 24.08.2026 (8. blok)
+- Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
+- **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
+  Karar gereken her madde `tasks/HAT.md`ye yazılır, Code beklemeden devam eder.
+  "Bitti, bilgi veriyorum" turu yok.
+- Aktif görev: H-2 (ıslak imza akışı) — HAT cevabı geldi, uygulanıyor
+- Son tamamlanan iş: **H-6 (karar B) canlıda uygulandı + tezgâha bağlandı** (`a1ebdc4`)
+- Doğrulama: `npm run test` **204/204** · guard sökülmüş kopyada **27 test düşüyor** (kanıt)
+- **CANLI ÖLÇÜM (H-6 sonrası):** dar politika **25** · kalan geniş **6**
+  (tam olarak dokunulmayacak öbek) · sahip **9/9** yetkili · erişimi değişen dosya **0**
+  · sahip-aynı-zamanda-taraf **0**
+- **Açık blokaj: yok** (H-3'ün silme adımı izin ekranında reddedildi — aşağıda)
+- **İletişim hattı:** `tasks/HAT.md`. Kurucu **altı maddenin de** cevabını yazdı
+  (`97390ec`). Durum: H-6 KAPANDI · H-3 kısmen (silme izni yok) · H-1 kurucuda ·
+  H-2 uygulanıyor · H-4 sırası gelmedi · H-5 migration gerektiriyor
+
+### İZİN DUVARI (24.08 · `.claude/settings.json`, commit `5767475`)
+Kural metni öneridir, izin listesi duvardır. Artık **deny**:
+`.env` okuma/yazma · `supabase/migrations/**` yazma · `npm install` ·
+`supabase functions deploy` · `supabase db push`.
+**Sonuç:** migration METNİ yazılır ama dosyaya Code koyamaz — uygulama Lovable
+SQL bölümünden yapılır (anayasa m.12). Tezgâhın "kusuru geri getir" kanıtı bu
+yüzden `MIG_DIZIN` ortam değişkeniyle **kopya dizin** üzerinden alınır.
+
+### KAPANDI — 24.08 · H-6 · P0 · SAHİP-TARAF GUARD'I BELİRSİZ ÖBEĞE DE UYGULANDI (karar **B**)
+Kurucu Code'un önerisinden (A) gerekçeyle ayrıldı: ölçüt "tablo `party_id`
+taşıyor mu" değil, **"bu yüzey arabulucuya mı ait"**. Belirsiz öbeğin 13'ü doğası
+gereği MEDIATOR_ONLY; bir tarafın bunları görmesi karşı taraf sızıntısı olmasa da
+**arabulucu-özel yüzeyin tarafa açılmasıdır** (constitution m.1 · mimari §14).
+A'nın açık bıraktığı 13 yüzey, kapattığı 4'ten riskliydi.
+
+- Migration Lovable'dan uygulandı: `20260824140724` (17 politika) +
+  `20260824140953` (taramada sonradan çıkan 2: `arabulucu_kontrol_tercihleri`,
+  `case_party_invites`). Uygulanan metin, Code'un hazırladığı taslakla
+  (`tests/gecici/h6-migration.sql`) **birebir aynı** — diff boş.
+- **Dosya yönetimi sahipte kaldı** (kararın şartı): kalan 6 geniş politika tam
+  olarak `case_documents` · `case_parties`×3 · `cases_private_keys` ·
+  `cases_vector_pool`. Sessiz istisna yok, istisna gerekmedi.
+- Tezgâh genişletildi (`tests/rls-sahip-taraf-guard.test.ts`, 35 durum):
+  kapsam artık 25 tablo; ayrıca **"guard kullanan ama listede olmayan tablo"**
+  testi eklendi — yeni bir tablo sessizce guard'a alınırsa yakalanır.
+- **KANITLANDI:** `supabase/migrations` artık yazmaya kapalı olduğu için kanıt
+  guard'ı sökülmüş **kopya** üzerinde alındı
+  (`MIG_DIZIN=tests/gecici/mig-kanit`) → **27 test düştü**, gerçek dizinde 35/35.
+
+### YARIM — 24.08 · H-3 · P3 · dört ölü dosyanın silinmesi (karar **A**)
+Kanıt tamamlandı, **silme adımı izin ekranında reddedildi**; dosyalar duruyor.
+KANIT (tarama):
+- `send-session-notification` → uygulamada **hiçbir çağrı yok**; tek geçtiği yer
+  `NotificationSettings.tsx:14`teki açıklama satırı.
+- `send-reschedule-notification` → yalnız `RescheduleApproval.tsx:86` ve
+  `RescheduleRequest.tsx:78` çağırıyor.
+- `RescheduleRequest.tsx` / `RescheduleApproval.tsx` → **hiçbir yerden import
+  edilmiyor** (grep boş). Yani çağrı zinciri kendi içinde kapalı = ölü.
+Silme yeniden denenmeyecek; kurucu izin verdiğinde tek komutla kapanır.
+
+### YENİ BULGU — P1 adayı · `mediator_requests` yalnız dört dosyalık ada DEĞİL
+H-3 taramasında çıktı: tablo 0 satır olmasına rağmen **beş canlı yüzey** ona
+dokunuyor — `MediatorDetail.tsx` (**INSERT**), `SessionCalendar.tsx`,
+`WeeklyCalendarView.tsx`, `useCaseStorage.ts`, `Analytics.tsx`.
+Yani "arabulucu talebi" akışı ya hiç kullanılmıyor ya da kırık. Kuyruğa alındı.
 
 ### KURUCUDA KALAN ÜÇ MADDE (hiçbiri beni bloke etmiyor)
 1. **P1 · `CRON_SECRET` değerinin yenilenmesi.** Runbook aşağıda. Bunu ben

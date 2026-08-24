@@ -601,3 +601,13 @@ edilmemişti.
 
 Somut kontrol: bir tezgâh/ekran eklerken sor — "bu, geçmesi gereken durumda
 gerçekten geçiyor mu?" Yalnız "düşmesi gereken durumda düşüyor mu?" yetmez.
+
+## 24.08.2026 — Terk edilmiş kod canlı görünür, sessizce boş döner
+`mediator_requests` / `reschedule_requests` (0 satır) üzerine kurulu dört dosya
+silindi: `send-session-notification`, `send-reschedule-notification`,
+`RescheduleRequest.tsx`, `RescheduleApproval.tsx` (H-3 · karar A).
+**Neden ders:** aynı tabloyu sorgulayan `send-session-reminders` "yapacak iş yok"
+sanıp 200 dönüyordu — oturum hatırlatmaları hiç gönderilmedi, üç tur kaybettirdi.
+Terk edilen kod silinmezse bir sonraki okuyan onu çalışan yol sanar.
+**Kural:** tablo boşalınca sorgusu da kalkar; "belki lazım olur" diye bırakılan
+çağrı zinciri tuzaktır. Tablolar duruyor (silmek geri dönüşsüz, §7.3).

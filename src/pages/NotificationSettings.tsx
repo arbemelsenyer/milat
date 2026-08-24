@@ -11,8 +11,7 @@ import { Navigate, Link } from "react-router-dom";
 // Bu sayfa TERCİH TUTMAZ. İletişim tercihi dosya kapsamlıdır: bütün gönderim
 // yolları `iletisim_tercihleri` satırını party_id ile okur (ajan-nobetci,
 // hazirlik-foyu-gonder, send-meeting-invite, send-session-reminders,
-// send-session-notification, send-reschedule-notification, randevu-teklif,
-// cancel-meeting-invite). Bir kullanıcı birden çok dosyada taraf olabildiği için
+// randevu-teklif, cancel-meeting-invite). Bir kullanıcı birden çok dosyada taraf olabildiği için
 // kullanıcı düzeyinde tek bir anahtar kümesi bu modele oturmuyor.
 // Sayfa, tercihin gerçekten ayarlandığı yüzeye (dosya içi "İletişim Tercihlerim")
 // götüren dürüst bir yönlendirmedir. Eski `notification_preferences` anahtarları
