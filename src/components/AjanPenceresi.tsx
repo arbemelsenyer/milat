@@ -391,7 +391,8 @@ export function AjanPenceresi({
       // "[akis:<olay>:<kural>] …" gerekçesinden kural kodları çıkarılır.
       const kodlar = new Set<string>();
       for (const r of ((kosan.data ?? []) as any[])) {
-        const m = /^\[akis:[^:]+:([^\]]+)\]/.exec(String(r?.gerekce ?? ""));
+        // Çapa kaldırıldı: aynı sınıf (bkz. yukarıdaki `[gecis:…]` notu).
+        const m = /\[akis:[^:]+:([^\]]+)\]/.exec(String(r?.gerekce ?? ""));
         if (m) kodlar.add(m[1]);
       }
       setKosanAdimlar(Array.from(kodlar));
@@ -494,7 +495,12 @@ export function AjanPenceresi({
 
     // (3) Aşama ilerlemeleri — tek satır, sebebiyle.
     for (const a of asamalar) {
-      const m = /^\[gecis:(\d+)->(\d+)\]\s*(.*)$/.exec(String(a.gerekce ?? ""));
+      /* ÇAPA KALDIRILDI (24.08.2026). Desen satır başına çapalıydı; oysa
+         nöbetçinin açtığı aşama görevleri `anaAjanaBildir` geçidinden geçiyor
+         ve geçit gerekçenin BAŞINA `[kaynak:…]` koyuyor (21.08 11:06'dan beri
+         yazılan 421 görevin hepsinde var). Çapa yüzünden o geçişler zaman
+         çizelgesinde SESSİZCE görünmüyordu (`if (!m) continue`). */
+      const m = /\[gecis:(\d+)->(\d+)\]\s*(.*)$/.exec(String(a.gerekce ?? ""));
       if (!m) continue;
       liste.push({
         id: `as-${a.id}`, zaman: new Date(a.created_at).getTime(), tip: "asama",

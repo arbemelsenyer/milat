@@ -38,6 +38,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { KAYIT_ONAY_SAAT, KAYIT_ONAY_SURUMU, KAYIT_ONAY_METNI } from "@/lib/kayitProtokolu";
+import { etiketsizGovde } from "@/lib/etiket";
 
 // YZ kullanım beyanı — metin ve sürümü tek yerde; sürüm değişirse onay yeniden istenir.
 const YZ_BEYAN_SURUMU = "v1";
@@ -1659,7 +1660,16 @@ function AjanimBolumu({ caseId, partyId }: { caseId: string; partyId: string }) 
     () => gorevler.map((g) => ({
       ...g,
       baslik: AJANIM_ETIKET[g.gorev_tipi] ?? g.gorev_tipi,
-      detay: g.sonuc || String(g.gerekce ?? "").replace(/^\[[^\]]+\]\s*/, "").trim(),
+      /* TARAFA GÖSTERİLEN METİN (24.08.2026 onarımı, iki kusur birden):
+         (1) Baştaki etiket TEK KEZ siliniyordu. Geçit `[kaynak:…]` eklemeye
+             başlayınca (21.08) üç etiket oldu ve taraf kendi ekranında
+             `[bekleyen:…] [eksik:…] [kol:…]` görüyordu — ham UUID dahil.
+             `etiketsizGovde` baştaki bütün grupları tüketir.
+         (2) `sonuc` gövdenin ÖNÜNE geçiyordu. `sonuc` iç muhasebedir
+             (ör. "son hatırlatma: 2026-08-23T11:09:03Z (1. hatırlatma)");
+             tarafın görmesi gereken şey SORUNUN KENDİSİDİR. Sıra çevrildi:
+             önce temiz gövde, gövde boşsa `sonuc`. */
+      detay: etiketsizGovde(g.gerekce) || g.sonuc || "",
     })),
     [gorevler],
   );
