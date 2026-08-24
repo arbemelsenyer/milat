@@ -31,3 +31,6 @@ supabase/.temp/
 # Gecici test dosyalari (CLAUDE.md 22): icerik git'e girmez, klasor notu girer
 tests/gecici/*
 !tests/gecici/.gitkeep.md
+
+# Stop kancasinin oturum sayaci (CLAUDE.md 5-A-1) — makineye ozel, izlenmez
+.claude/devam-sayaci
