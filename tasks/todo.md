@@ -10,7 +10,7 @@
   · kapılar tutuyor (yeni mükerrer görev satırı **0**)
 - **Gözle doğrulama:** ön yüzde dokunduğum üç dosya tarayıcıdan denetlendi;
   konsol hatasız, sızan iç etiket sıfır (ayrıntı aşağıda)
-- Açık blokaj: **yok**
+- Açık blokaj: **P0 · HUMAN GATE — self-servis başvuruda kör veri** (§7.4, üç seçenek yukarıda)
 - Sıradaki uygulanabilir iş: kurucu kararı bekleyen üç madde (aşağıda); teknik kuyruk boş
 
 ### KURUCUDA KALAN ÜÇ MADDE (hiçbiri beni bloke etmiyor)
@@ -330,6 +330,56 @@ Yani düğme artık adının söylediği işi yapıyor ve sunucuya iz bırakıyo
 NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
+
+### HUMAN GATE — 24.08 · P0 · SELF-SERVİS BAŞVURUDA KÖR VERİ KIRILIYOR (§7.4)
+
+**BULGU.** `is_case_owner_safe(case_id, user_id)` yalnız `cases.user_id`
+eşleşmesine bakar ve **34 RLS politikası** bunu *arabulucu düzeyi* yetki olarak
+kullanır (politika adlarının hepsi "Arabulucu …"). Ama:
+- Açılış sayfasındaki **"Başvuruyu Başlat"** düğmesi `/legal-reasoning?new=1`e
+  gider (`Landing.tsx:76` ve `:166`) — yani arabulucu olmayan bir kullanıcı da
+  dosya açabilir ve `cases.user_id` kendisi olur.
+- `MediationEngine.tsx:4101`: self-servis akışta **ilk taraf, dosyayı açanın
+  kendi `user_id`si ile** yazılır:
+  `user_id: !isMediator && parties.length === 0 ? userId : null`
+
+SONUÇ: self-servis başvuruda **dosya sahibi = dosyanın tarafı**. O kişi
+arabulucu düzeyi yetkiyle **karşı tarafın** hazırlık föyünü
+(`oturum_hazirlik_foyleri`), kalemlerini (`taraf_kalemleri`), bilirkişi
+beyanlarını ve oturum kayıtlarını görebilir. **Ürünün kör veri ilkesi kırılır.**
+
+CANLI DURUM: bugün **0 dosya** etkileniyor — mevcut 9 dosyanın hepsi arabulucu
+tarafından açılmış, hiçbirinde sahip aynı zamanda taraf değil. Kusur **gizli**,
+ama self-servis akış canlıda açık ve ilk kullanımda doğar.
+
+**BU BİR ÜRÜN KARARIDIR, KENDİM ÇÖZMEDİM — ve bunu bir denemeyle öğrendim.**
+Önce dar sandığım bir düzeltmeyi uyguladım (`is_case_owner_safe`e "sahip aynı
+zamanda tarafsa yetki verme" koşulu). Sonra `MediationEngine.tsx:4101`i okuyunca
+o düzeltmenin **self-servis akışı tamamen kilitleyeceğini** gördüm (başvurucu
+kendi dosyasına taraf ekleyemez, belge yükleyemez, taraf listesini göremez).
+**Geri aldım ve doğruladım** (`is_case_owner_safe` eski hâlinde; canlıda
+etkilenen dosya olmadığı için zarar doğmadı). Ölçmeden uyguladığım için oldu;
+ders `lessons.md`ye yazıldı.
+
+**KARAR GEREKEN SORU:** Self-servis başvuruda (görevli arabulucu henüz yokken)
+arabulucu düzeyi yetkiyi kim taşır?
+
+| seçenek | ne olur | bedeli |
+|---|---|---|
+| **A — Önerim.** Yalnız *taraf gizli* tablolarda (`oturum_hazirlik_foyleri`, `taraf_kalemleri`, `bilirkisi_secim_beyani`, `bilirkisi_taraf_yanitlari`, `oturum_kayitlari`) sahip yetkisi taraf olan sahibe verilmez. Dosya yönetimi (taraf ekleme, belge yükleme, `cases`) sahipte kalır. | Kör veri kapanır, self-servis akış çalışmaya devam eder | 5 politika değişir; başvurucu kendi föyünü yine görür (taraf politikası zaten veriyor) |
+| B | Self-servis başvuruda başvurucu taraf olarak YAZILMAZ; taraf kaydı ancak davetle bağlanır | Kök neden kalkar, tek satırlık kod değişikliği | Başvurucunun kendi taraf ekranı, davet akışı tamamlanana kadar çalışmaz |
+| C | Açılıştaki "Başvuruyu Başlat" arabulucu yüzeyine değil ayrı bir başvuru akışına gider | En temiz ayrım | Yeni yüzey gerekir, pilot için iş yükü |
+
+KARARIN ETKİSİ: A ve B kör veriyi kapatır; C ayrıca ürün akışını düzeltir ama
+pilotu geciktirir. Hiçbiri yapılmazsa self-servis ilk başvuruda karşı tarafın
+gizli verisi başvurucuya açılır.
+
+- [!] P0 · Self-servis başvuruda dosya sahibi = taraf → kör veri kırılıyor ·
+      **HUMAN GATE (§7.4)** · Kabul: seçilen seçenek uygulandıktan sonra,
+      sahip-aynı-zamanda-taraf olan bir dosyada karşı tarafın föyü/kalemi
+      sorgulandığında **0 satır** dönüyor · Denenenler: `is_case_owner_safe`
+      sertleştirmesi uygulandı ve self-servis akışı kilitlediği görülünce
+      geri alındı.
 
 ### CANLI GÖZLE DOĞRULAMA — 24.08 · ön yüzde dokunduğum üç dosya (tarayıcı)
 Bugün `MediationEngine`, `AjanPenceresi` ve `CaseRoom`a dokundum; üçü de canlıda

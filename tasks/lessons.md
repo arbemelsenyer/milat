@@ -510,3 +510,29 @@ Yazan tarafı düzeltmek yetmez; sözleşmenin iki ucu vardır.
 
 İKİNCİ KURAL: çapalı desen (`/^\[…\]/`) paylaşılan bir alanda kırılgandır.
 Etiket metnin İÇİNDE aranmalı. Bu oturumda aynı hata altı ayrı yerde çıktı.
+
+## 24.08.2026 — RLS'i değiştirmeden önce, o yetkiyi KİMİN kullandığını oku
+
+`is_case_owner_safe`e "sahip aynı zamanda tarafsa yetki verme" koşulunu ekledim.
+Gerekçem sağlamdı (34 politika bunu arabulucu yetkisi sayıyor, taraf olan sahip
+karşı tarafın verisini görürdü) ve canlı ölçümüm de "etkilenen dosya 0" diyordu.
+
+Ama eksik ölçmüştüm. `MediationEngine.tsx:4101`:
+```ts
+user_id: !isMediator && parties.length === 0 ? userId : null
+```
+Self-servis başvuruda ilk taraf, dosyayı açanın kendi `user_id`si ile yazılıyor.
+Yani o akışta sahip **her zaman** taraftır ve düzeltmem başvurucuyu kendi
+dosyasından kilitlerdi. Geri aldım.
+
+"Etkilenen satır 0" ölçümü YETMEDİ, çünkü o akış henüz hiç kullanılmamıştı.
+Mevcut VERİ, gelecekteki AKIŞI anlatmaz.
+
+KURAL: bir yetki denetimini (RLS, politika, guard) daraltmadan önce iki şeyi
+birden oku:
+1. O yetkiyi bugün kim kullanıyor (canlı veri), ve
+2. O yetkiyi hangi KOD YOLU üretiyor (yazan tarafı).
+İkincisi olmadan "kimse etkilenmiyor" demek yanıltıcıdır.
+
+İLGİLİ: aynı oturumda "tezgâh şemayı doğrular, veriyi doğrulamaz" dersi vardı.
+Bu onun aynası: "canlı veri bugünü doğrular, akışı doğrulamaz."
