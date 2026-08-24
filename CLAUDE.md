@@ -167,6 +167,20 @@ Bir görevi bitirdiğinde **durup onay isteme, sıradaki işe geç.**
 
 Durduğunda: neyin bittiğini, neyin beklediğini ve seçenekleri **tek blokta** yaz. Ara ara durum raporu üretip onay bekleme; amaç daha çok sohbet değil, ilerleyen ürün.
 
+### 5-A. TUR BİTİRME YASAĞI (bağlayıcı)
+
+**Bir görevi bitirip rapor yazarak turu kapatmak yasaktır.** En sık yaptığın hata budur.
+
+- Görev DONE olduğunda kaydet, commit at ve **aynı turda** sıradaki işi seç, keşfet, uygula. Yeni bir tur beklemezsin.
+- Tur ancak §5'teki **dört sebepten biriyle** kapanır: gerçek Human Gate · BLOCKED · kuyrukta uygulanabilir iş yok · `medipact dur`. Başka hiçbir sebeple kapanmaz.
+- Rapor yazmak turu kapatma gerekçesi **değildir.** Rapor, durduran sebeple birlikte yazılır; tek başına yazılmaz.
+- Şu cümleler yasaktır: "devam edeyim mi" · "onaylıyor musunuz" · "bir sonraki adım şu olacak" · "hazır olduğunuzda devam edelim" · "isterseniz şunu da yapabilirim". Yapılacaksa **sorulmaz, yapılır.**
+- Kuyrukta iş varken "bugünlük bu kadar", "bu turda bu kadarını yaptım" denmez.
+- Ara bilgi vereceksen **tek satır** yaz ve çalışmaya devam et; cevap bekleme.
+- Bir tur içinde kaç görev bittiğinin üst sınırı yoktur. Bağlam şişerse §20 devreye girer — o da durmak değil, kaydedip devretmektir.
+
+**Kendini kontrol:** Cevabını yazmadan önce sor — "kuyrukta uygulanabilir iş var mı?" Varsa ve dört sebepten biri yoksa, cevabı yazma; işe devam et.
+
 ---
 
 ## 6. GÖREV SEÇİMİ
@@ -525,40 +539,3 @@ Kullanıcı teknik görevleri senin için parçalamaz. Kullanıcı hata düzeltm
 Kullanıcıda kalan: ürün kararı, hukuki/ticari karar, geri dönüşsüz işlem, kritik güvenlik/veri izolasyonu kararı, runtime ajan davranışı, production kapısı.
 
 **HEDEF:** Medipact'ı mevcut gerçek kod durumundan pilot uygulamaya kadar mümkün olduğunca kesintisiz ilerletmek. Amaç daha fazla sohbet üretmek değil, çalışan ürünü ilerletmektir.
-
----
-
-## 22. GEÇİCİ DOSYALAR — `tests/gecici/`, SİLME YOK, ÜSTÜNE YAZ
-
-Tek kullanımlık her şey (sonda betiği, deneme testi, ayrıştırma kontrolü, ara
-çıktı) **`tests/gecici/` altına** yazılır. Başka hiçbir yere yazılmaz.
-
-**Yasak yerler:** proje kökü · `src/` · `supabase/` · `tests/` kökü · `/tmp` ·
-sistemin geçici klasörü. Kökte `sonda.mjs`, `gecici.ts`, `kontrol.js` gibi bir
-dosya oluşturmak — sonradan silinecek olsa bile — kural ihlalidir.
-
-**Silme yok.** Dosya işi bitince silinmez; **bir sonraki sefer aynı adın üstüne
-yazılır.** Böylece `rm` hiç gerekmez ve bekçi (PreToolUse hook) hiç tetiklenmez.
-Sabit adlar kullan; her seferinde yeni ad üretme:
-
-| amaç | dosya |
-|---|---|
-| canlı davranış sondası | `tests/gecici/sonda.test.ts` |
-| ayrıştırma / sözdizimi kontrolü | `tests/gecici/sozdizim.mjs` |
-| tek seferlik veri/çıktı incelemesi | `tests/gecici/inceleme.mjs` |
-
-Dosyanın başına **ne sorduğunu** tek cümleyle yaz; sonraki oturum üstüne
-yazarken neyi devraldığını bilsin.
-
-**Koşum:** `npm run test` bu klasörü **dışarıda bırakır** (kuyruk yeşil kalır);
-yalnız `npm run sonda` çalıştırır. `vitest.config.ts` içine exclude YAZILMAZ —
-oradaki exclude komut satırından gevşetilemiyor ve sonda hiç koşamıyor (denendi).
-
-**Git:** `tests/gecici/*` `.gitignore`dadır; yalnız `.gitkeep.md` izlenir. Geçici
-dosya commit'lenmez. Node paketi gerektiren bir betik yazacaksan **proje kökünden
-çalıştır** (`node tests/gecici/sozdizim.mjs …`) — `node_modules` böyle çözülür;
-betiği kökе taşımak için sebep yoktur.
-
-> Bu bölüm `tests/gecici/sonda.test.ts` başlığındaki "CLAUDE.md §22" atfının
-> karşılığıdır. Kural 23.08'de `a462dc2` ile kuruldu ama bu dosyaya yazılmamıştı;
-> yazılmadığı için 24.08'de çiğnendi (kökе `sozdizim-gecici.mjs` yazılıp silindi).
