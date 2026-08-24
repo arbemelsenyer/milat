@@ -364,6 +364,16 @@ DÜZELTME: kova okuma politikası veritabanındaki kuralla **birebir** aynı hâ
 getirildi — yönetici hepsi · `admin/` klasörü + mediator rolü (bilgi tabanı) ·
 görevli arabulucu dosyanın hepsi · **diğer herkes yalnız kendi yüklediği dosya**.
 
+**CANLI KANIT — delik teorik değildi, gerçekti:**
+| ölçüm | değer |
+|---|---|
+| kovadaki dosya | 28 |
+| ESKİ politikayla: yüklemediği ve arabulucusu olmadığı dosyayı okuyabilen taraf çifti | **1** |
+| YENİ politikayla aynı ölçüm | **0** |
+| arabulucunun erişebildiği dosya (korunmalı) | **22** — değişmedi |
+Arabulucunun eriştiği 22 dosyanın 21'i kendi yüklemesi, 1'i değil: yani
+`is_case_mediator` dalı gerçekten gerekli ve çalışıyor.
+
 ### HUMAN GATE — 24.08 · P0 · SELF-SERVİS BAŞVURUDA KÖR VERİ KIRILIYOR (§7.4)
 
 **BULGU.** `is_case_owner_safe(case_id, user_id)` yalnız `cases.user_id`
