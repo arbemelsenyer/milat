@@ -445,3 +445,25 @@ turda yeniden açabilir. 21.08'de bu kapı `startsWith → includes` ile
 KURAL: bir kusuru düzeltirken "bu kalıp başka nerede var?" diye ara. Somut
 arama: düzeltilen işlevin ADIYLA değil, KUSURUN KALIBIYLA grep at
 (burada: `sinirdanGecir(` çağıran her yer).
+
+## 24.08.2026 — "Bu işi yapan bir kol zaten var mı?" sorusu KOD YAZMADAN ÖNCE sorulur
+
+Oturum hatırlatması dört turda çözüldü. Üçüncü turda `send-session-reminders`i
+doğru tabloya bağlayıp alıcı çözümünü yazdım. Dördüncü turda ortaya çıktı ki
+ürünün ZATEN çalışan bir hatırlatma kolu vardı: `ajan-nobetci` →
+`oturumHatirlatmaGorevleriAc` + `oturumHatirlatmaYurut`. Türkçe yazıyor,
+adresi doğru yerden alıyor, iletişim tercihini uyguluyor, imza ekliyor.
+
+Yazdığım şey kopyaydı. Dahası ZARARLIYDI: aynı `gorev_tipi` ve etiketi yazdığı
+için nöbetçinin mükerrer yazım kapısını tetikleyip DOĞRU kolu susturacaktı.
+
+KURAL: bir yetenek eklemeden önce "bu işi yapan bir kol zaten var mı?" diye ara.
+Somut arama: işin ADIYLA değil, İŞİN KENDİSİYLE grep at —
+`grep -rn "hatirlatma\|reminder" supabase/functions/ --include=*.ts -l`
+Tek bir dosyanın adına bakıp "demek ki burası" deme; o dosya terk edilmiş
+olabilir (nitekim öyleydi).
+
+İKİNCİ KURAL: kopyayı kaldırırken de ölç. Kopyayı kaldırdığımda ortak oturumda
+karşı taraf hatırlatma alamayacaktı, çünkü nöbetçi yalnız `participants`e
+gönderiyor ve oraya tek taraf yazılıyor. Kaldırma da bir değişikliktir ve
+kanıt ister.

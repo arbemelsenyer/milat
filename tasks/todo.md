@@ -3,8 +3,8 @@
 - Tarih: 24.08.2026 (gece oturumu · 5. blok)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok
-- Son tamamlanan iş: oturum hatırlatmaları gerçekten gönderiliyor (`e4c788d`) — 401'in altındaki ikinci kusur
-- Doğrulama sonucu: `npm run test` **101/101** · lint **2360** (temel çizginin bir altında) · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
+- Son tamamlanan iş: oturum hatırlatması zinciri uçtan uca çözüldü (`4456c80`) — canlıda 3 e-posta gönderildi
+- Doğrulama sonucu: `npm run test` **97/97** · lint **2354** (temel çizginin 6 altında) · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
 - **KURUCUDAN TEK SOMUT KONTROL** (§11-B — benim yapamadığım tek şey): bir dosyada
   arabulucu hesabıyla "Aşama N+1'e Geç →" düğmesine bas, sayfayı yenile. Dosya yeni
   aşamada KALMALI (eskiden geri düşüyordu). Sunucu tarafını ben doğrularım:
@@ -76,6 +76,38 @@ DEĞİŞMEDİ, düğme onda yalnız ekranı taşır. Sol menüdeki gezinme (`got
 DEĞİŞMEDİ: bakmak için aşamaya geçmek dosyayı ilerletmez. Yeni bir yetki
 icat edilmedi; RLS zaten bu ölçütü taşıyor (yönetici · görevli arabulucu · dosya
 sahibi) — `akis-onayla` düzeltmesiyle aynı ölçüt.
+
+### KAPANDI — 24.08 · P0 · OTURUM HATIRLATMASI: DÖRT TURDA ÇÖZÜLDÜ, ZİNCİRİN UCU GÖRÜLDÜ
+Bu madde bu oturumun en uzun işiydi ve **her tur bir öncekinin eksiğini gösterdi.**
+Sonuç canlı kanıtla kapandı.
+
+| tur | bulgu | commit |
+|---|---|---|
+| 1 | cron `x-cron-secret` göndermiyor → her saat **401** | migration (cron) |
+| 2 | yetki düzelince görüldü: fonksiyon terk edilmiş `mediator_requests`i sorguluyor (canlıda **0 satır**) → 200 döner, **sıfır** gönderir | `e4c788d` |
+| 3 | adres `profiles`e bağlıydı; canlıda tarafların çoğunda `user_id` **boş** — adres `case_parties.email`te | `7b4bf53` |
+| 4 | ürünün **zaten** bir hatırlatma kolu var (`ajan-nobetci`); yazdığım kopyaydı ve doğru kolu **susturacaktı** | `8c603d5` |
+| 5 | asıl kusur: nöbetçinin etiket deseni `^\[hatirlatma:` ile **çapalıydı**, geçit başa `[kaynak:nobetci]` koyduğu için hiç eşleşmiyordu → nöbetçi **hiç** hatırlatma göndermemiş | `8c603d5` |
+| 6 | kopyayı kaldırınca boşluk açılacaktı: nöbetçi yalnız `participants`e gönderiyor, `randevu-teklif` oraya **tek taraf** yazıyor → ortak oturumda karşı taraf hatırlatma almazdı | `6c06138` |
+
+**CANLI KANIT — 02:00:00 UTC:**
+`{"success":true,"message":"Processed 1 sessions, sent 3 reminder emails","count":3}`
+Zincir gerçekten gönderdi (2 taraf + arabulucu). Test oturumu "farazi FSM test"
+dosyasına kuruldu; o dosyanın iki tarafının adresi de kurumun kendi alan adında.
+Aynı turda `dual-ai-validate` de **200** döndü → jobid 2'nin 401'i de kapandı.
+
+NİHAİ DURUM — **tek kol vardır ve nöbetçidedir:**
+`oturumHatirlatmaGorevleriAc` (24 saat içindeki her planlı oturum için görev) +
+`oturumHatirlatmaYurut` (Türkçe e-posta · `case_parties.email` · iletişim
+tercihi · video bağlantısı · arabulucu imzası). 3 dakikada bir koşar.
+`send-session-reminders` artık e-posta GÖNDERMEZ; tek kolun nöbetçi olduğunu
+söyleyen 200 döner. Cron işi (jobid 1) bilerek duruyor: denetim kanalında nabız.
+
+ALICI KURALI (yeni, kodda açık):
+- `private` (özel/caucus) → YALNIZ `participants`. Özel oturumun varlığı karşı
+  tarafa hiçbir yüzeyden açılmaz (constitution · kör veri); hatırlatma da açamaz.
+  Katılımcı yoksa iş atlanır, alıcı **genişletilmez**.
+- diğer (ortak/ön görüşme) → dosyanın **bütün** tarafları.
 
 ### ESKİ ŞEMA ADASI HARİTASI — 24.08 (kaynak: hatırlatma P0'ının kök nedeni)
 Hatırlatma kusuru "terk edilmiş tabloya sorgu" sınıfındaydı. Aynı adaya bağlı
