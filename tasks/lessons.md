@@ -579,3 +579,25 @@ yokluyor?"** diye sor. Somut yöntem:
    biri düşerse sessizce korumasız kalmasın.
 
 Kapsam genişletmesi kanıtlandı: kapsam geri daraltılınca 8+ test düşüyor.
+
+## 24.08.2026 — Bir koruma ekranı, izinli tek kitlesi için yanlış sonuç veriyorsa kırıktır
+
+Gizlilik Test Paketi ekranı "Taraf A, Taraf B'nin verisini okuyamıyor mu?"
+sorusunu yanıtlamak için var. İki şey aynı anda doğruydu:
+- Sayfa YALNIZ yöneticiye açıktı.
+- Yönetici RLS'i tasarım gereği aşar → her yoklama "sızıntı" görür.
+
+Canlıda koşturdum: 12 yoklama, **Geçti 5 / Başarısız 7** — yedisi de yanlış
+alarm. Ekran yıllardır kırmızı yanıyordu, yani gerçek bir sızıntı eklense
+kimse fark etmezdi. Nitekim aynı gün bulunan gerçek storage sızıntısı da fark
+edilmemişti.
+
+İKİ KURAL:
+1. Bir koruma aracını, **izin verdiği kitleyle** birlikte değerlendir. "Kim
+   koşacak?" sorusunun cevabı aracın sonucunu anlamsız kılıyorsa araç kırıktır.
+2. Yanlış alarm üreten bir gösterge, hiç gösterge olmamasından **daha
+   kötüdür**: gerçek alarmı gizler. Ölçüm anlamsızsa "başarısız" değil
+   **"belirsiz"** de ve sebebini yaz.
+
+Somut kontrol: bir tezgâh/ekran eklerken sor — "bu, geçmesi gereken durumda
+gerçekten geçiyor mu?" Yalnız "düşmesi gereken durumda düşüyor mu?" yetmez.
