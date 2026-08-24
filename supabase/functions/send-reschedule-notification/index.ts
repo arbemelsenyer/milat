@@ -1,3 +1,19 @@
+/* ⚠️ ESKİ ŞEMA ADASI — CANLIDA KULLANILMIYOR (24.08.2026 denetimi)
+ *
+ * Bu dosya `mediator_requests` / `reschedule_requests` tablolarına dayanır.
+ * CANLI ÖLÇÜM: her ikisi de **0 satır**. Gerçek oturumlar `case_sessions`,
+ * gerçek taraflar `case_parties` tablosundadır.
+ *
+ * Bu adaya YENİ İŞ BAĞLANMAZ. Bağlanırsa sessizce hiçbir şey yapmaz:
+ * sorgu boş döner, kod "yapacak bir şey yok" sanır ve 200 döner.
+ * BU TAM OLARAK 24.08'DE OLDU: `send-session-reminders` aynı tabloyu
+ * sorguluyordu ve oturum hatırlatmaları HİÇ gönderilmiyordu; cron'un 401'i
+ * bu daha derin kusuru gizliyordu. Ayrıntı: tasks/todo.md · 24.08 P0 maddesi.
+ *
+ * Yeni iş yazarken doğru kaynak: `case_sessions` (+ `scheduled_at`) ve
+ * `case_parties` (+ `email`). Taraf adresi `profiles`te DEĞİL, taraf
+ * kaydındadır: tarafların çoğunda `user_id` boştur (kayıt olmadan katılıyorlar).
+ */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 

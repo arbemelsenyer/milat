@@ -77,6 +77,27 @@ DEĞİŞMEDİ: bakmak için aşamaya geçmek dosyayı ilerletmez. Yeni bir yetki
 icat edilmedi; RLS zaten bu ölçütü taşıyor (yönetici · görevli arabulucu · dosya
 sahibi) — `akis-onayla` düzeltmesiyle aynı ölçüt.
 
+### ESKİ ŞEMA ADASI HARİTASI — 24.08 (kaynak: hatırlatma P0'ının kök nedeni)
+Hatırlatma kusuru "terk edilmiş tabloya sorgu" sınıfındaydı. Aynı adaya bağlı
+başka ne var diye tarandı:
+| dosya / tablo | durum | canlı etki |
+|---|---|---|
+| `mediator_requests` | **0 satır** | — |
+| `reschedule_requests` | **0 satır**, FK'si `mediator_requests`e | — |
+| `send-session-notification` | uygulamada **çağrılmıyor** (yalnız bir yorumda anılıyor) | yok |
+| `send-reschedule-notification` | iki bileşenden çağrılıyor ama o bileşenler **hiçbir yerde render edilmiyor** | yok |
+| `RescheduleRequest.tsx` · `RescheduleApproval.tsx` | **import edilmiyor** | yok |
+SONUÇ: ada tamamen ölü; canlı kusur YOK. Ama **tuzak**: canlı görünüyor ve
+sorgusu sessizce boş dönüyor — "yapacak bir şey yok" sanılıp 200 dönülüyor.
+24.08'de tam olarak bu oldu.
+YAPILAN: dört dosyanın başına açık uyarı konuldu (ne olduğu, neden dokunulmaması
+gerektiği, doğru kaynağın ne olduğu). Silme YAPILMADI — tablo/kod silmek geri
+dönüşsüzdür (§7.3) ve kurucu kararıdır.
+- [ ] P3 · Eski şema adası (`mediator_requests` · `reschedule_requests` + dört
+      dosya) kaldırılsın mı? · Kabul: ya kaldırılır ve hiçbir yerden anılmaz, ya
+      da "bilerek duruyor" kararı `Kritik kararlar`a yazılır · **kurucu kararı**
+      (§7.3 — tablo/kod silme).
+
 ### KAPANDI — 24.08 · P1 · İŞ ETİKETİ SINIR SÜZGECİNDEN GEÇMİYOR (`c722026`, 36 fan-out)
 Hatırlatma zincirini canlıda sınamak için test oturumu kurdum; o turda nöbetçi
 iki `otomatik_analiz` satırı yazdı ve **ikisi de** yalnız şuydu:
