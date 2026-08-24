@@ -39,6 +39,7 @@ import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { KAYIT_ONAY_SAAT, KAYIT_ONAY_SURUMU, KAYIT_ONAY_METNI } from "@/lib/kayitProtokolu";
 import { etiketsizGovde } from "@/lib/etiket";
+import { depoHataMetni } from "@/lib/depoHatasi";
 
 // YZ kullanım beyanı — metin ve sürümü tek yerde; sürüm değişirse onay yeniden istenir.
 const YZ_BEYAN_SURUMU = "v1";
@@ -340,7 +341,10 @@ export default function CaseRoom() {
       a.remove();
       setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
     } catch (e: any) {
-      toast({ title: "İndirilemedi", description: e?.message ?? "Bilinmeyen hata", variant: "destructive" });
+      /* Ham depo hatası ("Object not found") kullanıcıya yetki sorunu gibi
+         görünüyordu. `depoHataMetni` dosya yokluğunu yetki eksikliğinden
+         ayırır — canlıda dosyası olmayan 2 üstveri satırı var. */
+      toast({ title: "İndirilemedi", description: depoHataMetni(e), variant: "destructive" });
     } finally {
       setDocBusy(null);
     }

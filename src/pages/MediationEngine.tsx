@@ -46,6 +46,7 @@ import { Phase3ErrorBoundary } from "@/components/mediation/Phase3ErrorBoundary"
 import { MeetingNotesPanel } from "@/components/mediation/MeetingNotesPanel";
 import { ProcessTrackerPanel } from "@/components/mediation/ProcessTrackerPanel";
 import { KAYIT_ONAY_SAAT, KAYIT_ONAY_SURUMU, KAYIT_TEK_KAPI_UYARISI } from "@/lib/kayitProtokolu";
+import { depoHataMetni } from "@/lib/depoHatasi";
 import { AgentControlPanel } from "@/components/mediation/AgentControlPanel";
 import { AjanPenceresi } from "@/components/AjanPenceresi";
 import { CaseQaPanel } from "@/components/mediation/CaseQaPanel";
@@ -6327,7 +6328,8 @@ async function openStorageSource(sourceUrl: string, page?: number | null) {
     window.open(`${blobUrl}${pageSuffix}`, "_blank", "noopener,noreferrer");
     setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
   } catch (e: any) {
-    toast({ title: "Kaynak açılamadı", description: e?.message || "Dosya indirilemedi.", variant: "destructive" });
+    // Ham depo hatası yerine ayırt edici cümle (bkz. src/lib/depoHatasi.ts).
+    toast({ title: "Kaynak açılamadı", description: depoHataMetni(e), variant: "destructive" });
   }
 }
 

@@ -352,10 +352,17 @@ Storage denetimi sırasında çıktı: `case_documents`ta 24 üstveri satırınd
 **2'sinin dosyası kovada yok** (`farazi-test/…` yollu, tohum verisi).
 Arabulucu o iki satırda "indir" derse hata alır. Benim politika değişikliğim
 kırmadı — zaten kırıktılar (kovada hiç bulunmuyorlar).
-- [ ] P3 · Dosyası olmayan iki `case_documents` satırı temizlensin ya da
-      arayüzde "dosya yok" olarak işaretlensin · Kabul: `case_documents`ta
-      dosyası bulunmayan satır 0, ya da o satırlarda indirme düğmesi çıkmıyor ·
-      NOT: satır silmek veri silmedir (§7.3) — arayüzde işaretlemek daha güvenli.
+- [x] P3 · Dosyası olmayan belge satırı kullanıcıya açıkça anlatılıyor ·
+      DONE 24.08.2026 · **Güvenli seçenek uygulandı** (satır SİLİNMEDİ, §7.3):
+      `src/lib/depoHatasi.ts` depo hatasını üçe ayırıyor — *dosya yok* /
+      *yetki yok* / *bilinmeyen*. Her iki indirme yüzeyi de ortak çeviriciyi
+      kullanıyor. Doğrulama: `tests/depo-hatasi.test.ts` 9 durum; kusur geri
+      getirilince 2 test düşüyor.
+      NEDEN ÖNEMLİ: aynı gün kova politikası daraltıldı, yani "yetki yok" da
+      gerçek bir olasılık; ikisi ayrı anlatılmazsa kullanıcı dosya yokluğunu
+      yetki sorunu sanır.
+      SİLME yolundaki hata BİLEREK dokunulmadı: orada depo kaldırma zaten
+      `console.warn` ile yutuluyor, catch bir **veritabanı** hatasıdır.
 
 ### DENETİM — 24.08 · GİRİŞSİZ TOKEN AKIŞLARI — TEMİZ ÇIKTI
 Taraflar hesapsız işlem yapıyor (`/randevu/:token`, `/katilim/:token`), yani
