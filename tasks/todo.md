@@ -5,8 +5,11 @@
 - Aktif görev: yok — yarım iş yok
 - Son tamamlanan iş: bütün mükerrer yazım kapıları ortak kalıba alındı (`ba1585e`, canlı 200)
 - Doğrulama sonucu: `npm run test` **133/133** · tsc hatasız · build hatasız · lint **2358** (oturum başı 2361)
-- **CANLI SAĞLIK (07:11):** deploy sonrası koşumların hepsi **200** · hatalı 0
-  · işlenmemiş olay 0 · yeni `akis_hatasi` 0 · kapılar tutuyor (yeni mükerrer görev satırı 0)
+- **CANLI SAĞLIK (07:15):** deploy sonrası **4 koşum, hepsi 200** · hatalı 0
+  · işlenmemiş olay 0 · yeni `akis_hatasi` 0 · `closed_at` boş kapalı dosya 0
+  · kapılar tutuyor (yeni mükerrer görev satırı **0**)
+- **Gözle doğrulama:** ön yüzde dokunduğum üç dosya tarayıcıdan denetlendi;
+  konsol hatasız, sızan iç etiket sıfır (ayrıntı aşağıda)
 - Açık blokaj: **yok**
 - Sıradaki uygulanabilir iş: kurucu kararı bekleyen üç madde (aşağıda); teknik kuyruk boş
 
@@ -327,6 +330,24 @@ Yani düğme artık adının söylediği işi yapıyor ve sunucuya iz bırakıyo
 NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
+
+### CANLI GÖZLE DOĞRULAMA — 24.08 · ön yüzde dokunduğum üç dosya (tarayıcı)
+Bugün `MediationEngine`, `AjanPenceresi` ve `CaseRoom`a dokundum; üçü de canlıda
+kurucunun açık oturumundan gözle denetlendi (§11-B).
+
+| yüzey | ne doğrulandı |
+|---|---|
+| Aşama 4 (`MediationEngine`) | Kayıt protokolü kartı **tek kaynaktan gelen** metinle çıkıyor; "48 saat" cümleleri sabitten türemiş; `girdiTamamla` düzeltmesinin ürettiği **iki taraf föyü** duruyor; test oturumu `scheduled` görünüyor |
+| Ajan penceresi (`AjanPenceresi`) | Zaman çizelgesinde **üç aşama geçişi** görünüyor (çapa kalkmasaydı bir kısmı sessizce kaybolacaktı) |
+| Sızan iç etiket | Görünen metinde `[kaynak:…]` · `[eksik:…]` · `[kol:…]` · `[gecis:…]` → **sıfır** |
+| Konsol | Hata/exception **yok** |
+
+**YAPAMADIĞIM TEK KONTROL:** tarafın kendi "Ajanım" paneli yalnız TARAF
+oturumunda render oluyor; ben yönetici oturumundayım, panel hiç çizilmiyor.
+O tek görsel doğrulama yapılamadı. Kanıt üç ayrı açıdan var: tezgâh kaynağı
+denetliyor, yayındaki pakette yeni ayırıcı **var** ve eski tek-silme **yok**,
+arabulucu yüzeylerinde sızan etiket sıfır. Yine de kurucu bir taraf hesabıyla
+girip "Ajanım" kartına bakarsa doğrulama tamamlanır.
 
 ### DENETİM — 24.08 · "TERK EDİLMİŞ KAYNAĞA SORGU" SINIFI TARANDI (TEMİZ ÇIKTI)
 Hatırlatma P0'ının kök nedeni "canlıda boş olan tabloyu okuma"ydı. Aynı sınıf
