@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS trg_akis_gorev_cevap ON public.ajan_gorevleri;
