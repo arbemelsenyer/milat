@@ -380,6 +380,22 @@ güvenli (sahiplik dar), dosya yönetimi (A kararı gereği sahipte kalmalı) ve
 (arabulucunun kendi çalışma kaydı mı, taraf içeriği mi) → **`tasks/HAT.md` H-6**
 olarak yazıldı, önerimle birlikte. Kararı beklemeden devam ediyorum (§23).
 
+**TEZGÂHA BAĞLANDI** (`tests/rls-sahip-taraf-guard.test.ts`, 15 durum). Migration
+kaynağını denetliyor: guard tanımı duruyor mu · `SECURITY DEFINER` +
+`search_path` sabit mi · altı tablonun her biri guard kullanıyor mu · arabulucu
+dalı korunmuş mu · **dosya yönetimi tabloları yanlışlıkla daraltılmış mı**
+(`cases`, `case_parties`, `case_documents`, `cases_private_keys`,
+`cases_vector_pool`). Böylece A kararının iki yarısı da (kapatılan + açık
+bırakılan) sabitlendi.
+**KANITLANDI:** guard migration'dan geçici olarak çıkarılıp koşuldu →
+**7 test düştü**; geri konunca 15/15 geçti. Toplam **184/184**.
+
+> TEZGÂHIN İLK YAZIMI KUSURLUYDU. Tabloyu `indexOf("ON public.<tablo>")` ile
+> arıyordum; o desen **eski bir migration'ın `CREATE INDEX … ON public.<tablo>`
+> satırına** düşüyor ve pencere yanlış yere bakıyordu. Üç test düştü, yöntem
+> `CREATE POLICY` bloklarını ayrıştırmaya çevrildi. (Bugün dördüncü kez: bir
+> tezgâh "geçti" demeden önce kusur geri getirilip düştüğü görülmeli.)
+
 > İZLEME: ilk self-servis başvuru geldiğinde şu sorgu **0** dönmelidir —
 > `select count(*) from cases c where public.is_case_owner_safe(c.id,c.user_id)
 > and exists(select 1 from case_parties p where p.case_id=c.id and p.user_id=c.user_id)
