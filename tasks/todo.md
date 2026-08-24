@@ -362,11 +362,17 @@ hata verir, `ses_silindi_at` hiç yazılmaz ve **kayıt süresiz kalır** — ta
 verilen "24 saat sonra kalıcı silinir" sözü ve constitution m.10 çiğnenir.
 BUGÜN ZARAR YOK: `oturum_kayitlari` boş, yükleme yolu yok. Kodun başına açık
 uyarı konuldu, kuyruğa madde açıldı.
-- [ ] P2 · `oturum-kayitlari` kovası açılsın ve okuma politikası DAR yazılsın ·
-      Kabul: kova var; taraf kimliğiyle o kovadan okuma 0 satır dönüyor;
-      `ajan-nobetci` silme kolu `ses_silindi_at` yazabiliyor · NOT: onay metni
-      "kayıt ve dökümü yalnız arabulucu görür" diyor — belge kovasındaki
-      24.08 kusuru (kova politikası veritabanındakinden genişti) tekrarlanmasın.
+- [x] P2 · `oturum-kayitlari` kovası açıldı · DONE 24.08.2026 · Doğrulama:
+      `storage.buckets` → kova var, `public=false`; o kovaya ait istemci
+      politikası sayısı **0** (deny-by-default). Servis rolü RLS'e tabi
+      olmadığı için silme kolu çalışır.
+      YOL DÜZENİ UYDURULMADI: yükleme yolu henüz yazılmadığından dosya yolu
+      düzeni belli değil; politika yazmak için desen uydurmak gerekirdi.
+- [ ] P3 · Kayıt hattı kurulduğunda `oturum-kayitlari` kovasına **dar** okuma
+      politikası eklensin · Kabul: yol düzeni belli olduktan sonra yalnız
+      görevli arabulucu (+yönetici) okuyabiliyor; taraf kimliğiyle okuma 0 satır
+      dönüyor · NOT: belge kovasında bu politikanın geniş yazılması 24.08'de
+      canlı bir kör veri sızıntısı doğurdu (1 gerçek çift) — tekrarlanmasın.
 
 ### KAPANDI — 24.08 · P0 · STORAGE KOVASI VERİTABANINDAN DAHA GENİŞ OKUTUYORDU
 Kör veri denetimini dosyaların durduğu **Storage** tarafına da yaptım (daha önce

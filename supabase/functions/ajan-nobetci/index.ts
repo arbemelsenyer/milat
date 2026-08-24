@@ -2008,18 +2008,21 @@ async function braketKollari(admin: any, dosya: any, taraflar: any[]): Promise<B
    zamanı + silme notu, ayrıca "yapılmayanlar" listesine gerekçe düşer.
    Kayıt/döküm hattı henüz kurulmadığı için tablo boşsa kol sessizce geçer.
    ──────────────────────────────────────────────────────────────────────────── */
-/* ⚠️ BU KOVA HENÜZ YOK (24.08.2026 denetimi). Canlıda yalnız iki kova var:
-   `avatars` ve `case-documents`. Ses kaydı silme kolu aşağıda bu kovadan
-   silmeye çalışıyor; kova açılmadan kayıt hattı devreye girerse silme HER
-   TURDA hata verir, `ses_silindi_at` hiç yazılmaz ve kayıt süresiz kalır.
-   O da tarafa onay metninde verilen "ses kaydı süreç bitiminden 24 saat sonra
-   kalıcı olarak silinir" sözünü ve constitution m.10'u (süresiz saklama yasağı)
-   çiğner.
-   BUGÜN ZARAR YOK: `oturum_kayitlari` tablosu boş, yükleme yolu da yok.
-   KAYIT HATTINI KURAN KİŞİYE: önce bu kovayı aç ve okuma politikasını DAR
-   yaz — onay metni "kayıt ve dökümü YALNIZ arabulucu görür" diyor, yani
-   taraf bu kovadan okuyamamalı. (Belge kovasında aynı hata 24.08'de canlıda
-   bulundu: kova politikası veritabanındakinden genişti.) */
+/* KAYIT KOVASI — ÖZEL VE İSTEMCİYE KAPALI (24.08.2026'da açıldı)
+   Bu kova canlıda YOKTU; silme kolu var olmayan bir kovadan silmeye çalışıyordu.
+   Kayıt hattı devreye girseydi silme her turda hata verir, `ses_silindi_at` hiç
+   yazılmaz ve kayıt süresiz kalırdı — tarafa onay metninde verilen "ses kaydı
+   süreç bitiminden 24 saat sonra kalıcı olarak silinir" sözü ve constitution
+   m.10 (süresiz saklama yasağı) çiğnenirdi.
+   Kova ÖZEL açıldı ve istemciye HİÇBİR politika verilmedi (deny-by-default):
+     · Onay metni "kayıt ve dökümü YALNIZ arabulucu görür" diyor; taraf bu
+       kovadan okuyamamalı.
+     · Yükleme yolu henüz yazılmadığı için dosya yolu düzeni belli değil;
+       politika yazmak için uydurmak gerekirdi — uydurulmadı.
+     · Servis rolü RLS'e tabi değildir: aşağıdaki silme kolu çalışır.
+   KAYIT HATTINI KURACAK KİŞİYE: yol düzenini belirledikten sonra arabulucuya
+   DAR bir okuma politikası ekle. Belge kovasında bunun geniş yazılması 24.08'de
+   canlı bir kör veri sızıntısı doğurmuştu — aynı hatayı tekrarlama. */
 const KAYIT_BUCKET = "oturum-kayitlari";
 
 async function kayitSilmeKollari(
