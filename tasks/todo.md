@@ -8,8 +8,11 @@
 - **CANLI SAĞLIK (10:43):** son 20 dk **7 koşum, hepsi 200** · hatalı 0 ·
   işlenmemiş olay 0 · son 5 saatte `akis_hatasi` 0 · `closed_at` boş kapalı dosya 0 ·
   `cron.job`ta düz metin sır **0**
-- **Açık blokaj: P0 · HUMAN GATE — self-servis başvuruda kör veri** (§7.4)
-- **Karar bekleyen altı madde:** `tasks/karar-paketi.md`
+- **Açık blokaj: yok.** P0 kör veri kararı (A) uygulandı ve doğrulandı.
+- **İletişim hattı:** `tasks/HAT.md` (CLAUDE.md §23). Açık maddeler: **H-1…H-5**.
+  Her tur başında `## COWORK → CODE` okunur; cevap gelmişse uygulanır ve madde
+  arşive iner.
+- **Karar bekleyen beş madde:** `tasks/HAT.md` → H-1…H-5 (P0 kapandı)
 
 ### KURUCUDA KALAN ÜÇ MADDE (hiçbiri beni bloke etmiyor)
 1. **P1 · `CRON_SECRET` değerinin yenilenmesi.** Runbook aşağıda. Bunu ben
@@ -328,6 +331,44 @@ Yani düğme artık adının söylediği işi yapıyor ve sunucuya iz bırakıyo
 NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
+
+### KAPANDI — 24.08 · P0 · SELF-SERVİS KÖR VERİ — **A SEÇENEĞİ UYGULANDI** (kurucu kararı)
+Karar paketindeki A seçeneği uygulandı ve canlıda doğrulandı.
+
+**YAPILAN.** Yeni dar yardımcı:
+```sql
+is_case_owner_not_party(_case_id, _user_id) :=
+  is_case_owner_safe(...) AND NOT EXISTS (case_parties: aynı dosya + aynı kullanıcı)
+```
+Taraf-gizli **beş** politikada `is_case_owner_safe` → `is_case_owner_not_party`:
+`oturum_hazirlik_foyleri` · `oturum_kayitlari` · `taraf_kalemleri` ·
+`bilirkisi_secim_beyani` · `bilirkisi_taraf_yanitlari`.
+`is_case_mediator` dalı, `polcmd`ler ve **roller birebir korundu**
+(`oturum_hazirlik_foyleri` + `oturum_kayitlari` → `TO authenticated`, diğer üçü
+TO'suz; bu fark migration'da açıkça yazıldı).
+**DOSYA YÖNETİMİ SAHİPTE KALDI:** `cases`, `case_parties` (taraf ekleme/silme),
+`case_documents` politikaları **değiştirilmedi** — self-servis akış çalışmaya
+devam ediyor. Geçen turda geri aldığım geniş düzeltmenin kilitlediği şey tam
+olarak buydu.
+
+**CANLI DOĞRULAMA (dört ölçüm):**
+| ölçüm | sonuç |
+|---|---|
+| Beş politikanın dar yardımcıya geçmesi | **5/5** · arabulucu dalı korundu · `polcmd` aynı |
+| Erişimi değişen dosya | **0** |
+| Sahibin hâlâ yetkili olduğu dosya | **9 / 9** |
+| Guard'ın iç koşulu (taraf tanıma) | gerçek veride **true** (3 taraf kaydı üzerinde) |
+| **Guard engelliyor mu** | sahiplik yarısı zorla `true` yapıldığında bile fonksiyon **false** → **engelliyor** |
+
+Son ölçüm önemli: canlıda sahip-aynı-zamanda-taraf olan dosya **yok** (kusur bu
+yüzden gizliydi), o yüzden engelleme yolu gerçek bir çiftle koşulamıyor. Bunun
+yerine sahiplik yarısı `OR true` ile zorlanıp **veriye dokunmadan** ölçüldü:
+sonuç `false`. Yani guard doğru çalışıyor.
+
+> İZLEME: ilk self-servis başvuru geldiğinde şu sorgu **0** dönmelidir —
+> `select count(*) from cases c where public.is_case_owner_safe(c.id,c.user_id)
+> and exists(select 1 from case_parties p where p.case_id=c.id and p.user_id=c.user_id)
+> and public.is_case_owner_not_party(c.id,c.user_id);`
 
 ### KAPANDI — 24.08 · P1 · GİZLİLİK EKRANI YÖNETİCİ OTURUMUNDA ANLAMSIZDI
 Kapsamı genişlettikten sonra ekranı **canlıda koşturdum** — ve asıl kusur orada

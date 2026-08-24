@@ -1,4 +1,18 @@
-# KARAR PAKETİ — kurucu kararı bekleyen maddeler
+# KARAR PAKETİ — **DEVREDİLDİ**
+
+> **Bu dosya artık kullanılmıyor.** 24.08.2026'da kalıcı iletişim hattı kuruldu:
+> **`tasks/HAT.md`** (kural: CLAUDE.md §23).
+>
+> - **Madde 1 (P0 · self-servis kör veri): KAPANDI.** Kurucu **A** seçeneğini
+>   seçti, uygulandı ve canlıda doğrulandı. Ayrıntı `tasks/todo.md`de,
+>   özet `HAT.md` → ARŞİV → `H-0`.
+> - **Kalan beş madde** `HAT.md` → `## CODE → COWORK` bölümüne **H-1…H-5**
+>   olarak taşındı; cevaplar oraya yazılır.
+>
+> Aşağıdaki içerik tarihsel kayıt olarak duruyor; **güncel değildir**.
+
+---
+
 
 **24.08.2026 · gece oturumu sonu.** Bu dosya bir durum dosyası DEĞİLDİR; tek
 doğruluk kaynağı `tasks/todo.md`dir (CLAUDE.md §0). Burada yalnız **karar

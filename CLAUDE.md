@@ -579,3 +579,37 @@ betiği köke taşımak için sebep yoktur.
 > **24.08 ikinci kez:** bölüm bir kez yazıldı (`8c603d5`) ama sonraki bir
 > `CLAUDE.md` düzenlemesinde düştü ve kural yine görünmez oldu. Bu dosyayı
 > baştan yazan her düzenleme bu bölümü KORUMALIDIR.
+
+---
+
+## 23. HAT — DURMA, YAZ VE DEVAM ET
+
+> **Numara notu:** bu kural §22 olarak istendi; §22 zaten *geçici dosyalar*
+> kuralıdır (aynı oturumda geri konuldu ve kurucu iki kez teyit etti). Numara
+> çakışmasın diye §23 verildi. `tests/gecici/sonda.test.ts` içindeki
+> "CLAUDE.md §22" atfı geçerliliğini korur.
+
+**Durman gereken her karar/soru `tasks/HAT.md`ye yazılır. Yazdıktan sonra
+BEKLEME — o cevaba bağlı olmayan işe devam et.**
+
+### Nasıl işler
+1. Bir Human Gate (§7) ya da senin çözemeyeceğin bir karar çıktığında,
+   `tasks/HAT.md` → `## CODE → COWORK` bölümüne yeni bir `H-<no>` maddesi yaz.
+2. **Madde biçimi zorunludur:** tarih · madde · **sorun** · **seçenekler** ·
+   **senin önerin** · **kararın etkisi**. Önerisiz soru yazılmaz (§7-B.3).
+3. Yazdın, bitti. **Cevabı bekleme.** Kuyrukta o cevaba bağlı olmayan iş varsa
+   ona geç (§5-A). Tur yalnızca §5'teki dört sebeple kapanır.
+4. **Her turun başında** `## COWORK → CODE` bölümünü oku. Cevap gelmişse:
+   uygula → canlıda doğrula → sonucu `tasks/todo.md`ye işle → maddeyi
+   `## ARŞİV`e taşı ve **KAPANDI** yaz.
+
+### Sınırlar
+- `HAT.md` bir **durum dosyası değildir** (§0). Tek doğruluk kaynağı
+  `tasks/todo.md`dir. HAT yalnız **açık iletişimi** tutar; kapanan madde
+  arşive iner ve sonucu `todo.md`ye yazılır.
+- Numara (`H-1`, `H-2`, …) **yeniden kullanılmaz**.
+- Aynı konuda ikinci madde açma; mevcut maddeyi güncelle.
+- HAT'a yazmak, işi bırakmak demek **değildir**: maddeyi yaz ve çalışmaya
+  devam et. "Cevap bekliyorum" diyerek durmak §5-A ihlalidir.
+- Sır, jeton, kişisel veri HAT'a **yazılmaz** (§12). Gerekiyorsa "değeri
+  kurucu girer" diye tarif edilir.
