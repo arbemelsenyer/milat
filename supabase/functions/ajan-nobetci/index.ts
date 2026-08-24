@@ -2477,8 +2477,14 @@ const GUN_MS = 24 * 60 * 60 * 1000;
 async function bilirkisiEtiketiVarMi(
   admin: any, caseId: string, gorevTipi: string, etiket: string,
 ): Promise<boolean> {
+  /* ONARIM (24.08.2026): sırasız `.limit(200)` bu kapıyı da ölçekte
+     körleştiriyordu (aynı kusur `gorevEtiketiVarMi`de canlıda görüldü:
+     411 satır, kapı hiç tutmuyordu). Aynı kalıp uygulandı. */
   const { data } = await admin.from("ajan_gorevleri")
-    .select("id, gerekce").eq("case_id", caseId).eq("gorev_tipi", gorevTipi).limit(200);
+    .select("id, gerekce").eq("case_id", caseId).eq("gorev_tipi", gorevTipi)
+    .like("gerekce", `%${etiket}%`)
+    .order("created_at", { ascending: false })
+    .limit(50);
   return ((data ?? []) as any[]).some((r) => String(r?.gerekce ?? "").includes(etiket));
 }
 
@@ -2499,7 +2505,9 @@ async function bilirkisiKollari(admin: any, dosya: any): Promise<BilirkisiOzet> 
     if (sessizKalabilir.size > 0) {
       const { data: sunumlar } = await admin.from("ajan_gorevleri")
         .select("id, hedef_party_id, gerekce, durum, created_at")
-        .eq("case_id", caseId).eq("gorev_tipi", "bilirkisi_secimi").limit(200);
+        .eq("case_id", caseId).eq("gorev_tipi", "bilirkisi_secimi")
+        .order("created_at", { ascending: false })   // sırasız limit ölçekte satır kaçırır
+        .limit(200);
       const satirlar = (sunumlar ?? []) as any[];
 
       for (const g of satirlar) {

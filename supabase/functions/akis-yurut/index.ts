@@ -148,7 +148,8 @@ async function panoyaYaz(
   let sorgu = admin.from("ajan_gorevleri")
     .select("id, gerekce").eq("case_id", caseId).eq("gorev_tipi", gorevTipi).eq("durum", "bekliyor");
   sorgu = hedefPartyId ? sorgu.eq("hedef_party_id", hedefPartyId) : sorgu.is("hedef_party_id", null);
-  const { data: mevcut } = await sorgu.limit(200);
+  // Sırasız limit ölçekte satır kaçırır; en yeniden sıralanır.
+  const { data: mevcut } = await sorgu.order("created_at", { ascending: false }).limit(200);
   const bekleyenler = (mevcut ?? []) as any[];
 
   if (konuEtiketi) {
@@ -225,9 +226,14 @@ async function hataYaz(
 ): Promise<void> {
   try {
     const gerekce = `${etiket} ${akisHataMetni(baslik, sebep)}`.slice(0, 500);
+    /* ONARIM (24.08.2026): eşleşme TAM olduğu için sorgu da tam eşleşmeyle
+       yapılır. Eskiden 300 satır çekilip JS'te taranıyordu ve sıralama yoktu;
+       `akis_hatasi` satırları birikince kapı körelirdi. `.eq` sunucuda çalışır,
+       satır sayısından bağımsızdır. */
     const { data: mevcut } = await admin.from("ajan_gorevleri")
-      .select("id, gerekce").eq("case_id", caseId).eq("gorev_tipi", "akis_hatasi").limit(300);
-    if (((mevcut ?? []) as any[]).some((r) => String(r?.gerekce ?? "") === gerekce)) return;
+      .select("id").eq("case_id", caseId).eq("gorev_tipi", "akis_hatasi")
+      .eq("gerekce", gerekce).limit(1);
+    if (((mevcut ?? []) as any[]).length > 0) return;
     await admin.from("ajan_gorevleri").insert({
       case_id: caseId, gorev_tipi: "akis_hatasi", durum: "bekliyor",
       hedef_party_id: partyId, gerekce,
@@ -337,11 +343,29 @@ async function asamaIlerlet(admin: any): Promise<{ ilerletilen: number; notlar: 
       }
 
       /* Aynı geçiş İKİNCİ KEZ yazılmaz — arabulucu elle geri aldıysa ajan aynı
-         geçişi tekrar denemez. Etiket nöbetçinin kullandığıyla AYNIDIR. */
+         geçişi tekrar denemez. Etiket nöbetçinin kullandığıyla AYNIDIR.
+
+         ONARIM (24.08.2026) — İKİ KUSUR BİRDEN:
+         (a) `startsWith` kullanılıyordu. Ama `asama_gecisi` satırlarını ÜÇ
+             kaynak yazıyor: bu koşucu (`[gecis:…]` ile başlar), ön yüzdeki
+             elle ilerletme (aynı biçim) ve NÖBETÇİ — nöbetçi `anaAjanaBildir`
+             geçidinden yazdığı için satır `[kaynak:nobetci] [gecis:…]` ile
+             başlar. `startsWith` o satırları GÖRMÜYORDU; yani yukarıdaki
+             güvence nöbetçinin yaptığı geçişler için boştu ve koşucu aynı
+             geçişi yeniden yazabilirdi.
+         (b) `.limit(200)` sırasızdı. Postgres sırasız sorguda hangi satırları
+             döndüreceğini garanti etmez; satır sayısı artınca kapı körelir
+             (aynı kusur `ajan-nobetci/gorevEtiketiVarMi`de canlıda görüldü:
+             411 satır, kapı hiç tutmuyordu).
+         Çözüm `gorevEtiketiVarMi` ile aynı: sunucuda `like` ile daralt,
+         en yeniden sırala, JS'te `includes` ile kesinleştir. */
       const etiket = `[gecis:${mevcut}->${hedef}]`;
       const { data: iz } = await admin.from("ajan_gorevleri")
-        .select("id, gerekce").eq("case_id", dosya.id).eq("gorev_tipi", "asama_gecisi").limit(200);
-      if (((iz ?? []) as any[]).some((r) => String(r?.gerekce ?? "").startsWith(etiket))) continue;
+        .select("id, gerekce").eq("case_id", dosya.id).eq("gorev_tipi", "asama_gecisi")
+        .like("gerekce", `%${etiket}%`)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (((iz ?? []) as any[]).some((r) => String(r?.gerekce ?? "").includes(etiket))) continue;
 
       const { error: uErr } = await admin.from("cases")
         .update({ current_phase: hedef }).eq("id", dosya.id).eq("current_phase", mevcut);
@@ -759,12 +783,21 @@ Deno.serve(async (req) => {
 
         /* Aynı olay için aynı kural İKİNCİ KEZ çalıştırılmaz. İz, panoda
            'akis_kosuldu' satırı olarak durur ve etiketiyle aranır. */
+        /* ONARIM (24.08.2026): sorgu etiketle DARALTILIR ve en yeniden
+           sıralanır. Eskiden sırasız `.limit(300)` ile bütün iz satırları
+           çekiliyordu; dosya başına satır sayısı artınca kapı körelir
+           (aynı kusur nöbetçide canlıda görüldü). `startsWith` yerine
+           `includes`: satır ileride bir geçitten geçip ön ek alırsa kapı
+           yine tutar. */
         const etiket = `[akis:${olay.id}:${kuralKodu}]`;
         const { data: izSatirlari } = await admin.from("ajan_gorevleri")
           .select("id, gorev_tipi, gerekce").eq("case_id", caseId)
-          .in("gorev_tipi", ["akis_kosuldu", "akis_hatasi"]).limit(300);
+          .in("gorev_tipi", ["akis_kosuldu", "akis_hatasi"])
+          .like("gerekce", `%${etiket}%`)
+          .order("created_at", { ascending: false })
+          .limit(50);
         const kosulmus = ((izSatirlari ?? []) as any[])
-          .some((r) => String(r?.gerekce ?? "").startsWith(etiket) && String(r?.gorev_tipi) === "akis_kosuldu");
+          .some((r) => String(r?.gerekce ?? "").includes(etiket) && String(r?.gorev_tipi) === "akis_kosuldu");
         if (kosulmus) {
           ozet.atlanan_kural++;
           ozet.notlar.push(`${kuralKodu}: bu olay için zaten koşuldu`);
@@ -795,7 +828,7 @@ Deno.serve(async (req) => {
         /* İKİ DENEME SINIRI: aynı olay+kural için en fazla iki deneme yapılır.
            Sınır dolmuşsa olay işlenmiş sayılır ve sonsuz döngü kurulmaz. */
         const oncekiHatalar = ((izSatirlari ?? []) as any[])
-          .filter((r) => String(r?.gerekce ?? "").startsWith(etiket) && String(r?.gorev_tipi) === "akis_hatasi").length;
+          .filter((r) => String(r?.gerekce ?? "").includes(etiket) && String(r?.gorev_tipi) === "akis_hatasi").length;
         if (oncekiHatalar >= 2) {
           ozet.atlanan_kural++;
           ozet.notlar.push(`${kuralKodu}: iki denemede de çalışmadı, bırakıldı`);
