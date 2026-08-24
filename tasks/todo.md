@@ -331,6 +331,29 @@ NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
 
+### DENETİM — 24.08 · VERİ İZOLASYONU / GÜVENLİK TAM TARAMASI
+Ürünün çekirdek vaadi kör veridir; bu eksen daha önce hiç uçtan uca denetlenmemişti.
+On başlık tarandı. **Bir canlı kusur bulundu ve kapatıldı, bir madde Human Gate'e çıktı; kalan sekiz başlık temiz.**
+
+| eksen | sonuç |
+|---|---|
+| Tablo RLS **okuma** (taraf gizli tabloları) | temiz — hepsi `is_own_case_party` / `user_id = auth.uid()` kapsamlı |
+| Tablo RLS **yazma** | temiz — taraf yalnız kendi satırını yazıyor |
+| **Storage okuma** (`case-documents`) | **KUSUR — canlı 1 sızıntı çifti, kapatıldı** (yukarıdaki madde) |
+| `SECURITY DEFINER` fonksiyonlar | temiz — hepsinde `search_path` ayarlı (0 eksik) |
+| Görünümler | temiz — ikisi de `security_invoker`, çağıranın RLS'ine tabi |
+| Genel kova (`avatars`) | temiz — **0 nesne**, hassas içerik yok |
+| Token entropisi | temiz — `katilim_token` ve `randevu_teklifleri.token` **64 hane / 256 bit** |
+| Token RLS maruziyeti | temiz — taraf `case_parties`te **yalnız kendi satırını** görüyor; karşı tarafın token'ı okunamaz. `randevu_teklifleri` yalnız arabulucu/yöneticiye açık |
+| Girişsiz token sayfaları | temiz — `/randevu/:token` ve `/katilim/:token` doğrudan tabloya değil **edge function'a** gidiyor (servis rolü) |
+| Politikasız RLS tablosu | `gundem_kalem_havuzu` — yalnız edge function'dan kullanılıyor; RLS açık + politika yok = istemciye kapalı, **doğru davranış** |
+
+YANLIŞ ALARM OLARAK ELENEN: `mediators_public` görünümü kimlik (`user_id`)
+taşıyor ve storage yolları `<uid>/<case_id>/…` biçiminde; ilk bakışta "taraf
+arabulucunun kimliğini okuyup dosya yolu kurar" gibi göründü. Ölçtüm:
+`mediators` tablosu yalnız **yönetici ve kişinin kendisine** açık, yani taraf o
+görünümü okuyamıyor. İstismar yolu **tutmuyor** — kayda geçirmedim.
+
 ### KUYRUĞA EKLENDİ — 24.08 · kayıt kovası yok (gizli, kayıt hattıyla birlikte doğar)
 `ajan-nobetci` ses kaydını `oturum-kayitlari` kovasından siliyor
 (`KAYIT_BUCKET`), ama canlıda yalnız iki kova var: `avatars` ve
