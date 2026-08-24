@@ -162,319 +162,29 @@ serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    console.log("Starting session reminder check...");
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Calculate the time window for 24-hour reminder
-    // Sessions that are between 23 and 25 hours from now
-    const now = new Date();
-    const { baslangic: reminderStart, bitis: reminderEnd } = hatirlatmaPenceresi(now);
-
-    console.log(`Checking for sessions between ${reminderStart.toISOString()} and ${reminderEnd.toISOString()}`);
-
-    /* ── VERİ KAYNAĞI DÜZELTMESİ (24.08.2026 · P0) ────────────────────────
-       Bu fonksiyon `mediator_requests` tablosunu `scheduled_date` sütunuyla
-       sorguluyordu. O tablo CANLIDA BOŞTUR (0 satır) ve terk edilmiştir;
-       gerçek oturumlar `case_sessions.scheduled_at`tedir (canlıda 31 satır).
-       Yani cron'un yetkisi düzelse bile bu fonksiyon HİÇBİR ZAMAN hatırlatma
-       gönderemezdi — 401 bu daha derin kusuru gizliyordu.
-       `case_sessions`te `user_id`/`mediator_id` YOKTUR; alıcılar dosyadan
-       çözülür: taraflar `case_parties`ten, arabulucu `cases`ten. */
-    const { data: oturumlar, error: sessionsError } = await supabase
-      .from("case_sessions")
-      .select("id, case_id, session_type, meeting_type, video_link, notes, scheduled_at, status")
-      .eq("status", "scheduled")
-      .gte("scheduled_at", reminderStart.toISOString())
-      .lt("scheduled_at", reminderEnd.toISOString());
-
-    if (sessionsError) {
-      console.error("Error fetching sessions:", sessionsError);
-      throw sessionsError;
-    }
-
-    const sessions = (oturumlar ?? []) as Oturum[];
-    if (sessions.length === 0) {
-      console.log("No sessions require reminders at this time");
-      return new Response(
-        JSON.stringify({ success: true, message: "No sessions require reminders", count: 0 }),
-        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    console.log(`Found ${sessions.length} sessions requiring reminders`);
-
-    let sentCount = 0;
-    const errors: string[] = [];
-
-    for (const session of sessions) {
-      try {
-        /* MÜKERRER GÖNDERİM KAPISI. Pencere 2 saat geniş, cron saatlik → aynı
-           oturum iki turda birden yakalanır. İz `ajan_gorevleri`de durur;
-           varsa oturum atlanır. Motor kanununun "mükerrer yazım kapısı"
-           kalıbıdır; yeni tablo açılmadı. Pencerenin geniş kalması bilerekdir:
-           bir tur kaçarsa hatırlatma yine de gider. */
-        const izEtiketi = hatirlatmaEtiketi(session.id);
-        const { data: izSatirlari } = await supabase
-          .from("ajan_gorevleri")
-          .select("gerekce")
-          .eq("case_id", session.case_id)
-          .eq("gorev_tipi", "oturum_hatirlatma")
-          .limit(200);
-        if (zatenGonderildiMi((izSatirlari ?? []) as IzSatiri[], izEtiketi)) {
-          console.log(`Reminder already sent for session ${session.id}`);
-          continue;
-        }
-
-        // Dosya künyesi ve görevli arabulucu.
-        const { data: dosyaSatiri } = await supabase
-          .from("cases")
-          .select("id, user_id, assigned_mediator_id, dispute_type, your_name, other_party_name")
-          .eq("id", session.case_id)
-          .maybeSingle();
-        const caseDetails = (dosyaSatiri ?? null) as DosyaKunye | null;
-
-        /* ALICILAR dosyadan çözülür (`case_sessions`te user_id/mediator_id yok).
-           ADRES `case_parties.email`ten gelir — `profiles`ten DEĞİL.
-           CANLI ÖLÇÜM (24.08): tarafların çoğunda `user_id` BOŞTUR; taraflar
-           kayıt olmadan token bağlantısıyla katılıyor (`/katilim/:token`).
-           Adresi profile bağlamak neredeyse hiçbir tarafa hatırlatma
-           göndermemek demekti. Kalıp `hazirlik-foyu-gonder:361` ile aynı.
-           Profil yalnız YEDEKTİR: taraf kaydında adres yoksa ve `user_id`
-           varsa oradan bakılır. */
-        const { data: taraflar } = await supabase
-          .from("case_parties")
-          .select("id, user_id, email, first_name, last_name, company_name")
-          .eq("case_id", session.case_id);
-        const tarafListesi = (taraflar ?? []) as TarafKaydi[];
-        const mediatorId = caseDetails?.assigned_mediator_id ?? null;
-
-        /* Arabulucunun profili BİR KEZ okunur: hem tarafın e-postasındaki
-           "Mediator" satırında hem de arabulucunun kendi e-postasında kullanılır. */
-        let arabulucuProfil: Profil | null = null;
-        if (mediatorId) {
-          const { data: mp } = await supabase
-            .from("profiles").select("email, full_name").eq("user_id", mediatorId).maybeSingle();
-          arabulucuProfil = (mp ?? null) as Profil | null;
-        }
-
-        const scheduledDate = new Date(session.scheduled_at);
-        const formattedDate = scheduledDate.toLocaleDateString("en-US", {
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        });
-        const formattedTime = scheduledDate.toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-
-        /* Oturum biçimi: ürünün gerçekten bildiği tek işaret video bağlantısıdır.
-           Bağlantı varsa çevrim içi, yoksa yüz yüze. Uydurma yapılmaz. */
-        const oturumCevrimIci = oturumCevrimIciMi(session);
-        const sessionTypeText = oturumBicimMetni(session);
-
-        let buOturumdaGonderilen = 0;
-
-        // ── TARAFLAR ────────────────────────────────────────────────────────
-        for (const taraf of tarafListesi) {
-          let tarafEposta = String(taraf.email ?? "").trim();
-          let tarafProfil: Profil | null = null;
-          if (taraf.user_id) {
-            const { data: profilSatiri } = await supabase
-              .from("profiles")
-              .select("email, full_name")
-              .eq("user_id", taraf.user_id)
-              .maybeSingle();
-            tarafProfil = (profilSatiri ?? null) as Profil | null;
-            if (!tarafEposta) tarafEposta = String(tarafProfil?.email ?? "").trim();
-          }
-          if (!tarafEposta) {
-            errors.push(`hatırlatma atlandı — tarafın e-posta adresi yok (${taraf.id})`);
-            continue;
-          }
-          /* Hitap: taraf kaydındaki ad. Kurumsal tarafta unvan kullanılır.
-             Hiçbiri yoksa profil adı, o da yoksa şablonun kendi "there" yedeği. */
-          const tarafAdi =
-            [taraf.first_name, taraf.last_name].filter(Boolean).join(" ").trim()
-            || String(taraf.company_name ?? "").trim()
-            || String(tarafProfil?.full_name ?? "").trim()
-            || null;
-
-          const userEmailHtml = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="utf-8">
-              <title>Session Reminder</title>
-            </head>
-            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-                <h1 style="color: white; margin: 0; font-size: 24px;">⏰ Session Reminder</h1>
-              </div>
-              
-              <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
-                <p style="color: #333; font-size: 16px;">Hello ${tarafAdi || "there"},</p>
-                
-                <p style="color: #333; font-size: 16px;">This is a friendly reminder that your mediation session is scheduled for <strong>tomorrow</strong>.</p>
-                
-                <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
-                  <h3 style="margin: 0 0 15px 0; color: #333;">Session Details</h3>
-                  <p style="margin: 5px 0; color: #555;"><strong>📅 Date:</strong> ${formattedDate}</p>
-                  <p style="margin: 5px 0; color: #555;"><strong>🕐 Time:</strong> ${formattedTime}</p>
-                  <p style="margin: 5px 0; color: #555;"><strong>📍 Type:</strong> ${sessionTypeText}</p>
-                  ${caseDetails?.dispute_type ? `<p style="margin: 5px 0; color: #555;"><strong>📋 Case:</strong> ${caseDetails.dispute_type}</p>` : ""}
-                  ${arabulucuProfil?.full_name ? `<p style="margin: 5px 0; color: #555;"><strong>👤 Mediator:</strong> ${arabulucuProfil.full_name}</p>` : ""}
-                </div>
-                
-                <h4 style="color: #333; margin-top: 25px;">How to Prepare:</h4>
-                <ul style="color: #555; line-height: 1.8;">
-                  <li>Review any documents related to your case</li>
-                  <li>Prepare a list of key points you want to discuss</li>
-                  <li>Find a quiet, private space for the session</li>
-                  ${oturumCevrimIci ? "<li>Test your video and audio equipment beforehand</li>" : ""}
-                </ul>
-                
-                ${session.notes ? `<p style="color: #555; background: #e8f4ff; padding: 15px; border-radius: 8px; margin-top: 20px;"><strong>Note from mediator:</strong> ${session.notes}</p>` : ""}
-                
-                <p style="color: #333; font-size: 16px; margin-top: 25px;">We look forward to seeing you!</p>
-                
-                <p style="color: #888; font-size: 14px; margin-top: 30px;">Best regards,<br>The MediPact AI Team</p>
-              </div>
-            </body>
-            </html>
-          `;
-
-          /* İLETİŞİM TERCİHİ (İBA 1.5): hatırlatma ÖNEMLİ listede değildir —
-             "yalnız önemli adımlar" ve "haftalık özet" seçildiğinde gönderilmez,
-             sessiz saatte de düşer. Taraf kaydı burada kesin bilindiği için
-             süzgeç doğrudan o tarafın kimliğiyle çalışır. */
-          const izin = await gonderilsinMi(supabase, taraf.id, "hatirlatma");
-          if (!izin.gonder) {
-            console.log(`Reminder skipped (iletişim tercihi): ${izin.sebep}`);
-            errors.push(`hatırlatma atlandı — iletişim tercihi: ${izin.sebep}`);
-            continue;
-          }
-
-          await resend.emails.send({
-            from: "MİLAT Arabuluculuk <info@milatmediation.com>",
-            to: [tarafEposta],
-            subject: `⏰ Reminder: Your Mediation Session is Tomorrow - ${formattedDate}`,
-            html: userEmailHtml,
-          });
-          console.log(`Sent reminder to party: ${tarafEposta}`);
-          sentCount++;
-          buOturumdaGonderilen++;
-
-          /* Uygulama içi bildirim KULLANICI kaydı ister; kayıtsız taraf
-             (user_id yok) yalnız e-posta alır. */
-          if (taraf.user_id) {
-            await supabase.rpc("create_notification", {
-              p_user_id: taraf.user_id,
-              p_title: "Session Reminder",
-              p_message: `Your mediation session is tomorrow at ${formattedTime}. Please be prepared!`,
-              p_type: "reminder",
-              p_link: `/summary?case=${session.case_id}`,
-            });
-          }
-        }
-
-        // ── ARABULUCU ───────────────────────────────────────────────────────
-        if (mediatorId) {
-          /* Arabulucuya gönderilen künyede taraf ADI yazılır; bu bilgi zaten
-             dosyanın kendi künyesindedir (kör veri sınırı aşılmaz). */
-          const tarafAdlari = caseDetails?.your_name ?? null;
-
-          if (arabulucuProfil?.email) {
-            const mediatorEmailHtml = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="utf-8">
-              <title>Session Reminder</title>
-            </head>
-            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-                <h1 style="color: white; margin: 0; font-size: 24px;">⏰ Upcoming Session Reminder</h1>
-              </div>
-              
-              <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
-                <p style="color: #333; font-size: 16px;">Hello ${arabulucuProfil.full_name || "Mediator"},</p>
-                
-                <p style="color: #333; font-size: 16px;">This is a reminder that you have a mediation session scheduled for <strong>tomorrow</strong>.</p>
-                
-                <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #11998e;">
-                  <h3 style="margin: 0 0 15px 0; color: #333;">Session Details</h3>
-                  <p style="margin: 5px 0; color: #555;"><strong>📅 Date:</strong> ${formattedDate}</p>
-                  <p style="margin: 5px 0; color: #555;"><strong>🕐 Time:</strong> ${formattedTime}</p>
-                  <p style="margin: 5px 0; color: #555;"><strong>📍 Type:</strong> ${sessionTypeText}</p>
-                  ${caseDetails?.dispute_type ? `<p style="margin: 5px 0; color: #555;"><strong>📋 Case:</strong> ${caseDetails.dispute_type}</p>` : ""}
-                  ${caseDetails?.your_name && caseDetails?.other_party_name ? `<p style="margin: 5px 0; color: #555;"><strong>👥 Parties:</strong> ${caseDetails.your_name} vs ${caseDetails.other_party_name}</p>` : ""}
-                  ${tarafAdlari ? `<p style="margin: 5px 0; color: #555;"><strong>👤 Client:</strong> ${tarafAdlari}</p>` : ""}
-                </div>
-                
-                <p style="color: #333; font-size: 16px; margin-top: 25px;">Please review the case details before the session.</p>
-                
-                <p style="color: #888; font-size: 14px; margin-top: 30px;">Best regards,<br>The MediPact AI Team</p>
-              </div>
-            </body>
-            </html>
-          `;
-
-            await resend.emails.send({
-              from: "MİLAT Arabuluculuk <info@milatmediation.com>",
-              to: [arabulucuProfil.email],
-              subject: `⏰ Mediator Reminder: Session Tomorrow - ${formattedDate}`,
-              html: mediatorEmailHtml,
-            });
-            console.log(`Sent reminder to mediator: ${arabulucuProfil.email}`);
-            sentCount++;
-            buOturumdaGonderilen++;
-          }
-
-          await supabase.rpc("create_notification", {
-            p_user_id: mediatorId,
-            p_title: "Session Reminder",
-            p_message: `You have a mediation session tomorrow at ${formattedTime}.`,
-            p_type: "reminder",
-            p_link: `/mediator`,
-          });
-        }
-
-        /* İZ: bir şey gönderildiyse yazılır. Hiç gönderilmediyse (adres yok ya
-           da tercih kapalı) iz YAZILMAZ — sonraki tur yeniden denesin. */
-        if (buOturumdaGonderilen > 0) {
-          await supabase.from("ajan_gorevleri").insert({
-            case_id: session.case_id,
-            gorev_tipi: "oturum_hatirlatma",
-            durum: "yapildi",
-            hedef_party_id: null,
-            gerekce: `${izEtiketi} 24 saat hatırlatması gönderildi (${buOturumdaGonderilen} alıcı)`,
-            sonuc: "hatırlatma gönderildi",
-          });
-        }
-
-      } catch (sessionError) {
-        console.error(`Error processing session ${session.id}:`, sessionError);
-        errors.push(`Session ${session.id}: ${sessionError instanceof Error ? sessionError.message : "Unknown error"}`);
-      }
-    }
-
-    console.log(`Reminder process complete. Sent ${sentCount} emails.`);
-
+    /* TEK HATIRLATMA YOLU VARDIR VE BURASI DEĞİLDİR (24.08.2026 kararı).
+       Ürünün gerçek hatırlatma kolu `ajan-nobetci`dedir:
+       `oturumHatirlatmaGorevleriAc` 24 saat içindeki her planlı oturum için
+       görev açar, `oturumHatirlatmaYurut` onu yürütür. O kol 3 dakikada bir
+       koşar, Türkçe yazar, adresi `case_parties.email`ten alır, iletişim
+       tercihini uygular, video bağlantısını ve arabulucu imzasını ekler.
+       Bu fonksiyon ise ESKİ İNGİLİZCE koldu ve terk edilmiş `mediator_requests`
+       tablosunu sorguluyordu (canlıda 0 satır) — yani hiç çalışmıyordu.
+       KOPYA YAZILMADI: 24 saatlik pencere zaten nöbetçinin kapsamındadır.
+       İki kol birlikte çalışsaydı taraf AYNI hatırlatmayı iki kez alırdı;
+       dahası bu fonksiyonun yazacağı `oturum_hatirlatma` satırı nöbetçinin
+       mükerrer kapısını tetikleyip DOĞRU kolu susturacaktı.
+       Cron işi (jobid 1) bilerek duruyor: saatlik 200, denetim kanalında
+       görünür bir nabız. İş yapmaz. */
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Processed ${sessions.length} sessions, sent ${sentCount} reminder emails`,
-        count: sentCount,
-        errors: errors.length > 0 ? errors : undefined,
+        devredildi: "ajan-nobetci",
+        message: "Oturum hatırlatmaları ajan-nobetci kolu tarafından gönderilir; bu uç nokta iş yapmaz.",
+        count: 0,
       }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
+      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
-
   } catch (error) {
     console.error("Error in send-session-reminders:", error);
     return new Response(
@@ -482,10 +192,7 @@ serve(async (req: Request): Promise<Response> => {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
+      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
 });

@@ -610,7 +610,17 @@ async function oturumHatirlatmaGorevleriAc(admin: any, dosya: any): Promise<{ ac
 
 // Hatırlatma yürütücüsü: oturumun taraflarına tek e-posta. Karşı taraf verisi geçmez.
 async function oturumHatirlatmaYurut(admin: any, dosya: any, gerekce: string): Promise<{ durum: string; sonuc: string }> {
-  const m = /^\[hatirlatma:([0-9a-f-]+)\]/i.exec(String(gerekce ?? ""));
+  /* ONARIM (24.08.2026) — ETİKET METNİN BAŞINDA DEĞİL, İÇİNDE ARANIR.
+     Desen `^\[hatirlatma:…\]` ile SATIR BAŞINA çapalıydı. Oysa görev
+     `anaAjanaBildir` geçidinden yazılıyor ve geçit gerekçenin BAŞINA
+     `[kaynak:nobetci]` koyuyor. Sonuç: desen HİÇBİR ZAMAN eşleşmiyor, her
+     hatırlatma görevi "Hatırlatma etiketi okunamadı" diyerek `atlandi`
+     oluyordu — yani **nöbetçi hiçbir zaman hatırlatma göndermedi.**
+     CANLI KANIT (24.08 01:27 · 01:30 · 01:33): aynı oturum için üst üste
+     `atlandi` satırları.
+     Bu, 21.08'de `gorevEtiketiVarMi`de yapılan `startsWith → includes`
+     onarımının AYNISI; o tur bu OKUYUCU atlanmıştı. */
+  const m = /\[hatirlatma:([0-9a-f-]+)\]/i.exec(String(gerekce ?? ""));
   if (!m) return { durum: "atlandi", sonuc: "Hatırlatma etiketi okunamadı" };
   const sessionId = m[1];
 

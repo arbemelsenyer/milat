@@ -1,123 +1,66 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import {
-  hatirlatmaPenceresi, hatirlatmaEtiketi, zatenGonderildiMi,
-  oturumCevrimIciMi, oturumBicimMetni,
-  PENCERE_BASLANGIC_SAAT, PENCERE_BITIS_SAAT,
-} from "../supabase/functions/send-session-reminders/hatirlatma";
 
-/* OTURUM HATIRLATMASI TEZGÂHI (24.08.2026 · P0)
-   İki ayrı kusur vardı ve ikincisi birincinin altında saklıydı:
+/* OTURUM HATIRLATMASI — TEK KOL TEZGÂHI (24.08.2026)
+
+   BU MADDE ÜÇ TURDA ÇÖZÜLDÜ; her tur bir öncekinin eksiğini gösterdi:
    (1) cron işi `x-cron-secret` göndermiyordu → her saat HTTP 401.
-   (2) Yetki düzelse BİLE hatırlatma gitmezdi: fonksiyon `mediator_requests`
-       tablosunu `scheduled_date` sütunuyla sorguluyordu. O tablo canlıda
-       BOŞ (0 satır) ve terk edilmiş; gerçek oturumlar `case_sessions`ta
-       `scheduled_at` ile duruyor (canlıda 31 satır).
-   Bu tezgâh (2)'yi sabitler: doğru tablo, doğru sütun, mükerrer gönderim
-   kapısı ve oturum biçimi. */
+   (2) Yetki düzelince görüldü ki `send-session-reminders` terk edilmiş
+       `mediator_requests` tablosunu sorguluyor (canlıda 0 satır) → yetki
+       düzelse bile hiçbir şey göndermezdi.
+   (3) Kaynağı `case_sessions`e çevirince görüldü ki ürünün ZATEN çalışan bir
+       hatırlatma kolu var: `ajan-nobetci` → `oturumHatirlatmaGorevleriAc` +
+       `oturumHatirlatmaYurut`. O kol 24 saati kapsıyor, 3 dakikada bir koşuyor,
+       TÜRKÇE yazıyor, adresi `case_parties.email`ten alıyor, iletişim
+       tercihini uyguluyor. Yani yazdığım şey KOPYAYDI.
+       Dahası zararlıydı: aynı `gorev_tipi`/etiketi yazdığı için nöbetçinin
+       mükerrer kapısını tetikleyip DOĞRU kolu susturacaktı.
 
-const KAYNAK = readFileSync(
-  "supabase/functions/send-session-reminders/index.ts", "utf-8",
-);
+   ASIL KUSUR ise nöbetçideydi: `oturumHatirlatmaYurut` etiketi
+   `^\[hatirlatma:…\]` ile SATIR BAŞINA çapalı arıyordu; oysa `anaAjanaBildir`
+   geçidi gerekçenin başına `[kaynak:nobetci]` koyuyor. Desen hiç eşleşmedi,
+   her görev `atlandi` oldu — nöbetçi HİÇBİR ZAMAN hatırlatma göndermedi.
+   CANLI KANIT: 24.08 01:27 · 01:30 · 01:33 aynı oturum için üst üste `atlandi`.
 
-describe("oturum hatırlatması — doğru veri kaynağı", () => {
-  it("`case_sessions` sorgulanır, terk edilmiş `mediator_requests` DEĞİL", () => {
-    expect(KAYNAK).toContain('.from("case_sessions")');
-    // Tabloya yapılan sorgu geri gelmemeli; yalnız açıklama metninde anılabilir.
-    expect(KAYNAK).not.toContain('.from("mediator_requests")');
+   Bu tezgâh iki şeyi sabitler: tek kol kalsın, ve o kolun etiket okuyucusu
+   çapalı olmasın. */
+
+const NOBETCI = readFileSync("supabase/functions/ajan-nobetci/index.ts", "utf-8");
+const CRON = readFileSync("supabase/functions/send-session-reminders/index.ts", "utf-8");
+
+describe("hatırlatma kolu — nöbetçi etiketi metnin İÇİNDE arar", () => {
+  it("etiket deseni satır başına ÇAPALI değildir", () => {
+    /* Kacis karmasasina girmemek icin desenin YAZILDIGI satir okunur. */
+    const satir = NOBETCI.split(/\r?\n/)
+      .find((l) => l.includes("hatirlatma:([0-9a-f-]+)"));
+    expect(satir, "hatırlatma etiketi deseni bulunamadı").toBeTruthy();
+    // Capali hali "/^" ile baslar; gecit basa [kaynak:nobetci] koydugu icin hic eslesmez.
+    expect(satir!.includes("/^")).toBe(false);
   });
 
-  it("`scheduled_at` ile süzülür, olmayan `scheduled_date` ile DEĞİL", () => {
-    expect(KAYNAK).toContain('.gte("scheduled_at"');
-    expect(KAYNAK).toContain('.lt("scheduled_at"');
-    expect(KAYNAK).not.toContain('"scheduled_date"');
-  });
-
-  it("alıcılar dosyadan çözülür (`case_sessions`te user_id/mediator_id yok)", () => {
-    expect(KAYNAK).toContain('.from("case_parties")');
-    expect(KAYNAK).toContain("assigned_mediator_id");
-    // Eski sema alanlari artik okunmamali:
-    expect(KAYNAK).not.toContain("session.user_id");
-    expect(KAYNAK).not.toContain("session.mediator_id");
-  });
-
-  /* CANLI ÖLÇÜM (24.08): tarafların çoğunda `user_id` BOŞTUR — taraflar kayıt
-     olmadan token bağlantısıyla katılıyor. Adres `case_parties.email`tedir.
-     İlk yazımda adresi `profiles`e bağlamıştım; o hâliyle neredeyse hiçbir
-     tarafa hatırlatma gitmezdi. Tezgâh bu gerçeği sabitler. */
-  it("taraf adresi `case_parties.email`ten alınır, profile BAĞLANMAZ", () => {
-    expect(KAYNAK).toContain('.select("id, user_id, email, first_name, last_name, company_name")');
-    // Taraf listesi user_id'ye gore SUZULMEMELI:
-    expect(KAYNAK).not.toContain('.filter((t) => t?.user_id)');
-  });
-
-  it("adresi olmayan taraf sessizce düşmez, sebebi yazılır", () => {
-    expect(KAYNAK).toContain("tarafın e-posta adresi yok");
-  });
-
-  it("uygulama içi bildirim yalnız kayıtlı tarafa yazılır", () => {
-    expect(KAYNAK).toContain("if (taraf.user_id) {");
+  it("mükerrer yazım kapısı da çapalı değildir (21.08 onarımı yerinde)", () => {
+    expect(NOBETCI).toContain('String(r?.gerekce ?? "").includes(etiket)');
   });
 });
 
-describe("hatırlatma penceresi", () => {
-  it("oturumdan 23–25 saat öncesini kapsar", () => {
-    const simdi = new Date("2026-08-24T00:00:00.000Z");
-    const { baslangic, bitis } = hatirlatmaPenceresi(simdi);
-    expect(baslangic.toISOString()).toBe("2026-08-24T23:00:00.000Z");
-    expect(bitis.toISOString()).toBe("2026-08-25T01:00:00.000Z");
-    expect(PENCERE_BITIS_SAAT - PENCERE_BASLANGIC_SAAT).toBe(2);
+describe("send-session-reminders — kopya kol kaldırıldı", () => {
+  it("terk edilmiş `mediator_requests` artık sorgulanmıyor", () => {
+    expect(CRON).not.toContain('.from("mediator_requests")');
+    expect(CRON).not.toContain('"scheduled_date"');
   });
 
-  it("24 saat sonraki oturum pencerenin İÇİNDE kalır", () => {
-    const simdi = new Date("2026-08-24T00:00:00.000Z");
-    const { baslangic, bitis } = hatirlatmaPenceresi(simdi);
-    const oturum = new Date("2026-08-25T00:00:00.000Z");
-    expect(oturum >= baslangic && oturum < bitis).toBe(true);
+  it("e-posta GÖNDERMİYOR: tek kol nöbetçidedir", () => {
+    expect(CRON).not.toContain("resend.emails.send");
+    expect(CRON).toContain('devredildi: "ajan-nobetci"');
   });
 
-  it("8 saat sonraki oturum pencerenin DIŞINDA kalır", () => {
-    const simdi = new Date("2026-08-24T00:00:00.000Z");
-    const { baslangic, bitis } = hatirlatmaPenceresi(simdi);
-    const oturum = new Date("2026-08-24T08:00:00.000Z");
-    expect(oturum >= baslangic && oturum < bitis).toBe(false);
-  });
-});
-
-describe("mükerrer gönderim kapısı", () => {
-  const etiket = hatirlatmaEtiketi("abc-123");
-
-  it("etiket oturum kimliğini taşır", () => {
-    expect(etiket).toBe("[hatirlatma:abc-123]");
+  it("nöbetçinin mükerrer kapısını tetikleyecek satır YAZMIYOR", () => {
+    // Ayni gorev_tipi yazilsaydi nobetcinin dogru kolu susardi.
+    expect(CRON).not.toContain('gorev_tipi: "oturum_hatirlatma"');
   });
 
-  it("iz varsa ikinci turda GÖNDERİLMEZ", () => {
-    const iz = [{ gerekce: `${etiket} 24 saat hatırlatması gönderildi (2 alıcı)` }];
-    expect(zatenGonderildiMi(iz, etiket)).toBe(true);
-  });
-
-  it("BAŞKA oturumun izi bu oturumu susturmaz", () => {
-    const iz = [{ gerekce: "[hatirlatma:baska-oturum] 24 saat hatırlatması gönderildi (1 alıcı)" }];
-    expect(zatenGonderildiMi(iz, etiket)).toBe(false);
-  });
-
-  it("iz yoksa gönderilir; boş/eksik liste çökertmez", () => {
-    expect(zatenGonderildiMi([], etiket)).toBe(false);
-    expect(zatenGonderildiMi(null, etiket)).toBe(false);
-    expect(zatenGonderildiMi(undefined, etiket)).toBe(false);
-  });
-});
-
-describe("oturum biçimi", () => {
-  it("video bağlantısı varsa çevrim içi", () => {
-    expect(oturumCevrimIciMi({ video_link: "https://ornek/oda" })).toBe(true);
-    expect(oturumBicimMetni({ video_link: "https://ornek/oda" })).toBe("Online (Video Call)");
-  });
-
-  it("bağlantı yok / boş / boşluk ise yüz yüze — uydurma yok", () => {
-    expect(oturumBicimMetni({ video_link: null })).toBe("In-Person");
-    expect(oturumBicimMetni({ video_link: "" })).toBe("In-Person");
-    expect(oturumBicimMetni({ video_link: "   " })).toBe("In-Person");
-    expect(oturumBicimMetni({})).toBe("In-Person");
+  it("yetki kapısı yerinde kalır (cron sırrı ya da yönetici)", () => {
+    expect(CRON).toContain('req.headers.get("x-cron-secret")');
+    expect(CRON).toContain('status: 401');
   });
 });
