@@ -1,3 +1,22 @@
+> ## KISAYOL — `medipact sohbet özeti` (23.08.2026)
+>
+> **Yalnız Cowork Claude'u bağlar. Claude Code'u BAĞLAMAZ, DAOS'a girmez.**
+>
+> Kurucu `medipact sohbet özeti` dediğinde: o Cowork sohbetinin tamamı taranır,
+> dolgu cümleleri, nezaket ifadeleri ve tekrarlar tamamen temizlenir, yalnız şu
+> dört başlık maddelenerek verilir — başka hiçbir şey yazılmaz:
+>
+> 1. **Anahtar Kavramlar ve Değişkenler**
+> 2. **Alınan Kararlar ve Kurallar**
+> 3. **Tamamlanan İşler**
+> 4. **Mevcut Durum ve Sıradaki Adım**
+>
+> Amaç: kurucu yeni sohbet açacağı zaman devir notu üretmek. Çıktı en öz metin
+> olur; giriş cümlesi, kapanış cümlesi, yorum, öneri eklenmez.
+>
+> Yeni sohbet bu özetle başlar. Beş kapı kuralındaki okuma listesi bu dosyayı
+> içerdiği için kısayol her oturumda görülür.
+
 # COWORK.md — MediPact Cowork Çalışma Kuralları
 
 Bu dosya Cowork tarafındaki Claude içindir. Code'un kuralları `CLAUDE.md`'dedir.
