@@ -18,6 +18,45 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 
 ## CODE → COWORK
 
+### H-6 · 24.08.2026 · P2 — Sahip-taraf guard'ı hangi tablolara kadar gitsin?
+**Sorun.** P0 kararı (A) uygulandı: taraf-gizli tablolarda sahip, o dosyanın
+tarafıysa arabulucu yetkisi verilmiyor. Beş tabloya uygulandı, sonra taramada
+altıncısı çıktı ve **açıkça belgeli** olduğu için o da uygulandı
+(`kayit_onaylari` — `CaseRoom.tsx:1292`: *"karşı tarafın onay verip vermediği bu
+ekrana hiçbir yoldan yazılmaz"*).
+
+Geriye **`is_case_owner_safe` kullanan 22 politika** kaldı. Bunlar üç öbekte:
+
+| öbek | tablolar | değerlendirmem |
+|---|---|---|
+| **Zaten güvenli** — sahiplik dar | `case_documents` (`uploaded_by = auth.uid()`), `case_parties` (kendi satırı / `mediator` rolü şartlı) | dokunma |
+| **Dosya yönetimi** — A kararı gereği sahipte kalmalı | `case_parties` ekleme/silme, `cases_private_keys`, `cases_vector_pool` | dokunma |
+| **BELİRSİZ** — karar gerekiyor | `ajan_bellek`, `ajan_deneyim`, `ajan_kosum_izi`, `ajan_onerileri`, `akis_olaylari`, `akis_duraklatma`, `arabulucu_talimatlari`, `bilirkisi_evrak_kumesi`, `bilirkisi_onerileri`, `bilirkisi_raporlari`, `dosya_kapanis`, `elverislilik_kontrol`, `foy_gonderim_kayitlari`, `iletisim_degisim`, `kayit_onay_talepleri`, `usul_engelleri`, `usul_onerileri` | **soru bu** |
+
+Belirsiz öbek iki türlü okunabilir: (a) bunlar *arabulucunun kendi çalışma
+kayıtlarıdır*, dosya sahibi görebilir; (b) içlerinde taraf içeriği geçtiği için
+sahip-taraf görmemeli. Dördünde `party_id` sütunu var (`ajan_bellek`,
+`akis_olaylari`, `foy_gonderim_kayitlari`, `iletisim_degisim`) — yani en azından
+onlar taraf ayrımı taşıyor.
+
+**Seçenekler.**
+| | ne yapılır | bedeli |
+|---|---|---|
+| **A** | Yalnız `party_id` taşıyan dördüne guard uygulanır; kalan 13 dokunulmaz | Dar ve ölçülebilir; taraf ayrımı taşıyanlar kapanır |
+| B | Belirsiz öbeğin tamamına (17 politika) guard uygulanır | En muhafazakâr; self-servis sahibin kendi dosyasında ajan kayıtlarını göremeyeceği anlamına gelir |
+| C | Hiçbirine dokunulmaz; beş+bir tablo yeterli sayılır | Bedava; taraf içeriği sızabilecek yüzeyler açık kalır |
+
+**Önerim: A.** `party_id` taşımak, ürünün o tabloda taraf ayrımı yaptığının
+somut işaretidir; gerisi arabulucunun kendi çalışma kaydı sayılabilir.
+B, self-servis başvurucunun kendi dosyasında ajan penceresini boşaltır.
+
+**Kararın etkisi.** C seçilirse `ajan_bellek` · `akis_olaylari` ·
+`foy_gonderim_kayitlari` · `iletisim_degisim` üzerinden sahip-taraf, karşı tarafa
+ait satırları görebilir. A ve B bunu kapatır; B ayrıca arabulucu çalışma
+kayıtlarını da sahibe kapatır (self-servi̇ste işlevsellik kaybı olabilir).
+
+---
+
 ### H-1 · 24.08.2026 · P1 — `CRON_SECRET` değerinin yenilenmesi ⚠️ ACİL
 **Sorun.** Cron sırrı `cron.job.command` içinde düz metin duruyordu. Saklama
 yeri düzeltildi: değer Vault'a taşındı, altı cron işi çalışma anında

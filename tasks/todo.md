@@ -365,6 +365,21 @@ yüzden gizliydi), o yüzden engelleme yolu gerçek bir çiftle koşulamıyor. B
 yerine sahiplik yarısı `OR true` ile zorlanıp **veriye dokunmadan** ölçüldü:
 sonuç `false`. Yani guard doğru çalışıyor.
 
+**KAPSAM TAMAMLAMASI — altıncı tablo (`kayit_onaylari`).** Beşliyi uyguladıktan
+sonra `is_case_owner_safe` kullanan 29 politikayı taradım. Biri aynı sınıfa
+**belgeli** olarak giriyordu: `CaseRoom.tsx:1292` diyor ki *"Kör veri (m.1): kart
+yalnız tarafın KENDİ kararını gösterir; karşı tarafın onay verip vermediği bu
+ekrana hiçbir yoldan yazılmaz."* Ama sahip politikası geniş olduğu için
+sahip-taraf bütün onay satırlarını görürdü. Guard oraya da uygulandı.
+Doğrulama: dar politika **1** · taraf politikaları (**2**) korundu · erişimi
+değişen dosya **0** · sahip **9/9** yetkili.
+
+**KALAN 22 POLİTİKA — kendiliğinden genişletmedim.** Üç öbeğe ayırdım: zaten
+güvenli (sahiplik dar), dosya yönetimi (A kararı gereği sahipte kalmalı) ve
+**belirsiz 17 politika**. Belirsiz öbek gerçek bir karar gerektiriyor
+(arabulucunun kendi çalışma kaydı mı, taraf içeriği mi) → **`tasks/HAT.md` H-6**
+olarak yazıldı, önerimle birlikte. Kararı beklemeden devam ediyorum (§23).
+
 > İZLEME: ilk self-servis başvuru geldiğinde şu sorgu **0** dönmelidir —
 > `select count(*) from cases c where public.is_case_owner_safe(c.id,c.user_id)
 > and exists(select 1 from case_parties p where p.case_id=c.id and p.user_id=c.user_id)
@@ -674,7 +689,12 @@ KARARIN ETKİSİ: A ve B kör veriyi kapatır; C ayrıca ürün akışını düz
 pilotu geciktirir. Hiçbiri yapılmazsa self-servis ilk başvuruda karşı tarafın
 gizli verisi başvurucuya açılır.
 
-- [!] P0 · Self-servis başvuruda dosya sahibi = taraf → kör veri kırılıyor ·
+- [x] P0 · Self-servis başvuruda dosya sahibi = taraf → kör veri kırılıyor ·
+      **DONE 24.08.2026 — kurucu A seçeneğini seçti, uygulandı ve canlıda
+      doğrulandı.** Doğrulama: 5/5 politika dar yardımcıya geçti · erişimi
+      değişen dosya 0 · sahip 9/9 dosyada hâlâ yetkili · guard engelliyor
+      (sahiplik yarısı zorla `true` yapıldığında bile `false` dönüyor).
+      (Aşağıdaki eski metin o günkü teşhistir.) ·
       **HUMAN GATE (§7.4)** · Kabul: seçilen seçenek uygulandıktan sonra,
       sahip-aynı-zamanda-taraf olan bir dosyada karşı tarafın föyü/kalemi
       sorgulandığında **0 satır** dönüyor · Denenenler: `is_case_owner_safe`
