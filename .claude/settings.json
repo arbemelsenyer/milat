@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(.env)",
+      "Read(**/.env*)",
+      "Edit(.env)",
+      "Write(.env)",
+      "Edit(supabase/migrations/**)",
+      "Write(supabase/migrations/**)",
+      "Bash(npm install*)",
+      "Bash(supabase functions deploy*)",
+      "Bash(supabase db push*)"
+    ]
+  }
+}
