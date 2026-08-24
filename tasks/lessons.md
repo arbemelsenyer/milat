@@ -467,3 +467,24 @@ olabilir (nitekim öyleydi).
 karşı taraf hatırlatma alamayacaktı, çünkü nöbetçi yalnız `participants`e
 gönderiyor ve oraya tek taraf yazılıyor. Kaldırma da bir değişikliktir ve
 kanıt ister.
+
+## 24.08.2026 — Sırasız `limit` bir kapıyı ÖLÇEKTE körleştirir
+
+`gorevEtiketiVarMi` mükerrer yazım kapısını şöyle kuruyordu:
+
+```ts
+.eq("case_id", caseId).eq("gorev_tipi", gorevTipi).limit(200)   // ORDER BY YOK
+```
+
+Postgres sırasız bir sorguda hangi 200 satırı döndüreceğini **garanti etmez**.
+Bir dosyada aynı tipten 200'den çok satır birikince kapı yeni satırları hiç
+görmez ve her turda bir tane daha yazar. Kendini besleyen döngü: yazdıkça
+körleşir, körleştikçe daha çok yazar. Canlıda 411 satıra çıkmıştı.
+
+İKİ KURAL:
+1. `limit` kullanan her "var mı?" sorgusu ya **sunucu tarafında filtrelenmeli**
+   (`.like`/`.eq`), ya da en azından **sıralanmalı**. Sırasız `limit` bir
+   varlık kontrolü için yanlış araçtır.
+2. Bir kusuru düzelttikten sonra **birikmiş sonucuna** da bak. Etiket silinmesi
+   kusurunu düzeltmek yetmedi; onun ürettiği 349 çöp satır kapıyı zaten
+   boğmuştu. "Kod düzeldi" ile "canlı düzeldi" ayrı şeylerdir.

@@ -4,7 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok
 - Son tamamlanan iş: oturum hatırlatması zinciri uçtan uca çözüldü (`4456c80`) — canlıda 3 e-posta gönderildi
-- Doğrulama sonucu: `npm run test` **97/97** · lint **2354** (temel çizginin 6 altında) · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
+- Doğrulama sonucu: `npm run test` **101/101** · lint **2354** (temel çizginin 6 altında) · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
 - **KURUCUDAN TEK SOMUT KONTROL** (§11-B — benim yapamadığım tek şey): bir dosyada
   arabulucu hesabıyla "Aşama N+1'e Geç →" düğmesine bas, sayfayı yenile. Dosya yeni
   aşamada KALMALI (eskiden geri düşüyordu). Sunucu tarafını ben doğrularım:
@@ -102,6 +102,24 @@ NİHAİ DURUM — **tek kol vardır ve nöbetçidedir:**
 tercihi · video bağlantısı · arabulucu imzası). 3 dakikada bir koşar.
 `send-session-reminders` artık e-posta GÖNDERMEZ; tek kolun nöbetçi olduğunu
 söyleyen 200 döner. Cron işi (jobid 1) bilerek duruyor: denetim kanalında nabız.
+
+#### 7. TUR — KAPI ÖLÇEKTE KÖRLEŞİYORDU (`4b543ac`)
+Etiket geri geldi ama nöbetçi **hâlâ** 3 dakikada bir yeni satır yazıyordu.
+CANLI ÖLÇÜM (04:27, dosya `eb70595a`): `oturum_hatirlatma` tipinde **411 satır**,
+yalnız **62'si etiketli**.
+KÖK NEDEN: `gorevEtiketiVarMi` `.limit(200)` kullanıyor ama **sıralama yok**.
+Postgres sırasız sorguda hangi 200 satırı döndüreceğini garanti etmez; pratikte
+en eskiler gelir. Bir dosyada aynı tipten 200'den çok satır birikince kapı YENİ
+satırları hiç görmüyor ve her turda bir tane daha yazıyor — **kendini besleyen
+döngü**: yazdıkça körleşiyor, körleştikçe daha çok yazıyor.
+Bu, etiket silinmesi kusurunun (`c722026`) **birikmiş sonucuydu**: 349 etiketsiz
+satır zaten oradaydı ve kapıyı boğmuştu. Etiketi geri getirmek tek başına
+yetmedi — bu yüzden düzeltmeden sonra da canlıya bakmak gerekti.
+ÇÖZÜM iki katmanlı: sunucu tarafında `like` ile daralt (satır sayısından
+bağımsız), JS tarafında `includes` ile kesinleştir (21.08 notunun gerekçesi
+korunur). En yeniden eskiye sıralanır.
+> Birikmiş 349 etiketsiz satır SİLİNMEDİ (§7.3 geri dönüşsüz). Yeni kapı
+> onlardan etkilenmiyor.
 
 ALICI KURALI (yeni, kodda açık):
 - `private` (özel/caucus) → YALNIZ `participants`. Özel oturumun varlığı karşı
