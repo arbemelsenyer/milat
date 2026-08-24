@@ -4,7 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok
 - Son tamamlanan iş: oturum hatırlatmaları gerçekten gönderiliyor (`e4c788d`) — 401'in altındaki ikinci kusur
-- Doğrulama sonucu: `npm run test` **89/89** · lint **2360** (temel çizginin bir altında) · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
+- Doğrulama sonucu: `npm run test` **95/95** · lint **2360** (temel çizginin bir altında) · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
 - **KURUCUDAN TEK SOMUT KONTROL** (§11-B — benim yapamadığım tek şey): bir dosyada
   arabulucu hesabıyla "Aşama N+1'e Geç →" düğmesine bas, sayfayı yenile. Dosya yeni
   aşamada KALMALI (eskiden geri düşüyordu). Sunucu tarafını ben doğrularım:
@@ -76,6 +76,46 @@ DEĞİŞMEDİ, düğme onda yalnız ekranı taşır. Sol menüdeki gezinme (`got
 DEĞİŞMEDİ: bakmak için aşamaya geçmek dosyayı ilerletmez. Yeni bir yetki
 icat edilmedi; RLS zaten bu ölçütü taşıyor (yönetici · görevli arabulucu · dosya
 sahibi) — `akis-onayla` düzeltmesiyle aynı ölçüt.
+
+### KAPANDI — 24.08 · P1 · İŞ ETİKETİ SINIR SÜZGECİNDEN GEÇMİYOR (`c722026`, 36 fan-out)
+Hatırlatma zincirini canlıda sınamak için test oturumu kurdum; o turda nöbetçi
+iki `otomatik_analiz` satırı yazdı ve **ikisi de** yalnız şuydu:
+`[kaynak:nobetci] Bu konuda size yazabileceğim bir şey bulamadım.` — iş etiketi YOK.
+
+KÖK NEDEN: `anaAjanaBildir` gerekçenin **tamamını** ortak sınır süzgecinden
+geçiriyordu. Süzgeç eleyince `sade` yedeği dönüyor ve metnin başındaki **iş
+etiketi de siliniyordu**.
+
+BEDELİ İKİ TANE, BİRİ AĞIR:
+1. **Mükerrer yazım kapısı körelıyor.** `gorevEtiketiVarMi` "bu iş zaten açıldı
+   mı" diye etiketi arar; etiket silinince bulamaz ve nöbetçi **aynı görevi her
+   turda yeniden açabilir.** 21.08'de aynı kapı `startsWith → includes` ile
+   onarılmıştı; o turda sebebin BU olduğu görülmemiş, yalnız belirti düzeltilmiş.
+2. Arabulucu hangi işin ne olduğunu göremiyor.
+
+Bu, 23.08'de `akis-yurut/hata-metni.ts` ile düzeltilen kusurun **aynısı, başka
+geçitte**. O tur yalnız koşucu kolu onarılmış, bu geçit atlanmıştı.
+
+DÜZELTME: sınır katmanı GEVŞETİLMEDİ, metin ikiye ayrıldı. Baştaki `[...]`
+etiketleri KODUN ürettiği dizelerdir (içlerinde taraf verisi bulunması yapısal
+olarak mümkün değil) → süzgece girmez. Serbest açıklama eskisi gibi süzgeçten
+geçer; elenirse metni konmaz ama sessiz de düşmez, hangi türün elediği yazılır.
+Tezgâh (`tests/ana-ajana-bildir-etiket.test.ts`, 6 durum) **kanıtlandı**: kusur
+geri getirilip koşuldu → 4 test DÜŞTÜ; geri alınınca 6/6 geçti.
+
+> DERS: bir kusur sınıfı düzeltilince **aynı sınıfın öteki geçitleri de
+> taranmalı.** 23.08'de metin ikiye ayrılmıştı ama yalnız bir çağıranda;
+> ikinci geçit 24.08'e kadar kusurlu kaldı ve sessizce mükerrer görev üretme
+> riski taşıdı.
+
+### CANLI DOĞRULAMA — 24.08 · `girdiTamamla` düzeltmesi gerçek akışta sınandı
+Hatırlatma sınaması için "farazi FSM test" dosyasına gerçek bir oturum kuruldu
+(`143060da…`, 25 Ağu 02:00 UTC). Tetikleyici `oturum_planlandi` olayını doğurdu
+ve nöbetçi 01:18'de işledi:
+`[akis:0804fa4b…:oturum_planlandi__foy_hazirla] hazirlik-foyu çalıştırıldı (2 taraf)`
+19.08'de **HTTP 400** veren kuralın aynısı; `akis_hatasi` doğmadı.
+Yani `124e6cb` düzeltmesi canlı akışta kanıtlandı — birim tezgâhıyla değil,
+gerçek olay zinciriyle.
 
 ### KAPANDI — 24.08 · P0 · OTURUM HATIRLATMALARI: 401'İN ALTINDA İKİNCİ KUSUR (`e4c788d`)
 Cron başlığını düzeltmek **tek başına yanılsama olurdu**: fonksiyon 200 döner,

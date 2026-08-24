@@ -425,3 +425,23 @@ yazılmadan ÖNCE canlı dağılıma sorulur:
 
 İLGİLİ: aynı oturumda `closed_at` de böyleydi — sütun vardı, tetikleyici vardı,
 ama onu dolduran yol hiç işlemiyordu.
+
+## 24.08.2026 — Bir kusur sınıfı düzeltilince ÖTEKİ GEÇİTLERİ de tara
+
+23.08'de `akis-yurut/hata-metni.ts` ile şu çözüldü: insana giden metnin tamamı
+sınır süzgecinden geçirilince, süzgeç eleyince metnin KODLA ÜRETİLEN kısmı da
+kayboluyor. Çözüm metni ikiye ayırmaktı: kod üretimi başlık süzgece girmez,
+serbest metin girer.
+
+Ama aynı kalıp `_shared/anlatim.ts` içindeki `anaAjanaBildir` geçidinde de
+vardı ve orası ATLANMIŞTI. 24.08'de canlıda göründü: nöbetçinin yazdığı iki
+satır da yalnız yedek cümleye inmişti, iş etiketi silinmişti.
+
+Etiketin silinmesi kozmetik değildi: `gorevEtiketiVarMi` mükerrer yazım kapısını
+o etiketle kurar. Etiket yoksa kapı boş kümeye bakar ve nöbetçi aynı görevi her
+turda yeniden açabilir. 21.08'de bu kapı `startsWith → includes` ile
+"onarılmıştı" — belirti düzeltilmiş, sebep görülmemişti.
+
+KURAL: bir kusuru düzeltirken "bu kalıp başka nerede var?" diye ara. Somut
+arama: düzeltilen işlevin ADIYLA değil, KUSURUN KALIBIYLA grep at
+(burada: `sinirdanGecir(` çağıran her yer).
