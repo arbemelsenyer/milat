@@ -536,3 +536,26 @@ birden oku:
 
 İLGİLİ: aynı oturumda "tezgâh şemayı doğrular, veriyi doğrulamaz" dersi vardı.
 Bu onun aynası: "canlı veri bugünü doğrular, akışı doğrulamaz."
+
+## 24.08.2026 — Aynı kuralın VERİTABANI ve STORAGE yüzleri ayrı ayrı yazılır
+
+`case_documents` tablosunun RLS politikası taraf için `uploaded_by = auth.uid()`
+diyor; adı bile "Party sees own uploads only". Ama dosyanın kendisi Storage'da
+duruyor ve `case-documents` kovasının okuma politikası `can_access_case(...)`
+kullanıyordu — o fonksiyon dosyanın HER tarafına izin verir.
+
+Sonuç: satırı gizlenen belgenin dosyası karşı tarafça indirilebiliyordu.
+Kodun kendi yorumu (`CaseRoom.tsx:327`) bile kapsamın dar olduğunu sanıyordu.
+
+KURAL: bir gizlilik kuralı hem tabloda hem kovada geçerli olmalıdır. Tablo
+politikasını yazmak YETMEZ; dosya ayrı bir yetki sistemindedir.
+Denetim sorgusu:
+```sql
+select p.polname, pg_get_expr(p.polqual, p.polrelid)
+from pg_policy p join pg_class c on c.oid=p.polrelid
+join pg_namespace n on n.oid=c.relnamespace
+where n.nspname='storage' and c.relname='objects';
+```
+Ve `can_access_case` gibi "erişebilir mi" yardımcıları GENİŞTİR — dosya
+düzeyinde kullanılırsa kör veriyi kırar. Dar kural için dar yardımcı gerekir
+(`is_case_mediator`, `uploaded_by` eşleşmesi).

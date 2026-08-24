@@ -331,6 +331,39 @@ NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
 
+### KAPANDI — 24.08 · P0 · STORAGE KOVASI VERİTABANINDAN DAHA GENİŞ OKUTUYORDU
+Kör veri denetimini dosyaların durduğu **Storage** tarafına da yaptım (daha önce
+hiç bakılmamış). Canlı ve gerçek bir kusur çıktı.
+
+KUSUR: `case_documents` **veritabanı** politikası taraf için
+`uploaded_by = auth.uid()` diyor — adı bile *"Party sees own uploads only"*.
+Ama `case-documents` **kovasının** okuma politikası `can_access_case(...)`
+kullanıyordu ve o fonksiyon dosyanın **herhangi bir tarafına** izin verir:
+```
+c.user_id = uid OR c.assigned_mediator_id = uid
+OR EXISTS(case_parties where case_id=... and user_id=uid)   ← HER TARAF
+OR has_role(admin)
+```
+SONUÇ: üstverisi (satırı) gizlenen belgenin **dosyası** karşı tarafça
+indirilebiliyordu. Sözleşmenin iki ucu birbirini tutmuyordu.
+
+NİYET İKİ YERDE YAZILI: politikanın adı ve `CaseRoom.tsx:327` yorumu —
+*"Mevcut SELECT politikası kendi yüklediği dosyaya zaten izin veriyor."*
+Yani yazan da kapsamın dar olduğunu sanıyordu. Bu yüzden **karar değil, kusur**.
+
+TÜKETİCİLER OKUNDU (geçen turdaki hatamı tekrarlamamak için):
+| tüketici | ihtiyacı | değişimden etkilenir mi |
+|---|---|---|
+| `CaseRoom:332` taraf | yalnız kendi belgesi | hayır |
+| `MediationEngine:6324` arabulucu | dosyanın hepsi | hayır (`is_case_mediator`) |
+| `SourceViewerDialog` | **yalnız arabulucu yüzeyinde** kullanılıyor | hayır |
+| bilirkişi | bu kovadan istemci tarafında zaten okumuyor | hayır |
+| edge function'lar | servis rolü, RLS'e tabi değil | hayır |
+
+DÜZELTME: kova okuma politikası veritabanındaki kuralla **birebir** aynı hâle
+getirildi — yönetici hepsi · `admin/` klasörü + mediator rolü (bilgi tabanı) ·
+görevli arabulucu dosyanın hepsi · **diğer herkes yalnız kendi yüklediği dosya**.
+
 ### HUMAN GATE — 24.08 · P0 · SELF-SERVİS BAŞVURUDA KÖR VERİ KIRILIYOR (§7.4)
 
 **BULGU.** `is_case_owner_safe(case_id, user_id)` yalnız `cases.user_id`
