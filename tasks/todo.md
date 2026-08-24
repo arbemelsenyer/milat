@@ -347,6 +347,35 @@ NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
 
+### DENETİM — 24.08 · TARAF YÜZEYİ (kod tarafı) — TEMİZ ÇIKTI
+RLS denetiminden sonra **kodun kendisini** denetledim: taraf yüzeyi
+(`CaseRoom`) dosya kapsamlı sorgular yapıyor mu, yapıyorsa RLS onları gerçekten
+daraltıyor mu?
+
+`CaseRoom` altı tabloyu **dosya kapsamlı** (`eq("case_id", …)`) sorguluyor.
+Hepsinin RLS'i tek tek okundu:
+| tablo | taraf politikası | sonuç |
+|---|---|---|
+| `party_analyses` | `user_id = auth.uid()` | taraf yalnız kendi analizini alır ✓ |
+| `case_documents` | `uploaded_by = auth.uid()` | kendi yüklemesi ✓ |
+| `case_parties` | `user_id = auth.uid()` | **yalnız kendi satırı** ✓ |
+| `case_discovery_questions` | `user_id = auth.uid()` | kendi sorusu ✓ |
+| `common_ground_reports` | taraf politikası **YOK** | taraf 0 satır alır ✓ |
+| `case_payments` | `payer_party_id IN (kendi taraf kayıtları)` | kendi ödemesi ✓ |
+
+**İNCELENEN TEK RİSKLİ NOKTA — `negotiation_rounds`:** taraf politikası dosya
+kapsamlı (`is_case_party`) ve taraf için **UPDATE** yetkisi de var. İlk bakışta
+"taraf karşı tarafın cevabını değiştirebilir" gibi göründü. Ölçtüm:
+- Tabloda `party_id` YOK; `proposal` ortak, `accepted_by`/`rejected_by` dizi.
+  Yani yapısı gereği **ortak** müzakere turu; iki tarafın aynı teklifi görmesi
+  doğrudur (kör teklif değildir — o `teklif_braketleri`dir ve taraf kapsamlıdır).
+- Yazma `enforce_negotiation_rounds_party_update` tetikleyicisiyle korunuyor:
+  taraf `case_id` · `round_no` · `proposal` · `created_at` değiştiremez;
+  dizilere **yalnız kendi kimliğini** ekleyebilir (`OLD <@ NEW` ve
+  `NEW <@ OLD || auth.uid()` küme kapsama denetimi); `status` tetikleyicide
+  hesaplanır, taraf yazamaz; taraf için DELETE politikası yok.
+SONUÇ: kusur yok, koruma sağlam.
+
 ### DENETİM — 24.08 · VERİ İZOLASYONU / GÜVENLİK TAM TARAMASI
 Ürünün çekirdek vaadi kör veridir; bu eksen daha önce hiç uçtan uca denetlenmemişti.
 On başlık tarandı. **Bir canlı kusur bulundu ve kapatıldı, bir madde Human Gate'e çıktı; kalan sekiz başlık temiz.**
