@@ -331,6 +331,20 @@ NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
 
+### KUYRUĞA EKLENDİ — 24.08 · kayıt kovası yok (gizli, kayıt hattıyla birlikte doğar)
+`ajan-nobetci` ses kaydını `oturum-kayitlari` kovasından siliyor
+(`KAYIT_BUCKET`), ama canlıda yalnız iki kova var: `avatars` ve
+`case-documents`. Kova açılmadan kayıt hattı devreye girerse silme her turda
+hata verir, `ses_silindi_at` hiç yazılmaz ve **kayıt süresiz kalır** — tarafa
+verilen "24 saat sonra kalıcı silinir" sözü ve constitution m.10 çiğnenir.
+BUGÜN ZARAR YOK: `oturum_kayitlari` boş, yükleme yolu yok. Kodun başına açık
+uyarı konuldu, kuyruğa madde açıldı.
+- [ ] P2 · `oturum-kayitlari` kovası açılsın ve okuma politikası DAR yazılsın ·
+      Kabul: kova var; taraf kimliğiyle o kovadan okuma 0 satır dönüyor;
+      `ajan-nobetci` silme kolu `ses_silindi_at` yazabiliyor · NOT: onay metni
+      "kayıt ve dökümü yalnız arabulucu görür" diyor — belge kovasındaki
+      24.08 kusuru (kova politikası veritabanındakinden genişti) tekrarlanmasın.
+
 ### KAPANDI — 24.08 · P0 · STORAGE KOVASI VERİTABANINDAN DAHA GENİŞ OKUTUYORDU
 Kör veri denetimini dosyaların durduğu **Storage** tarafına da yaptım (daha önce
 hiç bakılmamış). Canlı ve gerçek bir kusur çıktı.

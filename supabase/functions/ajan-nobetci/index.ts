@@ -2008,6 +2008,18 @@ async function braketKollari(admin: any, dosya: any, taraflar: any[]): Promise<B
    zamanı + silme notu, ayrıca "yapılmayanlar" listesine gerekçe düşer.
    Kayıt/döküm hattı henüz kurulmadığı için tablo boşsa kol sessizce geçer.
    ──────────────────────────────────────────────────────────────────────────── */
+/* ⚠️ BU KOVA HENÜZ YOK (24.08.2026 denetimi). Canlıda yalnız iki kova var:
+   `avatars` ve `case-documents`. Ses kaydı silme kolu aşağıda bu kovadan
+   silmeye çalışıyor; kova açılmadan kayıt hattı devreye girerse silme HER
+   TURDA hata verir, `ses_silindi_at` hiç yazılmaz ve kayıt süresiz kalır.
+   O da tarafa onay metninde verilen "ses kaydı süreç bitiminden 24 saat sonra
+   kalıcı olarak silinir" sözünü ve constitution m.10'u (süresiz saklama yasağı)
+   çiğner.
+   BUGÜN ZARAR YOK: `oturum_kayitlari` tablosu boş, yükleme yolu da yok.
+   KAYIT HATTINI KURAN KİŞİYE: önce bu kovayı aç ve okuma politikasını DAR
+   yaz — onay metni "kayıt ve dökümü YALNIZ arabulucu görür" diyor, yani
+   taraf bu kovadan okuyamamalı. (Belge kovasında aynı hata 24.08'de canlıda
+   bulundu: kova politikası veritabanındakinden genişti.) */
 const KAYIT_BUCKET = "oturum-kayitlari";
 
 async function kayitSilmeKollari(
