@@ -404,3 +404,24 @@ görülmelidir.** Bu oturumda üç tezgâhın üçü de böyle sınandı:
 YAN KURAL: kaynak dosyada desen aramak için regex şart değil. Kesin dize
 (`includes`) hem okunur hem de kaçış tuzağı taşımaz. Regex ancak gerçekten
 gerekliyse kullanılır ve o zaman `String.raw` ya da düz dize tercih edilir.
+
+## 24.08.2026 — Birim tezgâhı şemayı doğrular, veriyi doğrulamaz
+
+`send-session-reminders` düzeltilirken alıcı adresi `profiles.email`e bağlandı.
+Tezgâh yeşildi, tipler doğruydu, sorgu geçerliydi. Ama canlı veri şunu dedi:
+
+```
+select count(*) filter (where user_id is not null) from case_parties  -->  3 / 12
+```
+
+Taraflar **kayıt olmadan** token bağlantısıyla katılıyor (`/katilim/:token`);
+adresleri `case_parties.email`de. Yani düzeltme, yetkiyi ve tabloyu onardıktan
+sonra bile neredeyse hiçbir tarafa e-posta göndermeyecekti.
+
+KURAL: "kim alacak / hangi adrese gidecek / hangi alan dolu" kararları kod
+yazılmadan ÖNCE canlı dağılıma sorulur:
+`select count(*) filter (where <alan> is not null), count(*) from <tablo>`
+Şemada sütunun var olması, canlıda dolu olduğu anlamına GELMEZ.
+
+İLGİLİ: aynı oturumda `closed_at` de böyleydi — sütun vardı, tetikleyici vardı,
+ama onu dolduran yol hiç işlemiyordu.

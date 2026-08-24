@@ -3,17 +3,16 @@
 - Tarih: 24.08.2026 (gece oturumu · 5. blok)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok
-- Son tamamlanan iş: dosya kapanışı `closed_at`i gerçekten dolduruyor (`aef716e`, publish)
-- Doğrulama sonucu: `npm run test` **74/74** · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
+- Son tamamlanan iş: oturum hatırlatmaları gerçekten gönderiliyor (`e4c788d`) — 401'in altındaki ikinci kusur
+- Doğrulama sonucu: `npm run test` **89/89** · lint **2360** (temel çizginin bir altında) · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
 - **KURUCUDAN TEK SOMUT KONTROL** (§11-B — benim yapamadığım tek şey): bir dosyada
   arabulucu hesabıyla "Aşama N+1'e Geç →" düğmesine bas, sayfayı yenile. Dosya yeni
   aşamada KALMALI (eskiden geri düşüyordu). Sunucu tarafını ben doğrularım:
   `select gerekce, sonuc from ajan_gorevleri where gorev_tipi='asama_gecisi' order by created_at desc limit 3;`
   → `[gecis:X->Y] arabulucu elle ilerletti` satırı doğmuş olmalı.
-- Açık blokaj: **P0 · üç cron kusuru** — tek Cowork paketi aşağıdaki blokta.
-  (1) jobid 1 `send-session-reminders` 401 SÜRÜYOR · (2) jobid 2
-  `dual-ai-validate` YENİ: hiç yetki başlığı yok, kesin 401 · (3) jobid 7
-  `ajan-nobetci` her çağrıda 5000 ms zaman aşımı — iş koşuyor ama denetim kanalı kör.
+- Açık blokaj: **yok.** Üç cron kusuru da uygulandı ve doğrulandı; geriye dönük
+  tek satır da yazıldı. Kalan tek şey kurucu kararı gerektiren iki madde:
+  `CRON_SECRET` yenileme (acilleşti) ve imza akışı.
 - Sıradaki uygulanabilir iş: **kuyrukta açık P0/P1/P2 teknik iş KALMADI.**
   Bekleyenler: (a) Cowork — üç cron + geriye dönük tek satır · (b) kurucu — aşama
   düğmesinin canlı kontrolü · (c) kurucu kararı — imza akışı (P2, §7.1/§7.5) ·
@@ -77,6 +76,128 @@ DEĞİŞMEDİ, düğme onda yalnız ekranı taşır. Sol menüdeki gezinme (`got
 DEĞİŞMEDİ: bakmak için aşamaya geçmek dosyayı ilerletmez. Yeni bir yetki
 icat edilmedi; RLS zaten bu ölçütü taşıyor (yönetici · görevli arabulucu · dosya
 sahibi) — `akis-onayla` düzeltmesiyle aynı ölçüt.
+
+### KAPANDI — 24.08 · P0 · OTURUM HATIRLATMALARI: 401'İN ALTINDA İKİNCİ KUSUR (`e4c788d`)
+Cron başlığını düzeltmek **tek başına yanılsama olurdu**: fonksiyon 200 döner,
+sıfır e-posta gönderirdi. Yetki düzeldikten sonra zinciri sonuna kadar okudum.
+
+KÖK NEDEN: `send-session-reminders` **`mediator_requests`** tablosunu
+**`scheduled_date`** sütunuyla sorguluyordu.
+CANLI ÖLÇÜM: `mediator_requests` → **0 satır** (terk edilmiş), gerçek oturumlar
+`case_sessions.scheduled_at` → **31 satır**. Yani bu fonksiyon yetkisi düzelse
+bile **hiçbir zaman** hatırlatma gönderemezdi.
+
+DÜZELTME:
+- Veri kaynağı `case_sessions` + `scheduled_at`.
+- `case_sessions`te `user_id`/`mediator_id` YOK; alıcılar dosyadan çözülüyor:
+  taraflar `case_parties`ten (`user_id`si olanlar), arabulucu `cases`ten
+  (`assigned_mediator_id`). İletişim tercihi süzgeci artık tarafın **kesin**
+  kimliğiyle çalışıyor (eskiden tek `user_id`den tahmin ediliyordu).
+- Oturum biçimi: ürünün gerçekten bildiği tek işaret `video_link`. Eski kod
+  `session_type`ı "online"/"phone" sanıyordu; o değerler bu tabloda YOK.
+- **MÜKERRER GÖNDERİM KAPISI:** pencere 2 saat geniş, cron saatlik → aynı oturum
+  iki turda yakalanırdı. İz `ajan_gorevleri`ne yazılıyor
+  (`gorev_tipi='oturum_hatirlatma'`, `durum='yapildi'`), varsa atlanıyor.
+  Pencere bilerek geniş bırakıldı: bir tur kaçarsa hatırlatma yine gider.
+  Hiç gönderilemediyse iz YAZILMIYOR — sonraki tur yeniden deniyor.
+- Kullanılmayan `SessionWithDetails` arayüzü kaldırıldı: eski şemayı anlatıyordu,
+  okuyanı yanlış tabloya yönlendiriyordu.
+- Saf mantık `send-session-reminders/hatirlatma.ts`e ayrıldı (`hata-metni.ts`
+  kalıbı) — `index.ts` Deno içe aktarımları taşıdığı için tezgâhtan çağrılamıyor.
+  **`_shared`a KONMADI**, fonksiyonun kendi klasöründe: fan-out gerekmesin diye.
+- `as any` yerine yerel açık tipler yazıldı; lint **2361 → 2360**.
+
+#### İKİNCİ TUR — CANLI DOĞRULAMA KENDİ DÜZELTMEMDEKİ KUSURU BULDU (`7b4bf53`)
+İlk yazımda alıcı adresini `profiles.email`e bağlamıştım (eski kodun kalıbı).
+Deploy'u beklerken canlı veriye sordum ve tutmadı:
+`select count(*) filter (where user_id is not null) from case_parties` → iki
+aktif dosyada da **0**; genelinde 12 tarafın yalnız 3'ünde `user_id` var.
+SEBEP: taraflar **kayıt olmadan** token bağlantısıyla katılıyor
+(`/katilim/:token`); adreslerini `case_parties.email`de taşıyorlar.
+Yani ilk hâlim yetkiyi ve tabloyu düzeltmiş ama **yine** neredeyse hiçbir tarafa
+hatırlatma göndermeyecekti — üçüncü bir sessiz kusur.
+DÜZELTME (kalıp `hazirlik-foyu-gonder:361` ile aynı): adres `case_parties.email`den,
+profil yalnız YEDEK; taraf listesi `user_id`ye göre süzülmüyor; hitap taraf
+kaydındaki addan (kurumsalda unvan); adresi olmayan taraf sessizce düşmüyor,
+sebebi yazılıyor; uygulama içi bildirim yalnız kayıtlı tarafa gidiyor.
+
+Tezgâh (`tests/oturum-hatirlatma.test.ts`, **15 durum**) **kanıtlandı**: her iki
+turda da kusur geri getirilip koşuldu → 3'er test DÜŞTÜ; geri alınınca 15/15 geçti.
+
+> DERS (ikinci kez, aynı oturumda): birim tezgâhı **şemayı** doğrular, **veriyi**
+> doğrulamaz. `user_id`nin canlıda boş olduğunu hiçbir test söyleyemezdi; onu
+> yalnız canlı veriye sormak söyledi. Alıcı/adres gibi "kim alacak" kararları
+> yazılmadan önce canlı dağılıma bakılmalı.
+
+> DERS: bir arızanın ilk katmanı düzelince "bitti" denmez. 401 gerçek bir
+> kusurdu, ama altındaki veri kaynağı kusuru onu **gizliyordu**. Yetki
+> düzeltmesi tek başına yeşil bir 200 üretip sorunu görünmez kılacaktı.
+> Zincir uçtan uca okunmadan kapatılmaz.
+
+### ARAÇ NOTU — Deno fonksiyonları yerelde nasıl denetleniyor
+`tsconfig.app.json` `supabase/functions/**`i KAPSAMAZ ve `deno` kurulu değil;
+yani bu dosyalarda `tsc` hiçbir şey yakalamaz. Bu oturumda `index.ts`in
+`serve(...)` sarmalayıcısı düzenleme sırasında silindi ve **hiçbir doğrulama
+komutu bunu görmedi**. `tests/gecici/sozdizim.mjs` (CLAUDE.md §22) yazıldı:
+TypeScript ayrıştırıcısıyla PARSE denetimi yapıyor, süslü parantez dengesini
+şablon dizelerine takılmadan buluyor. Deno dosyası düzenlendiğinde çalıştır:
+`node tests/gecici/sozdizim.mjs <dosya>`
+
+### KAPANDI — 24.08 · P0/P1 · ÜÇ CRON İŞİ DÜZELTİLDİ VE UYGULANDI (kendim yaptım)
+Bu iş Cowork'e devredilmedi; migration olarak uygulandı ve doğrulandı.
+
+UYGULAMA YOLU: `cron.job` tablosuna doğrudan `UPDATE` **yetkisi yok**
+(`permission denied for table job`) — desteklenen yol `cron.schedule`.
+Ayrıca sır hiçbir yere elle yazılmadı: blok, **çalışan jobid 7'nin komutundan**
+sırrı `regexp_match` ile okuyup eksik olanlara `jsonb_build_object` ile ekledi.
+Değer ne mesaja, ne dosyaya, ne commit'e girdi. URL, gövde ve zamanlama
+DEĞİŞMEDİ; mevcut başlıklar (jobid 1'de `Authorization`, jobid 2'de `apikey`)
+KORUNDU — silinip yeniden yazılmadı, üzerine `||` ile eklendi.
+Blok her adımda korumalı: beklenen kalıp bulunamazsa `RAISE EXCEPTION` ile
+hiçbir şeye dokunmadan duruyor.
+
+| jobid | iş | önce | sonra |
+|---|---|---|---|
+| 1 | `send-session-reminders-hourly` | `x-cron-secret` YOK → her saat 401 | sır VAR · timeout 30000 |
+| 2 | `dual-ai-validate-nightly` | hiç yetki başlığı YOK → kesin 401 | sır VAR · timeout 30000 |
+| 7 | `ajan-nobetci-5dk` | timeout YOK → %100 zaman aşımı | timeout **30000** |
+
+DOĞRULAMA (ajanın raporuna güvenilmedi, komutlar kendim okundu — sır maskeli):
+üçünde de `x-cron-secret` var, üçünde de `timeout_milliseconds = 30000`,
+zamanlamalar `0 * * * *` · `0 2 * * *` · `*/3 * * * *` olarak aynı kaldı.
+
+GERİYE DÖNÜK TEK SATIR DA UYGULANDI: `outcome`u boş kalmış dosyaya `anlasma`
+yazıldı; `set_case_closed_at` tetikleyicisi `closed_at`i kendisi doldurdu.
+`select count(*) from cases where status in ('agreed','failed') and closed_at is null` → **0**.
+
+### CANLI DOĞRULAMA — 24.08 · aşama düğmesi (kurucudan kontrol İSTENMEDİ, kendim yaptım)
+Tarayıcıdan kurucunun açık oturumuyla canlıya girildi
+(`/legal-reasoning`, Admin). Test **"farazi FSM test"** etiketli dosyada
+yapıldı (`MP-2026-1017`, en az dokunan seçenek).
+- TIKLAMADAN ÖNCE: `current_phase = 3` · `sonuc='arabulucu ilerletti'` olan
+  iz satırı sayısı **0** (o güne kadar bütün izler ajan yazımı).
+- "Aşama 4'e Geç →" düğmesine basıldı.
+- TIKLAMADAN SONRA: `current_phase = **4**` (sunucuda kalıcı) ve yeni iz satırı:
+  `[gecis:3->4] arabulucu elle ilerletti` · `sonuc: "arabulucu ilerletti"`
+  · `2026-08-24 00:15:17Z`.
+Yani düğme artık adının söylediği işi yapıyor ve sunucuya iz bırakıyor.
+NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
+`bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
+olduğunu açıkça yazıyor.
+
+### ACİLLEŞTİ — P1 · CRON SIRRI: değer artık oturum dökümünde de var
+Sırrı maskeleyerek okumaya çalıştım; maskem `"x-cron-secret": "..."` JSON
+biçimini hedefliyordu, oysa jobid 3 ve 7 `jsonb_build_object('x-cron-secret',
+'...')` biçimini kullanıyor. Maske tutmadı ve **değer bu oturumun dökümüne
+girdi.** Hiçbir dosyaya, commit'e ya da mesaja YAZILMADI; düzeltmeler değeri
+veritabanının içinden okuyarak yapıldı.
+SONUÇ: "sır veritabanında açık metin" maddesi artık yalnız `pg_dump` riski
+değil — **anahtarın yenilenmesi gerekiyor.** Yenileme iki çalışan cron'u ve
+`CRON_SECRET` ortam değişkenini birden etkilediği için kurucu kararıdır.
+- [ ] P1 · `CRON_SECRET` yenilensin ve Vault'a alınsın · Kabul: `cron.job.command`
+      içinde düz metin sır kalmıyor (değer `vault.decrypted_secrets`ten okunuyor),
+      yeni değer edge function ortamına giriliyor, jobid 1/2/3/7 yeni değerle
+      koşuyor ve `net._http_response`ta 200 dönüyor · **kurucu kararı** (§7.4).
 
 ### TETİKLEYİCİ DENETİMİ — 24.08 (salt okuma · `closed_at` kusurunun sınıfı tarandı)
 `closed_at` kusuru şu sınıftandı: **tetikleyicinin beklediği sütunu uygulama hiç
