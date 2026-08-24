@@ -119,7 +119,6 @@ export function AnlasmaImzaPaneli({ caseRow, onSigned }: Props) {
 
   useEffect(() => {
     void yukle();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseRow?.id]);
 
   const seciliIdler = useMemo(
