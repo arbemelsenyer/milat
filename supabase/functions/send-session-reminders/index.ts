@@ -122,7 +122,10 @@ type DosyaKunye = {
   id: string; user_id: string | null; assigned_mediator_id: string | null;
   dispute_type: string | null; your_name: string | null; other_party_name: string | null;
 };
-type TarafKaydi = { id: string; user_id: string | null };
+type TarafKaydi = {
+  id: string; user_id: string | null; email: string | null;
+  first_name: string | null; last_name: string | null; company_name: string | null;
+};
 type Profil = { email: string | null; full_name: string | null };
 type IzSatiri = { gerekce: string | null };
 
@@ -231,12 +234,18 @@ serve(async (req: Request): Promise<Response> => {
         const caseDetails = (dosyaSatiri ?? null) as DosyaKunye | null;
 
         /* ALICILAR dosyadan çözülür (`case_sessions`te user_id/mediator_id yok).
-           `user_id`si olmayan taraf atlanır: adres profilden gelir. */
+           ADRES `case_parties.email`ten gelir — `profiles`ten DEĞİL.
+           CANLI ÖLÇÜM (24.08): tarafların çoğunda `user_id` BOŞTUR; taraflar
+           kayıt olmadan token bağlantısıyla katılıyor (`/katilim/:token`).
+           Adresi profile bağlamak neredeyse hiçbir tarafa hatırlatma
+           göndermemek demekti. Kalıp `hazirlik-foyu-gonder:361` ile aynı.
+           Profil yalnız YEDEKTİR: taraf kaydında adres yoksa ve `user_id`
+           varsa oradan bakılır. */
         const { data: taraflar } = await supabase
           .from("case_parties")
-          .select("id, user_id")
+          .select("id, user_id, email, first_name, last_name, company_name")
           .eq("case_id", session.case_id);
-        const tarafListesi = ((taraflar ?? []) as TarafKaydi[]).filter((t) => t?.user_id);
+        const tarafListesi = (taraflar ?? []) as TarafKaydi[];
         const mediatorId = caseDetails?.assigned_mediator_id ?? null;
 
         /* Arabulucunun profili BİR KEZ okunur: hem tarafın e-postasındaki
@@ -269,13 +278,28 @@ serve(async (req: Request): Promise<Response> => {
 
         // ── TARAFLAR ────────────────────────────────────────────────────────
         for (const taraf of tarafListesi) {
-          const { data: profilSatiri } = await supabase
-            .from("profiles")
-            .select("email, full_name")
-            .eq("user_id", taraf.user_id)
-            .maybeSingle();
-          const tarafProfil = (profilSatiri ?? null) as Profil | null;
-          if (!tarafProfil?.email) continue;
+          let tarafEposta = String(taraf.email ?? "").trim();
+          let tarafProfil: Profil | null = null;
+          if (taraf.user_id) {
+            const { data: profilSatiri } = await supabase
+              .from("profiles")
+              .select("email, full_name")
+              .eq("user_id", taraf.user_id)
+              .maybeSingle();
+            tarafProfil = (profilSatiri ?? null) as Profil | null;
+            if (!tarafEposta) tarafEposta = String(tarafProfil?.email ?? "").trim();
+          }
+          if (!tarafEposta) {
+            errors.push(`hatırlatma atlandı — tarafın e-posta adresi yok (${taraf.id})`);
+            continue;
+          }
+          /* Hitap: taraf kaydındaki ad. Kurumsal tarafta unvan kullanılır.
+             Hiçbiri yoksa profil adı, o da yoksa şablonun kendi "there" yedeği. */
+          const tarafAdi =
+            [taraf.first_name, taraf.last_name].filter(Boolean).join(" ").trim()
+            || String(taraf.company_name ?? "").trim()
+            || String(tarafProfil?.full_name ?? "").trim()
+            || null;
 
           const userEmailHtml = `
             <!DOCTYPE html>
@@ -290,7 +314,7 @@ serve(async (req: Request): Promise<Response> => {
               </div>
               
               <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
-                <p style="color: #333; font-size: 16px;">Hello ${tarafProfil.full_name || "there"},</p>
+                <p style="color: #333; font-size: 16px;">Hello ${tarafAdi || "there"},</p>
                 
                 <p style="color: #333; font-size: 16px;">This is a friendly reminder that your mediation session is scheduled for <strong>tomorrow</strong>.</p>
                 
@@ -334,21 +358,25 @@ serve(async (req: Request): Promise<Response> => {
 
           await resend.emails.send({
             from: "MİLAT Arabuluculuk <info@milatmediation.com>",
-            to: [tarafProfil.email],
+            to: [tarafEposta],
             subject: `⏰ Reminder: Your Mediation Session is Tomorrow - ${formattedDate}`,
             html: userEmailHtml,
           });
-          console.log(`Sent reminder to party: ${tarafProfil.email}`);
+          console.log(`Sent reminder to party: ${tarafEposta}`);
           sentCount++;
           buOturumdaGonderilen++;
 
-          await supabase.rpc("create_notification", {
-            p_user_id: taraf.user_id,
-            p_title: "Session Reminder",
-            p_message: `Your mediation session is tomorrow at ${formattedTime}. Please be prepared!`,
-            p_type: "reminder",
-            p_link: `/summary?case=${session.case_id}`,
-          });
+          /* Uygulama içi bildirim KULLANICI kaydı ister; kayıtsız taraf
+             (user_id yok) yalnız e-posta alır. */
+          if (taraf.user_id) {
+            await supabase.rpc("create_notification", {
+              p_user_id: taraf.user_id,
+              p_title: "Session Reminder",
+              p_message: `Your mediation session is tomorrow at ${formattedTime}. Please be prepared!`,
+              p_type: "reminder",
+              p_link: `/summary?case=${session.case_id}`,
+            });
+          }
         }
 
         // ── ARABULUCU ───────────────────────────────────────────────────────

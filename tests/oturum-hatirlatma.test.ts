@@ -40,6 +40,24 @@ describe("oturum hatırlatması — doğru veri kaynağı", () => {
     expect(KAYNAK).not.toContain("session.user_id");
     expect(KAYNAK).not.toContain("session.mediator_id");
   });
+
+  /* CANLI ÖLÇÜM (24.08): tarafların çoğunda `user_id` BOŞTUR — taraflar kayıt
+     olmadan token bağlantısıyla katılıyor. Adres `case_parties.email`tedir.
+     İlk yazımda adresi `profiles`e bağlamıştım; o hâliyle neredeyse hiçbir
+     tarafa hatırlatma gitmezdi. Tezgâh bu gerçeği sabitler. */
+  it("taraf adresi `case_parties.email`ten alınır, profile BAĞLANMAZ", () => {
+    expect(KAYNAK).toContain('.select("id, user_id, email, first_name, last_name, company_name")');
+    // Taraf listesi user_id'ye gore SUZULMEMELI:
+    expect(KAYNAK).not.toContain('.filter((t) => t?.user_id)');
+  });
+
+  it("adresi olmayan taraf sessizce düşmez, sebebi yazılır", () => {
+    expect(KAYNAK).toContain("tarafın e-posta adresi yok");
+  });
+
+  it("uygulama içi bildirim yalnız kayıtlı tarafa yazılır", () => {
+    expect(KAYNAK).toContain("if (taraf.user_id) {");
+  });
 });
 
 describe("hatırlatma penceresi", () => {
