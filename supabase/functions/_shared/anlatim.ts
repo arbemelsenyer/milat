@@ -1338,8 +1338,37 @@ export async function anaAjanaBildir(
   },
 ): Promise<{ yazildi: boolean; sebep: string }> {
   try {
-    // ORTAK SINIR KATMANI: insana giden metin süzgeçten geçer.
-    const guvenli = sinirdanGecir(o.gerekce, `anaAjanaBildir.${o.kaynak}`);
+    /* ORTAK SINIR KATMANI — AMA İŞ ETİKETİ SÜZGEÇTEN GEÇMEZ (24.08.2026 kusuru).
+       Eskiden gerekçenin TAMAMI süzgece giriyordu. Süzgeç elediğinde `sade`
+       yedeği ("Bu konuda size yazabileceğim bir şey bulamadım.") dönüyor ve
+       metnin başındaki İŞ ETİKETİ de siliniyordu. İki sonucu vardı:
+         · MÜKERRER YAZIM KAPISI KÖRELİYORDU: `gorevEtiketiVarMi` etiketi
+           arayarak "bu iş zaten açıldı mı" diye bakar; etiket silinince
+           bulamaz ve nöbetçi aynı görevi her turda yeniden açabilir.
+         · Arabulucu hangi işin ne olduğunu göremiyordu.
+       CANLI KANIT (dosya e7e34dc3, 24.08 01:18): iki `otomatik_analiz` satırı
+       da yalnız yedek cümleye inmiş, iş etiketi YOK.
+       ÇÖZÜM — sınır katmanı GEVŞETİLMEDİ, metin ikiye ayrıldı (aynı çözüm
+       `akis-yurut/hata-metni.ts`te uygulanmıştı, bu geçit atlanmıştı):
+         · Baştaki `[...]` etiketleri KODUN ürettiği dizelerdir; içlerinde taraf
+           verisi bulunması yapısal olarak mümkün değildir → süzgece girmez.
+         · Serbest açıklama taraf verisi taşıyabilir → eskisi gibi süzgeçten
+           geçer; elenirse SESSİZ DÜŞMEZ, hangi türün elediği yazılır. */
+    const ham = String(o.gerekce ?? "").trim();
+    const isEtiketleri = (/^(?:\[[^\]]{0,160}\]\s*)+/.exec(ham) ?? [""])[0].trim();
+    const aciklama = ham.slice(isEtiketleri.length).trim();
+    let govde = "";
+    if (aciklama) {
+      const r = sinirDenetle(aciklama);
+      if (r.gecti) govde = aciklama;
+      else {
+        console.error("[sinir] cümle elendi", {
+          nereden: `anaAjanaBildir.${o.kaynak}`, turler: r.turler,
+        });
+        govde = `Ayrıntı kayda geçmedi (sınır katmanı eledi: ${r.turler.join(", ")}).`;
+      }
+    }
+    const guvenli = `${isEtiketleri} ${govde}`.trim();
     const etiket = `[kaynak:${o.kaynak}]${o.bekleyen ? `[bekleyen:${o.bekleyen}]` : ""}`;
     const temelSatir: Record<string, unknown> = {
       case_id: o.case_id,
