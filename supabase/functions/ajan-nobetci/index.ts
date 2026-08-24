@@ -624,11 +624,19 @@ async function oturumHatirlatmaYurut(admin: any, dosya: any, gerekce: string): P
   if (!m) return { durum: "atlandi", sonuc: "Hatırlatma etiketi okunamadı" };
   const sessionId = m[1];
 
-  const { data: oturum, error: sErr } = await admin.from("case_sessions")
+  /* Okunan satırın yerel tipi: üretilmiş Supabase tipleri Deno tarafında yok,
+     `any` yerine küçük ve açık bir tip yazılır. */
+  type OturumSatiri = {
+    id: string; scheduled_at: string | null; status: string | null;
+    participants: { party_id?: string | null }[] | null;
+    video_link: string | null; session_type: string | null;
+  };
+  const { data: oturumSatiri, error: sErr } = await admin.from("case_sessions")
     .select("id, scheduled_at, status, participants, video_link, session_type").eq("id", sessionId).maybeSingle();
   if (sErr) return { durum: "bekliyor", sonuc: `Oturum okunamadı: ${sErr.message}` };
-  if (!oturum) return { durum: "atlandi", sonuc: "Oturum kaydı bulunamadı" };
-  if (String((oturum as any).status) !== "scheduled") return { durum: "atlandi", sonuc: "Oturum artık planlı değil" };
+  if (!oturumSatiri) return { durum: "atlandi", sonuc: "Oturum kaydı bulunamadı" };
+  const oturum = oturumSatiri as OturumSatiri;
+  if (String(oturum.status) !== "scheduled") return { durum: "atlandi", sonuc: "Oturum artık planlı değil" };
 
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) return { durum: "bekliyor", sonuc: "RESEND_API_KEY yok, hatırlatma gönderilemedi" };
@@ -644,9 +652,9 @@ async function oturumHatirlatmaYurut(admin: any, dosya: any, gerekce: string): P
        · diğer (ortak/ön görüşme) → dosyanın BÜTÜN tarafları. Ortak oturumu
          herkesin bilmesi zaten gerekir; `participants` burada eksik bir
          kayıttır, gizlilik sınırı değildir. */
-  const ozelOturum = String((oturum as any).session_type ?? "") === "private";
-  const katilimciIds = (Array.isArray((oturum as any).participants) ? (oturum as any).participants : [])
-    .map((p: any) => String(p?.party_id ?? "")).filter(Boolean);
+  const ozelOturum = String(oturum.session_type ?? "") === "private";
+  const katilimciIds = (Array.isArray(oturum.participants) ? oturum.participants : [])
+    .map((p) => String(p?.party_id ?? "")).filter(Boolean);
 
   let tarafSorgusu = admin.from("case_parties")
     .select("id, party_type, first_name, last_name, company_name, email");
@@ -658,14 +666,20 @@ async function oturumHatirlatmaYurut(admin: any, dosya: any, gerekce: string): P
   } else {
     tarafSorgusu = tarafSorgusu.eq("case_id", dosya.id);
   }
-  const { data: taraflar } = await tarafSorgusu;
-  if (((taraflar ?? []) as any[]).length === 0) {
+  type TarafSatiri = {
+    id: string; party_type: string | null;
+    first_name: string | null; last_name: string | null;
+    company_name: string | null; email: string | null;
+  };
+  const { data: tarafVerisi } = await tarafSorgusu;
+  const taraflar = (tarafVerisi ?? []) as TarafSatiri[];
+  if (taraflar.length === 0) {
     return { durum: "atlandi", sonuc: "Oturum için alıcı taraf bulunamadı" };
   }
   const { imza, dosyaSatiri } = await imzaBlogu(admin, dosya.id);
-  const { gun, saat } = trGunSaat(String((oturum as any).scheduled_at));
+  const { gun, saat } = trGunSaat(String(oturum.scheduled_at));
   const esc = (t: string) => String(t).replace(/</g, "&lt;");
-  const link = String((oturum as any).video_link ?? "").trim();
+  const link = String(oturum.video_link ?? "").trim();
 
   let gonderilen = 0;
   const hatalar: string[] = [];

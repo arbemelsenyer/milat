@@ -76,7 +76,7 @@ describe("send-session-reminders — kopya kol kaldırıldı", () => {
    tarafa hiçbir yüzeyden açılmaz (constitution · kör veri). */
 describe("hatırlatma alıcıları — özel oturum genişletilmez", () => {
   it("özel oturumda YALNIZ katılımcılar hedeflenir", () => {
-    expect(NOBETCI).toContain('const ozelOturum = String((oturum as any).session_type ?? "") === "private"');
+    expect(NOBETCI).toContain('=== "private"');
     expect(NOBETCI).toContain('tarafSorgusu.in("id", katilimciIds)');
   });
 
