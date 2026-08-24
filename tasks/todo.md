@@ -323,6 +323,44 @@ NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
 
+### KAPANDI — 24.08 · P1 · CRON SIRRI VAULT'A ALINDI, DÜZ METİN KALKTI
+`cron.job.command` içinde sır **düz metin** duruyordu: `cron` şemasını okuyabilen
+herkes görüyor, değer `pg_dump`'a ve yedeklere düşüyordu.
+
+YAPILAN: değer **DEĞİŞTİRİLMEDEN** Vault'a taşındı; altı cron işinin komutu
+çalışma anında `vault.decrypted_secrets`ten okuyacak biçimde yeniden tanımlandı
+(jobid 1 · 2 · 3 · 7 · 9 · 10). Değer aynı kaldığı için edge function ortam
+değişkenine dokunulmadı → **kesinti olmadı**.
+Blok korumalıydı: Vault'tan okunan değer birebir aynı değilse hiçbir cron'a
+dokunmadan duracaktı; ayrıca her iş için "düz metin komutta kaldı mı" denetimi
+yapıldı. Sır hiçbir mesaja, dosyaya ya da commit'e YAZILMADI — değer yalnız
+veritabanının içinde dolaştı.
+
+CANLI DOĞRULAMA (04:33):
+- `cron.job` içinde düz metin sır taşıyan iş sayısı: **0**
+- `vault.secrets` içinde `cron_secret`: **1**
+- 04:33:00 nöbetçi koşumu: **200** → Vault okuması çalışma anında sorunsuz.
+
+### AÇIK — P1 · `CRON_SECRET` DEĞERİNİN YENİLENMESİ (yalnız kurucu yapabilir)
+Vault taşıması **saklama yerini** düzeltti, **değeri** değiştirmedi. Değerin
+yenilenmesi gerekiyor çünkü bu oturumda maskeleme denemem tutmadı ve değer
+oturum dökümüne girdi (ayrıntı aşağıdaki blokta).
+**BUNU BEN YAPAMAM — yapısal sebeple:** yeni değeri ben üretsem ya da okusam
+değer yine benim bağlamıma girer, yani yenileme amacını boşa çıkarır. Yeni
+değeri görmeyen biri üretmelidir.
+RUNBOOK (kurucu · sırayla, kesintisiz):
+1. Yeni bir sır üret (ör. `openssl rand -base64 32`). **Bana gösterme.**
+2. Supabase → Edge Functions → Secrets: `CRON_SECRET` değerini yenisiyle
+   güncelle. (Bu adım tek başına cron'ları 401'e düşürür; hemen 3. adıma geç.)
+3. SQL (tek ifade, cron komutlarına DOKUNMAZ — hepsi zaten Vault'tan okuyor):
+   `select vault.update_secret((select id from vault.secrets where name='cron_secret'), '<YENİ DEĞER>', 'cron_secret', 'Edge function cron kapisi (x-cron-secret)');`
+4. Kontrol: 3 dakika sonra
+   `select status_code, created from net._http_response order by created desc limit 3;`
+   → **200** olmalı. 401 görürsen 2. ve 3. adımdaki değerler tutmuyordur.
+> 2. ve 3. adım arasında en fazla bir nöbetçi turu (3 dk) 401 alır; iş kaybı
+> olmaz, tur yeniden koşar. Komutlar Vault'tan okuduğu için artık yenileme
+> **tek noktadan** yapılır — cron tanımlarına bir daha dokunmak gerekmez.
+
 ### ACİLLEŞTİ — P1 · CRON SIRRI: değer artık oturum dökümünde de var
 Sırrı maskeleyerek okumaya çalıştım; maskem `"x-cron-secret": "..."` JSON
 biçimini hedefliyordu, oysa jobid 3 ve 7 `jsonb_build_object('x-cron-secret',
