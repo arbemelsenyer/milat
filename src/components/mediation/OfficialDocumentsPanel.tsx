@@ -17,6 +17,10 @@ import { downloadOfficialPdf, downloadOfficialDocx, downloadOfficialUdf, officia
 // notuyla kapatılmıştı; şart sağlandı (47 şablon yüklü). Bileşen hep yerinde
 // durdu (src/components/mediation/TaslakDenetimi.tsx), yalnız çağrısı kapalıydı.
 import { TaslakDenetimi } from "@/components/mediation/TaslakDenetimi";
+// ISLAK İMZA KAPISI (HAT H-2, karar A) — imza kaydı yalnız arabulucunun kendi
+// oturumuyla yazılır; ayrı bileşende durur ki çalışan belge üretim yolu (m.8)
+// bu işten etkilenmesin.
+import { AnlasmaImzaPaneli } from "@/components/mediation/AnlasmaImzaPaneli";
 
 interface Props {
   caseRow: any;
@@ -443,6 +447,10 @@ ${paragraphElems.join("\n")}
             <Button size="sm" variant="outline" onClick={() => setError(null)}>Geri Dön</Button>
           </div>
         </div>
+      )}
+
+      {outcome === "anlasma" && (
+        <AnlasmaImzaPaneli caseRow={caseRow} onSigned={() => { void loadVersions(); onOutcomeSaved?.(); }} />
       )}
 
       {setKinds.length > 0 && (
