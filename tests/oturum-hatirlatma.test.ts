@@ -96,3 +96,31 @@ describe("hatırlatma alıcıları — özel oturum genişletilmez", () => {
     expect(NOBETCI).toContain("participants, video_link, session_type");
   });
 });
+
+/* MÜKERRER KAPI SATIR SAYISI ARTINCA KÖRLEŞMEZ (24.08.2026 kusuru)
+   `gorevEtiketiVarMi` `.limit(200)` kullanıyordu ama SIRALAMA YOKTU. Postgres
+   sırasız sorguda hangi 200 satırı döndüreceğini garanti etmez. Bir dosyada
+   aynı tipten 200'den çok satır birikince kapı YENİ satırları hiç görmüyor ve
+   her turda bir tane daha yazıyor — kendini besleyen döngü.
+   CANLI KANIT (24.08 04:27, dosya eb70595a): `oturum_hatirlatma` tipinde
+   411 satır, yalnız 62'si etiketli; nöbetçi 3 dakikada bir yenisini yazıyordu. */
+describe("mükerrer yazım kapısı — ölçekte körleşmez", () => {
+  it("sorgu sunucu tarafında etiketle DARALTILIR", () => {
+    expect(NOBETCI).toContain('.like("gerekce", `%${etiket}%`)');
+  });
+
+  it("sonuç en yeniden eskiye sıralanır", () => {
+    expect(NOBETCI).toContain('.order("created_at", { ascending: false })');
+  });
+
+  it("JS tarafı kesinleştirme KALIR (21.08 gerekçesi korunur)", () => {
+    expect(NOBETCI).toContain('String(r?.gerekce ?? "").includes(etiket)');
+  });
+
+  it("sırasız geniş tarama kalmadı", () => {
+    const satir = NOBETCI.split(/\r?\n/)
+      .find((l) => l.includes('.eq("gorev_tipi", gorevTipi)'));
+    expect(satir, "kapı sorgusu bulunamadı").toBeTruthy();
+    expect(satir!.includes("limit(200)")).toBe(false);
+  });
+});

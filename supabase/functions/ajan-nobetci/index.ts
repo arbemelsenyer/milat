@@ -144,9 +144,28 @@ function metin(v: unknown): string {
    aynı görevi her turda yeniden yazabiliyordu.
    includes hem eski (etiketle başlayan) hem yeni (etiketi içeren) satırları
    bulur; kapı yalnızca daralır, hiçbir satırı gözden kaçırmaz. */
+/* ONARIM (24.08.2026) — KAPI SATIR SAYISI ARTINCA KÖRLEŞİYORDU.
+   Sorgu `.limit(200)` kullanıyordu ama SIRALAMA YOKTU. Postgres sırasız
+   sorguda hangi 200 satırı döndüreceğini garanti etmez (pratikte en eskiler
+   gelir). Bir dosyada aynı tipten 200'den çok satır birikince kapı artık
+   YENİ satırları hiç görmüyor ve her turda bir tane daha yazıyor —
+   kendini besleyen bir döngü.
+   CANLI KANIT (24.08 04:27, dosya eb70595a): `oturum_hatirlatma` tipinde
+   **411 satır**, yalnız 62'si etiketli; nöbetçi 3 dakikada bir yenisini
+   yazmayı sürdürüyordu.
+   ÇÖZÜM iki katmanlı:
+     1. Sunucu tarafında `like` ile DARALT — satır sayısından bağımsız çalışır.
+     2. JS tarafında `includes` ile KESİNLEŞTİR — 21.08 notunun gerekçesi
+        korunur (köşeli parantez sorgu diline karışırsa `like` yanlış eşleyebilir;
+        `includes` son sözü söyler). En kötü hâlde `like` bulamaz ve eski
+        davranışa dönülür; yanlış pozitif üretmez.
+   Ayrıca en yeniden eskiye sıralanır: kapı her zaman güncel satırları görür. */
 async function gorevEtiketiVarMi(admin: any, caseId: string, gorevTipi: string, etiket: string): Promise<boolean> {
   const { data } = await admin.from("ajan_gorevleri")
-    .select("id, gerekce").eq("case_id", caseId).eq("gorev_tipi", gorevTipi).limit(200);
+    .select("id, gerekce").eq("case_id", caseId).eq("gorev_tipi", gorevTipi)
+    .like("gerekce", `%${etiket}%`)
+    .order("created_at", { ascending: false })
+    .limit(50);
   return ((data ?? []) as any[]).some((r) => String(r?.gerekce ?? "").includes(etiket));
 }
 
