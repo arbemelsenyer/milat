@@ -7,7 +7,7 @@
 // içindeki "yapilmayanlar" listesine zaman damgasıyla yazılır (Ajan Paneli okur).
 // Güvenlik deseni check-new-tariff ile aynı: x-cron-secret veya admin JWT; yoksa 401.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { sinirdanGecir, anaAjanaBildir } from "../_shared/anlatim.ts";
+import { sinirdanGecir, anaAjanaBildir, etiketleriAyir } from "../_shared/anlatim.ts";
 
 /* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
    Taraf kendi ekranından bildirim sıklığını ve sessiz saatlerini belirler
@@ -561,7 +561,16 @@ async function asamaGecisiGoreviAc(admin: any, dosya: any): Promise<{ acildi: bo
 
 // asama_gecisi yürütücüsü: cases.current_phase yalnız İLERİ yazılır.
 async function asamaGecisiYurut(admin: any, caseId: string, gerekce: string): Promise<{ durum: string; sonuc: string }> {
-  const m = /^\[gecis:(\d+)->(\d+)\]/.exec(String(gerekce ?? ""));
+  /* ONARIM (24.08.2026) — ÇAPA KALDIRILDI. Desen `^\[gecis:…\]` ile satır
+     başına çapalıydı; oysa görev `anaAjanaBildir` geçidinden yazılıyor ve geçit
+     gerekçenin BAŞINA `[kaynak:…]` koyuyor. Geçit 21.08 11:06'da devreye girdi;
+     o tarihten sonra açılan HER görev bu ön eki taşıyor (canlıda 421 satır).
+     Yani bu yürütücü o tarihten beri hiçbir görevi çalıştıramazdı — otomatik
+     aşama ilerletme sessizce durmuş olurdu. Henüz o tipte yeni görev açılmadığı
+     için canlıya yansımamıştı; kusur GİZLİYDİ.
+     Aynı sınıf: `oturumHatirlatmaYurut` (canlıda görüldü) ve
+     `teklifDegerlendirYurut` (bu turda birlikte düzeltildi). */
+  const m = /\[gecis:(\d+)->(\d+)\]/.exec(String(gerekce ?? ""));
   if (!m) return { durum: "atlandi", sonuc: "Geçiş etiketi okunamadı" };
   const kaynak = Number(m[1]);
   const hedef = Number(m[2]);
@@ -958,7 +967,9 @@ async function teklifDegerlendirGorevleriAc(admin: any, dosya: any): Promise<{ a
 type TeklifSonuc = { durum: string; sonuc: string; otomatikOnay?: boolean; alternatif?: boolean };
 
 async function teklifDegerlendirYurut(admin: any, dosya: any, gerekce: string, partyId: string): Promise<TeklifSonuc> {
-  const m = /^\[teklif:([0-9a-f-]+)\]/i.exec(String(gerekce ?? ""));
+  // ONARIM (24.08.2026) — ÇAPA KALDIRILDI; gerekçe `[kaynak:…]` ile başlıyor.
+  // Ayrıntı: `asamaGecisiYurut` başındaki not.
+  const m = /\[teklif:([0-9a-f-]+)\]/i.exec(String(gerekce ?? ""));
   if (!m) return { durum: "atlandi", sonuc: "Teklif etiketi okunamadı" };
   const teklifId = m[1];
 
@@ -1228,7 +1239,13 @@ async function soruHatirlatmaKollari(
     if (!Number.isFinite(son) || simdi - son < araSaat * 3_600_000) continue;
 
     const sayi = hatirlatmaSayisi(soru.sonuc) + 1;
-    const metinGovde = metin(soru.gerekce).replace(/^\[[^\]]*\]\s*/g, "").replace(/^\[[^\]]*\]\s*/g, "");
+    /* ONARIM (24.08.2026) — ETİKET TEMİZLİĞİ SAYIYA DEĞİL, TÜKENMEYE DAYANIR.
+       Eskiden baştaki etiket TAM İKİ KEZ siliniyordu. Ama gerekçe artık üç
+       etiketle başlıyor: `[kaynak:…][bekleyen:…] [eksik:…]` (ve bazen
+       `[kol:…]`). İki silme yetmiyordu ve TARAFA GİDEN e-posta gövdesi
+       `[eksik:…] [kol:…]` gibi İÇ ETİKETLERLE başlıyordu.
+       `etiketleriAyir` baştaki bütün grupları tüketir — sayıya bağlı değildir. */
+    const metinGovde = etiketleriAyir(metin(soru.gerekce)).govde;
 
     // Tarafa gidecekse e-posta mevcut süzgeçten geçer; arabulucu sorusunda
     // e-posta gönderilmez, hatırlatma sohbette görünür.
