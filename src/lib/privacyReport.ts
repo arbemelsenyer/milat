@@ -4,7 +4,11 @@ import autoTable from "jspdf-autotable";
 export type PrivacyResultRow = {
   name: string;
   description: string;
-  status: "pass" | "fail" | "pending";
+  /* "belirsiz" (24.08.2026): yoklama koşuldu ama sonucu ANLAMLI DEĞİL.
+     Tek durumu: oturum YÖNETİCİ. Yönetici RLS'i tasarım gereği aşar, yani her
+     yoklama "sızıntı" görür. Bunu "başarısız" saymak yanlış alarmdır; ayrı bir
+     durum olarak anlatılır. */
+  status: "pass" | "fail" | "pending" | "belirsiz";
   detail?: string;
 };
 
@@ -43,14 +47,22 @@ export function generatePrivacyReportPdf(run: PrivacyRun): jsPDF {
   doc.text(`Çalıştırma: ${new Date(run.ranAt).toLocaleString("tr-TR")}`, 14, 26);
   if (run.userEmail) doc.text(`Çalıştıran: ${run.userEmail}`, 14, 32);
   doc.setTextColor(0);
-  doc.text(`Toplam: ${run.results.length}   Geçti: ${passed}   Başarısız: ${failed}`, 14, 40);
+  const belirsiz = run.results.filter((r) => r.status === "belirsiz").length;
+  doc.text(
+    `Toplam: ${run.results.length}   Geçti: ${passed}   Başarısız: ${failed}` +
+      (belirsiz ? `   Belirsiz: ${belirsiz} (yönetici oturumu)` : ""),
+    14, 40,
+  );
 
   autoTable(doc, {
     startY: 46,
     head: [["Test", "Durum", "Açıklama / Detay"]],
     body: run.results.map((r) => [
       r.name,
-      r.status === "pass" ? "GEÇTİ" : r.status === "fail" ? "BAŞARISIZ" : "BEKLİYOR",
+      r.status === "pass" ? "GEÇTİ"
+        : r.status === "fail" ? "BAŞARISIZ"
+        : r.status === "belirsiz" ? "BELİRSİZ"
+        : "BEKLİYOR",
       `${r.description}${r.detail ? `\n\n${r.detail}` : ""}`,
     ]),
     styles: { fontSize: 9, cellPadding: 3, valign: "top" },

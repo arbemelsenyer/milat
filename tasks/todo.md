@@ -347,6 +347,36 @@ NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
 
+### KAPANDI — 24.08 · P1 · GİZLİLİK EKRANI YÖNETİCİ OTURUMUNDA ANLAMSIZDI
+Kapsamı genişlettikten sonra ekranı **canlıda koşturdum** — ve asıl kusur orada
+çıktı.
+
+İki şey aynı anda doğruydu:
+- Sayfa **yalnız yöneticiye** açıktı (`if (!isAdmin) … "yalnızca yöneticilere açıktır"`).
+- **Yönetici RLS'i tasarım gereği aşar** → her yoklama "sızıntı" görür.
+
+Yani ekran amacını **yapısal olarak** yerine getiremiyordu: tek izinli
+kitlesi için sonucu her zaman yanlış.
+
+**CANLI KANIT (yönetici oturumu):** 12 yoklama koştu →
+**Geçti 5 · Başarısız 7**. Yedisi de **yanlış alarmdı.**
+
+> Bu, bugünkü gerçek storage sızıntısının neden fark edilmediğini de açıklıyor:
+> ekran zaten kırmızı yanıyordu, yeni bir kırmızı dikkat çekmezdi.
+
+DÜZELTME:
+- **Kapı açıldı.** Sayfa artık oturum açmış her kullanıcıya görünür. Güvenlik
+  genişlemesi YOK: sayfa yalnız kullanıcının **zaten koşabileceği** sorguları
+  koşar, yeni hiçbir veri açmaz.
+- **Yeni durum: `belirsiz`.** Yönetici oturumunda her yoklama "başarısız" değil
+  **BELİRSİZ** işaretlenir ve sebebi yazılır: *"Yönetici RLS'i tasarım gereği
+  aşar… gerçek doğrulama için TARAF hesabıyla giriş yapın."*
+- Ekrana uyarı bandı, özete "Belirsiz" rozeti, PDF raporuna hem satır durumu
+  hem özet sayısı eklendi.
+
+Tezgâh (`tests/gizlilik-ekrani-belirsiz.test.ts`, 10 durum) **kanıtlandı**:
+kusur geri getirilip koşuldu → 9 test düştü. Toplam **169/169**.
+
 ### KAPANDI — 24.08 · P1 · GİZLİLİK TEZGÂHININ KAPSAM BOŞLUĞU
 Bugünkü storage sızıntısı **neden fark edilmedi** diye tezgâha baktım.
 `privacy-leak-suite` ürünün kör veri vaadini koruyan tezgâhtır ve yalnız

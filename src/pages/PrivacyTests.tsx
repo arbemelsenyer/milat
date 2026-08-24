@@ -16,6 +16,13 @@ import {
   type PrivacyRun,
 } from "@/lib/privacyReport";
 
+/* Yönetici oturumunda her yoklamanın altına düşen açıklama. Yönetici RLS'i
+   tasarım gereği aşar; sonucu "başarısız" saymak yanlış alarm olurdu. */
+const YONETICI_NOTU =
+  "BELİRSİZ — yönetici oturumu. Yönetici RLS'i tasarım gereği aşar, bu yüzden " +
+  "yoklama anlamlı sonuç veremez. Gerçek doğrulama için TARAF hesabıyla giriş " +
+  "yapıp bu sayfayı yeniden çalıştırın.";
+
 export default function PrivacyTests() {
   const { user, isLoading, isAdmin } = useAuth();
   const [results, setResults] = useState<PrivacyResultRow[]>([]);
@@ -26,17 +33,17 @@ export default function PrivacyTests() {
     setLastRun(loadLastRun());
   }, []);
 
+  /* KAPI AÇILDI (24.08.2026) — ekran yalnız YÖNETİCİYE açıktı ve bu onu
+     yapısal olarak işe yaramaz kılıyordu: yönetici RLS'i tasarım gereği aşar,
+     yani her yoklama "sızıntı" görür. Canlıda koşuldu: 12 yoklamanın 7'si
+     "başarısız" çıktı — hepsi yanlış alarmdı.
+     Ekranın amacı "Taraf A, Taraf B'nin verisini okuyamıyor mu?" sorusunu
+     yanıtlamaktır; bu ancak TARAF oturumunda anlamlıdır.
+     Güvenlik açısından genişleme YOK: sayfa yalnız kullanıcının zaten
+     koşabileceği sorguları koşar, yeni hiçbir veri açmaz. Yönetici oturumunda
+     sonuçlar "belirsiz" olarak işaretlenir (aşağıda). */
   if (isLoading) return null;
   if (!user) return <Navigate to="/auth" replace />;
-  if (!isAdmin)
-    return (
-      <div className="min-h-screen bg-background">
-        <AppNavbar />
-        <main className="container max-w-3xl py-8 px-4">
-          <Card className="p-6">Bu sayfa yalnızca yöneticilere açıktır.</Card>
-        </main>
-      </div>
-    );
 
   const run = async () => {
     setRunning(true);
@@ -65,9 +72,10 @@ export default function PrivacyTests() {
       next.push({
         name: q.name,
         description: q.description,
-        status: leaks === 0 && !error ? "pass" : "fail",
-        detail:
-          leaks === 0
+        status: isAdmin ? "belirsiz" : (leaks === 0 && !error ? "pass" : "fail"),
+        detail: isAdmin
+          ? YONETICI_NOTU
+          : leaks === 0
             ? `OK — sızıntı yok (${(data ?? []).length} satır döndü, hepsi yetkili).`
             : `SIZINTI: ${leaks} yetkisiz satır görüldü.`,
       });
@@ -102,10 +110,12 @@ export default function PrivacyTests() {
         next.push({
           name: DEPO_YOKLAMASI.name,
           description: DEPO_YOKLAMASI.description,
-          status: depoSizintisiVarMi(indirmeBasarili) ? "fail" : "pass",
-          detail: indirmeBasarili
-            ? "SIZINTI: başkasının yüklediği dosya indirilebildi."
-            : "OK — dosya indirilemedi, kova politikası dar.",
+          status: isAdmin ? "belirsiz" : (depoSizintisiVarMi(indirmeBasarili) ? "fail" : "pass"),
+          detail: isAdmin
+            ? YONETICI_NOTU
+            : indirmeBasarili
+              ? "SIZINTI: başkasının yüklediği dosya indirilebildi."
+              : "OK — dosya indirilemedi, kova politikası dar.",
         });
       }
     }
@@ -160,6 +170,7 @@ export default function PrivacyTests() {
   const view = results.length > 0 ? results : lastRun?.results ?? [];
   const passed = view.filter((r) => r.status === "pass").length;
   const failed = view.filter((r) => r.status === "fail").length;
+  const belirsiz = view.filter((r) => r.status === "belirsiz").length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -170,6 +181,15 @@ export default function PrivacyTests() {
             <h1 className="text-2xl font-display font-semibold">Gizlilik Test Paketi</h1>
             <p className="text-sm text-muted-foreground">
               Taraf A verilerinin Taraf B tarafından okunamadığını canlı sorgularla doğrular.
+              {isAdmin && (
+                <span className="mt-2 block rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-900 dark:text-amber-200">
+                  <strong>Yönetici oturumundasınız.</strong> Yönetici satır düzeyi
+                  güvenliği tasarım gereği aşar; bu yüzden yoklamalar anlamlı bir
+                  sonuç veremez ve <strong>BELİRSİZ</strong> olarak işaretlenir.
+                  Gerçek doğrulama için bir <strong>taraf hesabıyla</strong> giriş
+                  yapıp bu sayfayı yeniden çalıştırın.
+                </span>
+              )}
             </p>
           </div>
           <Button onClick={run} disabled={running}>
@@ -195,6 +215,9 @@ export default function PrivacyTests() {
         )}
 
         <div className="flex gap-3 mb-4">
+          {belirsiz > 0 && (
+            <Badge variant="outline" className="gap-1">Belirsiz: {belirsiz}</Badge>
+          )}
           <Badge variant="default" className="gap-1"><ShieldCheck className="h-3 w-3" /> Geçti: {passed}</Badge>
           <Badge variant={failed > 0 ? "destructive" : "outline"} className="gap-1">
             <ShieldAlert className="h-3 w-3" /> Başarısız: {failed}
@@ -217,10 +240,15 @@ export default function PrivacyTests() {
                 </div>
                 <Badge
                   variant={
-                    r.status === "pass" ? "default" : r.status === "fail" ? "destructive" : "outline"
+                    r.status === "pass" ? "default"
+                      : r.status === "fail" ? "destructive"
+                      : "outline"
                   }
                 >
-                  {r.status === "pass" ? "GEÇTİ" : r.status === "fail" ? "BAŞARISIZ" : "Bekliyor"}
+                  {r.status === "pass" ? "GEÇTİ"
+                    : r.status === "fail" ? "BAŞARISIZ"
+                    : r.status === "belirsiz" ? "BELİRSİZ"
+                    : "Bekliyor"}
                 </Badge>
               </div>
             </Card>
