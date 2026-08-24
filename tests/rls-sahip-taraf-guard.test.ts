@@ -15,12 +15,21 @@ import { join } from "node:path";
    yetkisi verilmez. Dosya yönetimi (cases, case_parties, case_documents)
    SAHİPTE KALIR — self-servis akış çalışmaya devam eder.
 
+   H-6 · KARAR B (24.08): belirsiz öbeğin tamamı da guard'a alındı; dosya
+   yönetimi (case_parties ekleme/silme, cases_private_keys, cases_vector_pool)
+   sahipte KALDI. Canlı ölçüm: dar politika 25 · kalan geniş 6 (tam olarak
+   dokunulmayacak öbek) · sahip 9/9 yetkili · erişimi değişen dosya 0.
+
    Bu tezgâh migration kaynağını denetler: guard tanımı duruyor mu, hangi
    tablolara uygulanmış, ve dosya yönetimi tabloları YANLIŞLIKLA daraltılmış mı.
    (Canlı davranış ayrıca ölçüldü: erişimi değişen dosya 0, sahip 9/9 yetkili,
    guard sahiplik yarısı zorla true yapıldığında bile false dönüyor.) */
 
-const MIG_DIZIN = "supabase/migrations";
+/* Kaynak dizin dışarıdan verilebilir. Sebebi: `supabase/migrations/**` artık
+   .claude/settings.json ile yazmaya kapalı; bu tezgâhın "kusur geri gelirse
+   düşüyor mu" kanıtı ancak guard'ı sökülmüş bir KOPYA üzerinde alınabilir.
+   Kanıt koşumu: MIG_DIZIN=tests/gecici/mig-kanit npx vitest run <bu dosya> */
+const MIG_DIZIN = process.env.MIG_DIZIN ?? "supabase/migrations";
 
 const HEPSI = readdirSync(MIG_DIZIN)
   .map((f) => readFileSync(join(MIG_DIZIN, f), "utf-8"))
@@ -49,8 +58,8 @@ function tablonunBloklari(tablo: string): PolitikaBloku[] {
   return BLOKLAR.filter((b) => b.tablo === tablo);
 }
 
-/** Guard'ın uygulandığı tablolar — kararın kapsamı (A seçeneği + belgeli 6.). */
-const KAPSAM = [
+/** A kararının ilk kapsamı (taraf-gizli beş tablo + belgeli 6.). */
+const KAPSAM_A = [
   "oturum_hazirlik_foyleri",
   "oturum_kayitlari",
   "taraf_kalemleri",
@@ -58,6 +67,37 @@ const KAPSAM = [
   "bilirkisi_taraf_yanitlari",
   "kayit_onaylari",
 ];
+
+/* H-6 · KARAR B (kurucu, 24.08) — Code'un önerisi A'ydı; kurucu gerekçeyle
+   ayrıldı: ölçüt "tablo `party_id` taşıyor mu" değil, "bu yüzey ARABULUCUYA
+   mı ait" olmalı. Belirsiz öbeğin 13'ü doğası gereği MEDIATOR_ONLY'dir ve
+   bir tarafın bunları görmesi karşı taraf sızıntısı olmasa da
+   arabulucu-özel yüzeyin tarafa açılmasıdır (constitution m.1 · mimari §14).
+   A'nın açık bıraktığı 13 yüzey, kapattığı 4'ten daha riskliydi. */
+const KAPSAM_B = [
+  "ajan_bellek",
+  "ajan_deneyim",
+  "ajan_kosum_izi",
+  "ajan_onerileri",
+  "akis_duraklatma",
+  "akis_olaylari",
+  "arabulucu_talimatlari",
+  "bilirkisi_evrak_kumesi",
+  "bilirkisi_onerileri",
+  "bilirkisi_raporlari",
+  "dosya_kapanis",
+  "elverislilik_kontrol",
+  "foy_gonderim_kayitlari",
+  "iletisim_degisim",
+  "kayit_onay_talepleri",
+  "usul_engelleri",
+  "usul_onerileri",
+  // Taramada sonradan çıkan ikisi — ikisi de arabulucu-özel yüzey.
+  "arabulucu_kontrol_tercihleri",
+  "case_party_invites",
+];
+
+const KAPSAM = [...KAPSAM_A, ...KAPSAM_B];
 
 /** Dosya yönetimi — A kararı gereği sahipte KALMALI, daraltılmamalı. */
 const DOKUNULMAYACAK = ["cases_private_keys", "cases_vector_pool"];
@@ -102,7 +142,22 @@ describe("kapsam — taraf-gizli tablolar guard'a alınmış", () => {
   });
 });
 
-describe("dosya yönetimi sahipte kaldı (A kararının şartı)", () => {
+describe("kapsam sayısı — sessiz daralma/gevşeme olmasın", () => {
+  it("guard'a alınan tablo sayısı 25 politika kadar (A: 6 · B: 19)", () => {
+    expect(KAPSAM_A.length).toBe(6);
+    expect(KAPSAM_B.length).toBe(19);
+    const guardli = new Set(
+      BLOKLAR.filter((b) => b.govde.includes("is_case_owner_not_party")).map((b) => b.tablo),
+    );
+    // Migration kaynağında guard kullanan HER tablo listede olmalı; yeni bir
+    // tablo guard'a alınıp buraya yazılmazsa bu test onu yakalar.
+    for (const tablo of guardli) {
+      expect(KAPSAM, `${tablo} guard kullanıyor ama tezgâh listesinde yok`).toContain(tablo);
+    }
+  });
+});
+
+describe("dosya yönetimi sahipte kaldı (A ve B kararlarının ortak şartı)", () => {
   for (const tablo of [...DOKUNULMAYACAK, "case_parties", "cases", "case_documents"]) {
     it(`${tablo} guard'a alınmadı`, () => {
       const guardli = tablonunBloklari(tablo).filter((b) => b.govde.includes("is_case_owner_not_party"));
