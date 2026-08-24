@@ -488,3 +488,25 @@ körleşir, körleştikçe daha çok yazar. Canlıda 411 satıra çıkmıştı.
 2. Bir kusuru düzelttikten sonra **birikmiş sonucuna** da bak. Etiket silinmesi
    kusurunu düzeltmek yetmedi; onun ürettiği 349 çöp satır kapıyı zaten
    boğmuştu. "Kod düzeldi" ile "canlı düzeldi" ayrı şeylerdir.
+
+## 24.08.2026 — Bir "sözleşme değişikliği" bütün okuyucuları kırar; hepsini tara
+
+`anaAjanaBildir` geçidi 21.08 11:06'da `gerekce`nin başına `[kaynak:…]` koymaya
+başladı. Bu tek satırlık değişiklik, gerekçeyi okuyan HER yeri sessizce kırdı.
+Canlı sayım: geçitten sonra yazılan 421 görevin hepsi ön eki taşıyor.
+
+Kırılanlar (dört ayrı taramada bulundu, her tarama bir öncekinin kaçırdığını):
+1. `akis-yurut` hata metni (23.08'de düzeltildi)
+2. `anaAjanaBildir` ve `eksigiSor` — etiketi süzgeç yiyordu
+3. Nöbetçi: `oturumHatirlatmaYurut` · `asamaGecisiYurut` · `teklifDegerlendirYurut`
+   — üçü de `^` ile çapalı
+4. Ön yüz: `CaseRoom` "Ajanım" paneli (tarafa iç etiket + ham UUID gösteriyordu)
+   ve `AjanPenceresi` zaman çizelgesi (aşama geçişleri sessizce kayboluyordu)
+
+KURAL: paylaşılan bir alanın BİÇİMİNİ değiştiriyorsan (ön ek, ayraç, sıra),
+o alanı OKUYAN her yeri aynı turda tara. Somut arama, alanın adıyla:
+`grep -rn "gerekce" src/ supabase/functions/ | grep -E "exec\(|match\(|startsWith|replace\(|slice\("`
+Yazan tarafı düzeltmek yetmez; sözleşmenin iki ucu vardır.
+
+İKİNCİ KURAL: çapalı desen (`/^\[…\]/`) paylaşılan bir alanda kırılgandır.
+Etiket metnin İÇİNDE aranmalı. Bu oturumda aynı hata altı ayrı yerde çıktı.

@@ -4,7 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok — yarım iş yok
 - Son tamamlanan iş: cron sırrı Vault'a alındı (`a92d488`); oturum hatırlatma zinciri uçtan uca çalışıyor
-- Doğrulama sonucu: `npm run test` **101/101** · tsc hatasız · build hatasız · lint **2354** (oturum başı 2361)
+- Doğrulama sonucu: `npm run test` **123/123** · tsc hatasız · build hatasız · lint **2358** (oturum başı 2361)
 - **CANLI SAĞLIK (04:35):** son 30 dk'da **10 yanıt, hepsi 200** · hatalı 0 · zaman aşımı 0
   · işlenmemiş olay 0 · son 6 saatte `akis_hatasi` 0 · `closed_at` boş kapalı dosya 0
 - Açık blokaj: **yok**
@@ -327,6 +327,70 @@ Yani düğme artık adının söylediği işi yapıyor ve sunucuya iz bırakıyo
 NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
+
+### KAPANDI — 24.08 · P1 · AYNI SINIF ÖN YÜZDE DE VARDI (`b53f796`, publish)
+Arka uçtaki üç çapalı okuyucuyu düzelttikten sonra **aynı sınıfı ön yüzde de
+taradım.** Üç yer çıktı; biri canlı ve doğrudan **tarafa görünür**.
+
+**(1) CANLI · `CaseRoom.tsx` "Ajanım" paneli — tarafın kendi ekranı. İki kusur:**
+- Baştaki etiket **tek kez** siliniyordu. Geçit `[kaynak:…]` eklemeye başlayınca
+  (21.08 11:06) üç etiket oldu.
+- `sonuc` gövdenin **önüne** geçiyordu; `sonuc` iç muhasebedir.
+
+CANLI KANIT — bekleyen dört `taraf_sorusu` satırında tarafın gördüğü:
+| alan | değer |
+|---|---|
+| `sonuc` dolu → gösterilen | `son hatırlatma: 2026-08-23T11:09:03.883Z (1. hatırlatma)` |
+| `sonuc` boş olsaydı | `[bekleyen:taraf_cevabi] [eksik:bilirkisi-onay:55dd060f-…] [kol:bilirkisi-sorulari] Dosyada teknik inceleme gündemde…` |
+
+Yani taraf ya iç zaman damgası ya üç iç etiket + **ham UUID** görüyordu;
+**sorunun kendisini hiçbir hâlde temiz görmüyordu.** Sıra çevrildi: önce temiz
+gövde, gövde boşsa `sonuc`.
+
+**(2) GİZLİ · `AjanPenceresi` zaman çizelgesi** — `/^\[gecis:…\]` çapalıydı ve
+`if (!m) continue` diyordu. Nöbetçinin açtığı aşama geçişleri çizelgede
+**sessizce görünmüyordu**.
+
+**(3) AYNI SINIF · `/^\[akis:…\]`** — bugün kırık değil (akış satırları geçitten
+geçmiyor), ama aynı kırılganlık; çapası kaldırıldı.
+
+KOPYA YÖNETİMİ: `src/lib/etiket.ts` açıldı. Aynı işlev `_shared/anlatim.ts`te
+zaten var ama orası Deno tarafı, Vite paketine giremez — kopya **zorunlu**.
+`tests/etiket-ayirici-esitlik.test.ts` iki sürümün **aynı** sonucu verdiğini
+10 örnek üzerinde sabitliyor; sapma olursa tezgâh düşer.
+
+> Bu, geçit ön eki kusurunun **dördüncü** taraması. Sırayla: koşucu (23.08) →
+> `anaAjanaBildir` + `eksigiSor` (24.08) → nöbetçi üç okuyucu (24.08) → ön yüz
+> üç okuyucu (24.08). Her tarama bir öncekinin kaçırdığını buldu.
+
+### KAPANDI — 24.08 · P1 · GEÇİT ÖN EKİ ÜÇ OKUYUCUYU DAHA KIRIYORDU (`b4bc3c6`)
+Bir önceki turda `oturumHatirlatmaYurut`un çapalı deseni düzeltilmişti. Dersi
+uyguladım ve **aynı sınıfı taradım** — üç yer daha çıktı.
+
+ÖLÇÜM: `anaAjanaBildir` geçidi gerekçenin başına `[kaynak:…]` koyuyor ve geçit
+**21.08 11:06**'da devreye girdi. Canlı sayım: o tarihten sonra yazılan
+**421 görevin hepsi** bu ön eki taşıyor, öncesindeki **123 görev** taşımıyor.
+Yani iş etiketini `^` ile satır başına çapalı arayan her yürütücü 21.08'den beri
+hiçbir görevi çalıştıramaz.
+
+| yer | sonuç | durum |
+|---|---|---|
+| `asamaGecisiYurut` | otomatik aşama ilerletme sessizce durur | **gizli** — en son başarılı koşum 19.08 (geçit öncesi) |
+| `teklifDegerlendirYurut` | teklif değerlendirmesi sessizce durur | **gizli** — en son başarılı koşum 19.08 |
+| hatırlatma e-postası gövdesi | **tarafa giden metin iç etiketle başlıyordu** | **CANLI** |
+
+Üçüncüsü en görünür olanı: gövdedeki etiketler **tam iki kez** siliniyordu.
+Gerekçe artık üç etiketle başlıyor (`[kaynak:…][bekleyen:…] [eksik:…]`, bazen
+`[kol:…]`), iki silme yetmiyordu ve taraf `[eksik:…] [kol:…]` ile başlayan bir
+e-posta alıyordu. `etiketleriAyir` ile baştaki bütün gruplar tüketiliyor —
+sayıya bağlı değil. Ortak yardımcı kullanıldı, yeni kopya yazılmadı.
+
+TEZGÂH GÜÇLÜ BİR DEĞİŞMEZE BAĞLANDI: *gerekçeden etiket okuyan hiçbir desen
+çapalı olmayacak.* Böylece dördüncü bir okuyucu eklenirse tezgâh yakalar.
+
+> DERS (üçüncü kez doğrulandı): bir kusur sınıfı bulununca **sınıfın tamamını
+> tara.** Bu turda tarama tek grep'ti (`/^\[` deseni) ve üç kusur çıkardı —
+> ikisi henüz canlıya yansımamış, biri tarafa görünür durumdaydı.
 
 ### KAPANDI — 24.08 · P1 · CRON SIRRI VAULT'A ALINDI, DÜZ METİN KALKTI
 `cron.job.command` içinde sır **düz metin** duruyordu: `cron` şemasını okuyabilen
