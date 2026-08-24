@@ -3,10 +3,10 @@
 - Tarih: 24.08.2026 (gece oturumu · 5. blok · KAPANIŞ)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok — yarım iş yok
-- Son tamamlanan iş: cron sırrı Vault'a alındı (`a92d488`); oturum hatırlatma zinciri uçtan uca çalışıyor
+- Son tamamlanan iş: bütün mükerrer yazım kapıları ortak kalıba alındı (`ba1585e`, canlı 200)
 - Doğrulama sonucu: `npm run test` **133/133** · tsc hatasız · build hatasız · lint **2358** (oturum başı 2361)
-- **CANLI SAĞLIK (04:35):** son 30 dk'da **10 yanıt, hepsi 200** · hatalı 0 · zaman aşımı 0
-  · işlenmemiş olay 0 · son 6 saatte `akis_hatasi` 0 · `closed_at` boş kapalı dosya 0
+- **CANLI SAĞLIK (07:11):** deploy sonrası koşumların hepsi **200** · hatalı 0
+  · işlenmemiş olay 0 · yeni `akis_hatasi` 0 · kapılar tutuyor (yeni mükerrer görev satırı 0)
 - Açık blokaj: **yok**
 - Sıradaki uygulanabilir iş: kurucu kararı bekleyen üç madde (aşağıda); teknik kuyruk boş
 
@@ -327,6 +327,32 @@ Yani düğme artık adının söylediği işi yapıyor ve sunucuya iz bırakıyo
 NOT: test dosyası aşama 4'te bırakıldı; geri alma yalnız ileri giden
 `bumpPhase` ile mümkün değil ve dosya zaten farazi testtir. İz satırı ne
 olduğunu açıkça yazıyor.
+
+### DENETİM — 24.08 · "TERK EDİLMİŞ KAYNAĞA SORGU" SINIFI TARANDI (TEMİZ ÇIKTI)
+Hatırlatma P0'ının kök nedeni "canlıda boş olan tabloyu okuma"ydı. Aynı sınıf
+sistematik tarandı; **yeni kusur çıkmadı** — bu da bir sonuçtur, riski sınırlar.
+
+YÖNTEM: edge function'ların dokunduğu **69 tablo** çıkarıldı, `pg_stat_user_tables`
+ile canlı satır sayıları alındı, **16 boş tablo** bulundu. Boş olmak kusur
+değildir (özellik henüz kullanılmamış olabilir); kusur imzası **"okunuyor ama
+hiç yazılmıyor"**dur. O ayrım için sonda yazıldı (`tests/gecici/inceleme.mjs`).
+
+Sonda dört tablo işaretledi; **üçü sonda artefaktı** çıktı — yazan yol
+`supabase.from("x" as any)` kalıbını kullandığı için desene takılmamış:
+| tablo | gerçek durum |
+|---|---|
+| `iletisim_tercihleri` | yazılıyor — `CaseRoom.tsx:1835` (upsert) |
+| `arabulucu_kontrol_tercihleri` | yazılıyor — `AjanPenceresi.tsx:736` (upsert) |
+| `taraf_musaitlik` | yazılıyor — `CaseRoom.tsx:2253` (insert) |
+| `reschedule_requests` | **gerçekten yazan yok** — zaten bilinen ölü ada, işaretli |
+
+SONUÇ: `mediator_requests`/`reschedule_requests` adası dışında terk edilmiş
+kaynağa sorgu YOK. Diğer 15 boş tablo, henüz kullanılmamış özelliklerdir
+(bilirkişi raporu, oturum kaydı, mesajlaşma vb.) ve hepsinin yazan yolu vardır.
+
+> SONDA DERSİ: `from("x")` araması bu depoda YETMEZ; üretilmiş tipleri atlatmak
+> için `from("x" as any)` kalıbı yaygın. Tablo araması yaparken desen
+> `from("x"` olmalı (kapanış parantezi olmadan).
 
 ### KAPANDI — 24.08 · P1 · BÜTÜN MÜKERRER KAPILAR ORTAK KALIBA ALINDI (`ba1585e`)
 Dersin dediğini uyguladım ve sözleşmenin **okuyan tarafını** baştan sona taradım
