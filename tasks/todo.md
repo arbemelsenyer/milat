@@ -1,33 +1,15 @@
 ## Nerede kaldık
 
-- Tarih: 24.08.2026 (gece oturumu · 6. blok · KAPANIŞ)
+- Tarih: 24.08.2026 (gece oturumu · 7. blok · KAPANIŞ)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok — yarım iş yok, çalışma ağacı temiz
-- Son tamamlanan iş: `oturum-kayitlari` kovası açıldı (`e806385`); veri izolasyonu tam taraması
-- Doğrulama: `npm run test` **133/133** · tsc hatasız · build hatasız · lint **2358** (oturum başı 2361)
-- **CANLI SAĞLIK (07:58):** son 30 dk **10 koşum, hepsi 200** · hatalı 0 ·
-  işlenmemiş olay 0 · son 6 saatte `akis_hatasi` 0 · `closed_at` boş kapalı dosya 0 ·
-  etkin cron 7 · `cron.job`ta düz metin sır **0**
+- Son tamamlanan iş: gizlilik ekranı yönetici oturumunda "belirsiz" diyor (`5ad286c`, publish)
+- Doğrulama: `npm run test` **169/169** · tsc hatasız · build hatasız · lint **2358** (oturum başı 2361)
+- **CANLI SAĞLIK (10:43):** son 20 dk **7 koşum, hepsi 200** · hatalı 0 ·
+  işlenmemiş olay 0 · son 5 saatte `akis_hatasi` 0 · `closed_at` boş kapalı dosya 0 ·
+  `cron.job`ta düz metin sır **0**
 - **Açık blokaj: P0 · HUMAN GATE — self-servis başvuruda kör veri** (§7.4)
-
-> **KARAR PAKETİ:** karar bekleyen altı maddenin tamamı — sorun · seçenekler ·
-> önerim · kararın etkisi — `tasks/karar-paketi.md` dosyasındadır. O dosya bir
-> durum dosyası DEĞİLDİR; tek doğruluk kaynağı bu dosyadır (§0). Karar verilince
-> madde buraya işlenir ve karar paketinden düşer.
-
-### TUR NEDEN KAPANDI (§5 · iki sebep birden)
-1. **Gerçek Human Gate** — self-servis başvuruda kör veri (§7.4, üç seçenek aşağıda).
-2. **Kuyrukta uygulanabilir iş kalmadı.** Kalan altı maddenin hepsi tek tek
-   değerlendirildi; hiçbiri bana açık değil:
-
-| madde | neden bana açık değil |
-|---|---|
-| P0 · self-servis kör veri | **Human Gate (§7.4)** — ürün kararı, üç seçenek sunuldu |
-| P1 · `CRON_SECRET` **değerinin** yenilenmesi | **Yapısal engel:** yeni değeri üretsem ya da okusam yine bağlamıma girer, yenilemeyi boşa çıkarır. Vault yarısı BİTTİ; kalan tek adım kurucunun. Runbook yazılı |
-| P2 · İmza akışı | **Human Gate (§7.1/§7.5)** — imza beş insan kapısından biri, davranışı ürün kararı |
-| P3 · Eski şema adası silinsin mi | **Human Gate (§7.3)** — tablo/kod silmek geri dönüşsüz. Dosyalar uyarıyla işaretlendi |
-| P3 · Kayıt kovasına dar okuma politikası | **Önkoşul yok:** kayıt hattı (yükleme yolu) yazılmadan yol düzeni belli değil; politika için desen uydurmak gerekir |
-| P3 · `soru_cevaplandi` tüketicisi | **Ürün kararı:** olay tüketilecek mi yoksa tetikleyici mi kalkacak. Bugün zararsız (motor m.5 `[kol:…]` ile sağlanıyor) |
+- **Karar bekleyen altı madde:** `tasks/karar-paketi.md`
 
 ### KURUCUDA KALAN ÜÇ MADDE (hiçbiri beni bloke etmiyor)
 1. **P1 · `CRON_SECRET` değerinin yenilenmesi.** Runbook aşağıda. Bunu ben
@@ -376,6 +358,16 @@ DÜZELTME:
 
 Tezgâh (`tests/gizlilik-ekrani-belirsiz.test.ts`, 10 durum) **kanıtlandı**:
 kusur geri getirilip koşuldu → 9 test düştü. Toplam **169/169**.
+
+**CANLI KANIT (yayın sonrası, aynı yönetici oturumu):**
+| | önce | sonra |
+|---|---|---|
+| Başarısız | **7** (hepsi yanlış alarm) | **0** |
+| Belirsiz | — (durum yoktu) | **9** |
+| Geçti | 5 | 3 (yönetici için gerçekten anlamlı olanlar) |
+Uyarı bandı ve "TARAF hesabıyla çalıştırın" yönergesi ekranda görünüyor.
+Yani gösterge artık yalan söylemiyor: ölçemediğini "başarısız" değil
+**belirsiz** diyor ve sebebini yazıyor.
 
 ### KAPANDI — 24.08 · P1 · GİZLİLİK TEZGÂHININ KAPSAM BOŞLUĞU
 Bugünkü storage sızıntısı **neden fark edilmedi** diye tezgâha baktım.
