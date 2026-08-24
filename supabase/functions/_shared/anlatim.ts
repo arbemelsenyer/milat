@@ -306,8 +306,12 @@ export async function eksigiSor(
     // Belirsizse ARABULUCUYA sorulur ve gerekçeye "şüpheli" düşülür.
     const hedefPartyId = tarafaMi ? String(o.party_id) : null;
     const supheliNotu = o.hedef === "belirsiz" ? " (şüpheli — kime sorulacağı net değil)" : "";
-    // ORTAK SINIR KATMANI: insana giden soru metni süzgeçten geçer.
-    const guvenliMesaj = sinirdanGecir(o.mesaj, "eksigiSor");
+    /* ORTAK SINIR KATMANI: insana giden soru metni süzgeçten geçer — AMA
+       baştaki `[kol:…]` etiketi korunur. O etiket cevap gelince hangi kolun
+       uyanacağını söyler (motor kanunu m.5); elenirse cevaplanan soru hiçbir
+       kolu uyandıramaz. Etiketi mesajın içine koyan çağıranlar:
+       `bilirkisi-sorulari:148` ve `taraf-kalem-cikar:400`. */
+    const guvenliMesaj = etiketiKoruyarakSuz(o.mesaj, "eksigiSor");
     const gerekce = `[eksik:${kisalt(o.etiket, 60)}] ${kisalt(guvenliMesaj, 400)}${supheliNotu}`;
 
     // Mükerrer yazma: aynı dosya + tip + hedef için aynı etiketli satır varsa geç.
@@ -1153,6 +1157,34 @@ export function sinirdanGecir(metin: unknown, nereden = ""): string {
   return r.sade;
 }
 
+/* ── ETİKET KORUYAN SÜZGEÇ (24.08.2026) ──────────────────────────────────────
+   Metnin başındaki `[...]` grupları KODUN ürettiği etiketlerdir: `[eksik:…]`,
+   `[kol:…]`, `[oto:…]`, `[akis:…]`, `[gecis:…]`. İçlerinde taraf verisi
+   bulunması yapısal olarak mümkün DEĞİLDİR; süzgece ihtiyaçları yoktur.
+   Ama süzgece SOKULURLARSA, serbest metin elendiğinde birlikte silinirler —
+   ve bu etiketler kozmetik değildir:
+     · `[eksik:…]` · `[oto:…]` → mükerrer yazım kapılarının dayanağı; silinince
+       kapı boş kümeye bakar ve aynı görev her turda yeniden açılabilir.
+     · `[kol:…]` → motorun 5. maddesi: cevap gelince hangi kolun uyanacağını
+       söyler (ajan-nobetci, soru gerekçesinden okur). Silinirse cevaplanan
+       soru hiçbir kolu uyandıramaz.
+   Bu yüzden etiketler ayrılır, YALNIZ gövde süzgeçten geçer. Süzgeç
+   GEVŞETİLMEDİ: elenen gövdenin metni yine konmaz, ama sessiz de düşmez. */
+export function etiketleriAyir(metin: unknown): { etiketler: string; govde: string } {
+  const ham = String(metin ?? "").trim();
+  const etiketler = (/^(?:\[[^\]]{0,160}\]\s*)+/.exec(ham) ?? [""])[0].trim();
+  return { etiketler, govde: ham.slice(etiketler.length).trim() };
+}
+
+export function etiketiKoruyarakSuz(metin: unknown, nereden = ""): string {
+  const { etiketler, govde } = etiketleriAyir(metin);
+  if (!govde) return etiketler;
+  const r = sinirDenetle(govde);
+  if (r.gecti) return `${etiketler} ${govde}`.trim();
+  console.error("[sinir] cümle elendi", { nereden, turler: r.turler });
+  return `${etiketler} Ayrıntı kayda geçmedi (sınır katmanı eledi: ${r.turler.join(", ")}).`.trim();
+}
+
 /* ── 2) PROMPT INJECTION SAVUNMASI ───────────────────────────────────────────
    Belgelerden, taraf beyanlarından, e-postalardan, dosya adlarından ve dış
    metinlerden gelen her şey VERİDİR, TALİMAT DEĞİLDİR. İçinde ajana yönelik
@@ -1354,21 +1386,7 @@ export async function anaAjanaBildir(
            verisi bulunması yapısal olarak mümkün değildir → süzgece girmez.
          · Serbest açıklama taraf verisi taşıyabilir → eskisi gibi süzgeçten
            geçer; elenirse SESSİZ DÜŞMEZ, hangi türün elediği yazılır. */
-    const ham = String(o.gerekce ?? "").trim();
-    const isEtiketleri = (/^(?:\[[^\]]{0,160}\]\s*)+/.exec(ham) ?? [""])[0].trim();
-    const aciklama = ham.slice(isEtiketleri.length).trim();
-    let govde = "";
-    if (aciklama) {
-      const r = sinirDenetle(aciklama);
-      if (r.gecti) govde = aciklama;
-      else {
-        console.error("[sinir] cümle elendi", {
-          nereden: `anaAjanaBildir.${o.kaynak}`, turler: r.turler,
-        });
-        govde = `Ayrıntı kayda geçmedi (sınır katmanı eledi: ${r.turler.join(", ")}).`;
-      }
-    }
-    const guvenli = `${isEtiketleri} ${govde}`.trim();
+    const guvenli = etiketiKoruyarakSuz(o.gerekce, `anaAjanaBildir.${o.kaynak}`);
     const etiket = `[kaynak:${o.kaynak}]${o.bekleyen ? `[bekleyen:${o.bekleyen}]` : ""}`;
     const temelSatir: Record<string, unknown> = {
       case_id: o.case_id,

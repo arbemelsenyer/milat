@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { anaAjanaBildir } from "../supabase/functions/_shared/anlatim";
+import { anaAjanaBildir, eksigiSor, etiketleriAyir, etiketiKoruyarakSuz } from "../supabase/functions/_shared/anlatim";
 
 /* İŞ ETİKETİ SÜZGEÇTEN GEÇMEZ (24.08.2026 kusuru)
    `anaAjanaBildir` gerekçenin TAMAMINI ortak sınır süzgecinden geçiriyordu.
@@ -93,5 +93,94 @@ describe("anaAjanaBildir — iş etiketi hiçbir hâlde silinmez", () => {
     const gerekce = String(yazilanlar[0].gerekce);
     expect(gerekce).toContain("sınır katmanı eledi");
     expect(gerekce).not.toContain(ELENEN);
+  });
+});
+
+/* KOL ETİKETİ — MOTOR KANUNU m.5'İN DAYANAĞI
+   `eksigiSor` soru metnini süzgeçten geçiriyordu. `[kol:…]` etiketi mesajın
+   İÇİNDE geliyor (`bilirkisi-sorulari:148`, `taraf-kalem-cikar:400`), yani
+   metin elenirse etiket de silinirdi. O etiket cevap gelince hangi kolun
+   uyanacağını söyler (`ajan-nobetci:1141` gerekçeden okur); silinirse
+   cevaplanan soru HİÇBİR kolu uyandıramaz. */
+describe("eksigiSor — kol etiketi süzgeçten sağ çıkar", () => {
+  function sahteAdminSoru() {
+    const yazilanlar: Record<string, unknown>[] = [];
+    /* `eksigiSor` zinciri DOĞRUDAN await ediyor (`const { data } = await q`).
+       Bu yüzden zincirin kendisi thenable olmalı; `limit` Promise dönerse
+       sonraki `.is()` çağrısı Promise üzerinde aranır ve düşer. */
+    type Zincir = {
+      eq: () => Zincir; is: () => Zincir; limit: () => Zincir;
+      then: (c: (v: { data: unknown[] }) => unknown) => Promise<unknown>;
+    };
+    const zincir = (): Zincir => {
+      const z: Zincir = {
+        eq: () => z, is: () => z, limit: () => z,
+        then: (c) => Promise.resolve(c({ data: [] })),
+      };
+      return z;
+    };
+    const admin = {
+      from() {
+        return {
+          select: () => zincir(),
+          insert: async (g: Record<string, unknown>) => { yazilanlar.push(g); return { error: null }; },
+        };
+      },
+    };
+    return { admin, yazilanlar };
+  }
+
+  it("soru metni ELENSE BİLE [kol:…] gerekçede kalır", async () => {
+    const { admin, yazilanlar } = sahteAdminSoru();
+    const r = await eksigiSor(admin, {
+      case_id: "11111111-1111-1111-1111-111111111111",
+      hedef: "arabulucu",
+      gorev_tipi: "arabulucu_sorusu",
+      mesaj: "[kol:taraf-kalem-cikar] 3 kalem 12500 TL tutarında eşleşti",
+      etiket: "kalem:kira-farki",
+    });
+    expect(r.yazildi).toBe(true);
+    const gerekce = String(yazilanlar[0].gerekce);
+    expect(gerekce).toContain("[kol:taraf-kalem-cikar]");
+    expect(gerekce).toContain("[eksik:kalem:kira-farki]");
+    // Suzgec gevsetilmedi: elenen metnin kendisi KONMAZ.
+    expect(gerekce).not.toContain("12500");
+  });
+
+  it("nöbetçinin okuduğu desen gerekçede bulunur", async () => {
+    const { admin, yazilanlar } = sahteAdminSoru();
+    await eksigiSor(admin, {
+      case_id: "11111111-1111-1111-1111-111111111111",
+      hedef: "arabulucu",
+      gorev_tipi: "arabulucu_sorusu",
+      mesaj: "[kol:bilirkisi-sorulari] 4 ayrı 900 sayısı",
+      etiket: "bilirkisi:onay",
+    });
+    // ajan-nobetci/index.ts:1141 ile AYNI desen.
+    const kol = /\[kol:([a-z0-9-]+)\]/i.exec(String(yazilanlar[0].gerekce));
+    expect(kol?.[1]).toBe("bilirkisi-sorulari");
+  });
+});
+
+describe("etiketleriAyir — sınırlar", () => {
+  it("baştaki etiket grupları ayrılır, gövde kalır", () => {
+    const r = etiketleriAyir("[a:1][b:2] serbest metin");
+    expect(r.etiketler).toBe("[a:1][b:2]");
+    expect(r.govde).toBe("serbest metin");
+  });
+
+  it("ORTADAKİ köşeli parantez etiket sayılmaz", () => {
+    const r = etiketleriAyir("metin [a:1] devam");
+    expect(r.etiketler).toBe("");
+    expect(r.govde).toBe("metin [a:1] devam");
+  });
+
+  it("yalnız etiketten oluşan metin gövdesiz döner", () => {
+    expect(etiketiKoruyarakSuz("[a:1]", "t")).toBe("[a:1]");
+  });
+
+  it("etiketsiz güvenli metin aynen geçer", () => {
+    expect(etiketiKoruyarakSuz("dosyadaki belgeye göre eşleşme var", "t"))
+      .toBe("dosyadaki belgeye göre eşleşme var");
   });
 });
