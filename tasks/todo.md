@@ -90,7 +90,17 @@ Sonuç canlı kanıtla kapandı.
 | 5 | asıl kusur: nöbetçinin etiket deseni `^\[hatirlatma:` ile **çapalıydı**, geçit başa `[kaynak:nobetci]` koyduğu için hiç eşleşmiyordu → nöbetçi **hiç** hatırlatma göndermemiş | `8c603d5` |
 | 6 | kopyayı kaldırınca boşluk açılacaktı: nöbetçi yalnız `participants`e gönderiyor, `randevu-teklif` oraya **tek taraf** yazıyor → ortak oturumda karşı taraf hatırlatma almazdı | `6c06138` |
 
-**CANLI KANIT — 02:00:00 UTC:**
+**CANLI KANIT — NÖBETÇİ KOLU GERÇEKTEN GÖNDERDİ (04:18 → 04:30):**
+| saat | sonuç | ne düzelmişti |
+|---|---|---|
+| 04:18 · 04:21 | `atlandi` — "Hatırlatma etiketi okunamadı" | (henüz düzeltilmemiş: çapalı desen) |
+| 04:24 | `atlandi` — "Oturumda katılımcı taraf kaydı yok" | desen düzeldi (`8c603d5`) |
+| **04:27 · 04:30** | **`yapildi` — "2 tarafa hatırlatma gönderildi"** | alıcı kuralı (`6c06138`) |
+Yani nöbetçinin hiç çalışmayan hatırlatma kolu **canlıda iki tarafa da gönderdi**.
+(İki kez göndermesinin sebebi kapı düzeltmesinin o an henüz deploy olmamasıydı;
+`4b543ac` 04:30:24'te indi.)
+
+**CANLI KANIT — ESKİ CRON KOLU 02:00:00 UTC:**
 `{"success":true,"message":"Processed 1 sessions, sent 3 reminder emails","count":3}`
 Zincir gerçekten gönderdi (2 taraf + arabulucu). Test oturumu "farazi FSM test"
 dosyasına kuruldu; o dosyanın iki tarafının adresi de kurumun kendi alan adında.
