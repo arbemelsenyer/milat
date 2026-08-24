@@ -4,7 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B)
 - Aktif görev: yok
 - Son tamamlanan iş: oturum hatırlatmaları gerçekten gönderiliyor (`e4c788d`) — 401'in altındaki ikinci kusur
-- Doğrulama sonucu: `npm run test` **95/95** · lint **2360** (temel çizginin bir altında) · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
+- Doğrulama sonucu: `npm run test` **101/101** · lint **2360** (temel çizginin bir altında) · tsc hatasız · build hatasız · lint 2361 (temel çizgi korundu)
 - **KURUCUDAN TEK SOMUT KONTROL** (§11-B — benim yapamadığım tek şey): bir dosyada
   arabulucu hesabıyla "Aşama N+1'e Geç →" düğmesine bas, sayfayı yenile. Dosya yeni
   aşamada KALMALI (eskiden geri düşüyordu). Sunucu tarafını ben doğrularım:
@@ -107,6 +107,23 @@ geri getirilip koşuldu → 4 test DÜŞTÜ; geri alınınca 6/6 geçti.
 > taranmalı.** 23.08'de metin ikiye ayrılmıştı ama yalnız bir çağıranda;
 > ikinci geçit 24.08'e kadar kusurlu kaldı ve sessizce mükerrer görev üretme
 > riski taşıdı.
+
+#### DERS HEMEN UYGULANDI — ÜÇÜNCÜ GEÇİT DE BULUNDU (`97f077d`, 36 fan-out)
+`sinirdanGecir(` çağıran **her yer** tarandı (15 çağrı). Bir geçit daha çıktı:
+`eksigiSor` soru metnini süzgeçten geçiriyor ve **`[kol:…]` etiketi mesajın
+İÇİNDE** geliyor (`bilirkisi-sorulari:148` · `taraf-kalem-cikar:400`).
+BEDELİ MOTOR KANUNU m.5'TİR: `[kol:…]` cevap gelince hangi kolun uyanacağını
+söyler (`ajan-nobetci:1141` gerekçeden okur). Elenirse **cevaplanan soru hiçbir
+kolu uyandıramaz** — sessizce.
+Bugün tesadüfen elenmiyor (o iki cümle "belge" gibi dayanak kelimesi taşıyor),
+ama kırılgan: metne bir rakam eklenmesi zinciri sessizce koparırdı.
+DÜZELTME: etiket koruyan süzgeç ortak yardımcıya alındı (`etiketleriAyir` +
+`etiketiKoruyarakSuz`); iki geçit de onu kullanıyor, `anaAjanaBildir`deki kopya
+kalktı — aynı işi yapan mantık TEK yerde.
+Tezgâh 6 → **12 duruma** çıktı, kanıtlandı: geri alınınca 6 test düştü.
+> Tezgâhın sahte istemcisi ilk yazımda kusurluydu: `eksigiSor` zinciri doğrudan
+> `await` ediyor; `limit` Promise dönünce sonraki `.is()` düşüyordu. Zincir
+> thenable yapıldı. (Bu, "yeşil tezgâh kanıt değildir" dersinin ikinci örneği.)
 
 ### CANLI DOĞRULAMA — 24.08 · `girdiTamamla` düzeltmesi gerçek akışta sınandı
 Hatırlatma sınaması için "farazi FSM test" dosyasına gerçek bir oturum kuruldu
