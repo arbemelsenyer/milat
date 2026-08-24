@@ -1,5 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  hatirlatmaPenceresi, hatirlatmaEtiketi, zatenGonderildiMi,
+  oturumCevrimIciMi, oturumBicimMetni,
+} from "./hatirlatma.ts";
 
 /* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
    Taraf kendi ekranından bildirim sıklığını ve sessiz saatlerini belirler
@@ -102,29 +106,25 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-interface SessionWithDetails {
-  id: string;
-  case_id: string;
-  user_id: string;
-  mediator_id: string | null;
-  scheduled_date: string;
-  session_type: string | null;
-  notes: string | null;
-  status: string;
-  user_profile?: {
-    email: string | null;
-    full_name: string | null;
-  };
-  mediator_profile?: {
-    email: string | null;
-    full_name: string | null;
-  };
-  case_details?: {
-    dispute_type: string | null;
-    your_name: string | null;
-    other_party_name: string | null;
-  };
-}
+/* NOT: buradaki eski `SessionWithDetails` arayüzü kaldırıldı. Terk edilmiş
+   `mediator_requests` şemasını (user_id · mediator_id · scheduled_date)
+   anlatıyordu, hiçbir yerde kullanılmıyordu ve okuyanı yanlış tabloya
+   yönlendiriyordu. Gerçek kaynak `case_sessions`tir. */
+
+/* Bu fonksiyonun okuduğu satırların yerel tipleri. Üretilmiş Supabase tipleri
+   Deno tarafında bulunmadığı için `any` yerine küçük ve açık tipler yazılır. */
+type Oturum = {
+  id: string; case_id: string; session_type: string | null;
+  meeting_type: string | null; video_link: string | null;
+  notes: string | null; scheduled_at: string; status: string;
+};
+type DosyaKunye = {
+  id: string; user_id: string | null; assigned_mediator_id: string | null;
+  dispute_type: string | null; your_name: string | null; other_party_name: string | null;
+};
+type TarafKaydi = { id: string; user_id: string | null };
+type Profil = { email: string | null; full_name: string | null };
+type IzSatiri = { gerekce: string | null };
 
 serve(async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
@@ -165,25 +165,32 @@ serve(async (req: Request): Promise<Response> => {
     // Calculate the time window for 24-hour reminder
     // Sessions that are between 23 and 25 hours from now
     const now = new Date();
-    const reminderStart = new Date(now.getTime() + 23 * 60 * 60 * 1000);
-    const reminderEnd = new Date(now.getTime() + 25 * 60 * 60 * 1000);
+    const { baslangic: reminderStart, bitis: reminderEnd } = hatirlatmaPenceresi(now);
 
     console.log(`Checking for sessions between ${reminderStart.toISOString()} and ${reminderEnd.toISOString()}`);
 
-    // Fetch sessions that need reminders
-    const { data: sessions, error: sessionsError } = await supabase
-      .from("mediator_requests")
-      .select("*")
+    /* ── VERİ KAYNAĞI DÜZELTMESİ (24.08.2026 · P0) ────────────────────────
+       Bu fonksiyon `mediator_requests` tablosunu `scheduled_date` sütunuyla
+       sorguluyordu. O tablo CANLIDA BOŞTUR (0 satır) ve terk edilmiştir;
+       gerçek oturumlar `case_sessions.scheduled_at`tedir (canlıda 31 satır).
+       Yani cron'un yetkisi düzelse bile bu fonksiyon HİÇBİR ZAMAN hatırlatma
+       gönderemezdi — 401 bu daha derin kusuru gizliyordu.
+       `case_sessions`te `user_id`/`mediator_id` YOKTUR; alıcılar dosyadan
+       çözülür: taraflar `case_parties`ten, arabulucu `cases`ten. */
+    const { data: oturumlar, error: sessionsError } = await supabase
+      .from("case_sessions")
+      .select("id, case_id, session_type, meeting_type, video_link, notes, scheduled_at, status")
       .eq("status", "scheduled")
-      .gte("scheduled_date", reminderStart.toISOString())
-      .lt("scheduled_date", reminderEnd.toISOString());
+      .gte("scheduled_at", reminderStart.toISOString())
+      .lt("scheduled_at", reminderEnd.toISOString());
 
     if (sessionsError) {
       console.error("Error fetching sessions:", sessionsError);
       throw sessionsError;
     }
 
-    if (!sessions || sessions.length === 0) {
+    const sessions = (oturumlar ?? []) as Oturum[];
+    if (sessions.length === 0) {
       console.log("No sessions require reminders at this time");
       return new Response(
         JSON.stringify({ success: true, message: "No sessions require reminders", count: 0 }),
@@ -198,32 +205,50 @@ serve(async (req: Request): Promise<Response> => {
 
     for (const session of sessions) {
       try {
-        // Fetch user profile
-        const { data: userProfile } = await supabase
-          .from("profiles")
-          .select("email, full_name")
-          .eq("user_id", session.user_id)
-          .maybeSingle();
-
-        // Fetch mediator profile if assigned
-        let mediatorProfile = null;
-        if (session.mediator_id) {
-          const { data: medProfile } = await supabase
-            .from("profiles")
-            .select("email, full_name")
-            .eq("user_id", session.mediator_id)
-            .maybeSingle();
-          mediatorProfile = medProfile;
+        /* MÜKERRER GÖNDERİM KAPISI. Pencere 2 saat geniş, cron saatlik → aynı
+           oturum iki turda birden yakalanır. İz `ajan_gorevleri`de durur;
+           varsa oturum atlanır. Motor kanununun "mükerrer yazım kapısı"
+           kalıbıdır; yeni tablo açılmadı. Pencerenin geniş kalması bilerekdir:
+           bir tur kaçarsa hatırlatma yine de gider. */
+        const izEtiketi = hatirlatmaEtiketi(session.id);
+        const { data: izSatirlari } = await supabase
+          .from("ajan_gorevleri")
+          .select("gerekce")
+          .eq("case_id", session.case_id)
+          .eq("gorev_tipi", "oturum_hatirlatma")
+          .limit(200);
+        if (zatenGonderildiMi((izSatirlari ?? []) as IzSatiri[], izEtiketi)) {
+          console.log(`Reminder already sent for session ${session.id}`);
+          continue;
         }
 
-        // Fetch case details
-        const { data: caseDetails } = await supabase
+        // Dosya künyesi ve görevli arabulucu.
+        const { data: dosyaSatiri } = await supabase
           .from("cases")
-          .select("dispute_type, your_name, other_party_name")
+          .select("id, user_id, assigned_mediator_id, dispute_type, your_name, other_party_name")
           .eq("id", session.case_id)
           .maybeSingle();
+        const caseDetails = (dosyaSatiri ?? null) as DosyaKunye | null;
 
-        const scheduledDate = new Date(session.scheduled_date);
+        /* ALICILAR dosyadan çözülür (`case_sessions`te user_id/mediator_id yok).
+           `user_id`si olmayan taraf atlanır: adres profilden gelir. */
+        const { data: taraflar } = await supabase
+          .from("case_parties")
+          .select("id, user_id")
+          .eq("case_id", session.case_id);
+        const tarafListesi = ((taraflar ?? []) as TarafKaydi[]).filter((t) => t?.user_id);
+        const mediatorId = caseDetails?.assigned_mediator_id ?? null;
+
+        /* Arabulucunun profili BİR KEZ okunur: hem tarafın e-postasındaki
+           "Mediator" satırında hem de arabulucunun kendi e-postasında kullanılır. */
+        let arabulucuProfil: Profil | null = null;
+        if (mediatorId) {
+          const { data: mp } = await supabase
+            .from("profiles").select("email, full_name").eq("user_id", mediatorId).maybeSingle();
+          arabulucuProfil = (mp ?? null) as Profil | null;
+        }
+
+        const scheduledDate = new Date(session.scheduled_at);
         const formattedDate = scheduledDate.toLocaleDateString("en-US", {
           weekday: "long",
           year: "numeric",
@@ -235,14 +260,23 @@ serve(async (req: Request): Promise<Response> => {
           minute: "2-digit",
         });
 
-        const sessionTypeText = session.session_type === "online" 
-          ? "Online (Video Call)" 
-          : session.session_type === "phone" 
-          ? "Phone Call" 
-          : "In-Person";
+        /* Oturum biçimi: ürünün gerçekten bildiği tek işaret video bağlantısıdır.
+           Bağlantı varsa çevrim içi, yoksa yüz yüze. Uydurma yapılmaz. */
+        const oturumCevrimIci = oturumCevrimIciMi(session);
+        const sessionTypeText = oturumBicimMetni(session);
 
-        // Send reminder to user
-        if (userProfile?.email) {
+        let buOturumdaGonderilen = 0;
+
+        // ── TARAFLAR ────────────────────────────────────────────────────────
+        for (const taraf of tarafListesi) {
+          const { data: profilSatiri } = await supabase
+            .from("profiles")
+            .select("email, full_name")
+            .eq("user_id", taraf.user_id)
+            .maybeSingle();
+          const tarafProfil = (profilSatiri ?? null) as Profil | null;
+          if (!tarafProfil?.email) continue;
+
           const userEmailHtml = `
             <!DOCTYPE html>
             <html>
@@ -256,7 +290,7 @@ serve(async (req: Request): Promise<Response> => {
               </div>
               
               <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
-                <p style="color: #333; font-size: 16px;">Hello ${userProfile.full_name || "there"},</p>
+                <p style="color: #333; font-size: 16px;">Hello ${tarafProfil.full_name || "there"},</p>
                 
                 <p style="color: #333; font-size: 16px;">This is a friendly reminder that your mediation session is scheduled for <strong>tomorrow</strong>.</p>
                 
@@ -266,7 +300,7 @@ serve(async (req: Request): Promise<Response> => {
                   <p style="margin: 5px 0; color: #555;"><strong>🕐 Time:</strong> ${formattedTime}</p>
                   <p style="margin: 5px 0; color: #555;"><strong>📍 Type:</strong> ${sessionTypeText}</p>
                   ${caseDetails?.dispute_type ? `<p style="margin: 5px 0; color: #555;"><strong>📋 Case:</strong> ${caseDetails.dispute_type}</p>` : ""}
-                  ${mediatorProfile?.full_name ? `<p style="margin: 5px 0; color: #555;"><strong>👤 Mediator:</strong> ${mediatorProfile.full_name}</p>` : ""}
+                  ${arabulucuProfil?.full_name ? `<p style="margin: 5px 0; color: #555;"><strong>👤 Mediator:</strong> ${arabulucuProfil.full_name}</p>` : ""}
                 </div>
                 
                 <h4 style="color: #333; margin-top: 25px;">How to Prepare:</h4>
@@ -274,7 +308,7 @@ serve(async (req: Request): Promise<Response> => {
                   <li>Review any documents related to your case</li>
                   <li>Prepare a list of key points you want to discuss</li>
                   <li>Find a quiet, private space for the session</li>
-                  ${session.session_type === "online" ? "<li>Test your video and audio equipment beforehand</li>" : ""}
+                  ${oturumCevrimIci ? "<li>Test your video and audio equipment beforehand</li>" : ""}
                 </ul>
                 
                 ${session.notes ? `<p style="color: #555; background: #e8f4ff; padding: 15px; border-radius: 8px; margin-top: 20px;"><strong>Note from mediator:</strong> ${session.notes}</p>` : ""}
@@ -289,35 +323,42 @@ serve(async (req: Request): Promise<Response> => {
 
           /* İLETİŞİM TERCİHİ (İBA 1.5): hatırlatma ÖNEMLİ listede değildir —
              "yalnız önemli adımlar" ve "haftalık özet" seçildiğinde gönderilmez,
-             sessiz saatte de düşer. Alıcı user_id ile geldiği için taraf kaydı
-             dosya + kullanıcı eşleşmesiyle bulunur; taraf kaydı yoksa (ör. dosya
-             sahibi taraf olarak kayıtlı değilse) süzgeç açık kalır ve gönderilir. */
-          const { data: tarafSatiri } = await supabase
-            .from("case_parties")
-            .select("id")
-            .eq("case_id", session.case_id)
-            .eq("user_id", session.user_id)
-            .maybeSingle();
-          const izin = await gonderilsinMi(supabase, (tarafSatiri as any)?.id, "hatirlatma");
+             sessiz saatte de düşer. Taraf kaydı burada kesin bilindiği için
+             süzgeç doğrudan o tarafın kimliğiyle çalışır. */
+          const izin = await gonderilsinMi(supabase, taraf.id, "hatirlatma");
           if (!izin.gonder) {
             console.log(`Reminder skipped (iletişim tercihi): ${izin.sebep}`);
             errors.push(`hatırlatma atlandı — iletişim tercihi: ${izin.sebep}`);
-          } else {
-            await resend.emails.send({
-              from: "MİLAT Arabuluculuk <info@milatmediation.com>",
-              to: [userProfile.email],
-              subject: `⏰ Reminder: Your Mediation Session is Tomorrow - ${formattedDate}`,
-              html: userEmailHtml,
-            });
-
-            console.log(`Sent reminder to user: ${userProfile.email}`);
-            sentCount++;
+            continue;
           }
+
+          await resend.emails.send({
+            from: "MİLAT Arabuluculuk <info@milatmediation.com>",
+            to: [tarafProfil.email],
+            subject: `⏰ Reminder: Your Mediation Session is Tomorrow - ${formattedDate}`,
+            html: userEmailHtml,
+          });
+          console.log(`Sent reminder to party: ${tarafProfil.email}`);
+          sentCount++;
+          buOturumdaGonderilen++;
+
+          await supabase.rpc("create_notification", {
+            p_user_id: taraf.user_id,
+            p_title: "Session Reminder",
+            p_message: `Your mediation session is tomorrow at ${formattedTime}. Please be prepared!`,
+            p_type: "reminder",
+            p_link: `/summary?case=${session.case_id}`,
+          });
         }
 
-        // Send reminder to mediator
-        if (mediatorProfile?.email) {
-          const mediatorEmailHtml = `
+        // ── ARABULUCU ───────────────────────────────────────────────────────
+        if (mediatorId) {
+          /* Arabulucuya gönderilen künyede taraf ADI yazılır; bu bilgi zaten
+             dosyanın kendi künyesindedir (kör veri sınırı aşılmaz). */
+          const tarafAdlari = caseDetails?.your_name ?? null;
+
+          if (arabulucuProfil?.email) {
+            const mediatorEmailHtml = `
             <!DOCTYPE html>
             <html>
             <head>
@@ -330,7 +371,7 @@ serve(async (req: Request): Promise<Response> => {
               </div>
               
               <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
-                <p style="color: #333; font-size: 16px;">Hello ${mediatorProfile.full_name || "Mediator"},</p>
+                <p style="color: #333; font-size: 16px;">Hello ${arabulucuProfil.full_name || "Mediator"},</p>
                 
                 <p style="color: #333; font-size: 16px;">This is a reminder that you have a mediation session scheduled for <strong>tomorrow</strong>.</p>
                 
@@ -341,7 +382,7 @@ serve(async (req: Request): Promise<Response> => {
                   <p style="margin: 5px 0; color: #555;"><strong>📍 Type:</strong> ${sessionTypeText}</p>
                   ${caseDetails?.dispute_type ? `<p style="margin: 5px 0; color: #555;"><strong>📋 Case:</strong> ${caseDetails.dispute_type}</p>` : ""}
                   ${caseDetails?.your_name && caseDetails?.other_party_name ? `<p style="margin: 5px 0; color: #555;"><strong>👥 Parties:</strong> ${caseDetails.your_name} vs ${caseDetails.other_party_name}</p>` : ""}
-                  ${userProfile?.full_name ? `<p style="margin: 5px 0; color: #555;"><strong>👤 Client:</strong> ${userProfile.full_name}</p>` : ""}
+                  ${tarafAdlari ? `<p style="margin: 5px 0; color: #555;"><strong>👤 Client:</strong> ${tarafAdlari}</p>` : ""}
                 </div>
                 
                 <p style="color: #333; font-size: 16px; margin-top: 25px;">Please review the case details before the session.</p>
@@ -352,36 +393,36 @@ serve(async (req: Request): Promise<Response> => {
             </html>
           `;
 
-          await resend.emails.send({
-            from: "MİLAT Arabuluculuk <info@milatmediation.com>",
-            to: [mediatorProfile.email],
-            subject: `⏰ Mediator Reminder: Session Tomorrow - ${formattedDate}`,
-            html: mediatorEmailHtml,
-          });
+            await resend.emails.send({
+              from: "MİLAT Arabuluculuk <info@milatmediation.com>",
+              to: [arabulucuProfil.email],
+              subject: `⏰ Mediator Reminder: Session Tomorrow - ${formattedDate}`,
+              html: mediatorEmailHtml,
+            });
+            console.log(`Sent reminder to mediator: ${arabulucuProfil.email}`);
+            sentCount++;
+            buOturumdaGonderilen++;
+          }
 
-          console.log(`Sent reminder to mediator: ${mediatorProfile.email}`);
-          sentCount++;
-        }
-
-        // Create in-app notification for user
-        if (userProfile) {
           await supabase.rpc("create_notification", {
-            p_user_id: session.user_id,
+            p_user_id: mediatorId,
             p_title: "Session Reminder",
-            p_message: `Your mediation session is tomorrow at ${formattedTime}. Please be prepared!`,
-            p_type: "reminder",
-            p_link: `/summary?case=${session.case_id}`,
-          });
-        }
-
-        // Create in-app notification for mediator
-        if (session.mediator_id) {
-          await supabase.rpc("create_notification", {
-            p_user_id: session.mediator_id,
-            p_title: "Session Reminder",
-            p_message: `You have a mediation session tomorrow at ${formattedTime} with ${userProfile?.full_name || "a client"}.`,
+            p_message: `You have a mediation session tomorrow at ${formattedTime}.`,
             p_type: "reminder",
             p_link: `/mediator`,
+          });
+        }
+
+        /* İZ: bir şey gönderildiyse yazılır. Hiç gönderilmediyse (adres yok ya
+           da tercih kapalı) iz YAZILMAZ — sonraki tur yeniden denesin. */
+        if (buOturumdaGonderilen > 0) {
+          await supabase.from("ajan_gorevleri").insert({
+            case_id: session.case_id,
+            gorev_tipi: "oturum_hatirlatma",
+            durum: "yapildi",
+            hedef_party_id: null,
+            gerekce: `${izEtiketi} 24 saat hatırlatması gönderildi (${buOturumdaGonderilen} alıcı)`,
+            sonuc: "hatırlatma gönderildi",
           });
         }
 

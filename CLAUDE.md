@@ -492,7 +492,16 @@ Codex bu projede **danışmandır**, bağımlılık değildir.
 
 Sohbet uzadıkça bağlam dolar ve kalite düşer. Bunu **sen** yönetirsin, kullanıcı değil.
 
-- Her DONE görevden sonra: `tasks/todo.md` güncellenir **ve** commit atılır. Böylece bağlam kaybolsa bile iş kaybolmaz.
+- **Her DONE görevden sonra istisnasız:** `tasks/todo.md` güncellenir **ve** commit atılır. Amaç şu: kullanıcı **hangi an `/clear` yazarsa yazsın hiçbir şey kaybolmasın.** Yarım bırakılmış bir iş varsa "Aktif görev" satırına nerede kalındığı yazılır.
+- `/clear` komutunu sen veremezsin — onu kullanıcı yazar. Senin işin, o an geldiğinde kaybın sıfır olmasını sağlamaktır.
+- **Bağlam ciddi şekilde şiştiğinde** (uzun okumalar, tekrar eden aramalar, kendi kararlarını hatırlamamak, sistemin uyarı vermesi): mevcut görevi bitir, sonra **`medipact dur` ile aynı tam kapanışı kendiliğinden yap** — kullanıcı istemeden:
+  1. Yapılan işi ve doğrulama sonucunu `tasks/todo.md`'ye yaz
+  2. "Nerede kaldık" bloğunu eksiksiz güncelle (aşama · aktif görev · son tamamlanan · blokaj · sıradaki iş)
+  3. Öğrenilen varsa `tasks/lessons.md`'ye ekle
+  4. Commit at
+  5. Ardından tek satır söyle:
+     > "Bağlam şişti, gün sonu kaydını yaptım. `/clear` yazıp `medipact devam` de — kaldığım yerden sürerim."
+- Bu bir izin isteme değildir, bildirimdir. Bir sonraki oturum `tasks/todo.md`'den kesintisiz devam eder; hiçbir şey kaybolmaz. Bu normal işleyiştir, hata değildir.
 - Bağlamın dolmaya başladığını fark edersen (uzun dosya okumaları, tekrar eden aramalar, kendi kararlarını hatırlamamak): mevcut görevi bitir, durumu yaz, commit at ve kullanıcıya **tek satırla** şunu söyle:
   > "Bağlam doldu. `/clear` yazıp yeni oturumda `medipact devam` de — kaldığım yerden sürerim."
 - Yeni oturum `tasks/todo.md` üstündeki bloktan devam eder; hiçbir şey kaybolmaz. Bu bir hata değil, normal işleyiştir.
@@ -519,25 +528,37 @@ Kullanıcıda kalan: ürün kararı, hukuki/ticari karar, geri dönüşsüz işl
 
 ---
 
-## 22. GEÇİCİ TEST DOSYALARI — TEK YER, SİLME YOK
+## 22. GEÇİCİ DOSYALAR — `tests/gecici/`, SİLME YOK, ÜSTÜNE YAZ
 
-Tek kullanımlık sonda/tezgâh dosyaları için **tek adres `tests/gecici/`**'dir.
+Tek kullanımlık her şey (sonda betiği, deneme testi, ayrıştırma kontrolü, ara
+çıktı) **`tests/gecici/` altına** yazılır. Başka hiçbir yere yazılmaz.
 
-| Kural | Ayrıntı |
+**Yasak yerler:** proje kökü · `src/` · `supabase/` · `tests/` kökü · `/tmp` ·
+sistemin geçici klasörü. Kökte `sonda.mjs`, `gecici.ts`, `kontrol.js` gibi bir
+dosya oluşturmak — sonradan silinecek olsa bile — kural ihlalidir.
+
+**Silme yok.** Dosya işi bitince silinmez; **bir sonraki sefer aynı adın üstüne
+yazılır.** Böylece `rm` hiç gerekmez ve bekçi (PreToolUse hook) hiç tetiklenmez.
+Sabit adlar kullan; her seferinde yeni ad üretme:
+
+| amaç | dosya |
 |---|---|
-| **Nereye** | `tests/gecici/`. `/tmp`, `%TEMP%` ve sistem geçici klasörleri **kullanılmaz**. |
-| **Git** | Klasörün içeriği `.gitignore`'dadır; yalnız `tests/gecici/.gitkeep.md` izlenir. |
-| **Silme yok** | Geçici dosya **silinmez**; aynı ada **üstüne yazılır**. Böylece `rm` gerekmez. |
-| **Toplu koşum** | `vitest.config.ts` bu klasörü `exclude` eder; `npm run test` onu çalıştırmaz. Tek tek çağrılır: `npx vitest run tests/gecici/<ad>.test.ts`. |
-| **Adlandırma** | Sabit, tekrar kullanılabilir adlar seç (`sonda.test.ts`, `probe.test.ts`) — her denemede yeni ad üretme. |
+| canlı davranış sondası | `tests/gecici/sonda.test.ts` |
+| ayrıştırma / sözdizimi kontrolü | `tests/gecici/sozdizim.mjs` |
+| tek seferlik veri/çıktı incelemesi | `tests/gecici/inceleme.mjs` |
 
-**Bekçi (PreToolUse) tarafı:** silme kuralı yalnız `tests/gecici/` **altındaki** yollar için onaysız geçer. Başka **hiçbir** yerdeki silme geçmez:
-- klasörün kendisi (`rm -rf tests/gecici`) → **sorar**
-- `..` ile ağaçtan çıkan yol → **sorar**
-- operandlardan biri bile dışarıdaysa → **sorar**
-- operandsız silme, `find -delete`, `find -exec rm` → **sorar**
-- ters bölülü yol (`tests\gecici\x`) → **sorar** (ayrıştırıcı POSIX kipinde; bilinen sınır, güvenli yön). Geçici yolları **eğik bölü** ile yaz.
+Dosyanın başına **ne sorduğunu** tek cümleyle yaz; sonraki oturum üstüne
+yazarken neyi devraldığını bilsin.
 
-**Kalıcı tezgâh geçici değildir.** Tekrar tekrar koşulacak bir tezgâh `tests/gecici/`'ye değil, depoda izlenen bir yere yazılır — bekçi tezgâhı `tests/bekci/test_guard.py` gibi. (Bu tezgâh bir kez geçici klasörde kaybolduğu için oraya taşındı.)
+**Koşum:** `npm run test` bu klasörü **dışarıda bırakır** (kuyruk yeşil kalır);
+yalnız `npm run sonda` çalıştırır. `vitest.config.ts` içine exclude YAZILMAZ —
+oradaki exclude komut satırından gevşetilemiyor ve sonda hiç koşamıyor (denendi).
 
-Bekçi dosyaları depo dışındadır: `~/.claude/hooks/guard-shell.sh` ve `~/.claude/hooks/guard_secret_operands.py`. Bekçi kuralı değiştiğinde `tests/bekci/test_guard.py` **aynı turda** güncellenir ve koşturulur.
+**Git:** `tests/gecici/*` `.gitignore`dadır; yalnız `.gitkeep.md` izlenir. Geçici
+dosya commit'lenmez. Node paketi gerektiren bir betik yazacaksan **proje kökünden
+çalıştır** (`node tests/gecici/sozdizim.mjs …`) — `node_modules` böyle çözülür;
+betiği kökе taşımak için sebep yoktur.
+
+> Bu bölüm `tests/gecici/sonda.test.ts` başlığındaki "CLAUDE.md §22" atfının
+> karşılığıdır. Kural 23.08'de `a462dc2` ile kuruldu ama bu dosyaya yazılmamıştı;
+> yazılmadığı için 24.08'de çiğnendi (kökе `sozdizim-gecici.mjs` yazılıp silindi).
