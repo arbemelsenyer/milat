@@ -5,9 +5,12 @@
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
   Karar gereken her madde `tasks/HAT.md`ye yazılır, Code beklemeden devam eder.
   "Bitti, bilgi veriyorum" turu yok.
-- Aktif görev: H-2 (ıslak imza akışı) — HAT cevabı geldi, uygulanıyor
-- Son tamamlanan iş: **H-6 (karar B) canlıda uygulandı + tezgâha bağlandı** (`a1ebdc4`)
-- Doğrulama: `npm run test` **204/204** · guard sökülmüş kopyada **27 test düşüyor** (kanıt)
+- Aktif görev: yok — HAT'ın cevaplanmış dört maddesi (H-2·H-3·H-5·H-6) KAPANDI
+- Açık HAT maddesi: **H-1** (kurucuda: CRON_SECRET yenilemesi) · **H-4** (sırası
+  gelmedi: kayıt hattı yazılınca)
+- Son tamamlanan iş: **H-5** — `trg_akis_gorev_cevap` kaldırıldı (`edd7b64`)
+- Bu turda kapanan: H-6 (`a1ebdc4`) · H-3 (`de0049b`) · H-2 (`4d09b03`) · H-5 (`edd7b64`)
+- Doğrulama: `npm run test` **210/210** · tsc temiz · build başarılı · lint 2346
 - **CANLI ÖLÇÜM (H-6 sonrası):** dar politika **25** · kalan geniş **6**
   (tam olarak dokunulmayacak öbek) · sahip **9/9** yetkili · erişimi değişen dosya **0**
   · sahip-aynı-zamanda-taraf **0**
@@ -61,6 +64,33 @@ H-3 taramasında çıktı: tablo 0 satır olmasına rağmen **beş canlı yüzey
 dokunuyor — `MediatorDetail.tsx` (**INSERT**), `SessionCalendar.tsx`,
 `WeeklyCalendarView.tsx`, `useCaseStorage.ts`, `Analytics.tsx`.
 Yani "arabulucu talebi" akışı ya hiç kullanılmıyor ya da kırık. Kuyruğa alındı.
+
+### KAPANDI — 24.08 · H-2 · P2 · ISLAK İMZA KAPISI AÇILDI (karar **A**)
+`agreement_documents.signed_by` hiçbir yüzeyden yazılmıyordu; şema ve tetikleyici
+hazır olduğu hâlde `anlasma_belgesi_imzalandi` olayı **hiç doğmuyordu**.
+- Yeni yüzey: `src/components/mediation/AnlasmaImzaPaneli.tsx`. Arabulucu imzalı
+  taramayı yükler (`case-documents` kovası, `<uid>/<case_id>/…` yol düzeni),
+  imzalayan tarafları işaretler; `signed_by` + `metadata.imzalandi_at` yazılır.
+- `OfficialDocumentsPanel` içine yalnız `outcome === "anlasma"` iken bağlandı.
+  Ayrı bileşen: çalışan belge üretim yolu (anayasa m.8) bu işten etkilenmiyor.
+- **Yetki sınırı mimariyle tutuldu** (kararın şartı): yazma istemciden
+  kullanıcının kendi JWT'siyle gider; `Mediator manages agreement docs`
+  politikası (`is_case_mediator`) süzer. Hiçbir edge function `signed_by`'a
+  dokunmuyor — servis rolü RLS'i aşardı, o yüzden imza bilinçli olarak sunucuya
+  TAŞINMADI.
+- `signed_by` = `case_parties.id` listesi (user_id değil: davet kabul etmemiş
+  tarafın user_id'si yok).
+- **TEZGÂH:** `tests/imza-kapisi.test.ts`, 6 durum. **KANITLANDI:** sahte bir
+  edge function'a `signed_by:` yazımı konup `FN_DIZIN` ile koşuldu → test DÜŞTÜ;
+  gerçek dizinde 6/6 geçiyor.
+- Doğrulama: 210/210 test · tsc temiz · build başarılı.
+
+### KAPANDI — 24.08 · H-5 · P3 · TÜKETİCİSİZ `soru_cevaplandi` TETİKLEYİCİSİ (karar **A**)
+Kaldırmadan önce kararın şartı doğrulandı: `akis_kurallari`'nda bu olay koduna
+bağlı kural **0** · kod tabanında tüketici **0** · işlenmemiş olay **0**.
+`trg_akis_gorev_cevap` kaldırıldı (Lovable göçü `20260824184056`, commit
+`edd7b64`). Birikmiş **12** satır SİLİNMEDİ. Uyandırma `ajan-nobetci`deki
+`[kol:…]` yoluyla sürüyor — tek yol kaldı, mükerrer koşum riski kapandı.
 
 ### KURUCUDA KALAN ÜÇ MADDE (hiçbiri beni bloke etmiyor)
 1. **P1 · `CRON_SECRET` değerinin yenilenmesi.** Runbook aşağıda. Bunu ben
@@ -210,7 +240,7 @@ sorgusu sessizce boş dönüyor — "yapacak bir şey yok" sanılıp 200 dönül
 YAPILAN: dört dosyanın başına açık uyarı konuldu (ne olduğu, neden dokunulmaması
 gerektiği, doğru kaynağın ne olduğu). Silme YAPILMADI — tablo/kod silmek geri
 dönüşsüzdür (§7.3) ve kurucu kararıdır.
-- [ ] P3 · Eski şema adası (`mediator_requests` · `reschedule_requests` + dört
+- [x] P3 · Eski şema adası (`mediator_requests` · `reschedule_requests` + dört
       dosya) kaldırılsın mı? · Kabul: ya kaldırılır ve hiçbir yerden anılmaz, ya
       da "bilerek duruyor" kararı `Kritik kararlar`a yazılır · **kurucu kararı**
       (§7.3 — tablo/kod silme).
@@ -976,7 +1006,7 @@ yazmıyor.** Aynı sınıftan başka var mı diye bütün tetikleyiciler tarand�
 akışı henüz KURULMAMIŞ; şema ve tetikleyici hazır, yüzey yok.
 Bu bir kusur DEĞİL, eksik özelliktir: imza ürünün beş insan kapısından biridir
 (§13 · constitution) ve yapılması ürün kararıdır — kendiliğinden eklenmez.
-- [ ] P2 · İmza akışı yok: `agreement_documents.signed_by` hiçbir yüzeyden
+- [x] P2 · İmza akışı yok: `agreement_documents.signed_by` hiçbir yüzeyden
       yazılmıyor, bu yüzden `anlasma_belgesi_imzalandi` olayı hiç doğmuyor ve
       ona bağlanacak hiçbir akış çalışamaz · Kabul: imzalayan kişi ve zaman
       `signed_by` üzerine yazılıyor, olay doğuyor, `akis_olaylari`da görünüyor ·
@@ -1104,7 +1134,7 @@ Canlı `akis_kurallari` × kod sözleşmesi karşılaştırıldı:
   SAĞLANIYOR: uyandırma `ajan-nobetci/index.ts:1141`'de sorunun gerekçesindeki
   `[kol:<fonksiyon>]` etiketiyle yapılıyor, olay üzerinden değil.
   Bu olaylar "oldu" işaretidir, akış tetiği değil. İşlenmemiş olay sayısı 0.
-- [ ] P3 · `soru_cevaplandi` olayını yazan tetikleyici ile onu okuyan kimse yok ·
+- [x] P3 · `soru_cevaplandi` olayını yazan tetikleyici ile onu okuyan kimse yok ·
       **Kaynak bulundu (24.08):** `trg_akis_gorev_cevap` → `akis_olay_yaz_dongu()`,
       `ajan_gorevleri` üzerinde **AFTER UPDATE**; `durum` `'yapildi'`ya döndüğünde
       `soru_cevaplandi` yazıyor (`veri`: `gorev_id`, `gorev_tipi`).

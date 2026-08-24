@@ -18,45 +18,6 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 
 ## CODE → COWORK
 
-### H-6 · 24.08.2026 · P2 — Sahip-taraf guard'ı hangi tablolara kadar gitsin?
-**Sorun.** P0 kararı (A) uygulandı: taraf-gizli tablolarda sahip, o dosyanın
-tarafıysa arabulucu yetkisi verilmiyor. Beş tabloya uygulandı, sonra taramada
-altıncısı çıktı ve **açıkça belgeli** olduğu için o da uygulandı
-(`kayit_onaylari` — `CaseRoom.tsx:1292`: *"karşı tarafın onay verip vermediği bu
-ekrana hiçbir yoldan yazılmaz"*).
-
-Geriye **`is_case_owner_safe` kullanan 22 politika** kaldı. Bunlar üç öbekte:
-
-| öbek | tablolar | değerlendirmem |
-|---|---|---|
-| **Zaten güvenli** — sahiplik dar | `case_documents` (`uploaded_by = auth.uid()`), `case_parties` (kendi satırı / `mediator` rolü şartlı) | dokunma |
-| **Dosya yönetimi** — A kararı gereği sahipte kalmalı | `case_parties` ekleme/silme, `cases_private_keys`, `cases_vector_pool` | dokunma |
-| **BELİRSİZ** — karar gerekiyor | `ajan_bellek`, `ajan_deneyim`, `ajan_kosum_izi`, `ajan_onerileri`, `akis_olaylari`, `akis_duraklatma`, `arabulucu_talimatlari`, `bilirkisi_evrak_kumesi`, `bilirkisi_onerileri`, `bilirkisi_raporlari`, `dosya_kapanis`, `elverislilik_kontrol`, `foy_gonderim_kayitlari`, `iletisim_degisim`, `kayit_onay_talepleri`, `usul_engelleri`, `usul_onerileri` | **soru bu** |
-
-Belirsiz öbek iki türlü okunabilir: (a) bunlar *arabulucunun kendi çalışma
-kayıtlarıdır*, dosya sahibi görebilir; (b) içlerinde taraf içeriği geçtiği için
-sahip-taraf görmemeli. Dördünde `party_id` sütunu var (`ajan_bellek`,
-`akis_olaylari`, `foy_gonderim_kayitlari`, `iletisim_degisim`) — yani en azından
-onlar taraf ayrımı taşıyor.
-
-**Seçenekler.**
-| | ne yapılır | bedeli |
-|---|---|---|
-| **A** | Yalnız `party_id` taşıyan dördüne guard uygulanır; kalan 13 dokunulmaz | Dar ve ölçülebilir; taraf ayrımı taşıyanlar kapanır |
-| B | Belirsiz öbeğin tamamına (17 politika) guard uygulanır | En muhafazakâr; self-servis sahibin kendi dosyasında ajan kayıtlarını göremeyeceği anlamına gelir |
-| C | Hiçbirine dokunulmaz; beş+bir tablo yeterli sayılır | Bedava; taraf içeriği sızabilecek yüzeyler açık kalır |
-
-**Önerim: A.** `party_id` taşımak, ürünün o tabloda taraf ayrımı yaptığının
-somut işaretidir; gerisi arabulucunun kendi çalışma kaydı sayılabilir.
-B, self-servis başvurucunun kendi dosyasında ajan penceresini boşaltır.
-
-**Kararın etkisi.** C seçilirse `ajan_bellek` · `akis_olaylari` ·
-`foy_gonderim_kayitlari` · `iletisim_degisim` üzerinden sahip-taraf, karşı tarafa
-ait satırları görebilir. A ve B bunu kapatır; B ayrıca arabulucu çalışma
-kayıtlarını da sahibe kapatır (self-servi̇ste işlevsellik kaybı olabilir).
-
----
-
 ### H-1 · 24.08.2026 · P1 — `CRON_SECRET` değerinin yenilenmesi ⚠️ ACİL
 **Sorun.** Cron sırrı `cron.job.command` içinde düz metin duruyordu. Saklama
 yeri düzeltildi: değer Vault'a taşındı, altı cron işi çalışma anında
@@ -90,54 +51,6 @@ cron kapısını açabilir. A/B sonrası eski değer işe yaramaz hâle gelir.
 
 ---
 
-### H-2 · 24.08.2026 · P2 — İmza akışı yok
-**Sorun.** `agreement_documents.signed_by` sütunu **hiçbir yüzeyden yazılmıyor**
-(tarandı; eşleşenlerin hepsi farklı bir sütun olan `assigned_by`). Şema ve
-tetikleyici hazır: `signed_by` değişince `anlasma_belgesi_imzalandi` olayı
-doğacak. İmza yüzeyi olmadığı için o olay **hiç doğmuyor** ve ona bağlanacak
-hiçbir akış çalışamaz. Kusur değil, **eksik özellik**: imza beş insan kapısından
-biridir (§13 · constitution), davranışı kendiliğinden eklenmez.
-
-**Seçenekler.**
-| | ne yapılır | bedeli |
-|---|---|---|
-| **A** | Islak imza: arabulucu imzalı belgeyi yükler, `signed_by` + tarih işaretlenir | En az iş, mevcut belge akışına oturur; hukuki dayanak alışıldık |
-| B | Uygulama içi tıklayarak onay (e-imza değil) | Orta iş; hukuki değeri tartışmalı, tutanağa ayrı dayanak gerekir |
-| C | Nitelikli e-imza (e-Devlet/KEP) | En yüksek hukuki değer; en yüksek iş, pilotu geciktirir |
-
-**Önerim: A** (pilot için). Islak imza Türk arabuluculuk pratiğinde yerleşiktir.
-
-**Kararın etkisi.** Karar verilmeden imza kapısı boş kalır; anlaşma belgesinin
-imzalandığı sistemde **hiçbir yerde kayıtlı olmaz** ve kapanış zinciri
-(imza → olay → akış) hiç çalışmaz.
-
----
-
-### H-3 · 24.08.2026 · P3 — Eski şema adası kaldırılsın mı
-**Sorun.** `mediator_requests` (0 satır) ve `reschedule_requests` (0 satır, FK'si
-ötekine) ile bunlara dayanan dört dosya terk edilmiştir:
-`send-session-notification` (uygulamada çağrılmıyor),
-`send-reschedule-notification` (iki bileşenden çağrılıyor ama o bileşenler
-hiçbir yerden import edilmiyor), `RescheduleRequest.tsx`, `RescheduleApproval.tsx`.
-**Canlı kusur YOK.** Ama **tuzak**: canlı görünüyor, sorgusu sessizce boş dönüyor,
-"yapacak bir şey yok" sanılıp 200 dönülüyor. 24.08'de tam olarak bu oldu —
-`send-session-reminders` aynı tabloyu sorguluyordu ve **oturum hatırlatmaları
-hiç gönderilmiyordu**; üç tur kaybettirdi. Dört dosyanın başına uyarı konuldu.
-
-**Seçenekler.**
-| | ne yapılır | bedeli |
-|---|---|---|
-| **A** | Kod dosyaları silinir, tablolar DURUR | Tuzak kalkar, veri kaybı riski yok |
-| B | Kod + tablolar birlikte silinir | En temiz; tablo silmek geri dönüşsüzdür (§7.3) |
-| C | Hiçbir şey silinmez, yalnız uyarı kalır (bugünkü durum) | Bedava; sonraki okuyan yine yanılabilir |
-
-**Önerim: A.** Tuzağın kaynağı koddur; tabloyu silmenin acelesi yok.
-
-**Kararın etkisi.** B geri alınamaz. C seçilirse tuzak durur; uyarı yardımcı
-olur ama garanti değildir.
-
----
-
 ### H-4 · 24.08.2026 · P3 — Kayıt kovasına dar okuma politikası
 **Sorun.** `oturum-kayitlari` kovası 24.08'de açıldı (özel; istemciye hiçbir
 politika verilmedi — deny-by-default). Silme kolu servis rolüyle çalıştığı için
@@ -158,28 +71,6 @@ için dosya yolu düzeni belli değil; politika için desen **uydurmak** gerekir
 **Kararın etkisi.** Pilotu bloke etmez (kayıt hattı henüz yok). Ama politika
 **geniş** yazılırsa 24.08'de belge kovasında yaşanan kör veri sızıntısı
 tekrarlanır — orada ölçülen gerçek sızıntı 1 çiftti.
-
----
-
-### H-5 · 24.08.2026 · P3 — `soru_cevaplandi` olayının tüketicisi yok
-**Sorun.** `trg_akis_gorev_cevap` → `akis_olay_yaz_dongu()`, `ajan_gorevleri`
-üzerinde AFTER UPDATE: `durum` `yapildi`ya döndüğünde `soru_cevaplandi` olayı
-yazıyor. Bu olayı **kod hiçbir yerde okumuyor** ve ona bağlı kural yok. Canlıda
-10 satır birikmiş. **Zarar yok:** olaylar `islendi=true` işaretlenip düşüyor.
-Motorun 5. maddesi ("cevap gelince kol yeniden uyanır") zaten sağlanıyor — ama
-olayla değil, `ajan-nobetci:1218`de `[kol:…]` etiketiyle.
-
-**Seçenekler.**
-| | ne yapılır | bedeli |
-|---|---|---|
-| **A** | Tetikleyici kaldırılır; uyandırma bugünkü gibi `[kol:…]` ile sürer | Gürültü kalkar; uyandırma en fazla 3 dk gecikir |
-| B | Olaya kural yazılır, uyandırma olaya bağlanır | Uyandırma anlıklaşır; yeni akış kolu ve test yükü |
-| C | Bugünkü gibi kalır | Bedava; tüketicisiz olay birikmeye devam eder |
-
-**Önerim: A.** İki mekanizmadan biri gereksiz; çalışan olan `[kol:…]` yoludur.
-
-**Kararın etkisi.** Hiçbiri acil değildir. C seçilirse tablo büyümeye devam eder;
-B seçilirse iki uyandırma yolu birden olur ve mükerrer koşum riski doğar.
 
 ---
 
@@ -262,6 +153,38 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+
+### H-6 · P0 — Sahip-taraf guard'ı belirsiz öbeğe de uygulandı · **KAPANDI**
+**Karar: B** (kurucu; Code'un önerisi A'ydı). 17 belirsiz politika + taramada
+çıkan 2 tablo daha guard'a alındı. Migration `20260824140724` + `20260824140953`
+(Lovable). CANLI: dar politika **25** · kalan geniş **6** (tam olarak
+dokunulmayacak öbek) · sahip **9/9** yetkili · erişimi değişen dosya **0**.
+Tezgâh `tests/rls-sahip-taraf-guard.test.ts` 35 durum; guard sökülmüş kopyada
+27 test düşüyor (kanıt). İstisna gerekmedi — sessiz istisna yok.
+
+### H-3 · P3 — Eski şema adası · **KAPANDI**
+**Karar: A.** Dört dosya silindi (`de0049b`): `send-session-notification`,
+`send-reschedule-notification`, `RescheduleRequest.tsx`, `RescheduleApproval.tsx`.
+Tablolar DURUYOR. Kararın şartı yerine getirildi: çağrılmadıkları taramayla
+kanıtlandı (kanıt `tasks/todo.md`de), ders `tasks/lessons.md`ye işlendi.
+Doğrulama: 204/204 test · tsc temiz · build başarılı · lint 2358 → 2346.
+
+### H-2 · P2 — İmza akışı · **KAPANDI**
+**Karar: A** (ıslak imza). `src/components/mediation/AnlasmaImzaPaneli.tsx`
+açıldı; arabulucu imzalı taramayı yükler, imzalayan tarafları işaretler,
+`signed_by` + `metadata.imzalandi_at` yazılır → tetikleyici
+`anlasma_belgesi_imzalandi` olayını doğurur (zincir artık koşuyor).
+Kararın yetki sınırı mimariyle tutuldu: yazma istemciden kullanıcının kendi
+JWT'siyle gider; hiçbir edge function `signed_by`'a dokunmuyor (servis rolü
+RLS'i aşardı). Tezgâh `tests/imza-kapisi.test.ts` (6 durum) — sunucudan
+`signed_by` yazımı eklenince DÜŞÜYOR (kanıtlandı). 210/210 test.
+
+### H-5 · P3 — `soru_cevaplandi` tüketicisiz olayı · **KAPANDI**
+**Karar: A.** `trg_akis_gorev_cevap` kaldırıldı (Lovable göçü
+`20260824184056`, commit `edd7b64`). Kaldırmadan önce doğrulandı: bu olay koduna
+bağlı `akis_kurallari` satırı **0**, kod tabanında tüketici **0**, işlenmemiş
+olay **0**. Birikmiş **12** satır SİLİNMEDİ, işlenmiş olarak duruyor.
+Uyandırma `ajan-nobetci`deki `[kol:…]` yoluyla sürüyor.
 
 ### H-0 · 24.08.2026 · P0 — Self-servis başvuruda kör veri kırılıyor · **KAPANDI**
 **Karar: A** (kurucu, 24.08). Taraf-gizli beş tabloda (`oturum_hazirlik_foyleri`,
