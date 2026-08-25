@@ -5,17 +5,47 @@
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
   Karar gereken her madde `tasks/HAT.md`ye yazılır, Code beklemeden devam eder.
   "Bitti, bilgi veriyorum" turu yok.
-- Aktif görev: (bu turda seçilecek — kuyruk taraması sürüyor)
-- Son tamamlanan iş: **P1 · eski şema adası kaldırıldı** (`87d1dc4`) + **P3 · lint
-  `tests/gecici/` taramıyor** (`e56d122`) — ikisi de canlıda doğrulandı
+- Aktif görev: P1 · `ProcessTrackerPanel` atama adımını ölü tablodan okuyor (araştırılıyor)
+- Son tamamlanan iş: **P2 · ölü yüzey tezgâhı** (`97517c2`) — kanıtlandı
+  (önce: P1 eski şema adası `87d1dc4` · P3 lint kapsamı `e56d122`, ikisi de canlıda)
 - Açık HAT maddesi: **H-1** (kurucuda: `CRON_SECRET` yenilemesi — Code'un işi
   yalnız yenileme sonrası 200 doğrulaması) · **H-4** (önkoşul yok: kayıt hattı
   yazılınca)
-- Doğrulama: `npm run test` **215/215** · tsc temiz · build başarılı ·
+- Doğrulama: `npm run test` **219/219** · tsc temiz · build başarılı ·
   lint **2349** (src 1063 → **1058**, adanın gerçek etkisi −5)
 - **Açık blokaj: yok**
-- Sıradaki uygulanabilir iş: kuyrukta önkoşulsuz iş kalmadı → §6 gereği kodun
-  gerçek durumundan yeni P0/P1 adayı çıkarılıyor.
+- Açık HAT maddesi (yeni): **H-7** (`session_feedback` yapısal olarak imkânsız) ·
+  **H-8** (emekliye ayrılmış başvuru adası) — ikisi de beklenmiyor, iş sürüyor.
+- Sıradaki uygulanabilir iş: ölü/terk edilmiş tablodan okuyan **erişilebilir**
+  yüzeyler (`ProcessTrackerPanel` → `case_assignments`).
+
+### KAPANDI — 25.08 · P2 · ÖLÜ YÜZEY TEZGÂHI (`97517c2`)
+Ada taraması kalıcı tezgâha çevrildi: `tests/olu-yuzey.test.ts`, `src/main.tsx`ten
+**geçişli** erişilebilirlik grafı kurar. Tek düzey "import ediliyor mu" taraması
+YETMİYORDU — `IntakeForm` import ediliyordu ama onu import eden `Intake.tsx` de
+ölüydü.
+- Söz 1: erişilemeyen dosya kümesi **dondurulmuştur** (35 dosya). Yeni ölü yüzey
+  doğarsa ya da ölü sayılan biri diriltilirse test düşer.
+- Söz 2: erişilemeyen bir dosya veritabanına **YAZIYORSA** gerekçesiyle
+  `YAZAN_OLU`da adı geçmelidir. Bugün altı dosya: `IntakeForm` (`cases` +
+  `case_parties` INSERT) · `SessionFeedback` · `CaseDocuments`
+  (`storage.remove` + satır DELETE) · `useCaseStorage` · `MediatorBlockedDates` ·
+  `MediatorAvailabilityCalendar`.
+- Dördüncü test **tezgâhın kendisini** korur (`ERİŞİLİR > 100` + bilinen sayfalar).
+  İlk yazımda göreli import çözümü kanıt kopyasının kökünü düşürüyordu ve graf
+  gerçek `src/`e çıkıyordu; o testi bu yakaladı (24.08'deki bozuk-bekçi dersinin
+  aynısı).
+- **KANITLANDI:** kopyaya tek bir ölü yazıcı eklendi
+  (`OLU_KOK=tests/gecici/olu-kanit`) → tam olarak **2 test DÜŞTÜ** ve yalnız o
+  dosyayı adıyla gösterdi; gerçek dizinde 4/4 geçiyor.
+- Doğrulama: **219/219** test · tsc temiz · lint 2349 (değişmedi).
+- Deploy gerekmedi: yalnız `tests/**` değişti (§11-B).
+
+### HAT'A YAZILDI — 25.08 · beklenmedi (§23)
+| madde | öz | önerim |
+|---|---|---|
+| **H-7 · P1** | `session_feedback` **yapısal olarak imkânsız**: INSERT ve arabulucu SELECT politikaları ölü `mediator_requests`e zincirli; tablo 0 satır ve tek yazanı 25.08'de silindi. `Analytics` yine de puan paneli çiziyor. | A — `case_sessions`e bağla; panel o zamana kadar gizlensin |
+| **H-8 · P2** | Emekliye ayrılmış **başvuru adası** (17 dosya). `/intake` → `RedirectToHub` → `/legal-reasoning`; Landing düğmeleri de doğrudan merkeze. `IntakeForm` hâlâ `cases`+`case_parties` INSERT ediyor = merkezin kurallarını atlayan **ikinci dosya açma yolu**. | A — H-3 sınıfı: kod gider, tablo durur |
 
 ### KAPANDI — 25.08 · P1 · ESKİ ŞEMA ADASI KALDIRILDI (`87d1dc4`, publish)
 24.08'de H-3 taramasında bulunan "P1 adayı" madde. `mediator_requests` canlıda
