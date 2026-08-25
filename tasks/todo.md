@@ -4,8 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P3 · kullanılabilirlik** — pilot kuyruğunun **Code'a ait
-  bütün maddeleri bitti**
+- Son tamamlanan iş: **P1 · kazanım sayacı (katsayılar parametre) + §15.1 denetimi**
 - **PİLOT KUYRUĞU DURUMU: 14 maddeden 9'u DONE, 5'i BLOCKED.** Açık (yapılabilir)
   madde **YOK**. Beşinin de engeli karar ya da kurucu eylemi:
   dördü **HAT H-15** (saklama süreleri · antet/şablon · üyelik-kota · kazanım
@@ -113,7 +112,7 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
-- [x] P1 · **Taraf katılım ekranında aydınlatma metni** · **DONE 25.08.2026**
+- [~] P1 · **Taraf katılım ekranında aydınlatma metni** · **CANLI DOĞRULAMA BEKLİYOR** (§15.1 şart 4) · kod tarafı 25.08.2026
       · Kabul: `/katilim/:token` sayfasında KVKK aydınlatma metni **karardan önce**
       gösteriliyor ve metin `Auth.tsx` ile **aynı kaynaktan** geliyor (ikinci kopya yok)
       · Doğrulama: `tests/kvkk-taraf-aydinlatma.test.ts` (4 durum) · 275/275 test ·
@@ -198,62 +197,26 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       **Bulgu:** üyelik/paket/kota tablosu **yok**, kodda karşılığı yok
       ("subscription" eşleşmeleri Supabase auth dinleyicileri).
       **NOT:** ürün/fiyat kararı gerektirir — başlamadan önce HAT'a çıkarılmalı (§7.2).
-- [!] P1 · **Kazanım sayacı** · **BLOCKED → HAT H-15/4** (ürün: "kazanım" tanımı) · Tanım olmadan sayaç ya hiç yapılmaz ya da uydurma rakam üretir; ikincisi kabul edilemez (§15.1). Kalan: · Kabul: baz çizgi alınıyor ve dosya bazında kazanılan
-      saat üretiliyor · **Bulgu:** tablo yok, kodda karşılığı yok ("baseline"
-      eşleşmeleri CSS sınıf adları). **NOT:** "kazanım" tanımı ürün kararıdır.
-- [x] P2 · **Ödeme defteri "Kaydet" görünürlüğü** (§15.5-4) · **DONE 25.08.2026
-      (zaten kuruluymuş — doğrulandı ve kilitlendi)** · Doğrulama:
-      `tests/odeme-defteri.test.ts` (5 durum) · 307/307 test
-      · **§15.5'te 28.07'den beri açık duran TEK pilot blokeriydi; kapandı.**
-      · **Bulgu:** defterin dört yazım yolu da kurulu — satır ekle · satır
-      düzenle/Kaydet · toplu kaydet · ücret sözleşmesi Kaydet. Dördü de
-      **koşulsuz** render ediliyor; yalnız işlem sürerken devre dışı kalıyorlar
-      (çift gönderimi önlemek için — doğru davranış, görünürlük kusuru değil).
-      Silme onay istiyor, ödenmiş kayıt değişikliği ayrıca uyarıyor. Dört hata
-      alanı da (`editError` · `rowError` · `stageError` · `contractError`)
-      kullanıcıya gösteriliyor — sessiz başarısızlık yok.
-
-### Canlı doğrulama maddeleri (kod değil, kanıt üretir)
-- [x] P2 · **§3 otomatik doldurma** · **DONE 25.08.2026 (doğrulandı, bir tuzak
-      kaldırıldı)** · Doğrulama: `tests/belge-motoru.test.ts` (5 durum) · 301/301
-      · **Dolan alanlar** kayıtlı veriden geliyor: dosya no · büro no · arb no ·
-      başvuru tarihi · anlaşma konusu/bedeli/şartları · taraf bloğu (vekil, vergi
-      dairesi vb. `partyBlock` ile) · oturum tarihi · ücret bloğu · arabulucu adı ·
-      sonuç · kapanış · dava şartı son tarihi.
-      · **KALDIRILAN TUZAK:** `gorevlendirme_tarihi` alanına `created_at` (kaydın
-      oluşturulma anı) basılıyordu — tutanakta **başka bir tarihi** "görevlendirme
-      tarihi" diye göstermek olgu uydurmaktır (H-9'daki "Dosya Atama Tarihi"
-      kusuruyla aynı aile). §3 bunu zaten **manuel** alan sayıyor ve şemada kolonu
-      yok. Boş bırakıldı (§15.1 camdan kutu). Bugün hiçbir şablon bu alanı
-      kullanmıyor — görünür etkisi yok, ama şablon eklendiğinde tuzak kendiliğinden
-      kurulurdu.
-      · **IBAN İNCELENDİ, DOĞRU DAVRANIŞ ZATEN VARDI:** 47 şablonun 7'sinde "IBAN"
-      geçiyor ama bunlar `{{iban}}` yer tutucusu **değil**, Bakanlık şablonlarındaki
-      **noktalı elle doldurma alanları** (`TR …………`). Üstelik 7'nin 6'sında IBAN
-      **tarafa** ait (kim kime ödeyecek), arabulucuya değil — sistemde taraf IBAN'ı
-      tutulmuyor. Otomatik doldurmak **yanlış** olurdu; §3.4'ün düzenlenebilir
-      taslak akışına aittir. Arabulucunun kendi IBAN'ı ödeme bilgisi PDF'ine
-      `get_case_mediator_payment_info` ile **zaten akıyor**.
-
-- [x] P2 · **Dava şartı dosyalarında bilgilendirme belgelemesi üretiliyor** ·
-      **DONE 25.08.2026 — GERÇEK BOŞLUKTU, KAPATILDI** · Doğrulama:
-      `tests/belge-motoru.test.ts` · 302/302 test · tsc temiz · build temiz
-      · **Bulgu:** dört bilgilendirme şablonu canlıda **aktif** duruyordu
-      (`ihtiyari_` · `isci_isveren_` · `kira_` · `ticari_bilgilendirme`, her biri
-      17–19 KB) ama `generate-official-document` çözücüsünde ve
-      `OfficialDocumentsPanel`in `DocKind` listesinde karşılığı **yoktu** — yani
-      şablonlar hazırdı, **hiçbir yüzeyden üretilemiyordu.**
-      · **Düzeltme:** çözücüye `bilgilendirme` kolu eklendi; desen `davet`/
-      `ilk_oturum` ile birebir aynı (`{grup}_bilgilendirme`, ihtiyari kolunda
-      `ihtiyari_bilgilendirme`). İstek doğrulaması da genişletildi.
-      · **Sonuçtan BAĞIMSIZ gösteriliyor:** bilgilendirme süreç **başında** yapılır;
-      anlaşma/anlaşamama kararı henüz yokken de üretilebilmeli. Bu yüzden
-      `DOC_SET_AGREED`/`FAILED` kümelerine değil, her zaman görünen ayrı bir
-      kümeye (`DOC_SET_HER_ZAMAN`) kondu.
+- [!] P1 · **Kazanım sayacı** · **KOD YARISI BİTTİ · BLOCKED → HAT H-15/4**
+      (yalnız katsayı DEĞERLERİ) · Doğrulama: `tests/kazanim-sayaci.test.ts`
+      (9 durum) · 331/331 test
+      · **Engel aşıldı:** madde "kazanım"ın tanımını bekliyordu. Tanımı beklemek
+      yerine **tanım veriye taşındı**: katsayılar `kazanim_katsayilari`
+      tablosunda durur, kurucu girer. Böylece karar beklenmeden kod hazır oldu.
+      · **CAMDAN KUTU YAPISAL OLARAK SAĞLANDI (tezgâhla kilitli):** katsayı
+      kodda sabit **değil** · katsayı girilmemişse o kalem **saate çevrilmez**
+      (adet yine gösterilir) · **hiç** katsayı yoksa toplam **verilmez**,
+      "yeterli veri yok" denir · her kalem **adet + katsayı + DAYANAK** ile
+      döner, yani toplamın nereden geldiği satır satır görülür · rakamın
+      **TAHMİN** olduğu gizlenmez · sayılacak tablo haritadan gelir.
+      *"Bu dosyada 7 saat kazandınız" demek, 7'nin nereden geldiği
+      gösterilemiyorsa uydurmadır (§15.1).*
+      · **Kalan:** beş iş türü için dakika + dayanak (göç:
+      `tests/gecici/kazanim-katsayilari.sql`, Code yazdı çalıştırmadı §10).
 
 - [!] P2 · **Taraf akışı telefonda uçtan uca** · **BLOCKED — gerçek telefon gerekiyor (kurucu)** · Kalan: · Kabul: gerçek telefonda davet →
       başvuru → belge → Kör Teklif → ödeme bilgisi zinciri kesintisiz tamamlanıyor.
-- [x] P3 · **Kullanılabilirlik bulguları (03.08 saha notu)** · **DONE 25.08.2026**
+- [~] P3 · **Kullanılabilirlik bulguları (03.08 saha notu)** · **CANLI DOĞRULAMA BEKLİYOR** (§15.1 şart 4) · kod tarafı 25.08.2026
       · Doğrulama: `tests/form-kaybi-erisilebilirlik.test.ts` (6 durum) · 313/313
       test · tsc temiz · build temiz · lint 2331 (taban)
 
@@ -276,6 +239,40 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       tetikleyicinin `id`si olmadığı için menülerin **erişilebilir adı yoktu** —
       ekran okuyucu "combobox" diyor, neyi seçtiğini söylemiyordu. İki menüye de
       `aria-label` eklendi.
+
+### §15.1 DENETİMİ — 25.08.2026 (kapanan 9 madde, beş şarta karşı)
+
+`mimari/15-kabul-kriterleri.md` §15.1: bir kalem **beşi birden** sağlanmadan
+"bitti" sayılmaz. Kapatılan dokuz madde tek tek geçirildi.
+
+**BULGU: dördü şart 4'ü (canlı test) SAĞLAMIYOR.** §15'in kendi kuralı gereği
+bunlar `DONE` değil **`CANLI DOĞRULAMA BEKLİYOR`**dur; işaretleri düzeltildi.
+
+| madde | 1 gizlilik | 2 camdan kutu | 3 insan üstün | 4 canlı test | 5 kırıntı yok |
+|---|---|---|---|---|---|
+| Orkestratör dört adım + künye | ✓ | ✓ künye bekçisi | ✓ | **✓ 5 dosyada 4/4** | ✓ |
+| §3 otomatik doldurma | ✓ | ✓ uydurma tarih kaldırıldı | ✓ taslak düzenlenebilir | ~ kod denetimi | ✓ |
+| UDF belge zinciri | ✓ | ✓ | ✓ | ~ gerçek UYAP örneğiyle | ✓ |
+| Ücret tarife tabanı | ✓ | ✓ tabanı gösteriyor | ✓ | ~ kod denetimi | ✓ |
+| Ödeme defteri Kaydet | ✓ | ✓ hata gösteriliyor | ✓ | **✗** | ✓ |
+| Taraf aydınlatma metni | ✓ | ✓ | — | **✗** | ✓ |
+| Dava şartı bilgilendirme | ✓ | ✓ | ✓ | **✗** yeni kod | ✓ |
+| Kullanılabilirlik | ✓ taslakta taraf verisi yok | ✓ | ✓ | **✗** yeni kod | ✓ |
+| Sesli oturum notu | ✓ teknik kısıt | ✓ metin düzeltilebilir | ✓ arabulucu onaylar | **✗** RLS yok | ✓ |
+
+**Şart 4 neden bu kadar çok yerde eksik:** bu turda yazılan kod canlıya çıktı
+ama **gerçek veriyle kurucunun gözüyle** koşulmadı. §15 bunu açıkça ayırıyor;
+"kod yazıldı + test yeşil" canlı kanıt değildir.
+
+**TEK OTURUMDA KAPANABİLİR.** Kurucunun bir dosyada yapacağı beş dokunuş
+dördünü birden kapatır:
+1. Ödeme defterine bir satır ekle → düzenle → sil (Kaydet her adımda görünüyor mu)
+2. Belge üretiminde **Bilgilendirme Tutanağı**nı üret ve indir
+3. Yeni Başvuru formunu yarıda bırak, sekmeyi bekletip dön (içerik duruyor mu)
+4. Taraf davet bağlantısını aç (aydınlatma metni karardan önce görünüyor mu)
+5. Sesli not — ama önce `oturum-kayitlari-politika.sql` çalıştırılmalı
+
+Şart 1/2/3/5 dokuz maddede de sağlanıyor; eksik olan yalnız şart 4'tür.
 
 ### §15.1 — BEŞ KABUL ŞARTI (her madde için ayrı ayrı sağlanmalı)
 Bir kalem, aşağıdaki **beşi birden** sağlanmadan "bitti" sayılmaz:
