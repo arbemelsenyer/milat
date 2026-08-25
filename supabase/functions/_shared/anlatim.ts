@@ -112,14 +112,22 @@ async function yaz(
     // Bayrak yalnız AÇIKÇA istendiğinde yazılır; masa ajanının satırı tarafa açılmaz.
     if (sahip.tarafaGorunur === true) govde.tarafa_gorunur = true;
 
-    if ((mevcut as any)?.id) {
-      await admin.from("agent_states").update(govde).eq("id", (mevcut as any).id);
-    } else {
-      await admin.from("agent_states").insert({
+    /* AŞAĞIDAKİ catch KORUMA DEĞİLDİR: supabase-js DB hatasını FIRLATMAZ,
+       `{error}` döndürür. Okunmazsa anlatım satırı sessizce kaybolur ve
+       "[anlatim] yazılamadı" satırı KONSOLA DA hiç düşmez — arabulucu panelde
+       ajanın ne yaptığını göremez, sebebini de hiçbir yerde bulamaz.
+       Anlatım best-effort'tur: asıl işi bozmaz, ama susmaz. */
+    const { error: anlatimErr } = (mevcut as any)?.id
+      ? await admin.from("agent_states").update(govde).eq("id", (mevcut as any).id)
+      : await admin.from("agent_states").insert({
         case_id: sahip.case_id,
         agent_type: sahip.agent_type,
         party_id: sahip.party_id ?? null,
         ...govde,
+      });
+    if (anlatimErr) {
+      console.error("[anlatim] yazılamadı", {
+        agent_type: sahip.agent_type, hata: kisalt(anlatimErr.message, 120),
       });
     }
   } catch (e: any) {
@@ -463,9 +471,15 @@ export async function anlatimYansit(
       return;
     }
 
-    await admin.from("agent_states").update({
+    // Aynı sebep: catch koruma değildir, `{error}` okunmazsa iz hiç kalmaz.
+    const { error: yansitErr } = await admin.from("agent_states").update({
       last_output: { ...cikti, ...patchCikti, adimlar, durum_izi: status },
     }).eq("id", (mevcut as any).id);
+    if (yansitErr) {
+      console.error("[anlatim] yansıtma yazılamadı", {
+        agent_type: sahip.agent_type, hata: kisalt(yansitErr.message, 120),
+      });
+    }
 
     /* B1 — deneyim defteri: kendi durum yazıcısını kullanan kollar da nesnel
        sonucu yazar. Yalnız kapanışta yazılır, ara adımlarda değil. */

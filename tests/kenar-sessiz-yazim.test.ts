@@ -322,16 +322,33 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     // Bu, tek tek islev denetimlerinin kacirdigi yeni yazimlari da yakalar.
     const kok = KOK ? `${KOK}/supabase/functions` : "supabase/functions";
     const ciplak: string[] = [];
-    for (const ad of readdirSync(kok, { withFileTypes: true })) {
-      if (!ad.isDirectory() || ad.name === "_shared") continue;
-      const yol = `${kok}/${ad.name}/index.ts`;
-      if (!existsSync(yol)) continue;
+    const tara = (yol: string, etiket: string) => {
+      if (!existsSync(yol)) return;
       readFileSync(yol, "utf-8").split(String.fromCharCode(10)).forEach((l, i) => {
-        if (/^\s*await\s+(admin|sb|supabase|client)\.from\(/.test(l)) {
-          ciplak.push(`${ad.name}:${i + 1}`);
+        if (/^\s*await\s+(admin|sb|supabase|client|db)\.from\(/.test(l)) {
+          ciplak.push(`${etiket}:${i + 1}`);
         }
       });
+    };
+    for (const ad of readdirSync(kok, { withFileTypes: true })) {
+      if (!ad.isDirectory()) continue;
+      if (ad.name === "_shared") {
+        // Paylaşılan katman da kapsam içi: buradaki bir sessiz yazım 35 işlevi etkiler.
+        for (const p of readdirSync(`${kok}/_shared`)) {
+          if (p.endsWith(".ts")) tara(`${kok}/_shared/${p}`, `_shared/${p}`);
+        }
+        continue;
+      }
+      tara(`${kok}/${ad.name}/index.ts`, ad.name);
     }
     expect(ciplak, `sonucu okunmayan yazım: ${ciplak.join(" | ")}`).toEqual([]);
+  });
+
+  it("anlatım defteri (_shared/anlatim.ts): yazım düşerse konsola düşüyor", () => {
+    // Dosyanin kendi sozu "[anlatim] yazilamadi" logudur — ama catch hic
+    // calismadigi icin o log HIC dusmuyordu. 35 islev bu katmani kullaniyor.
+    const g = readFileSync(y("supabase/functions/_shared/anlatim.ts"), "utf-8");
+    for (const im of ["anlatimErr", "yansitErr"]) expect(g, `${im} okunmuyor`).toContain(im);
+    expect(g).toContain("catch KORUMA DEĞİLDİR");
   });
 });
