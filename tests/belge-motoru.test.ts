@@ -69,4 +69,27 @@ describe("belge motoru: §3 doldurma + UDF zinciri", () => {
     const admin = readFileSync("supabase/functions/admin-upload-template/index.ts", "utf-8");
     expect(admin).toMatch(/tuketici/);
   });
+
+  it("dava şartı dosyasında BİLGİLENDİRME belgesi üretilebiliyor", () => {
+    /* mimari §15.2: "Dava şartı dosyalarında bilgilendirme belgelemesi
+       üretiliyor." 25.08'e kadar sağlanmıyordu: dört bilgilendirme şablonu
+       canlıda AKTİF duruyordu (`ihtiyari_` · `isci_isveren_` · `kira_` ·
+       `ticari_bilgilendirme`, 17–19 KB) ama çözücüde ve panelde karşılığı
+       yoktu — hiçbir yüzeyden üretilemiyordu. */
+    expect(ISLEV, "çözücü bilgilendirmeyi tanımıyor").toContain('kind === "bilgilendirme"');
+    expect(ISLEV, "istek doğrulaması bilgilendirmeyi reddediyor")
+      .toMatch(/"anlasma_belgesi",\s*"bilgilendirme"\]\.includes\(kind\)/);
+    // Desen `davet`/`ilk_oturum` ile ayni olmali: {grup}_bilgilendirme + ihtiyari.
+    expect(ISLEV).toContain('return ["ihtiyari_bilgilendirme"]');
+    expect(ISLEV).toContain("`${group}_bilgilendirme`");
+
+    // Panel: sonuctan BAGIMSIZ gorunmeli — bilgilendirme surec BASINDA yapilir.
+    expect(PANEL, "panel bilgilendirmeyi tanımıyor").toContain('"bilgilendirme"');
+    expect(PANEL, "sonuç kararına bağlanmış").toContain("DOC_SET_HER_ZAMAN");
+    const herZamanIdx = PANEL.indexOf("...DOC_SET_HER_ZAMAN");
+    const kosulIdx = PANEL.indexOf('outcome === "anlasma" ? DOC_SET_AGREED', herZamanIdx);
+    expect(herZamanIdx, "her-zaman kümesi setKinds'e girmiyor").toBeGreaterThan(-1);
+    expect(kosulIdx, "koşullu küme her-zaman kümesinden önce").toBeGreaterThan(herZamanIdx);
+    expect(PANEL).toContain("Bilgilendirme Tutanağı");
+  });
 });

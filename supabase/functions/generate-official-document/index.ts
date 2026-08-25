@@ -56,7 +56,7 @@ function selectTemplateCandidates(opts: {
   mediation_type?: string | null;
   outcome?: string | null;
   dispute_type?: string | null;
-  kind: "son_tutanak" | "davet" | "ilk_oturum" | "anlasma_belgesi";
+  kind: "son_tutanak" | "davet" | "ilk_oturum" | "anlasma_belgesi" | "bilgilendirme";
   variant?: string | null;
 }): string[] {
   const { mediation_type, outcome, dispute_type, kind, variant } = opts;
@@ -76,6 +76,17 @@ function selectTemplateCandidates(opts: {
     if (variant && group) candidates.push(`${group}_${variant}_anlasma_belgesi`);
     if (group) candidates.push(`${group}_anlasma_belgesi`);
     return uniq(candidates);
+  }
+
+  /* BİLGİLENDİRME (mimari §15.2: "Dava şartı dosyalarında bilgilendirme
+     belgelemesi üretiliyor"). Şablonlar canlıda ZATEN VARDI ve aktifti
+     (`ihtiyari_bilgilendirme` · `isci_isveren_bilgilendirme` ·
+     `kira_bilgilendirme` · `ticari_bilgilendirme`, her biri 17–19 KB) ama
+     çözücüde ve panelde karşılığı yoktu — yani hiçbir yüzeyden üretilemiyordu.
+     Desen `davet`/`ilk_oturum` ile birebir aynıdır. */
+  if (kind === "bilgilendirme") {
+    if (isIhtiyari) return ["ihtiyari_bilgilendirme"];
+    return uniq([...(group ? [`${group}_bilgilendirme`] : []), "dava_sarti_bilgilendirme"]);
   }
 
   if (kind === "davet") {
@@ -259,7 +270,7 @@ Deno.serve(async (req) => {
   // (müracaat tutanağı, yetki belgesi vb.) doğrudan istemesinin yoludur.
   if (!requestedTemplateType) {
     if (!kind) return j({ error: "case_id and kind required" }, 400);
-    if (!["son_tutanak", "davet", "ilk_oturum", "anlasma_belgesi"].includes(kind)) return j({ error: "invalid kind" }, 400);
+    if (!["son_tutanak", "davet", "ilk_oturum", "anlasma_belgesi", "bilgilendirme"].includes(kind)) return j({ error: "invalid kind" }, 400);
   }
 
   // Load case, parties, session, fee, mediator profile.

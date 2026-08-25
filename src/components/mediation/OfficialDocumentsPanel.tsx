@@ -27,7 +27,7 @@ interface Props {
   onOutcomeSaved?: () => void;
 }
 
-type DocKind = "son_tutanak" | "davet" | "ilk_oturum" | "anlasma_belgesi";
+type DocKind = "son_tutanak" | "davet" | "ilk_oturum" | "anlasma_belgesi" | "bilgilendirme";
 
 // Sürüm = agreement_documents tablosundaki bir satır. Yeni tablo/sütun yok;
 // metin ve durum metadata JSONB'sinde durur, sıra created_at'tendir.
@@ -105,6 +105,11 @@ function wordDiff(oldText: string, newText: string): DiffPart[] {
 
 const DOC_SET_AGREED: DocKind[] = ["ilk_oturum", "son_tutanak", "anlasma_belgesi", "davet"];
 const DOC_SET_FAILED: DocKind[] = ["son_tutanak"];
+/* BİLGİLENDİRME sonuçtan BAĞIMSIZDIR (mimari §15.2). Taraflar süreç BAŞINDA
+   bilgilendirilir; anlaşma/anlaşamama kararı henüz yokken de üretilebilmeli.
+   Bu yüzden `DOC_SET_*` kümelerine değil, her zaman görünen ayrı bir kümeye
+   konur. Şablonlar canlıda zaten aktifti ama hiçbir yüzeyden üretilemiyordu. */
+const DOC_SET_HER_ZAMAN: DocKind[] = ["bilgilendirme"];
 
 export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
   const [outcome, setOutcome] = useState<"anlasma" | "anlasamama" | null>(caseRow?.outcome ?? null);
@@ -125,7 +130,10 @@ export function OfficialDocumentsPanel({ caseRow, onOutcomeSaved }: Props) {
   const [versions, setVersions] = useState<Record<string, DocVersion[]>>({});
   const [showDiff, setShowDiff] = useState<Record<string, boolean>>({});
 
-  const setKinds: DocKind[] = outcome === "anlasma" ? DOC_SET_AGREED : outcome === "anlasamama" ? DOC_SET_FAILED : [];
+  const setKinds: DocKind[] = [
+    ...DOC_SET_HER_ZAMAN,
+    ...(outcome === "anlasma" ? DOC_SET_AGREED : outcome === "anlasamama" ? DOC_SET_FAILED : []),
+  ];
 
   useEffect(() => {
     setOutcome(caseRow?.outcome ?? null);
@@ -392,6 +400,7 @@ ${paragraphElems.join("\n")}
     son_tutanak: outcome === "anlasma" ? "Anlaşma Son Tutanağı (m.17)" : "Anlaşamama Son Tutanağı",
     anlasma_belgesi: "Anlaşma Belgesi (m.18)",
     davet: "Davet Mektubu (türe uygun)",
+    bilgilendirme: "Bilgilendirme Tutanağı (türe uygun)",
   };
 
   return (

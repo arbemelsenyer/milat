@@ -4,7 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P1 · sesli oturum notu (H-14/B) + P0 kabuk bekçisi (H-11)**
+- Son tamamlanan iş: **P2 · dava şartı bilgilendirme belgesi (gerçek boşluk kapatıldı)**
 - **SESSİZ ÇAĞRI KUSURU İSTEMCİ YÜZEYİNİN TAMAMINDA KAPANDI:** `.from` ·
   `.rpc` · `.storage` · `.functions.invoke` · iç `fetch`. Kenar (`_shared`
   dâhil) ve ön yüz. Kenarda çıplak `.from(...)`, `.rpc(...)` ve
@@ -208,8 +208,22 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       taslak akışına aittir. Arabulucunun kendi IBAN'ı ödeme bilgisi PDF'ine
       `get_case_mediator_payment_info` ile **zaten akıyor**.
 
-- [ ] P2 · **Dava şartı dosyalarında bilgilendirme belgelemesi üretiliyor** · Kabul:
-      dava şartı işaretli bir dosyada bilgilendirme belgesi üretiliyor ve indirilebiliyor.
+- [x] P2 · **Dava şartı dosyalarında bilgilendirme belgelemesi üretiliyor** ·
+      **DONE 25.08.2026 — GERÇEK BOŞLUKTU, KAPATILDI** · Doğrulama:
+      `tests/belge-motoru.test.ts` · 302/302 test · tsc temiz · build temiz
+      · **Bulgu:** dört bilgilendirme şablonu canlıda **aktif** duruyordu
+      (`ihtiyari_` · `isci_isveren_` · `kira_` · `ticari_bilgilendirme`, her biri
+      17–19 KB) ama `generate-official-document` çözücüsünde ve
+      `OfficialDocumentsPanel`in `DocKind` listesinde karşılığı **yoktu** — yani
+      şablonlar hazırdı, **hiçbir yüzeyden üretilemiyordu.**
+      · **Düzeltme:** çözücüye `bilgilendirme` kolu eklendi; desen `davet`/
+      `ilk_oturum` ile birebir aynı (`{grup}_bilgilendirme`, ihtiyari kolunda
+      `ihtiyari_bilgilendirme`). İstek doğrulaması da genişletildi.
+      · **Sonuçtan BAĞIMSIZ gösteriliyor:** bilgilendirme süreç **başında** yapılır;
+      anlaşma/anlaşamama kararı henüz yokken de üretilebilmeli. Bu yüzden
+      `DOC_SET_AGREED`/`FAILED` kümelerine değil, her zaman görünen ayrı bir
+      kümeye (`DOC_SET_HER_ZAMAN`) kondu.
+
 - [ ] P2 · **Taraf akışı telefonda uçtan uca** · Kabul: gerçek telefonda davet →
       başvuru → belge → Kör Teklif → ödeme bilgisi zinciri kesintisiz tamamlanıyor.
 - [ ] P3 · **Kullanılabilirlik bulguları (03.08 saha notu)** · Kabul: dosya açılış formu
