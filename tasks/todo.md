@@ -4,9 +4,10 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P1 · ön yüzde sessiz depo çağrıları (4 yer)**
-- **SESSİZ ÇAĞRI KUSURU ÜÇ CEPHEDE DE KAPANDI:** kenar (`_shared` dâhil) ·
-  ön yüz · `rpc`/`storage`. Kenarda çıplak `.from(...)`, `.rpc(...)` ve
+- Son tamamlanan iş: **P1 · sessiz `functions.invoke` çağrıları (10 yer)**
+- **SESSİZ ÇAĞRI KUSURU İSTEMCİ YÜZEYİNİN TAMAMINDA KAPANDI:** `.from` ·
+  `.rpc` · `.storage` · `.functions.invoke` · iç `fetch`. Kenar (`_shared`
+  dâhil) ve ön yüz. Kenarda çıplak `.from(...)`, `.rpc(...)` ve
   `.storage` çağrısı **SIFIR**; ön yüzde `tests/sessiz-yazim.test.ts`
   **DONDURULMUŞ listesi BOŞ**. Üçü de tarama testiyle kilitlendi.
 - **12. blokta biten işler (sırayla):** `53b33cc` P1 `taraf-kalem-cikar` ·
@@ -16,11 +17,12 @@
   `19be6fe` P2 `_shared/anlatim.ts` (3 yer, 35 işlev fan-out) · `cc0acbb` kayıt ·
   `10bdb83` P1 ön yüz (4 dosya) · `4f16648` kayıt · `1233489` P1 sessiz `rpc`
   + depo (12 yer, 9 işlev) · `bc558eb` P1 ön yüz depo çağrıları (4 yer) ·
-  `8e8e416` kayıt.
+  `8e8e416` kayıt · `7974bac` kayıt · `03c445f` P1 `functions.invoke` (9 yer) ·
+  `a27b221` P2 `fetch` iç çağrısı (1 yer).
 - **Bu oturumun dersleri `tasks/lessons.md`ye yazıldı** (3 yeni ders: sessiz
   yazım kuyruk döngüsü kurar · öz denetim eşiği kusurla birlikte düşer ·
   `rpc`/`storage` de fırlatmaz).
-- Doğrulama: `npm run test` **267/267** · tsc temiz · lint **2333** · `npm run build` temiz
+- Doğrulama: `npm run test` **268/268** · tsc temiz · lint **2331** · `npm run build` temiz
   (taban 2334'tü; `randevu-teklif`te bir `any` kaldırıldı)
 - **Açık blokaj: yok**
 - **REDEPLOY DURUMU (§11-B):**
@@ -39,12 +41,30 @@
     `get_message` ile doğrulandı.
   - OK `bc558eb` · **ön yüz depo çağrıları** — publish edildi. `get_project`
     doğruladı: `latest_commit_sha=bc558eb9…`, `is_published=true`.
-  - **BEKLEYEN REDEPLOY YOK.**
+  - `03c445f` · **ön yüz `functions.invoke`** — publish istendi
+    (deployment `1aae0902`), sonucu doğrulanacak.
+  - `a27b221` · `extract-document-text` — deploy istendi
+    (`umsg_01m0vpw7ypekvtshsp1hqe74gm`), sonucu doğrulanacak.
 - Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9**.
 - Sıradaki uygulanabilir iş: **kuyruk boş.** Sessiz yazım kusuru kenarda ve ön
   yüzde kapandı, iki tezgâh da kilitli. Yeni P0/P1 adayı kodun gerçek
   durumundan çıkarılmalı. En yakın aday: **H-8 ölü yüzey öbeğinin silinmesi**
   (37 dosya) — ama silme kararı kurucudadır, HAT'ta açık bekliyor.
+
+### KAPANDI — 25.08 · P1 · SESSİZ `functions.invoke` ÇAĞRILARI (10 YER)
+**Sınıfın en ince tuzağı.** `supabase.functions.invoke`, işlev düzeyi hatada
+(500 vb.) **REDDETMEZ** — `{ data, error }` ile **çözülür**. Yani hem
+`try { await invoke() } catch {}` hem de `.catch(...)` yalnız **taşıma**
+hatasını yakalar; sunucunun döndürdüğü hata bu yolların ikisinden de görünmez.
+Aynısı `fetch` için de geçerli: HTTP 500'de reddetmez, `res.ok` denetlenmelidir.
+
+| yer | sessiz kalırsa |
+|---|---|
+| `extract-document-text` ateşle-unut ×4 (`CaseRoom`, `ExpertWitness`, `MediationEngine`×2) | Belge yüklenir ama **metni hiç çıkarılmaz** → ajanlar o belgeyi okuyamaz. `.catch` bunu hiç görmüyordu. |
+| `AdminDashboard` · atama bildirimi | Atama YAPILIR ama ne dosya sahibi ne arabulucu haberdar edilir; yönetici de göremez. Artık toast ile bildiriliyor. |
+| `AdminDashboard` · rol bildirimi ×2 | `catch {}` **boştu**: kullanıcı rolünün değiştiğini hiç öğrenmeyebilirdi. |
+| `KnowledgeBaseAdmin` · iş sürdürme | İş "running"de **sonsuza dek** asılı kalır; döngü her 5 sn yeniden dener ve hiçbir yere iz düşmez. |
+| `extract-document-text` → `belge-ozeti` iç `fetch` | Yorumun sözü "hata loglanır"dı ama `res.ok` denetlenmediği için `belge-ozeti`nin 500'ü sessizce düşüyordu. |
 
 ### KAPANDI — 25.08 · P1 · ÖN YÜZDE SESSİZ DEPO ÇAĞRILARI (4 YER)
 `MediationEngine` **canlı** yüzeydir. `deleteDoc` depodaki dosyayı silmeye

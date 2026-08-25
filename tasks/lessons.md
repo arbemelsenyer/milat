@@ -745,5 +745,32 @@ Doğru sıra: **depo silmesi doğrulanmadan kayıt satırı silinmez.**
 
 **Ders:** "hata fırlatmaz" özelliği istemcinin TAMAMINA aittir, tek bir metoda
 değil. Bir kusur sınıfını kapatırken desen değil **istemci yüzeyi** taranmalı:
-`.from` · `.rpc` · `.storage` · `.functions`. Tarama testi de üçünü birden
+`.from` · `.rpc` · `.storage` · `.functions`. Tarama testi hepsini birden
 kapsar (`tests/kenar-sessiz-yazim.test.ts`).
+
+**Sonrasında:** kendi yazdığım bu ders `.functions`ı sayıyordu ama onu
+taramamıştım — "ağaç temiz" derken bir yüzey açıkta kalmıştı. Kanca durdurup
+devam ettirince tarandı ve **10 yer daha** çıktı. Bir dersi yazmak onu
+uygulamak değildir: listenin her maddesi ayrıca koşulmalı.
+
+## 25.08.2026 — `invoke` ve `fetch` HTTP hatasında REDDETMEZ
+
+Sınıfın en ince tuzağı. `supabase.functions.invoke` işlev düzeyi hatada (500 vb.)
+**reddetmez** — `{ data, error }` ile **çözülür**. Yani şu iki kalıbın İKİSİ de
+sunucunun döndürdüğü hatayı **hiç görmez**:
+
+```
+try { await supabase.functions.invoke(...) } catch {}        // catch hiç çalışmaz
+supabase.functions.invoke(...).catch((e) => console.error(e)) // .catch hiç çalışmaz
+```
+
+Yalnız **taşıma** hatasında (ağ kopması) çalışırlar. Aynısı `fetch` için de
+geçerlidir: HTTP 500'de reddetmez, `res.ok` denetlenmelidir. Doğrusu her iki
+yolu da kapatmaktır: `.then(({ error }) => …)` **ve** `.catch(…)`.
+
+Ürün karşılığı: belge yüklenip **metni hiç çıkarılmıyor** (ajanlar o belgeyi
+okuyamaz), atama yapılıp taraflara **haber gitmiyor**, bilgi tabanı işi
+"running"de **sonsuza dek** asılı kalıyordu.
+
+**Ders:** `await` + `try/catch` bir sonucun denetlendiği anlamına gelmez.
+Denetim, **dönen nesnenin `error` alanının okunmasıdır**.
