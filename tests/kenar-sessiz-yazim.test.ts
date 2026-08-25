@@ -395,4 +395,18 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     for (const im of ["anlatimErr", "yansitErr"]) expect(g, `${im} okunmuyor`).toContain(im);
     expect(g).toContain("catch KORUMA DEĞİLDİR");
   });
+
+  it("belge durumu sözlük çatalı: metni çıkarılmış belge görünmez kalmıyor", () => {
+    /* 25.08 CANLI BULGUSU: `case_documents.extraction_status` canlida IKI deger
+       tasiyor — 22 satir `"tamam"`, 2 satir eski `"completed"` (ikisinin de
+       metni var). Tek degere bakan suzgec, metni GERCEKTEN cikarilmis belgeleri
+       gorunmez yapiyordu: nobetci o dosyada "okunabilir belge yok" sayiyor ve
+       belge imzasi degismedigi icin kollar yeniden kosmuyordu. */
+    const g = oku("ajan-nobetci");
+    expect(g, "sözlük çatalı karşılanmıyor").toContain("METIN_CIKARILDI");
+    expect(g, "eski değer kabul edilmiyor").toMatch(/new Set\(\["tamam",\s*"completed"\]\)/);
+    // Suzgec artik Set uzerinden calismali, duz esitlik kalmamali.
+    expect(g, "hâlâ tek değere eşitlik süzgeci var")
+      .not.toMatch(/extraction_status\s*\?\?\s*""\)\s*===\s*"tamam"/);
+  });
 });

@@ -2762,7 +2762,15 @@ async function otomatikKosumKollari(admin: any, dosya: any, butce: Butce): Promi
   ]);
   const taraflar = (taraflarRes.data ?? []) as any[];
   const belgeler = (belgelerRes.data ?? []) as any[];
-  const metinliBelgeler = belgeler.filter((d) => String(d.extraction_status ?? "") === "tamam");
+  /* SÖZLÜK ÇATALI (25.08 canlı bulgusu): `extraction_status` canlıda iki değer
+     taşıyor — bugünkü kod `"tamam"` yazıyor ama 19.08 tarihli iki satırda eski
+     `"completed"` duruyor. Tek değere bakan süzgeç, METNİ GERÇEKTEN ÇIKARILMIŞ
+     belgeleri görünmez yapıyordu: nöbetçi o dosyada "okunabilir belge yok"
+     sayıyor ve belge imzası değişmediği için kollar yeniden koşmuyordu.
+     Veri düzeltmesi yerine kod hoşgörülü kılındı — üretim verisine dokunmadan
+     eski satırlar da doğru sayılır (yeni yazım tek değerde kalır). */
+  const METIN_CIKARILDI = new Set(["tamam", "completed"]);
+  const metinliBelgeler = belgeler.filter((d) => METIN_CIKARILDI.has(String(d.extraction_status ?? "")));
   const orkestratorTamam = ((orkestratorRes.data ?? []) as any[])[0] ?? null;
 
   const enSonBelge = metinliBelgeler
