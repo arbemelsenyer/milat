@@ -725,3 +725,25 @@ bakmalıdır: tarayıcı bozulursa düşer, kusur kapanınca düşmez.
 Aynı ilke `tests/kenar-sessiz-yazim.test.ts`teki *KENAR TARAMASI* durumunda da
 uygulandı: orada beklenen değer sabit **sıfırdır** (bulgu listesi boş olmalı),
 bir eşik değil.
+
+
+## 25.08.2026 — Kusur `.from(...)` ile sınırlı değil: `rpc` ve `storage` de fırlatmaz
+
+Sessiz yazım avı `.from(...)` deseniyle başladı ve "ağaç temiz" noktasına
+geldi. Sonra `orchestrator-run`da `Promise.allSettled` incelenirken görüldü ki
+**`rpc` de `{error}` döndürüp fırlatmıyor** — yani `allSettled` onu her zaman
+"fulfilled" sayıyor. Aynı şey `storage.remove` için de geçerli.
+
+Bulunan: 11 × `create_notification` (8 işlev) + 5 depo silmesi. Ürün karşılığı:
+süre uyarısı, oturum daveti/iptali, randevu teklifi, atama bildirimi sessizce
+buharlaşabiliyordu — sistem "haber verdim" sayarken muhatap hiçbir şey duymuyordu.
+
+**En ağırı depo silmesiydi:** kayıt satırı silinip depo silmesi sessizce düşerse
+dosya **öksüz** kalır — artık hiçbir kayıt onu göstermediği için hiçbir silme
+kolu bir daha bulamaz. Bu, constitution m.10 süresiz saklama yasağına aykırıdır.
+Doğru sıra: **depo silmesi doğrulanmadan kayıt satırı silinmez.**
+
+**Ders:** "hata fırlatmaz" özelliği istemcinin TAMAMINA aittir, tek bir metoda
+değil. Bir kusur sınıfını kapatırken desen değil **istemci yüzeyi** taranmalı:
+`.from` · `.rpc` · `.storage` · `.functions`. Tarama testi de üçünü birden
+kapsar (`tests/kenar-sessiz-yazim.test.ts`).

@@ -1,6 +1,6 @@
 ## Nerede kaldık
 
-- Tarih: 25.08.2026 (12. blok)
+- Tarih: 25.08.2026 (12. blok) — **§20 gereği kapatıldı (bağlam şişti)**
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
@@ -15,7 +15,11 @@
   `62e99b6` P1 kalan 16 yazım (13 işlev) · `69b8bde` P2 `agent_states` (25 yer) ·
   `19be6fe` P2 `_shared/anlatim.ts` (3 yer, 35 işlev fan-out) · `cc0acbb` kayıt ·
   `10bdb83` P1 ön yüz (4 dosya) · `4f16648` kayıt · `1233489` P1 sessiz `rpc`
-  + depo (12 yer, 9 işlev) · `bc558eb` P1 ön yüz depo çağrıları (4 yer).
+  + depo (12 yer, 9 işlev) · `bc558eb` P1 ön yüz depo çağrıları (4 yer) ·
+  `8e8e416` kayıt.
+- **Bu oturumun dersleri `tasks/lessons.md`ye yazıldı** (3 yeni ders: sessiz
+  yazım kuyruk döngüsü kurar · öz denetim eşiği kusurla birlikte düşer ·
+  `rpc`/`storage` de fırlatmaz).
 - Doğrulama: `npm run test` **267/267** · tsc temiz · lint **2333** · `npm run build` temiz
   (taban 2334'tü; `randevu-teklif`te bir `any` kaldırıldı)
 - **Açık blokaj: yok**
@@ -33,8 +37,9 @@
     `is_published=true`, canlı sayfa açılıyor.
   - OK `1233489` · **9 işlev** (sessiz `rpc` + `storage`) — deploy edildi ve
     `get_message` ile doğrulandı.
-  - `bc558eb` · **ön yüz depo çağrıları** — publish istendi
-    (deployment `5fc3ff82`), sonucu doğrulanacak.
+  - OK `bc558eb` · **ön yüz depo çağrıları** — publish edildi. `get_project`
+    doğruladı: `latest_commit_sha=bc558eb9…`, `is_published=true`.
+  - **BEKLEYEN REDEPLOY YOK.**
 - Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9**.
 - Sıradaki uygulanabilir iş: **kuyruk boş.** Sessiz yazım kusuru kenarda ve ön
   yüzde kapandı, iki tezgâh da kilitli. Yeni P0/P1 adayı kodun gerçek
