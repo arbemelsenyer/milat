@@ -1,34 +1,66 @@
 ## Nerede kaldık
 
-- Tarih: 25.08.2026 (10. blok)
+- Tarih: 25.08.2026 (10. blok) — **`medipact dur` ile kapatıldı**
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
   Karar gereken her madde `tasks/HAT.md`ye yazılır, Code beklemeden devam eder.
-  "Bitti, bilgi veriyorum" turu yok.
-- Aktif görev: yok — sıradaki iş seçiliyor
-- Son tamamlanan iş: **P1+P2 · sessiz yutulan veritabanı yazımları**
-  (27 bulundu → **19 kapatıldı**, kalan 8 gerekçeli)
-  (önce: P1 bilirkişi önerisi izi `825dfb4` · P1 atama tarihi `0e5b1c9`)
-- Doğrulama: `npm run test` **233/233** · tsc temiz · build başarılı · lint **2343**
+- Aktif görev: yok — kuyruk temiz, blokaj yok
+- Son tamamlanan iş: **P1 · takip föyü oturum satırları** (`ProcessTrackerPanel`)
+- Bu bloğun tamamlananları (sırayla):
+  `0e5b1c9` P1 atama tarihi uydurulmuyor (kaydı bu blokta tamamlandı) ·
+  `825dfb4` P1 bilirkişi önerisi iz bırakıyor ve tarafa ulaşıyor ·
+  `bcbdeb8` P1 sessiz yutulan yazımlar (12 yol) ·
+  `b772c4d` P2 kontrolsüz yazımların kalanı (7 yol) ·
+  `4319e66` P3 `ProcessTrackerPanel` bayat `as any` ·
+  bu commit: P1 föy oturum satırları
+- Doğrulama: `npm run test` **237/237** · tsc temiz · build başarılı · lint **2343**
+  (blok başı 2349 → −6)
 - **Açık blokaj: yok**
-- Açık HAT maddesi: **H-1** (kurucuda: `CRON_SECRET` yenilemesi — Code'un işi
-  yalnız yenileme sonrası 200 doğrulaması) · **H-4** (önkoşul yok) ·
-  **H-7** (`session_feedback` yapısal olarak imkânsız) · **H-8** (başvuru adası)
-  — hiçbiri beklenmiyor, iş sürüyor.
-- Sıradaki uygulanabilir iş: canlıda 0/az satırlı tablo taramasının kalanı —
-  `pending_pool` (0 satır · `MevzuatAdmin`) · `case_process_tracker`
-  (9 dosyada 1 satır) · `oturum_erteleme` etiketi `status === "cancelled"`
-  satırını okuyor (iptal ≠ erteleme — doğrulanacak).
+- **Canlı kanıt:** `medipact-ai.lovable.app` bundle'ında `825dfb4` doğrulandı
+  ("Yeni Bilirkişi Önerisi" ×2, "Bilirkişi Önerisi Geri Çekildi", "Taraflarca
+  Onaylandı"). `bcbdeb8` · `b772c4d` · `4319e66` ve bu commit için publish
+  tetiklendi; bundle doğrulaması **sıradaki oturumun ilk işi**.
+- Açık HAT maddesi: **H-1** (kurucuda: `CRON_SECRET`) · **H-4** (önkoşul yok) ·
+  **H-7** (`session_feedback` yapısal olarak imkânsız) · **H-8** (başvuru adası) ·
+  **H-9** (föyün oturum satırları otomatik mi kalsın — bugün yazıldı).
+- **Sıradaki uygulanabilir iş (yeni oturum buradan başlar):**
+  1. Canlı bundle'da son dört commit'in dizelerini doğrula (yukarıdaki liste).
+  2. Canlıda 0/az satırlı tablo taramasının kalanı: `pending_pool` (0 satır ·
+     `MevzuatAdmin`) · `case_process_tracker` (9 dosyada 1 satır).
+  3. `messages` tablosu **kusur DEĞİL** — RLS sağlam, yalnız hiç kullanılmamış;
+     tekrar araştırma.
 
-## Kuyruk (yeni açılanlar)
-- [x] P2 · Yönetici yüzeylerinde kontrolsüz yazım (`KnowledgeBaseAdmin`,
-      `TariffAdmin` ×2, `TemplateAdmin`) · Kabul: `DONDURULMUS` listesinden
-      çıktı · DONE 25.08 · Doğrulama: 233/233 test, tsc temiz, lint 2348
-- [x] P2 · `AjanPenceresi` kontrolsüz yazım ×3 · DONE 25.08 · aynı doğrulama
-- [x] P3 · `ProcessTrackerPanel` bayat `(supabase as any)` · Kabul: cast kalktı,
-      tsc temiz · DONE 25.08 · Doğrulama: 233/233 test, tsc temiz, **lint 2348 → 2343**
-      (cast tip denetimini kapatıyordu; kalkınca `trackerRow` gerçek tipini aldı
-      ve üç `as any` daha gereksizleşti). Tablo `types.ts:1893`te zaten VARDI.
+### KAPANDI — 25.08 · P1 · TAKİP FÖYÜ OTURUM SATIRLARI YAPILMAMIŞ OTURUMU YAZDIRMIYOR
+`ProcessTrackerPanel.autoState` föyün "İlk Oturum" / "2. Oturum" satırlarını
+`sessions.filter((s) => s.scheduled_at)` üzerinden kuruyordu — **iptal edilmiş
+ve taslak** oturumlar da sayılıyordu. Bunlar resmi takip föyü alanlarıdır;
+yapılmamış oturumu tarihiyle yazdırmak, aynı gün kapatılan "Dosya Atama Tarihi"
+kusurunun (`0e5b1c9`) aynısıdır.
+
+**CANLI KANIT (Lovable SQL):** `case_sessions` 32 satır — **21'i `cancelled`**,
+10 `scheduled`, 1 `draft`. `5186ee1d…` dosyasında tarih sırasına göre ikinci
+kayıt (24.07 07:00) İPTAL EDİLMİŞTİ ve föy onu **"2. Oturum ✓"** olarak
+gösteriyordu. Düzeltmeden sonra aynı dosyada ikinci sıraya gerçek oturum
+(27.07 11:00) geçiyor.
+
+İkinci satır: **"Oturum Erteleme"** HERHANGİ bir iptalde işaretleniyordu — hatta
+`scheduled_at` boş bir iptal kaydında bile (kutu ✓, tarih "—"). Erteleme,
+iptalin ardından daha ileri bir tarihe oturum kurulmasıdır; şemada ayrı bir
+"ertelendi" durumu **yoktur** (kolonlar tarandı), o yüzden **ardıl koşulu**
+arandı: ardılı olmayan iptal artık erteleme sayılmıyor.
+
+Föy **etiketleri değişmedi** — bunlar bakanlık föyünün alan adlarıdır;
+düzeltilen şey yalnız TÜRETME mantığıdır (test bunu ayrıca koruyor).
+
+**TEZGÂH:** `tests/foy-oturum.test.ts` (4 durum). **KANITLANDI:** düzeltme
+öncesi panel `FOY_KOK=tests/gecici/foy-kanit` kopyasına açıldı → **3/4 test
+DÜŞTÜ**; dördüncü (etiketler yerinde mi) doğru şekilde geçti. Gerçek dizinde 4/4.
+- Doğrulama: **237/237** test · tsc temiz · build başarılı · lint **2343**.
+
+**HAT'A YAZILDI (beklenmedi, §23): H-9 · P2** — şemada "oturum yapıldı" kaydı
+YOK (`scheduled`/`cancelled`/`draft`). Yani düzeltilmiş hâliyle bile föy
+"planlandı"yı gösteriyor. Önerim: **B** (üç satır da elle işaretlensin, diğer 13
+satır gibi) şimdi, **A** (şemaya "yapıldı" durumu) pilottan sonra.
 
 ### KAPANDI — 25.08 · P1 · SESSİZ YUTULAN VERİTABANI YAZIMLARI (12 YOL)
 **Kök neden — tek cümle:** `supabase-js` hata **fırlatmaz**. `{ error }`

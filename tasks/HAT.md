@@ -72,6 +72,37 @@ tek kapı olarak seçilmiş.
 "başvuru formu" olduğu için kurucunun bunu bilerek onaylaması gerekir — pilotta
 kullanılacak bir ekran değil, emekliye ayrılmış bir ekrandır.
 
+
+### H-9 · 25.08.2026 · P2 — Takip föyünün oturum satırları otomatik mi kalsın?
+**Sorun.** `ProcessTrackerPanel` föyünde "İlk Oturum", "2. Oturum", "Oturum
+Erteleme" satırları **otomatik** (kutu kilitli, arabulucu elle işaretleyemiyor)
+ve `case_sessions`ten türetiliyor. Bugün türetme düzeltildi: iptal ve taslak
+kayıtlar artık sayılmıyor, erteleme ardılı olan iptal ister (canlı kanıt: 32
+oturum kaydının **21'i iptal**; `5186ee1d` dosyasında föy iptal edilmiş bir
+oturumu "2. Oturum" diye gösteriyordu).
+
+Ama asıl soru duruyor: **şemada "oturum yapıldı" kaydı YOK.** Durumlar yalnız
+`scheduled` · `cancelled` · `draft`. Yani "İlk Oturum ✓ 24.07.2026" en iyi
+ihtimalle "o tarihe oturum PLANLANMIŞTI" demektir — föy ise yapılmış oturumu
+kaydeder. Bu, 25.08'de kapattığımız "Dosya Atama Tarihi" kusuruyla aynı aileden.
+
+**Seçenekler.**
+| | ne yapılır | bedeli |
+|---|---|---|
+| **A** | `case_sessions`e "yapıldı" durumu (ya da `held_at`) eklenir; föy onu okur | Şema göçü (Lovable SQL) + oturum ekranına tek düğme; föy gerçeği yazar |
+| B | Üç satır **elle işaretlenir** hale getirilir (diğer 13 satır gibi) | Ucuz, yalan yok; arabulucu kendi işaretler |
+| C | Bugünkü hâl (planlanan tarih, düzeltilmiş türetme) | Föy "planlandı"yı "yapıldı" gibi göstermeye devam eder |
+
+**Önerim: B şimdi, A pilottan sonra.** Föy zaten arabulucunun kendi takip
+belgesidir ve 13 satırı hâlihazırda elle işaretleniyor; üçünü de elle almak
+bugün yalanı bitirir ve şema göçü gerektirmez. A doğrusudur ama oturum akışına
+dokunur, pilot öncesi risklidir.
+
+**Kararın etkisi.** B seçilirse föy hiçbir satırında olgu uydurmaz. C seçilirse
+resmi takip föyünde "yapıldı" ile "planlandı" ayrımı kurulmamış kalır.
+
+---
+
 ---
 
 ## COWORK → CODE` bölümüne yazar. Code her turun başında o

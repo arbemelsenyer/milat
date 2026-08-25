@@ -273,10 +273,24 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
 
   const autoState = useMemo(() => {
     const davetDoc = agreementDocs.find((d) => d.metadata?.kind === "davet");
-    const scheduled = sessions.filter((s) => s.scheduled_at);
-    const first = scheduled[0];
-    const second = scheduled[1];
-    const cancelled = sessions.find((s) => s.status === "cancelled");
+    // 25.08.2026 — Föy satırları resmi takip alanlarıdır; İPTAL EDİLMİŞ ya da
+    // TASLAK bir oturum "İlk Oturum"/"2. Oturum" diye yazdırılamaz. Canlı kanıt:
+    // 5186ee1d dosyasında 2. sıradaki kayıt iptal edilmiş bir oturumdu ve föy
+    // onu yapılmış gibi gösteriyordu (32 oturum kaydının 21'i iptal).
+    const gecerli = sessions.filter(
+      (s) => s.scheduled_at && s.status !== "cancelled" && s.status !== "draft",
+    );
+    const first = gecerli[0];
+    const second = gecerli[1];
+    // Erteleme, iptal edilen bir oturumun ARDINDAN daha ileri bir tarihe yeni
+    // oturum kurulmasıdır. Ardılı olmayan tek başına iptal erteleme değildir.
+    const zaman = (s: { scheduled_at: string }) => new Date(s.scheduled_at).getTime();
+    const cancelled = sessions.find(
+      (s) =>
+        s.status === "cancelled" &&
+        s.scheduled_at &&
+        gecerli.some((o) => zaman(o) > zaman(s)),
+    );
     const outcome = caseData?.outcome;
     const status = caseData?.status;
     const sonucText = outcome === "anlasma" ? "Anlaşma" : outcome === "anlasamama" ? "Anlaşamama" : "";
