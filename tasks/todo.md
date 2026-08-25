@@ -165,8 +165,18 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       "temiz" demez, açıkça söyler · silme hataları yutulmaz.
       · **Kalan:** her tür için gün sayısı (H-15/1'de öneri tablosu var) +
       göçün çalıştırılması + günlük cron kaydı.
+      · **DEPLOY: OK** — `saklama-imha` canlıya alındı (commit `6ba6902`,
+      `get_message` ile doğrulandı). Tablo kurulmadığı için şu an açıkça
+      "parametre tablosu henüz kurulmamış" diyor; sessizce "temiz" demiyor.
 
-- [!] P1 · **Arabulucunun kendi anteti / şablonu** · **BLOCKED → HAT H-15/2** (ürün) · **IBAN ÇÖZÜLDÜ:** `profiles.iban`/`banka_adi` var ve ödeme bilgisi PDF'ine akıyor. Kalan **antet/logo** (profilde kolon yok) ve arabulucuya özel şablon (şablonlar admin tarafından genel yükleniyor). Önerim A: antet eklensin, şablon genel kalsın. Kalan: · Kabul: arabulucu
+- [!] P1 · **Arabulucunun kendi anteti / şablonu** · **BLOCKED → HAT H-15/2** (ürün) · **IBAN ÇÖZÜLDÜ:** `profiles.iban`/`banka_adi` var ve ödeme bilgisi PDF'ine akıyor. Kalan **antet/logo** (profilde kolon yok) ve arabulucuya özel şablon (şablonlar admin tarafından genel yükleniyor). Önerim A: antet eklensin, şablon genel kalsın.
+      · **GÖÇ METNİ YAZILDI** (Code yazdı, çalıştırmadı — §10):
+      `tests/gecici/antet-alanlari.sql` → `profiles`e `buro_adi` ·
+      `buro_adresi` · `antet_logo_url`. Göç çalıştıktan sonra Code'un işi tek
+      adım: `generate-official-document` bugün `profiles`ten yalnız `full_name`
+      çekiyor; select genişler, doldurma haritasına üç alan girer ve
+      `tutanak_yeri` büro adresinden dolar (bugün sabit boş). Kolonlar var
+      olmadan yazılamaz — olmayan kolonu seçmek sorguyu düşürür. Kalan: · Kabul: arabulucu
       kendi antetini, IBAN'ını ve belge şablonunu bir kez tanımlıyor; üretilen
       tutanak/anlaşma/fatura bu değerleri kullanıyor · **Bulgu:** `mediators`
       tablosunda antet/IBAN/şablon kolonu **yok** (var olanlar: photo_url, bio,
