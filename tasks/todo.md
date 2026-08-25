@@ -103,6 +103,20 @@ sayılmıyor · boş kuyruk bırakıyor · bozuk girdi ve olmayan dizin fail-ope
 Ayrıca `tests/gecici/yol-bicimi.mjs`: Windows `cwd` hem ters hem ileri bölülü
 biçimde okunuyor (biri okunamasa bekçi o biçimde **hiç** engelleyemezdi).
 
+**BAĞLANDIKTAN SONRA GERÇEK PROJEYE KARŞI DA SINANDI**
+(`tests/gecici/gercek-karar.mjs`, salt okuma): üç meşru durma sebebi de
+**bırakılıyor** — yani yeni bir döngü kurulmadı. Sebepsiz bir rapora ise
+engelliyor ve gerekçeyi gösteriyor: *"HAT.md'de cevaplanmış ama uygulanmamış
+madde var: H-1, H-4."*
+
+> **H-1/H-4 NOTU (sonraki oturum bunu kovalamasın):** ikisinin de cevabı var ama
+> uygulaması **dış önkoşula** bağlı — H-1'i kurucu yeniler (cevabı "bu madde
+> Code'a ait değildir" diyor), H-4 kayıt hattı yazılmasını bekliyor. Bekçinin
+> kuralı "cevaplandı ama hâlâ CODE → COWORK'te duruyor" olduğu için ikisini de
+> işaretliyor. **Yanlış alarm değil, eksik ayrım:** yalnız *sebepsiz* durmada
+> tetikleniyor; gerçek sebep yazıldığında bırakıyor. ARŞİV'e taşımak yanlış
+> olurdu (maddeler gerçekten açık), bu yüzden olduğu gibi bırakıldı.
+
 **TEZGÂHIN KENDİSİ DE BİR KUSUR VERDİ.** İlk yazımda üç fixture **aynı dizini**
 paylaşıyordu ve senaryolar kapanış olarak sonda koştuğu için hepsi **son yazılan**
 içeriği görüyordu; tezgâh, bekçi doğru çalışırken "engellemiyor" diyordu. Her
