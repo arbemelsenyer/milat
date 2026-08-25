@@ -67,7 +67,9 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     for (const im of ["deneyimErr", "duzeltmeErr", "kapanisErr"]) {
       expect(g, `${im} okunmuyor`).toContain(im);
     }
-    expect(g, "eksikler çağırana bildirilmiyor").toMatch(/silindi:\s*true,\s*kayit:\s*oncekiToplam,\s*uyarilar/);
+    // `belge: yollar.length` 25.08'de eklendi (depo temizliği); amaç aynı:
+    // eksikler `uyarilar` ile çağırana taşınıyor mu.
+    expect(g, "eksikler çağırana bildirilmiyor").toMatch(/silindi:\s*true,\s*kayit:\s*oncekiToplam,[\s\S]{0,40}uyarilar/);
     // Silme dongusu ve `cases` silmesi eskiden beri denetli — bozulmamali.
     expect(g).toContain("Silme tamamlanamadı; hiçbir kayıt yarım bırakılmadı");
     expect(g).toMatch(/const\s*\{\s*error:\s*dErr\s*\}\s*=\s*await\s+admin\.from\("cases"\)\.delete/);
@@ -432,5 +434,29 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     // Kollardaki mevcut `kapali` denetimleri bozulmamali.
     expect(g.match(/status === "agreed" \|\| dosya\?\.status === "failed"/g)?.length ?? 0)
       .toBeGreaterThanOrEqual(4);
+  });
+
+  it("KVKK silmesi depoyu da temizliyor (öksüz belge bırakmıyor)", () => {
+    /* 25.08 CANLI BULGUSU: `dosya-verilerini-sil` KVKK silme koludur ama depoya
+       HIC dokunmuyordu — `case_documents` satirlari siliniyor, taraflarin
+       belgeleri kovada KALIYORDU. Satir gittikten sonra o dosyayi gosteren
+       hicbir kayit kalmadigi icin hicbir silme kolu onlari bir daha bulamaz
+       (constitution m.10). Canlida bu yolla uretilmis 6 oksuz dosya bulundu. */
+    const g = oku("dosya-verilerini-sil");
+    expect(g, "depo kovasi tanimli degil").toContain("BELGE_KOVASI");
+    expect(g, "depo silmesi yok").toMatch(/storage\.from\(BELGE_KOVASI\)\.remove\(/);
+    for (const im of ["yolErr", "depoErr"]) expect(g, `${im} okunmuyor`).toContain(im);
+    // SIRA: yollar okunur -> depo silinir -> ANCAK SONRA satirlar silinir.
+    const yolIdx = g.indexOf('.select("file_path").eq("case_id", case_id)');
+    const depoIdx = g.indexOf("storage.from(BELGE_KOVASI).remove(");
+    // Satır silme döngüsü: sayım döngüsü değil, `delete()` çağıran olan.
+    const satirIdx = g.indexOf('await admin.from(t.tablo).delete()');
+    expect(yolIdx, "yollar okunmuyor").toBeGreaterThan(-1);
+    expect(depoIdx, "depo silmesi yok").toBeGreaterThan(yolIdx);
+    expect(satirIdx, "satır silmesi depo silmesinden ÖNCE").toBeGreaterThan(depoIdx);
+    // Depo silinemezse SATIRLARA DOKUNULMAZ.
+    expect(g).toContain("hiçbir kayıt silinmedi");
+    // Soz kanitlanabilir: silinen belge sayisi cagirana bildirilir.
+    expect(g).toMatch(/belge:\s*yollar\.length/);
   });
 });

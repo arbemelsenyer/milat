@@ -36,6 +36,10 @@ function temiz(v: unknown): string {
 
 /* SİLME SIRASI — yabancı anahtarlara uygun: önce çocuk kayıtlar, sonra
    taraflar, en sonda dosyanın kendisi. Her tablo case_id ile silinir. */
+// Tarafların belgelerinin durduğu kova. Silme kolu satırlarla birlikte
+// dosyaları da kaldırmalıdır; yoksa dosyalar öksüz kalır (constitution m.10).
+const BELGE_KOVASI = "case-documents";
+
 const SILME_SIRASI: { tablo: string; alan?: string }[] = [
   { tablo: "belge_ozetleri", alan: "case_id" },
   { tablo: "case_documents" },
@@ -123,6 +127,41 @@ Deno.serve(async (req) => {
       } catch { /* tablo yoksa sayıma girmez */ }
     }
 
+    /* DEPO TEMİZLİĞİ — SATIRLARDAN ÖNCE (25.08.2026 canlı bulgusu).
+       Bu kol KVKK silme koludur ama depoya HİÇ dokunmuyordu: `case_documents`
+       satırları siliniyor, tarafların belgeleri `case-documents` kovasında
+       KALIYORDU. Satır gittikten sonra o dosyayı gösteren hiçbir kayıt kalmadığı
+       için hiçbir silme kolu onları bir daha bulamaz — constitution m.10
+       (süresiz saklama yasağı) ihlali. Canlıda bu yolla üretilmiş 6 öksüz dosya
+       bulundu (30.06–01.07, dosyaları artık var olmayan davalara ait).
+
+       SIRA KRİTİK: önce dosya (asıl kişisel veri), sonra satır. Ters sırada
+       depo silmesi düşerse indeks yok olur ve veri erişilemez biçimde KALIR.
+       Yollar satırlar silinmeden ÖNCE okunur; sonra okunamaz. */
+    const { data: belgeYollari, error: yolErr } = await admin.from("case_documents")
+      .select("file_path").eq("case_id", case_id).limit(1000);
+    if (yolErr) {
+      return json({
+        silindi: false,
+        error: `Belge yolları okunamadı; hiçbir kayıt silinmedi: ${yolErr.message}`,
+      }, 500);
+    }
+    const yollar = ((belgeYollari ?? []) as { file_path?: string }[])
+      .map((b) => String(b?.file_path ?? "").trim())
+      .filter((y) => y.length > 0);
+
+    if (yollar.length > 0) {
+      const { error: depoErr } = await admin.storage.from(BELGE_KOVASI).remove(yollar);
+      if (depoErr) {
+        // Depo temizlenemediyse SATIRLARA DOKUNULMAZ: dosyalar bulunabilir kalsın.
+        console.error(`[dosya-verilerini-sil] depo temizlenemedi (${case_id}): ${depoErr.message}`);
+        return json({
+          silindi: false,
+          error: "Belgeler depodan silinemedi; hiçbir kayıt silinmedi. Lütfen tekrar deneyin.",
+        }, 500);
+      }
+    }
+
     // SİLME — sırayla. Hata olursa DURUR; yarım silme bırakılmaz.
     for (const t of SILME_SIRASI) {
       const { error } = await admin.from(t.tablo).delete().eq(t.alan ?? "case_id", case_id);
@@ -173,9 +212,13 @@ Deno.serve(async (req) => {
     if (uyarilar.length > 0) {
       console.error("[dosya-verilerini-sil] silme sonrası eksikler", { case_id, uyarilar });
     }
+    /* "Kişisel veri kalmadı" sözü artık depoyu da kapsıyor: silinen dosya
+       sayısı çağırana bildirilir, yani söz KANITLANABİLİR. */
     return json({
-      silindi: true, kayit: oncekiToplam, uyarilar,
-      mesaj: sinirdanGecir(`${oncekiToplam} kayıt silindi, dosyada kişisel veri kalmadı.`, "silme"),
+      silindi: true, kayit: oncekiToplam, belge: yollar.length, uyarilar,
+      mesaj: sinirdanGecir(
+        `${oncekiToplam} kayıt${yollar.length > 0 ? ` ve ${yollar.length} belge` : ""} silindi, `
+        + "dosyada kişisel veri kalmadı.", "silme"),
     });
   } catch (e: any) {
     console.error("[dosya-verilerini-sil] Genel hata:", String(e?.message ?? e).slice(0, 200));
