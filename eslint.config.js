@@ -5,7 +5,9 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  // tests/gecici/ tek kullanimlik sonda alanidir (CLAUDE.md §22): git disidir ve
+  // icinde kanit icin kusurlu kaynak kopyalari durur. Lint sayisini bozmasin.
+  { ignores: ["dist", "tests/gecici"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
