@@ -6,7 +6,8 @@
   Karar gereken her madde `tasks/HAT.md`ye yazılır, Code beklemeden devam eder.
   "Bitti, bilgi veriyorum" turu yok.
 - Aktif görev: yok — sıradaki iş seçiliyor
-- Son tamamlanan iş: **P1 · sessiz yutulan veritabanı yazımları** (12 yol kapatıldı)
+- Son tamamlanan iş: **P1+P2 · sessiz yutulan veritabanı yazımları**
+  (27 bulundu → **19 kapatıldı**, kalan 8 gerekçeli)
   (önce: P1 bilirkişi önerisi izi `825dfb4` · P1 atama tarihi `0e5b1c9`)
 - Doğrulama: `npm run test` **233/233** · tsc temiz · build başarılı · lint **2348**
 - **Açık blokaj: yok**
@@ -14,16 +15,15 @@
   yalnız yenileme sonrası 200 doğrulaması) · **H-4** (önkoşul yok) ·
   **H-7** (`session_feedback` yapısal olarak imkânsız) · **H-8** (başvuru adası)
   — hiçbiri beklenmiyor, iş sürüyor.
-- Sıradaki uygulanabilir iş: **P2 · dondurulmuş kontrolsüz yazımların kalanı**
-  (yönetici yüzeyleri ×4 + `AjanPenceresi` ×3) — gerekçeleri
-  `tests/sessiz-yazim.test.ts` içindeki `DONDURULMUS` listesinde.
+- Sıradaki uygulanabilir iş: **P3 · `ProcessTrackerPanel` bayat `as any`**
+  (kuyrukta), ardından canlıda 0/az satırlı tablo taramasının kalanı
+  (`pending_pool` · `case_process_tracker`).
 
 ## Kuyruk (yeni açılanlar)
-- [ ] P2 · Yönetici yüzeylerinde kontrolsüz yazım (`KnowledgeBaseAdmin`,
-      `TariffAdmin` ×2, `TemplateAdmin`) · Kabul: `tests/sessiz-yazim.test.ts`
-      `DONDURULMUS` listesinden bu dört dosya çıkar ve tezgâh yeşil kalır.
-- [ ] P2 · `AjanPenceresi` kontrolsüz yazım ×3 (runtime ajan yüzeyi, §13 —
-      yalnız hata yüzeyleme, davranış değişmez) · Kabul: aynı.
+- [x] P2 · Yönetici yüzeylerinde kontrolsüz yazım (`KnowledgeBaseAdmin`,
+      `TariffAdmin` ×2, `TemplateAdmin`) · Kabul: `DONDURULMUS` listesinden
+      çıktı · DONE 25.08 · Doğrulama: 233/233 test, tsc temiz, lint 2348
+- [x] P2 · `AjanPenceresi` kontrolsüz yazım ×3 · DONE 25.08 · aynı doğrulama
 - [ ] P3 · `ProcessTrackerPanel` içindeki `(supabase as any)` bayat: yorum
       "case_process_tracker üretilen tiplerde yok" diyor ama tablo
       `types.ts:1893`te VAR · Kabul: cast kalkar, tsc temiz.
@@ -54,10 +54,18 @@ genelinde **27** kontrolsüz yazım.
 | `MeetingNotesPanel` | `case_notes` kontrol ediliyordu ama tur kaydı edilmiyordu; yine de "Not kaydedildi" deniyordu. |
 | `OfficialDocumentsPanel.syncEditedRecord` | `Promise<boolean>` **her zaman true** dönüyordu → **resmi belge düzenlemesi** yazılamasa bile "Düzenleme kaydedildi". Çağıran `if (ok)` dalını zaten doğru yazmıştı; yalan dönen işlevdi. |
 
-**Dondurulan 15 yazım** (gerekçeleri `tests/sessiz-yazim.test.ts` içinde,
+**İkinci tur (aynı gün, P2):** kuyruğa yazılan yedi yazım da kapatıldı —
+`TariffAdmin` ×2 (yutulursa **iki tarife birden aktif** kalır ve ücret hesabı
+hangisini seçeceği belirsizleşir), `KnowledgeBaseAdmin` + `TemplateAdmin`
+(eski tür satırı kalır, aynı şablon iki türde birden görünür), `AjanPenceresi`
+×3 (ajan penceresinin toast'u yok — hata artık **yazışma akışına** düşüyor:
+"Talimatı reddedemedim — kayıt yazılamadı…" ve "Tercihi kaydedemedim…".
+Ajanın yetkisi/karar sınırı **değişmedi**, yalnız başarısızlık görünür oldu;
+§13 kapsamına girmez).
+
+**Dondurulan 8 yazım** (gerekçeleri `tests/sessiz-yazim.test.ts` içinde,
 gerekçesiz bırakılan yok): ölü yüzeyler (`CaseDocuments`, `IntakeForm` — H-8) ·
-yalnız `read` bayrağı (`NotificationBell`, `Dashboard` — yenilemede düzelir) ·
-yönetici yüzeyleri ×4 ve `AjanPenceresi` ×3 → **kuyruğa P2 olarak yazıldı**.
+yalnız `read` bayrağı (`NotificationBell` ×2, `Dashboard` — yenilemede düzelir).
 
 **TEZGÂH:** `tests/sessiz-yazim.test.ts` (5 durum). Tarayıcı üç kusur sınıfını
 birden yakalıyor: sonucu okunmayan yazım · hiç tetiklenmeyen try/catch · her

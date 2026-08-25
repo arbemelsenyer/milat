@@ -30,8 +30,10 @@ export function TariffAdmin() {
 
   async function toggleActive(row: Row) {
     if (!row.is_active) {
-      // deactivate all others first
-      await supabase.from("fee_tariffs" as any).update({ is_active: false }).neq("id", row.id);
+      // deactivate all others first — yutulursa IKI tarife birden aktif kalir
+      // ve ucret hesabi hangisini sececeği belirsiz hale gelir.
+      const { error: kapatErr } = await supabase.from("fee_tariffs" as any).update({ is_active: false }).neq("id", row.id);
+      if (kapatErr) return toast.error("Diğer tarifeler pasifleştirilemedi: " + kapatErr.message);
     }
     const { error } = await supabase.from("fee_tariffs" as any).update({ is_active: !row.is_active }).eq("id", row.id);
     if (error) return toast.error(error.message);
@@ -46,8 +48,9 @@ export function TariffAdmin() {
     if (!yil || yil < 2020) return toast.error("Geçerli bir yıl girin");
     if (!newDate) return toast.error("Yürürlük tarihi zorunlu");
     setSaving(true);
-    // deactivate existing active tariffs
-    await supabase.from("fee_tariffs" as any).update({ is_active: false }).eq("is_active", true);
+    // deactivate existing active tariffs — aynı gerekçe: iki aktif tarife olmaz.
+    const { error: kapatErr } = await supabase.from("fee_tariffs" as any).update({ is_active: false }).eq("is_active", true);
+    if (kapatErr) { setSaving(false); return toast.error("Mevcut tarife pasifleştirilemedi: " + kapatErr.message); }
     const { error } = await supabase.from("fee_tariffs" as any).insert({
       yil, effective_date: newDate, is_active: true, tariff_data: parsed,
     } as any);

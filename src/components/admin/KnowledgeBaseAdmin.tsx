@@ -338,7 +338,10 @@ export function KnowledgeBaseAdmin() {
         uploaded_at: new Date().toISOString(),
       }, { onConflict: "template_type" });
       if (upErr) throw upErr;
-      await supabase.from("document_templates").delete().eq("template_type", "diger");
+      // Sonuc okunmazsa 'diger' satiri kalir ve ayni sablon iki turde birden
+      // gorunur; supabase-js firlatmadigi icin distaki catch de calismaz.
+      const { error: silErr } = await supabase.from("document_templates").delete().eq("template_type", "diger");
+      if (silErr) throw silErr;
       toast({ title: "Tür güncellendi", description: `${fileName} → ${newType}` });
       setUploadResults((prev) => prev.map((r) => r.name === fileName ? { ...r, template_type: newType, needs_manual: false, auto_detected: false } : r));
     } catch (e: any) {

@@ -9,8 +9,7 @@ import { join } from "node:path";
    kalıbı bir koruma değildir: catch hiç çalışmaz, kullanıcıya "kaydedildi"
    denir ve veri kaybolur.
 
-   25.08 taramasında 27 kontrolsüz yazım bulundu. Kullanıcıyı yanıltan ya da
-   veri kaybettiren 12'si kapatıldı (aşağıdaki KAPATILANLAR). Kalanlar
+   25.08 taramasında 27 kontrolsüz yazım bulundu; 19'u kapatıldı. Kalan 8
    GEREKÇESİYLE dondurulmuştur: yeni bir kontrolsüz yazım eklenirse bu test
    düşer ve adını gösterir.
 
@@ -77,14 +76,6 @@ const DONDURULMUS: Record<string, string> = {
     "P3 · yalnız `read` bayrağı. Başarısızlığın tek sonucu bildirimin okunmamış görünmeye devam etmesidir; veri kaybı yok, yenilemede düzelir.",
   "src/pages/Dashboard.tsx":
     "P3 · yalnız `read` bayrağı — NotificationBell ile aynı gerekçe.",
-  "src/components/admin/KnowledgeBaseAdmin.tsx":
-    "P2 · yönetici yüzeyi, şablon temizliği. Kuyrukta.",
-  "src/components/admin/TariffAdmin.tsx":
-    "P2 · yönetici yüzeyi, tarife aktiflik bayrağı. Kuyrukta.",
-  "src/components/admin/TemplateAdmin.tsx":
-    "P2 · yönetici yüzeyi, şablon silme. Kuyrukta.",
-  "src/components/AjanPenceresi.tsx":
-    "P2 · runtime ajan yüzeyi (CLAUDE.md §13). Hata yüzeyleme davranış değişikliği değildir ama bu dosya ayrı ele alınır. Kuyrukta.",
 };
 
 describe("sessiz yutulan veritabanı yazımı eklenmiyor", () => {
@@ -116,6 +107,11 @@ describe("sessiz yutulan veritabanı yazımı eklenmiyor", () => {
       "src/pages/AgreementGenerator.tsx",
       "src/components/mediation/MeetingNotesPanel.tsx",
       "src/components/mediation/OfficialDocumentsPanel.tsx",
+      // ikinci tur (aynı gün): yönetici yüzeyleri + runtime ajan penceresi
+      "src/components/admin/KnowledgeBaseAdmin.tsx",
+      "src/components/admin/TariffAdmin.tsx",
+      "src/components/admin/TemplateAdmin.tsx",
+      "src/components/AjanPenceresi.tsx",
     ];
     for (const d of kapatilan) {
       expect(dosyalari, `${d} yeniden sessiz yazım içeriyor`).not.toContain(d);

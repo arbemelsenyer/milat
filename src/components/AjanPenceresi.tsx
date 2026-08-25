@@ -654,17 +654,30 @@ export function AjanPenceresi({
      23.08 kararı — bu işlev KALDIRILMADI, yalnız adı ayrıldı: "Yeniden öner"
      artık bilirkişi aday taramasının adıdır (bkz. bilirkisiYenidenOner). */
   async function talimatReddet(g: GorevSatiri, sebep: string) {
+    // supabase-js hata FIRLATMAZ: sonuc okunmazsa yazim basarisiz olsa bile
+    // asagida "Talimati reddettim" denirdi. Reddin gerceklestigi yer
+    // `ajan_gorevleri` satiridir; o yazilamadiysa red OLMAMISTIR ve bunu
+    // arabulucuya soylemek yanlis olur. (Ajanin yetkisi/karar siniri
+    // degismiyor — yalnizca basarisizlik artik gorunur oluyor.)
     const m = /\[talimat:([0-9a-f-]{6,})\]/i.exec(String(g.gerekce ?? ""));
+    let izNotu = "";
     if (m) {
-      await (supabase.from("arabulucu_talimatlari" as any) as any).update({
+      const { error: talimatErr } = await (supabase.from("arabulucu_talimatlari" as any) as any).update({
         durum: "reddedildi", red_sebebi: sebep.trim() || null,
         karar_zamani: new Date().toISOString(),
       }).eq("id", m[1]);
+      if (talimatErr) izNotu = " (talimat kaydina islenemedi)";
     }
-    await supabase.from("ajan_gorevleri")
+    const { error: gorevErr } = await supabase.from("ajan_gorevleri")
       .update({ durum: "atlandi", sonuc: "arabulucu talimatı reddetti" }).eq("id", g.id);
+    if (gorevErr) {
+      setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
+        metin: `Talimatı reddedemedim — kayıt yazılamadı: ${gorevErr.message}. Lütfen tekrar deneyin.` }]);
+      await yukle();
+      return;
+    }
     setYazisma((o) => [...o, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
-      metin: "Talimatı reddettim. Yeni talimatınızı yazabilirsiniz." }]);
+      metin: `Talimatı reddettim${izNotu}. Yeni talimatınızı yazabilirsiniz.` }]);
     setDuzeltmeAdimi("talimat");   // B5 — tek soru: neyi düzelttiniz?
     setTalimatKipi(true);
     await yukle();
@@ -733,12 +746,16 @@ export function AjanPenceresi({
         const liste = Array.isArray((mevcut as any)?.onay_isteyen_adimlar)
           ? (mevcut as any).onay_isteyen_adimlar.map((x: any) => String(x)) : [];
         if (!liste.includes(adim)) liste.push(adim);
-        await (supabase.from("arabulucu_kontrol_tercihleri" as any) as any).upsert({
+        // Tercih yazilamazsa "once size soracagim" sozu tutulamaz; sessizce
+        // verilmis bir soz, verilmemis bir sozden daha kotudur.
+        const { error: tercihErr } = await (supabase.from("arabulucu_kontrol_tercihleri" as any) as any).upsert({
           case_id: caseId, mediator_id: uid, onay_isteyen_adimlar: liste,
           guncelleme_zamani: new Date().toISOString(),
         }, { onConflict: "case_id,mediator_id" });
         setYazisma((x) => [...x, { id: `aj-${Date.now()}`, zaman: Date.now(), tip: "ajan",
-          metin: "Bu dosyada o adımda önce size soracağım." }]);
+          metin: tercihErr
+            ? `Tercihi kaydedemedim: ${tercihErr.message}. Bu adımda otomatik akış sürer — lütfen tekrar deneyin.`
+            : "Bu dosyada o adımda önce size soracağım." }]);
       } else if (tarafModu) { if (hedef && onGit) onGit(hedef); }
       else if (hedef) { setCockpitHedef(hedef); }
     }
