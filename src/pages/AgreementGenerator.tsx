@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
 import { AppNavbar } from '@/components/AppNavbar';
 import { Button } from '@/components/ui/button';
 import { Loader2, FileCheck, Copy, Download, CheckCircle } from 'lucide-react';
@@ -73,13 +74,22 @@ export default function AgreementGenerator() {
         throw new Error(t('Belge üretilemedi, lütfen tekrar deneyin.', 'Document could not be generated, please retry.'));
       }
       if (caseId && user) {
-        await supabase.from('case_documents').insert({
+        // supabase-js hata FIRLATMAZ: `error` okunmazsa aşağıdaki catch çalışmaz
+        // ve üretilen belge ekranda görünürken dosyaya HİÇ kaydedilmemiş olurdu.
+        const { error: kayitErr } = await supabase.from('case_documents').insert({
           case_id: caseId,
           file_name: `${selectedDoc.label}_${today}.txt`,
           file_path: `agreements/${caseId}/${Date.now()}_${docType}.txt`,
           mime_type: 'text/plain',
           uploaded_by: user.id,
         });
+        if (kayitErr) {
+          toast({
+            title: t('Belge dosyaya kaydedilemedi', 'Document could not be filed'),
+            description: kayitErr.message,
+            variant: 'destructive',
+          });
+        }
       }
     } catch (e) {
       // If the stream had already produced text, keep it visible and append

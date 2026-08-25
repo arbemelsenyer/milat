@@ -203,7 +203,14 @@ export default function AdminDashboard() {
   const handleAddRole = async (userId: string, role: string) => {
     setIsUpdatingRole(true);
     const { error } = await supabase.from('user_roles').insert({ user_id: userId, role: role as 'admin' | 'mediator' | 'user' });
-    if (!error) {
+    if (error) {
+      // Yetki değişikliği sessiz kalmaz: yazılamadıysa yönetici bunu görmeli.
+      toast({
+        title: language === 'tr' ? 'Rol eklenemedi' : 'Role not added',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
       try {
         await supabase.functions.invoke('send-role-notification', {
           body: { targetUserId: userId, role, action: 'added', language },
@@ -218,7 +225,19 @@ export default function AdminDashboard() {
 
   const handleRemoveRole = async (userId: string, role: string) => {
     setIsUpdatingRole(true);
-    await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', role as 'admin' | 'mediator' | 'user');
+    // Silme sonucu YUTULMAZ: yazılamazsa rol duruyor demektir. Buna rağmen
+    // "Rol Kaldırıldı" demek ve kullanıcıya "rolünüz alındı" bildirimi
+    // göndermek, duran bir yetkiyi kaldırılmış göstermektir.
+    const { error } = await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', role as 'admin' | 'mediator' | 'user');
+    if (error) {
+      toast({
+        title: language === 'tr' ? 'Rol kaldırılamadı' : 'Role not removed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      setIsUpdatingRole(false);
+      return;
+    }
     try {
       await supabase.functions.invoke('send-role-notification', {
         body: { targetUserId: userId, role, action: 'removed', language },

@@ -1865,9 +1865,15 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik, isMediato
     setNavigating(true);
     try {
       // Pre-create a placeholder session with the chosen meeting_type (user can edit below)
-      await supabase.from("case_sessions").insert({
+      // supabase-js hata FIRLATMAZ; `error` okunmazsa aşağıdaki catch hiç çalışmaz
+      // ve taslak oturum yazılmadan aşama ilerlerdi.
+      const { error: oturumErr } = await supabase.from("case_sessions").insert({
         case_id: caseRow.id, session_type: "joint", meeting_type: meetingType, status: "draft",
       } as any).select().maybeSingle();
+      if (oturumErr) {
+        toast({ title: "Oturum taslağı oluşturulamadı", description: trErr(oturumErr.message), variant: "destructive" });
+        return;
+      }
       await bumpPhase(4);
       onAdvance(5);
     } catch (e: any) {
@@ -4963,8 +4969,22 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
   }
 
   async function deleteDoc(d: any) {
-    await supabase.storage.from("case-documents").remove([d.file_path]);
-    await supabase.from("case_documents").delete().eq("id", d.id);
+    // İki yazımın ikisi de kontrolsüzdü. Dosya silinip satır kalırsa kırık
+    // referans, satır silinip dosya kalırsa KVKK kapsamında SİLİNMEMİŞ kişisel
+    // veri doğar. Önce depo, sonra satır; her ikisi de raporlanır.
+    const { error: depoErr } = await supabase.storage.from("case-documents").remove([d.file_path]);
+    if (depoErr) {
+      toast({ title: "Belge dosyası silinemedi", description: trErr(depoErr.message), variant: "destructive" });
+      return;
+    }
+    const { error: satirErr } = await supabase.from("case_documents").delete().eq("id", d.id);
+    if (satirErr) {
+      toast({
+        title: "Belge kaydı silinemedi",
+        description: `Dosya depodan silindi ancak kayıt duruyor: ${trErr(satirErr.message)}`,
+        variant: "destructive",
+      });
+    }
     loadAll();
   }
 
@@ -5873,9 +5893,14 @@ function ComparativeRiskAnalysis({
           .order("created_at", { ascending: false }).limit(1).maybeSingle();
         if (!existing) return;
         const nextReport = { ...((existing as any).report ?? {}), risk_ozeti: summary };
-        await supabase.from("common_ground_reports")
+        // supabase-js hata FIRLATMAZ: `error` okunmazsa aşağıdaki console.warn
+        // hiç çalışmaz ve yazım sessizce kaybolur. Bu alan türetilmiştir
+        // (her açılışta yeniden hesaplanır), o yüzden kullanıcı uyarılmaz —
+        // ama kayıt sessiz de kalmaz.
+        const { error: yazErr } = await supabase.from("common_ground_reports")
           .update({ risk_ozeti: summary as any, report: nextReport as any })
           .eq("id", (existing as any).id);
+        if (yazErr) console.warn("[ComparativeRiskAnalysis] persist failed", yazErr.message);
       } catch (e) { console.warn("[ComparativeRiskAnalysis] persist failed", e); }
     })();
   }, [caseId, avgUzlasma, rows, strongestScenario, reportData?.risk_ozeti]);
@@ -12516,7 +12541,12 @@ function PaymentAccountingPanel({ caseRow }: { caseRow: CaseRow }) {
       });
 
       if (existingFeeId) {
-        await supabase.from("case_fees" as any).update({ invoice_generated: true } as any).eq("id", existingFeeId);
+        // Makbuz indirildi; bayrak yazılamazsa indirme geri alınmaz ama
+        // "makbuz üretildi" izi kaybolur — arabulucu bunu bilmeli.
+        const { error: bayrakErr } = await supabase.from("case_fees" as any).update({ invoice_generated: true } as any).eq("id", existingFeeId);
+        if (bayrakErr) {
+          toast({ title: "Makbuz kaydı işaretlenemedi", description: trErr(bayrakErr.message), variant: "destructive" });
+        }
       }
       toast({ title: "Makbuz taslağı indirildi" });
     } catch (e: any) {

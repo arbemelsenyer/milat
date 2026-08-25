@@ -98,10 +98,13 @@ export function MeetingNotesPanel({ caseId, caseSummary }: { caseId: string; cas
         .from("negotiation_rounds").select("round_no").eq("case_id", caseId)
         .order("round_no", { ascending: false }).limit(1);
       const nextNo = ((roundData?.[0] as any)?.round_no ?? 0) + 1;
-      await supabase.from("negotiation_rounds").insert({
+      // supabase-js hata FIRLATMAZ: `error` okunmazsa dıştaki catch çalışmaz ve
+      // tur kaydı yazılmadan "Not kaydedildi" denirdi.
+      const { error: turErr } = await supabase.from("negotiation_rounds").insert({
         case_id: caseId, round_no: nextNo, status: "note",
         proposal: payload as any,
       } as any);
+      if (turErr) throw turErr;
 
       setNote("");
       toast({ title: "Not kaydedildi", description: "AI analizi tamamlandı." });

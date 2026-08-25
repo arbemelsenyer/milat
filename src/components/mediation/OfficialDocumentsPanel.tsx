@@ -272,9 +272,13 @@ ${paragraphElems.join("\n")}
     if (!rec) return false;
     try {
       const baseMeta = rec.metadata && typeof rec.metadata === "object" ? rec.metadata : {};
-      await supabase.from("agreement_documents").update({
+      // supabase-js hata FIRLATMAZ: `error` okunmadan bu işlev HER ZAMAN true
+      // dönüyordu ve resmi belge düzenlemesi yazılamasa bile ekranda
+      // "Düzenleme kaydedildi" görünüyordu.
+      const { error } = await supabase.from("agreement_documents").update({
         metadata: { ...baseMeta, filled_text: filledText, edited_at: new Date().toISOString() } as any,
       }).eq("id", rec.id);
+      if (error) return false;
       setSavedTexts((prev) => ({ ...prev, [kind]: filledText }));
       return true;
     } catch {

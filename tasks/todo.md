@@ -6,19 +6,67 @@
   Karar gereken her madde `tasks/HAT.md`ye yazılır, Code beklemeden devam eder.
   "Bitti, bilgi veriyorum" turu yok.
 - Aktif görev: yok — sıradaki iş seçiliyor
-- Son tamamlanan iş: **P1 · bilirkişi önerisi iz bırakıyor ve tarafa ulaşıyor**
-  (önce: P1 atama tarihi uydurulmuyor `0e5b1c9` · P2 ölü yüzey tezgâhı `97517c2`)
-- Doğrulama: `npm run test` **228/228** · tsc temiz · build başarılı ·
-  lint **2348** (yeni modül 0 hata; baseline 2349 → −1)
+- Son tamamlanan iş: **P1 · sessiz yutulan veritabanı yazımları** (12 yol kapatıldı)
+  (önce: P1 bilirkişi önerisi izi `825dfb4` · P1 atama tarihi `0e5b1c9`)
+- Doğrulama: `npm run test` **233/233** · tsc temiz · build başarılı · lint **2348**
 - **Açık blokaj: yok**
 - Açık HAT maddesi: **H-1** (kurucuda: `CRON_SECRET` yenilemesi — Code'un işi
-  yalnız yenileme sonrası 200 doğrulaması) · **H-4** (önkoşul yok: kayıt hattı
-  yazılınca) · **H-7** (`session_feedback` yapısal olarak imkânsız) ·
-  **H-8** (emekliye ayrılmış başvuru adası) — hiçbiri beklenmiyor, iş sürüyor.
-- Sıradaki uygulanabilir iş: canlıda 0 satırlı tabloları okuyan **erişilebilir**
-  yüzeyler taraması sürüyor. Kalan adaylar: `pending_pool` (0 satır ·
-  `MevzuatAdmin`) · `case_process_tracker` (9 dosyada **1** satır) ·
-  `messages` (0 satır — RLS sağlam, yalnız kullanılmamış; kusur DEĞİL).
+  yalnız yenileme sonrası 200 doğrulaması) · **H-4** (önkoşul yok) ·
+  **H-7** (`session_feedback` yapısal olarak imkânsız) · **H-8** (başvuru adası)
+  — hiçbiri beklenmiyor, iş sürüyor.
+- Sıradaki uygulanabilir iş: **P2 · dondurulmuş kontrolsüz yazımların kalanı**
+  (yönetici yüzeyleri ×4 + `AjanPenceresi` ×3) — gerekçeleri
+  `tests/sessiz-yazim.test.ts` içindeki `DONDURULMUS` listesinde.
+
+## Kuyruk (yeni açılanlar)
+- [ ] P2 · Yönetici yüzeylerinde kontrolsüz yazım (`KnowledgeBaseAdmin`,
+      `TariffAdmin` ×2, `TemplateAdmin`) · Kabul: `tests/sessiz-yazim.test.ts`
+      `DONDURULMUS` listesinden bu dört dosya çıkar ve tezgâh yeşil kalır.
+- [ ] P2 · `AjanPenceresi` kontrolsüz yazım ×3 (runtime ajan yüzeyi, §13 —
+      yalnız hata yüzeyleme, davranış değişmez) · Kabul: aynı.
+- [ ] P3 · `ProcessTrackerPanel` içindeki `(supabase as any)` bayat: yorum
+      "case_process_tracker üretilen tiplerde yok" diyor ama tablo
+      `types.ts:1893`te VAR · Kabul: cast kalkar, tsc temiz.
+
+### KAPANDI — 25.08 · P1 · SESSİZ YUTULAN VERİTABANI YAZIMLARI (12 YOL)
+**Kök neden — tek cümle:** `supabase-js` hata **fırlatmaz**. `{ error }`
+okunmazsa yazımın başarısız olduğu hiç anlaşılmaz; dahası `try { await
+supabase…insert() } catch {}` kalıbı bir koruma **değildir** — catch hiç
+çalışmaz. Kullanıcıya "kaydedildi" denir, veri kaybolur.
+
+Bu kusur bu blokta üçüncü kez çıktı (`AdminDashboard` atama izi `0e5b1c9`,
+bilirkişi izi `825dfb4`), o yüzden nokta düzeltme yerine **tarandı**: `src`
+genelinde **27** kontrolsüz yazım.
+
+**Kapatılan 12 yol** (kullanıcıyı yanıltan ya da veri kaybettiren):
+| yer | sessiz kalırsa ne olur |
+|---|---|
+| `AdminDashboard.handleRemoveRole` | **Duran yetki kaldırılmış gösteriliyordu**: silme yutuluyor, sonra hem "Rol Kaldırıldı" deniyor hem kullanıcıya "rolünüz alındı" bildirimi gidiyordu. Hata dalı artık bildirimden **önce** dönüyor. |
+| `AdminDashboard.handleAddRole` | Hata varken hiçbir geri bildirim yoktu — sessizce hiçbir şey olmuyordu. |
+| `MediationEngine.chooseMeeting` | Taslak oturum yazılmadan aşama 5'e geçiliyordu (try/catch supabase hatasını görmüyor). |
+| `MediationEngine.deleteDoc` | İki yazım da kontrolsüzdü: dosya silinip satır kalırsa kırık referans, satır silinip dosya kalırsa **KVKK kapsamında silinmemiş kişisel veri**. |
+| `MediationEngine` risk özeti | Türetilmiş alan; kullanıcı uyarılmıyor ama artık `console.warn`a düşüyor (eskiden warn hiç çalışmıyordu). |
+| `MediationEngine` makbuz bayrağı | "Makbuz üretildi" izi sessizce kayboluyordu. |
+| `CaseRoom.answerDiscovery` | **Tarafın yazdığı cevap** sessizce kayboluyordu. |
+| `CaseRoom.finalize` | Dosya "anlaşma ile kapandı" görünürken **anlaşma metni** hiçbir yere yazılmamış olabiliyordu. |
+| `CaseRoom.setStatus` | Tur durumu güncellenmemiş olabiliyordu. |
+| `CaseRoom` bilirkişi kaldırma | Silinmemiş atama kaldırılmış gösteriliyordu. |
+| `MeetingNotesPanel` | `case_notes` kontrol ediliyordu ama tur kaydı edilmiyordu; yine de "Not kaydedildi" deniyordu. |
+| `OfficialDocumentsPanel.syncEditedRecord` | `Promise<boolean>` **her zaman true** dönüyordu → **resmi belge düzenlemesi** yazılamasa bile "Düzenleme kaydedildi". Çağıran `if (ok)` dalını zaten doğru yazmıştı; yalan dönen işlevdi. |
+
+**Dondurulan 15 yazım** (gerekçeleri `tests/sessiz-yazim.test.ts` içinde,
+gerekçesiz bırakılan yok): ölü yüzeyler (`CaseDocuments`, `IntakeForm` — H-8) ·
+yalnız `read` bayrağı (`NotificationBell`, `Dashboard` — yenilemede düzelir) ·
+yönetici yüzeyleri ×4 ve `AjanPenceresi` ×3 → **kuyruğa P2 olarak yazıldı**.
+
+**TEZGÂH:** `tests/sessiz-yazim.test.ts` (5 durum). Tarayıcı üç kusur sınıfını
+birden yakalıyor: sonucu okunmayan yazım · hiç tetiklenmeyen try/catch · her
+zaman "başarılı" dönen sarmalayıcı. Beşinci test **tarayıcının kendisini**
+koruyor (0 bulursa tezgâh bozulmuş demektir — 24.08 bozuk-bekçi dersi).
+**KANITLANDI:** düzeltme öncesi ağaç `SESSIZ_KOK=tests/gecici/sessiz-kanit`e
+(`git archive HEAD src`) açıldı → **4/5 test DÜŞTÜ** ve altı dosyayı adıyla
+gösterdi; gerçek dizinde 5/5 geçiyor.
+- Doğrulama: **233/233** test · tsc temiz · build başarılı · lint 2348 (değişmedi).
 
 ### KAPANDI — 25.08 · P1 · BİLİRKİŞİ ÖNERİSİ İZ BIRAKIYOR VE TARAFA ULAŞIYOR
 Bilirkişi önerisini **iki** yüzey yazıyordu ve ikisi aynı işi yapmıyordu:

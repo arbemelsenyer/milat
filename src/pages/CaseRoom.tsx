@@ -401,7 +401,13 @@ export default function CaseRoom() {
   }
 
   async function answerDiscovery(qId: string, answer: string) {
-    await supabase.from("case_discovery_questions").update({ answer_text: answer }).eq("id", qId);
+    // Tarafın yazdığı cevap sessizce kaybolmaz: yazılamazsa taraf bunu görmeli,
+    // yoksa cevabını verdiğini sanıp ekrandan ayrılır.
+    const { error } = await supabase.from("case_discovery_questions").update({ answer_text: answer }).eq("id", qId);
+    if (error) {
+      toast({ title: "Cevap kaydedilemedi", description: error.message, variant: "destructive" });
+      return;
+    }
     await loadAll();
   }
 
@@ -2682,7 +2688,8 @@ function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string;
 
   const remove = async (row: any) => {
     if (!user) return;
-    await supabase.from("case_expert_assignments").delete().eq("id", row.id);
+    const { error: silErr } = await supabase.from("case_expert_assignments").delete().eq("id", row.id);
+    if (silErr) { toast({ title: "Kaldırılamadı", description: silErr.message, variant: "destructive" }); return; }
     await izYaz({
       caseId, assignmentId: row.id, expertId: row.expert_id,
       actorId: user.id, actorRole: "mediator", action: "removed",
@@ -2897,7 +2904,8 @@ function RoundsTab({ caseId, parties }: { caseId: string; parties: any[] }) {
   };
 
   const setStatus = async (id: string, status: string) => {
-    await supabase.from("negotiation_rounds").update({ status }).eq("id", id);
+    const { error } = await supabase.from("negotiation_rounds").update({ status }).eq("id", id);
+    if (error) { toast({ title: "Tur durumu güncellenemedi", description: error.message, variant: "destructive" }); return; }
     load();
   };
 
@@ -2953,16 +2961,29 @@ function AgreementTab({ caseRow, parties, onChanged }: { caseRow: any; parties: 
     const { error } = await supabase.from("cases").update({
       status, current_phase: 8,
     } as any).eq("id", caseRow.id);
+    // Anlaşma METNİ ayrı bir yazımdır. Sonucu yutulursa dosya "anlaşma ile
+    // kapandı" görünür ama anlaşmanın kendisi hiçbir yerde durmaz.
+    let belgeErr: string | null = null;
     if (!error && status === "agreement" && agreementText.trim()) {
-      await supabase.from("agreement_documents").insert({
+      const { error: docErr } = await supabase.from("agreement_documents").insert({
         case_id: caseRow.id,
         doc_type: "agreement",
         metadata: { text: agreementText, fee: feeAmount, meeting_date: meetingDate, meeting_location: meetingLocation },
         file_path: "",
       } as any);
+      belgeErr = docErr?.message ?? null;
     }
     setSaving(false);
     if (error) { toast({ title: "Hata", description: error.message, variant: "destructive" }); return; }
+    if (belgeErr) {
+      toast({
+        title: "Anlaşma metni kaydedilemedi",
+        description: `Dosya kapandı ancak anlaşma belgesi yazılamadı: ${belgeErr}`,
+        variant: "destructive",
+      });
+      onChanged();
+      return;
+    }
     toast({ title: status === "agreement" ? "Anlaşma kaydedildi" : "Başvuru sonlandırıldı" });
     onChanged();
   };

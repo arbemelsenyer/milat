@@ -1,0 +1,149 @@
+import { describe, it, expect } from "vitest";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+
+/* SESSİZ YUTULAN VERİTABANI YAZIMLARI (25.08.2026)
+
+   `supabase-js` hata FIRLATMAZ — `{ error }` okunmazsa yazımın başarısız olduğu
+   HİÇ anlaşılmaz. Bu yüzden `try { await supabase...insert(...) } catch {}`
+   kalıbı bir koruma değildir: catch hiç çalışmaz, kullanıcıya "kaydedildi"
+   denir ve veri kaybolur.
+
+   25.08 taramasında 27 kontrolsüz yazım bulundu. Kullanıcıyı yanıltan ya da
+   veri kaybettiren 12'si kapatıldı (aşağıdaki KAPATILANLAR). Kalanlar
+   GEREKÇESİYLE dondurulmuştur: yeni bir kontrolsüz yazım eklenirse bu test
+   düşer ve adını gösterir.
+
+   Bu tezgâh üç kusur sınıfını birden yakalar:
+     1. sonucu hiç okunmayan yazım,
+     2. supabase çağrısını saran ama hiç tetiklenmeyen try/catch,
+     3. her zaman "başarılı" dönen sarmalayıcı (`Promise<boolean>`).
+
+   Kanıt için kök değiştirilebilir: SESSIZ_KOK=tests/gecici/sessiz-kanit */
+
+const KOK = (process.env.SESSIZ_KOK ?? "").replace(/\/+$/, "");
+const y = (goreli: string) => (KOK ? `${KOK}/${goreli}` : goreli);
+
+/** Sonucu hiç kontrol edilmeyen yazımlar — `dosya:satır` kümesi. */
+function kontrolsuzYazimlar(kok: string): string[] {
+  const dosyalar: string[] = [];
+  (function tara(d: string) {
+    for (const ad of readdirSync(d)) {
+      const p = join(d, ad);
+      if (statSync(p).isDirectory()) tara(p);
+      else if (/\.tsx?$/.test(ad) && !p.includes("integrations")) dosyalar.push(p);
+    }
+  })(kok);
+
+  const bulgular: string[] = [];
+  for (const f of dosyalar) {
+    const g = readFileSync(f, "utf-8");
+    if (!g.includes("supabase")) continue;
+    const satirlar = g.split("\n");
+    const YAZIM = /\.\s*(insert|update|delete|upsert)\s*\(/g;
+    let m: RegExpExecArray | null;
+    while ((m = YAZIM.exec(g))) {
+      const idx = m.index;
+      const satirNo = g.slice(0, idx).split("\n").length;
+      const onceki = g.slice(Math.max(0, idx - 400), idx);
+      if (!/supabase|Table\(\)|admin\./.test(onceki)) continue;
+      const ctx = satirlar.slice(Math.max(0, satirNo - 4), satirNo).join("\n");
+      const sonrasi = g.slice(idx, idx + 600);
+      const kontrolVar =
+        /\{\s*(data\s*:|error|data)\b[^}]*\}\s*=\s*await/.test(ctx) ||
+        /const\s+\w+\s*=\s*await/.test(ctx) ||
+        /\.then\s*\(/.test(sonrasi) ||
+        /return\s+await|return\s+supabase/.test(ctx);
+      if (!kontrolVar) {
+        // Kök öneki ve Windows ters bölü normalize edilir.
+        const TERS = String.fromCharCode(92); // ters bölü — heredoc kaçışlarına takılmasın
+        const bol = (t: string) => t.split(TERS).join("/");
+        const tam = bol(f);
+        const goreli = KOK ? tam.replace(`${bol(KOK)}/`, "") : tam;
+        bulgular.push(`${goreli}:${satirNo}`);
+      }
+    }
+  }
+  return bulgular.sort();
+}
+
+/** Dondurulmuş kalanlar — her biri GEREKÇELİdir. Sayı değil, ad eşleşir. */
+const DONDURULMUS: Record<string, string> = {
+  "src/components/CaseDocuments.tsx":
+    "ÖLÜ YÜZEY (tests/olu-yuzey.test.ts · H-8 sınıfı): erişilemez. Diriltilirse yazım kontrolü de gelmelidir.",
+  "src/components/intake/IntakeForm.tsx":
+    "ÖLÜ YÜZEY (H-8 · başvuru adası): erişilemez ve zaten kaldırılması önerilen dosya.",
+  "src/components/NotificationBell.tsx":
+    "P3 · yalnız `read` bayrağı. Başarısızlığın tek sonucu bildirimin okunmamış görünmeye devam etmesidir; veri kaybı yok, yenilemede düzelir.",
+  "src/pages/Dashboard.tsx":
+    "P3 · yalnız `read` bayrağı — NotificationBell ile aynı gerekçe.",
+  "src/components/admin/KnowledgeBaseAdmin.tsx":
+    "P2 · yönetici yüzeyi, şablon temizliği. Kuyrukta.",
+  "src/components/admin/TariffAdmin.tsx":
+    "P2 · yönetici yüzeyi, tarife aktiflik bayrağı. Kuyrukta.",
+  "src/components/admin/TemplateAdmin.tsx":
+    "P2 · yönetici yüzeyi, şablon silme. Kuyrukta.",
+  "src/components/AjanPenceresi.tsx":
+    "P2 · runtime ajan yüzeyi (CLAUDE.md §13). Hata yüzeyleme davranış değişikliği değildir ama bu dosya ayrı ele alınır. Kuyrukta.",
+};
+
+describe("sessiz yutulan veritabanı yazımı eklenmiyor", () => {
+  const bulunan = kontrolsuzYazimlar(y("src"));
+  const dosyalari = Array.from(new Set(bulunan.map((b) => b.split(":")[0]))).sort();
+
+  it("tarayıcı gerçekten çalışıyor (tezgâhın kendisi korunuyor)", () => {
+    // Tarama çökerse ya da yolu şaşarsa 0 bulur ve test sessizce yeşil kalırdı.
+    expect(bulunan.length, "tarama hiçbir şey bulmadı — tarayıcı bozulmuş olabilir").toBeGreaterThan(0);
+    expect(dosyalari.length).toBeGreaterThan(3);
+  });
+
+  it("kontrolsüz yazım yalnız gerekçesi yazılmış dosyalarda kalmış", () => {
+    const yeni = dosyalari.filter((d) => !(d in DONDURULMUS));
+    expect(
+      yeni,
+      `Gerekçesiz kontrolsüz yazım: ${yeni.join(", ")}\n` +
+        "supabase-js hata fırlatmaz — sonucu okuyup kullanıcıya bildirin, " +
+        "ya da DONDURULMUS listesine GEREKÇESİYLE ekleyin.",
+    ).toEqual([]);
+  });
+
+  it("kapatılan yollar geri açılmıyor", () => {
+    // 25.08'de kapatılan 12 yol: hiçbiri listeye geri düşmemeli.
+    const kapatilan = [
+      "src/pages/AdminDashboard.tsx",
+      "src/pages/MediationEngine.tsx",
+      "src/pages/CaseRoom.tsx",
+      "src/pages/AgreementGenerator.tsx",
+      "src/components/mediation/MeetingNotesPanel.tsx",
+      "src/components/mediation/OfficialDocumentsPanel.tsx",
+    ];
+    for (const d of kapatilan) {
+      expect(dosyalari, `${d} yeniden sessiz yazım içeriyor`).not.toContain(d);
+    }
+  });
+
+  it("resmi belge düzenlemesi 'kaydedildi' derken gerçekten kaydediliyor", () => {
+    // `syncEditedRecord` supabase hatasını okumadan HER ZAMAN true dönüyordu.
+    const g = readFileSync(y("src/components/mediation/OfficialDocumentsPanel.tsx"), "utf-8");
+    const i = g.indexOf("async function syncEditedRecord");
+    expect(i, "syncEditedRecord bulunamadı").toBeGreaterThan(-1);
+    const govde = g.slice(i, i + 1200);
+    expect(govde, "hata okunmadan true dönülüyor").toMatch(/const\s*\{\s*error\s*\}\s*=\s*await\s+supabase/);
+    expect(govde).toContain("if (error) return false;");
+  });
+
+  it("rol kaldırma başarısızsa 'Rol Kaldırıldı' denmiyor", () => {
+    const g = readFileSync(y("src/pages/AdminDashboard.tsx"), "utf-8");
+    const i = g.indexOf("const handleRemoveRole");
+    expect(i).toBeGreaterThan(-1);
+    const govde = g.slice(i, i + 900);
+    expect(govde, "silme sonucu okunmuyor — duran yetki kaldırılmış gösterilir").toMatch(
+      /const\s*\{\s*error\s*\}\s*=\s*await\s+supabase\.from\('user_roles'\)\.delete/,
+    );
+    // Hata dalı, başarı bildirimi ve kullanıcıya giden 'removed' bildiriminden ÖNCE dönmeli.
+    const hataIdx = govde.indexOf("if (error)");
+    const bildirimIdx = govde.indexOf("send-role-notification");
+    expect(hataIdx).toBeGreaterThan(-1);
+    expect(hataIdx, "hata dalı bildirimin sonrasında — yanlış bildirim yine gider").toBeLessThan(bildirimIdx);
+  });
+});
