@@ -18,32 +18,6 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 
 ## CODE → COWORK
 
-### H-4 · 24.08.2026 · P3 — Kayıt kovasına dar okuma politikası
-**Sorun.** `oturum-kayitlari` kovası 24.08'de açıldı (özel; istemciye hiçbir
-politika verilmedi — deny-by-default). Silme kolu servis rolüyle çalıştığı için
-sorun yok. Ama arabulucunun kaydı **uygulamadan** dinlemesi gerekirse dar bir
-okuma politikası gerekecek. **Şu an yazılamaz:** yükleme yolu henüz kodlanmadığı
-için dosya yolu düzeni belli değil; politika için desen **uydurmak** gerekirdi.
-
-**Seçenekler.**
-| | ne yapılır | bedeli |
-|---|---|---|
-| **A** | Kayıt hattı yazılırken yol düzeni belirlenir, sonra dar politika eklenir | Doğru sıra; şimdi iş yok |
-| B | Şimdi bir yol düzeni dayatılır ve politika yazılır | Hattı yazanı bağlar; yanlış tahminde iki kez iş |
-| C | Politika hiç yazılmaz; arabulucu kaydı yalnız edge function üzerinden (imzalı bağlantı) dinler | En güvenli; her dinleme için sunucu turu |
-
-**Önerim: A**, ve hattı yazan kişi **C**'yi ciddi değerlendirsin: onay metni
-"kayıt ve dökümü **yalnız arabulucu** görür" diyor.
-
-**Kararın etkisi.** Pilotu bloke etmez (kayıt hattı henüz yok). Ama politika
-**geniş** yazılırsa 24.08'de belge kovasında yaşanan kör veri sızıntısı
-tekrarlanır — orada ölçülen gerçek sızıntı 1 çiftti.
-
----
-
-
----
-
 ### H-7 · 25.08.2026 · P1 — Geri bildirim (`session_feedback`) yapısal olarak imkânsız
 **Sorun.** Adanın **altıncı** yüzeyi: `SessionFeedback.tsx` hiçbir yerden import
 edilmiyor (geçişli graf taraması: `main.tsx`ten erişilemez). Dahası, erişilebilir
@@ -255,49 +229,6 @@ yalnız aydınlatmadır. B/C'de rıza kaydı denetlenebilir biçimde tutulur.
 
 ---
 
-### H-14 · 25.08.2026 · P1 — Sesli oturum notu: ses nereye gidecek? (§15.2)
-**Sorun.** §15.2: "Oturum sonrası özet **hem yazılı hem sesli** girilebiliyor;
-sesli not metne dökülüp arabulucunun onayıyla föye ve analiz zincirine giriyor."
-
-**Yazılı yarı KURULU ve canlı:** `MeetingNotesPanel` → `analyze-meeting-notes`
-→ `case_notes` (phase 7) → orkestratör bunu görüşme malzemesi sayıyor.
-**Onay kapısı da kurulu:** `kayit_onay_talepleri` / `kayit_onaylari`,
-`create-video-room` odayı tüm katılımcıların onayına bağlıyor (B18).
-**Şema da hazır:** `oturum_kayitlari.ses_dosya_yolu` · `dokum_metni`, ve
-`ajan-nobetci` içinde 24 saatlik imha kolu çalışıyor.
-
-**Eksik olan tek şey ses hattı** — ve o, Code'un tek başına veremeyeceği bir
-karara bağlı: **ses verisi sistemden çıkacak mı, çıkacaksa nereye?**
-
-Bugünkü aydınlatma metni yalnız **metin** analizinden ve **Google Gemini
-API**'den söz ediyor. Ses kaydını bir konuşma-tanıma servisine göndermek
-**yeni bir veri işleme türüdür**; mevcut aydınlatma bunu kapsamaz (§7.4).
-
-**Seçenekler.**
-| | ses nereden gelir / nereye gider | bedeli |
-|---|---|---|
-| **A** | Arabulucunun tarayıcısı kaydeder (MediaRecorder) → kovaya yüklenir → döküm bir STT servisine gider | En esnek; **ses üçüncü tarafa çıkar** → aydınlatma metni güncellenmeli, taraf rızası gözden geçirilmeli |
-| B | Yalnız arabulucunun **kendi sesli notu** (taraf sesi yok) kaydedilir | Taraf verisi hiç çıkmaz; §15.2'nin "oturum sonrası özet" ifadesine birebir uyar — özet arabulucunundur |
-| C | Video sağlayıcısı kaydeder, kayıt oradan çekilir | Onay kapısı zaten videoya bağlı; ama kayıt sağlayıcının altyapısında da durur |
-| D | Ses hiç işlenmez; yalnız yazılı not kalır | §15.2 sağlanmaz |
-
-**Önerim: B.** Şartın sözü "**oturum sonrası özet**"tir — özeti giren
-arabulucudur, taraf değil. B ile taraf sesi hiç kaydedilmez, KVKK yüzeyi
-dramatik biçimde küçülür ve aydınlatma metnine yalnız "arabulucunun sesli notu
-metne dökülür" cümlesi eklenir. A'ya pilottan sonra, taraf rızası tasarımı
-yeniden ele alınarak geçilebilir.
-
-**Kararın etkisi.** A veya C seçilirse: aydınlatma metni güncellenir, taraf
-rızası (H-13) yeniden değerlendirilir, STT servisi seçilir (maliyet + veri
-yeri). B seçilirse: yalnız arabulucu kaydı, mevcut rıza yapısı yeterli.
-D seçilirse §15.2 kalemi pilot kapısında **açık kalır**.
-
-**Karar geldiğinde Code'un yapacağı iş (B varsayımıyla):** kayıt düğmesi +
-kovaya yükleme + STT çağrısı + `dokum_metni` yazımı + arabulucu onayı + föye
-aktarım. Ayrıca HAT **H-4** (kovaya dar okuma politikası) bu hat yazılınca
-kapanabilir hâle gelir — yol düzeni ancak o zaman belli olur.
-
-
 ## COWORK → CODE
 
 _Cevaplar buraya yazılır. Biçim:_
@@ -392,6 +323,60 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+
+### H-14 · KAPANDI · 25.08.2026 — Sesli oturum notu (karar B uygulandı)
+**Seçim: B** — yalnız arabulucunun kendi sesli notu. Üç şart da kuruldu ve
+tezgâhla kilitlendi (`tests/sesli-not.test.ts`, 10/10):
+1. Ses metne çevrildiği **an** siliniyor — döküm başarısız olsa da. Silme
+   sonucu okunuyor; silinemezse `ses_dosya_yolu` temizlenmiyor ki 24 saatlik
+   imha kolu bulabilsin.
+2. Aydınlatma metni (`KVKK_SESLI_NOT`) `src/lib/kvkk-metinleri.ts` içinde
+   **tek yerde**: hangi hizmet · ne kadar kalıyor · ne zaman siliniyor.
+3. Tek seferlik onay olmadan kayıt **başlamıyor**.
+
+**Teknik kısıt kuruldu:** istemci yalnız `getUserMedia({audio:true,video:false})`
+çağırıyor; uzak ses akışı API'lerinin (`RTCPeerConnection` · `getDisplayMedia` ·
+`ontrack` · `getReceivers` · `srcObject` · `DailyIframe`) **hiçbiri kodda
+geçmiyor** ve tezgâh bunu yorumları ayıklayarak denetliyor. Sunucu tarafı da
+çağıranın dosyanın arabulucusu olduğunu doğruluyor (taraf → 403).
+
+**Kalan:** kovanın INSERT politikası (bkz. H-4 arşiv kaydı) ve dökümün canlı
+kanıtı — `tasks/todo.md`de işaretli.
+
+---
+
+
+### H-4 · KAPANDI · 25.08.2026 — Kayıt kovası: dar okuma politikası GEREKMİYOR
+**Önkoşul bugün doğdu.** H-4 "yükleme yolu henüz kodlanmadığı için dosya yolu
+düzeni belli değil" diye bekliyordu. Sesli not hattı (H-14/B) düzeni kurdu:
+`<arabulucu_id>/<case_id>/<zaman>.webm`.
+
+**Cevap C'den bile dar çıktı.** H-4 cevabı "önce C'yi (imzalı bağlantı) dene,
+yetmezse dar politika yaz" diyordu. Bugünkü hatta ses **metne çevrilir çevrilmez
+siliniyor** (H-14 şart 1) ve saklanan tek şey metin — metin de kovada değil
+`oturum_kayitlari` tablosunda. Yani **istemcinin kovadan okumasına hiç gerek
+yok**: `SesliNotKaydi.tsx` yalnız `upload` çağırıyor; `download`,
+`createSignedUrl`, `list` **hiç geçmiyor**. Okuma ve silme sunucuda servis
+rolüyle yapılıyor, servis rolü RLS'e tabi değil.
+**Sonuç: kova okumaya KAPALI kalıyor. Ne dar politika ne imzalı bağlantı gerekti.**
+
+**Ama bu sırada CANLI BİR AÇIK bulundu (P1).** `storage.objects` deny-by-default
+çalışıyor ve `oturum-kayitlari` kovası için **canlıda hiç politika yok** (yalnız
+`avatars` ve `case-documents` politikaları var). Bu yüzden **yükleme de düşer** —
+sesli not hattı kodda bitmiş görünür ama ilk kullanımda politika ihlaliyle
+başarısız olur.
+
+**Gereken tek şey bir INSERT politikası** (Code yazdı, ÇALIŞTIRMADI — §10):
+`tests/gecici/oturum-kayitlari-politika.sql`. Ölçü: kimliği doğrulanmış
+kullanıcı, **yalnız kendi klasörüne** ve **yalnız arabulucusu olduğu dosyaya**
+yükleyebilir (`is_case_mediator`). Taraf yükleyemez. Okuma politikası
+**eklenmez**.
+
+Bu politika çalıştırılana kadar sesli not hattı canlıda **çalışmaz**;
+`tasks/todo.md`de bu şekilde işaretlendi.
+
+---
+
 
 ### H-11 · KAPANDI · 25.08.2026 — Kabuk bekçisi geri kuruldu
 **Seçim: A.** Kurucu `guard-shell.YEDEK.sh` sürümünü PowerShell'den

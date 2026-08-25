@@ -128,7 +128,15 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       başarısız olsa da; (2) aydınlatma metni `kvkk-metinleri.ts`te tek yerde;
       (3) tek seferlik onay olmadan kayıt başlamıyor. Taraf sesi **teknik olarak**
       erişilemez (uzak akış API'leri kodda geçmiyor, tezgâh denetliyor).
-      · **KALAN TEK ŞEY:** dökümün canlıda gerçekten çalıştığının kanıtı —
+      · **CANLIYI ENGELLEYEN AÇIK (P1):** `storage.objects` deny-by-default ve
+      `oturum-kayitlari` kovası için **canlıda hiç politika yok** — istemci
+      yüklemesi politika ihlaliyle düşer, yani hat kodda bitmiş görünse de
+      **çalışmaz**. Gereken tek şey bir INSERT politikası: Code yazdı,
+      **çalıştırmadı** (§10) → `tests/gecici/oturum-kayitlari-politika.sql`.
+      Ölçü: kimliği doğrulanmış kullanıcı, yalnız KENDİ klasörüne ve yalnız
+      **arabulucusu olduğu** dosyaya yükler (`is_case_mediator`); taraf yükleyemez;
+      okuma politikası eklenmez.
+      · **KALAN İKİNCİ ŞEY:** dökümün canlıda gerçekten çalıştığının kanıtı —
       `ai.gateway.lovable.dev` üzerinden `input_audio` gönderimi Code tarafından
       sınanamıyor (mikrofon ve `LOVABLE_API_KEY` gerekiyor; anahtar §12 gereği
       okunmaz). Kurucudan **tek somut kontrol** isteniyor (aşağıda).
@@ -1524,8 +1532,12 @@ uyarı konuldu, kuyruğa madde açıldı.
       olmadığı için silme kolu çalışır.
       YOL DÜZENİ UYDURULMADI: yükleme yolu henüz yazılmadığından dosya yolu
       düzeni belli değil; politika yazmak için desen uydurmak gerekirdi.
-- [ ] P3 · Kayıt hattı kurulduğunda `oturum-kayitlari` kovasına **dar** okuma
-      politikası eklensin · Kabul: yol düzeni belli olduktan sonra yalnız
+- [x] P3 · `oturum-kayitlari` kovası okuma politikası · **DONE 25.08.2026 —
+      GEREKMEDİĞİ KANITLANDI** (HAT H-4 ARŞİV) · Sesli not hattı ses'i metne
+      çevirir çevirmez sildiği için istemcinin kovadan okumasına gerek yok:
+      `SesliNotKaydi.tsx` yalnız `upload` çağırıyor, `download`/`createSignedUrl`/
+      `list` hiç geçmiyor. Kova okumaya **kapalı** kalıyor — H-4 cevabındaki C
+      (imzalı bağlantı) tercihinden bile dar.
       görevli arabulucu (+yönetici) okuyabiliyor; taraf kimliğiyle okuma 0 satır
       dönüyor · NOT: belge kovasında bu politikanın geniş yazılması 24.08'de
       canlı bir kör veri sızıntısı doğurdu (1 gerçek çift) — tekrarlanmasın.
