@@ -5,12 +5,16 @@
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
 - Son tamamlanan iş: **P1 · H-15'in dört kararı uygulandı + saklama canlıda**
-- **PİLOT KUYRUĞU: 10/14 DONE · 4 BLOCKED.** Dördünün de **kodu bitti**;
+- **PİLOT KUYRUĞU: 11/14 DONE · 3 BLOCKED.** Dördünün de **kodu bitti**;
   engel yalnız **SQL çalıştırma** (üç göç + bir cron) ve bir gerçek telefon.
 - **CANLIDA DOĞRULANAN (Code sorguladı):** `saklama_sureleri` tablosu ✓ değerli
   (6/6) · `Sesli not%` kova politikası ✓ (hat artık çalışabilir).
   **Henüz çalıştırılmamış:** antet kolonları · `arabulucu_baz_cizgi` ·
-  `paket_kotalari` · `saklama-imha` cron kaydı · `saklama_gun >= 0` kısıtı.
+  `saklama-imha` cron kaydı · `saklama_gun >= 0` kısıtı.
+  (`paket_kotalari` **isteğe bağlı** — pilotta kota uygulanmıyor.)
+- **KALAN ÜÇ MADDE:** antet (göç) · kazanım (göç) · taraf akışı telefonda
+  (gerçek cihaz). Üçünün de **kodu bitti ve canlıda**; hiçbirinde Code
+  tarafında yapılacak iş kalmadı.
 - **BEŞİ TEK DOSYADA TOPLANDI:** `tests/gecici/PILOT-KALAN-GOCLER.sql` — tek
   yapıştırma, sırayla koşar, her bölüm `if not exists` / `on conflict` ile
   korumalı (ikinci kez çalıştırmak zararsız). **Bağımlılıkları canlıda
@@ -205,35 +209,26 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       · **Kalan:** `tests/gecici/antet-alanlari.sql` çalıştırılacak. Arabulucuya
       özel ŞABLON kapsam dışı (H-15/2 önerisi A: şablon genel kalır).
 
-- [!] P1 · **Üyelik / paket / kota** · **KOD YARISI BİTTİ · BLOCKED → HAT H-15/3**
-      (yalnız paket/limit DEĞERLERİ) · Doğrulama: `tests/kota-kapisi.test.ts`
-      (7 durum) · 338/338 test
-      · **Engel aşıldı — karar veriye taşındı:** *"pilotta kota yok"* da bir
-      **veri durumudur** (`limit_deger` NULL = sınırsız). Kurucu hiçbir şey
-      girmezse sistem bugünkü gibi çalışır; kota istendiğinde **kod değişmeden**
-      değer girilir.
-      · **Kapı kazara kimseyi kilitlemiyor (tezgâhla kilitli):** limit NULL →
-      sınırsız · kota satırı yok → sınırsız · tablo hiç yok → sınırsız ·
-      sınır aşılsa bile **varsayılan engellemez** (`dolunca='uyar'`) ·
-      kota uygulanmıyorsa kullanım **boşuna sayılmaz**.
-      · **FAIL-OPEN BİLİNÇLİ:** kota **ticari** bir sınırdır, güvenlik sınırı
-      değil. Kota okunamayınca arabulucunun işini durdurmak, sınırı aşmasına
-      izin vermekten daha zararlıdır. (Güvenlik kapıları fail-closed'dır.)
-      · **KURUCUNUN İSTEDİĞİ SAYAÇ VE EKRAN YAPILDI (26.08):** "analiz
-      koşumlarını arabulucu bazında sayan tüketim + `/admin`de 'kim kaç analiz
-      tüketti' listesi" → `src/components/admin/AnalizTuketimi.tsx`, AdminDashboard'a
-      **Analiz tüketimi** sekmesi olarak bağlandı. Doğrulama:
+- [x] P1 · **Üyelik / paket / kota** · **DONE 26.08.2026 — KURUCU KARARIYLA
+      PİLOT KAPISINDAN DÜŞTÜ + Code'a düşen iş yapıldı**
+      · **Kurucunun sözü (HAT H-15/3):** *"SAYAÇ ÇALIŞSIN, ENGEL OLMASIN. …
+      YAPILMAYACAK: paket/fiyat ekranı, kota engeli, aşım ücreti mekanizması,
+      ödeme entegrasyonu. Bunlar pilot sonrası. **Bu seçimle madde pilot
+      kapısından düşer.**"* — maddeyi "BLOCKED" tutmak bu kararı okumamaktı.
+      · **Code'a düşen iş yapıldı (26.08):** analiz koşumlarını arabulucu bazında
+      sayan tüketim + `/admin` → **Analiz tüketimi** sekmesi
+      (`src/components/admin/AnalizTuketimi.tsx`). Doğrulama:
       `tests/analiz-tuketimi.test.ts` (6 durum) · 345/345 test.
       · **Ayrı sayaç tablosu TUTULMADI:** tüketim çıktıların kendisinden sayılır.
-      İkinci bir sayaç tablosu ikinci bir doğruluk kaynağı yaratır ve ikisi
-      kaçınılmaz olarak birbirinden ayrılır. Bu sayede göç de gerekmedi.
-      · **Gizlilik:** ekran yalnız SAYI gösterir — dosya başlığı, taraf adı,
-      uyuşmazlık içeriği, tutar girmez (§14, m.1). Tezgâh bunu kilitliyor.
-      · **YAPILMAYAN (kurucu "pilot sonrası" dedi):** paket/fiyat ekranı, kota
-      engeli, aşım ücreti, ödeme entegrasyonu. Tezgâh bunların sızmadığını da
-      denetliyor.
-      · **Kalan:** paket/limit değerleri (göç `PILOT-KALAN-GOCLER.sql` Bölüm 3'te,
-      pilot paketi dört kota türünde de SINIRSIZ kurulu).
+      İkinci sayaç tablosu ikinci doğruluk kaynağı yaratır ve ikisi kaçınılmaz
+      olarak birbirinden ayrılır (bugünkü `extraction_status` sözlük çatalının
+      aynı ailesi). **Bu sayede göç GEREKMEDİ — ekran şimdi çalışıyor.**
+      · **Gizlilik:** ekran yalnız SAYI gösterir; dosya başlığı, taraf adı,
+      içerik, tutar girmez (§14, m.1). Tezgâh hem bunu hem de "yapılmayacak"
+      denenlerin sızmadığını kilitliyor.
+      · **`PILOT-KALAN-GOCLER.sql` Bölüm 3 (paket tabloları) İSTEĞE BAĞLIDIR** —
+      pilotta kota uygulanmadığı için gerekli değil; kota kapısı tablo yokken de
+      "sınırsız" der. Pilot sonrası paket tasarımı yapılırken çalıştırılır.
 
 - [!] P1 · **Kazanım sayacı** · **KOD YARISI BİTTİ · BLOCKED → HAT H-15/4**
       (yalnız katsayı DEĞERLERİ) · Doğrulama: `tests/kazanim-sayaci.test.ts`
