@@ -805,3 +805,24 @@ tezgâhtaydı. Her fixture kendi dizinine alındı.
 açamazsa dosyayı boş okur ve FAIL-OPEN'a düşer: hiç engellemez, üstelik sessizce.
 Bu yüzden bekçi tezgâhı yol biçimini **ayrıca** sınamalıdır (`yol-bicimi.mjs`:
 ters bölü ve ileri bölü, ikisi de).
+
+
+## 25.08.2026 — Commit mesajını heredoc ile yazma
+
+`git commit -F - <<'EOF' … EOF` kalıbı işe yarıyor ama **kurucuya her seferinde
+onay ekranı çıkarıyor**: Claude Code komutu statik olarak çözemediği için
+heredoc'lu `git commit`i güvenli sayamıyor ve izin soruyor. Bir turda onlarca
+commit atılınca bu, kurucuyu arka arkaya onay ekranına düşürüyor — §18-A'nın
+"kullanıcıyı arka arkaya onay ekranına düşürme" kuralının tam ihlali.
+
+**Kural:** commit mesajı ya **tek satırlık `-m`** ile yazılır, ya da çok satırlı
+ise önce bir dosyaya yazılıp `git commit -F <dosya>` ile verilir.
+
+Dosya için sabit ad kullanılır ve **silinmez, üstüne yazılır** (§22):
+`tests/gecici/commit-mesaji.txt`
+
+Aynı gerekçe `gh pr create --body-file` için de geçerlidir.
+
+**Genel ilke:** bir kalıp teknik olarak çalışıyor diye doğru değildir; kurucuya
+çıkardığı onay yükü de kalıbın maliyetidir. Tekrar eden onay ekranı bir kusurdur
+(§18-A), kalıbı değiştirmek gerekir.
