@@ -668,3 +668,34 @@ karşılığı olmadığı çıktı — uydurma etiket, kusurdur (§7-B.2).
 **Ders 3:** kanıt kopyası (`ADA_KOK` / `MIG_DIZIN` / `FN_DIZIN`) `tests/gecici/`
 altına çıkarılıyor ve o alan lint'e giriyordu → doğrulama sayısı 2349'dan
 3412'ye fırladı. Sonda alanı **doğrulama komutlarının dışında** tutulmalı.
+
+
+## 25.08.2026 — Sessiz yazım **kuyruk döngüsü** kurar
+
+Sessiz yazımın bilinen zararı "kayıt kaybolur"du. Bu turda ikinci ve daha
+sinsi bir zarar çıktı: kenar işlevlerinin kuyrukları `durum="bekliyor"` /
+`islendi_at is null` gibi alanlarla taranıyor. **Kapanış damgası** sessizce
+düşerse iş **başarıyla yapılmış** olur ama kuyrukta kalır ve **her turda
+yeniden koşar**.
+
+Ürün karşılığı bir log satırı değil: `ajan-nobetci` hatırlatma sayacı düşerse
+tarafa **aynı e-posta her nöbet turunda yeniden gider**. Bu sistem hatası
+değil, tarafın gözünde tacizdir. Aynı desen mükerrer `bilirkisi_taraf_yanitlari`
+satırı, mükerrer taahhüt düşürme ve mükerrer randevu teklifi üretiyordu.
+
+**Ders 1 — sıra önemlidir:** bir "işlendi/onaylandı" damgası, damgaladığı işin
+yazımının **ardına** konur. `taraf-kalem-cikar` ve `dual-ai-validate` tam
+tersini yapıyordu: ürün yazımı sessizce düşse bile damga atılıyor, satır bir
+daha sorguya girmediği için veri **kalıcı** kayboluyordu.
+
+**Ders 2 — damga düşerse yan etki de yapılmaz.** `akis-yurut`ta durum yazılamazsa
+panoya da yazılmaz: talimat kuyrukta kaldığı için sonraki tur aynı mesajı
+zaten yeniden üretecek, arabulucu iki kez okuyacaktı.
+
+**Ders 3 — `Promise.allSettled` sonucu okunmazsa bekçi değildir.**
+`orchestrator-run` yalnız `settled[0]`a bakıyordu; ayrıca `rpc` de `{error}`
+döndürür, **fırlatmaz** — `allSettled` onu "fulfilled" sayar. Bildirim
+düşünce arabulucu zincirin durduğunu hiç duymuyordu.
+
+**Tarama:** dosya başına `^\s*await admin\.from\(` deseni sıfır olmalı. Bu,
+tezgâhta her işlev için ayrıca doğrulanıyor (`tests/kenar-sessiz-yazim.test.ts`).

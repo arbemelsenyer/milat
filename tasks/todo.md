@@ -1,38 +1,51 @@
 ## Nerede kaldık
 
-- Tarih: 25.08.2026 (11. blok) — **§20 gereği kapatıldı (bağlam şişti)**
+- Tarih: 25.08.2026 (12. blok)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
-- Aktif görev: yok — kuyruk temiz, blokaj yok, bekleyen redeploy yok
-- Son tamamlanan iş: **P1 · `bilirkisi-secim` sessiz yazımları (6 yer)**
-- **11. blokta biten işler (sırayla):** `74018e0` P2 ölü bileşenler ·
-  `26f2abd` P1 davet zinciri · `38ee346` P1 kenar ürün yazımları ·
-  `6654b15` P2 toplantı iptali + randevu · `5defbe3` P1 bilirkişi kararı ·
-  `7459384` P1 `bilirkisi-secim`. Hepsi push edildi ve deploy edildi.
-- **Bu oturumun dersleri `tasks/lessons.md`ye yazıldı** (4 yeni ders:
-  supabase-js fırlatmaz · canlı paket doğrulaması ölü kodu bulur ·
-  güvenilmez bekçi kurulmaz · heredoc ters bölüyü yiyor).
-- Doğrulama: `npm run test` **252/252** · tsc temiz · lint **2334**
+- Aktif görev: yok — kenar işlevi sessiz yazımları temizlendi
+- Son tamamlanan iş: **P0 · `ajan-nobetci` sessiz yazımları (15 yer)**
+- **12. blokta biten işler (sırayla):** `53b33cc` P1 `taraf-kalem-cikar` ·
+  `37c8867` P1 `dual-ai-validate` + `orchestrator-run` · `32fad07` P1
+  `akis-yurut` · `a3de13f` P0 `ajan-nobetci` (15 yer).
+- Doğrulama: `npm run test` **257/257** · tsc temiz · lint **2334** (değişmedi)
 - **Açık blokaj: yok**
 - **REDEPLOY DURUMU (§11-B):**
-  - ✅ `send-party-invite` · `revoke-party-invite` · `send-meeting-invite` —
-    Lovable ajanı `supabase--deploy_edge_functions` ile deploy etti (commit
-    `26f2abd`, üçü de onaylandı). MCP çağrısı 300 sn'de zaman aşımına uğradı ama
-    **iş tamamlandı**; `list_messages` ile doğrulandı.
-  - ✅ `accept-party-invite` · `party-confidential-analysis` ·
-    `extract-document-text` · `dosya-verilerini-sil` — Lovable ajanı deploy
-    etti (commit `38ee346`, dördü de onaylandı).
-  - ✅ `cancel-meeting-invite` · `randevu-teklif` — Lovable ajanı deploy etti
-    (commit `6654b15`, ikisi de onaylandı).
-  - ✅ `bilirkisi-ekranim` — Lovable ajanı deploy etti (commit `5defbe3`).
-  - ✅ `bilirkisi-secim` — Lovable ajanı deploy etti (commit `7459384`).
+  - OK `taraf-kalem-cikar` — Lovable ajanı deploy etti (commit `53b33cc`).
+  - OK `dual-ai-validate` · `orchestrator-run` — deploy edildi (commit `37c8867`).
+  - OK `akis-yurut` — deploy edildi (commit `32fad07`). MCP çağrısı 300 sn'de
+    zaman aşımına uğradı ama iş tamamlandı; `list_messages` ile doğrulandı.
+  - OK `ajan-nobetci` · `orchestrator-run` — deploy edildi (commit `a3de13f`,
+    ikisi de onaylandı; `get_message` ile doğrulandı).
   - **Bekleyen redeploy YOK.**
 - Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9**.
-- Sıradaki uygulanabilir iş: **P2 · kalan kenar işlevi sessiz yazımları.**
-  Öncelik: `taraf-kalem-cikar` · `ajan-nobetci` · `akis-yurut` ·
-  `orchestrator-run` · `dual-ai-validate`. En sonda `agent_states` defter yazımları
-  (yüksek hacim, büyük ölçüde en-iyi-çaba) ve `_shared/**` — ona dokunmak
+- Sıradaki uygulanabilir iş: **P2 · `agent_states` defter yazımları**
+  (yüksek hacim, büyük ölçüde en-iyi-çaba) ve **`_shared/**`** — ona dokunmak
   **39 fonksiyon fan-out redeploy** demektir, ayrı tur olarak planlanmalı.
+
+### KAPANDI — 25.08 · KENAR İŞLEVİ SESSİZ YAZIMLARI — KUYRUK TEMİZLENDİ
+Kuyrukta sayılan beş işlevin hepsi bitti. Ortak kusur: `supabase-js` DB hatasını
+**fırlatmaz**, `{error}` döndürür — okunmayınca `try/catch` hiç çalışmaz.
+Kenar işlevleri gözetimsiz (cron/ajan) koştuğu için gören de olmaz.
+
+**Bu turun ayırt edici bulgusu: KUYRUK DÖNGÜSÜ.** Bu işlevlerin kuyrukları
+`durum="bekliyor"` / `islendi_at is null` gibi alanlarla taranıyor. Kapanış
+damgası sessizce düşerse iş **başarıyla yapılmış** olur ama kuyrukta kalır ve
+**her turda yeniden koşar**:
+
+| işlev | sessiz kalırsa |
+|---|---|
+| `taraf-kalem-cikar` | Kalem yazılamaz ama belge "işlendi" damgalanırsa mükerrer koşum kapısı o belgeyi bir daha **hiç** okumaz → kalemler **kalıcı kaybolur**. Damga artık yazım kapısının ardında. |
+| `dual-ai-validate` | `cases_vector_pool` insert düşer ama satır "approved" damgalanırsa satır bir daha `status="pending"` sorgusuna girmez → metin havuza hiç girmeden **kalıcı kaybolur**, sayaç "onaylandı" der. Damga artık yazımın ardında. |
+| `orchestrator-run` | "Atlandı" işareti düşerse panelde kart **boş** kalır: arabulucu adımın neden atlandığını hiçbir yerden öğrenemez. `allSettled` yalnız `[0]` okunuyordu; adım satırı ve "zincir durdu" bildirimi iz bırakmadan düşüyordu. |
+| `akis-yurut` | Talimat durumu düşerse talimat kuyrukta kalır: "uygulandi" düşerse **iş her turda tekrarlanır** ve arabulucuya aynı onay isteği tekrar tekrar gider; "deneme:1" düşerse **iki deneme sınırı hiç devreye girmez**. |
+| `ajan-nobetci` | **En ağırı.** Ana yürütücünün kapanışı düşerse görev 'bekliyor' kalır → tarafa **aynı e-posta her nöbet turunda yeniden** gider, randevu yeniden teklif edilir, aşama yeniden ilerletilir. Ayrıca: hatırlatma sayacı (taraf spam'i), bilirkişi sayımı (mükerrer `bilirkisi_taraf_yanitlari`), braket `islendi_at` (mükerrer taahhüt düşürme). |
+
+**TEZGÂH:** `tests/kenar-sessiz-yazim.test.ts` beş durumla genişletildi (toplam 13).
+Her durum ayrıca ilgili dosyada **çıplak `await admin.from(...)` satırı kalmadığını**
+ve daha önce denetli olan yazımların bozulmadığını doğruluyor.
+**KANITLANDI:** `KENAR_KOK=tests/gecici/kenar-kanit` kopyasında beş durumun
+hepsi **DÜŞÜYOR**.
 
 ### KAPANDI — 25.08 · P1 · `bilirkisi-secim` SESSİZ YAZIMLARI (6 YER)
 Bu işlev **büyük ölçüde doğru yazılmıştı**: ana yazımların hepsi (`bilirkisi_secim_beyani`,
