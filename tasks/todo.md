@@ -4,7 +4,13 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P1 · dört maddenin canlı kanıtı Code tarafından toplandı**
+- Son tamamlanan iş: **P1 · H-15'in dört kararı uygulandı + saklama canlıda**
+- **PİLOT KUYRUĞU: 10/14 DONE · 4 BLOCKED.** Dördünün de **kodu bitti**;
+  engel yalnız **SQL çalıştırma** (üç göç + bir cron) ve bir gerçek telefon.
+- **CANLIDA DOĞRULANAN (Code sorguladı):** `saklama_sureleri` tablosu ✓ değerli
+  (6/6) · `Sesli not%` kova politikası ✓ (hat artık çalışabilir).
+  **Henüz çalıştırılmamış:** antet kolonları · `arabulucu_baz_cizgi` ·
+  `paket_kotalari` · `saklama-imha` cron kaydı.
 - **PİLOT KUYRUĞU: 9/14 DONE (hepsi §15.1'in beşini de sağlıyor) · 0 bekleyen ·
   5 BLOCKED.** Beşinin de kodu bitti; engel yalnız **SQL çalıştırma** ve
   iki değer kararı. Kod tarafında yapılacak iş kalmadı.
@@ -146,11 +152,11 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       başarısız olsa da; (2) aydınlatma metni `kvkk-metinleri.ts`te tek yerde;
       (3) tek seferlik onay olmadan kayıt başlamıyor. Taraf sesi **teknik olarak**
       erişilemez (uzak akış API'leri kodda geçmiyor, tezgâh denetliyor).
-      · **CANLIYI ENGELLEYEN AÇIK (P1):** `storage.objects` deny-by-default ve
-      `oturum-kayitlari` kovası için **canlıda hiç politika yok** — istemci
-      yüklemesi politika ihlaliyle düşer, yani hat kodda bitmiş görünse de
-      **çalışmaz**. Gereken tek şey bir INSERT politikası: Code yazdı,
-      **çalıştırmadı** (§10) → `tests/gecici/oturum-kayitlari-politika.sql`.
+      · **ENGEL KALKTI (25.08):** kova INSERT politikası **canlıda çalıştırıldı**
+      (Cowork). Code doğruladı: `pg_policies`te `Sesli not%` ile başlayan **1
+      satır** var. (Not: PostgreSQL 63 karakter sınırı yüzünden politika adı
+      kısalmış — aramada `like 'Sesli not%'` kullanılmalı.) Hat artık canlıda
+      çalışabilir durumda.
       Ölçü: kimliği doğrulanmış kullanıcı, yalnız KENDİ klasörüne ve yalnız
       **arabulucusu olduğu** dosyaya yükler (`is_case_mediator`); taraf yükleyemez;
       okuma politikası eklenmez.
@@ -159,25 +165,23 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       sınanamıyor (mikrofon ve `LOVABLE_API_KEY` gerekiyor; anahtar §12 gereği
       okunmaz). Kurucudan **tek somut kontrol** isteniyor (aşağıda).
 
-- [!] P1 · **Saklama süresi parametre tablosu + periyodik imha** ·
-      **KOD YARISI BİTTİ · BLOCKED → HAT H-15/1** (yalnız süre DEĞERLERİ, hukuki)
-      · Doğrulama: `tests/saklama-imha.test.ts` (9 durum) · 322/322 test
-      · **Yapılanlar:** (a) parametre tablosu göç metni
-      `tests/gecici/saklama-suresi-politika.sql` — Code yazdı, çalıştırmadı (§10);
-      (b) **periyodik imha kolu yazıldı**: `supabase/functions/saklama-imha`.
-      · **GÜVENLİ TASARIM (tezgâhla kilitli):** süre kodda **sabit değil**,
-      parametre tablosundan okunuyor · `saklama_gun` **NULL olan tür ATLANIR**,
-      yani kurucu süreleri girene kadar kol **hiçbir şey silmez** · silinecek
-      tablo adı **haritadan** gelir, parametre satırından değil (kötü/yanlış bir
-      satır rastgele tablo sildiremez) · **kapanmamış dosyaya dokunulmaz** ·
-      dosyanın kendisini silmez (o `dosya-verilerini-sil` kolunun işi) ·
-      `kuru: true` ile önce **ne silineceği görülebilir** · tablo yoksa sessizce
-      "temiz" demez, açıkça söyler · silme hataları yutulmaz.
-      · **Kalan:** her tür için gün sayısı (H-15/1'de öneri tablosu var) +
-      göçün çalıştırılması + günlük cron kaydı.
-      · **DEPLOY: OK** — `saklama-imha` canlıya alındı (commit `6ba6902`,
-      `get_message` ile doğrulandı). Tablo kurulmadığı için şu an açıkça
-      "parametre tablosu henüz kurulmamış" diyor; sessizce "temiz" demiyor.
+- [x] P1 · **Saklama süresi parametre tablosu + periyodik imha** ·
+      **DONE 25.08.2026 — CANLI** (kalan tek şey cron kaydı, SQL hazır)
+      · **CANLI DOĞRULAMA (Code sorguladı):** `public.saklama_sureleri` tablosu
+      **var** ve **6 satırın 6'sında değer girili** — kurucu kararı: tek çatı
+      **5 yıl** (1825 gün, dosya kapanışından), mali kayıt **10 yıl** (3650),
+      ham ses NULL (kodda anında silinir).
+      · **Kurucunun verdiği üç iş de yapıldı:**
+        (a) `Verilerim.tsx` artık **tabloyu okuyor** — 14 kategorinin 10'unda
+        tarafa "Belirsiz" yazıyordu, **hepsi eşleşti, sabit metin kalmadı**.
+        Süre değişince kod değişmez. Tablo okunamazsa uydurmuyor, sebebini yazıyor.
+        (b) `saklama_gun >= 0` kısıtı için SQL hazır (0 gün = anında yazılabilsin).
+        (c) `saklama-imha` kolu tabloyu okuyor ve deploy edildi; canlıda 25.08'de
+        eklenen `odeme_kayitlari` türü de eşlendi.
+      · **KALAN (tek adım):** cron kaydı — `tests/gecici/saklama-imha-cron.sql`.
+        Onsuz şart "periyodik" değil "elle tetiklenebilir" kalır. Desen jobid 3
+        ile aynı: sır Vault'tan okunur, komuta düz metin yazılmaz (H-1 kuralı).
+        Günde bir, 03:00. Önce `{"kuru": true}` ile ne silineceği görülebilir.
 
 - [!] P1 · **Arabulucunun kendi anteti / şablonu** · **KOD YARISI BİTTİ ·
       BLOCKED → HAT H-15/2** (yalnız göçün çalıştırılması) · 338/338 test
