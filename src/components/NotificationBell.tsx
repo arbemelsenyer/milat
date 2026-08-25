@@ -93,11 +93,18 @@ export function NotificationBell() {
     }
   };
 
+  /* supabase-js hata FIRLATMAZ. Yazım sessizce düşerse ekranda "okundu"
+     görünür ama sayfa yenilenince bildirim geri gelir — kullanıcı zilin
+     bozuk olduğunu sanar. Ekran, yazım doğrulandıktan sonra güncellenir. */
   const markAsRead = async (id: string) => {
-    await supabase
+    const { error } = await supabase
       .from('notifications')
       .update({ read: true })
       .eq('id', id);
+    if (error) {
+      console.error('[NotificationBell] okundu işareti yazılamadı:', error.message);
+      return;
+    }
 
     setNotifications(prev =>
       prev.map(n => (n.id === id ? { ...n, read: true } : n))
@@ -107,11 +114,15 @@ export function NotificationBell() {
   const markAllAsRead = async () => {
     if (!user) return;
 
-    await supabase
+    const { error } = await supabase
       .from('notifications')
       .update({ read: true })
       .eq('user_id', user.id)
       .eq('read', false);
+    if (error) {
+      console.error('[NotificationBell] toplu okundu işareti yazılamadı:', error.message);
+      return;
+    }
 
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };

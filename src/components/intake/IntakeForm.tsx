@@ -245,26 +245,36 @@ export function IntakeForm() {
         const title = `${primaryName} vs ${respondentName}`;
         const category = formData.disputeType || 'other';
         
-        await supabase.from('cases').update({
+        /* supabase-js DB hatasını FIRLATMAZ, `{error}` döndürür. Okunmazsa
+           kullanıcıya "Başvurunuz başarıyla gönderildi" denir ve panele
+           yönlendirilir — oysa hiçbir şey yazılmamıştır. */
+        const { error: dosyaErr } = await supabase.from('cases').update({
           status: 'submitted',
           title,
           category,
           mediation_type: mediationType || null,
           ai_summary: summary as unknown as import('@/integrations/supabase/types').Json,
         }).eq('id', caseId);
+        if (dosyaErr) throw new Error(`Başvuru kaydedilemedi: ${dosyaErr.message}`);
 
         // Also save form fields
         await saveCase(caseId, formData);
 
-        await supabase.from('case_parties').delete().eq('case_id', caseId);
-        await supabase.from('case_parties').insert(
+        /* SİL-SONRA-YAZ: silme başarılı olup yazma sessizce düşerse dosya
+           TARAFSIZ kalır — arabuluculuk yürüyemez ve kullanıcı bunu hiçbir
+           yerden öğrenemez. Bu yüzden her iki adım da denetlenir ve hata
+           hâlinde yönlendirme YAPILMAZ; kullanıcı yeniden gönderebilir. */
+        const { error: silErr } = await supabase.from('case_parties').delete().eq('case_id', caseId);
+        if (silErr) throw new Error(`Taraflar güncellenemedi: ${silErr.message}`);
+        const { error: tarafErr } = await supabase.from('case_parties').insert(
           allParties.map((party, index) =>
             intakePartyToRow(caseId, index === 0 ? user.id : null, index, party),
           ) as any,
         );
+        if (tarafErr) throw new Error(`Taraflar kaydedilemedi: ${tarafErr.message}`);
 
-        // Create notification for creator
-        await supabase.rpc('create_notification', {
+        // Create notification for creator (best-effort: başvuru zaten kaydedildi).
+        const { error: bildirimErr } = await supabase.rpc('create_notification', {
           p_user_id: user.id,
           p_title: language === 'tr' ? 'Başvuru Gönderildi' : 'Case Submitted',
           p_message: language === 'tr' 
@@ -272,6 +282,7 @@ export function IntakeForm() {
             : `Your case "${title}" has been submitted successfully.`,
           p_type: 'case_submitted',
         });
+        if (bildirimErr) console.error('[IntakeForm] bildirim yazılamadı:', bildirimErr.message);
 
         toast({
           title: language === 'tr' ? 'Başvuru Gönderildi' : 'Case Submitted',

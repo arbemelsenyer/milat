@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /* SESSİZ YUTULAN VERİTABANI YAZIMLARI (25.08.2026)
@@ -66,26 +66,36 @@ function kontrolsuzYazimlar(kok: string): string[] {
   return bulgular.sort();
 }
 
-/** Dondurulmuş kalanlar — her biri GEREKÇELİdir. Sayı değil, ad eşleşir. */
-const DONDURULMUS: Record<string, string> = {
-  "src/components/CaseDocuments.tsx":
-    "ÖLÜ YÜZEY (tests/olu-yuzey.test.ts · H-8 sınıfı): erişilemez. Diriltilirse yazım kontrolü de gelmelidir.",
-  "src/components/intake/IntakeForm.tsx":
-    "ÖLÜ YÜZEY (H-8 · başvuru adası): erişilemez ve zaten kaldırılması önerilen dosya.",
-  "src/components/NotificationBell.tsx":
-    "P3 · yalnız `read` bayrağı. Başarısızlığın tek sonucu bildirimin okunmamış görünmeye devam etmesidir; veri kaybı yok, yenilemede düzelir.",
-  "src/pages/Dashboard.tsx":
-    "P3 · yalnız `read` bayrağı — NotificationBell ile aynı gerekçe.",
-};
+/** Dondurulmuş kalanlar — her biri GEREKÇELİdir. Sayı değil, ad eşleşir.
+    25.08 (12. blok): liste BOŞALDI. Kalan dört dosyanın da yazımı kapatıldı —
+    `Dashboard` ve `NotificationBell` canlı yüzeydi; `CaseDocuments` ve
+    `IntakeForm` ölü yüzeydir (H-8, silme kararı kurucuda) ama dondurma notu
+    "diriltilirse yazım kontrolü de gelmelidir" diyordu, tuzak şimdiden
+    kaldırıldı. Yeni bir kontrolsüz yazım eklenirse aşağıdaki test düşer. */
+const DONDURULMUS: Record<string, string> = {};
 
 describe("sessiz yutulan veritabanı yazımı eklenmiyor", () => {
   const bulunan = kontrolsuzYazimlar(y("src"));
   const dosyalari = Array.from(new Set(bulunan.map((b) => b.split(":")[0]))).sort();
 
   it("tarayıcı gerçekten çalışıyor (tezgâhın kendisi korunuyor)", () => {
-    // Tarama çökerse ya da yolu şaşarsa 0 bulur ve test sessizce yeşil kalırdı.
-    expect(bulunan.length, "tarama hiçbir şey bulmadı — tarayıcı bozulmuş olabilir").toBeGreaterThan(0);
-    expect(dosyalari.length).toBeGreaterThan(3);
+    /* ÖZ DENETİM CANLI BULGUYA BAĞLANAMAZ: kusur kapandıkça bulgu sıfıra iner
+       ve "0 bulundu" ile "tarayıcı bozuldu" ayırt edilemez hâle gelirdi (12.
+       blokta tam bu oldu — `> 3` eşiği kusur kapanınca düştü). Bunun yerine
+       tarayıcı, İÇİNE KASITLI KUSUR KONMUŞ bir örnek üzerinde denenir. */
+    const ornek = "tests/gecici/tarayici-ornegi";
+    mkdirSync(`${ornek}/src`, { recursive: true });
+    writeFileSync(`${ornek}/src/ornek.tsx`, [
+      "import { supabase } from '@/integrations/supabase/client';",
+      "export async function yaz() {",
+      "  await supabase.from('t').insert({ a: 1 });",   // KASITLI: sonucu okunmuyor
+      "  const { error } = await supabase.from('t').update({ a: 2 }).eq('id', 1);",
+      "  return error;",
+      "}",
+    ].join(String.fromCharCode(10)));
+    const ornekBulgu = kontrolsuzYazimlar(`${ornek}/src`);
+    expect(ornekBulgu.length, "tarayıcı kasıtlı kusuru bulamadı — bozulmuş").toBe(1);
+    expect(ornekBulgu[0]).toContain("ornek.tsx");
   });
 
   it("kontrolsüz yazım yalnız gerekçesi yazılmış dosyalarda kalmış", () => {

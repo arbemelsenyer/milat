@@ -53,6 +53,7 @@ export function CaseDocuments({ caseId }: CaseDocumentsProps) {
     if (files.length === 0 || !user) return;
 
     setIsUploading(true);
+    let yuklenen = 0;
 
     for (const file of files) {
       const filePath = `${user.id}/${caseId}/${Date.now()}_${file.name}`;
@@ -66,7 +67,12 @@ export function CaseDocuments({ caseId }: CaseDocumentsProps) {
         continue;
       }
 
-      await supabase.from('case_documents').insert({
+      /* DOSYA DEPOYA GİRDİ. Kayıt satırı sessizce düşerse belge dosyada
+         GÖRÜNMEZ ama depoda durur: kullanıcı "yüklendi" duyar, belgeyi
+         bulamaz; üstelik KVKK silme kolu `case_documents` üzerinden
+         çalıştığı için o dosyayı hiç bulamaz (öksüz kayıt).
+         Bu yüzden satır yazılamazsa yüklenen dosya geri alınır. */
+      const { error: kayitErr } = await supabase.from('case_documents').insert({
         case_id: caseId,
         uploaded_by: user.id,
         file_name: file.name,
@@ -74,15 +80,30 @@ export function CaseDocuments({ caseId }: CaseDocumentsProps) {
         file_size: file.size,
         mime_type: file.type,
       });
+      if (kayitErr) {
+        await supabase.storage.from('case-documents').remove([filePath]);
+        toast({
+          variant: 'destructive',
+          title: language === 'tr' ? 'Kaydedilemedi' : 'Not saved',
+          description: language === 'tr'
+            ? `"${file.name}" kaydedilemedi, yeniden deneyin: ${kayitErr.message}`
+            : `"${file.name}" could not be saved, please retry: ${kayitErr.message}`,
+        });
+        continue;
+      }
+      yuklenen++;
     }
 
     setIsUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
     fetchDocuments();
-    toast({
-      title: language === 'tr' ? 'Yüklendi' : 'Uploaded',
-      description: language === 'tr' ? 'Belgeler başarıyla yüklendi.' : 'Documents uploaded successfully.',
-    });
+    // Hiçbiri yazılamadıysa "başarıyla yüklendi" DENMEZ.
+    if (yuklenen > 0) {
+      toast({
+        title: language === 'tr' ? 'Yüklendi' : 'Uploaded',
+        description: language === 'tr' ? 'Belgeler başarıyla yüklendi.' : 'Documents uploaded successfully.',
+      });
+    }
   };
 
   const handleDownload = async (doc: CaseDocument) => {
@@ -104,9 +125,30 @@ export function CaseDocuments({ caseId }: CaseDocumentsProps) {
   };
 
   const handleDelete = async (doc: CaseDocument) => {
-    await supabase.storage.from('case-documents').remove([doc.file_path]);
-    await supabase.from('case_documents').delete().eq('id', doc.id);
+    /* Önce depodaki dosya (asıl veri), sonra kayıt satırı. Satır silmesi
+       sessizce düşerse belge listede DURMAYA devam eder ama dosya yoktur:
+       indirme kırılır ve kullanıcı "silindi" duymuş olur. */
+    const { error: depoErr } = await supabase.storage.from('case-documents').remove([doc.file_path]);
+    if (depoErr) {
+      toast({
+        variant: 'destructive',
+        title: language === 'tr' ? 'Silinemedi' : 'Not deleted',
+        description: depoErr.message,
+      });
+      return;
+    }
+    const { error: satirErr } = await supabase.from('case_documents').delete().eq('id', doc.id);
     fetchDocuments();
+    if (satirErr) {
+      toast({
+        variant: 'destructive',
+        title: language === 'tr' ? 'Yarım silindi' : 'Partially deleted',
+        description: language === 'tr'
+          ? `Dosya silindi ama kaydı kaldırılamadı, yeniden deneyin: ${satirErr.message}`
+          : `File removed but its record could not be deleted, please retry: ${satirErr.message}`,
+      });
+      return;
+    }
     toast({
       title: language === 'tr' ? 'Silindi' : 'Deleted',
       description: language === 'tr' ? 'Belge silindi.' : 'Document deleted.',

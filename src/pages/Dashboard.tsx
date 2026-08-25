@@ -344,7 +344,14 @@ export default function Dashboard() {
   };
 
   const markAsRead = async (id: string) => {
-    await supabase.from("notifications").update({ read: true }).eq("id", id);
+    /* Yazım sessizce düşerse ekranda okundu görünür ama sayfa yenilenince
+       bildirim geri gelir. Ekranı iyimser güncellemek yerine yazım
+       doğrulandıktan sonra güncellenir. */
+    const { error: okunduErr } = await supabase.from("notifications").update({ read: true }).eq("id", id);
+    if (okunduErr) {
+      console.error("[Dashboard] bildirim okundu işareti yazılamadı:", okunduErr.message);
+      return;
+    }
     setNotifications((p) => p.map((n) => (n.id === id ? { ...n, read: true } : n)));
   };
 
