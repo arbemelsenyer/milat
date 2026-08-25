@@ -362,6 +362,13 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     const d = oku("admin-delete-knowledge");
     expect(d, "depoErr okunmuyor").toContain("depoErr");
     expect(d).toContain("öksüz dosya");
+    /* `fetch` de HTTP hatasında REDDETMEZ: ateşle-unut iç çağrıda yalnız
+       `.catch` varsa sunucunun 500'ü hiçbir yere düşmez. Yorumun sözü
+       "hata loglanır" ancak `res.ok` denetlenirse tutulur. */
+    const e2 = oku("extract-document-text");
+    const i2 = e2.indexOf("functions/v1/belge-ozeti");
+    expect(i2, "belge-ozeti çağrısı bulunamadı").toBeGreaterThan(-1);
+    expect(e2.slice(i2, i2 + 900), "HTTP durumu denetlenmiyor").toContain("belge-ozeti HTTP");
   });
 
   it("TARAMA: çıplak rpc / storage çağrısı da kalmadı", () => {

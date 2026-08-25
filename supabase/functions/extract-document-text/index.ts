@@ -174,7 +174,14 @@ Deno.serve(async (req) => {
                 Authorization: `Bearer ${serviceKey}`,
               },
               body: JSON.stringify({ document_id: doc.id }),
-            }).catch((e) => console.error(`[extract-document-text] belge-ozeti tetiklenemedi (${doc.id}): ${e?.message ?? e}`));
+            })
+              /* `fetch` HTTP hatasında REDDETMEZ: 500 dönerse aşağıdaki
+                 `.catch` çalışmaz. Yorumun sözü "hata loglanır" — o söz
+                 ancak `res.ok` denetlenirse tutulur. */
+              .then((r) => {
+                if (!r.ok) console.error(`[extract-document-text] belge-ozeti HTTP ${r.status} (${doc.id})`);
+              })
+              .catch((e) => console.error(`[extract-document-text] belge-ozeti tetiklenemedi (${doc.id}): ${e?.message ?? e}`));
           }
         } catch (e: any) {
           console.error(`[extract-document-text] belge-ozeti çağrısı kurulamadı: ${e?.message ?? e}`);
