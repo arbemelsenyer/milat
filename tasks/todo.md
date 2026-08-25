@@ -4,7 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P1 · `CRON_SECRET` yenilendi (H-1 KAPANDI) + HAT yapı onarımı**
+- Son tamamlanan iş: **P1 · KVKK silmesi depoyu da temizliyor**
 - **SESSİZ ÇAĞRI KUSURU İSTEMCİ YÜZEYİNİN TAMAMINDA KAPANDI:** `.from` ·
   `.rpc` · `.storage` · `.functions.invoke` · iç `fetch`. Kenar (`_shared`
   dâhil) ve ön yüz. Kenarda çıplak `.from(...)`, `.rpc(...)` ve
@@ -51,7 +51,8 @@
     `get_project`: `latest_commit_sha=74ec5862…`, `is_published=true`.
   - **BEKLEYEN REDEPLOY YOK.**
 - Açık HAT maddesi: **H-4** · **H-7** · **H-8** · **H-9** · **H-10** ·
-  **H-11 (P0 · kabuk bekçisi devre dışı — kanıtlı, kurucu kararı bekliyor)**.
+  **H-11 (P0 · kabuk bekçisi devre dışı — kanıtlı)** · **H-12 (P1 · depoda
+  birikmiş öksüz belgeler — kök neden kapandı, birikmiş borç kurucu kararı bekliyor)**.
   **H-1 KAPANDI** (25.08, `CRON_SECRET` yenilendi ve canlıda doğrulandı).
 - Sıradaki uygulanabilir iş: **kuyruk boş.** Sessiz yazım kusuru kenarda ve ön
   yüzde kapandı, iki tezgâh da kilitli. Yeni P0/P1 adayı kodun gerçek
@@ -75,6 +76,38 @@ Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
 - **Sıradaki oturumun ilk işi:** `tasks/HAT.md` → `## COWORK → CODE` oku;
   cevap gelmişse uygula. Cevap yoksa kuyruk boş olduğu için yeni P0/P1 adayı
   kodun gerçek durumundan çıkarılır (§6).
+
+### KAPANDI — 25.08 · P1 · KVKK SİLMESİ DEPOYU DA TEMİZLİYOR
+**Nasıl bulundu.** Bugün kodda *öksüz dosya* üretilmesini engelledim ama
+**mevcut öksüzleri hiç kontrol etmemiştim.** Kontrol edince kök neden çıktı:
+`dosya-verilerini-sil` — KVKK silme kolu — **depoya hiç dokunmuyordu.**
+`case_documents` satırlarını siliyor, tarafların belgeleri `case-documents`
+kovasında kalıyordu. Satır gittikten sonra o dosyayı gösteren hiçbir kayıt
+kalmadığı için **hiçbir silme kolu onları bir daha bulamaz** — constitution
+m.10 (süresiz saklama yasağı) ihlali.
+
+**Canlı kanıt:** bu yolla üretilmiş **6 öksüz dosya** var (30.06–01.07), hepsi
+**artık var olmayan** dosyalara ait.
+
+**Düzeltme.** Belge yolları satırlar silinmeden **önce** okunuyor (sonra
+okunamaz), depo temizleniyor, **ancak ondan sonra** satırlar siliniyor.
+Sıra kritik: ters sırada depo silmesi düşerse indeks yok olur ve veri
+**erişilemez biçimde kalır**. Depo temizlenemezse satırlara **dokunulmuyor**
+("hiçbir kayıt silinmedi") — bugün `MediationEngine.deleteDoc` ve
+`CaseDocuments`ta kurulan sıranın aynısı. Silinen belge sayısı çağırana
+dönülüyor, yani "kişisel veri kalmadı" sözü artık **kanıtlanabilir**.
+
+**TEZGÂH:** `tests/kenar-sessiz-yazim.test.ts` bir durumla genişletildi (25).
+Sıra ayrıca doğrulanıyor: yolları oku → depoyu sil → satırları sil.
+**KANITLANDI:** `KENAR_KOK=tests/gecici/kenar-kanit` kopyasında düşüyor.
+Bu sırada dönüş gövdesine `belge` alanı eklendiği için **eski bir testin**
+iddiası kırılmıştı; amacı korunarak güncellendi (eksikler hâlâ `uyarilar` ile
+çağırana taşınıyor mu).
+
+**BİRİKMİŞ BORÇ → HAT H-12 (P1).** Kök neden kapandı ama geçmişte birikenler
+duruyor: **6** gerçek KVKK öksüzü · **71** bilgi tabanında karşılığı olmayan
+`admin/` dosyası · **2** dosyası kayıp `case_documents` satırı (indirme kırılır).
+Depodan silmek üretim verisi silmesidir (§7.3/§10) — Code saydı, **silmedi**.
 
 ### KAPANDI — 25.08 · P1 · `CRON_SECRET` YENİLENDİ (H-1 KAPANDI)
 Kurucu değeri üretti ve hem *Edge Functions → Secrets* hem *Vault* tarafında

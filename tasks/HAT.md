@@ -231,6 +231,49 @@ gelir ve bu turdaki tezgâh her seferinde yeniden koşulabilir.
 **A seçilirse tek komut yeter (kurucu çalıştırır):**
 `cp ~/.claude/hooks/guard-shell.YEDEK.sh ~/.claude/hooks/guard-shell.sh && node tests/gecici/bekci-sinama.mjs`
 
+---
+
+### H-12 · 25.08.2026 · **P1** — Depoda birikmiş öksüz belgeler (KVKK)
+**Sorun.** Bugün `dosya-verilerini-sil` kolundaki kök neden kapatıldı (silme
+artık depoyu da temizliyor, commit `10a70e6`). Ama **geçmişte birikmiş öksüzler
+duruyor** ve onları silmek üretim verisi silmesidir — §7.3 gereği kurucu kararı,
+§10 gereği çalıştıran Cowork/kurucudur. Code silmedi, yalnız saydı.
+
+**Sayım (salt okuma, dosya adı/içerik dökülmedi).**
+`case-documents` kovası: **149 nesne**, `case_documents`: **24 satır**.
+
+| küme | adet | ne olduğu |
+|---|---|---|
+| `admin/…` · bilgi tabanında karşılığı **var** | 50 | **normal** — yönetici yüklemesi, `case_documents`ta olmaması doğru |
+| `admin/…` · bilgi tabanında karşılığı **yok** | **71** | parçaları silinmiş ama dosyası kalmış yüklemeler. Bir kısmı, bugün düzelttiğim `admin-delete-knowledge` **sessiz depo silmesinin** ürünü olabilir |
+| `<uuid>/<case>/…` · `case_documents` satırı **yok** | **6** | **gerçek KVKK öksüzü** — 30.06–01.07, hepsi **artık var olmayan** dosyalara ait; taraf belgeleri kovada duruyor ve hiçbir silme kolu onları bulamaz |
+| `case_documents` satırı var, **dosyası yok** | **2** | ters yön: indirme kırılır |
+
+**Neden P1.** Altı öksüz, constitution m.10 (süresiz saklama yasağı) kapsamında
+kişisel veri içeriyor ve **hiçbir kayıt onları göstermediği için** bir KVKK
+silme talebinde de bulunamazlar. Kök neden kapatıldı; kalan **birikmiş borçtur**.
+
+**Seçenekler.**
+| | ne yapılır | bedeli |
+|---|---|---|
+| **A** | Önce 6 uuid öksüzü silinir (KVKK), 71 admin dosyası ayrıca değerlendirilir, 2 dosyasız satır temizlenir | Geri dönüşü yok; ama zaten hiçbir yüzeyden erişilemeyen veri |
+| B | Yalnız 6 uuid öksüz silinir, gerisi durur | KVKK borcu kapanır; bilgi tabanı çöpü kalır |
+| C | Hiçbiri silinmez | Kişisel veri süresiz kovada kalır |
+
+**Önerim: A**, ama **sırayla ve ayrı ayrı onaylanarak.** 6 uuid öksüz nettir
+(dosyaları yok, erişilemez, kişisel veri). 71 admin dosyası için önce şu
+sorulmalı: bunlar yeniden yüklenecek kaynaklar mı, yoksa çöp mü — silmeden önce
+`knowledge_base_jobs` geçmişine bakılmalı. 2 dosyasız satır kullanıcıya kırık
+indirme gösteriyor; satır silinmeli ya da dosya geri yüklenmeli.
+
+**Kararın etkisi.** C'de kalınırsa altı taraf belgesi kovada süresiz durur ve
+bir KVKK talebinde "sildik" demek **doğru olmaz**. A/B geri dönüşsüzdür; bu
+yüzden Code kendiliğinden yapmadı.
+
+**Not:** silme komutunu Code yazabilir ama **çalıştırmaz** (§10). Karar
+verildiğinde tam komut metni bu maddeye eklenecek.
+
+
 ## COWORK → CODE
 
 _Cevaplar buraya yazılır. Biçim:_
