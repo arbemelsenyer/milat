@@ -54,16 +54,30 @@ Deno.serve(async (req) => {
     if (existingInvite && existingInvite.invite_status === "accepted") {
       return new Response(JSON.stringify({ error: "Invite already accepted" }), { status: 409, headers: corsHeaders });
     }
-    if (existingInvite) {
-      await admin.from("case_party_invites").update({
-        token_hash: tokenHash, invite_status: "pending", updated_at: new Date().toISOString(),
-      }).eq("id", existingInvite.id);
-    } else {
-      await admin.from("case_party_invites").insert({
-        case_party_id: party_id, token_hash: tokenHash, invite_status: "pending",
-      });
+    // 25.08.2026 — bu yazimlarin sonucu OKUNMUYORDU. Jeton karmasi kaydedilemezse
+    // e-posta yine gonderilir ama taraf bagi acamaz: kirik davet, hata yok.
+    // E-postadan ONCE yaziliyor; yazilamiyorsa gonderme, hata don.
+    const { error: jetonErr } = existingInvite
+      ? await admin.from("case_party_invites").update({
+          token_hash: tokenHash, invite_status: "pending", updated_at: new Date().toISOString(),
+        }).eq("id", existingInvite.id)
+      : await admin.from("case_party_invites").insert({
+          case_party_id: party_id, token_hash: tokenHash, invite_status: "pending",
+        });
+    if (jetonErr) {
+      return new Response(
+        JSON.stringify({ error: `Davet kaydı yazılamadı, e-posta gönderilmedi: ${jetonErr.message}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
-    await admin.from("case_parties").update({ invite_status: "pending" }).eq("id", party_id);
+    const { error: tarafErr } = await admin.from("case_parties")
+      .update({ invite_status: "pending" }).eq("id", party_id);
+    if (tarafErr) {
+      return new Response(
+        JSON.stringify({ error: `Taraf davet durumu yazılamadı, e-posta gönderilmedi: ${tarafErr.message}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     const name = party.party_type === "individual"
       ? `${party.first_name ?? ""} ${party.last_name ?? ""}`.trim() || "Sayın Taraf"

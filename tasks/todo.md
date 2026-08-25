@@ -3,22 +3,46 @@
 - Tarih: 25.08.2026 (11. blok)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
-  Karar gereken her madde `tasks/HAT.md`ye yazılır, Code beklemeden devam eder.
 - Aktif görev: yok
-- Son tamamlanan iş: **P2 · canlı dosyanın içindeki ölü bileşenler**
-  (`RoundsTab` + `RiskSummaryCard` kaldırıldı, sembol düzeyi tezgâh kuruldu)
-- Doğrulama: `npm run test` **240/240** · tsc temiz · build başarılı · lint **2334**
+- Son tamamlanan iş: **P1 · davet zincirinde sessiz yazım** (3 kenar işlevi)
+- Doğrulama: `npm run test` **244/244** · tsc temiz · build başarılı · lint **2334**
 - **Açık blokaj: yok**
-- **CANLI DOĞRULAMA TAMAM (10. blok):** `medipact-ai.lovable.app` bundle'ında
-  beş commit de doğrulandı — `825dfb4` (bilirkişi dizeleri) · `bcbdeb8` +
-  `b772c4d` (14 hata dizesinden 13'ü; 14'ü aşağıdaki bulguyu doğurdu) ·
-  `4319e66` (tip değişikliği, build kanıtı) · `c279063` (föy süzgeci
-  `!=="cancelled" && !=="draft"` canlı pakette, bundle `index-BHQT2JIF.js`).
-- Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9** —
-  hiçbiri beklenmiyor.
-- Sıradaki uygulanabilir iş: canlıda 0/az satırlı tablo taramasının kalanı —
-  `pending_pool` (0 satır · `MevzuatAdmin`) · `case_process_tracker`
-  (9 dosyada 1 satır).
+- **REDEPLOY BEKLİYOR (§11-B):** `send-party-invite` · `revoke-party-invite` ·
+  `send-meeting-invite`. GitHub senkronu edge function deploy ETMEZ
+  (`tasks/lessons.md` 18.08 dersi). Ön yüz değişmedi → publish gerekmiyor.
+- Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9**.
+- Sıradaki uygulanabilir iş: **P2 · kenar işlevi sessiz yazımlarının kalanı**
+  (112 site). Öncelik sırası: `party-confidential-analysis` (taraf analizi +
+  keşif soruları — kaybolursa arabuluculuk verisi gider) ·
+  `extract-document-text` (belge "işleniyor"da takılır) · `randevu-teklif` ·
+  `taraf-kalem-cikar`. `agent_states` defter yazımları en sonda (yüksek hacim,
+  büyük ölçüde en-iyi-çaba) ve `_shared/**` dosyalarına dokunmak **39 fonksiyon
+  fan-out redeploy** demektir — ayrı tur olarak planlanmalı.
+
+### KAPANDI — 25.08 · P1 · DAVET ZİNCİRİNDE SESSİZ YAZIM (3 KENAR İŞLEVİ)
+Kenar işlevleri **gözetimsiz** çalışır (cron, ajan): sessiz başarısızlığı görecek
+kullanıcı yoktur. `supabase/functions` taraması **118** kontrolsüz yazım buldu.
+Bu tur, pilotun kendisinin geçtiği **taraf daveti/iptali zincirini** kapattı.
+
+| işlev | sessiz kalırsa ne olurdu |
+|---|---|
+| `revoke-party-invite` | Üç yazımın üçü de okunmadan `ok: true` dönüyordu. Erişimi gerçekten kesen yazım `case_party_invites.token_hash` rotasyonudur: başarısız olursa **eski davet bağlantısı çalışmaya devam eder** ama arabulucuya "iptal edildi" denirdi. **Sessizce başarısız olan bir erişim iptali.** Artık 500 + açık cümle döner; erişimi etkilemeyen diğer iki yazım `uyarilar` dizisinde raporlanır. |
+| `send-party-invite` | Jeton karması yazılamazsa e-posta yine giderdi ve taraf bağlantıyı açtığında **içeri giremezdi** — hata görünmezdi. Artık yazım **e-postadan ÖNCE** doğrulanır; yazılamıyorsa gönderilmez. |
+| `send-meeting-invite` | `invite_sent_at` damgası yazılamazsa oturum "davet gönderilmedi" görünür ve **aynı davet ikinci kez** gidebilir. Artık `uyarilar`da döner; iki denetim izi yazımının hatası da `console.error`a düşer (bu işlevde kullanıcı yok, gözlem kanalı kayıttır). |
+
+**Yan bulgu (kusur değil, kayda geçti):** `case_parties.invite_status` varsayılanı
+`'pending'`. Yani "hiç davet edilmedi" ile "davet edildi, yanıt bekleniyor" aynı
+değeri taşıyor — canlıda 14 `pending` tarafın yalnız 6'sının davet satırı var.
+Merkez yüzey bunu doğru ayırıyor (`MediationEngine` gerçek `case_party_invites`
+kaydına bakıyor), `CaseRoom` rozeti ise "Davet Bekliyor" diyor — bu ifade her iki
+durumu da doğru karşılıyor. Kusur sayılmadı.
+
+**TEZGÂH:** `tests/davet-yazim.test.ts` (4 durum). Sıra da denetleniyor:
+e-posta gönderimi jeton doğrulamasından **sonra** olmalı, `ok: true` hata
+dalından **sonra** dönmeli. **KANITLANDI:** düzeltme öncesi işlevler
+`DAVET_KOK=tests/gecici/davet-kanit` kopyasına açıldı → **4/4 test DÜŞTÜ**;
+gerçek dizinde 4/4.
+- Doğrulama: **244/244** test · tsc temiz · build başarılı · lint 2334 (değişmedi).
 
 ### KAPANDI — 25.08 · P2 · CANLI DOSYANIN İÇİNDEKİ ÖLÜ BİLEŞENLER
 **Nasıl bulundu — canlı doğrulama işe yaradı.** `bcbdeb8` ile eklenen 14 hata

@@ -40,17 +40,34 @@ Deno.serve(async (req) => {
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rand));
     const tokenHash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 
-    await admin.from("case_party_invites").update({
+    // 25.08.2026 — uc yazimin ucu de sonucu OKUNMADAN yapiliyor ve ardindan
+    // kosulsuz `ok: true` donuluyordu. Erisimi gercekten kesen yazim asagidaki
+    // BIRINCISIDIR (token_hash rotasyonu): basarisiz olursa ESKI DAVET BAGLANTISI
+    // CALISMAYA DEVAM EDER ama arabulucuya "iptal edildi" denirdi. Bir erisim
+    // iptalinin sessizce basarisiz olmasi kabul edilemez.
+    const { error: davetErr } = await admin.from("case_party_invites").update({
       invite_status: "revoked", token_hash: tokenHash, updated_at: new Date().toISOString(),
     }).eq("case_party_id", party_id);
-    await admin.from("case_parties").update({ invite_status: "revoked" }).eq("id", party_id);
+    if (davetErr) {
+      return new Response(
+        JSON.stringify({ error: `Davet iptal edilemedi, eski bağlantı hâlâ geçerli: ${davetErr.message}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Buradan sonrasi erisimi etkilemez (bag zaten olu); eksik kalirsa bildirilir.
+    const uyarilar: string[] = [];
+    const { error: tarafErr } = await admin.from("case_parties")
+      .update({ invite_status: "revoked" }).eq("id", party_id);
+    if (tarafErr) uyarilar.push(`taraf durumu güncellenemedi: ${tarafErr.message}`);
 
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || null;
-    await admin.from("party_invite_logs").insert({
+    const { error: izErr } = await admin.from("party_invite_logs").insert({
       case_id: party.case_id, party_id: party.id, event_type: "revoked", ip_address: ip,
     });
+    if (izErr) uyarilar.push(`denetim izi yazılamadı: ${izErr.message}`);
 
-    return new Response(JSON.stringify({ ok: true }), {
+    return new Response(JSON.stringify({ ok: true, uyarilar }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {

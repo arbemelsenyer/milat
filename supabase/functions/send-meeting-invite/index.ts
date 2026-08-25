@@ -284,11 +284,14 @@ serve(async (req) => {
         const resendId = (resp && (resp as any).id) || null;
         results.push({ party_id: p.id, email: p.email, ok: true, resend_id: resendId });
 
-        await admin.from("meeting_invite_logs").insert({
+        // Sonuc okunmazsa denetim izi sessizce kaybolur (supabase-js firlatmaz,
+        // distaki catch calismaz). E-posta gitti; hata yalniz kayda yazilir.
+        const { error: izErr } = await admin.from("meeting_invite_logs").insert({
           session_id: sessionId, case_id: session.case_id, party_id: p.id,
           recipient_email: p.email, recipient_name: displayName,
           status: "sent", resend_message_id: resendId,
         });
+        if (izErr) console.error("[send-meeting-invite] davet izi yazılamadı", { party_id: p.id, error: izErr.message });
 
         if (p.user_id) {
           await admin.rpc("create_notification", {
@@ -303,20 +306,28 @@ serve(async (req) => {
         const msg = e?.message ?? "Bilinmeyen hata";
         console.error("[send-meeting-invite] Taraf gönderim hatası", { party_id: p.id, email: p.email, error: msg });
         results.push({ party_id: p.id, email: p.email, ok: false, error: msg });
-        await admin.from("meeting_invite_logs").insert({
+        const { error: izErr2 } = await admin.from("meeting_invite_logs").insert({
           session_id: sessionId, case_id: session.case_id, party_id: p.id,
           recipient_email: p.email, recipient_name: displayName,
           status: "failed", error_message: msg,
         });
+        if (izErr2) console.error("[send-meeting-invite] başarısızlık izi yazılamadı", { party_id: p.id, error: izErr2.message });
       }
     }
 
+    const uyarilar: string[] = [];
     const sentCount = results.filter((r) => r.ok).length;
     const failedCount = results.length - sentCount;
     if (sentCount > 0) {
-      await admin.from("case_sessions")
+      // Bu damga davranisi belirler: yazilamazsa oturum "davet gonderilmedi"
+      // gorunur ve ayni davet ikinci kez gonderilebilir. Sessiz birakilmaz.
+      const { error: damgaErr } = await admin.from("case_sessions")
         .update({ invite_sent_at: new Date().toISOString() })
         .eq("id", sessionId);
+      if (damgaErr) {
+        console.error("[send-meeting-invite] invite_sent_at yazılamadı", { sessionId, error: damgaErr.message });
+        uyarilar.push(`gönderim damgası yazılamadı: ${damgaErr.message}`);
+      }
       // AKIŞ OLAYI (best-effort): oturum daveti tarafa gönderildi. Alıcı adresi yazılmaz.
       await olayYaz(admin, {
         case_id: session.case_id, olay_kodu: "oturum_daveti_gonderildi",
@@ -324,7 +335,7 @@ serve(async (req) => {
       });
     }
     return new Response(JSON.stringify({
-      success: true, sent: sentCount, failed: failedCount, total: results.length, results,
+      success: true, sent: sentCount, failed: failedCount, total: results.length, results, uyarilar,
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
     console.error("[send-meeting-invite] Genel hata:", error);
