@@ -1,23 +1,61 @@
 ## Nerede kaldık
 
-- Tarih: 24.08.2026 (8. blok)
+- Tarih: 25.08.2026 (9. blok)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
   Karar gereken her madde `tasks/HAT.md`ye yazılır, Code beklemeden devam eder.
   "Bitti, bilgi veriyorum" turu yok.
-- Aktif görev: yok — HAT'ın cevaplanmış dört maddesi (H-2·H-3·H-5·H-6) KAPANDI
-- Açık HAT maddesi: **H-1** (kurucuda: CRON_SECRET yenilemesi) · **H-4** (sırası
-  gelmedi: kayıt hattı yazılınca)
-- Son tamamlanan iş: **H-5** — `trg_akis_gorev_cevap` kaldırıldı (`edd7b64`)
-- Bu turda kapanan: H-6 (`a1ebdc4`) · H-3 (`de0049b`) · H-2 (`4d09b03`) · H-5 (`edd7b64`)
-- Doğrulama: `npm run test` **210/210** · tsc temiz · build başarılı · lint 2346
-- **CANLI ÖLÇÜM (H-6 sonrası):** dar politika **25** · kalan geniş **6**
-  (tam olarak dokunulmayacak öbek) · sahip **9/9** yetkili · erişimi değişen dosya **0**
-  · sahip-aynı-zamanda-taraf **0**
-- **Açık blokaj: yok** (H-3'ün silme adımı izin ekranında reddedildi — aşağıda)
-- **İletişim hattı:** `tasks/HAT.md`. Kurucu **altı maddenin de** cevabını yazdı
-  (`97390ec`). Durum: H-6 KAPANDI · H-3 kısmen (silme izni yok) · H-1 kurucuda ·
-  H-2 uygulanıyor · H-4 sırası gelmedi · H-5 migration gerektiriyor
+- Aktif görev: (bu turda seçilecek — kuyruk taraması sürüyor)
+- Son tamamlanan iş: **P1 · eski şema adası kaldırıldı** (`87d1dc4`) + **P3 · lint
+  `tests/gecici/` taramıyor** (`e56d122`) — ikisi de canlıda doğrulandı
+- Açık HAT maddesi: **H-1** (kurucuda: `CRON_SECRET` yenilemesi — Code'un işi
+  yalnız yenileme sonrası 200 doğrulaması) · **H-4** (önkoşul yok: kayıt hattı
+  yazılınca)
+- Doğrulama: `npm run test` **215/215** · tsc temiz · build başarılı ·
+  lint **2349** (src 1063 → **1058**, adanın gerçek etkisi −5)
+- **Açık blokaj: yok**
+- Sıradaki uygulanabilir iş: kuyrukta önkoşulsuz iş kalmadı → §6 gereği kodun
+  gerçek durumundan yeni P0/P1 adayı çıkarılıyor.
+
+### KAPANDI — 25.08 · P1 · ESKİ ŞEMA ADASI KALDIRILDI (`87d1dc4`, publish)
+24.08'de H-3 taramasında bulunan "P1 adayı" madde. `mediator_requests` canlıda
+**0 satır** ve tüketicisi yok; buna rağmen **beş canlı ön yüz yüzeyi** ona
+dokunuyordu:
+| yüzey | ne yapıyordu | gerçek sonuç |
+|---|---|---|
+| `MediatorDetail.tsx` | **INSERT** (randevu talebi) | talep hiçbir yere düşmüyordu |
+| `MediatorMarketplace.tsx` | sayfaya tek giriş | kendisi de ölüydü (import 0) |
+| `SessionCalendar.tsx` · `WeeklyCalendarView.tsx` | takvim | hiçbir yerden import edilmiyor |
+| `useCaseStorage.submitMediatorRequest` | yardımcı | çağrısı kalmamış |
+| `Analytics.tsx` | oturum istatistiği | yıllardır **"0 oturum"** gösteriyordu |
+
+CANLI RANDEVU YOLU BAŞKADIR: `randevu_teklifleri` (arabulucu seçenek sunar,
+taraf seçer — `randevu-teklif`), atama `case_assignments`, oturumlar
+`case_sessions`.
+- Analytics artık `case_sessions` / `scheduled_at` okuyor. Oturum tipi etiketleri
+  ürünün kendi değerleriyle değiştirildi (ön/ana/özel/ortak görüşme); eski
+  "online / yüz yüze" ayrımı `session_type` alanında **hiç yoktu** — uydurma bir
+  etiketti (§7-B.2: etiket-işlev uyumsuzluğu kusurdur).
+- **TABLOLAR DURUYOR** (H-3 kararı A · §7.3): geri dönüşü olan yalnız koddur.
+- TEZGÂH: `tests/eski-sema-adasi.test.ts` (5 durum) — ada geri sızarsa yakalar.
+  **KANITLANDI:** kusurlu hâl `ADA_KOK=tests/gecici/ada-kanit` kopyasında geri
+  getirildi → **5/5 test DÜŞTÜ**; gerçek dizinde 5/5 geçiyor.
+- **CANLI KANIT (publish):** paket `index-BlFMtooh.js` → **`index-CJQSVyaw.js`**
+  | belirteç | önce | sonra |
+  |---|---|---|
+  | `mediator_requests` | 2 | **0** |
+  | `/mediator/:id` | 1 | **0** |
+  | `scheduled_date` | 4 | **0** |
+  | `case_sessions` | — | 18 |
+  Paket boyutu 3.425.445 → 3.383.767 bayt (−41.678).
+
+### KAPANDI — 25.08 · P3 · LINT ARTIK `tests/gecici/` TARAMIYOR (`e56d122`)
+`npm run lint` bir **doğrulama komutudur** (PROJE_OZETI.md) ama `tests/gecici/`
+alanını da tarıyordu. Ada kanıtı için oraya `src` kopyası çıkarılınca sayı
+2349 → **3412**'ye fırladı; yani sonda dosyaları doğrulama ölçüsünü bozuyordu.
+`eslint.config.js` → `ignores: ["dist", "tests/gecici"]`. Bu alan zaten git
+dışıdır (§22) ve içinde bilerek **kusurlu** kaynak kopyaları durur
+(`ADA_KOK` · `MIG_DIZIN` · `FN_DIZIN`).
 
 ### İZİN DUVARI (24.08 · `.claude/settings.json`, commit `5767475`)
 Kural metni öneridir, izin listesi duvardır. Artık **deny**:
@@ -58,12 +96,6 @@ KANIT (tarama):
 - `RescheduleRequest.tsx` / `RescheduleApproval.tsx` → **hiçbir yerden import
   edilmiyor** (grep boş). Yani çağrı zinciri kendi içinde kapalı = ölü.
 Silme yeniden denenmeyecek; kurucu izin verdiğinde tek komutla kapanır.
-
-### YENİ BULGU — P1 adayı · `mediator_requests` yalnız dört dosyalık ada DEĞİL
-H-3 taramasında çıktı: tablo 0 satır olmasına rağmen **beş canlı yüzey** ona
-dokunuyor — `MediatorDetail.tsx` (**INSERT**), `SessionCalendar.tsx`,
-`WeeklyCalendarView.tsx`, `useCaseStorage.ts`, `Analytics.tsx`.
-Yani "arabulucu talebi" akışı ya hiç kullanılmıyor ya da kırık. Kuyruğa alındı.
 
 ### KAPANDI — 24.08 · H-2 · P2 · ISLAK İMZA KAPISI AÇILDI (karar **A**)
 `agreement_documents.signed_by` hiçbir yüzeyden yazılmıyordu; şema ve tetikleyici

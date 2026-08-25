@@ -611,3 +611,22 @@ sanıp 200 dönüyordu — oturum hatırlatmaları hiç gönderilmedi, üç tur 
 Terk edilen kod silinmezse bir sonraki okuyan onu çalışan yol sanar.
 **Kural:** tablo boşalınca sorgusu da kalkar; "belki lazım olur" diye bırakılan
 çağrı zinciri tuzaktır. Tablolar duruyor (silmek geri dönüşsüz, §7.3).
+
+## 25.08.2026 — Ölü kod tek dosya değil, **ada** olur
+
+`mediator_requests` "dört dosyalık ada" sanılmıştı; tarama beş canlı yüzey
+buldu ve biri **INSERT** atıyordu (`MediatorDetail`), biri de kullanıcıya
+yıllardır yanlış rakam gösteriyordu (`Analytics` → hep "0 oturum").
+
+**Ders:** bir tabloyu terk edilmiş ilan etmeden önce `.from("<tablo>")` deseni
+**bütün** `src` ağacında aranır; import zinciri kapalı diye dosya ölü sayılmaz —
+ölü sayfanın *okuduğu* tablo başka bir canlı sayfada da geçiyor olabilir.
+
+**Ders 2:** ölü kaynağı silmek yetmez, **tüketiciyi doğru kaynağa bağlamak**
+gerekir. Analytics'i sadece silseydik sayfa boşalırdı; `case_sessions`e
+bağlandı. Bu sırada "online / yüz yüze" etiketinin `session_type` alanında hiç
+karşılığı olmadığı çıktı — uydurma etiket, kusurdur (§7-B.2).
+
+**Ders 3:** kanıt kopyası (`ADA_KOK` / `MIG_DIZIN` / `FN_DIZIN`) `tests/gecici/`
+altına çıkarılıyor ve o alan lint'e giriyordu → doğrulama sayısı 2349'dan
+3412'ye fırladı. Sonda alanı **doğrulama komutlarının dışında** tutulmalı.
