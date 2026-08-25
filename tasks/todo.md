@@ -9,24 +9,26 @@
 - Son tamamlanan iş: **P1+P2 · sessiz yutulan veritabanı yazımları**
   (27 bulundu → **19 kapatıldı**, kalan 8 gerekçeli)
   (önce: P1 bilirkişi önerisi izi `825dfb4` · P1 atama tarihi `0e5b1c9`)
-- Doğrulama: `npm run test` **233/233** · tsc temiz · build başarılı · lint **2348**
+- Doğrulama: `npm run test` **233/233** · tsc temiz · build başarılı · lint **2343**
 - **Açık blokaj: yok**
 - Açık HAT maddesi: **H-1** (kurucuda: `CRON_SECRET` yenilemesi — Code'un işi
   yalnız yenileme sonrası 200 doğrulaması) · **H-4** (önkoşul yok) ·
   **H-7** (`session_feedback` yapısal olarak imkânsız) · **H-8** (başvuru adası)
   — hiçbiri beklenmiyor, iş sürüyor.
-- Sıradaki uygulanabilir iş: **P3 · `ProcessTrackerPanel` bayat `as any`**
-  (kuyrukta), ardından canlıda 0/az satırlı tablo taramasının kalanı
-  (`pending_pool` · `case_process_tracker`).
+- Sıradaki uygulanabilir iş: canlıda 0/az satırlı tablo taramasının kalanı —
+  `pending_pool` (0 satır · `MevzuatAdmin`) · `case_process_tracker`
+  (9 dosyada 1 satır) · `oturum_erteleme` etiketi `status === "cancelled"`
+  satırını okuyor (iptal ≠ erteleme — doğrulanacak).
 
 ## Kuyruk (yeni açılanlar)
 - [x] P2 · Yönetici yüzeylerinde kontrolsüz yazım (`KnowledgeBaseAdmin`,
       `TariffAdmin` ×2, `TemplateAdmin`) · Kabul: `DONDURULMUS` listesinden
       çıktı · DONE 25.08 · Doğrulama: 233/233 test, tsc temiz, lint 2348
 - [x] P2 · `AjanPenceresi` kontrolsüz yazım ×3 · DONE 25.08 · aynı doğrulama
-- [ ] P3 · `ProcessTrackerPanel` içindeki `(supabase as any)` bayat: yorum
-      "case_process_tracker üretilen tiplerde yok" diyor ama tablo
-      `types.ts:1893`te VAR · Kabul: cast kalkar, tsc temiz.
+- [x] P3 · `ProcessTrackerPanel` bayat `(supabase as any)` · Kabul: cast kalktı,
+      tsc temiz · DONE 25.08 · Doğrulama: 233/233 test, tsc temiz, **lint 2348 → 2343**
+      (cast tip denetimini kapatıyordu; kalkınca `trackerRow` gerçek tipini aldı
+      ve üç `as any` daha gereksizleşti). Tablo `types.ts:1893`te zaten VARDI.
 
 ### KAPANDI — 25.08 · P1 · SESSİZ YUTULAN VERİTABANI YAZIMLARI (12 YOL)
 **Kök neden — tek cümle:** `supabase-js` hata **fırlatmaz**. `{ error }`

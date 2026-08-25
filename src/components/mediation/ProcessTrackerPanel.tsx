@@ -10,8 +10,10 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDisputeType } from "@/lib/disputeLabels";
 
-// case_process_tracker isn't in the generated Supabase types yet.
-const trackerTable = () => (supabase as any).from("case_process_tracker");
+// 25.08.2026 — `(supabase as any)` KALDIRILDI. Yorum "üretilen tiplerde yok"
+// diyordu ama tablo `src/integrations/supabase/types.ts` içinde VAR; cast yalnız
+// tip denetimini kapatıyordu.
+const trackerTable = () => supabase.from("case_process_tracker");
 
 interface Props {
   caseRow: any;
@@ -166,9 +168,9 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
       setAgreementDocs(docs ?? []);
       setSessions(sessionRows ?? []);
       setTracker({
-        buro_no: (trackerRow as any)?.buro_no ?? "",
-        arb_no: (trackerRow as any)?.arb_no ?? "",
-        items: ((trackerRow as any)?.items as Items) ?? {},
+        buro_no: trackerRow?.buro_no ?? "",
+        arb_no: trackerRow?.arb_no ?? "",
+        items: (trackerRow?.items as Items) ?? {},
       });
 
       const mediatorId = resolvedCase?.assigned_mediator_id;
@@ -204,7 +206,7 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
   function persistTracker(next: Tracker) {
     void trackerTable()
       .upsert({ case_id: caseRow.id, buro_no: next.buro_no || null, arb_no: next.arb_no || null, items: next.items }, { onConflict: "case_id" })
-      .then(({ error }: any) => {
+      .then(({ error }) => {
         if (error) toast({ title: "Kaydedilemedi", description: error.message, variant: "destructive" });
       });
   }
