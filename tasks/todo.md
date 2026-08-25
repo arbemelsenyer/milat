@@ -10,7 +10,15 @@
 - **CANLIDA DOĞRULANAN (Code sorguladı):** `saklama_sureleri` tablosu ✓ değerli
   (6/6) · `Sesli not%` kova politikası ✓ (hat artık çalışabilir).
   **Henüz çalıştırılmamış:** antet kolonları · `arabulucu_baz_cizgi` ·
-  `paket_kotalari` · `saklama-imha` cron kaydı.
+  `paket_kotalari` · `saklama-imha` cron kaydı · `saklama_gun >= 0` kısıtı.
+- **BEŞİ TEK DOSYADA TOPLANDI:** `tests/gecici/PILOT-KALAN-GOCLER.sql` — tek
+  yapıştırma, sırayla koşar, her bölüm `if not exists` / `on conflict` ile
+  korumalı (ikinci kez çalıştırmak zararsız). **Bağımlılıkları canlıda
+  doğrulandı** (`has_role` · `app_role` · `pg_cron` · `pg_net` · Vault sırrı ·
+  `profiles` · `auth.users`) → koşarken patlamaz.
+  **Hiçbiri davranış değiştirmez:** tablolar değer olmadan/sınırsız kurulur —
+  kota kimseyi engellemez, kazanım rakam üretmez, antet alanları boş gelir.
+  `kazanim-katsayilari.sql` **çalıştırılmayacak** (H-15/4 ile geçersiz).
 - **PİLOT KUYRUĞU: 9/14 DONE (hepsi §15.1'in beşini de sağlıyor) · 0 bekleyen ·
   5 BLOCKED.** Beşinin de kodu bitti; engel yalnız **SQL çalıştırma** ve
   iki değer kararı. Kod tarafında yapılacak iş kalmadı.
