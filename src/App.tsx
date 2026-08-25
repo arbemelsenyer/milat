@@ -21,7 +21,6 @@ import AgreementGenerator from "./pages/AgreementGenerator";
 import MediationEngine from "./pages/MediationEngine";
 import CaseDetail from "./pages/CaseDetail";
 import CaseRoom from "./pages/CaseRoom";
-import MediatorDetail from "./pages/MediatorDetail";
 import NotificationSettings from "./pages/NotificationSettings";
 import PrivacyTests from "./pages/PrivacyTests";
 import HealthCheck from "./pages/HealthCheck";
@@ -90,7 +89,11 @@ const App = () => (
               <Route path="/legal-precedents" element={<LegalPrecedents />} />
               <Route path="/agreement-generator" element={<AgreementGenerator />} />
               <Route path="/mediator-dashboard" element={<MediatorDashboard />} />
-              <Route path="/mediator/:id" element={<MediatorDetail />} />
+              {/* 24.08.2026 — `/mediator/:id` (MediatorDetail) KALDIRILDI: sayfaya
+                  hiçbir yerden bağlantı yoktu (tek giriş MediatorMarketplace idi, o da
+                  ölüydü) ve tek eylemi terk edilmiş `mediator_requests` tablosuna
+                  INSERT atmaktı. Canlı randevu yolu `randevu_teklifleri`dir
+                  (arabulucu seçenek sunar, taraf seçer); atama `case_assignments`. */}
               <Route path="/notification-settings" element={<NotificationSettings />} />
               <Route path="/privacy-tests" element={<PrivacyTests />} />
               <Route path="/health-check" element={<HealthCheck />} />

@@ -152,40 +152,6 @@ export function useCaseStorage() {
     return true;
   };
 
-  const submitMediatorRequest = async (
-    caseId: string,
-    userId: string,
-    preferredDates: string[],
-    preferredTime: string,
-    sessionType: string,
-    notes?: string
-  ): Promise<boolean> => {
-    const { error } = await supabase
-      .from('mediator_requests')
-      .insert({
-        case_id: caseId,
-        user_id: userId,
-        preferred_dates: preferredDates,
-        preferred_time: preferredTime,
-        session_type: sessionType,
-        notes: notes || null,
-        status: 'pending',
-      });
-
-    if (error) {
-      console.error('Error submitting mediator request:', error);
-      return false;
-    }
-
-    // Update case status
-    await supabase
-      .from('cases')
-      .update({ status: 'submitted' })
-      .eq('id', caseId);
-
-    return true;
-  };
-
   return {
     caseId,
     setCaseId,
@@ -194,7 +160,6 @@ export function useCaseStorage() {
     loadCase,
     saveCase,
     saveSummary,
-    submitMediatorRequest,
   };
 }
 

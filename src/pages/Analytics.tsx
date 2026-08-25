@@ -30,7 +30,7 @@ interface RequestData {
   id: string;
   status: string;
   created_at: string;
-  scheduled_date: string | null;
+  scheduled_at: string | null;
   session_type: string | null;
 }
 
@@ -182,7 +182,10 @@ export default function Analytics() {
     try {
       const [casesRes, requestsRes, feedbackRes] = await Promise.all([
         supabase.from('cases').select('id, status, dispute_type, created_at, updated_at'),
-        supabase.from('mediator_requests').select('id, status, created_at, scheduled_date, session_type'),
+        // 24.08.2026 — KAYNAK DEĞİŞTİ: `mediator_requests` eski şemadır ve canlıda
+        // 0 satırdır; bu sayfa yıllardır "0 oturum" gösteriyordu. Oturumların
+        // gerçekte durduğu yer `case_sessions` (canlıda 32 satır).
+        supabase.from('case_sessions').select('id, status, created_at, scheduled_at, session_type'),
         supabase.from('session_feedback').select('id, overall_rating, mediator_rating, fairness_rating, would_recommend, created_at')
       ]);
 
@@ -239,14 +242,24 @@ export default function Analytics() {
   }));
 
   // Sessions by type
+  // Oturum tipleri ürünün kendi değerleridir (SessionScheduler): ön/ana/özel
+  // görüşme. Eski kod bunu online/yüz yüze diye etiketliyordu — o ayrım
+  // `case_sessions.session_type` alanında hiç yok, uydurma bir etiketti.
+  const SESSION_TYPE_LABELS: Record<string, string> = {
+    preliminary: 'Ön Görüşme',
+    main: 'Ana Görüşme',
+    private: 'Özel Görüşme',
+    joint: 'Ortak Görüşme',
+    ortak: 'Ortak Görüşme',
+  };
   const sessionsByType = Object.entries(
     requests.reduce((acc, r) => {
-      const type = r.session_type || 'online';
+      const type = r.session_type || 'bilinmiyor';
       acc[type] = (acc[type] || 0) + 1;
       return acc;
     }, {} as Record<string, number>)
   ).map(([name, value]) => ({
-    name: name === 'online' ? t.online : t.inPerson,
+    name: SESSION_TYPE_LABELS[name] || name,
     value
   }));
 
@@ -255,7 +268,7 @@ export default function Analytics() {
     const date = subDays(new Date(), 29 - i);
     const dateStr = format(date, 'yyyy-MM-dd');
     const count = requests.filter(r => 
-      r.scheduled_date && format(parseISO(r.scheduled_date), 'yyyy-MM-dd') === dateStr
+      r.scheduled_at && format(parseISO(r.scheduled_at), 'yyyy-MM-dd') === dateStr
     ).length;
     return {
       date: format(date, 'dd MMM'),

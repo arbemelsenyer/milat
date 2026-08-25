@@ -30,7 +30,7 @@ type FlowPhase = 'intake' | 'decision' | 'ai_exploration' | 'mediator_scheduling
 export function IntakeForm() {
   const { t, language } = useLanguage();
   const { user } = useAuth();
-  const { caseId, setCaseId, isSaving, createCase, loadCase, saveCase, saveSummary, submitMediatorRequest } = useCaseStorage();
+  const { caseId, setCaseId, isSaving, createCase, loadCase, saveCase, saveSummary } = useCaseStorage();
   const [searchParams] = useSearchParams();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<IntakeFormData>(initialFormData);
