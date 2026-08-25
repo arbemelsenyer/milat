@@ -28,9 +28,11 @@ async function upsertPartyAnalysisState(
   const { data: existing } = await admin.from("agent_states")
     .select("id").eq("case_id", case_id).eq("agent_type", "party_analysis").eq("party_id", party_id).maybeSingle();
   if (existing?.id) {
-    await admin.from("agent_states").update(patch).eq("id", existing.id);
+    const { error: durumErr } = await admin.from("agent_states").update(patch).eq("id", existing.id);
+    if (durumErr) console.error("[party-confidential-analysis] ajan durum satırı yazılamadı:", durumErr.message);
   } else {
-    await admin.from("agent_states").insert({ case_id, agent_type: "party_analysis", party_id, ...patch });
+    const { error: durumErr } = await admin.from("agent_states").insert({ case_id, agent_type: "party_analysis", party_id, ...patch });
+    if (durumErr) console.error("[party-confidential-analysis] ajan durum satırı yazılamadı:", durumErr.message);
   }
   // ANLATIM (best-effort): aynı satıra düz Türkçe adım yazılır; davranış değişmez.
   await anlatimYansit(admin, { case_id, agent_type: "party_analysis", party_id }, patch);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 
 /* KENAR İŞLEVLERİNDE SESSİZ YAZIM — ürün yazımları (25.08.2026)
 
@@ -297,5 +297,41 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     // Yan izler.
     expect(oku("randevu-teklif"), "linkErr okunmuyor").toContain("linkErr");
     expect(oku("taraf-asistan"), "iş defteri izi denetlenmiyor").toContain("iş defteri izi yazılamadı");
+  });
+
+  it("ajan durum defteri (agent_states): her yazımın sonucu okunuyor", () => {
+    // Bu satirlar Ajan Kontrol Paneli'ni besler. Dosyalardaki yorum "hata yutulur
+    // ve YALNIZ KONSOLA LOGLANIR" diyordu — ama supabase-js firlatmadigi icin
+    // catch hic calismiyor ve konsola da hicbir sey dusmuyordu: yazilan sozun
+    // kendisi tutulmuyordu. Defter yazimi asil isi hala BOZMAZ, sadece susmaz.
+    const DOSYALAR = [
+      "belge-ozeti", "olay-cizelgesi", "guc-dengesi", "elverislilik", "dosya-ozeti-oner",
+      "common-ground-report", "iletisim-degisim", "mediation-ai", "party-confidential-analysis",
+      "classify-dispute", "detect-legal-deadlines", "orchestrator-run",
+      "multi-agent-negotiation", "masa-kalem-karsilastir",
+    ];
+    for (const ad of DOSYALAR) {
+      const g = oku(ad);
+      expect(g, `${ad}: durum yazımının sonucu okunmuyor`).toContain("durumErr");
+      expect(g, `${ad}: hata kayda düşmüyor`).toContain("ajan durum satırı yazılamadı");
+    }
+  });
+
+  it("KENAR TARAMASI: hiçbir edge function'da çıplak yazım kalmadı", () => {
+    // Tek kapi: `^\s*await <istemci>.from(...)` deseni butun agacta SIFIR olmali.
+    // Bu, tek tek islev denetimlerinin kacirdigi yeni yazimlari da yakalar.
+    const kok = KOK ? `${KOK}/supabase/functions` : "supabase/functions";
+    const ciplak: string[] = [];
+    for (const ad of readdirSync(kok, { withFileTypes: true })) {
+      if (!ad.isDirectory() || ad.name === "_shared") continue;
+      const yol = `${kok}/${ad.name}/index.ts`;
+      if (!existsSync(yol)) continue;
+      readFileSync(yol, "utf-8").split(String.fromCharCode(10)).forEach((l, i) => {
+        if (/^\s*await\s+(admin|sb|supabase|client)\.from\(/.test(l)) {
+          ciplak.push(`${ad.name}:${i + 1}`);
+        }
+      });
+    }
+    expect(ciplak, `sonucu okunmayan yazım: ${ciplak.join(" | ")}`).toEqual([]);
   });
 });

@@ -239,9 +239,10 @@ Deno.serve(async (req) => {
         .select("id, status, updated_at").eq("case_id", case_id)
         .eq("agent_type", "orchestrator").is("party_id", null).maybeSingle();
       if (stale?.status === "running" && Date.now() - new Date(stale.updated_at as string).getTime() > STALE_RUNNING_MS) {
-        await admin.from("agent_states")
+        const { error: durumErr } = await admin.from("agent_states")
           .update({ status: "failed", error_message: "önceki koşu yarıda kaldı" })
           .eq("id", stale.id);
+        if (durumErr) console.error("[orchestrator-run] ajan durum satırı yazılamadı:", durumErr.message);
         console.log(`[orchestrator-run] takılı kalmış önceki koşu kapatıldı: case=${case_id}`);
       }
     } catch (e: any) {

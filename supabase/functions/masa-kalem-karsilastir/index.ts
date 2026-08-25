@@ -252,9 +252,10 @@ Deno.serve(async (req) => {
       if ((satir as any)?.id) {
         const eskiCikti = (satir as any).last_output && typeof (satir as any).last_output === "object"
           ? (satir as any).last_output : {};
-        await admin.from("agent_states").update({
+        const { error: durumErr } = await admin.from("agent_states").update({
           last_output: { ...eskiCikti, karsilastirma: { ozet, ortusen, yakin, ayrilan } },
         }).eq("id", (satir as any).id);
+        if (durumErr) console.error("[masa-kalem-karsilastir] ajan durum satırı yazılamadı:", durumErr.message);
       }
     } catch (e: any) {
       console.error("[masa-kalem-karsilastir] sonuç yazılamadı", String(e?.message ?? e).slice(0, 120));

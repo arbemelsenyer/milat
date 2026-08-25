@@ -65,7 +65,8 @@ async function upsertAgentState(
 
   // ANLATIM (best-effort): aynı satıra düz Türkçe adım yazılır; davranış değişmez.
   if (existing?.id) {
-    await supabase.from("agent_states").update(patch).eq("id", existing.id);
+    const { error: durumErr } = await supabase.from("agent_states").update(patch).eq("id", existing.id);
+    if (durumErr) console.error("[multi-agent-negotiation] ajan durum satırı yazılamadı:", durumErr.message);
     await anlatimYansit(supabase, { case_id: caseId, agent_type: agentType, party_id: null }, patch);
     return existing.id;
   } else {

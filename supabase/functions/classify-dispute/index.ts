@@ -26,9 +26,11 @@ async function upsertAgentActivityState(
   query = party_id ? query.eq("party_id", party_id) : query.is("party_id", null);
   const { data: existing } = await query.maybeSingle();
   if (existing?.id) {
-    await admin.from("agent_states").update(patch).eq("id", existing.id);
+    const { error: durumErr } = await admin.from("agent_states").update(patch).eq("id", existing.id);
+    if (durumErr) console.error("[classify-dispute] ajan durum satırı yazılamadı:", durumErr.message);
   } else {
-    await admin.from("agent_states").insert({ case_id, agent_type, party_id, ...patch });
+    const { error: durumErr } = await admin.from("agent_states").insert({ case_id, agent_type, party_id, ...patch });
+    if (durumErr) console.error("[classify-dispute] ajan durum satırı yazılamadı:", durumErr.message);
   }
   // ANLATIM (best-effort): aynı satıra düz Türkçe adım yazılır; davranış değişmez.
   await anlatimYansit(admin, { case_id, agent_type, party_id }, patch);

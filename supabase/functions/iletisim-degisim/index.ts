@@ -138,10 +138,12 @@ async function durumYaz(
     const { data: mevcutSatir } = await sorgu.maybeSingle();
     const govde = { ...patch, updated_at: new Date().toISOString() };
     if (mevcutSatir?.id) {
-      await admin.from("agent_states").update(govde).eq("id", mevcutSatir.id);
+      const { error: durumErr } = await admin.from("agent_states").update(govde).eq("id", mevcutSatir.id);
+      if (durumErr) console.error("[iletisim-degisim] ajan durum satırı yazılamadı:", durumErr.message);
     } else {
-      await admin.from("agent_states")
+      const { error: durumErr } = await admin.from("agent_states")
         .insert({ case_id: caseId, agent_type: AGENT_TYPE, party_id: partyId, ...govde });
+      if (durumErr) console.error("[iletisim-degisim] ajan durum satırı yazılamadı:", durumErr.message);
     }
     // ANLATIM (best-effort): aynı satıra düz Türkçe adım yazılır; davranış değişmez.
     await anlatimYansit(admin, { case_id: caseId, agent_type: AGENT_TYPE, party_id: partyId }, patch);
