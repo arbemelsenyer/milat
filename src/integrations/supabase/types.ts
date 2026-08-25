@@ -4359,6 +4359,39 @@ export type Database = {
           },
         ]
       }
+      saklama_sureleri: {
+        Row: {
+          aciklama: string | null
+          baslangic: string
+          created_at: string
+          guncelleyen: string | null
+          id: string
+          saklama_gun: number | null
+          updated_at: string
+          veri_turu: string
+        }
+        Insert: {
+          aciklama?: string | null
+          baslangic?: string
+          created_at?: string
+          guncelleyen?: string | null
+          id?: string
+          saklama_gun?: number | null
+          updated_at?: string
+          veri_turu: string
+        }
+        Update: {
+          aciklama?: string | null
+          baslangic?: string
+          created_at?: string
+          guncelleyen?: string | null
+          id?: string
+          saklama_gun?: number | null
+          updated_at?: string
+          veri_turu?: string
+        }
+        Relationships: []
+      }
       session_feedback: {
         Row: {
           comments: string | null
