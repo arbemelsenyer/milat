@@ -103,4 +103,33 @@ describe("kazanım sayacı: rakam arabulucunun kendi beyanı", () => {
       expect(kolonlar, `baz çizgi tablosunda ${yasak} kolonu var`).not.toContain(yasak);
     }
   });
+
+  it("baz çizgi arabulucudan İŞ ÜRETİLMEDEN ÖNCE isteniyor", () => {
+    /* Kurucu talimatı: "baz çizgi kayıt anında alınır — pilot arabulucuları
+       baz çizgi sorulmadan kaydolursa kazanım rakamı bir daha geriye dönük
+       kurulamaz." Kayıt e-posta onayı gerektirdiği için `signUp` anında oturum
+       (auth.uid()) yok ve RLS gereği satır yazılamaz; bu yüzden soru
+       arabulucunun çalışmaya BAŞLADIĞI ilk ekranda sorulur. */
+    const kart = readFileSync("src/components/mediation/BazCizgiSorulari.tsx", "utf-8");
+    const motor = readFileSync("src/pages/MediationEngine.tsx", "utf-8");
+    // Uc soru da 5.9'daki haliyle sorulmali.
+    for (const a of ["belge_saat", "analiz_saat", "beyan_saat"]) {
+      expect(kart, `${a} sorulmuyor`).toContain(a);
+    }
+    // Beyan verilmisse kart CIKMAZ (tek seferlik).
+    expect(kart).toMatch(/setGerekli\(!data\)/);
+    expect(kart).toMatch(/if \(!gerekli\) return null/);
+    /* Kart kapatılamaz: "atlanmayacak" (kurucu). Kapatma düğmesi olmamalı.
+       YORUMA DEĞİL KODA BAK — bu dosyanın kendi yorumu "kapatılamaz" diyor ve
+       kelimeye bakan denetim onu kusur sanıyordu (bugün DÖRDÜNCÜ kez). */
+    const kartKodu = kart.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
+    expect(kartKodu, "kart kapatılabiliyor — atlanabilir olur")
+      .not.toMatch(/onDismiss|setGizli|onClose|kapat\w*\(/i);
+    // Ama calismayi da engellememeli: liste ekraninda, akisi kilitlemeden.
+    expect(motor).toContain("<BazCizgiSorulari userId={user.id} />");
+    // Gizlilik: forma içerik alanı girmemeli — yine YORUM DEĞİL kod denetlenir.
+    for (const yasak of ["case_id", "party_id", "tutar"]) {
+      expect(kartKodu, `baz çizgi formunda ${yasak} var`).not.toContain(yasak);
+    }
+  });
 });

@@ -53,6 +53,7 @@ import { AjanPenceresi } from "@/components/AjanPenceresi";
 import { CaseQaPanel } from "@/components/mediation/CaseQaPanel";
 // Ücretli model çağrısı işareti — TEK tanım (bkz. UcretliIsaret.tsx).
 import { UcretliIsaret } from "@/components/mediation/UcretliIsaret";
+import { BazCizgiSorulari } from "@/components/mediation/BazCizgiSorulari";
 
 // Paylaşılan giriş animasyonu deseni — Dashboard.tsx'teki containerVariants/itemVariants ile aynı.
 const containerVariants = {
@@ -678,6 +679,11 @@ export default function MediationEngine() {
               <Plus className="h-4 w-4 mr-1" /> Yeni Başvuru Oluştur
             </Button>
           </header>
+
+          {/* Kazanım baz çizgisi: arabulucu iş üretmeden ÖNCE alınır (§5.9,
+              HAT H-15/4). Beyan verilene kadar görünür; kapatılamaz ama
+              çalışmayı da engellemez. */}
+          {(isMediator || isAdmin) && user?.id && <BazCizgiSorulari userId={user.id} />}
 
           {showNew && (
             <NewCaseForm

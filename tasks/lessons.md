@@ -826,3 +826,29 @@ Aynı gerekçe `gh pr create --body-file` için de geçerlidir.
 **Genel ilke:** bir kalıp teknik olarak çalışıyor diye doğru değildir; kurucuya
 çıkardığı onay yükü de kalıbın maliyetidir. Tekrar eden onay ekranı bir kusurdur
 (§18-A), kalıbı değiştirmek gerekir.
+
+## 25.08.2026 — Tezgâh yoruma bakarsa kendi belgesini kusur sanır (DÖRT KEZ)
+
+Bugün **dört ayrı tezgâhta** aynı hata yapıldı: bir yasak deseni (`getDisplayMedia`,
+`tutar`, `kapat`, `RTCPeerConnection`) dosyada aranırken **yorumlar da tarandı** —
+ve yorumlar zaten "bu API kullanılmıyor", "tutar bu tabloya girmez", "kart
+kapatılamaz" diye o kelimeleri **açıklamak için** içeriyordu. Tezgâh, dosyanın
+kendi belgesini kusur sanıp kırmızı yandı.
+
+Bu, 23.08'de `guard-shell.sh`ta öğrenilen kuralın aynısıdır ve orada "kelimeye
+değil çalıştırılan komuta bak" diye yazılmıştı. Tezgâhlara taşınmamıştı.
+
+**KURAL:** bir dosyada "şu şey GEÇMEMELİ" denetimi yapılacaksa, önce yorumlar
+ayıklanır, sonra bakılır:
+
+```js
+const kod = ham.replace(/\\/\\*[\\s\\S]*?\\*\\//g, " ").replace(/(^|[^:])\\/\\/.*$/gm, "$1");
+```
+
+SQL için `.replace(/--.*$/gm, "")`, ve kolon denetiminde yalnız
+`create table (...)` aralığına bakılır.
+
+**Neden bu kadar tekrarladı:** yasak deseni yazan kişi, aynı deseni yorumda da
+yazmak zorunda kalıyor (neyin neden yasak olduğunu anlatmak için). Yani bu hata
+rastlantı değil, **kalıbın kendisinden doğuyor**. Bu yüzden "yorumları ayıkla"
+adımı, yasak-desen denetimi yazarken opsiyonel değil **zorunlu** sayılmalıdır.
