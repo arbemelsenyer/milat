@@ -15,6 +15,14 @@
 - **KALAN ÜÇ MADDE:** antet (göç) · kazanım (göç) · taraf akışı telefonda
   (gerçek cihaz). Üçünün de **kodu bitti ve canlıda**; hiçbirinde Code
   tarafında yapılacak iş kalmadı.
+- **GÖÇ SONRASI DOĞRULAMA TEK KOMUTA İNDİRİLDİ:**
+  `node tests/gecici/goc-sonrasi-dogrula.mjs` — çalıştırılacak SQL'i ve beklenen
+  sayıları basar (salt okuma). Göç koştuktan sonra bu sorgu, iki maddenin
+  gerçekten kapandığını tek bakışta gösterir; sonra `todo.md`de DONE işaretlenir.
+- **KOD İKİ MADDEDE DE GÖÇÜ BEKLEMEDEN ÇALIŞIYOR:** antet alanları göç gelmeden
+  boş basılıyor, kolonlar gelince kendiliğinden doluyor; baz çizgi kartı tablo
+  yokken hiç görünmüyor, gelince çıkıyor. Yani göç koştuğu an ikisi de ek kod
+  gerektirmeden tamamlanır.
 - **BEŞİ TEK DOSYADA TOPLANDI:** `tests/gecici/PILOT-KALAN-GOCLER.sql` — tek
   yapıştırma, sırayla koşar, her bölüm `if not exists` / `on conflict` ile
   korumalı (ikinci kez çalıştırmak zararsız). **Bağımlılıkları canlıda
