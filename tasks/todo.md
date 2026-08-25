@@ -41,10 +41,10 @@
     `get_message` ile doğrulandı.
   - OK `bc558eb` · **ön yüz depo çağrıları** — publish edildi. `get_project`
     doğruladı: `latest_commit_sha=bc558eb9…`, `is_published=true`.
-  - `03c445f` · **ön yüz `functions.invoke`** — publish istendi
-    (deployment `1aae0902`), sonucu doğrulanacak.
-  - `a27b221` · `extract-document-text` — deploy istendi
-    (`umsg_01m0vpw7ypekvtshsp1hqe74gm`), sonucu doğrulanacak.
+  - OK `03c445f` · **ön yüz `functions.invoke`** — publish edildi.
+  - OK `a27b221` · `extract-document-text` — deploy edildi ve doğrulandı.
+    `get_project`: `latest_commit_sha=74ec5862…`, `is_published=true`.
+  - **BEKLEYEN REDEPLOY YOK.**
 - Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9**.
 - Sıradaki uygulanabilir iş: **kuyruk boş.** Sessiz yazım kusuru kenarda ve ön
   yüzde kapandı, iki tezgâh da kilitli. Yeni P0/P1 adayı kodun gerçek
