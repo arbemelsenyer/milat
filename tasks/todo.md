@@ -4,7 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P1 · PİLOT İŞ LİSTESİ ÇIKARILDI (13 madde + 5 kabul şartı)**
+- Son tamamlanan iş: **P1 · pilot kuyruğu 1. madde — taraf aydınlatma metni**
 - **SESSİZ ÇAĞRI KUSURU İSTEMCİ YÜZEYİNİN TAMAMINDA KAPANDI:** `.from` ·
   `.rpc` · `.storage` · `.functions.invoke` · iç `fetch`. Kenar (`_shared`
   dâhil) ve ön yüz. Kenarda çıplak `.from(...)`, `.rpc(...)` ve
@@ -105,12 +105,20 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
-- [ ] P1 · **Taraf katılım ekranında aydınlatma metni yok** · Kabul: `/katilim/:token`
-      sayfasında (`KatilimCevap.tsx`) KVKK aydınlatma metni gösteriliyor ve taraf
-      onaylamadan katılım tamamlanmıyor; metin `Auth.tsx`teki mevcut metinle aynı
-      kaynaktan geliyor (ikinci kopya yazılmıyor) · **Bulgu:** `KatilimCevap.tsx`te
-      "aydinlatma/KVKK" geçen **0** satır; §15.2 "taraf kayıt ekranında gösteriliyor"
-      diyor. Arabulucu tarafında (`Auth.tsx`) metin VAR.
+- [x] P1 · **Taraf katılım ekranında aydınlatma metni** · **DONE 25.08.2026**
+      · Kabul: `/katilim/:token` sayfasında KVKK aydınlatma metni **karardan önce**
+      gösteriliyor ve metin `Auth.tsx` ile **aynı kaynaktan** geliyor (ikinci kopya yok)
+      · Doğrulama: `tests/kvkk-taraf-aydinlatma.test.ts` (4 durum) · 275/275 test ·
+      build temiz · commit `0bfcef8`
+      · **Kanıt:** düzeltmeden önce `KatilimCevap.tsx`te KVKK/aydınlatma geçen **0**
+      satır vardı. Üç metin `src/lib/kvkk-metinleri.ts`e çıkarıldı; `Auth.tsx` de
+      oradan okuyor (davranışı değişmedi). Tezgâh, gömülü kopya sızmasını da
+      engelliyor: metnin imzası (`Google Gemini API`) yalnız kaynak dosyada geçebilir.
+      · **AÇIK KALAN (HAT H-13, P2):** katılımın açık **rıza** ile kapılanıp
+      kapılanmayacağı hukuki karardır (§7.2) — aydınlatma ≠ rıza. Bugün gösterildi,
+      engellenmedi; karar kurucuda.
+      · **Canlı:** publish doğrulandı (`get_project`: `latest_commit_sha=0bfcef82…`).
+
 - [ ] P1 · **Oturum kaydı hattı yok (ses → döküm → föy)** · Kabul: arabulucu oturum
       sonrası notu **hem yazılı hem sesli** girebiliyor; ses `oturum-kayitlari` kovasına
       yükleniyor, `oturum_kayitlari.ses_dosya_yolu` doluyor, döküm `dokum_metni`ne

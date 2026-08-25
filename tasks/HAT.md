@@ -274,6 +274,38 @@ yüzden Code kendiliğinden yapmadı.
 verildiğinde tam komut metni bu maddeye eklenecek.
 
 
+---
+
+### H-13 · 25.08.2026 · P2 — Taraf katılımı açık rıza ile KAPILANSIN mı?
+**Sorun.** Bugün mimari §15.2'nin "aydınlatma metni taraf kayıt ekranında
+gösteriliyor" şartı sağlandı: `/katilim/:token` sayfasında KVKK aydınlatması ve
+imha politikası artık **karardan önce** görünüyor (commit `0bfcef8`). Şart
+"gösteriliyor" dediği için **gösterildi** — katılım engellenmiyor.
+
+Ama ayrı bir soru duruyor: **taraf, "Katılıyorum"a basmadan önce açık rıza
+vermeli mi?** Hukuken ikisi farklıdır: *aydınlatma* bilgilendirmedir (KVKK m.10),
+*açık rıza* ise onaydır (m.5). Arabuluculuk sürecinin kendi hukuki dayanağı var;
+ama tarafın verisinin **yapay zekâ ile analiz edilmesi** ayrı bir işlemdir ve
+arabulucu tarafında bunun için ayrı bir "Açık Rıza Beyanı" zaten alınıyor
+(`Auth.tsx`). Tarafta alınmıyor.
+
+**Seçenekler.**
+| | ne yapılır | bedeli |
+|---|---|---|
+| **A** | Bugünkü hâl: aydınlatma gösterilir, katılım engellenmez | §15.2 sağlanır; AI analizi için tarafın açık rızası **yok** |
+| B | "Katılıyorum" öncesi onay kutusu: rıza verilmeden katılım tamamlanmaz | Hukuken en güvenli; tek dokunuşluk akışa bir adım ekler, katılım oranını düşürebilir |
+| C | Rıza ayrı alınır: taraf katılır, AI analizi rızası ilk sohbette istenir | Akış bozulmaz; rıza gelene kadar o tarafın verisi analize girmemeli — **motor tarafında iş gerektirir** |
+
+**Önerim: B** — ama kararı kurucu vermeli, çünkü hukuki sonuç doğurur (§7.2) ve
+katılım oranını etkiler. B'nin uygulaması küçüktür: metin zaten
+`@/lib/kvkk-metinleri`de tek kaynakta, `KVKK_ACIK_RIZA` hazır duruyor; onay
+kutusu + `taraf-katilim` işlevinde rıza damgası yeterli.
+
+**Kararın etkisi.** A'da kalınırsa taraf verisi, tarafın açık rızası olmadan AI
+analizine giriyor olur — pilotta bir taraf bunu sorarsa savunulacak dayanak
+yalnız aydınlatmadır. B/C'de rıza kaydı denetlenebilir biçimde tutulur.
+
+
 ## COWORK → CODE
 
 _Cevaplar buraya yazılır. Biçim:_
