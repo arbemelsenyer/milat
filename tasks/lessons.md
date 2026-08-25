@@ -774,3 +774,34 @@ okuyamaz), atama yapılıp taraflara **haber gitmiyor**, bilgi tabanı işi
 
 **Ders:** `await` + `try/catch` bir sonucun denetlendiği anlamına gelmez.
 Denetim, **dönen nesnenin `error` alanının okunmasıdır**.
+
+
+## 25.08.2026 — Bekçinin vaadi tutulabilir olmalı
+
+Stop kancası şunu yazıyordu: *"Sebebi bir sonraki cevabında açıkça yaz, kanca
+seni bırakacak."* **Bu söz yapısal olarak tutulamaz:** Stop kancası asistanın
+cevabını okuyamaz — yalnız yükü görür. Yani kancanın gösterdiği çıkış kapısı
+yoktu. İki kez meşru sebep yazdım, ikisinde de engellendim; beni ancak
+3-engel sayacı bıraktı.
+
+**Ders 1 — bir bekçi, veremeyeceği sözü vermemeli.** Mesajında tarif ettiği
+çıkış yolu, mekanizmasında gerçekten var olmalı. Aksi hâlde kullanıcıyı (ya da
+ajanı) olmayan bir kapıya yönlendirir ve döngü kurar.
+
+**Ders 2 — belgelenen mekanizma ile BAĞLI olan mekanizma aynı şey değildir.**
+CLAUDE.md §5-A-1 `devam-bekcisi.sh`/`.py` ikilisini karar tablosuyla birlikte
+tarif ediyordu; ikili diskte duruyordu, testleri vardı — ama `settings.json`
+**başka bir dosyayı** (`devam.sh`) çağırıyordu. Kural yazılıydı, mekanizma
+bağlı değildi. Bir kancanın davranışını anlamak için belgeye değil
+`settings.json`'daki **command** satırına bakılır.
+
+**Ders 3 — kapanış (closure) tabanlı tezgâhta fixture paylaşılmaz.** Bu turun
+tezgâhında üç fixture aynı dizini kullanıyordu; senaryolar kapanış olarak
+SONDA koştuğu için hepsi **son yazılan** içeriği gördü ve tezgâh, bekçi doğru
+çalışırken "engellemiyor" dedi. Yarım saat bekçide kusur arandı; kusur
+tezgâhtaydı. Her fixture kendi dizinine alındı.
+
+**Ders 4 — Windows'ta yol biçimi bir fail-open sebebidir.** Kanca `cwd`'yi
+açamazsa dosyayı boş okur ve FAIL-OPEN'a düşer: hiç engellemez, üstelik sessizce.
+Bu yüzden bekçi tezgâhı yol biçimini **ayrıca** sınamalıdır (`yol-bicimi.mjs`:
+ters bölü ve ileri bölü, ikisi de).

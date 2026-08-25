@@ -4,7 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P1 · canlı sağlık denetimi → iki gerçek kusur**
+- Son tamamlanan iş: **P1 · Stop kancası yanlış alarm döngüsü (§18-A)**
 - **SESSİZ ÇAĞRI KUSURU İSTEMCİ YÜZEYİNİN TAMAMINDA KAPANDI:** `.from` ·
   `.rpc` · `.storage` · `.functions.invoke` · iç `fetch`. Kenar (`_shared`
   dâhil) ve ön yüz. Kenarda çıplak `.from(...)`, `.rpc(...)` ve
@@ -50,7 +50,8 @@
   - OK `a27b221` · `extract-document-text` — deploy edildi ve doğrulandı.
     `get_project`: `latest_commit_sha=74ec5862…`, `is_published=true`.
   - **BEKLEYEN REDEPLOY YOK.**
-- Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9** · **H-10**.
+- Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9** · **H-10** ·
+  **H-11 (P0 · kabuk bekçisi devre dışı — kanıtlı, kurucu kararı bekliyor)**.
 - Sıradaki uygulanabilir iş: **kuyruk boş.** Sessiz yazım kusuru kenarda ve ön
   yüzde kapandı, iki tezgâh da kilitli. Yeni P0/P1 adayı kodun gerçek
   durumundan çıkarılmalı. En yakın aday: **H-8 ölü yüzey öbeğinin silinmesi**
@@ -73,6 +74,39 @@ Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
 - **Sıradaki oturumun ilk işi:** `tasks/HAT.md` → `## COWORK → CODE` oku;
   cevap gelmişse uygula. Cevap yoksa kuyruk boş olduğu için yeni P0/P1 adayı
   kodun gerçek durumundan çıkarılır (§6).
+
+### KAPANDI — 25.08 · P1 · STOP KANCASI YANLIŞ ALARM DÖNGÜSÜ KURUYORDU (§18-A)
+**Belirti.** Bugün iki kez, **meşru** bir durma sebebi yazdığım hâlde
+("kuyrukta uygulanabilir iş kalmadı") tur kapatılamadı. Kancanın kendi mesajı
+*"sebebi bir sonraki cevabında açıkça yaz, kanca seni bırakacak"* diyordu —
+**ama bu söz tutulamaz:** Stop kancası asistanın cevabını okuyamaz, yalnızca
+yükü görür. Yani vaat edilen çıkış yolu yoktu; beni ancak 3-engel sayacı bırakıyordu.
+
+**Kök neden.** `settings.json`'daki Stop kancası `~/.claude/hooks/devam.sh`'ı
+çağırıyordu. O dosya **kör** bir engelleyici: kuyruğa bakmıyor, HAT'a bakmıyor,
+cevabı okumuyor — koşulsuz olarak üst üste 3 kez blokluyor.
+
+CLAUDE.md **§5-A-1**'de tarif edilen asıl mekanizma (`devam-bekcisi.sh` +
+`devam-bekcisi.py`) diskte **duruyordu ama bağlı değildi**. O ikili gerçek karar
+tablosunu uyguluyor: cevaptaki gerçek durma sebeplerini tanır, kuyruktaki
+`- [ ] P0–P3` maddelerine bakar, karar/önkoşul bekleyenleri yapılabilir saymaz,
+HAT'ta cevaplanmış madde arar ve her hata yolunda **FAIL-OPEN** çıkar.
+
+**Düzeltme.** `settings.json` → Stop kancası `devam-bekcisi.sh`'a bağlandı.
+`devam.sh` silinmedi, diskte duruyor.
+
+**TEZGÂH — kurmadan ÖNCE sınandı** (`tests/gecici/devam-bekcisi-sinama.mjs`,
+12 senaryo, **12/12**): dört meşru durma sebebi de bırakılıyor · `stop_hook_active`
+döngü koruması çalışıyor · yapılabilir madde varken **engelliyor ve gerekçede
+maddeyi adıyla gösteriyor** · "kurucu kararı" işaretli madde yapılabilir
+sayılmıyor · boş kuyruk bırakıyor · bozuk girdi ve olmayan dizin fail-open.
+Ayrıca `tests/gecici/yol-bicimi.mjs`: Windows `cwd` hem ters hem ileri bölülü
+biçimde okunuyor (biri okunamasa bekçi o biçimde **hiç** engelleyemezdi).
+
+**TEZGÂHIN KENDİSİ DE BİR KUSUR VERDİ.** İlk yazımda üç fixture **aynı dizini**
+paylaşıyordu ve senaryolar kapanış olarak sonda koştuğu için hepsi **son yazılan**
+içeriği görüyordu; tezgâh, bekçi doğru çalışırken "engellemiyor" diyordu. Her
+fixture kendi dizinine alındı. Bozuk tezgâh, tezgâhsızlıktan kötüdür (24.08 dersi).
 
 ### KAPANDI — 25.08 · P1 · CANLI SAĞLIK DENETİMİ → İKİ GERÇEK KUSUR
 Bugün ~80 fonksiyon sürümü deploy edildi; §11-B gereği canlı sistem denetlendi.
