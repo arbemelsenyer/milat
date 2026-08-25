@@ -121,21 +121,23 @@ serve(async (req) => {
     }
 
     // In-app notifications
-    await supabase.rpc("create_notification", {
+    const { error: bildirimErr } = await supabase.rpc("create_notification", {
       p_user_id: caseData.user_id,
       p_title: isEn ? "Mediator Assigned" : "Arabulucu Atandı",
       p_message: isEn ? `${mediatorName} assigned to your case.` : `${mediatorName} başvurunuza atandı.`,
       p_type: "mediator_assigned",
       p_link: "/dashboard",
     });
+    if (bildirimErr) console.error("[send-assignment-notification] bildirim gönderilemedi:", bildirimErr.message);
 
-    await supabase.rpc("create_notification", {
+    const { error: bildirimErr2 } = await supabase.rpc("create_notification", {
       p_user_id: mediatorId,
       p_title: isEn ? "New Case" : "Yeni Başvuru",
       p_message: isEn ? `You've been assigned to "${caseTitle}".` : `"${caseTitle}" başvurusu size atandı.`,
       p_type: "mediator_assigned",
       p_link: "/mediator",
     });
+    if (bildirimErr2) console.error("[send-assignment-notification] bildirim gönderilemedi:", bildirimErr2.message);
 
     return new Response(JSON.stringify({ success: true }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {

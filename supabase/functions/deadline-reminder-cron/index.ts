@@ -53,13 +53,14 @@ Deno.serve(async (req) => {
     const targets = [c.user_id, c.assigned_mediator_id].filter(Boolean) as string[];
     for (const uid of targets) {
       try {
-        await admin.rpc("create_notification", {
+        const { error: bildirimErr } = await admin.rpc("create_notification", {
           p_user_id: uid,
           p_title: "⏰ Süre bitişine 3 gün kaldı",
           p_message: `${c.application_no ?? "Başvuru"} — "${c.title ?? ""}" için yasal arabuluculuk süresi ${new Date(dl).toLocaleDateString("tr-TR")} tarihinde doluyor.`,
           p_type: "warning",
           p_link: `/mediation?case=${c.id}`,
         });
+        if (bildirimErr) console.error("[deadline-reminder-cron] bildirim gönderilemedi:", bildirimErr.message);
       } catch (_) { /* continue */ }
     }
     /* İŞARET ZORUNLUDUR: yukarıdaki sorgu `deadline_warning_sent=false` ile

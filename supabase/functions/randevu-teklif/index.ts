@@ -501,13 +501,14 @@ async function oturumDavetiGonder(
   try {
     const mediatorId = arabulucuId;
     if (mediatorId) {
-      await admin.rpc("create_notification", {
+      const { error: bildirimErr } = await admin.rpc("create_notification", {
         p_user_id: mediatorId,
         p_title: "Randevu onaylandı, davet gönderildi",
         p_message: "Randevu onaylandı, davet gönderildi.",
         p_type: "info",
         p_link: null,
       });
+      if (bildirimErr) console.error("[randevu-teklif] bildirim gönderilemedi:", bildirimErr.message);
     }
   } catch (e) {
     console.error("[randevu-teklif] bildirim yazılamadı", (e as any)?.message ?? e);

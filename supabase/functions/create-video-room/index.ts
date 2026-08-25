@@ -222,13 +222,14 @@ serve(async (req) => {
 
     // Send notifications using the database function
     for (const notif of notifications) {
-      await supabase.rpc('create_notification', {
+      const { error: bildirimErr } = await supabase.rpc('create_notification', {
         p_user_id: notif.user_id,
         p_title: notif.title,
         p_message: notif.message,
         p_type: notif.type,
         p_link: notif.link,
       });
+      if (bildirimErr) console.error("[create-video-room] bildirim gönderilemedi:", bildirimErr.message);
     }
 
     return new Response(

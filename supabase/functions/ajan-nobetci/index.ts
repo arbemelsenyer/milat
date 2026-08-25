@@ -197,13 +197,14 @@ async function arabulucuyaBildir(admin: any, dosya: any, baslik: string, mesaj: 
   const hedef = takvimSahibi(dosya);
   if (!hedef) return;
   try {
-    await admin.rpc("create_notification", {
+    const { error: bildirimErr } = await admin.rpc("create_notification", {
       p_user_id: hedef,
       p_title: baslik,
       p_message: mesaj,
       p_type: "info",
       p_link: `/cases/${dosya.id}`,
     });
+    if (bildirimErr) console.error("[ajan-nobetci] bildirim gönderilemedi:", bildirimErr.message);
   } catch (e: any) {
     console.error(`[ajan-nobetci] bildirim yazılamadı (${dosya.id}): ${e?.message ?? e}`);
   }
@@ -2716,12 +2717,13 @@ async function bilirkisiKollari(admin: any, dosya: any): Promise<BilirkisiOzet> 
           .select("user_id").eq("id", expertId).maybeSingle();
         if ((uzman as any)?.user_id) {
           try {
-            await admin.rpc("create_notification", {
+            const { error: bildirimErr2 } = await admin.rpc("create_notification", {
               p_user_id: (uzman as any).user_id,
               p_title: "Bilirkişi raporu bekleniyor",
               p_message: "Görevi kabul ettiğiniz dosyada rapor henüz teslim edilmedi.",
               p_type: "info", p_link: "/bilirkisi",
             });
+            if (bildirimErr2) console.error("[ajan-nobetci] bildirim gönderilemedi:", bildirimErr2.message);
           } catch (e: any) {
             ozet.sebepler.push(`bilirkişiye hatırlatma yazılamadı: ${e?.message ?? e}`);
           }

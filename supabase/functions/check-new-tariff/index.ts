@@ -89,24 +89,26 @@ Deno.serve(async (req) => {
     if (matches.length > 0) {
       const first = matches[0];
       for (const a of admins ?? []) {
-        await admin.rpc("create_notification", {
+        const { error: bildirimErr } = await admin.rpc("create_notification", {
           p_user_id: a.user_id,
           p_title: `📢 ${nextYear} Arabuluculuk Asgari Ücret Tarifesi yayınlandı`,
           p_message: `${first.title} — fee_tariffs tablosunu güncelleyin. Kaynak: ${first.url}`,
           p_type: "warning",
           p_link: "/admin?tab=tariff",
         });
+        if (bildirimErr) console.error("[check-new-tariff] bildirim gönderilemedi:", bildirimErr.message);
         notified++;
       }
     } else {
       for (const a of admins ?? []) {
-        await admin.rpc("create_notification", {
+        const { error: bildirimErr2 } = await admin.rpc("create_notification", {
           p_user_id: a.user_id,
           p_title: `⏳ ${nextYear} tarifesi henüz yayınlanmadı`,
           p_message: `Resmi Gazete'de ${nextYear} arabuluculuk asgari ücret tarifesi bulunamadı. Ocak başına kadar tekrar kontrol edin.`,
           p_type: "info",
           p_link: "/admin?tab=tariff",
         });
+        if (bildirimErr2) console.error("[check-new-tariff] bildirim gönderilemedi:", bildirimErr2.message);
         notified++;
       }
     }

@@ -294,13 +294,14 @@ serve(async (req) => {
         if (izErr) console.error("[send-meeting-invite] davet izi yazılamadı", { party_id: p.id, error: izErr.message });
 
         if (p.user_id) {
-          await admin.rpc("create_notification", {
+          const { error: bildirimErr } = await admin.rpc("create_notification", {
             p_user_id: p.user_id,
             p_title: "Toplantı Daveti Gönderildi",
             p_message: `${typeLabel} — ${dateStr} ${timeStr}`,
             p_type: "info",
             p_link: `/cases/${session.case_id}`,
           });
+          if (bildirimErr) console.error("[send-meeting-invite] bildirim gönderilemedi:", bildirimErr.message);
         }
       } catch (e: any) {
         const msg = e?.message ?? "Bilinmeyen hata";

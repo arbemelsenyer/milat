@@ -252,13 +252,14 @@ serve(async (req) => {
         });
         if (izErr) console.error("[cancel-meeting-invite] iptal izi yazılamadı", { party_id: p.id, error: izErr.message });
         if (p.user_id) {
-          await admin.rpc("create_notification", {
+          const { error: bildirimErr } = await admin.rpc("create_notification", {
             p_user_id: p.user_id,
             p_title: "Toplantı İptal Edildi",
             p_message: `${typeLabel} — ${dateStr} ${timeStr} iptal edildi.`,
             p_type: "warning",
             p_link: `/cases/${session.case_id}`,
           });
+          if (bildirimErr) console.error("[cancel-meeting-invite] bildirim gönderilemedi:", bildirimErr.message);
         }
       } catch (e: any) {
         const msg = e?.message ?? "Bilinmeyen hata";

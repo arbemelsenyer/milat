@@ -344,6 +344,43 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     expect(ciplak, `sonucu okunmayan yazım: ${ciplak.join(" | ")}`).toEqual([]);
   });
 
+  it("bildirim ve depo çağrıları da sessiz değil (rpc/storage da FIRLATMAZ)", () => {
+    // `.from(...)` gibi `.rpc(...)` ve `.storage...` da hata FIRLATMAZ. Bildirim
+    // sessizce duserse muhatap olayi HIC duymaz — sistem "haber verdim" sayar.
+    const BILDIREN = [
+      "ajan-nobetci", "cancel-meeting-invite", "check-new-tariff", "create-video-room",
+      "deadline-reminder-cron", "randevu-teklif", "send-assignment-notification",
+      "send-meeting-invite",
+    ];
+    for (const ad of BILDIREN) {
+      const g = oku(ad);
+      expect(g, `${ad}: bildirim sonucu okunmuyor`).toContain("bildirimErr");
+      expect(g, `${ad}: hata kayda düşmüyor`).toContain("bildirim gönderilemedi");
+    }
+    // Depo silmesi: kayit satirlari SILINDI; silme duserse dosya OKSUZ kalir ve
+    // hicbir silme kolu onu bir daha bulamaz (KVKK: suresiz saklama yasagi).
+    const d = oku("admin-delete-knowledge");
+    expect(d, "depoErr okunmuyor").toContain("depoErr");
+    expect(d).toContain("öksüz dosya");
+  });
+
+  it("TARAMA: çıplak rpc / storage çağrısı da kalmadı", () => {
+    const kok = KOK ? `${KOK}/supabase/functions` : "supabase/functions";
+    const ciplak: string[] = [];
+    for (const ad of readdirSync(kok, { withFileTypes: true })) {
+      if (!ad.isDirectory()) continue;
+      const yol = `${kok}/${ad.name}/index.ts`;
+      if (!existsSync(yol)) continue;
+      readFileSync(yol, "utf-8").split(String.fromCharCode(10)).forEach((l, i) => {
+        // `has_role` gibi SALT OKUMA rpc'leri kapsam dışı: sonucu zaten `data` ile okunur.
+        if (/^\s*await\s+(admin|sb|supabase|client|finalAdmin)\.(rpc\(|storage[.\s])/.test(l)) {
+          ciplak.push(`${ad.name}:${i + 1}`);
+        }
+      });
+    }
+    expect(ciplak, `sonucu okunmayan çağrı: ${ciplak.join(" | ")}`).toEqual([]);
+  });
+
   it("anlatım defteri (_shared/anlatim.ts): yazım düşerse konsola düşüyor", () => {
     // Dosyanin kendi sozu "[anlatim] yazilamadi" logudur — ama catch hic
     // calismadigi icin o log HIC dusmuyordu. 35 islev bu katmani kullaniyor.
