@@ -4,18 +4,19 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P1 · ön yüz sessiz yazımları (4 dosya)**
-- **SESSİZ YAZIM KUSURU HEM KENARDA HEM ÖN YÜZDE KAPANDI.** Kenarda (`_shared`
-  dâhil) çıplak `await <istemci>.from(...)` yazımı **SIFIR**; ön yüzde
-  `tests/sessiz-yazim.test.ts` **DONDURULMUŞ listesi BOŞ**. İkisi de tarama
-  testiyle kilitlendi.
+- Son tamamlanan iş: **P1 · ön yüzde sessiz depo çağrıları (4 yer)**
+- **SESSİZ ÇAĞRI KUSURU ÜÇ CEPHEDE DE KAPANDI:** kenar (`_shared` dâhil) ·
+  ön yüz · `rpc`/`storage`. Kenarda çıplak `.from(...)`, `.rpc(...)` ve
+  `.storage` çağrısı **SIFIR**; ön yüzde `tests/sessiz-yazim.test.ts`
+  **DONDURULMUŞ listesi BOŞ**. Üçü de tarama testiyle kilitlendi.
 - **12. blokta biten işler (sırayla):** `53b33cc` P1 `taraf-kalem-cikar` ·
   `37c8867` P1 `dual-ai-validate` + `orchestrator-run` · `32fad07` P1
   `akis-yurut` · `a3de13f` P0 `ajan-nobetci` (15 yer) · `04547a5` kayıt ·
   `62e99b6` P1 kalan 16 yazım (13 işlev) · `69b8bde` P2 `agent_states` (25 yer) ·
   `19be6fe` P2 `_shared/anlatim.ts` (3 yer, 35 işlev fan-out) · `cc0acbb` kayıt ·
-  `10bdb83` P1 ön yüz (4 dosya).
-- Doğrulama: `npm run test` **264/264** · tsc temiz · lint **2333** · `npm run build` temiz
+  `10bdb83` P1 ön yüz (4 dosya) · `4f16648` kayıt · `1233489` P1 sessiz `rpc`
+  + depo (12 yer, 9 işlev) · `bc558eb` P1 ön yüz depo çağrıları (4 yer).
+- Doğrulama: `npm run test` **267/267** · tsc temiz · lint **2333** · `npm run build` temiz
   (taban 2334'tü; `randevu-teklif`te bir `any` kaldırıldı)
 - **Açık blokaj: yok**
 - **REDEPLOY DURUMU (§11-B):**
@@ -30,12 +31,35 @@
   - OK `10bdb83` · **ön yüz (`src/**`)** — Lovable `deploy_project` ile publish
     edildi. `get_project` doğruladı: `latest_commit_sha=10bdb833…`,
     `is_published=true`, canlı sayfa açılıyor.
-  - **Bekleyen redeploy YOK.**
+  - OK `1233489` · **9 işlev** (sessiz `rpc` + `storage`) — deploy edildi ve
+    `get_message` ile doğrulandı.
+  - `bc558eb` · **ön yüz depo çağrıları** — publish istendi
+    (deployment `5fc3ff82`), sonucu doğrulanacak.
 - Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9**.
 - Sıradaki uygulanabilir iş: **kuyruk boş.** Sessiz yazım kusuru kenarda ve ön
   yüzde kapandı, iki tezgâh da kilitli. Yeni P0/P1 adayı kodun gerçek
   durumundan çıkarılmalı. En yakın aday: **H-8 ölü yüzey öbeğinin silinmesi**
   (37 dosya) — ama silme kararı kurucudadır, HAT'ta açık bekliyor.
+
+### KAPANDI — 25.08 · P1 · ÖN YÜZDE SESSİZ DEPO ÇAĞRILARI (4 YER)
+`MediationEngine` **canlı** yüzeydir. `deleteDoc` depodaki dosyayı silmeye
+çalışıyor, sonucu **okumadan** kayıt satırını siliyordu: depo silmesi sessizce
+düşerse dosya **öksüz** kalır — hiçbir kayıt onu göstermez, hiçbir silme kolu
+bulamaz (constitution m.10). Sıra düzeltildi: **depo silmesi doğrulanmadan satır
+silinmiyor.** Üç geri-alma yolu (yükleme sonrası satır yazılamazsa dosyayı geri
+alan silme) da artık düşerse kayda geçiyor.
+
+### KAPANDI — 25.08 · P1 · SESSİZ `rpc` VE DEPO ÇAĞRILARI (12 YER · 9 İŞLEV)
+Kusur `.from(...)` ile sınırlı değilmiş: **`.rpc(...)` ve `.storage...` da hata
+FIRLATMAZ.** `orchestrator-run`da bu bulununca ağaç yeniden tarandı.
+
+| yer | sessiz kalırsa |
+|---|---|
+| 11 × `create_notification` (8 işlev) | Muhatap olayı **hiç duymaz** ama sistem "haber verdim" sayar: süre uyarısı, oturum daveti/iptali, randevu teklifi, atama bildirimi, yeni tarife uyarısı — hepsi sessizce buharlaşabiliyordu. |
+| `admin-delete-knowledge` · `storage.remove` | Kayıt satırları **silindi**; depo silmesi düşerse dosya **öksüz** kalır ve artık hiçbir kayıt onu göstermediği için hiçbir silme kolu onu bir daha bulamaz — constitution m.10 süresiz saklama yasağına aykırı. |
+
+**Kapsam dışı bırakılan:** `has_role` gibi **salt okuma** rpc'leri — sonuçları
+zaten `data` ile okunuyor, yazım değiller. Tarama deseni bunları dışlıyor.
 
 ### KAPANDI — 25.08 · P1 · ÖN YÜZ SESSİZ YAZIMLARI (4 DOSYA)
 Aynı kusur sınıfı `src/` tarafında da duruyordu. `tests/sessiz-yazim.test.ts`
