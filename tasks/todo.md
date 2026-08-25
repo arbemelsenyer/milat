@@ -4,7 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P1 · KVKK silmesi depoyu da temizliyor**
+- Son tamamlanan iş: **P1 · PİLOT İŞ LİSTESİ ÇIKARILDI (13 madde + 5 kabul şartı)**
 - **SESSİZ ÇAĞRI KUSURU İSTEMCİ YÜZEYİNİN TAMAMINDA KAPANDI:** `.from` ·
   `.rpc` · `.storage` · `.functions.invoke` · iç `fetch`. Kenar (`_shared`
   dâhil) ve ön yüz. Kenarda çıplak `.from(...)`, `.rpc(...)` ve
@@ -56,7 +56,8 @@
   **H-11 (P0 · kabuk bekçisi devre dışı — kanıtlı)** · **H-12 (P1 · depoda
   birikmiş öksüz belgeler — kök neden kapandı, birikmiş borç kurucu kararı bekliyor)**.
   **H-1 KAPANDI** (25.08, `CRON_SECRET` yenilendi ve canlıda doğrulandı).
-- Sıradaki uygulanabilir iş: **kuyruk boş.** Sessiz yazım kusuru kenarda ve ön
+- Sıradaki uygulanabilir iş: **PİLOT KUYRUĞU** (aşağıda, 13 madde).
+  En üstteki: taraf katılım ekranında aydınlatma metni. ESKİ NOT: Sessiz yazım kusuru kenarda ve ön
   yüzde kapandı, iki tezgâh da kilitli. Yeni P0/P1 adayı kodun gerçek
   durumundan çıkarılmalı. En yakın aday: **H-8 ölü yüzey öbeğinin silinmesi**
   (37 dosya) — ama silme kararı kurucudadır, HAT'ta açık bekliyor.
@@ -78,6 +79,97 @@ Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
 - **Sıradaki oturumun ilk işi:** `tasks/HAT.md` → `## COWORK → CODE` oku;
   cevap gelmişse uygula. Cevap yoksa kuyruk boş olduğu için yeni P0/P1 adayı
   kodun gerçek durumundan çıkarılır (§6).
+
+
+## PİLOT KUYRUĞU — Aşama 1 kapanışı (25.08.2026'da çıkarıldı)
+
+**Kaynak:** `mimari/15-kabul-kriterleri.md` §15.2 (Aşama 1 kapanışı, 13 kalem) +
+§15.5 (pilot blokerleri) + §15.1 (beş kabul şartı). `tasks/yol-haritasi.md` düz
+anlatıdır, iş listesi değildir — köprü burada kuruldu.
+
+**Kapsam sınırı:** yalnız **Aşama 1** (arabulucular / ilk pilot). §15.3 (Aşama 2
+dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmadı.**
+
+**TOPLAM: 14 madde** — 9'u iş, 5'i canlı doğrulama (P1: 7 · P2: 6 · P3: 1) · **+5 kabul şartı** (§15.1, her madde için ayrı).
+
+> Ayrıca kuyrukta pilot dışı **1** eski madde duruyor (P3 · `oturum-kayitlari` dar
+> okuma politikası, HAT H-4). O madde bu listenin **2. maddesine bağlıdır**: kayıt
+> hattı yazılınca yol düzeni belli olur ve politika ancak o zaman yazılabilir.
+
+### Listeye ALINMAYANLAR (§15.2'de var ama yapılmış — kanıtlı)
+| kalem | kanıt |
+|---|---|
+| Arabulucular arası veri sızmıyor | 22.07 kapandı; HAT **H-6** guard'ı belirsiz öbeğe de uyguladı, ARŞİV'de |
+| Davet e-postası kendi alan adından | v0.33 · 23.07 kapandı, `info@milatmediation.com` canlı teslim kanıtlı |
+| Arabulucu onboarding (§15.5-3) | 22.07 kapandı |
+| Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
+
+### Kuyruk
+- [ ] P1 · **Taraf katılım ekranında aydınlatma metni yok** · Kabul: `/katilim/:token`
+      sayfasında (`KatilimCevap.tsx`) KVKK aydınlatma metni gösteriliyor ve taraf
+      onaylamadan katılım tamamlanmıyor; metin `Auth.tsx`teki mevcut metinle aynı
+      kaynaktan geliyor (ikinci kopya yazılmıyor) · **Bulgu:** `KatilimCevap.tsx`te
+      "aydinlatma/KVKK" geçen **0** satır; §15.2 "taraf kayıt ekranında gösteriliyor"
+      diyor. Arabulucu tarafında (`Auth.tsx`) metin VAR.
+- [ ] P1 · **Oturum kaydı hattı yok (ses → döküm → föy)** · Kabul: arabulucu oturum
+      sonrası notu **hem yazılı hem sesli** girebiliyor; ses `oturum-kayitlari` kovasına
+      yükleniyor, `oturum_kayitlari.ses_dosya_yolu` doluyor, döküm `dokum_metni`ne
+      yazılıyor ve arabulucunun **onayıyla** föye/analiz zincirine giriyor ·
+      **Bulgu:** şema hazır (11 kolon) ve silme kolu çalışıyor, ama kovanın kodda
+      tek tüketicisi silme kolu — **yükleme yolu hiç yazılmamış.** HAT **H-4** de
+      bu hattı bekliyor (yol düzeni belirlenince dar okuma politikası yazılacak).
+- [ ] P1 · **Saklama süresi parametre tablosu + periyodik imha yok** · Kabul: saklama
+      süreleri bir parametre tablosundan okunuyor (kodda sabit değil) ve süresi dolan
+      kayıtlar periyodik olarak imha ediliyor; imha kayda geçiyor · **Bulgu:**
+      `Auth.tsx`te imha **metni** var ama mekanizma yok; parametre tablosu yok;
+      periyodik imha yalnız oturum kaydı için (24 saat) kurulu. constitution m.10.
+- [ ] P1 · **Arabulucunun kendi anteti / IBAN'ı / şablonu yok** · Kabul: arabulucu
+      kendi antetini, IBAN'ını ve belge şablonunu bir kez tanımlıyor; üretilen
+      tutanak/anlaşma/fatura bu değerleri kullanıyor · **Bulgu:** `mediators`
+      tablosunda antet/IBAN/şablon kolonu **yok** (var olanlar: photo_url, bio,
+      hourly_rate…); `invoice-pdf.ts` `data.mediatorIban` bekliyor ama kaynağı belirsiz.
+- [ ] P1 · **UDEF belge zinciri yok** · Kabul: UDEF çıktısı üretiliyor ve canlı test
+      geçiyor · **Bulgu:** "UDEF" yalnız `mimari/` belgelerinde geçiyor, **kodda sıfır**.
+      Tutanak/anlaşma tarafı kurulu (25 dosya).
+- [ ] P1 · **Üyelik / paket / kota modeli yok** · Kabul: paket tanımlı, kota sayılıyor,
+      kota dolunca ilgili işlem engelleniyor ve kullanıcıya sebebi gösteriliyor ·
+      **Bulgu:** üyelik/paket/kota tablosu **yok**, kodda karşılığı yok
+      ("subscription" eşleşmeleri Supabase auth dinleyicileri).
+      **NOT:** ürün/fiyat kararı gerektirir — başlamadan önce HAT'a çıkarılmalı (§7.2).
+- [ ] P1 · **Kazanım sayacı yok** · Kabul: baz çizgi alınıyor ve dosya bazında kazanılan
+      saat üretiliyor · **Bulgu:** tablo yok, kodda karşılığı yok ("baseline"
+      eşleşmeleri CSS sınıf adları). **NOT:** "kazanım" tanımı ürün kararıdır.
+- [ ] P2 · **Ödeme defteri "Kaydet" görünürlüğü — son doğrulama** (§15.5-4, tek açık
+      bloker) · Kabul: ödeme defterinde satır ekleme/düzenleme/silme canlıda uçtan uca
+      çalışıyor ve Kaydet düğmesi her durumda görünür · **Bulgu:** `case_payments`
+      (17 kolon) ve `fee_tariffs` şeması var; §15.5'te "son doğrulama" olarak açık.
+- [ ] P2 · **Ücret hesabı tarife tabanının altına inmiyor** · Kabul: tarife tabanının
+      altında bir ücret kaydedilemiyor; deneme reddediliyor ve sebebi gösteriliyor.
+
+### Canlı doğrulama maddeleri (kod değil, kanıt üretir)
+- [ ] P2 · **§3 otomatik doldurma tam mı** · Kabul: gerçek bir dosyada §3 kalemlerinin
+      hepsi otomatik doluyor; dolmayan kalem varsa adıyla listeleniyor.
+- [ ] P2 · **Orchestrator gerçek dosyada dört adımı tamamlıyor, uydurma künye yok** ·
+      Kabul: gerçek dosyada dört adım `completed`; üretilen raporlarda kaynak künyesi
+      **birebir** doğrulanıyor, uydurma künye **sıfır**.
+- [ ] P2 · **Dava şartı dosyalarında bilgilendirme belgelemesi üretiliyor** · Kabul:
+      dava şartı işaretli bir dosyada bilgilendirme belgesi üretiliyor ve indirilebiliyor.
+- [ ] P2 · **Taraf akışı telefonda uçtan uca** · Kabul: gerçek telefonda davet →
+      başvuru → belge → Kör Teklif → ödeme bilgisi zinciri kesintisiz tamamlanıyor.
+- [ ] P3 · **Kullanılabilirlik bulguları (03.08 saha notu)** · Kabul: dosya açılış formu
+      sayfa boşta kalınca içerik kaybetmiyor; açılır menüler klavyeyle gezilebiliyor ve
+      seçenekler erişilebilirlik ağacında görünüyor.
+
+### §15.1 — BEŞ KABUL ŞARTI (her madde için ayrı ayrı sağlanmalı)
+Bir kalem, aşağıdaki **beşi birden** sağlanmadan "bitti" sayılmaz:
+1. **Gizlilik** (§14) — kör veri sınırı korunuyor mu
+2. **Camdan kutu** — kaynak gösteriliyor · veri yoksa "yeterli veri yok" deniyor ·
+   künye temizleyici çalışıyor
+3. **İnsan üstünlüğü** — manuel giriş ajanı ezer
+4. **Canlı test** — kurucunun gözüyle, gerçek veriyle
+5. **Kırıntı yok** — yarım yüzey, ölü düğme, boş panel bırakılmadı
+
+---
 
 ### KAPANDI — 25.08 · P1 · KVKK SİLMESİ DEPOYU DA TEMİZLİYOR
 **Nasıl bulundu.** Bugün kodda *öksüz dosya* üretilmesini engelledim ama
