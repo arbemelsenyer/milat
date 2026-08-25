@@ -330,7 +330,15 @@ Deno.serve(async (req) => {
     admin.from("case_sessions").select("*").eq("case_id", case_id).order("scheduled_at", { ascending: true }).limit(1),
     admin.from("case_fees").select("*").eq("case_id", case_id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     caseRow.assigned_mediator_id
-      ? admin.from("profiles").select("full_name").eq("user_id", caseRow.assigned_mediator_id).maybeSingle()
+      /* ANTET (mimari §3: "arabulucu kimliği/adresi ... belgelere otomatik akar").
+         `select("*")` BİLEREK: antet kolonları (`buro_adi` · `buro_adresi` ·
+         `antet_logo_url`) henüz göçle eklenmedi (HAT H-15/2,
+         `tests/gecici/antet-alanlari.sql`). Olmayan bir kolonu ADIYLA seçmek
+         sorguyu düşürür ve belge üretimini komple kırardı; `*` ile kod
+         göçten ÖNCE de SONRA da çalışır — kolonlar gelince kendiliğinden dolar.
+         Çekilen satır arabulucunun KENDİ profilidir ve yalnız bu belgeye
+         basılır; taraf verisi değildir. */
+      ? admin.from("profiles").select("*").eq("user_id", caseRow.assigned_mediator_id).maybeSingle()
       : Promise.resolve({ data: null } as any),
     admin.from("case_process_tracker").select("buro_no, arb_no").eq("case_id", case_id).maybeSingle(),
   ]);
@@ -359,6 +367,12 @@ Deno.serve(async (req) => {
     ? fmtDate(caseRow.deadline_extended || caseRow.deadline_total)
     : "";
 
+  /* Antet alanları: göç gelmeden `undefined` gelir ve boş basılır (§15.1 —
+     veri yoksa uydurma yok). Dar tip, `any` kullanmadan okumayı sağlar. */
+  const antet = (profile ?? {}) as {
+    buro_adi?: string | null; buro_adresi?: string | null; antet_logo_url?: string | null;
+  };
+
   const filled = fillTemplate(tpl.template_content, {
     dosya_no: caseRow.application_no || caseRow.uyap_no || "",
     buro_no: (tracker as any)?.buro_no || "",
@@ -374,7 +388,7 @@ Deno.serve(async (req) => {
        veri yoksa "yeterli veri yok" denir, uydurulmaz (§15.1 camdan kutu). */
     gorevlendirme_tarihi: "",
     tutanak_tarihi: new Date().toLocaleDateString("tr-TR"),
-    tutanak_yeri: "",
+    tutanak_yeri: antet.buro_adresi || "",
     anlasma_konusu: caseRow.issue_description || caseRow.title || "",
     anlasma_bedeli: caseRow.agreement_amount ? String(caseRow.agreement_amount) : "",
     agreement_terms: caseRow.agreement_terms || "",
@@ -383,6 +397,12 @@ Deno.serve(async (req) => {
     session_date,
     fee_block,
     mediator_name: (profile as any)?.full_name || "",
+    /* ANTET ALANLARI — göç gelmeden `undefined` gelir ve boş basılır; §15.1
+       "veri yoksa uydurma" ilkesi: eksik alan BOŞ kalır, yerine başka bir şey
+       konmaz. `tutanak_yeri` de büro adresinden dolar (eskiden sabit boştu). */
+    buro_adi: antet.buro_adi || "",
+    buro_adresi: antet.buro_adresi || "",
+    antet_logo_url: antet.antet_logo_url || "",
     outcome: outcome || "",
     closed_at: fmtDate(caseRow.closed_at),
     dava_sarti_son_tarih: davaSartiSonTarih,

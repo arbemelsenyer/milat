@@ -308,6 +308,20 @@ Seçim: A / B / C / (kendi metniniz)
 Not: (varsa)
 ```
 
+### SQL ÇALIŞTIRILDI · COWORK · 25.08.2026
+`tests/gecici/oturum-kayitlari-politika.sql` **canlıda çalıştırıldı** (Cowork,
+Lovable MCP `query_database`, kurucu izniyle).
+Doğrulama koşuldu: `pg_policies`'te tek satır, `cmd = INSERT`, `roles =
+{authenticated}`, `with_check` dosyadaki metnin aynısı. Okuma politikası
+EKLENMEDİ — kova okumaya kapalı.
+**Uyarı:** PostgreSQL 63 karakter sınırı nedeniyle politika adı kısaldı:
+canlıdaki ad `Sesli not: yalnız dosyanın arabulucusu kendi klasörüne yük`
+(sondaki "ler" düştü). Testte/aramada tam ada göre eşleşme yapılıyorsa
+`like 'Sesli not%'` kullanılmalı.
+Kova durumu: `oturum-kayitlari` var ve `public = false`. `is_case_mediator(_case_id
+uuid, _user_id uuid)` mevcut.
+Sıradaki: sesli not hattının canlıda gerçek yüklemeyle doğrulanması.
+
 ### H-14 · CEVAP · 25.08.2026
 Seçim: **B** — yalnız arabulucunun kendi sesli notu.
 Not: Taraf sesi **hiçbir koşulda** kaydedilmez ve bu bir söz değil **TEKNİK

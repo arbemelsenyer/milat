@@ -168,35 +168,37 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       `get_message` ile doğrulandı). Tablo kurulmadığı için şu an açıkça
       "parametre tablosu henüz kurulmamış" diyor; sessizce "temiz" demiyor.
 
-- [!] P1 · **Arabulucunun kendi anteti / şablonu** · **BLOCKED → HAT H-15/2** (ürün) · **IBAN ÇÖZÜLDÜ:** `profiles.iban`/`banka_adi` var ve ödeme bilgisi PDF'ine akıyor. Kalan **antet/logo** (profilde kolon yok) ve arabulucuya özel şablon (şablonlar admin tarafından genel yükleniyor). Önerim A: antet eklensin, şablon genel kalsın.
-      · **GÖÇ METNİ YAZILDI** (Code yazdı, çalıştırmadı — §10):
-      `tests/gecici/antet-alanlari.sql` → `profiles`e `buro_adi` ·
-      `buro_adresi` · `antet_logo_url`. Göç çalıştıktan sonra Code'un işi tek
-      adım: `generate-official-document` bugün `profiles`ten yalnız `full_name`
-      çekiyor; select genişler, doldurma haritasına üç alan girer ve
-      `tutanak_yeri` büro adresinden dolar (bugün sabit boş). Kolonlar var
-      olmadan yazılamaz — olmayan kolonu seçmek sorguyu düşürür. Kalan: · Kabul: arabulucu
-      kendi antetini, IBAN'ını ve belge şablonunu bir kez tanımlıyor; üretilen
-      tutanak/anlaşma/fatura bu değerleri kullanıyor · **Bulgu:** `mediators`
-      tablosunda antet/IBAN/şablon kolonu **yok** (var olanlar: photo_url, bio,
-      hourly_rate…); `invoice-pdf.ts` `data.mediatorIban` bekliyor ama kaynağı belirsiz.
-- [x] P1 · **UDF belge zinciri** · **DONE 25.08.2026 — KURULUYMUŞ, MADDE HATALI
-      AÇILMIŞTI** · Doğrulama: `tests/belge-motoru.test.ts` · 301/301 test
-      · **Neden yanlış açıldı:** yol haritasında yazım **"UDEF"**; kodda ve
-      gerçekte format **UDF** (UYAP Doküman Formatı). Yanlış dizgeyle aradığım
-      için "sıfır kod" sanmıştım.
-      · **Gerçek durum:** `generate-official-document` UDF XML'i **gerçek UYAP
-      şemasıyla** üretiyor (`format_id="1.8"`, karakter — bayt değil — ofsetli
-      run'lar; Türkçe karakterlerin kaymaması için `Array.from` uzunluğu).
-      Gerçek bir UYAP çıktısına karşı doğrulanmış (`ornek_gercek.udf.udf`).
-      İstemci `OfficialDocumentsPanel`de **pdf · docx · udf** üçünü de sunuyor;
-      tüketici şablonu zincirde var.
+- [!] P1 · **Arabulucunun kendi anteti / şablonu** · **KOD YARISI BİTTİ ·
+      BLOCKED → HAT H-15/2** (yalnız göçün çalıştırılması) · 338/338 test
+      · **IBAN ÇÖZÜLDÜ:** `profiles.iban`/`banka_adi` var, ödeme bilgisi PDF'ine
+      `get_case_mediator_payment_info` ile akıyor.
+      · **ANTET KODU YAZILDI ve göçten ÖNCE de çalışıyor:**
+      `generate-official-document` artık `profiles`i `select("*")` ile çekiyor.
+      Olmayan bir kolonu **adıyla** seçmek sorguyu düşürür ve belge üretimini
+      komple kırardı; `*` ile kod göçten önce de sonra da çalışır — kolonlar
+      gelince alanlar **kendiliğinden** dolar. Doldurma haritasına `buro_adi` ·
+      `buro_adresi` · `antet_logo_url` girdi ve **`tutanak_yeri` artık büro
+      adresinden doluyor** (eskiden sabit boştu).
+      · **Kalan:** `tests/gecici/antet-alanlari.sql` çalıştırılacak. Arabulucuya
+      özel ŞABLON kapsam dışı (H-15/2 önerisi A: şablon genel kalır).
 
-- [!] P1 · **Üyelik / paket / kota** · **BLOCKED → HAT H-15/3** (ticari) · Önerim: **pilotta kota YOK** (pilot 5–10 arabuluculu, 3 ay ücretsiz; kota pilot verisi olmadan yanlış kurulur). Bu seçilirse madde pilot kapısından düşer. Kalan: · Kabul: paket tanımlı, kota sayılıyor,
-      kota dolunca ilgili işlem engelleniyor ve kullanıcıya sebebi gösteriliyor ·
-      **Bulgu:** üyelik/paket/kota tablosu **yok**, kodda karşılığı yok
-      ("subscription" eşleşmeleri Supabase auth dinleyicileri).
-      **NOT:** ürün/fiyat kararı gerektirir — başlamadan önce HAT'a çıkarılmalı (§7.2).
+- [!] P1 · **Üyelik / paket / kota** · **KOD YARISI BİTTİ · BLOCKED → HAT H-15/3**
+      (yalnız paket/limit DEĞERLERİ) · Doğrulama: `tests/kota-kapisi.test.ts`
+      (7 durum) · 338/338 test
+      · **Engel aşıldı — karar veriye taşındı:** *"pilotta kota yok"* da bir
+      **veri durumudur** (`limit_deger` NULL = sınırsız). Kurucu hiçbir şey
+      girmezse sistem bugünkü gibi çalışır; kota istendiğinde **kod değişmeden**
+      değer girilir.
+      · **Kapı kazara kimseyi kilitlemiyor (tezgâhla kilitli):** limit NULL →
+      sınırsız · kota satırı yok → sınırsız · tablo hiç yok → sınırsız ·
+      sınır aşılsa bile **varsayılan engellemez** (`dolunca='uyar'`) ·
+      kota uygulanmıyorsa kullanım **boşuna sayılmaz**.
+      · **FAIL-OPEN BİLİNÇLİ:** kota **ticari** bir sınırdır, güvenlik sınırı
+      değil. Kota okunamayınca arabulucunun işini durdurmak, sınırı aşmasına
+      izin vermekten daha zararlıdır. (Güvenlik kapıları fail-closed'dır.)
+      · **Kalan:** paket/limit değerleri (göç: `tests/gecici/kota-tablosu.sql`,
+      pilot paketi dört kota türünde de SINIRSIZ kurulu).
+
 - [!] P1 · **Kazanım sayacı** · **KOD YARISI BİTTİ · BLOCKED → HAT H-15/4**
       (yalnız katsayı DEĞERLERİ) · Doğrulama: `tests/kazanim-sayaci.test.ts`
       (9 durum) · 331/331 test
