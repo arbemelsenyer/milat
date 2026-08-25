@@ -177,4 +177,32 @@ describe("sessiz yutulan veritabanı yazımı eklenmiyor", () => {
     // Geri alma yollari da kayda duser.
     expect(m).toContain("öksüz dosya");
   });
+
+  it("functions.invoke sonucu da okunuyor (invoke işlev hatasında REDDETMEZ)", () => {
+    /* EN İNCE TUZAK: `invoke` işlev düzeyi hatada (500 vb.) REDDETMEZ —
+       `{ data, error }` ile ÇÖZÜLÜR. Yani `try { await invoke() } catch {}`
+       ve `.catch(...)` yalnız TAŞIMA hatasını yakalar; sunucunun döndürdüğü
+       hata bu yollardan HİÇ görünmez. */
+    const ATESLE_UNUT = [
+      "src/pages/CaseRoom.tsx",
+      "src/pages/ExpertWitness.tsx",
+      "src/pages/MediationEngine.tsx",
+    ];
+    for (const d of ATESLE_UNUT) {
+      const g = readFileSync(y(d), "utf-8");
+      const i = g.indexOf("extract-document-text");
+      expect(i, `${d}: çağrı bulunamadı`).toBeGreaterThan(-1);
+      // Cagrinin hemen ardinda `{ error }` okuyan bir `.then` olmali.
+      const blok = g.slice(i, i + 400);
+      expect(blok, `${d}: invoke sonucu okunmuyor — yalnız .catch var`)
+        .toMatch(/\.then\(\(\{\s*error\s*\}\)/);
+      expect(blok).toContain("çalıştırılamadı");
+    }
+    // Bekleyen cagrilarda bos/etkisiz catch kalmamali.
+    const a = readFileSync(y("src/pages/AdminDashboard.tsx"), "utf-8");
+    expect(a, "atama/rol bildirimlerinin sonucu okunmuyor").toContain("bildirimErr");
+    expect(a, "boş catch duruyor").not.toContain("} catch {}");
+    const k = readFileSync(y("src/components/admin/KnowledgeBaseAdmin.tsx"), "utf-8");
+    expect(k, "iş sürdürme sonucu okunmuyor").toContain("devamErr");
+  });
 });

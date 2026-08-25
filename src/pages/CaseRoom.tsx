@@ -321,6 +321,9 @@ export default function CaseRoom() {
     if (insErr) { toast({ title: "Kayıt hatası", description: insErr.message, variant: "destructive" }); return; }
     // Metin çıkarma: beklemesiz (fire-and-forget) — yüklemeyi bloklamaz, hata sessizce loglanır.
     supabase.functions.invoke("extract-document-text", { body: { document_id: inserted?.id } })
+      .then(({ error }) => {
+        if (error) console.error("[extract-document-text] çalıştırılamadı", error.message);
+      })
       .catch((e) => console.error("[extract-document-text] tetiklenemedi", e));
     toast({ title: "Belge yüklendi" });
     await loadAll();

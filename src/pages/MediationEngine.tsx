@@ -3282,6 +3282,9 @@ function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection,
         }
         // Metin çıkarma: beklemesiz (fire-and-forget) — yüklemeyi bloklamaz, hata sessizce loglanır.
         supabase.functions.invoke("extract-document-text", { body: { document_id: inserted?.id } })
+          .then(({ error }) => {
+            if (error) console.error("[extract-document-text] çalıştırılamadı", error.message);
+          })
           .catch((err) => console.error("[extract-document-text] tetiklenemedi", err));
       }
       toast({ title: "Belge yüklendi" });
@@ -4967,6 +4970,9 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
         }
         // Metin çıkarma: beklemesiz (fire-and-forget) — yüklemeyi bloklamaz, hata sessizce loglanır.
         supabase.functions.invoke("extract-document-text", { body: { document_id: inserted?.id } })
+          .then(({ error }) => {
+            if (error) console.error("[extract-document-text] çalıştırılamadı", error.message);
+          })
           .catch((e) => console.error("[extract-document-text] tetiklenemedi", e));
       }
       toast({ title: "Belge yüklendi" });

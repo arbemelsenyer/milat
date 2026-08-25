@@ -96,6 +96,9 @@ export default function ExpertWitness() {
       if (docError) throw docError;
       // Metin çıkarma: beklemesiz (fire-and-forget) — yüklemeyi bloklamaz, hata sessizce loglanır.
       supabase.functions.invoke('extract-document-text', { body: { document_id: inserted?.id } })
+        .then(({ error }) => {
+          if (error) console.error('[extract-document-text] çalıştırılamadı', error.message);
+        })
         .catch((e) => console.error('[extract-document-text] tetiklenemedi', e));
 
       setResult(parsed);

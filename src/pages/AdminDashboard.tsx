@@ -180,11 +180,22 @@ export default function AdminDashboard() {
       });
     }
 
-    // Notify case owner + mediator
+    /* Notify case owner + mediator. `invoke` İŞLEV düzeyi hatada REDDETMEZ,
+       `{error}` ile çözülür — aşağıdaki catch yalnız taşıma hatasını yakalar.
+       Sessizce düşerse atama YAPILMIŞ olur ama ne dosya sahibi ne arabulucu
+       haberdar edilir; yönetici de bunu hiçbir yerden göremez. */
     try {
-      await supabase.functions.invoke('send-assignment-notification', {
+      const { error: bildirimErr } = await supabase.functions.invoke('send-assignment-notification', {
         body: { caseId: selectedCase.id, mediatorId: selectedMediatorId, language },
       });
+      if (bildirimErr) {
+        console.error('[AdminDashboard] atama bildirimi gönderilemedi:', bildirimErr.message);
+        toast({
+          title: language === 'tr' ? 'Atama yapıldı, bildirim gitmedi' : 'Assigned, notification failed',
+          description: bildirimErr.message,
+          variant: 'destructive',
+        });
+      }
     } catch (e) {
       console.error('Notification error:', e);
     }
@@ -212,10 +223,14 @@ export default function AdminDashboard() {
       });
     } else {
       try {
-        await supabase.functions.invoke('send-role-notification', {
+        // `invoke` işlev hatasında reddetmez; boş catch bunu HİÇ görmezdi.
+        const { error: bildirimErr } = await supabase.functions.invoke('send-role-notification', {
           body: { targetUserId: userId, role, action: 'added', language },
         });
-      } catch {}
+        if (bildirimErr) console.error('[AdminDashboard] rol eklendi bildirimi gönderilemedi:', bildirimErr.message);
+      } catch (e) {
+        console.error('[AdminDashboard] rol bildirimi tetiklenemedi:', e);
+      }
       toast({ title: language === 'tr' ? 'Rol Eklendi' : 'Role Added' });
       fetchAllUsers();
       fetchData();
@@ -239,10 +254,14 @@ export default function AdminDashboard() {
       return;
     }
     try {
-      await supabase.functions.invoke('send-role-notification', {
+      // `invoke` işlev hatasında reddetmez; boş catch bunu HİÇ görmezdi.
+      const { error: bildirimErr } = await supabase.functions.invoke('send-role-notification', {
         body: { targetUserId: userId, role, action: 'removed', language },
       });
-    } catch {}
+      if (bildirimErr) console.error('[AdminDashboard] rol kaldırıldı bildirimi gönderilemedi:', bildirimErr.message);
+    } catch (e) {
+      console.error('[AdminDashboard] rol bildirimi tetiklenemedi:', e);
+    }
     toast({ title: language === 'tr' ? 'Rol Kaldırıldı' : 'Role Removed' });
     fetchAllUsers();
     fetchData();

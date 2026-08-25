@@ -129,9 +129,15 @@ export function KnowledgeBaseAdmin() {
       if (current.processed_books >= current.total_books) return;
       resumingRef.current = current.id;
       try {
-        await supabase.functions.invoke("build-knowledge-base", {
+        /* `invoke` İŞLEV düzeyi hatada REDDETMEZ, `{error}` ile çözülür —
+           aşağıdaki catch yalnız taşıma hatasını yakalıyordu. Sessizce
+           düşerse iş "running" durumunda SONSUZA DEK asılı kalır: bu döngü
+           her 5 sn'de yeniden dener, hiçbir yere iz düşmez ve yönetici
+           bilgi tabanının neden ilerlemediğini göremez. */
+        const { error: devamErr } = await supabase.functions.invoke("build-knowledge-base", {
           body: { resume_job_id: current.id },
         });
+        if (devamErr) console.error("[KnowledgeBaseAdmin] iş sürdürülemedi:", devamErr.message);
       } catch (e) {
         console.error("resume failed", e);
       } finally {
