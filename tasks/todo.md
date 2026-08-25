@@ -151,9 +151,18 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       tutanak/anlaşma/fatura bu değerleri kullanıyor · **Bulgu:** `mediators`
       tablosunda antet/IBAN/şablon kolonu **yok** (var olanlar: photo_url, bio,
       hourly_rate…); `invoice-pdf.ts` `data.mediatorIban` bekliyor ama kaynağı belirsiz.
-- [ ] P1 · **UDEF belge zinciri yok** · Kabul: UDEF çıktısı üretiliyor ve canlı test
-      geçiyor · **Bulgu:** "UDEF" yalnız `mimari/` belgelerinde geçiyor, **kodda sıfır**.
-      Tutanak/anlaşma tarafı kurulu (25 dosya).
+- [x] P1 · **UDF belge zinciri** · **DONE 25.08.2026 — KURULUYMUŞ, MADDE HATALI
+      AÇILMIŞTI** · Doğrulama: `tests/belge-motoru.test.ts` · 301/301 test
+      · **Neden yanlış açıldı:** yol haritasında yazım **"UDEF"**; kodda ve
+      gerçekte format **UDF** (UYAP Doküman Formatı). Yanlış dizgeyle aradığım
+      için "sıfır kod" sanmıştım.
+      · **Gerçek durum:** `generate-official-document` UDF XML'i **gerçek UYAP
+      şemasıyla** üretiyor (`format_id="1.8"`, karakter — bayt değil — ofsetli
+      run'lar; Türkçe karakterlerin kaymaması için `Array.from` uzunluğu).
+      Gerçek bir UYAP çıktısına karşı doğrulanmış (`ornek_gercek.udf.udf`).
+      İstemci `OfficialDocumentsPanel`de **pdf · docx · udf** üçünü de sunuyor;
+      tüketici şablonu zincirde var.
+
 - [ ] P1 · **Üyelik / paket / kota modeli yok** · Kabul: paket tanımlı, kota sayılıyor,
       kota dolunca ilgili işlem engelleniyor ve kullanıcıya sebebi gösteriliyor ·
       **Bulgu:** üyelik/paket/kota tablosu **yok**, kodda karşılığı yok
@@ -178,26 +187,26 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       **Yeniden yazılmadı** — tezgâh gerilemeye karşı kilitledi.
 
 ### Canlı doğrulama maddeleri (kod değil, kanıt üretir)
-- [ ] P2 · **§3 otomatik doldurma tam mı** · Kabul: gerçek bir dosyada §3 kalemlerinin
-      hepsi otomatik doluyor; dolmayan kalem varsa adıyla listeleniyor.
-- [x] P2 · **Orchestrator dört adımı tamamlıyor, uydurma künye yok** ·
-      **DONE 25.08.2026 (zaten kuruluymuş — canlı kanıtlandı ve kilitlendi)** ·
-      Doğrulama: `tests/orkestrator-kunye.test.ts` (6 durum) · 296/296 test
-      · **CANLI KANIT:** `agent_states` sorgusu — **BEŞ gerçek dosyada** dört adımın
-      dördü de `completed` (classify_dispute · deadline_detect · party_analysis
-      taraf başına · common_ground), orkestratör satırı da `completed`.
-      · **KÜNYE BEKÇİSİ PROMPT RİCASI DEĞİL, DETERMİNİSTİK:** modelin gerçekten
-      gördüğü bağlamda **birebir** geçmeyen Yargıtay/BAM esas-karar numaraları
-      çıktıdan sökülüyor (`sanitizeCitationHallucinations` + `citationInContext`);
-      doğrulanamayan `precedents` kaydı filtreyle **atılıyor**, `sanitizeStringsDeep`
-      ile tüm alanlar taranıyor, kaç künye silindiği kayda düşüyor.
-      · **ZİNCİRİN İKİ UCUNDA DA VAR** — bu kritik: `common-ground-report`, taraf
-      analizindeki künyeyi "taraf düzeyinde denetlenmiş" sayıp bağlam kabul ediyor;
-      taraf ucunda (`party-confidential-analysis`) denetim olmasaydı denetlenmemiş
-      künye rapora **meşru bağlam diye** girerdi. İkisinde de var.
-      · İlk bakışta "rapor denetimsiz" sanmıştım (`sinirDenetle` orada yok); daha
-      derin okuyunca amaca özel **ayrı** bir bekçi olduğu görüldü. Yanlış bulgu
-      bildirilmedi.
+- [x] P2 · **§3 otomatik doldurma** · **DONE 25.08.2026 (doğrulandı, bir tuzak
+      kaldırıldı)** · Doğrulama: `tests/belge-motoru.test.ts` (5 durum) · 301/301
+      · **Dolan alanlar** kayıtlı veriden geliyor: dosya no · büro no · arb no ·
+      başvuru tarihi · anlaşma konusu/bedeli/şartları · taraf bloğu (vekil, vergi
+      dairesi vb. `partyBlock` ile) · oturum tarihi · ücret bloğu · arabulucu adı ·
+      sonuç · kapanış · dava şartı son tarihi.
+      · **KALDIRILAN TUZAK:** `gorevlendirme_tarihi` alanına `created_at` (kaydın
+      oluşturulma anı) basılıyordu — tutanakta **başka bir tarihi** "görevlendirme
+      tarihi" diye göstermek olgu uydurmaktır (H-9'daki "Dosya Atama Tarihi"
+      kusuruyla aynı aile). §3 bunu zaten **manuel** alan sayıyor ve şemada kolonu
+      yok. Boş bırakıldı (§15.1 camdan kutu). Bugün hiçbir şablon bu alanı
+      kullanmıyor — görünür etkisi yok, ama şablon eklendiğinde tuzak kendiliğinden
+      kurulurdu.
+      · **IBAN İNCELENDİ, DOĞRU DAVRANIŞ ZATEN VARDI:** 47 şablonun 7'sinde "IBAN"
+      geçiyor ama bunlar `{{iban}}` yer tutucusu **değil**, Bakanlık şablonlarındaki
+      **noktalı elle doldurma alanları** (`TR …………`). Üstelik 7'nin 6'sında IBAN
+      **tarafa** ait (kim kime ödeyecek), arabulucuya değil — sistemde taraf IBAN'ı
+      tutulmuyor. Otomatik doldurmak **yanlış** olurdu; §3.4'ün düzenlenebilir
+      taslak akışına aittir. Arabulucunun kendi IBAN'ı ödeme bilgisi PDF'ine
+      `get_case_mediator_payment_info` ile **zaten akıyor**.
 
 - [ ] P2 · **Dava şartı dosyalarında bilgilendirme belgelemesi üretiliyor** · Kabul:
       dava şartı işaretli bir dosyada bilgilendirme belgesi üretiliyor ve indirilebiliyor.

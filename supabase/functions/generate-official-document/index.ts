@@ -353,7 +353,15 @@ Deno.serve(async (req) => {
     buro_no: (tracker as any)?.buro_no || "",
     arb_no: (tracker as any)?.arb_no || "",
     basvuru_tarihi: fmtDate(caseRow.application_date || caseRow.created_at),
-    gorevlendirme_tarihi: fmtDate(caseRow.created_at),
+    /* GÖREVLENDİRME TARİHİ UYDURULMAZ. mimari §3 bunu MANUEL alan sayar
+       ("dava şartı: UYAP'tan okunup girilir"); şemada karşılığı olan bir kolon
+       YOK. Eskiden buraya `created_at` (kaydın oluşturulma anı) konuyordu —
+       tutanakta "görevlendirme tarihi" diye BAŞKA bir tarihi basmak olgu
+       uydurmaktır (H-9'daki "Dosya Atama Tarihi" kusuruyla aynı aile).
+       Bugün hiçbir şablon bu alanı kullanmıyor, yani görünür etkisi yok; ama
+       bir şablon eklendiğinde tuzak kendiliğinden kurulurdu. Boş bırakılıyor:
+       veri yoksa "yeterli veri yok" denir, uydurulmaz (§15.1 camdan kutu). */
+    gorevlendirme_tarihi: "",
     tutanak_tarihi: new Date().toLocaleDateString("tr-TR"),
     tutanak_yeri: "",
     anlasma_konusu: caseRow.issue_description || caseRow.title || "",
