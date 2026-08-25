@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/accordion";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2, Sparkles, Download, MessageSquare } from "lucide-react";
+import { SesliNotKaydi } from "@/components/mediation/SesliNotKaydi";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 
@@ -171,12 +172,21 @@ export function MeetingNotesPanel({ caseId, caseSummary }: { caseId: string; cas
           rows={6}
           placeholder="Görüşmede neler konuşuldu? Tarafların tutumları, yeni bilgiler, önemli noktalar..."
         />
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-3 flex-wrap">
           <p className="text-xs text-muted-foreground">AI, önceki notları ve analizleri de dikkate alır.</p>
-          <Button onClick={saveAndAnalyze} disabled={busy || !note.trim()}>
+          {/* SESLİ NOT (H-14/B): yalnız arabulucunun kendi mikrofonu. Çıkan metin
+              buradaki alana düşer; kaydı yine ARABULUCU onaylar (mevcut düğme). */}
+          <div className="flex items-center gap-2">
+            <SesliNotKaydi
+              caseId={caseId}
+              sessionId={sessionId === "none" ? null : sessionId}
+              onMetin={(m) => setNote((onceki) => (onceki.trim() ? `${onceki}\n\n${m}` : m))}
+            />
+            <Button onClick={saveAndAnalyze} disabled={busy || !note.trim()}>
             {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
-            Notu Kaydet ve Analiz Et
-          </Button>
+              Notu Kaydet ve Analiz Et
+            </Button>
+          </div>
         </div>
       </Card>
 
