@@ -219,7 +219,20 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       · **FAIL-OPEN BİLİNÇLİ:** kota **ticari** bir sınırdır, güvenlik sınırı
       değil. Kota okunamayınca arabulucunun işini durdurmak, sınırı aşmasına
       izin vermekten daha zararlıdır. (Güvenlik kapıları fail-closed'dır.)
-      · **Kalan:** paket/limit değerleri (göç: `tests/gecici/kota-tablosu.sql`,
+      · **KURUCUNUN İSTEDİĞİ SAYAÇ VE EKRAN YAPILDI (26.08):** "analiz
+      koşumlarını arabulucu bazında sayan tüketim + `/admin`de 'kim kaç analiz
+      tüketti' listesi" → `src/components/admin/AnalizTuketimi.tsx`, AdminDashboard'a
+      **Analiz tüketimi** sekmesi olarak bağlandı. Doğrulama:
+      `tests/analiz-tuketimi.test.ts` (6 durum) · 345/345 test.
+      · **Ayrı sayaç tablosu TUTULMADI:** tüketim çıktıların kendisinden sayılır.
+      İkinci bir sayaç tablosu ikinci bir doğruluk kaynağı yaratır ve ikisi
+      kaçınılmaz olarak birbirinden ayrılır. Bu sayede göç de gerekmedi.
+      · **Gizlilik:** ekran yalnız SAYI gösterir — dosya başlığı, taraf adı,
+      uyuşmazlık içeriği, tutar girmez (§14, m.1). Tezgâh bunu kilitliyor.
+      · **YAPILMAYAN (kurucu "pilot sonrası" dedi):** paket/fiyat ekranı, kota
+      engeli, aşım ücreti, ödeme entegrasyonu. Tezgâh bunların sızmadığını da
+      denetliyor.
+      · **Kalan:** paket/limit değerleri (göç `PILOT-KALAN-GOCLER.sql` Bölüm 3'te,
       pilot paketi dört kota türünde de SINIRSIZ kurulu).
 
 - [!] P1 · **Kazanım sayacı** · **KOD YARISI BİTTİ · BLOCKED → HAT H-15/4**

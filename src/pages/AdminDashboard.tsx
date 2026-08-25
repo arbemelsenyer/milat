@@ -6,13 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AnalizTuketimi } from '@/components/admin/AnalizTuketimi';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { AppNavbar } from '@/components/AppNavbar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, UserCog, Calendar, UserPlus, Trash2, Mail, ShieldAlert } from 'lucide-react';
+import { Loader2, Search, UserCog, Calendar, UserPlus, Trash2, Mail, ShieldAlert, BarChart3 } from 'lucide-react';
 import { KnowledgeBaseAdmin } from '@/components/admin/KnowledgeBaseAdmin';
 import { TariffAdmin } from '@/components/admin/TariffAdmin';
 import { TemplateAdmin } from '@/components/admin/TemplateAdmin';
@@ -381,6 +382,10 @@ export default function AdminDashboard() {
               <UserCog className="w-4 h-4" />
               {language === 'tr' ? 'Kullanıcılar' : 'Users'}
             </TabsTrigger>
+            <TabsTrigger value="tuketim" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Analiz tüketimi
+            </TabsTrigger>
             <TabsTrigger value="invite-logs" className="gap-2">
               <ShieldAlert className="w-4 h-4" />
               {language === 'tr' ? 'Davet Logları' : 'Invite Logs'}
@@ -542,6 +547,12 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             ))}
+          </TabsContent>
+
+          {/* HAT H-15/3: "sayaç çalışsın, engel olmasın" — pilotta kota yok,
+              tüketim yalnız sayılır (§13 kullanım sayaçları). */}
+          <TabsContent value="tuketim" className="space-y-4">
+            <AnalizTuketimi />
           </TabsContent>
 
           <TabsContent value="invite-logs" className="space-y-4">
