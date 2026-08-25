@@ -1069,8 +1069,20 @@ async function teklifDegerlendirYurut(admin: any, dosya: any, gerekce: string, p
   // saatler `sonuc` alanına HİÇ YAZILMIYORDU (randevu-teklif de okuyamıyordu).
   const hedefSatir = ((altSatir ?? []) as any[]).find((r) => String(r?.gerekce ?? "").includes(`[alternatif:${teklifId}]`));
   if (hedefSatir?.id) {
-    await admin.from("ajan_gorevleri")
+    /* 21.08 CANLI KUSURUNUN AYNISI SESSİZ YOLDAN: alternatif saatler `sonuc`a
+       yazılamazsa `randevu-teklif` onları OKUYAMAZ ve taraf "alternatif saat
+       yazıldı" der ama panoda hiçbir saat görünmez. Bu yüzden yazım düşerse
+       işlev "yapıldı" DEMEZ — görev bekliyor kalır, sonraki tur yeniden dener. */
+    const { error: altErr } = await admin.from("ajan_gorevleri")
       .update({ sonuc: JSON.stringify({ alternatifler: adaylar }) }).eq("id", hedefSatir.id);
+    if (altErr) {
+      console.error(`[ajan-nobetci] alternatif saatler yazılamadı (${hedefSatir.id}): ${altErr.message}`);
+      return {
+        durum: "bekliyor",
+        sonuc: `Alternatif saatler panoya yazılamadı: ${altErr.message}`.slice(0, 500),
+        alternatif: true,
+      };
+    }
   }
   return {
     durum: "yapildi",
@@ -1220,9 +1232,15 @@ async function soruHatirlatmaKollari(
       const govde: Record<string, unknown> = { case_id: dosya.id };
       if (soru.hedef_party_id) govde.party_id = soru.hedef_party_id;
       const r = await icFonksiyonCagir(kol[1], govde);
-      await admin.from("ajan_gorevleri")
+      /* "BİR KEZ" SÖZÜNÜ TUTAN İŞARET BUDUR (yukarıdaki `continue` bunu okur).
+         Sessizce düşerse kol HER TURDA yeniden uyandırılır. */
+      const { error: uyanErr } = await admin.from("ajan_gorevleri")
         .update({ sonuc: `${metin(soru.sonuc)} · kol yeniden uyandırıldı${r.ok ? "" : " (çalıştırılamadı)"}`.trim().slice(0, 500) })
         .eq("id", soru.id);
+      if (uyanErr) {
+        console.error(`[ajan-nobetci] uyandırma işareti yazılamadı (${soru.id}): ${uyanErr.message}`);
+        sebepler.push(`uyandırma işareti yazılamadı (${soru.id}) — ${kol[1]} tekrar uyandırılabilir`);
+      }
       if (r.ok) uyandirilan++;
       else sebepler.push(`cevaplanan soru sonrası ${kol[1]} çalıştırılamadı: ${r.sebep}`);
       continue;
@@ -1262,7 +1280,16 @@ async function soruHatirlatmaKollari(
 
     const yeniSonuc = `son hatırlatma: ${new Date().toISOString()} (${sayi}. hatırlatma)`;
     if (metin(soru.sonuc) === yeniSonuc) continue;   // aynı metin üst üste yazılmaz
-    await admin.from("ajan_gorevleri").update({ sonuc: yeniSonuc }).eq("id", soru.id);
+    /* HATIRLATMA SAYACI ZATEN E-POSTA GİTTİKTEN SONRA YAZILIR. Sessizce düşerse
+       sayaç hiç ilerlemez ve tarafa AYNI hatırlatma her nöbet turunda yeniden
+       gönderilir — bu bir sistem hatası değil, tarafın gözünde tacizdir. */
+    const { error: sayacErr } = await admin.from("ajan_gorevleri")
+      .update({ sonuc: yeniSonuc }).eq("id", soru.id);
+    if (sayacErr) {
+      console.error(`[ajan-nobetci] hatırlatma sayacı yazılamadı (${soru.id}): ${sayacErr.message}`);
+      sebepler.push(`hatırlatma sayacı yazılamadı (${soru.id}) — hatırlatma tekrarlanabilir`);
+      continue;
+    }
     hatirlatilan++;
   }
 
@@ -1557,12 +1584,21 @@ async function kuralOnerKollari(admin: any, dosya: any): Promise<{ acilan: numbe
       });
       if (error) { sebepler.push(`kural önerilemedi: ${error.message}`); continue; }
 
-      await admin.from("ajan_onerileri").insert({
+      /* KURAL SATIRI YAZILDI ama öneri satırı bu işlevin ARABULUCUYA GÖRÜNEN
+         yüzüdür: sessizce düşerse kural `etkin: false` olarak yazılmış hâlde
+         kalır ve arabulucu onu açması istendiğini HİÇ öğrenemez — kural
+         sonsuza dek ölü durur. */
+      const { error: oneriErr } = await admin.from("ajan_onerileri").insert({
         case_id: dosya.id, party_id: null, hedef: "arabulucu",
         baslik: `${adim} için bir kural öneriyorum`,
         gerekce: `${aciklama} Açayım mı?`,
         eylem_turu: "adim", eylem_adim: `kural:${kod}`, durum: "acik",
       });
+      if (oneriErr) {
+        sebepler.push(`kural yazıldı ama öneri sunulamadı (${kod}): ${oneriErr.message}`);
+        console.error(`[ajan-nobetci] kural önerisi yazılamadı (${kod}): ${oneriErr.message}`);
+        continue;
+      }
       acilan++;
     }
   } catch (e: any) {
@@ -1590,10 +1626,16 @@ async function aliskanlikKollari(admin: any, dosya: any): Promise<{ sebepler: st
       q.eq("case_id", dosya.id).eq("hedef", "arabulucu").eq("durum", "kapatildi"));
     const durdurma = await say("akis_duraklatma", (q: any) => q.eq("case_id", dosya.id));
 
+    // Alışkanlık sayacı düşerse öneri motoru eski sayıyla karar verir; iş
+    // durmaz ama sebep kayda geçer (sessiz sapma yok).
     const yaz = async (anahtar: string, sayac: number, sonDeger?: string) => {
-      await admin.from("arabulucu_aliskanliklari").upsert({
+      const { error: sayacErr } = await admin.from("arabulucu_aliskanliklari").upsert({
         mediator_id: mediatorId, anahtar, sayac, son_deger: sonDeger ?? null,
       }, { onConflict: "mediator_id,anahtar" });
+      if (sayacErr) {
+        console.error(`[ajan-nobetci] alışkanlık sayacı yazılamadı (${anahtar}): ${sayacErr.message}`);
+        sebepler.push(`alışkanlık sayacı yazılamadı (${anahtar})`);
+      }
     };
     await yaz("oneri_kabul", oneriKabul);
     await yaz("oneri_kapatildi", oneriKapatildi);
@@ -1634,11 +1676,15 @@ async function aliskanlikKollari(admin: any, dosya: any): Promise<{ sebepler: st
       const { data: varOlan } = await admin.from("ajan_onerileri")
         .select("id").eq("case_id", dosya.id).eq("baslik", baslik).limit(1);
       if (((varOlan ?? []) as any[]).length > 0) continue;
-      await admin.from("ajan_onerileri").insert({
+      const { error: tercihErr } = await admin.from("ajan_onerileri").insert({
         case_id: dosya.id, party_id: null, hedef: "arabulucu", baslik,
         gerekce: `Son dosyalarınızda bu adımın onayını ${n} kez kendiniz verdiniz.`,
         eylem_turu: "adim", eylem_adim: `tercih:${a}`, durum: "acik",
       });
+      if (tercihErr) {
+        sebepler.push(`tercih önerisi yazılamadı (${a}): ${tercihErr.message}`);
+        console.error(`[ajan-nobetci] tercih önerisi yazılamadı (${a}): ${tercihErr.message}`);
+      }
     }
   } catch (e: any) {
     sebepler.push(`alışkanlık sayımı yapılamadı: ${String(e?.message ?? e).slice(0, 120)}`);
@@ -1851,9 +1897,16 @@ async function ekOturumKararlariniIsle(admin: any, dosya: any): Promise<{ acilan
     const r = await randevuGoreviAc(admin, dosya);
     if (r.acildi) {
       acilan++;
-      await admin.from("ajan_gorevleri")
+      /* "KARAR BİR KEZ UYGULANIR" işareti (yukarıdaki `continue` bunu okur).
+         Sessizce düşerse randevu hattı HER TURDA yeniden başlatılır ve taraflara
+         mükerrer randevu teklifi gider. */
+      const { error: isaretErr } = await admin.from("ajan_gorevleri")
         .update({ sonuc: `${String(g?.sonuc ?? "Arabulucu onayladı")} · randevu hattı yeniden başlatıldı` })
         .eq("id", g.id);
+      if (isaretErr) {
+        console.error(`[ajan-nobetci] ek oturum işareti yazılamadı (${g.id}): ${isaretErr.message}`);
+        sebepler.push(`ek oturum işareti yazılamadı (${g.id}) — randevu hattı tekrar başlatılabilir`);
+      }
     } else if (r.sebep) {
       sebepler.push(`ek oturum randevusu açılamadı: ${r.sebep}`);
     }
@@ -1969,7 +2022,14 @@ async function braketKollari(admin: any, dosya: any, taraflar: any[]): Promise<B
       ozet.bant_sorusu_gonderildi++;
     }
     if (yazilan > 0) {
-      await admin.from("teklif_braketleri").update({ kosul_durumu: "soruldu" }).eq("id", b.id);
+      /* SORULDU DAMGASI: düşerse braket yeniden "sorulacak" sayılır ve tarafa
+         AYNI bant sorusu her nöbet turunda tekrar gider. */
+      const { error: damgaErr } = await admin.from("teklif_braketleri")
+        .update({ kosul_durumu: "soruldu" }).eq("id", b.id);
+      if (damgaErr) {
+        ozet.sebepler.push(`bant sorusu gönderildi ama 'soruldu' damgası yazılamadı — tekrar sorulabilir (${damgaErr.message})`);
+        console.error(`[ajan-nobetci] braket 'soruldu' damgası yazılamadı (${b.id}): ${damgaErr.message}`);
+      }
     }
   }
 
@@ -1993,8 +2053,15 @@ async function braketKollari(admin: any, dosya: any, taraflar: any[]): Promise<B
         { soru_id: c.id, bant_alt: braket.kosul_bant_alt, bant_ust: braket.kosul_bant_ust });
       if (yeniDurum === "dustu") ozet.taahhut_dustu++;
     }
-    await admin.from("braket_bant_sorulari")
+    /* İŞLENDİ DAMGASI: sorgu `islendi_at is null` ile taranır. Düşerse aynı
+       cevap her turda yeniden işlenir — taahhüt tekrar tekrar düşürülür ve
+       braket izine mükerrer satır yazılır. */
+    const { error: islendiErr } = await admin.from("braket_bant_sorulari")
       .update({ islendi_at: new Date().toISOString() }).eq("id", c.id);
+    if (islendiErr) {
+      ozet.sebepler.push(`bant cevabı işlendi damgası yazılamadı — mükerrer işleme riski (${islendiErr.message})`);
+      console.error(`[ajan-nobetci] 'islendi_at' yazılamadı (${c.id}): ${islendiErr.message}`);
+    }
   }
 
   return ozet;
@@ -2359,10 +2426,14 @@ async function videoBaglantiEpostasi(
 async function nobetciDurumYaz(admin: any, caseId: string, patch: Record<string, unknown>) {
   const { data: existing } = await admin.from("agent_states")
     .select("id").eq("case_id", caseId).eq("agent_type", "nobetci").is("party_id", null).maybeSingle();
-  if (existing?.id) {
-    await admin.from("agent_states").update(patch).eq("id", existing.id);
-  } else {
-    await admin.from("agent_states").insert({ case_id: caseId, agent_type: "nobetci", party_id: null, ...patch });
+  /* Koşum kaydı arabulucunun panelinde nöbetçinin çalıştığını gösterir.
+     Sessizce düşerse nöbetçi hiç koşmamış görünür — arabulucu sistemin
+     durduğunu sanar. İşi durdurmaz ama kayda düşer. */
+  const { error: durumErr } = existing?.id
+    ? await admin.from("agent_states").update(patch).eq("id", existing.id)
+    : await admin.from("agent_states").insert({ case_id: caseId, agent_type: "nobetci", party_id: null, ...patch });
+  if (durumErr) {
+    console.error(`[ajan-nobetci] nöbetçi koşum kaydı yazılamadı (${caseId}): ${durumErr.message}`);
   }
 }
 
@@ -2579,9 +2650,17 @@ async function bilirkisiKollari(admin: any, dosya: any): Promise<BilirkisiOzet> 
             + "arabulucunun adayını kabul etmiş sayıldı.",
         });
         if (yErr) { ozet.sebepler.push(`${alan}: sayım yazılamadı — ${yErr.message}`); continue; }
-        await admin.from("ajan_gorevleri")
+        /* GÖREV KAPANIŞI ZORUNLUDUR: yanıt satırı YAZILDI. Kapanış sessizce
+           düşerse görev 'bekliyor' kalır, sonraki tur aynı sayımı yeniden
+           yapar ve MÜKERRER `bilirkisi_taraf_yanitlari` satırı üretir —
+           üstelik iki tarafa da aynı bildirim tekrar gider. */
+        const { error: sayimKapatErr } = await admin.from("ajan_gorevleri")
           .update({ durum: "yapildi", sonuc: "beyana dayanarak kabul sayıldı" })
           .eq("id", g.id);
+        if (sayimKapatErr) {
+          ozet.sebepler.push(`${alan}: sayım görevi kapatılamadı — mükerrer sayım riski (${sayimKapatErr.message})`);
+          console.error(`[ajan-nobetci] sayım görevi kapatılamadı (${g.id}): ${sayimKapatErr.message}`);
+        }
 
         // İKİ TARAFA DA yazılır (komut §1).
         const { data: tumTaraflar } = await admin.from("case_parties")
@@ -3194,8 +3273,14 @@ Deno.serve(async (req) => {
           if (!YURUTULEN_TIPLER.includes(gorev.gorev_tipi)) continue;
           // Taraf ajanı görevlerinde hedef taraf ZORUNLUDUR (kör veri kapısı).
           if (TARAF_TIPLERI.includes(gorev.gorev_tipi) && !gorev.hedef_party_id) {
-            await admin.from("ajan_gorevleri")
+            // Atlama damgası düşerse görev 'bekliyor' kalır ve her turda yeniden
+            // aynı kapıya çarpar; sayaç boşuna artar.
+            const { error: atlaErr } = await admin.from("ajan_gorevleri")
               .update({ durum: "atlandi", sonuc: "Hedef taraf yok" }).eq("id", gorev.id);
+            if (atlaErr) {
+              console.error(`[ajan-nobetci] atlandı damgası yazılamadı (${gorev.id}): ${atlaErr.message}`);
+              hatalar.push(`${dosya.id}: atlandı damgası yazılamadı`);
+            }
             atlananGorev++;
             continue;
           }
@@ -3223,10 +3308,23 @@ Deno.serve(async (req) => {
                             ? await ozelOturumYurut(admin, dosya, gorev.hedef_party_id)
                             : await soruGonder(admin, dosya.id, gorev.hedef_party_id);
           if (durum !== "bekliyor") {
-            await admin.from("ajan_gorevleri").update({ durum, sonuc }).eq("id", gorev.id);
+            /* EN AĞIRI: kuyruk `durum="bekliyor"` ile taranır. Bu kapanış sessizce
+               düşerse görev 'bekliyor' KALIR ve HER NÖBET TURUNDA yeniden yürütülür:
+               tarafa aynı e-posta tekrar tekrar gider, randevu yeniden teklif edilir,
+               aşama yeniden ilerletilmeye çalışılır. Sayaç da "yapıldı" der. */
+            const { error: kapatErr } = await admin.from("ajan_gorevleri")
+              .update({ durum, sonuc }).eq("id", gorev.id);
+            if (kapatErr) {
+              hatalar.push(`${dosya.id}: görev kapanışı yazılamadı (${gorev.gorev_tipi}) — tekrar yürütülebilir`);
+              console.error(`[ajan-nobetci] görev kapanışı yazılamadı (${gorev.id}): ${kapatErr.message}`);
+            }
           } else {
             // Yazılamadı: görev bekliyor kalır, neden sonuc alanına düşer.
-            await admin.from("ajan_gorevleri").update({ sonuc }).eq("id", gorev.id);
+            const { error: sebepErr } = await admin.from("ajan_gorevleri")
+              .update({ sonuc }).eq("id", gorev.id);
+            if (sebepErr) {
+              console.error(`[ajan-nobetci] görev sebebi yazılamadı (${gorev.id}): ${sebepErr.message}`);
+            }
             hatalar.push(`${dosya.id}: ${sonuc}`);
             console.error(`[ajan-nobetci] görev yürütülemedi (${gorev.id}): ${sonuc}`);
           }

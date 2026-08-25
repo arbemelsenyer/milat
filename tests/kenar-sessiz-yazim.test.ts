@@ -206,4 +206,33 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     // Zaten denetli olan asama yazimi bozulmamali.
     expect(g).toMatch(/const\s*\{\s*error:\s*uErr\s*\}\s*=\s*await\s+admin\.from\("cases"\)/);
   });
+
+  it("ajan-nobetci: görev kapanışı sessiz düşerse iş tekrar tekrar yürütülmüyor", () => {
+    // BU DOSYADAKI EN AGIR KUSUR: gorev kuyrugu `durum="bekliyor"` ile taranir.
+    // Ana yurutucunun kapanis yazimi sessizce duserse gorev 'bekliyor' KALIR ve
+    // HER NOBET TURUNDA yeniden yurutulur: tarafa ayni e-posta tekrar tekrar
+    // gider, randevu yeniden teklif edilir, asama yeniden ilerletilir.
+    const g = oku("ajan-nobetci");
+    // Ana yurutucu + atlama damgasi.
+    for (const im of ["kapatErr", "sebepErr", "atlaErr"]) expect(g, `${im} okunmuyor`).toContain(im);
+    expect(g).toContain("tekrar yürütülebilir");
+    // Tekrar-gonderim ureten damgalar: hatirlatma sayaci, uyandirma, ek oturum.
+    for (const im of ["sayacErr", "uyanErr", "isaretErr"]) expect(g, `${im} okunmuyor`).toContain(im);
+    expect(g, "hatırlatma tekrarı uyarısı yok").toContain("hatırlatma tekrarlanabilir");
+    // Mukerrer SATIR ureten kapanislar: bilirkisi sayimi ve braket cevabi.
+    for (const im of ["sayimKapatErr", "islendiErr", "damgaErr"]) expect(g, `${im} okunmuyor`).toContain(im);
+    expect(g).toContain("mükerrer sayım riski");
+    expect(g).toContain("mükerrer işleme riski");
+    // Alternatif saatler yazilamazsa islev "yapildi" DEMEZ (21.08 kusurunun sessiz hâli).
+    expect(g, "altErr okunmuyor").toContain("altErr");
+    expect(g).toMatch(/durum:\s*"bekliyor",\s*\n\s*sonuc:\s*`Alternatif saatler panoya yazılamadı/);
+    // Oneri ve sayac yazimlari.
+    for (const im of ["oneriErr", "tercihErr", "durumErr"]) expect(g, `${im} okunmuyor`).toContain(im);
+    // Bu dosyada CIPLAK `await admin.from(...)` yazimi kalmamali.
+    const ciplak = g.split(String.fromCharCode(10)).filter((l) => /^\s*await\s+admin\.from\(/.test(l));
+    expect(ciplak, `sonucu okunmayan yazım: ${ciplak.join(" | ")}`).toEqual([]);
+    // Zaten denetli olan yazimlar bozulmamali.
+    expect(g).toContain("video_link yazılamadı");
+    expect(g).toContain("bant sorusu yazılamadı");
+  });
 });

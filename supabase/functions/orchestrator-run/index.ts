@@ -205,8 +205,9 @@ Deno.serve(async (req) => {
           String((settled[1] as PromiseRejectedResult).reason?.message ?? (settled[1] as PromiseRejectedResult).reason).slice(0, 200));
       }
       // rpc {error} FIRLATMAZ: bildirim düşerse arabulucu zincirin durduğunu HİÇ duymaz.
-      const bildirim = settled[2].status === "fulfilled"
-        ? (settled[2] as PromiseFulfilledResult<any>).value
+      type RpcSonuc = { error?: { message?: string } | null } | void | null;
+      const bildirim: RpcSonuc = settled[2].status === "fulfilled"
+        ? (settled[2] as PromiseFulfilledResult<RpcSonuc>).value
         : null;
       if (settled[2].status === "rejected" || bildirim?.error) {
         console.error(`[orchestrator-run] arabulucuya "zincir durdu" bildirimi gönderilemedi:`,
