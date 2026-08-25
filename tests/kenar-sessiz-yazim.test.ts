@@ -183,4 +183,27 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     // Zaten denetli olan ana durum yazimlari bozulmamali.
     expect(g.match(/if\s*\(error\)\s*throw\s+error;/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
+
+  it("akis-yurut: talimat durumu ve koşum izi sessiz kalmıyor", () => {
+    // Talimat kuyrugu `durum="bekliyor"` ile taranir. Durum yazimi sessizce
+    // duserse talimat kuyrukta KALIR ve HER TURDA yeniden kosar:
+    //  - "uygulandi" duserse is her turda tekrarlanir, arabulucuya ayni onay
+    //    istegi tekrar tekrar gider.
+    //  - "deneme:1" duserse IKI DENEME SINIRI hic devreye girmez.
+    const g = oku("akis-yurut");
+    expect(g, "durumYaz yardımcısı yok").toContain("const durumYaz =");
+    expect(g, "talimat durum yazımının sonucu okunmuyor").toContain("durumErr");
+    // Durum yazilamadiysa panoya da yazilmamali (mukerrer mesaj).
+    expect(g).toContain("talimat kuyrukta kaldı");
+    expect(g).toMatch(/if\s*\(!await\s+durumYaz\(/);
+    // Defter/iz yazimlari da denetli.
+    for (const im of ["hataErr", "izErr", "kosumErr"]) expect(g, `${im} okunmuyor`).toContain(im);
+    expect(g).toContain("deneme sınırı sayılamadı");
+    expect(g).toContain("yeniden koşabilir");
+    // Bu dosyada CIPLAK `await admin.from(...)` yazimi kalmamali.
+    const ciplak = g.split(String.fromCharCode(10)).filter((l) => /^\s*await\s+admin\.from\(/.test(l));
+    expect(ciplak, `sonucu okunmayan yazım: ${ciplak.join(" | ")}`).toEqual([]);
+    // Zaten denetli olan asama yazimi bozulmamali.
+    expect(g).toMatch(/const\s*\{\s*error:\s*uErr\s*\}\s*=\s*await\s+admin\.from\("cases"\)/);
+  });
 });

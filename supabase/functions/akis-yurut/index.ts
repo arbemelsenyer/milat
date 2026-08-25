@@ -234,10 +234,17 @@ async function hataYaz(
       .select("id").eq("case_id", caseId).eq("gorev_tipi", "akis_hatasi")
       .eq("gerekce", gerekce).limit(1);
     if (((mevcut ?? []) as any[]).length > 0) return;
-    await admin.from("ajan_gorevleri").insert({
+    /* HATA KAYDI İKİ İŞ YAPAR: arabulucuya hatayı bildirir VE `İKİ DENEME
+       SINIRI` bu satırları sayar. Sessizce düşerse hata görünmez KALIR ve
+       sınır hiç dolmaz — aynı kural sonsuza dek yeniden denenir.
+       Aşağıdaki catch koruma DEĞİLDİR: supabase-js DB hatasını fırlatmaz. */
+    const { error: hataErr } = await admin.from("ajan_gorevleri").insert({
       case_id: caseId, gorev_tipi: "akis_hatasi", durum: "bekliyor",
       hedef_party_id: partyId, gerekce,
     });
+    if (hataErr) {
+      console.error(`[akis-yurut] hata kaydı yazılamadı (${caseId}): ${hataErr.message} — deneme sınırı sayılamadı`);
+    }
   } catch (e: any) {
     console.error("[akis-yurut] hata kaydı yazılamadı", String(e?.message ?? e).slice(0, 120));
   }
@@ -372,11 +379,18 @@ async function asamaIlerlet(admin: any): Promise<{ ilerletilen: number; notlar: 
       if (uErr) { notlar.push(`aşama yazılamadı (${dosya.id}): ${uErr.message}`); continue; }
 
       // Sohbetin okuduğu biçim: "[gecis:ESKİ->YENİ] sebep".
-      await admin.from("ajan_gorevleri").insert({
+      /* AŞAMA ZATEN İLERLEDİ (yukarıdaki `uErr` denetimli). Bu satır geçişin
+         SOHBETTEKİ ve DENETİMDEKİ izidir: sessizce düşerse aşama sessizce
+         değişmiş olur — ne taraf ne arabulucu neden ilerlediğini görebilir. */
+      const { error: izErr } = await admin.from("ajan_gorevleri").insert({
         case_id: dosya.id, gorev_tipi: "asama_gecisi", durum: "yapildi",
         hedef_party_id: null, gerekce: `${etiket} ${sebep}`.slice(0, 500),
         sonuc: "ajan ilerletti",
       });
+      if (izErr) {
+        console.error(`[akis-yurut] aşama geçişi izi yazılamadı (${dosya.id}): ${izErr.message}`);
+        notlar.push(`aşama ${mevcut}→${hedef} ilerledi ama geçiş kaydı yazılamadı (${dosya.id})`);
+      }
       ilerletilen++;
     }
   } catch (e: any) {
@@ -401,6 +415,22 @@ async function talimatlariYurut(
 ): Promise<{ uygulanan: number; reddedilen: number }> {
   let uygulanan = 0;
   let reddedilen = 0;
+  /* TALİMAT DURUMU SESSİZ KALAMAZ. Kuyruk `durum="bekliyor"` ile taranır: durum
+     yazımı sessizce düşerse talimat kuyrukta KALIR ve HER TURDA yeniden koşar.
+     - "uygulandi" düşerse: iş her turda yeniden yapılır, arabulucuya aynı onay
+       isteği tekrar tekrar gider.
+     - "uygulanamadi" düşerse: aynı ret mesajı panoya sonsuza dek düşer.
+     - "deneme:1" düşerse: İKİ DENEME SINIRI hiç devreye girmez.
+     Bu yüzden her durum yazımının sonucu okunur ve düşerse özete iz bırakır. */
+  const durumYaz = async (id: string, yama: Record<string, unknown>, ne: string): Promise<boolean> => {
+    const { error: durumErr } = await admin.from("arabulucu_talimatlari").update(yama).eq("id", id);
+    if (durumErr) {
+      console.error(`[akis-yurut] talimat durumu yazılamadı (${id}/${ne}): ${durumErr.message}`);
+      ozet.notlar.push(`talimat durumu yazılamadı (${id}): ${ne} — talimat kuyrukta kaldı`);
+      return false;
+    }
+    return true;
+  };
   try {
     const { data: talimatlar, error } = await admin.from("arabulucu_talimatlari")
       .select("id, case_id, hedef_adim, talimat, durum, sonuc_ozeti, created_at")
@@ -426,11 +456,14 @@ async function talimatlariYurut(
 
       // Talimat almayan adım: hesap işidir, metin üretmez.
       if (TALIMAT_ALMAYAN.includes(adim)) {
-        await admin.from("arabulucu_talimatlari").update({
+        const yazildi = await durumYaz(String(t.id), {
           durum: "uygulanamadi",
           red_sebebi: "Bu adım veriden hesaplanır.",
           karar_zamani: new Date().toISOString(),
-        }).eq("id", t.id);
+        }, "talimat almayan adım");
+        // Durum yazılamadıysa panoya da yazılmaz: talimat kuyrukta kaldığı için
+        // sonraki tur aynı mesajı tekrar üretir, arabulucu iki kez okur.
+        if (!yazildi) continue;
         await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
           "Bu talimatı uygulayamam — bu adım veriden hesaplanır.", `talimat:${t.id}`);
         reddedilen++;
@@ -438,23 +471,23 @@ async function talimatlariYurut(
       }
 
       if (!motoraBagliMi(adim)) {
-        await admin.from("arabulucu_talimatlari").update({
+        if (await durumYaz(String(t.id), {
           durum: "uygulanamadi",
           red_sebebi: "Bu adım ortak çalışma motoruna bağlı değil.",
           karar_zamani: new Date().toISOString(),
-        }).eq("id", t.id);
-        reddedilen++;
+        }, "motora bağlı değil")) reddedilen++;
         continue;
       }
 
       // ANAYASA ÜSTÜNDÜR: yasak isteyen talimat uygulanmaz.
       const denetim = talimatiDenetle(talimatMetni);
       if (!denetim.uygun) {
-        await admin.from("arabulucu_talimatlari").update({
+        const yazildi = await durumYaz(String(t.id), {
           durum: "uygulanamadi",
           red_sebebi: denetim.sebep,
           karar_zamani: new Date().toISOString(),
-        }).eq("id", t.id);
+        }, "anayasa denetimi");
+        if (!yazildi) continue;
         await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
           `Bu talimatı uygulayamam — ${denetim.sebep}.`, `talimat:${t.id}`);
         reddedilen++;
@@ -464,11 +497,12 @@ async function talimatlariYurut(
       const girdi = await girdiTamamla(admin, adim, { case_id: caseId });
       if (girdi.govdeler.length === 0) {
         const eksikMetni = girdi.eksik.length ? girdi.eksik.join(", ") : "gerekli bilgi";
-        await admin.from("arabulucu_talimatlari").update({
+        const yazildi = await durumYaz(String(t.id), {
           durum: "uygulanamadi",
           red_sebebi: `${eksikMetni} dosyada bulunamadı`,
           karar_zamani: new Date().toISOString(),
-        }).eq("id", t.id);
+        }, "girdi bulunamadı");
+        if (!yazildi) continue;
         await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
           `Bu talimatı uygulayamadım — ${eksikMetni} dosyada bulunamadı.`, `talimat:${t.id}`);
         reddedilen++;
@@ -489,27 +523,32 @@ async function talimatlariYurut(
            denemede de olmazsa talimat bırakılır ve sebebi yazılır. */
         const denemeVar = String(t.sonuc_ozeti ?? "").includes("deneme:1");
         if (denemeVar) {
-          await admin.from("arabulucu_talimatlari").update({
+          const yazildi = await durumYaz(String(t.id), {
             durum: "uygulanamadi",
             red_sebebi: `İki denemede de çalışmadı: ${sonSebep}`.slice(0, 500),
             karar_zamani: new Date().toISOString(),
-          }).eq("id", t.id);
+          }, "iki deneme tükendi");
+          if (!yazildi) continue;
           await panoyaYaz(admin, caseId, "arabulucu_onayi", null,
             "Bu talimatı iki denemede de uygulayamadım.", `talimat:${t.id}`);
           reddedilen++;
         } else {
-          await admin.from("arabulucu_talimatlari")
-            .update({ sonuc_ozeti: "deneme:1" }).eq("id", t.id);
+          // Bu iz yazılamazsa iki deneme sınırı HİÇ devreye girmez: talimat
+          // sonsuza dek "birinci deneme" sayılıp her turda yeniden koşar.
+          await durumYaz(String(t.id), { sonuc_ozeti: "deneme:1" }, "deneme izi");
           ozet.notlar.push(`talimat çalıştırılamadı (${caseId}): ${sonSebep}`);
         }
         continue;
       }
 
-      await admin.from("arabulucu_talimatlari").update({
+      /* EN AĞIRI: "uygulandi" damgası düşerse iş BAŞARIYLA yapılmıştır ama
+         talimat kuyrukta kalır — her turda motor yeniden koşar ve arabulucuya
+         aynı onay isteği tekrar tekrar gider. Damga atılamadıysa onay istenmez. */
+      if (!await durumYaz(String(t.id), {
         durum: "uygulandi",
         uygulanma_zamani: new Date().toISOString(),
         sonuc_ozeti: talimatOzeti(talimatMetni),
-      }).eq("id", t.id);
+      }, "uygulandı damgası")) continue;
 
       /* ONAYA SUNULUR: iş taraf yüzeyine çıkmadan arabulucunun sohbetine düşer.
          Onay satırı 'arabulucu_onayi' tipindedir; nöbetçi bu tipi yürütmez. */
@@ -864,11 +903,17 @@ Deno.serve(async (req) => {
 
         if (hepsiOldu) {
           ozet.calistirilan_kural++;
-          await admin.from("ajan_gorevleri").insert({
+          /* KOŞUM İZİ: iş YAPILDI. İz sessizce düşerse kural "hiç koşmamış"
+             görünür ve sonraki turda AYNI iş yeniden koşar (mükerrer üretim). */
+          const { error: kosumErr } = await admin.from("ajan_gorevleri").insert({
             case_id: caseId, gorev_tipi: "akis_kosuldu", durum: "yapildi",
             hedef_party_id: partyId,
             gerekce: `${etiket} ${fonksiyon} çalıştırıldı${girdi.govdeler.length > 1 ? ` (${girdi.govdeler.length} taraf)` : ""}`,
           });
+          if (kosumErr) {
+            console.error(`[akis-yurut] koşum izi yazılamadı (${caseId}/${kuralKodu}): ${kosumErr.message}`);
+            ozet.notlar.push(`${kuralKodu}: çalıştı ama koşum izi yazılamadı — yeniden koşabilir`);
+          }
         } else {
           /* SESSİZ BAŞARISIZLIK YOK. Bir deneme hakkı daha varsa olay açık kalır
              ve sonraki turda girdi yeniden tamamlanıp yeniden denenir. */
