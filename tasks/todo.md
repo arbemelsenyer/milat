@@ -149,11 +149,23 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       sınanamıyor (mikrofon ve `LOVABLE_API_KEY` gerekiyor; anahtar §12 gereği
       okunmaz). Kurucudan **tek somut kontrol** isteniyor (aşağıda).
 
-- [!] P1 · **Saklama süresi parametre tablosu + periyodik imha** · **BLOCKED → HAT H-15/1** (hukuki: süre değerleri) · Code göç metnini YAZDI, çalıştırmadı: `tests/gecici/saklama-suresi-politika.sql`. Tablo **değer olmadan** kuruluyor (`saklama_gun` NULL → imha kolu dokunmaz), karar gelmeden hiçbir şey silinmez. Kalan: · Kabul: saklama
-      süreleri bir parametre tablosundan okunuyor (kodda sabit değil) ve süresi dolan
-      kayıtlar periyodik olarak imha ediliyor; imha kayda geçiyor · **Bulgu:**
-      `Auth.tsx`te imha **metni** var ama mekanizma yok; parametre tablosu yok;
-      periyodik imha yalnız oturum kaydı için (24 saat) kurulu. constitution m.10.
+- [!] P1 · **Saklama süresi parametre tablosu + periyodik imha** ·
+      **KOD YARISI BİTTİ · BLOCKED → HAT H-15/1** (yalnız süre DEĞERLERİ, hukuki)
+      · Doğrulama: `tests/saklama-imha.test.ts` (9 durum) · 322/322 test
+      · **Yapılanlar:** (a) parametre tablosu göç metni
+      `tests/gecici/saklama-suresi-politika.sql` — Code yazdı, çalıştırmadı (§10);
+      (b) **periyodik imha kolu yazıldı**: `supabase/functions/saklama-imha`.
+      · **GÜVENLİ TASARIM (tezgâhla kilitli):** süre kodda **sabit değil**,
+      parametre tablosundan okunuyor · `saklama_gun` **NULL olan tür ATLANIR**,
+      yani kurucu süreleri girene kadar kol **hiçbir şey silmez** · silinecek
+      tablo adı **haritadan** gelir, parametre satırından değil (kötü/yanlış bir
+      satır rastgele tablo sildiremez) · **kapanmamış dosyaya dokunulmaz** ·
+      dosyanın kendisini silmez (o `dosya-verilerini-sil` kolunun işi) ·
+      `kuru: true` ile önce **ne silineceği görülebilir** · tablo yoksa sessizce
+      "temiz" demez, açıkça söyler · silme hataları yutulmaz.
+      · **Kalan:** her tür için gün sayısı (H-15/1'de öneri tablosu var) +
+      göçün çalıştırılması + günlük cron kaydı.
+
 - [!] P1 · **Arabulucunun kendi anteti / şablonu** · **BLOCKED → HAT H-15/2** (ürün) · **IBAN ÇÖZÜLDÜ:** `profiles.iban`/`banka_adi` var ve ödeme bilgisi PDF'ine akıyor. Kalan **antet/logo** (profilde kolon yok) ve arabulucuya özel şablon (şablonlar admin tarafından genel yükleniyor). Önerim A: antet eklensin, şablon genel kalsın. Kalan: · Kabul: arabulucu
       kendi antetini, IBAN'ını ve belge şablonunu bir kez tanımlıyor; üretilen
       tutanak/anlaşma/fatura bu değerleri kullanıyor · **Bulgu:** `mediators`
