@@ -4,7 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P1 · Stop kancası yanlış alarm döngüsü (§18-A)**
+- Son tamamlanan iş: **P1 · `CRON_SECRET` yenilendi (H-1 KAPANDI) + HAT yapı onarımı**
 - **SESSİZ ÇAĞRI KUSURU İSTEMCİ YÜZEYİNİN TAMAMINDA KAPANDI:** `.from` ·
   `.rpc` · `.storage` · `.functions.invoke` · iç `fetch`. Kenar (`_shared`
   dâhil) ve ön yüz. Kenarda çıplak `.from(...)`, `.rpc(...)` ve
@@ -50,8 +50,9 @@
   - OK `a27b221` · `extract-document-text` — deploy edildi ve doğrulandı.
     `get_project`: `latest_commit_sha=74ec5862…`, `is_published=true`.
   - **BEKLEYEN REDEPLOY YOK.**
-- Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9** · **H-10** ·
+- Açık HAT maddesi: **H-4** · **H-7** · **H-8** · **H-9** · **H-10** ·
   **H-11 (P0 · kabuk bekçisi devre dışı — kanıtlı, kurucu kararı bekliyor)**.
+  **H-1 KAPANDI** (25.08, `CRON_SECRET` yenilendi ve canlıda doğrulandı).
 - Sıradaki uygulanabilir iş: **kuyruk boş.** Sessiz yazım kusuru kenarda ve ön
   yüzde kapandı, iki tezgâh da kilitli. Yeni P0/P1 adayı kodun gerçek
   durumundan çıkarılmalı. En yakın aday: **H-8 ölü yüzey öbeğinin silinmesi**
@@ -74,6 +75,38 @@ Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
 - **Sıradaki oturumun ilk işi:** `tasks/HAT.md` → `## COWORK → CODE` oku;
   cevap gelmişse uygula. Cevap yoksa kuyruk boş olduğu için yeni P0/P1 adayı
   kodun gerçek durumundan çıkarılır (§6).
+
+### KAPANDI — 25.08 · P1 · `CRON_SECRET` YENİLENDİ (H-1 KAPANDI)
+Kurucu değeri üretti ve hem *Edge Functions → Secrets* hem *Vault* tarafında
+güncelledi. **Code değeri istemedi, görmedi, okumadı, hiçbir çıktıya yazmadı.**
+
+Canlı kanıt (`net._http_response`, salt okuma): `08:27–09:42` **200** ×29 →
+**`09:45:00` 401 ×1** → `09:48 · 09:51 · 09:54` **200** ×3. Bu, H-1'in A
+seçeneğinin peşinen kabul ettiği imzanın aynısıdır: *"en fazla bir nöbetçi turu
+(3 dk) 401; iş kaybı yok, tur yeniden koşar."* Tek 401'den sonra üç tur üst üste
+200 → yenileme başarılı. HAT H-1 **ARŞİV**e taşındı.
+
+**Sır hijyeni:** `net.http_request_queue` ve istek başlıkları **hiç
+sorgulanmadı** — `x-cron-secret` orada taşınır (§12).
+
+### KAPANDI — 25.08 · P2 · `tasks/HAT.md` YAPISAL OLARAK BOZUKTU
+H-1'i arşive taşırken çıktı: **H-7…H-11 maddeleri `## CODE → COWORK` başlığının
+ÜSTÜNDE**, giriş metninin içinde duruyordu. H-7'nin başlığı bir cümlenin ortasına
+yapışmıştı — giriş şöyle yarılmıştı:
+
+> "Cowork (ya da kurucu) cevabı `" + **[H-7…H-11 gövdeleri]** + "`## COWORK → CODE` bölümüne yazar."
+
+**Neden önemliydi:** `devam-bekcisi.py` bu dosyayı `^## ` başlıklarına bölerek
+okur. İlk başlığın üstünde kalan maddeler **hiçbir bölüme girmez** — yani beş
+açık madde bekçiye **görünmezdi**. Kanca bu yüzden yalnız H-1 ve H-4'ü
+işaretliyordu. Hasar benim değişikliğimden önce vardı; H-10/H-11 aynı yanlış
+çapaya yazıldığı için sıraya katılmıştı.
+
+**Onarım:** giriş cümlesi birleştirildi, beş madde `## CODE → COWORK` bölümüne
+H-4'ün ardına taşındı. Onarım öncesi hâl `tests/gecici/HAT-onarim-oncesi.md`de
+duruyor. Doğrulama (`tests/gecici/gercek-karar.mjs`): üç meşru durma sebebi
+bırakılıyor, sebepsiz rapor engelleniyor ve gerekçe artık **yalnız H-4**
+gösteriyor (H-1 arşivde).
 
 ### KAPANDI — 25.08 · P1 · STOP KANCASI YANLIŞ ALARM DÖNGÜSÜ KURUYORDU (§18-A)
 **Belirti.** Bugün iki kez, **meşru** bir durma sebebi yazdığım hâlde
@@ -1572,20 +1605,35 @@ veritabanının içinden okuyarak yapıldı.
 SONUÇ: "sır veritabanında açık metin" maddesi artık yalnız `pg_dump` riski
 değil — **anahtarın yenilenmesi gerekiyor.** Yenileme iki çalışan cron'u ve
 `CRON_SECRET` ortam değişkenini birden etkilediği için kurucu kararıdır.
-- [ ] P1 · `CRON_SECRET` yenilensin ve Vault'a alınsın · Kabul: `cron.job.command`
-      içinde düz metin sır kalmıyor (değer `vault.decrypted_secrets`ten okunuyor),
-      yeni değer edge function ortamına giriliyor, jobid 1/2/3/7 yeni değerle
-      koşuyor ve `net._http_response`ta 200 dönüyor · **kurucu kararı** (§7.4).
-      **SAKLAMA YARISI DOĞRULANDI (25.08, salt okuma):** yedi cron işinin
-      hiçbirinde düz metin sır **yok** (`duz_metin_sir_var=false` ×7); altısı
-      `vault.decrypted_secrets`ten okuyor, yedincisi (jobid 4
+- [x] P1 · `CRON_SECRET` yenilendi ve Vault'a alındı · Kabul: `cron.job.command`
+      içinde düz metin sır yok (değer `vault.decrypted_secrets`ten okunuyor),
+      yeni değer edge function ortamına girildi, cron işleri yeni değerle koşuyor
+      ve `net._http_response`ta 200 dönüyor · **DONE 25.08.2026**
+      · Doğrulama: aşağıdaki canlı kanıt.
+
+      **CANLI KANIT (25.08, salt okuma — değer görülmedi/okunmadı):**
+      Kurucu yenilemeyi hem *Edge Functions → Secrets* hem *Vault* tarafında yaptı.
+      `net._http_response` son 90 dakika:
+
+      | zaman (UTC) | durum | anlamı |
+      |---|---|---|
+      | 08:27 – 09:42 | **200** ×29 | eski değerle olağan koşum |
+      | **09:45:00** | **401** ×1 | **yenileme boşluğu** — iki taraf bir an ayrı düştü |
+      | 09:48 · 09:51 · 09:54 | **200** ×3 | **yeni değer iki tarafta da geçerli** |
+
+      Bu, H-1'in A seçeneğinin peşinen kabul ettiği imzanın aynısıdır:
+      *"en fazla bir nöbetçi turu (3 dk) 401; iş kaybı yok, tur yeniden koşar."*
+      Tek 401'den sonra üç tur üst üste 200 döndü → yenileme başarılı.
+
+      **Saklama yarısı da doğrulandı:** yedi cron işinin hiçbirinde düz metin sır
+      yok; altısı `vault.decrypted_secrets`ten okuyor, yedincisi (jobid 4
       `notify-admins-new-tariff`) sır kullanmıyor — komutu
       `SELECT public.notify_admins_new_tariff();`, HTTP çağrısı değil.
-      `net._http_response` son 2 saatte **42 yanıt, hepsi 200**.
-      **KALAN:** değerin yenilenmesi + yeni değerin edge ortamına girilmesi.
-      Bu kısım HAT H-1 cevabıyla açıkça **Code'a ait değildir** (Code değeri
-      görmez/üretmez). Kurucu "yenilendi" dediğinde Code 3 dk sonra
-      `net._http_response`u yeniden doğrulayıp maddeyi kapatır.
+
+      **SIR HİJYENİ:** `net.http_request_queue` / istek başlıkları **hiç
+      sorgulanmadı** — `x-cron-secret` başlığı orada taşınır. Yalnız yanıt
+      tarafındaki `status_code` ve `created` okundu. Değer istenmedi,
+      görülmedi, hiçbir çıktıya yazılmadı.
 
 ### TETİKLEYİCİ DENETİMİ — 24.08 (salt okuma · `closed_at` kusurunun sınıfı tarandı)
 `closed_at` kusuru şu sınıftandı: **tetikleyicinin beklediği sütunu uygulama hiç

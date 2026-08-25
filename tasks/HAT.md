@@ -2,7 +2,49 @@
 
 **Amaç:** Claude Code'un durması gereken her karar/soru buraya yazılır. Code
 yazar ve **beklemez**; o cevaba bağlı olmayan işe devam eder. Cowork (ya da
-kurucu) cevabı `### H-7 · 25.08.2026 · P1 — Geri bildirim (`session_feedback`) yapısal olarak imkânsız
+kurucu) cevabı `## COWORK → CODE` bölümüne yazar. Code her turun başında o
+bölümü okur, cevap gelmişse uygular ve maddeyi kapatır.
+
+**Bu dosya bir DURUM dosyası değildir.** Tek doğruluk kaynağı `tasks/todo.md`dir
+(CLAUDE.md §0). Burada yalnız **açık iletişim** durur. Madde kapanınca sonucu
+`tasks/todo.md`ye işlenir ve buradan **ARŞİV**e taşınır.
+
+**Madde biçimi (zorunlu):** tarih · madde · sorun · seçenekler · önerim ·
+kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
+
+**Numaralandırma:** `H-1`, `H-2`, … Numara yeniden kullanılmaz.
+
+---
+
+## CODE → COWORK
+
+### H-4 · 24.08.2026 · P3 — Kayıt kovasına dar okuma politikası
+**Sorun.** `oturum-kayitlari` kovası 24.08'de açıldı (özel; istemciye hiçbir
+politika verilmedi — deny-by-default). Silme kolu servis rolüyle çalıştığı için
+sorun yok. Ama arabulucunun kaydı **uygulamadan** dinlemesi gerekirse dar bir
+okuma politikası gerekecek. **Şu an yazılamaz:** yükleme yolu henüz kodlanmadığı
+için dosya yolu düzeni belli değil; politika için desen **uydurmak** gerekirdi.
+
+**Seçenekler.**
+| | ne yapılır | bedeli |
+|---|---|---|
+| **A** | Kayıt hattı yazılırken yol düzeni belirlenir, sonra dar politika eklenir | Doğru sıra; şimdi iş yok |
+| B | Şimdi bir yol düzeni dayatılır ve politika yazılır | Hattı yazanı bağlar; yanlış tahminde iki kez iş |
+| C | Politika hiç yazılmaz; arabulucu kaydı yalnız edge function üzerinden (imzalı bağlantı) dinler | En güvenli; her dinleme için sunucu turu |
+
+**Önerim: A**, ve hattı yazan kişi **C**'yi ciddi değerlendirsin: onay metni
+"kayıt ve dökümü **yalnız arabulucu** görür" diyor.
+
+**Kararın etkisi.** Pilotu bloke etmez (kayıt hattı henüz yok). Ama politika
+**geniş** yazılırsa 24.08'de belge kovasında yaşanan kör veri sızıntısı
+tekrarlanır — orada ölçülen gerçek sızıntı 1 çiftti.
+
+---
+
+
+---
+
+### H-7 · 25.08.2026 · P1 — Geri bildirim (`session_feedback`) yapısal olarak imkânsız
 **Sorun.** Adanın **altıncı** yüzeyi: `SessionFeedback.tsx` hiçbir yerden import
 edilmiyor (geçişli graf taraması: `main.tsx`ten erişilemez). Dahası, erişilebilir
 olsaydı bile **yazamazdı** — canlı RLS politikası şöyle:
@@ -189,80 +231,6 @@ gelir ve bu turdaki tezgâh her seferinde yeniden koşulabilir.
 **A seçilirse tek komut yeter (kurucu çalıştırır):**
 `cp ~/.claude/hooks/guard-shell.YEDEK.sh ~/.claude/hooks/guard-shell.sh && node tests/gecici/bekci-sinama.mjs`
 
----
-
-## COWORK → CODE` bölümüne yazar. Code her turun başında o
-bölümü okur, cevap gelmişse uygular ve maddeyi kapatır.
-
-**Bu dosya bir DURUM dosyası değildir.** Tek doğruluk kaynağı `tasks/todo.md`dir
-(CLAUDE.md §0). Burada yalnız **açık iletişim** durur. Madde kapanınca sonucu
-`tasks/todo.md`ye işlenir ve buradan **ARŞİV**e taşınır.
-
-**Madde biçimi (zorunlu):** tarih · madde · sorun · seçenekler · önerim ·
-kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
-
-**Numaralandırma:** `H-1`, `H-2`, … Numara yeniden kullanılmaz.
-
----
-
-## CODE → COWORK
-
-### H-1 · 24.08.2026 · P1 — `CRON_SECRET` değerinin yenilenmesi ⚠️ ACİL
-**Sorun.** Cron sırrı `cron.job.command` içinde düz metin duruyordu. Saklama
-yeri düzeltildi: değer Vault'a taşındı, altı cron işi çalışma anında
-`vault.decrypted_secrets`ten okuyor, `cron.job`ta düz metin sır **0**. **Ama
-değer değişmedi** — ve 24.08 oturumunda maskeleme denemem tutmadığı için
-(jobid 3/7 `jsonb_build_object` biçimini kullanıyor, desenim JSON biçimini
-hedefliyordu) değer **oturum dökümüne girdi**. Hiçbir dosyaya, commit'e ya da
-mesaja yazılmadı.
-**Bunu Code yapamaz — yapısal sebeple:** yeni değeri üretse ya da okusa değer
-yine bağlamına girer, yenilemeyi baştan boşa çıkarır.
-
-**Seçenekler.**
-| | ne yapılır | bedeli |
-|---|---|---|
-| **A** | Runbook ile yenile (2 adım) | En fazla bir nöbetçi turu (3 dk) 401; iş kaybı yok, tur yeniden koşar |
-| B | Geçiş kipi: fonksiyonlar geçici olarak eski VE yeni sırrı kabul eder | Kesinti sıfır; `CRON_SECRET` okuyan her fonksiyonda kod değişikliği + iki fan-out |
-| C | Yenilenmez | Sır oturum dökümünde geçerli kalır |
-
-**Önerim: A.** Kesinti bir turdur ve zararsızdır; B'nin kod maliyeti bu risk
-için fazladır.
-
-**Runbook (A).**
-1. Yeni bir sır üret (ör. `openssl rand -base64 32`). **Code'a gösterme.**
-2. Supabase → Edge Functions → Secrets: `CRON_SECRET` değerini yenisiyle güncelle.
-3. Hemen ardından (cron tanımlarına DOKUNMAZ, hepsi Vault'tan okuyor):
-   `select vault.update_secret((select id from vault.secrets where name='cron_secret'), '<YENİ DEĞER>', 'cron_secret', 'Edge function cron kapisi (x-cron-secret)');`
-4. 3 dk sonra: `select status_code, created from net._http_response order by created desc limit 3;` → **200** olmalı.
-
-**Kararın etkisi.** C seçilirse sır geçerli kalır ve döküme erişimi olan herkes
-cron kapısını açabilir. A/B sonrası eski değer işe yaramaz hâle gelir.
-
----
-
-### H-4 · 24.08.2026 · P3 — Kayıt kovasına dar okuma politikası
-**Sorun.** `oturum-kayitlari` kovası 24.08'de açıldı (özel; istemciye hiçbir
-politika verilmedi — deny-by-default). Silme kolu servis rolüyle çalıştığı için
-sorun yok. Ama arabulucunun kaydı **uygulamadan** dinlemesi gerekirse dar bir
-okuma politikası gerekecek. **Şu an yazılamaz:** yükleme yolu henüz kodlanmadığı
-için dosya yolu düzeni belli değil; politika için desen **uydurmak** gerekirdi.
-
-**Seçenekler.**
-| | ne yapılır | bedeli |
-|---|---|---|
-| **A** | Kayıt hattı yazılırken yol düzeni belirlenir, sonra dar politika eklenir | Doğru sıra; şimdi iş yok |
-| B | Şimdi bir yol düzeni dayatılır ve politika yazılır | Hattı yazanı bağlar; yanlış tahminde iki kez iş |
-| C | Politika hiç yazılmaz; arabulucu kaydı yalnız edge function üzerinden (imzalı bağlantı) dinler | En güvenli; her dinleme için sunucu turu |
-
-**Önerim: A**, ve hattı yazan kişi **C**'yi ciddi değerlendirsin: onay metni
-"kayıt ve dökümü **yalnız arabulucu** görür" diyor.
-
-**Kararın etkisi.** Pilotu bloke etmez (kayıt hattı henüz yok). Ama politika
-**geniş** yazılırsa 24.08'de belge kovasında yaşanan kör veri sızıntısı
-tekrarlanır — orada ölçülen gerçek sızıntı 1 çiftti.
-
----
-
 ## COWORK → CODE
 
 _Cevaplar buraya yazılır. Biçim:_
@@ -342,6 +310,31 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+
+### H-1 · KAPANDI · 25.08.2026 — `CRON_SECRET` yenilendi
+**Seçim: A** (runbook ile yenileme). Kurucu değeri üretti ve hem *Edge Functions
+→ Secrets* hem *Vault* tarafında güncelledi. **Code değeri istemedi, görmedi,
+okumadı, hiçbir çıktıya yazmadı.**
+
+**Doğrulama (Code, salt okuma).** `net._http_response` son 90 dakika:
+`08:27–09:42` **200** ×29 (eski değer) → **`09:45:00` 401 ×1** (yenileme
+boşluğu) → `09:48 · 09:51 · 09:54` **200** ×3 (yeni değer geçerli).
+
+Bu, A seçeneğinin peşinen kabul ettiği imzanın aynısıdır: *"en fazla bir
+nöbetçi turu (3 dk) 401; iş kaybı yok, tur yeniden koşar."* Tek 401'den sonra
+üç tur üst üste 200 → **yenileme başarılı.**
+
+Saklama yarısı da doğrulandı: yedi cron işinin hiçbirinde düz metin sır yok
+(altısı Vault'tan okuyor; jobid 4 sır kullanmıyor, komutu düz bir `SELECT`).
+
+**Sır hijyeni:** `net.http_request_queue` ve istek başlıkları **hiç
+sorgulanmadı** — `x-cron-secret` orada taşınır. Yalnız yanıt tarafındaki
+`status_code` ve `created` okundu (§12).
+
+Sonuç `tasks/todo.md`ye işlendi; kuyruk maddesi **DONE 25.08.2026**.
+
+---
+
 
 ### H-6 · P0 — Sahip-taraf guard'ı belirsiz öbeğe de uygulandı · **KAPANDI**
 **Karar: B** (kurucu; Code'un önerisi A'ydı). 17 belirsiz politika + taramada
