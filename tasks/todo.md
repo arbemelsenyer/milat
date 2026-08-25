@@ -1,6 +1,6 @@
 ## Nerede kaldık
 
-- Tarih: 25.08.2026 (12. blok) — **§20 gereği kapatıldı (bağlam şişti)**
+- Tarih: 25.08.2026 (13. blok) — **`medipact dur` ile kapatıldı (kurucu komutu)**
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
@@ -23,7 +23,9 @@
 - **Bu oturumun dersleri `tasks/lessons.md`ye yazıldı** (3 yeni ders: sessiz
   yazım kuyruk döngüsü kurar · öz denetim eşiği kusurla birlikte düşer ·
   `rpc`/`storage` de fırlatmaz).
-- Doğrulama: `npm run test` **270/270** · tsc temiz · lint **2331** · `npm run build` temiz
+- Doğrulama (25.08 · dur anında yeniden koşuldu): `npm run test` **270/270 (30 dosya)** ·
+  `npx tsc --noEmit -p tsconfig.app.json` **temiz (çıkış 0)**. Bu oturumda kod
+  değişmedi; son iki commit (`1d06303`, `152e2c0`) yalnız kayıttır.
 - **CANLI:** son 2 saatte 42 cron yanıtı, hepsi **200**; işlenmemiş olay 0,
   bekleyen talimat 0, metin hatası 0.
   (taban 2334'tü; `randevu-teklif`te bir `any` kaldırıldı)
@@ -53,6 +55,24 @@
   yüzde kapandı, iki tezgâh da kilitli. Yeni P0/P1 adayı kodun gerçek
   durumundan çıkarılmalı. En yakın aday: **H-8 ölü yüzey öbeğinin silinmesi**
   (37 dosya) — ama silme kararı kurucudadır, HAT'ta açık bekliyor.
+
+### DUR KAYDI — 25.08.2026 · `medipact dur`
+Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
+
+- **Ağaç durumu (commit edilmemiş, bu oturuma ait DEĞİL — §11 gereği dokunulmadı):**
+  - silinmiş ama commit edilmemiş: `.agents/skills/medipact-calisma-duzeni/SKILL.md`
+  - izlenmeyen: `.github/.agents/` · `devam.sh` · `gs.sh` ·
+    `Yeni XLSX Worksheet.xlsx` · `repomix-output.xml` (4,7 MB depo dökümü)
+  - **`repomix-output.xml` sır taraması yapıldı:** gerçek jeton **yok**
+    (`eyJhbGciOi…` eşleşmesi 0), `.env` dosyası dökümün içinde **değil**;
+    68 eşleşme yalnız `SUPABASE_SERVICE_ROLE_KEY` **değişken adı**. Yeni P0 yok.
+- **`main` ile `origin/main` eşit** — bekleyen push yok.
+- **Bekleyen redeploy yok** (§11-B tablosu yukarıda).
+- **Açık HAT maddeleri (cevap bekliyor):** H-1 (⚠️ `CRON_SECRET` yenilemesi —
+  saklama yarısı doğrulandı, değer yenilemesi kurucuda) · H-4 · H-7 · H-8 · H-9 · H-10.
+- **Sıradaki oturumun ilk işi:** `tasks/HAT.md` → `## COWORK → CODE` oku;
+  cevap gelmişse uygula. Cevap yoksa kuyruk boş olduğu için yeni P0/P1 adayı
+  kodun gerçek durumundan çıkarılır (§6).
 
 ### KAPANDI — 25.08 · P1 · CANLI SAĞLIK DENETİMİ → İKİ GERÇEK KUSUR
 Bugün ~80 fonksiyon sürümü deploy edildi; §11-B gereği canlı sistem denetlendi.
