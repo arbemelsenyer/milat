@@ -1508,6 +1508,16 @@ değil — **anahtarın yenilenmesi gerekiyor.** Yenileme iki çalışan cron'u 
       içinde düz metin sır kalmıyor (değer `vault.decrypted_secrets`ten okunuyor),
       yeni değer edge function ortamına giriliyor, jobid 1/2/3/7 yeni değerle
       koşuyor ve `net._http_response`ta 200 dönüyor · **kurucu kararı** (§7.4).
+      **SAKLAMA YARISI DOĞRULANDI (25.08, salt okuma):** yedi cron işinin
+      hiçbirinde düz metin sır **yok** (`duz_metin_sir_var=false` ×7); altısı
+      `vault.decrypted_secrets`ten okuyor, yedincisi (jobid 4
+      `notify-admins-new-tariff`) sır kullanmıyor — komutu
+      `SELECT public.notify_admins_new_tariff();`, HTTP çağrısı değil.
+      `net._http_response` son 2 saatte **42 yanıt, hepsi 200**.
+      **KALAN:** değerin yenilenmesi + yeni değerin edge ortamına girilmesi.
+      Bu kısım HAT H-1 cevabıyla açıkça **Code'a ait değildir** (Code değeri
+      görmez/üretmez). Kurucu "yenilendi" dediğinde Code 3 dk sonra
+      `net._http_response`u yeniden doğrulayıp maddeyi kapatır.
 
 ### TETİKLEYİCİ DENETİMİ — 24.08 (salt okuma · `closed_at` kusurunun sınıfı tarandı)
 `closed_at` kusuru şu sınıftandı: **tetikleyicinin beklediği sütunu uygulama hiç
