@@ -4366,6 +4366,7 @@ export type Database = {
           created_at: string
           guncelleyen: string | null
           id: string
+          kalici: boolean
           saklama_gun: number | null
           updated_at: string
           veri_turu: string
@@ -4376,6 +4377,7 @@ export type Database = {
           created_at?: string
           guncelleyen?: string | null
           id?: string
+          kalici?: boolean
           saklama_gun?: number | null
           updated_at?: string
           veri_turu: string
@@ -4386,6 +4388,7 @@ export type Database = {
           created_at?: string
           guncelleyen?: string | null
           id?: string
+          kalici?: boolean
           saklama_gun?: number | null
           updated_at?: string
           veri_turu?: string
