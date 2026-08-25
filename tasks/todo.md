@@ -4,15 +4,18 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P2 · `_shared/anlatim.ts` sessiz yazımları (3 yer)**
-- **SESSİZ YAZIM KUYRUĞU TAMAMEN KAPANDI.** Ağaç genelinde çıplak
-  `await <istemci>.from(...)` yazımı **SIFIR** — tezgâhta tarama testiyle kilitlendi.
+- Son tamamlanan iş: **P1 · ön yüz sessiz yazımları (4 dosya)**
+- **SESSİZ YAZIM KUSURU HEM KENARDA HEM ÖN YÜZDE KAPANDI.** Kenarda (`_shared`
+  dâhil) çıplak `await <istemci>.from(...)` yazımı **SIFIR**; ön yüzde
+  `tests/sessiz-yazim.test.ts` **DONDURULMUŞ listesi BOŞ**. İkisi de tarama
+  testiyle kilitlendi.
 - **12. blokta biten işler (sırayla):** `53b33cc` P1 `taraf-kalem-cikar` ·
   `37c8867` P1 `dual-ai-validate` + `orchestrator-run` · `32fad07` P1
   `akis-yurut` · `a3de13f` P0 `ajan-nobetci` (15 yer) · `04547a5` kayıt ·
   `62e99b6` P1 kalan 16 yazım (13 işlev) · `69b8bde` P2 `agent_states` (25 yer) ·
-  `19be6fe` P2 `_shared/anlatim.ts` (3 yer, 35 işlev fan-out).
-- Doğrulama: `npm run test` **264/264** · tsc temiz · lint **2333**
+  `19be6fe` P2 `_shared/anlatim.ts` (3 yer, 35 işlev fan-out) · `cc0acbb` kayıt ·
+  `10bdb83` P1 ön yüz (4 dosya).
+- Doğrulama: `npm run test` **264/264** · tsc temiz · lint **2333** · `npm run build` temiz
   (taban 2334'tü; `randevu-teklif`te bir `any` kaldırıldı)
 - **Açık blokaj: yok**
 - **REDEPLOY DURUMU (§11-B):**
@@ -22,12 +25,38 @@
     edildi ve `get_message` ile doğrulandı.
   - OK `69b8bde` · **14 işlev** (`agent_states` sürüsü) — deploy edildi ve
     `get_message` ile doğrulandı.
-  - `19be6fe` · **`_shared/anlatim.ts` FAN-OUT** — 35 tüketici işlevin deploy'u
-    istendi (`umsg_01m0vnqsgze8nrytym1yn27ng9`), sonucu doğrulanacak.
+  - OK `19be6fe` · **`_shared/anlatim.ts` FAN-OUT** — 35 tüketici işlevin hepsi
+    deploy edildi ve `get_message` ile doğrulandı.
+  - OK `10bdb83` · **ön yüz (`src/**`)** — Lovable `deploy_project` ile publish
+    edildi. `get_project` doğruladı: `latest_commit_sha=10bdb833…`,
+    `is_published=true`, canlı sayfa açılıyor.
+  - **Bekleyen redeploy YOK.**
 - Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9**.
-- Sıradaki uygulanabilir iş: **kuyruk boş.** Sessiz yazım kusuru ağaç genelinde
-  (`_shared` dâhil) kapandı ve tarama testiyle kilitlendi. Yeni P0/P1 adayı
-  kodun gerçek durumundan çıkarılmalı.
+- Sıradaki uygulanabilir iş: **kuyruk boş.** Sessiz yazım kusuru kenarda ve ön
+  yüzde kapandı, iki tezgâh da kilitli. Yeni P0/P1 adayı kodun gerçek
+  durumundan çıkarılmalı. En yakın aday: **H-8 ölü yüzey öbeğinin silinmesi**
+  (37 dosya) — ama silme kararı kurucudadır, HAT'ta açık bekliyor.
+
+### KAPANDI — 25.08 · P1 · ÖN YÜZ SESSİZ YAZIMLARI (4 DOSYA)
+Aynı kusur sınıfı `src/` tarafında da duruyordu. `tests/sessiz-yazim.test.ts`
+tezgâhı zaten vardı ve dört dosyayı **gerekçeyle dondurmuştu**; dördü de kapatıldı
+ve **DONDURULMUŞ liste boşaldı**.
+
+| dosya | sessiz kalırsa |
+|---|---|
+| `intake/IntakeForm.tsx` | **En ağırı.** `case_parties` **sil-sonra-yaz**: silme başarılı olup yazma düşerse dosya **TARAFSIZ** kalır — arabuluculuk yürüyemez. Kullanıcı "Başvurunuz başarıyla gönderildi" duyar ve panele yönlendirilir. Artık hata fırlatılıyor, yönlendirme yapılmıyor. |
+| `CaseDocuments.tsx` | Dosya depoya girer, kayıt satırı düşerse belge dosyada **görünmez** ama depoda durur; KVKK silme kolu `case_documents` üzerinden çalıştığı için o dosyayı **hiç bulamaz** (öksüz kayıt). Artık satır yazılamazsa yüklenen dosya geri alınıyor. Silmede de "yarım silindi" ayrı bildiriliyor. |
+| `Dashboard.tsx` · `NotificationBell.tsx` | Ekran "okundu" gösterir, yenilemede bildirim geri gelir. Ekran artık yazım doğrulandıktan sonra güncelleniyor. |
+
+**ÖLÜ YÜZEY NOTU:** `IntakeForm` ve `CaseDocuments` H-8 kapsamında **ölü
+yüzeydir** (silme kararı kurucuda). Dondurma notu "diriltilirse yazım kontrolü de
+gelmelidir" diyordu; tuzak şimdiden kaldırıldı, canlı davranış değişmedi.
+
+**TEZGÂHIN ÖZ DENETİMİ ONARILDI.** `sessiz-yazim.test.ts` kendi tarayıcısını
+`dosyalari.length > 3` ile denetliyordu — yani **kusur kapandıkça düşen** bir
+eşikle. 12. blokta tam bu oldu. Öz denetim artık canlı bulguya değil,
+**içine kasıtlı kusur konmuş bir örneğe** bakıyor: tarayıcı bozulursa test düşer,
+kusur kapanınca düşmez.
 
 ### KAPANDI — 25.08 · SESSİZ YAZIM KUYRUĞU TAMAMEN KAPANDI (56 YAZIM · 32 İŞLEV)
 Ortak kusur: `supabase-js` DB hatasını **fırlatmaz**, `{error}` döndürür —

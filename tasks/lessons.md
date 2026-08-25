@@ -708,3 +708,20 @@ bozulmaz ama sebep kayda geçer.
 işlev denetimi yeni yazılan bir sessiz yazımı kaçırır; tezgâhtaki
 *KENAR TARAMASI* durumu (`tests/kenar-sessiz-yazim.test.ts`) bütün ağacı
 dolaşır ve kuyruğu kırar.
+
+
+## 25.08.2026 — Öz denetim eşiği kusurla birlikte düşer
+
+`tests/sessiz-yazim.test.ts` kendi tarayıcısını `dosyalari.length > 3` ile
+denetliyordu: "tarama 0 bulduysa tarayıcı bozulmuştur" mantığı. Ama eşik
+**canlı bulgu sayısına** bağlıydı; 12. blokta kusurun kendisi kapatılınca eşik
+düştü ve tezgâh, hiçbir şey bozulmadığı hâlde kırmızıya döndü.
+
+**Ders:** bir tezgâhın "ben çalışıyorum" kanıtı, denetlediği kusurun canlı
+sayısına bağlanamaz — düzeltme başarılı oldukça kanıt zayıflar ve sonunda
+yanlış alarm verir. Kanıt, **içine kasıtlı kusur konmuş sabit bir örneğe**
+bakmalıdır: tarayıcı bozulursa düşer, kusur kapanınca düşmez.
+
+Aynı ilke `tests/kenar-sessiz-yazim.test.ts`teki *KENAR TARAMASI* durumunda da
+uygulandı: orada beklenen değer sabit **sıfırdır** (bulgu listesi boş olmalı),
+bir eşik değil.
