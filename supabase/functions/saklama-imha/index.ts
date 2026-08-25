@@ -39,6 +39,8 @@ const TUR_HARITASI: Record<string, { tablo: string; zaman: string } | null> = {
   oturum_kaydi_dokum: { tablo: "oturum_kayitlari", zaman: "created_at" },
   case_documents: { tablo: "case_documents", zaman: "created_at" },
   case_notes: { tablo: "case_notes", zaman: "created_at" },
+  // Canlı tabloda 25.08'de eklendi (kurucu kararı: mali kayıt 10 yıl).
+  odeme_kayitlari: { tablo: "case_payments", zaman: "created_at" },
   // Dosyanın kendisinin silinmesi `dosya-verilerini-sil` kolunun işidir
   // (kapanış paketi + anonim kayıt + depo temizliği zinciriyle). Bu kol
   // oraya DOKUNMAZ; tür tanımlı ama eşlemesi bilerek yoktur.

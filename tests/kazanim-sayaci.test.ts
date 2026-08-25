@@ -1,82 +1,106 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
-/* KAZANIM SAYACI — mimari §15.2 · §15.1 camdan kutu · HAT H-15/4 (25.08.2026)
+/* KAZANIM SAYACI — mimari §5.9 · §15.1 camdan kutu · HAT H-15/4 seçim B
  *
- * §15.2: "kazanım sayacı baz çizgiyi alıyor ve dosya bazında saat üretiyor."
+ * KURUCU KARARI (B — KALEM KALEM): katsayıyı **biz koymayız**. Rakam
+ * arabulucunun kendi beyanıdır; kayıt olurken bir kez üç soru sorulur
+ * (§5.9 baz çizgisi) ve sayaç o beyanı kullanır. Ekranda hesabın kendisi
+ * görünür: "kendi verdiğiniz 2 saat × 6 belge = 12 saat".
  *
- * Bu maddenin engeli "kazanım"ın TANIMIYDI. Tanımı beklemek yerine sayaç,
- * tanımı **veriye taşıyacak** biçimde kuruldu: katsayılar parametre tablosunda
- * durur, kurucu girer. Böylece karar beklenmeden kod hazır olur ve — daha
- * önemlisi — §15.1'in "camdan kutu" şartı yapısal olarak sağlanır:
+ * TASARIM DEĞİŞTİ: ilk yazımda katsayılar YÖNETİCİDEN alınıyordu
+ * (`kazanim_katsayilari`). Kurucu kararı geldi, tasarım ona göre değiştirildi —
+ * `kazanim-katsayilari.sql` göçü ARTIK ÇALIŞTIRILMAMALIDIR.
  *
- *   "Bu dosyada 7 saat kazandınız" demek, 7'nin NEREDEN geldiği
- *   gösterilemiyorsa UYDURMADIR.
- *
- * Tezgâh bunun bozulmadığını denetler.
+ * Bu tezgâh iki şeyi denetler: (a) uydurma rakam üretilemez, (b) gizlilik —
+ * sayaç yalnız süre ve işlem tipi tutar (§14, constitution m.1).
  */
 
 const G = readFileSync("supabase/functions/kazanim-sayaci/index.ts", "utf-8");
-const SQL = readFileSync("tests/gecici/kazanim-katsayilari.sql", "utf-8");
+const SQL = readFileSync("tests/gecici/baz-cizgi.sql", "utf-8");
 
-describe("kazanım sayacı: uydurma rakam üretemiyor", () => {
-  it("katsayılar PARAMETRE TABLOSUNDAN geliyor, kodda sabit değil", () => {
-    expect(G).toContain('from("kazanim_katsayilari")');
+describe("kazanım sayacı: rakam arabulucunun kendi beyanı", () => {
+  it("katsayı ARABULUCUDAN gelir, yöneticiden değil", () => {
+    expect(G).toContain('from("arabulucu_baz_cizgi")');
+    expect(G, "eski yönetici katsayısı tasarımı duruyor").not.toContain("kazanim_katsayilari");
+    /* Kodda sabit KATSAYI olmamalı. Denetim yalnız ÜÇ BEYAN ALANINI hedefler —
+       `toplam_saat: 0` gibi meşru sıfırları yakalamamalı (dosyası olmayan
+       arabulucu için doğru cevaptır). Geniş bir `_saat` deseni onu da yakalıyordu. */
     const govde = G.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
-    expect(govde, "kodda sabit dakika var").not.toMatch(/dakika\s*[=:]\s*\d+/);
+    expect(govde, "kodda sabit katsayı var")
+      .not.toMatch(/(belge_saat|analiz_saat|beyan_saat)\s*[=:]\s*\d/);
   });
 
-  it("KATSAYI YOKSA SAATE ÇEVİRMİYOR", () => {
-    expect(G).toMatch(/if \(k\.dakika == null\)/);
-    const nullIdx = G.indexOf("if (k.dakika == null)");
-    const carpIdx = G.indexOf("adet * k.dakika");
-    expect(nullIdx, "NULL kapısı yok").toBeGreaterThan(-1);
-    expect(carpIdx, "çarpım NULL kapısından ÖNCE").toBeGreaterThan(nullIdx);
+  it("baz çizgi yoksa RAKAM ÜRETİLMEZ, üç soru geri döner", () => {
+    expect(G).toMatch(/if \(!baz\)/);
+    const idx = G.indexOf("if (!baz)");
+    const blok = G.slice(idx, G.indexOf("\n    }", idx));
+    expect(blok).toContain("yeterli_veri: false");
+    expect(blok).toContain('sebep: "baz_cizgi_yok"');
+    // Ekran sorabilsin diye sorular donuyor.
+    expect(blok).toContain("sorular:");
+  });
+
+  it("bir soru yanıtsızsa O KALEM saate çevrilmez", () => {
+    expect(G).toMatch(/if \(saat == null\)/);
+    const nullIdx = G.indexOf("if (saat == null)");
+    const carpIdx = G.indexOf("adet * Number(saat)");
+    expect(nullIdx).toBeGreaterThan(-1);
+    expect(carpIdx, "çarpım null kapısından ÖNCE").toBeGreaterThan(nullIdx);
     expect(G.slice(nullIdx, carpIdx)).toContain("continue;");
-    expect(G).toContain("katsayı girilmemiş — saate çevrilmedi");
+    expect(G).toContain("beyan verilmedi — saate çevrilmedi");
   });
 
-  it("HİÇ katsayı yoksa toplam VERMİYOR ('yeterli veri yok')", () => {
-    expect(G).toMatch(/if \(katsayiliTur === 0\)/);
-    const idx = G.indexOf("if (katsayiliTur === 0)");
-    /* Pencere BLOĞUN KENDİSİYLE sınırlı olmalı: `idx + 400` gibi kaba bir
-       dilim erken dönüşü aşıp normal dönüşe taşıyor ve orada `toplam_saat`
-       görüp yanlış alarm veriyor. Blok, kendi `}` kapanışında biter. */
+  it("hiçbir soru yanıtlanmadıysa toplam VERİLMEZ", () => {
+    expect(G).toMatch(/if \(saatliKalem === 0\)/);
+    const idx = G.indexOf("if (saatliKalem === 0)");
     const blok = G.slice(idx, G.indexOf("\n    }", idx));
     expect(blok).toContain("yeterli_veri: false");
     expect(blok, "veri yokken saat dönülüyor").not.toContain("toplam_saat");
   });
 
-  it("toplamın nereden geldiği satır satır dönüyor", () => {
-    // Her kalem: adet + katsayi + DAYANAK. Dayanaksiz rakam gosterilmez.
-    expect(G).toContain("katsayi_dakika: k.dakika");
-    expect(G).toContain("dayanak: k.dayanak");
-    expect(G).toContain("kalem_dakika: kalemDakika");
+  it("HESABIN KENDİSİ görünür (§15.1 camdan kutu)", () => {
+    expect(G).toContain("hesap:");
+    expect(G).toMatch(/kendi verdiğiniz \$\{saat\} saat × \$\{adet\}/);
+    // Rakamin niteligi gizlenmez.
+    expect(G).toContain("arabulucunun kendi beyanına dayalı hesap");
   });
 
-  it("rakamın TAHMİN olduğu gizlenmiyor", () => {
-    expect(G).toContain('nitelik: "tahmin"');
-    expect(G).toContain("elle yapılsaydı süreceği tahmini süre");
+  it("TAKVİM SÜRESİ kullanılmıyor (kurucu kararı)", () => {
+    // Taraf gec cevap verirse takvim farki sayaci eksiye dusururdu.
+    expect(G).toContain("TAKVİM SÜRESİ KULLANILMAZ");
+    const govde = G.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
+    expect(govde, "takvim farkı hesaplanıyor").not.toMatch(/closed_at|created_at.*getTime/);
   });
 
-  it("sayılacak tablo haritadan geliyor, parametre satırından değil", () => {
-    expect(G).toContain("const SAYIM");
-    expect(G).toMatch(/admin\.from\(hedef\.tablo\)/);
+  it("GİZLİLİK: yalnız süre ve işlem tipi tutulur", () => {
+    // Sayilan tablolar sabit; icerik/isim/tutar alani cekilmez.
+    expect(G).toContain("const KALEMLER");
+    const govde = G.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
+    for (const yasak of ["first_name", "last_name", "company_name", "amount", "statement"]) {
+      expect(govde, `sayaca ${yasak} giriyor`).not.toContain(yasak);
+    }
+    // Sayim yalniz `id` sayar, icerik cekmez.
+    expect(G).toMatch(/select\("id", \{ count: "exact", head: true \}\)/);
   });
 
-  it("yalnız dosyanın arabulucusu görüyor", () => {
-    expect(G).toContain("assigned_mediator_id");
+  it("yalnız kendi dosyasını / kendi sayacını görür", () => {
     expect(G).toContain("kazanım özeti size ait değil");
+    expect(G).toMatch(/assigned_mediator_id\.eq\.\$\{uid\}/);
   });
 
-  it("göç değer olmadan kuruluyor (sayaç susarak başlar)", () => {
-    expect(SQL).toMatch(/insert into public\.kazanim_katsayilari \(is_turu, dayanak\)/);
-    expect(SQL, "dayanak alanı yok").toContain("dayanak text");
-    expect(SQL).toContain("dakika integer");
-  });
-
-  it("tablo yoksa sessizce sıfır demiyor", () => {
-    expect(G).toContain("Kazanım katsayıları okunamadı");
-    expect(G).toContain("Katsayı tablosu henüz kurulmamış");
+  it("baz çizgi göçü: arabulucu kendi satırını yazar, başkasınınkini değil", () => {
+    expect(SQL).toContain("arabulucu_baz_cizgi");
+    expect(SQL).toMatch(/with check \(user_id = auth\.uid\(\)\)/);
+    expect(SQL, "süre dışında alan var").toContain("belge_saat");
+    /* Gizlilik: tabloda içerik alanı olmamalı. YORUMA DEĞİL KOLON TANIMINA
+       bakılır — göçün yorumu zaten "tutar bu tabloya GİRMEZ" diyor ve kelimeye
+       bakan denetim kendi belgesini kusur sanıyordu (bugün üçüncü kez). */
+    const kolonlar = SQL
+      .replace(/--.*$/gm, "")                       // SQL yorumları
+      .slice(SQL.indexOf("create table"), SQL.indexOf(");"));
+    for (const yasak of ["case_id", "party_id", "tutar", "amount"]) {
+      expect(kolonlar, `baz çizgi tablosunda ${yasak} kolonu var`).not.toContain(yasak);
+    }
   });
 });

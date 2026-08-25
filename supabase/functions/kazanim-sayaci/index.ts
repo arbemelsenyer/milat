@@ -1,17 +1,17 @@
 // KAZANIM SAYACI — dosya bazında kazanılan saat
-// mimari §15.2 · §15.1 (camdan kutu) · HAT H-15/4
+// mimari §5.9 · §15.2 · §15.1 (camdan kutu) · HAT H-15/4 (seçim B)
 //
-// CAMDAN KUTU İLKESİ BU İŞLEVİN OMURGASIDIR:
-//   · Katsayılar KODDA SABİT DEĞİL, `public.kazanim_katsayilari` tablosunda.
-//   · Katsayı girilmemişse (dakika NULL) o iş türü sayıma GİRMEZ.
-//   · Hiçbir katsayı girilmemişse işlev rakam ÜRETMEZ: "yeterli veri yok" der.
-//   · Dönen gövde her kalemin ADEDİNİ, KATSAYISINI ve DAYANAĞINI taşır —
-//     arabulucu toplamın nereden geldiğini satır satır görebilir.
-//     "7 saat kazandınız" demek, 7'nin nereden geldiği gösterilemiyorsa
-//     uydurmadır (§15.1).
+// KURUCU KARARI (B — KALEM KALEM): katsayıyı BİZ KOYMAYIZ. Rakam
+// **arabulucunun kendi beyanıdır**: kayıt olurken bir kez üç soru sorulur
+// (§5.9 baz çizgisi) ve sayaç o beyanı kullanır. Ekranda hesabın kendisi
+// görünür — "kendi verdiğiniz 2 saat × 6 belge = 12 saat". §15.1'in camdan
+// kutu şartı böyle sağlanır: rakamın kaynağı kullanıcının kendisidir.
 //
-// BAZ ÇİZGİ: "bu iş elle yapılsaydı kaç dakika sürerdi" tahmini. Tahmin
-// olduğu ekranda açıkça yazılır; ölçüm değildir.
+// TAKVİM SÜRESİ KULLANILMAZ (kurucu kararı): taraf üç hafta cevap vermezse
+// takvim farkı sayacı eksiye düşürürdü. Sayaç yalnız ÜRETİLEN ÇIKTIYI sayar.
+//
+// GİZLİLİK (§14, constitution m.1): sayaç yalnız **süre + işlem tipi** tutar.
+// Dosya içeriği, taraf adı, tutar buraya GİRMEZ.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
@@ -22,17 +22,33 @@ const corsHeaders = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-type Katsayi = { is_turu: string; dakika: number | null; dayanak: string | null };
-
-/** İş türü → o işin kaç kez yapıldığını veren sayım. Tablo adları KODDA
- *  sabittir; parametre tablosundan yalnız DAKİKA okunur. */
-const SAYIM: Record<string, { tablo: string; alan?: string }> = {
-  resmi_belge_uretimi: { tablo: "agreement_documents" },
-  taraf_analizi: { tablo: "party_analyses" },
-  ortak_zemin_raporu: { tablo: "common_ground_reports" },
-  hazirlik_foyu: { tablo: "oturum_hazirlik_foyleri" },
-  belge_metni_cikarma: { tablo: "case_documents" },
-};
+/* §5.9'un üç sorusu → hangi çıktılar sayılır.
+   Tablo adları KODDA sabittir; süre arabulucunun beyanından gelir. */
+const KALEMLER: {
+  anahtar: "belge_saat" | "analiz_saat" | "beyan_saat";
+  etiket: string;
+  soru: string;
+  tablolar: string[];
+}[] = [
+  {
+    anahtar: "belge_saat",
+    etiket: "Resmî belge üretimi",
+    soru: "Anlaşma belgesi / son tutanak hazırlamak elle kaç saat sürüyordu?",
+    tablolar: ["agreement_documents"],
+  },
+  {
+    anahtar: "analiz_saat",
+    etiket: "Dosya analizi ve takip föyü",
+    soru: "Dosya analizi + takip föyü çıkarmak elle kaç saat sürüyordu?",
+    tablolar: ["party_analyses", "common_ground_reports", "oturum_hazirlik_foyleri"],
+  },
+  {
+    anahtar: "beyan_saat",
+    etiket: "Taraf beyanlarının yapılandırılması",
+    soru: "Taraf beyanlarını yapılandırmak / özetlemek elle kaç saat sürüyordu?",
+    tablolar: ["belge_ozetleri", "taraf_kalemleri"],
+  },
+];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -52,73 +68,93 @@ Deno.serve(async (req) => {
     if (!uid) return json({ error: "Oturum doğrulanamadı" }, 401);
 
     const govde = await req.json().catch(() => ({}));
-    const case_id = String(govde?.case_id ?? "").trim();
-    if (!case_id) return json({ error: "case_id gerekli" }, 400);
+    const case_id = govde?.case_id ? String(govde.case_id) : null;
 
     const admin = createClient(SUPABASE_URL, SERVICE);
 
-    // Yetki: yalnız dosyanın arabulucusu kendi kazanımını görür.
-    const { data: dosya, error: dErr } = await admin.from("cases")
-      .select("id, assigned_mediator_id, user_id").eq("id", case_id).maybeSingle();
-    if (dErr) return json({ error: `Dosya okunamadı: ${dErr.message}` }, 500);
-    if (!dosya) return json({ error: "Dosya bulunamadı" }, 404);
-    const satir = dosya as { assigned_mediator_id?: string | null; user_id?: string | null };
-    if (String(satir.assigned_mediator_id ?? satir.user_id) !== uid) {
-      return json({ error: "Bu dosyanın kazanım özeti size ait değil" }, 403);
-    }
-
-    const { data: katsayilar, error: kErr } = await admin
-      .from("kazanim_katsayilari").select("is_turu, dakika, dayanak");
-    if (kErr) {
+    /* BAZ ÇİZGİ — arabulucunun KENDİ beyanı. Yoksa sayaç rakam ÜRETMEZ;
+       "baz çizgi alınmamış" der ve üç soruyu geri döndürür ki ekran sorabilsin. */
+    const { data: baz, error: bazErr } = await admin.from("arabulucu_baz_cizgi")
+      .select("belge_saat, analiz_saat, beyan_saat").eq("user_id", uid).maybeSingle();
+    if (bazErr) {
       return json({
-        error: `Kazanım katsayıları okunamadı: ${kErr.message}`,
-        ipucu: "Katsayı tablosu henüz kurulmamış olabilir (HAT H-15/4).",
+        error: `Baz çizgi okunamadı: ${bazErr.message}`,
+        ipucu: "Baz çizgi tablosu henüz kurulmamış olabilir (HAT H-15/4).",
       }, 500);
     }
-
-    const kalemler: Record<string, unknown>[] = [];
-    let toplamDakika = 0;
-    let katsayiliTur = 0;
-
-    for (const k of ((katsayilar ?? []) as Katsayi[])) {
-      const hedef = SAYIM[k.is_turu];
-      if (!hedef) continue;
-
-      const { count, error: sErr } = await admin.from(hedef.tablo)
-        .select("id", { count: "exact", head: true }).eq(hedef.alan ?? "case_id", case_id);
-      if (sErr) {
-        kalemler.push({ is_turu: k.is_turu, durum: "sayılamadı", sebep: sErr.message });
-        continue;
-      }
-      const adet = count ?? 0;
-
-      /* KATSAYI YOKSA RAKAM ÜRETİLMEZ. Adet yine gösterilir — arabulucu ajanın
-         ne ürettiğini görür — ama saate çevrilmez. */
-      if (k.dakika == null) {
-        kalemler.push({
-          is_turu: k.is_turu, adet,
-          dakika: null, dayanak: k.dayanak ?? null,
-          durum: "katsayı girilmemiş — saate çevrilmedi",
-        });
-        continue;
-      }
-      katsayiliTur++;
-      const kalemDakika = adet * k.dakika;
-      toplamDakika += kalemDakika;
-      kalemler.push({
-        is_turu: k.is_turu, adet,
-        katsayi_dakika: k.dakika, dayanak: k.dayanak ?? null,
-        kalem_dakika: kalemDakika,
-      });
-    }
-
-    /* HİÇ KATSAYI YOKSA TOPLAM VERİLMEZ. §15.1: veri yoksa "yeterli veri yok"
-       denir, rakam uydurulmaz. */
-    if (katsayiliTur === 0) {
+    const b = (baz ?? {}) as Record<string, number | null>;
+    if (!baz) {
       return json({
         ok: true,
         yeterli_veri: false,
-        mesaj: "Kazanım katsayıları henüz girilmedi; saat hesaplanmadı.",
+        sebep: "baz_cizgi_yok",
+        mesaj: "Kazanım hesabı için önce 'bu iş elle ne kadar sürüyordu' sorularını yanıtlayın.",
+        sorular: KALEMLER.map((k) => ({ anahtar: k.anahtar, soru: k.soru })),
+      });
+    }
+
+    // Dosya kapsamı: `case_id` verilirse o dosya, yoksa arabulucunun tüm dosyaları.
+    let dosyaIdler: string[] | null = null;
+    if (case_id) {
+      const { data: d } = await admin.from("cases")
+        .select("id, assigned_mediator_id, user_id").eq("id", case_id).maybeSingle();
+      const dd = d as { assigned_mediator_id?: string | null; user_id?: string | null } | null;
+      if (!dd) return json({ error: "Dosya bulunamadı" }, 404);
+      if (String(dd.assigned_mediator_id ?? dd.user_id) !== uid) {
+        return json({ error: "Bu dosyanın kazanım özeti size ait değil" }, 403);
+      }
+      dosyaIdler = [case_id];
+    } else {
+      const { data: liste, error: lErr } = await admin.from("cases")
+        .select("id").or(`assigned_mediator_id.eq.${uid},user_id.eq.${uid}`).limit(1000);
+      if (lErr) return json({ error: `Dosyalar okunamadı: ${lErr.message}` }, 500);
+      dosyaIdler = ((liste ?? []) as { id: string }[]).map((x) => x.id);
+      if (dosyaIdler.length === 0) {
+        return json({ ok: true, yeterli_veri: true, toplam_saat: 0, kalemler: [] });
+      }
+    }
+
+    const kalemler: Record<string, unknown>[] = [];
+    let toplamSaat = 0;
+    let saatliKalem = 0;
+
+    for (const k of KALEMLER) {
+      let adet = 0;
+      const sayimHatalari: string[] = [];
+      for (const t of k.tablolar) {
+        const { count, error: sErr } = await admin.from(t)
+          .select("id", { count: "exact", head: true }).in("case_id", dosyaIdler);
+        if (sErr) { sayimHatalari.push(`${t}: ${sErr.message}`); continue; }
+        adet += count ?? 0;
+      }
+
+      const saat = b[k.anahtar];
+      /* BEYAN YOKSA SAATE ÇEVRİLMEZ. Adet yine gösterilir — arabulucu ajanın ne
+         ürettiğini görür — ama uydurma katsayıyla saate çevrilmez. */
+      if (saat == null) {
+        kalemler.push({
+          etiket: k.etiket, adet, beyan_saat: null, soru: k.soru,
+          durum: "beyan verilmedi — saate çevrilmedi",
+          ...(sayimHatalari.length ? { sayim_hatalari: sayimHatalari } : {}),
+        });
+        continue;
+      }
+      saatliKalem++;
+      const kalemSaat = adet * Number(saat);
+      toplamSaat += kalemSaat;
+      kalemler.push({
+        etiket: k.etiket, adet, beyan_saat: Number(saat),
+        kalem_saat: Math.round(kalemSaat * 10) / 10,
+        // Hesabın KENDİSİ görünür (§15.1 camdan kutu).
+        hesap: `kendi verdiğiniz ${saat} saat × ${adet} = ${Math.round(kalemSaat * 10) / 10} saat`,
+        ...(sayimHatalari.length ? { sayim_hatalari: sayimHatalari } : {}),
+      });
+    }
+
+    if (saatliKalem === 0) {
+      return json({
+        ok: true, yeterli_veri: false, sebep: "beyan_yok",
+        mesaj: "Üç sorunun hiçbiri yanıtlanmadığı için saat hesaplanmadı.",
         kalemler,
       });
     }
@@ -126,12 +162,10 @@ Deno.serve(async (req) => {
     return json({
       ok: true,
       yeterli_veri: true,
-      toplam_dakika: toplamDakika,
-      toplam_saat: Math.round((toplamDakika / 60) * 10) / 10,
-      // Rakamın niteliği gizlenmez: bu bir TAHMİNDİR, ölçüm değil.
-      nitelik: "tahmin",
-      aciklama: "Ajanın ürettiği işlerin elle yapılsaydı süreceği tahmini süre. "
-        + "Katsayılar yöneticinin girdiği değerlerdir; her kalemin dayanağı listede.",
+      kapsam: case_id ? "dosya" : "tum_dosyalar",
+      toplam_saat: Math.round(toplamSaat * 10) / 10,
+      // Rakamın niteliği gizlenmez: arabulucunun KENDİ beyanına dayanır.
+      nitelik: "arabulucunun kendi beyanına dayalı hesap",
       kalemler,
     });
   } catch (e) {

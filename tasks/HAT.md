@@ -308,6 +308,92 @@ Seçim: A / B / C / (kendi metniniz)
 Not: (varsa)
 ```
 
+### H-15/1 · CEVAP DEĞİŞTİ · 25.08.2026 — SIFIR SAKLAMA
+**Bu blok, aşağıdaki "TEK ÇATI 5 YIL" kararının YERİNE GEÇER. 5 yıl artık geçersizdir.**
+
+**Kurucu kararı:** *"Süreç bitince her şey silinecek. İmzalı tutanaklar hariç —
+onları da zaten UYAP'a arabulucu yüklüyor, yani Medipact onları bile tutmayacak."*
+
+Yani ürünün saklama modeli **sıfır saklamadır**: dosya kapandığında dosyaya ait
+her şey silinir. Resmî nüsha UYAP'tadır; Medipact arşiv değildir, **çalışma
+tezgâhıdır**. Bu, ürünün "kör veri" çekirdeğiyle ve constitution m.10 ile
+tam uyumludur ve konumlandırma açısından da güçlüdür.
+
+**CANLIDA UYGULANDI (Cowork, 25.08.2026):** `saklama_sureleri` güncellendi —
+`case_documents · case_notes · oturum_kaydi_dokum · dosya_kapanis_sonrasi ·
+oturum_kaydi_ses` → **`saklama_gun = 0`**.
+`saklama_gun` check kısıtı `> 0` idi, **`>= 0` yapıldı** (0 = "anında/kapanışta
+sil" artık ifade edilebiliyor; H-15'te bildirilen kusur kapandı).
+`odeme_kayitlari` **şimdilik 3650'de bırakıldı** — aşağıdaki açık soruya bakınız.
+
+**CODE'A: SİLME TETİĞİ KAPANIŞ DEĞİL, ARABULUCUNUN AÇIK EYLEMİDİR.**
+Dosya kapanır kapanmaz anında silinirse arabulucu belgeleri indirip UYAP'a
+yükleyemeden veriyi kaybeder. Kurulacak akış:
+1. Dosya kapanır → veri **henüz silinmez**, ekranda "İmzalı tutanağı indir /
+   UYAP'a yükle" adımı görünür.
+2. Arabulucu **"Dosyayı kapat ve tüm verileri sil"** düğmesine basar → silinir.
+   Bu düğme geri alınamaz olduğu için tek seferlik onay ister.
+3. **Emniyet süpürgesi:** arabulucu unutursa kapanıştan N gün sonra otomatik
+   silinir (N kurucu onayı bekliyor, öneri 30 gün).
+Silme **gerçekten silme** olmalı: depo nesnesi + satır. Tezgâhla kanıtlanacak
+(H-14 şart 1'deki gibi).
+
+**`Verilerim.tsx` metni de değişecek:** tarafa artık "5 yıl" ya da "Belirsiz"
+değil, **"Süreç bittiğinde silinir"** yazacak. Sabit metinler (`SURE_BELGE`,
+`SURE_MALI`, `SURE_ANALIZ`, `SURE_TANIMSIZ`) kaldırılıp tablodan okunacak;
+14 kategori ↔ tablo eşlemesi yine kurulacak, "Belirsiz" yazan kategori kalmayacak.
+
+**ÜÇ AÇIK SORU CEVAPLANDI (kurucu, 25.08.2026) — CANLIDA UYGULANDI. TEKRAR SORMA (§7-B).**
+1. **Mali kayıt → SİLİNİR.** Gerekçe (kurucu): *"Makbuz bizim sistemimizden
+   kesilmiyor, onun için ayrı programlar var; biz ödeme programı da yaparsak
+   içinden çıkamayız."* Sistem yalnız **ücret hesabı / dökümü** üretir; makbuz
+   için arabulucu **kendi kullandığı programa yönlendirilir** (link), makbuzu
+   orada keser. Yani mevzuat gereği saklanması gereken mali kayıt Medipact'te
+   **oluşmuyor** → `odeme_kayitlari` dosyayla birlikte silinir.
+   **Code'a iş:** ödeme yüzeyinde makbuz kesme YOK; hesap dökümü + dış programa
+   yönlendirme linki olacak. Ödeme programı yazılmayacak (§16'ya da geçsin).
+2. **Onay kayıtları → KALICI.** Silinmez. Ama **içerik taşımaz**: yalnız kim ·
+   ne zaman · hangi metnin hangi sürümü · onay/ret. Beyan, belge, tutar, TCKN,
+   adres bu kayda GİRMEZ.
+3. **Anonim kapanış istatistiği → KALICI** (varsayım teyit edildi).
+4. **Otomatik süpürme → 7 GÜN.** Arabulucu "Dosyayı kapat ve tüm verileri sil"
+   derse **anında**; demezse kapanıştan **7 gün** sonra otomatik silinir.
+   7 gün, tutanağı indirip UYAP'a yükleme payıdır.
+
+**CANLIDA UYGULANDI (Cowork):** `saklama_sureleri`ye `kalici boolean` kolonu
+eklendi (NULL süre ile "kalıcı"yı ayırt etmek için — NULL artık "tanımsız"
+demek değil). Son durum:
+| veri_turu | saklama_gun | baslangic | kalici |
+|---|---|---|---|
+| `onay_kayitlari` | NULL | olusturma | **true** |
+| `anonim_kapanis_istatistigi` | NULL | olusturma | **true** |
+| `case_documents` | 7 | dosya_kapanisi | false |
+| `case_notes` | 7 | dosya_kapanisi | false |
+| `oturum_kaydi_dokum` | 7 | dosya_kapanisi | false |
+| `dosya_kapanis_sonrasi` | 7 | dosya_kapanisi | false |
+| `odeme_kayitlari` | 7 | dosya_kapanisi | false |
+| `oturum_kaydi_ses` | 0 | olusturma | false |
+
+**Kurucunun sonradan gözden geçirebileceği tek nokta (şimdi iş üretmez):**
+kalıcı onay kaydı "kimin onayı" bilgisini taşıyacaksa taraf kimliği de kalıcı
+olur. Bu yüzden kimlik alanı **en dar** tutulacak: ad-soyad + dosya numarası.
+TCKN, adres, iletişim, beyan bu kayda girmez.
+
+**ESKİ SORU LİSTESİ (cevaplandı, arşiv):**
+1. **Ödeme / mali kayıt.** Arabuluculuk ücretine ilişkin mali kayıtta saklama
+   yükümlülüğü mevzuattan gelir ve kurucunun feragat edebileceği bir şey
+   olmayabilir. Soru: mali kayıt Medipact'te mi kalsın (bugünkü hâl: 10 yıl),
+   yoksa o da silinip arabulucunun kendi muhasebesine mi bırakılsın?
+   Şimdilik **10 yılda bırakıldı** — silmemek, yanlış silmekten güvenlidir.
+2. **Onay kayıtları.** KVKK aydınlatma onayı · YZ kullanım beyanı onayı ·
+   oturum kaydı onayı/reddi. Bunlar "usulüne uydum"un ispatıdır. Her şeyle
+   birlikte silinirse, sonradan bir şikâyette elde kanıt kalmaz. Silinsin mi,
+   yoksa **içeriksiz** (yalnız "şu tarihte onay alındı") bir iz mi kalsın?
+3. **Anonim kapanış istatistiği** (veri çarkı, §5.9). İçerik/taraf adı/tutar
+   taşımadığı için "veri" sayılmaz ve kazanım sayacının da kaynağıdır.
+   **Varsayım: kalır.** Aksi söylenmezse böyle kurulacak.
+
+---
 ### H-15 · CEVAP · 25.08.2026 — DÖRT KARARIN TAMAMI
 
 **ÖNCE BİR DÜZELTME (Code'a).** H-15'te "tanım yok, tablo yok, kod yok" denen iki
@@ -320,7 +406,9 @@ madde için **tanım MİMARİDE ZATEN VAR**; eksik olan yalnız rakam/kalem:
 Bundan sonra "tanımsız" demeden önce bu iki dosya okunacak.
 
 ---
-**1) SAKLAMA SÜRELERİ · Seçim: A — TEK ÇATI, 5 YIL.**
+**1) SAKLAMA SÜRELERİ — ⛔ BU MADDE GEÇERSİZ. Yukarıdaki "SIFIR SAKLAMA" bloğu
+yerine geçti. Aşağıdaki 5 yıl metni yalnız tarihçe içindir, UYGULANMAYACAK.**
+~~Seçim: A — TEK ÇATI, 5 YIL.~~
 Not: Code'un önerdiği **1 yıl REDDEDİLDİ.** Gerekçe: `src/pages/Verilerim.tsx`
 tarafa **zaten** "dosya kapanışından sonra 5 yıl" gösteriyor ve `mimari §12.5.9`
 da 5 yıl diyor. 1 yıl yazılsaydı aynı ekranda belge 5 yıl / beyan 1 yıl görünür,

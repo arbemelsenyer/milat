@@ -21,11 +21,35 @@ type Kategori = {
   not?: string;
 };
 
-// Saklama süreleri mimari §12.5.9'dan ve 16.08 kayıt protokolü kararından alınmıştır.
-const SURE_BELGE = "Dosya kapanışından sonra 5 yıl (arabulucu gerekçeyle 10 yıla uzatabilir)";
-const SURE_MALI = "10 yıl (mali kayıt)";
-const SURE_ANALIZ = "Dosya belgeleriyle aynı süre (5 yıl)";
-const SURE_TANIMSIZ = "Belirsiz — bu kayıt tipi için saklama süresi henüz parametre olarak tanımlanmadı";
+/* SAKLAMA SÜRELERİ ARTIK PARAMETRE TABLOSUNDAN OKUNUR (25.08.2026).
+   Önceden bu ekranda dört sabit metin vardı ve **14 kategorinin 10'unda**
+   tarafa "Belirsiz — saklama süresi henüz parametre olarak tanımlanmadı"
+   yazıyordu. Kurucu kararıyla (HAT H-15/1) `public.saklama_sureleri` tablosu
+   kuruldu ve değerler girildi: tek çatı **5 yıl** (dosya kapanışından itibaren),
+   mali kayıt **10 yıl**, ham ses anında silinir.
+   Bu ekran o tabloyu okur — süre değişince kod değişmez, ekran kendiliğinden
+   güncellenir. Sabit metin BIRAKILMADI: "Belirsiz" yalnızca tablo gerçekten
+   okunamadığında görünür ve o zaman da sebebi açıkça yazılır (§15.1: veri
+   yoksa uydurma yok). */
+type SaklamaSuresi = { veri_turu: string; saklama_gun: number | null; baslangic: string };
+
+/** Gün sayısını insan diline çevirir. Tablo tek doğruluk kaynağıdır. */
+function sureMetni(kayit: SaklamaSuresi | undefined, okunabildiMi: boolean): string {
+  if (!okunabildiMi) {
+    return "Şu an gösterilemiyor — saklama süresi tablosu okunamadı. Arabulucunuza sorabilirsiniz.";
+  }
+  if (!kayit) {
+    return "Bu kayıt tipi için saklama süresi henüz tanımlanmadı.";
+  }
+  if (kayit.saklama_gun == null) {
+    return "İşlenir işlenmez silinir; saklanmaz.";
+  }
+  const yil = kayit.saklama_gun / 365;
+  const sure = Number.isInteger(yil) ? `${yil} yıl` : `${kayit.saklama_gun} gün`;
+  return kayit.baslangic === "dosya_kapanisi"
+    ? `Dosya kapanışından sonra ${sure}`
+    : `Kaydın oluşturulmasından sonra ${sure}`;
+}
 
 export default function Verilerim() {
   const { user, isLoading } = useAuth();
@@ -40,6 +64,25 @@ export default function Verilerim() {
       setYukleniyor(true);
       setHata(null);
       try {
+        /* SAKLAMA SÜRELERİ — tek doğruluk kaynağı `public.saklama_sureleri`.
+           Okunamazsa uydurulmaz: ekranda "gösterilemiyor" denir ve sebebi
+           yazılır (§15.1). Süre değişince bu ekran kendiliğinden güncellenir. */
+        const sureler = new Map<string, SaklamaSuresi>();
+        let sureTablosuOkundu = true;
+        {
+          const { data: sureSatirlari, error: sErr } = await supabase
+            .from("saklama_sureleri" as never)
+            .select("veri_turu, saklama_gun, baslangic");
+          if (sErr) {
+            sureTablosuOkundu = false;
+            console.error("[Verilerim] saklama süreleri okunamadı:", sErr.message);
+          } else {
+            for (const r of ((sureSatirlari ?? []) as unknown as SaklamaSuresi[])) {
+              sureler.set(r.veri_turu, r);
+            }
+          }
+        }
+
         // Kendi taraf kayıtlarım (RLS: yalnız user_id = auth.uid() satırları döner).
         const { data: taraflarim, error: pErr } = await supabase.from("case_parties")
           .select("id, statement").eq("user_id", user.id);
@@ -85,86 +128,86 @@ export default function Verilerim() {
             ad: "Taraf kaydım (ad, iletişim, kimlik/vergi no, adres, varsa vekil bilgisi)",
             sayi: (taraflarim ?? []).length,
             gorebilen: "Siz, arabulucunuz ve yönetici. Karşı taraf göremez.",
-            sure: SURE_TANIMSIZ,
+            sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
           },
           {
             ad: "Uyuşmazlığa ilişkin beyanım",
             sayi: beyanSayisi,
             gorebilen: "Siz, arabulucunuz ve yönetici. Karşı taraf göremez.",
-            sure: SURE_TANIMSIZ,
+            sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
           },
           {
             ad: "Yüklediğim belgeler",
             sayi: belge,
             gorebilen: "Yalnız siz (kendi yüklediğiniz) ve arabulucunuz. Karşı taraf göremez.",
-            sure: SURE_BELGE,
+            sure: sureMetni(sureler.get("case_documents"), sureTablosuOkundu),
           },
           {
             ad: "İhtiyaç tespiti sorularım ve cevaplarım",
             sayi: kesif,
             gorebilen: "Siz ve arabulucunuz. Karşı taraf göremez.",
-            sure: SURE_TANIMSIZ,
+            sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
           },
           {
             ad: "Dosya içinde yazdığım mesajlar",
             sayi: mesaj,
             gorebilen: "Dosyadaki katılımcılar: arabulucu ve dosyadaki taraflar.",
-            sure: SURE_TANIMSIZ,
+            sure: sureMetni(sureler.get("case_notes"), sureTablosuOkundu),
             not: "Bu kategori istisnadır: mesajlaşma yüzeyi dosya katılımcılarına açıktır.",
           },
           {
             ad: "Kabul aralığım (koşullu aralık / braket)",
             sayi: braket,
             gorebilen: "Siz ve arabulucunuz. Karşı taraf rakamlarınızı göremez.",
-            sure: SURE_TANIMSIZ,
+            sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
           },
           {
             ad: "Kör teklifim",
             sayi: korTeklif,
             gorebilen: "Siz ve arabulucunuz. Karşı taraf göremez.",
-            sure: SURE_TANIMSIZ,
+            sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
           },
           {
             ad: "Ödeme kayıtlarım",
             sayi: odeme,
             gorebilen: "Siz, arabulucunuz ve yönetici.",
-            sure: SURE_MALI,
+            sure: sureMetni(sureler.get("odeme_kayitlari"), sureTablosuOkundu),
           },
           {
             ad: "Bana ait ajan görev kayıtları",
             sayi: ajanGorev,
             gorebilen: "Siz (yalnız size yönelik satırlar), arabulucunuz ve yönetici.",
-            sure: SURE_TANIMSIZ,
+            sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
           },
           {
             ad: "Yapay zekâ kullanım bilgilendirmesi onayım",
             sayi: yzOnay,
             gorebilen: "Belirsiz — bu kaydın erişim politikası bu sayfadan doğrulanamadı.",
-            sure: SURE_TANIMSIZ,
+            sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
           },
           {
             ad: "Oturum kaydı onayım / reddim",
             sayi: kayitOnay,
             gorebilen: "Siz (yalnız kendi kararınız) ve arabulucunuz.",
-            sure: SURE_TANIMSIZ,
+            sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
           },
           {
             ad: "Randevu tekliflerim ve cevaplarım",
             sayi: randevu,
             gorebilen: "Belirsiz — bu kaydın erişim politikası bu sayfadan doğrulanamadı.",
-            sure: SURE_TANIMSIZ,
+            sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
           },
           {
             ad: "Bildirdiğim müsait gün ve saatler",
             sayi: musaitlik,
             gorebilen: "Belirsiz — bu kaydın erişim politikası bu sayfadan doğrulanamadı.",
-            sure: SURE_TANIMSIZ,
+            sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
           },
           {
             ad: "Hakkımda üretilen, yalnız arabulucuya açık analizler",
             sayi: null,
             gorebilen: "Yalnız arabulucunuz ve yönetici. Siz de karşı taraf da göremezsiniz.",
-            sure: SURE_ANALIZ,
+            sure: sureMetni(sureler.get("case_notes"), sureTablosuOkundu),
             not: "Bu kayıtların sayısı bu sayfadan okunamaz; erişim politikası izin vermez.",
           },
         ]);
