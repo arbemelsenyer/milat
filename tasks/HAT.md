@@ -306,6 +306,51 @@ analizine giriyor olur — pilotta bir taraf bunu sorarsa savunulacak dayanak
 yalnız aydınlatmadır. B/C'de rıza kaydı denetlenebilir biçimde tutulur.
 
 
+---
+
+### H-14 · 25.08.2026 · P1 — Sesli oturum notu: ses nereye gidecek? (§15.2)
+**Sorun.** §15.2: "Oturum sonrası özet **hem yazılı hem sesli** girilebiliyor;
+sesli not metne dökülüp arabulucunun onayıyla föye ve analiz zincirine giriyor."
+
+**Yazılı yarı KURULU ve canlı:** `MeetingNotesPanel` → `analyze-meeting-notes`
+→ `case_notes` (phase 7) → orkestratör bunu görüşme malzemesi sayıyor.
+**Onay kapısı da kurulu:** `kayit_onay_talepleri` / `kayit_onaylari`,
+`create-video-room` odayı tüm katılımcıların onayına bağlıyor (B18).
+**Şema da hazır:** `oturum_kayitlari.ses_dosya_yolu` · `dokum_metni`, ve
+`ajan-nobetci` içinde 24 saatlik imha kolu çalışıyor.
+
+**Eksik olan tek şey ses hattı** — ve o, Code'un tek başına veremeyeceği bir
+karara bağlı: **ses verisi sistemden çıkacak mı, çıkacaksa nereye?**
+
+Bugünkü aydınlatma metni yalnız **metin** analizinden ve **Google Gemini
+API**'den söz ediyor. Ses kaydını bir konuşma-tanıma servisine göndermek
+**yeni bir veri işleme türüdür**; mevcut aydınlatma bunu kapsamaz (§7.4).
+
+**Seçenekler.**
+| | ses nereden gelir / nereye gider | bedeli |
+|---|---|---|
+| **A** | Arabulucunun tarayıcısı kaydeder (MediaRecorder) → kovaya yüklenir → döküm bir STT servisine gider | En esnek; **ses üçüncü tarafa çıkar** → aydınlatma metni güncellenmeli, taraf rızası gözden geçirilmeli |
+| B | Yalnız arabulucunun **kendi sesli notu** (taraf sesi yok) kaydedilir | Taraf verisi hiç çıkmaz; §15.2'nin "oturum sonrası özet" ifadesine birebir uyar — özet arabulucunundur |
+| C | Video sağlayıcısı kaydeder, kayıt oradan çekilir | Onay kapısı zaten videoya bağlı; ama kayıt sağlayıcının altyapısında da durur |
+| D | Ses hiç işlenmez; yalnız yazılı not kalır | §15.2 sağlanmaz |
+
+**Önerim: B.** Şartın sözü "**oturum sonrası özet**"tir — özeti giren
+arabulucudur, taraf değil. B ile taraf sesi hiç kaydedilmez, KVKK yüzeyi
+dramatik biçimde küçülür ve aydınlatma metnine yalnız "arabulucunun sesli notu
+metne dökülür" cümlesi eklenir. A'ya pilottan sonra, taraf rızası tasarımı
+yeniden ele alınarak geçilebilir.
+
+**Kararın etkisi.** A veya C seçilirse: aydınlatma metni güncellenir, taraf
+rızası (H-13) yeniden değerlendirilir, STT servisi seçilir (maliyet + veri
+yeri). B seçilirse: yalnız arabulucu kaydı, mevcut rıza yapısı yeterli.
+D seçilirse §15.2 kalemi pilot kapısında **açık kalır**.
+
+**Karar geldiğinde Code'un yapacağı iş (B varsayımıyla):** kayıt düğmesi +
+kovaya yükleme + STT çağrısı + `dokum_metni` yazımı + arabulucu onayı + föye
+aktarım. Ayrıca HAT **H-4** (kovaya dar okuma politikası) bu hat yazılınca
+kapanabilir hâle gelir — yol düzeni ancak o zaman belli olur.
+
+
 ## COWORK → CODE
 
 _Cevaplar buraya yazılır. Biçim:_

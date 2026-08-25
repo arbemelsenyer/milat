@@ -4,7 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P1 · pilot kuyruğu 1. madde — taraf aydınlatma metni**
+- Son tamamlanan iş: **P2 · ücret tarife tabanı (zaten kuruluymuş, kilitlendi)**
 - **SESSİZ ÇAĞRI KUSURU İSTEMCİ YÜZEYİNİN TAMAMINDA KAPANDI:** `.from` ·
   `.rpc` · `.storage` · `.functions.invoke` · iç `fetch`. Kenar (`_shared`
   dâhil) ve ön yüz. Kenarda çıplak `.from(...)`, `.rpc(...)` ve
@@ -119,13 +119,21 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       engellenmedi; karar kurucuda.
       · **Canlı:** publish doğrulandı (`get_project`: `latest_commit_sha=0bfcef82…`).
 
-- [ ] P1 · **Oturum kaydı hattı yok (ses → döküm → föy)** · Kabul: arabulucu oturum
-      sonrası notu **hem yazılı hem sesli** girebiliyor; ses `oturum-kayitlari` kovasına
-      yükleniyor, `oturum_kayitlari.ses_dosya_yolu` doluyor, döküm `dokum_metni`ne
-      yazılıyor ve arabulucunun **onayıyla** föye/analiz zincirine giriyor ·
-      **Bulgu:** şema hazır (11 kolon) ve silme kolu çalışıyor, ama kovanın kodda
-      tek tüketicisi silme kolu — **yükleme yolu hiç yazılmamış.** HAT **H-4** de
-      bu hattı bekliyor (yol düzeni belirlenince dar okuma politikası yazılacak).
+- [!] P1 · **Sesli oturum notu hattı** · **BLOCKED → HAT H-14** (25.08) · Kabul:
+      arabulucu sesli not girebiliyor; ses kovaya yükleniyor, döküm `dokum_metni`ne
+      yazılıyor ve **arabulucunun onayıyla** föye/analiz zincirine giriyor
+      · **Denenenler / bulunanlar:** yazılı yarı **KURULU ve canlı**
+      (`MeetingNotesPanel` → `analyze-meeting-notes` → `case_notes` phase 7 →
+      orkestratör). Onay kapısı **kurulu** (`kayit_onay_talepleri`/`kayit_onaylari`,
+      `create-video-room` B18 kapısı). Şema **hazır** (`oturum_kayitlari`), 24 saatlik
+      imha kolu **çalışıyor**. Eksik olan yalnız ses hattı.
+      · **Kalan engel:** ses verisinin sistemden çıkıp çıkmayacağı **hukuki/ürün
+      kararıdır** (§7.2/§7.4) — bugünkü aydınlatma metni yalnız METİN analizinden ve
+      Gemini'den söz ediyor, ses kaydı yeni bir işleme türüdür. Önerim: yalnız
+      arabulucunun kendi sesli notu (taraf sesi hiç kaydedilmez).
+      · **Bağlı madde:** HAT **H-4** (kovaya dar okuma politikası) ancak bu hat
+      yazılınca yol düzeni belli olduğu için kapanabilir.
+
 - [ ] P1 · **Saklama süresi parametre tablosu + periyodik imha yok** · Kabul: saklama
       süreleri bir parametre tablosundan okunuyor (kodda sabit değil) ve süresi dolan
       kayıtlar periyodik olarak imha ediliyor; imha kayda geçiyor · **Bulgu:**
@@ -151,8 +159,16 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       bloker) · Kabul: ödeme defterinde satır ekleme/düzenleme/silme canlıda uçtan uca
       çalışıyor ve Kaydet düğmesi her durumda görünür · **Bulgu:** `case_payments`
       (17 kolon) ve `fee_tariffs` şeması var; §15.5'te "son doğrulama" olarak açık.
-- [ ] P2 · **Ücret hesabı tarife tabanının altına inmiyor** · Kabul: tarife tabanının
-      altında bir ücret kaydedilemiyor; deneme reddediliyor ve sebebi gösteriliyor.
+- [x] P2 · **Ücret hesabı tarife tabanının altına inmiyor** · **DONE 25.08.2026
+      (zaten kuruluymuş — doğrulandı ve kilitlendi)** · Kabul: tarife tabanının altında
+      bir ücret kaydedilemiyor; deneme reddediliyor ve sebebi **taban rakamıyla**
+      gösteriliyor · Doğrulama: `tests/ucret-tabani.test.ts` (5 durum) · 280/280 test
+      · **Bulgu:** kural **üç yazım yolunun üçünde de** kuruluymuş
+      (`saveUcretSozlesmesi` · tekil ödeme satırı · `saveStagedRows`); üçü de
+      yazımdan ÖNCE denetliyor ve `return` ile durduruyor, mesajda tabanı gösteriyor
+      (`AAÜT tabanının altına inilemez (taban: …)`). Taban kodda sabit değil:
+      `calculate-mediation-fee` `fee_tariffs` tablosundan okuyor.
+      **Yeniden yazılmadı** — tezgâh gerilemeye karşı kilitledi.
 
 ### Canlı doğrulama maddeleri (kod değil, kanıt üretir)
 - [ ] P2 · **§3 otomatik doldurma tam mı** · Kabul: gerçek bir dosyada §3 kalemlerinin
