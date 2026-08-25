@@ -196,6 +196,10 @@ Deno.serve(async (req) => {
 
     const yazilan: any[] = [];
     const eksikler: string[] = [];
+    /* YAZILAMAYAN KALEM: bu işlevin ÜRÜNÜ `taraf_kalemleri` satırıdır. Yazım
+       sessizce düşerse taraf "kalemlerinizi çıkardım" duyar ama listede hiçbir
+       şey yoktur; üstelik belge "işlendi" damgalanırsa kalemler KALICI kaybolur. */
+    const yazilamayan: string[] = [];
 
     // BÖLÜM 2 — hangi belgelerin atlandığı sohbete tek satırla yazılır.
     const atlananBelge: string[] = [];
@@ -284,6 +288,7 @@ ${alintiOlarakSar(belgeMetni.slice(0, MAX_GIRDI), "BELGE")}`,
       await anlatim.adim(`${adaylar.length} talep kalemi buldum.`);
 
       let dayanaksizSayisi = 0;
+      const yazilamayanOnce = yazilamayan.length;
 
       for (const aday of adaylar) {
         const kalemAdi = temiz(aday?.kalem_adi).slice(0, 120);
@@ -335,17 +340,31 @@ ${alintiOlarakSar(belgeMetni.slice(0, MAX_GIRDI), "BELGE")}`,
 
         // MÜKERRER YAZMA: aynı dosya + taraf + kalem adı bir kez yazılır.
         // Tarafın kendi girdiği satıra (kaynak='taraf') DOKUNULMAZ.
-        const { data: varOlan } = await admin.from("taraf_kalemleri")
+        /* MÜKERRER KAPISI OKUNAMAZSA YAZILMAZ: sorgu düşerse `varOlan` boş
+           döner ve kod var olan kalemin ÜSTÜNE ikinci satır yazar. Kalemi
+           atlamak, mükerrer kalem üretmekten iyidir — belge işaretlenmediği
+           için sonraki koşum yeniden dener. */
+        const { data: varOlan, error: bakErr } = await admin.from("taraf_kalemleri")
           .select("id, kaynak").eq("case_id", case_id).eq("party_id", party_id)
           .eq("kalem_adi", kalemAdi).maybeSingle();
+        if (bakErr) {
+          console.error(`[taraf-kalem-cikar] mükerrer kontrolü okunamadı: ${bakErr.message}`);
+          yazilamayan.push(kalemAdi);
+          continue;
+        }
         if (varOlan) {
           if (String((varOlan as any).kaynak) === "taraf") continue;   // insan üstündür
-          await admin.from("taraf_kalemleri").update({
+          const { error: gunErr } = await admin.from("taraf_kalemleri").update({
             tutar, dayanak_belge_id: dayanakBelgeId, dayanak_alinti: alinti || null,
             ajan_notu: notlar.join(" · ") || null, durum,
           }).eq("id", (varOlan as any).id);
+          if (gunErr) {
+            console.error(`[taraf-kalem-cikar] kalem güncellenemedi: ${gunErr.message}`);
+            yazilamayan.push(kalemAdi);
+            continue;
+          }
         } else {
-          await admin.from("taraf_kalemleri").insert({
+          const { error: yazErr } = await admin.from("taraf_kalemleri").insert({
             case_id, party_id, kalem_adi: kalemAdi, tutar,
             para_birimi: "TRY",
             dayanak_belge_id: dayanakBelgeId,
@@ -353,6 +372,11 @@ ${alintiOlarakSar(belgeMetni.slice(0, MAX_GIRDI), "BELGE")}`,
             ajan_notu: notlar.join(" · ") || null,
             durum, kaynak: "ajan",
           });
+          if (yazErr) {
+            console.error(`[taraf-kalem-cikar] kalem yazılamadı: ${yazErr.message}`);
+            yazilamayan.push(kalemAdi);
+            continue;
+          }
         }
         yazilan.push({ kalem_adi: kalemAdi, durum, belgesiz: belgesizKalem });
       }
@@ -362,11 +386,20 @@ ${alintiOlarakSar(belgeMetni.slice(0, MAX_GIRDI), "BELGE")}`,
       }
 
       /* Bu belge işlendi: işaret yazılır ki ikinci koşumda aynı belgeden
-         yeniden kalem üretilmesin. Yazılamazsa sebep defter notuna girer. */
-      const bellekNotu = await bellekYaz(admin, case_id, party_id, belgeAnahtari, {
-        zaman: new Date().toISOString(),
-      });
-      if (bellekNotu) console.error(`[defter] bellekYaz yazılamadı: ${bellekNotu}`);
+         yeniden kalem üretilmesin. Yazılamazsa sebep defter notuna girer.
+         KAPI: bu belgenin bir kalemi yazılamadıysa belge İŞLENDİ SAYILMAZ —
+         damga atılırsa sonraki koşum belgeyi atlar ve kalem kalıcı kaybolur. */
+      if (yazilamayan.length > yazilamayanOnce) {
+        console.error(
+          `[taraf-kalem-cikar] "${temiz(belge.file_name).slice(0, 60)}" işlendi damgalanmadı: ` +
+          `${yazilamayan.length - yazilamayanOnce} kalem yazılamadı`,
+        );
+      } else {
+        const bellekNotu = await bellekYaz(admin, case_id, party_id, belgeAnahtari, {
+          zaman: new Date().toISOString(),
+        });
+        if (bellekNotu) console.error(`[defter] bellekYaz yazılamadı: ${bellekNotu}`);
+      }
     }
 
     if (atlananBelge.length > 0) {
@@ -377,11 +410,20 @@ ${alintiOlarakSar(belgeMetni.slice(0, MAX_GIRDI), "BELGE")}`,
 
     /* Niteliği gereği belgeye bağlanmayan kalemler SORULACAKLAR listesine
        girmez — onlarda eksik yoktur, bilgi notu vardır. */
-    if (yazilan.length === 0 && atlananBelge.length > 0) {
+    if (yazilan.length === 0 && atlananBelge.length > 0 && yazilamayan.length === 0) {
       await anlatim.bitti({
         yapildi: "Bu belgelerden kalem daha önce çıkarılmıştı; yeniden çıkarmadım.",
       });
       return json({ kalem: 0, sebep: "belgelerden daha önce kalem çıkarıldı" });
+    }
+
+    /* YAZILAMAYAN KALEM SESSİZ GEÇİLMEZ: taraf listede eksik gördüğünde
+       sebebini bilmeli. Belge damgalanmadığı için sonraki koşum yeniden dener. */
+    if (yazilamayan.length > 0) {
+      eksikler.push(
+        `${yazilamayan.length} kalemi kaydedemedim (${yazilamayan.slice(0, 3).map((a) => `"${a}"`).join(", ")}); ` +
+        "bu belgeleri yeniden okuyacağım.",
+      );
     }
 
     const dayanaksiz = yazilan.filter((k) => k.durum === "dayanaksiz" && !k.belgesiz);
@@ -409,6 +451,7 @@ ${alintiOlarakSar(belgeMetni.slice(0, MAX_GIRDI), "BELGE")}`,
 
     return json({
       kalem: yazilan.length, dayanaksiz: dayanaksiz.length,
+      ...(yazilamayan.length > 0 ? { yazilamayan: yazilamayan.length } : {}),
       // BÖLÜM 1 — defter yazımı düştüyse sebebi çağırana taşınır, yutulmaz.
       ...(anlatim.defter_notu ? { defter_notu: anlatim.defter_notu } : {}),
     });

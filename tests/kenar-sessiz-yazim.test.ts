@@ -124,4 +124,28 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     expect(g).toContain("Beyan yazılamadı:");
     expect(g).toContain("Yanıt yazılamadı:");
   });
+
+  it("talep kalemi: yazılamayan kalem varken belge 'işlendi' damgalanmıyor", () => {
+    // Bu islevin URUNU `taraf_kalemleri` satiridir. Yazim sessizce duserse taraf
+    // "kalemlerinizi cikardim" duyar ama listede hicbir sey yoktur; ustelik belge
+    // "islendi" damgalanirsa MUKERRER KOSUM KAPISI o belgeyi bir daha hic okumaz
+    // ve kalemler KALICI kaybolur.
+    const g = oku("taraf-kalem-cikar");
+    for (const im of ["bakErr", "gunErr", "yazErr"]) expect(g, `${im} okunmuyor`).toContain(im);
+    // Damga kapisi: yazilamayan varken bellekYaz CALISMAMALI.
+    expect(g, "yazılamayan kalem varken belge işlendi damgalanıyor")
+      .toMatch(/if\s*\(\s*yazilamayan\.length\s*>\s*yazilamayanOnce\s*\)/);
+    const damgaIdx = g.indexOf("yazilamayan.length > yazilamayanOnce");
+    const bellekIdx = g.indexOf("bellekYaz(admin, case_id, party_id, belgeAnahtari");
+    expect(damgaIdx, "damga kapısı yok").toBeGreaterThan(-1);
+    expect(bellekIdx, "bellekYaz kapının ARDINDA değil").toBeGreaterThan(damgaIdx);
+    // Mukerrer kontrolu okunamazsa kalem ATLANIR (ikinci satir yazilmaz).
+    expect(g).toContain("mükerrer kontrolü okunamadı");
+    // Eksik carana ve tarafa bildirilir.
+    expect(g).toContain("kalemi kaydedemedim");
+    expect(g).toMatch(/yazilamayan:\s*yazilamayan\.length/);
+    // Bu dosyada CIPLAK `await admin.from(...)` yazimi kalmamali.
+    const ciplak = g.split(String.fromCharCode(10)).filter((l) => /^\s*await\s+admin\.from\(/.test(l));
+    expect(ciplak, `sonucu okunmayan yazım: ${ciplak.join(" | ")}`).toEqual([]);
+  });
 });
