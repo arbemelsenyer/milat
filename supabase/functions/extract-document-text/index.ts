@@ -129,8 +129,12 @@ Deno.serve(async (req) => {
           text = await extractFromBlob(blob, doc.file_name, doc.mime_type);
         } catch (e: any) {
           if (e instanceof UnsupportedFormatError) {
-            await admin.from("case_documents").update({ extraction_status: "desteklenmeyen_format" }).eq("id", doc.id);
-            results.push({ id: doc.id, status: "desteklenmeyen_format" });
+            // supabase-js firlatmaz: sonuc okunmazsa durum yazilmamis olsa bile
+            // cagirana yazilmis gibi bildirilir ve belge eski durumunda takilir.
+            const { error: dfErr } = await admin.from("case_documents")
+              .update({ extraction_status: "desteklenmeyen_format" }).eq("id", doc.id);
+            if (dfErr) console.error(`[extract-document-text] durum yazılamadı (${doc.id}): ${dfErr.message}`);
+            results.push({ id: doc.id, status: "desteklenmeyen_format", durum_yazildi: !dfErr });
             continue;
           }
           throw e;
@@ -138,15 +142,24 @@ Deno.serve(async (req) => {
 
         const trimmed = text.trim();
         if (!trimmed) {
-          await admin.from("case_documents").update({ extraction_status: "hata" }).eq("id", doc.id);
-          results.push({ id: doc.id, status: "hata" });
+          const { error: bosErr } = await admin.from("case_documents")
+            .update({ extraction_status: "hata" }).eq("id", doc.id);
+          if (bosErr) console.error(`[extract-document-text] durum yazılamadı (${doc.id}): ${bosErr.message}`);
+          results.push({ id: doc.id, status: "hata", durum_yazildi: !bosErr });
           continue;
         }
 
-        await admin.from("case_documents").update({
+        // ISLEVIN URUNU. Yazilamazsa belge metinsiz kalir ve alt hatlar (RAG,
+        // taraf analizi) onu sessizce gormez; buna ragmen "tamam" denirdi.
+        const { error: yazErr } = await admin.from("case_documents").update({
           extracted_text: trimmed.slice(0, MAX_CHARS_PER_DOC),
           extraction_status: "tamam",
         }).eq("id", doc.id);
+        if (yazErr) {
+          console.error(`[extract-document-text] metin yazılamadı (${doc.id}): ${yazErr.message}`);
+          results.push({ id: doc.id, status: "hata", hata: `metin kaydedilemedi: ${yazErr.message}` });
+          continue;
+        }
         // Belge özeti (İBA 1.2): metin yazıldıktan sonra iç kapıdan tetiklenir.
         // BEKLEMESİZ ve try/catch içinde — bu çağrının hatası çıkarma hattını
         // hiçbir koşulda etkilemez, sonuç yine "tamam" döner.
@@ -169,9 +182,9 @@ Deno.serve(async (req) => {
         results.push({ id: doc.id, status: "tamam" });
       } catch (e: any) {
         console.error(`[extract-document-text] belge ${doc.id} başarısız: ${e?.message ?? String(e)}`);
-        try {
-          await admin.from("case_documents").update({ extraction_status: "hata" }).eq("id", doc.id);
-        } catch { /* best-effort */ }
+        const { error: hataErr } = await admin.from("case_documents")
+          .update({ extraction_status: "hata" }).eq("id", doc.id);
+        if (hataErr) console.error(`[extract-document-text] hata durumu yazılamadı (${doc.id}): ${hataErr.message}`);
         results.push({ id: doc.id, status: "hata" });
       }
     }

@@ -137,8 +137,18 @@ Deno.serve(async (req) => {
 
     /* KALANLAR (kurucu kararı — kişisel veri İÇERMEZ): sayımlar ve kural
        kütüphanesi kalır, dosya bağlantısı KOPARILIR (case_id NULL). */
-    await admin.from("ajan_deneyim").update({ case_id: null }).eq("case_id", case_id);
-    await admin.from("duzeltme_kayitlari").update({ case_id: null }).eq("case_id", case_id);
+    // 25.08.2026 — bu uc yazimin sonucu OKUNMUYORDU ve ardindan kosulsuz
+    // "dosyada kisisel veri kalmadi" deniyordu. Silmenin kendisi zaten dogru
+    // denetleniyor (yukaridaki dongu + `cases`); eksik olan, silme SONRASI
+    // baglantiyi koparan ve silmeyi KAYDA GECIREN yazimlardi. Bir KVKK silme
+    // isleminin kaniti sessizce kaybolamaz.
+    const uyarilar: string[] = [];
+    const { error: deneyimErr } = await admin.from("ajan_deneyim")
+      .update({ case_id: null }).eq("case_id", case_id);
+    if (deneyimErr) uyarilar.push(`ajan_deneyim dosya bağlantısı koparılamadı: ${deneyimErr.message}`);
+    const { error: duzeltmeErr } = await admin.from("duzeltme_kayitlari")
+      .update({ case_id: null }).eq("case_id", case_id);
+    if (duzeltmeErr) uyarilar.push(`duzeltme_kayitlari dosya bağlantısı koparılamadı: ${duzeltmeErr.message}`);
 
     // Bir satırlık ANONİM kapanış kaydı: tarih, sonuç türü, süreç gün sayısı.
     const acilis = new Date(String((dosya as any).created_at ?? "")).getTime();
@@ -154,13 +164,17 @@ Deno.serve(async (req) => {
       }, 500);
     }
 
-    await admin.from("dosya_kapanis").update({
+    const { error: kapanisErr } = await admin.from("dosya_kapanis").update({
       silme_zamani: new Date().toISOString(), silen: userId,
       eksik_notu: `anonim kapanış: sonuç ${temiz((dosya as any).outcome) || "belirtilmedi"} · süreç ${gun ?? "?"} gün`,
     }).eq("case_id", case_id);
+    if (kapanisErr) uyarilar.push(`silme kaydı (dosya_kapanis) yazılamadı: ${kapanisErr.message}`);
 
+    if (uyarilar.length > 0) {
+      console.error("[dosya-verilerini-sil] silme sonrası eksikler", { case_id, uyarilar });
+    }
     return json({
-      silindi: true, kayit: oncekiToplam,
+      silindi: true, kayit: oncekiToplam, uyarilar,
       mesaj: sinirdanGecir(`${oncekiToplam} kayıt silindi, dosyada kişisel veri kalmadı.`, "silme"),
     });
   } catch (e: any) {

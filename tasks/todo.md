@@ -4,20 +4,49 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P1 · davet zincirinde sessiz yazım** (3 kenar işlevi)
-- Doğrulama: `npm run test` **244/244** · tsc temiz · build başarılı · lint **2334**
+- Son tamamlanan iş: **P1 · kenar işlevlerinde ürün yazımları** (4 işlev daha)
+- Doğrulama: `npm run test` **248/248** · tsc temiz · lint **2334**
 - **Açık blokaj: yok**
-- **REDEPLOY BEKLİYOR (§11-B):** `send-party-invite` · `revoke-party-invite` ·
-  `send-meeting-invite`. GitHub senkronu edge function deploy ETMEZ
-  (`tasks/lessons.md` 18.08 dersi). Ön yüz değişmedi → publish gerekmiyor.
+- **REDEPLOY DURUMU (§11-B):**
+  - ✅ `send-party-invite` · `revoke-party-invite` · `send-meeting-invite` —
+    Lovable ajanı `supabase--deploy_edge_functions` ile deploy etti (commit
+    `26f2abd`, üçü de onaylandı). MCP çağrısı 300 sn'de zaman aşımına uğradı ama
+    **iş tamamlandı**; `list_messages` ile doğrulandı.
+  - ⏳ `accept-party-invite` · `party-confidential-analysis` ·
+    `extract-document-text` · `dosya-verilerini-sil` — bu commit'ten sonra
+    redeploy gerekiyor.
 - Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9**.
-- Sıradaki uygulanabilir iş: **P2 · kenar işlevi sessiz yazımlarının kalanı**
-  (112 site). Öncelik sırası: `party-confidential-analysis` (taraf analizi +
-  keşif soruları — kaybolursa arabuluculuk verisi gider) ·
-  `extract-document-text` (belge "işleniyor"da takılır) · `randevu-teklif` ·
-  `taraf-kalem-cikar`. `agent_states` defter yazımları en sonda (yüksek hacim,
-  büyük ölçüde en-iyi-çaba) ve `_shared/**` dosyalarına dokunmak **39 fonksiyon
-  fan-out redeploy** demektir — ayrı tur olarak planlanmalı.
+- Sıradaki uygulanabilir iş: **P2 · kalan kenar işlevi sessiz yazımları.**
+  Öncelik: `cancel-meeting-invite` · `randevu-teklif` · `taraf-kalem-cikar` ·
+  `bilirkisi-ekranim` · `bilirkisi-secim`. En sonda `agent_states` defter
+  yazımları (yüksek hacim, büyük ölçüde en-iyi-çaba) ve `_shared/**` —
+  ona dokunmak **39 fonksiyon fan-out redeploy** demektir, ayrı tur.
+
+### KAPANDI — 25.08 · P1 · KENAR İŞLEVLERİNDE ÜRÜN YAZIMLARI (4 İŞLEV)
+Davet zincirinden sonra aynı kusur sınıfının **ürün yazımlarına** geçildi: bir
+işlevin var oluş sebebi olan yazımın sessizce kaybolması.
+
+| işlev | sessiz kalırsa |
+|---|---|
+| `accept-party-invite` | `case_parties.user_id` bağlanması **katılımın kendisidir**. Sessizce başarısız olursa taraf "katıldınız" cevabını alır ama erişimi olmaz; üstelik davet "accepted" işaretlenince yeniden davet **409** döner ve taraf **kalıcı olarak dışarıda kalır**. Artık bağ kurulmadan devam edilmiyor. |
+| `party-confidential-analysis` | `party_analyses` yazımı işlevin ürünüdür: bir LLM koşumu ve tarafın **gizli verisi**. Yazılamazsa analiz kaybolur, işlev yine başarılı döner, ekranda hiçbir şey çıkmaz. Artık hata olarak dönüyor. Kök neden, ajan defteri ve keşif soruları da kayda düşüyor. |
+| `extract-document-text` | `extracted_text` + `"tamam"` yazılamazsa belge metinsiz kalır; RAG ve taraf analizi onu **sessizce görmez** ama çağırana "tamam" denirdi. Artık "hata" bildiriliyor; diğer üç durum yazımı da denetleniyor. |
+| `dosya-verilerini-sil` | Silmenin **kendisi zaten doğru denetleniyordu** (sıralı döngü + `cases`). Eksik olan silme SONRASI yazımlardı: `ajan_deneyim`/`duzeltme_kayitlari` bağ koparma ve `dosya_kapanis` **silme kaydı**. Bir KVKK silme işleminin kanıtı sessizce kaybolamaz. Artık `uyarilar` dizisinde dönüyor. |
+
+**TARAYICI TEZGÂHI KURULMADI — gerekçesi kayda geçti.** Düzenli-ifadeye dayalı
+bir tarayıcı denendi: 4 satırlık pencere %50 yanlış alarm verdi, 9 satırlık
+pencere yanlış negatif riski doğurdu, deyim-sınırı yaklaşımı ise 222 bulguyla
+tamamen bozuldu (çok satırlı zincirler, ternary dalları, destructuring içindeki
+`{`). **Güvenilmez bir bekçi bekçisizlikten kötüdür** (24.08 dersi), o yüzden
+dondurulmuş liste yerine düzeltilen işlevlerin **sözü** denetleniyor; kalan yığın
+bu bloğun kuyruğunda sayısıyla duruyor.
+
+**TEZGÂH:** `tests/kenar-sessiz-yazim.test.ts` (4 durum). Sıra da denetleniyor:
+davet "accepted" işaretlemesi bağlanma kontrolünden **sonra**, metin yazılamazsa
+bildirilen durum "hata". **KANITLANDI:** düzeltme öncesi işlevler
+`KENAR_KOK=tests/gecici/kenar-kanit` kopyasına açıldı → **4/4 test DÜŞTÜ**;
+gerçek dizinde 4/4.
+- Doğrulama: **248/248** test · tsc temiz · lint 2334 (değişmedi).
 
 ### KAPANDI — 25.08 · P1 · DAVET ZİNCİRİNDE SESSİZ YAZIM (3 KENAR İŞLEVİ)
 Kenar işlevleri **gözetimsiz** çalışır (cron, ajan): sessiz başarısızlığı görecek

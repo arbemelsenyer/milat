@@ -44,17 +44,33 @@ Deno.serve(async (req) => {
     }
 
 
-    await admin.from("case_parties").update({
+    // 25.08.2026 — uc yazimin sonucu da OKUNMUYORDU. KATILIMI GERCEKLESTIREN
+    // yazim asagidaki BIRINCISIDIR (`case_parties.user_id` baglanmasi). Sessizce
+    // basarisiz olursa taraf "katildiniz" cevabini alir ama erisimi olmaz; ustelik
+    // davet "accepted" isaretlenirse yeniden davet de 409 doner ve taraf KALICI
+    // OLARAK DISARIDA KALIR. Once bag kurulur, ancak basarili olursa devam edilir.
+    const { error: bagErr } = await admin.from("case_parties").update({
       user_id: u.user.id, invite_status: "accepted",
     }).eq("id", party.id);
-    await admin.from("case_party_invites").update({
+    if (bagErr) {
+      console.error("[accept-party-invite] taraf bağlanamadı", { party_id: party.id, error: bagErr.message });
+      return new Response(
+        JSON.stringify({ error: `Katılım tamamlanamadı, davetiniz hâlâ geçerli: ${bagErr.message}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Buradan sonrasi erisimi etkilemez; eksik kalirsa kayda dusurulur.
+    const { error: davetErr } = await admin.from("case_party_invites").update({
       invite_status: "accepted", accepted_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }).eq("id", invite.id);
+    if (davetErr) console.error("[accept-party-invite] davet durumu yazılamadı", { invite: invite.id, error: davetErr.message });
 
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || null;
-    await admin.from("party_invite_logs").insert({
+    const { error: izErr } = await admin.from("party_invite_logs").insert({
       case_id: party.case_id, party_id: party.id, event_type: "accepted", ip_address: ip,
     });
+    if (izErr) console.error("[accept-party-invite] katılım izi yazılamadı", { party_id: party.id, error: izErr.message });
 
     // AKIŞ OLAYI (best-effort): taraf daveti kabul etti ve hesabına bağlandı.
     await olayYaz(admin, {

@@ -294,21 +294,27 @@ Bu tarafın perspektifinden detaylı analiz üret. Yukarıdaki bloklarda somut b
     const { data: existing } = await admin.from("party_analyses")
       .select("id").eq("case_id", case_id).eq("party_id", party_id).maybeSingle();
 
-    if (existing) {
-      await admin.from("party_analyses").update({
-        analysis: parsed,
-        discovery_questions: parsed.discovery_questions ?? [],
-        risk_analizi: parsed.risk_analizi ?? null,
-        issue_description_snapshot: caseRow?.issue_description ?? null,
-      }).eq("id", existing.id);
-    } else {
-      await admin.from("party_analyses").insert({
-        case_id, party_id, user_id: party.user_id ?? userId,
-        analysis: parsed,
-        discovery_questions: parsed.discovery_questions ?? [],
-        risk_analizi: parsed.risk_analizi ?? null,
-        issue_description_snapshot: caseRow?.issue_description ?? null,
-      });
+    // 25.08.2026 — bu yazimin sonucu OKUNMUYORDU. Bu satir islevin URUNUDUR:
+    // yazilamazsa analiz (bir LLM kosumu ve tarafin gizli verisi) kaybolur, islev
+    // yine basarili doner ve ekranda hicbir sey cikmaz. supabase-js firlatmadigi
+    // icin distaki catch de calismaz. Artik cagirana hata olarak doner.
+    const { error: analizErr } = existing
+      ? await admin.from("party_analyses").update({
+          analysis: parsed,
+          discovery_questions: parsed.discovery_questions ?? [],
+          risk_analizi: parsed.risk_analizi ?? null,
+          issue_description_snapshot: caseRow?.issue_description ?? null,
+        }).eq("id", existing.id)
+      : await admin.from("party_analyses").insert({
+          case_id, party_id, user_id: party.user_id ?? userId,
+          analysis: parsed,
+          discovery_questions: parsed.discovery_questions ?? [],
+          risk_analizi: parsed.risk_analizi ?? null,
+          issue_description_snapshot: caseRow?.issue_description ?? null,
+        });
+    if (analizErr) {
+      console.error(`[party-confidential-analysis] party_analyses yazılamadı: ${analizErr.message}`);
+      throw new Error(`Taraf analizi kaydedilemedi: ${analizErr.message}`);
     }
 
     /* AKIŞ OLAYI (best-effort): bu tarafın analizi tamamlandı. Analiz METNİ,
@@ -325,13 +331,14 @@ Bu tarafın perspektifinden detaylı analiz üret. Yukarıdaki bloklarda somut b
       try {
         const { data: existingRootCause } = await admin.from("party_root_cause_analysis")
           .select("id").eq("case_id", case_id).eq("party_id", party_id).maybeSingle();
-        if (existingRootCause) {
-          await admin.from("party_root_cause_analysis")
-            .update({ kok_neden: parsed.kok_neden }).eq("id", existingRootCause.id);
-        } else {
-          await admin.from("party_root_cause_analysis")
-            .insert({ case_id, party_id, kok_neden: parsed.kok_neden });
-        }
+        // Asagidaki catch DB hatasini yakalayamaz (supabase-js firlatmaz);
+        // sonuc okunup elle kayda dusurulur.
+        const { error: kokErr } = existingRootCause
+          ? await admin.from("party_root_cause_analysis")
+              .update({ kok_neden: parsed.kok_neden }).eq("id", existingRootCause.id)
+          : await admin.from("party_root_cause_analysis")
+              .insert({ case_id, party_id, kok_neden: parsed.kok_neden });
+        if (kokErr) console.error(`[party-confidential-analysis] kok_neden yazımı başarısız: ${kokErr.message}`);
       } catch (e: any) {
         console.error(`[party-confidential-analysis] kok_neden yazımı başarısız: ${e?.message ?? String(e)}`);
       }
@@ -357,7 +364,8 @@ Bu tarafın perspektifinden detaylı analiz üret. Yukarıdaki bloklarda somut b
           discovery_soru_sayisi: Array.isArray(parsed.discovery_questions) ? parsed.discovery_questions.length : 0,
         },
       });
-      await admin.from("agent_worklog").insert(worklogRows);
+      const { error: defterErr } = await admin.from("agent_worklog").insert(worklogRows);
+      if (defterErr) console.error(`[party-confidential-analysis] agent_worklog yazımı başarısız: ${defterErr.message}`);
     } catch (e: any) {
       console.error(`[party-confidential-analysis] agent_worklog yazımı başarısız: ${e?.message ?? String(e)}`);
     }
@@ -368,10 +376,12 @@ Bu tarafın perspektifinden detaylı analiz üret. Yukarıdaki bloklarda somut b
         .select("id").eq("case_id", case_id).eq("party_id", party_id)
         .eq("question_order", q.id ?? 0).maybeSingle();
       if (!exists) {
-        await admin.from("case_discovery_questions").insert({
+        // Kesif sorusu yazilamazsa arabulucu o soruyu hic gormez; sessiz kalmaz.
+        const { error: soruErr } = await admin.from("case_discovery_questions").insert({
           case_id, party_id, user_id: party.user_id ?? userId,
           question_text: q.question, question_order: q.id ?? 0,
         });
+        if (soruErr) console.error(`[party-confidential-analysis] keşif sorusu yazılamadı (sıra ${q.id ?? 0}): ${soruErr.message}`);
       }
     }
 
