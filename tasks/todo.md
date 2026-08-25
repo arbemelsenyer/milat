@@ -4,7 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P1 · sessiz `functions.invoke` çağrıları (10 yer)**
+- Son tamamlanan iş: **P1 · canlı sağlık denetimi → iki gerçek kusur**
 - **SESSİZ ÇAĞRI KUSURU İSTEMCİ YÜZEYİNİN TAMAMINDA KAPANDI:** `.from` ·
   `.rpc` · `.storage` · `.functions.invoke` · iç `fetch`. Kenar (`_shared`
   dâhil) ve ön yüz. Kenarda çıplak `.from(...)`, `.rpc(...)` ve
@@ -18,11 +18,14 @@
   `10bdb83` P1 ön yüz (4 dosya) · `4f16648` kayıt · `1233489` P1 sessiz `rpc`
   + depo (12 yer, 9 işlev) · `bc558eb` P1 ön yüz depo çağrıları (4 yer) ·
   `8e8e416` kayıt · `7974bac` kayıt · `03c445f` P1 `functions.invoke` (9 yer) ·
-  `a27b221` P2 `fetch` iç çağrısı (1 yer).
+  `a27b221` P2 `fetch` iç çağrısı (1 yer) · `b899149` P1 belge durumu sözlük
+  çatalı · kapanmış dosyada görev yürütülmesi.
 - **Bu oturumun dersleri `tasks/lessons.md`ye yazıldı** (3 yeni ders: sessiz
   yazım kuyruk döngüsü kurar · öz denetim eşiği kusurla birlikte düşer ·
   `rpc`/`storage` de fırlatmaz).
-- Doğrulama: `npm run test` **268/268** · tsc temiz · lint **2331** · `npm run build` temiz
+- Doğrulama: `npm run test` **270/270** · tsc temiz · lint **2331** · `npm run build` temiz
+- **CANLI:** son 2 saatte 42 cron yanıtı, hepsi **200**; işlenmemiş olay 0,
+  bekleyen talimat 0, metin hatası 0.
   (taban 2334'tü; `randevu-teklif`te bir `any` kaldırıldı)
 - **Açık blokaj: yok**
 - **REDEPLOY DURUMU (§11-B):**
@@ -50,6 +53,33 @@
   yüzde kapandı, iki tezgâh da kilitli. Yeni P0/P1 adayı kodun gerçek
   durumundan çıkarılmalı. En yakın aday: **H-8 ölü yüzey öbeğinin silinmesi**
   (37 dosya) — ama silme kararı kurucudadır, HAT'ta açık bekliyor.
+
+### KAPANDI — 25.08 · P1 · CANLI SAĞLIK DENETİMİ → İKİ GERÇEK KUSUR
+Bugün ~80 fonksiyon sürümü deploy edildi; §11-B gereği canlı sistem denetlendi.
+**Sistem sağlıklı:** son 2 saatte 42 cron yanıtının **hepsi 200**; 24 saatte
+`agent_states` yalnız `completed`; işlenmemiş akış olayı **0**, bekleyen
+talimat **0**, metin çıkarma hatası **0**. Ama iki gerçek kusur çıktı.
+
+**1) BELGE DURUMU SÖZLÜK ÇATALI (P1).** `case_documents.extraction_status`
+canlıda iki değer taşıyor: 22 satır `"tamam"`, 2 satır eski `"completed"` —
+**ikisinin de metni var** (930 ve 1332 karakter). Bugünkü kod yalnız `"tamam"`
+yazıyor; `"completed"` 19.08 tarihli eski bir sürümden kalma. `ajan-nobetci`
+tek değere bakan bir süzgeç kullanıyordu (`=== "tamam"`), dolayısıyla **metni
+gerçekten çıkarılmış iki belge nöbetçiye görünmez kalıyordu**: o dosyada
+"okunabilir belge yok" sayılıyor ve belge imzası değişmediği için kollar
+yeniden koşmuyordu. Üretim verisine dokunmadan **kod hoşgörülü kılındı**
+(`METIN_CIKARILDI` kümesi); yeni yazım tek değerde kalıyor.
+
+**2) KAPANMIŞ DOSYADA GÖREV YÜRÜTÜLMESİ (P1).** `agreed` bir dosyada 13.08'den
+beri bekleyen bir `randevu_teklifi` görevi bulundu (`sonuc` boş — hiç
+dokunulmamış). Zararsız kalmasının tek sebebi o dosyanın `otomatik_akis`ının
+kapalı olması; yani **şans**. Akış açıkken kapanan bir dosyada aynı görev,
+**anlaşması bitmiş bir uyuşmazlık için taraflara randevu teklif ederdi.**
+Kolların üçü `kapali` denetimini zaten uyguluyordu (`ekOturumSorusuAc`, kapanış
+onayları, kayıt silme) ama **yürütücü döngüsünde yoktu.** Kural oraya taşındı:
+görev silinmez, `atlandi` + "Dosya kapandığı için yürütülmedi" ile kapatılır.
+Yeni bir ürün kararı değil, verilmiş kararın eksik kaldığı yere uygulanmasıdır
+(CLAUDE.md §7-B.1) — bu yüzden Human Gate açılmadı.
 
 ### KAPANDI — 25.08 · P1 · SESSİZ `functions.invoke` ÇAĞRILARI (10 YER)
 **Sınıfın en ince tuzağı.** `supabase.functions.invoke`, işlev düzeyi hatada

@@ -409,4 +409,28 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     expect(g, "hâlâ tek değere eşitlik süzgeci var")
       .not.toMatch(/extraction_status\s*\?\?\s*""\)\s*===\s*"tamam"/);
   });
+
+  it("kapanmış dosyada görev yürütülmüyor", () => {
+    /* 25.08 CANLI BULGUSU: `agreed` bir dosyada 13.08'den beri bekleyen bir
+       `randevu_teklifi` gorevi bulundu. O dosyanin `otomatik_akis`i kapali
+       oldugu icin tetiklenmemisti — sans eseri zararsiz kaldi. Akis ACIKKEN
+       kapanan bir dosyada ayni gorev, ANLASMASI BITMIS bir uyusmazlik icin
+       taraflara randevu teklif ederdi.
+       Kollarin ucu `kapali` denetimini zaten uyguluyordu; yurutucu donguste
+       yoktu — kural oraya da tasindi (CLAUDE.md 7-B.1: verilmis karar). */
+    const g = oku("ajan-nobetci");
+    expect(g, "yürütücüde kapalı dosya denetimi yok").toContain("dosyaKapali");
+    expect(g).toContain("Dosya kapandığı için yürütülmedi");
+    // Denetim, gorev tipi suzgecinden SONRA ama yurutmeden ONCE olmali.
+    const kapaliIdx = g.indexOf("if (dosyaKapali)");
+    const yurutIdx = g.indexOf("let tarafSonuc: TeklifSonuc | null = null;");
+    expect(kapaliIdx, "kapalı denetimi yok").toBeGreaterThan(-1);
+    expect(yurutIdx, "yürütme kapalı denetiminden ÖNCE").toBeGreaterThan(kapaliIdx);
+    // Gorev silinmez, kapatilir: sebep kayda gecer.
+    expect(g.slice(kapaliIdx, yurutIdx)).toContain('durum: "atlandi"');
+    expect(g.slice(kapaliIdx, yurutIdx)).toContain("kapaliErr");
+    // Kollardaki mevcut `kapali` denetimleri bozulmamali.
+    expect(g.match(/status === "agreed" \|\| dosya\?\.status === "failed"/g)?.length ?? 0)
+      .toBeGreaterThanOrEqual(4);
+  });
 });

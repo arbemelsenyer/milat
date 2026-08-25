@@ -3278,9 +3278,30 @@ Deno.serve(async (req) => {
           "soru_gonder", "taraf_musaitlik_iste", "teklif_degerlendir", "taraf_eksik_bilgi",
           "ilk_temas", "ozel_oturum",
         ];
+        /* KAPANMIŞ DOSYADA GÖREV YÜRÜTÜLMEZ (25.08 canlı bulgusu).
+           Kolların üçü bu kuralı zaten uyguluyordu (`kapali` denetimi); yürütücü
+           döngüsünde yoktu. Canlıda `agreed` bir dosyada 13.08'den beri bekleyen
+           bir `randevu_teklifi` görevi bulundu — o dosyanın `otomatik_akis`ı
+           kapalı olduğu için tetiklenmemişti, yani şans eseri zararsız kaldı.
+           Akış açıkken kapanan bir dosyada aynı görev, ANLAŞMASI BİTMİŞ bir
+           uyuşmazlık için taraflara randevu teklif ederdi.
+           Görev silinmez, kapatılır: sebebi kayda geçer. */
+        const dosyaKapali = dosya?.status === "agreed" || dosya?.status === "failed"
+          || !!dosya?.closed_at;
         for (const gorev of (gorevler ?? []) as any[]) {
           // Tanınmayan görev tipine dokunulmaz: 'bekliyor' kalır.
           if (!YURUTULEN_TIPLER.includes(gorev.gorev_tipi)) continue;
+          if (dosyaKapali) {
+            const { error: kapaliErr } = await admin.from("ajan_gorevleri")
+              .update({ durum: "atlandi", sonuc: "Dosya kapandığı için yürütülmedi" })
+              .eq("id", gorev.id);
+            if (kapaliErr) {
+              console.error(`[ajan-nobetci] kapalı dosya görevi kapatılamadı (${gorev.id}): ${kapaliErr.message}`);
+              hatalar.push(`${dosya.id}: kapalı dosya görevi kapatılamadı`);
+            }
+            atlananGorev++;
+            continue;
+          }
           // Taraf ajanı görevlerinde hedef taraf ZORUNLUDUR (kör veri kapısı).
           if (TARAF_TIPLERI.includes(gorev.gorev_tipi) && !gorev.hedef_party_id) {
             // Atlama damgası düşerse görev 'bekliyor' kalır ve her turda yeniden
