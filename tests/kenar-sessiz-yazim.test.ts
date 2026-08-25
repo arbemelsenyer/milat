@@ -148,4 +148,39 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     const ciplak = g.split(String.fromCharCode(10)).filter((l) => /^\s*await\s+admin\.from\(/.test(l));
     expect(ciplak, `sonucu okunmayan yazım: ${ciplak.join(" | ")}`).toEqual([]);
   });
+
+  it("dual-ai-validate: havuza yazılamayan metin 'onaylandı' damgalanmıyor", () => {
+    // EN AGIRI: `cases_vector_pool` insert sessizce duser ama satir yine de
+    // 'approved' damgalanirsa satir bir daha `status="pending"` sorgusuna
+    // GIRMEZ — metin havuza hic girmeden KALICI kaybolur, sayac "onaylandi" der.
+    const g = oku("dual-ai-validate");
+    for (const im of ["havuzErr", "onayErr", "elemeErr", "retErr"]) {
+      expect(g, `${im} okunmuyor`).toContain(im);
+    }
+    // Havuz hatasi dalinda damga ATILMAMALI: dal `continue` ile kapanir.
+    const havuzIdx = g.indexOf("if (havuzErr)");
+    const damgaIdx = g.indexOf('status: "approved"');
+    expect(havuzIdx, "havuz hatası dalı yok").toBeGreaterThan(-1);
+    expect(damgaIdx, "onay damgası havuz kontrolünden ÖNCE").toBeGreaterThan(havuzIdx);
+    expect(g.slice(havuzIdx, damgaIdx), "havuz yazılamazken damgaya düşülüyor").toContain("continue");
+    // Sayac cagirana bildirilir.
+    expect(g).toMatch(/approved,\s*rejected,\s*yazilamayan/);
+    // Bu dosyada CIPLAK `await sb.from(...)` yazimi kalmamali.
+    const ciplak = g.split(String.fromCharCode(10)).filter((l) => /^\s*await\s+sb\.from\(/.test(l));
+    expect(ciplak, `sonucu okunmayan yazım: ${ciplak.join(" | ")}`).toEqual([]);
+  });
+
+  it("orchestrator-run: atlandı işareti ve zincir-durdu bildirimi sessiz değil", () => {
+    // `flagSkippedStep` yazilamazsa panelde kart BOS kalir: arabulucu adimin
+    // neden atlandigini hicbir yerden ogrenemez. `allSettled` yalniz [0]
+    // okunuyordu; adim satirinin ve bildirimin dusmesi iz birakmiyordu.
+    const g = oku("orchestrator-run");
+    for (const im of ["isaretErr", "adimErr"]) expect(g, `${im} okunmuyor`).toContain(im);
+    expect(g, "settled[1] okunmuyor").toContain("settled[1].status === \"rejected\"");
+    // rpc {error} FIRLATMAZ — bildirim sonucu ayrica denetlenmeli.
+    expect(g, "bildirim sonucu okunmuyor").toContain("bildirim?.error");
+    expect(g).toContain("zincir durdu");
+    // Zaten denetli olan ana durum yazimlari bozulmamali.
+    expect(g.match(/if\s*\(error\)\s*throw\s+error;/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  });
 });

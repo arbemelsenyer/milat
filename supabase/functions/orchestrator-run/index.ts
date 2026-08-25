@@ -44,10 +44,14 @@ async function flagSkippedStep(admin: Admin, case_id: string, agent_type: string
   query = party_id ? query.eq("party_id", party_id) : query.is("party_id", null);
   const { data: existing } = await query.maybeSingle();
   const patch = { status: "flagged", error_message: `Atlandı: ${reason}` };
-  if (existing?.id) {
-    await admin.from("agent_states").update(patch).eq("id", existing.id);
-  } else {
-    await admin.from("agent_states").insert({ case_id, agent_type, party_id, ...patch });
+  /* ATLANDI İŞARETİ ARABULUCUNUN GÖRDÜĞÜ ÜRÜNDÜR: sessizce düşerse panelde kart
+     "hiç çalışmamış" gibi boş kalır ve arabulucu adımın NEDEN atlandığını hiçbir
+     yerden öğrenemez. Zinciri durdurmaz (atlama zaten hata değildir) ama kayda düşer. */
+  const { error: isaretErr } = existing?.id
+    ? await admin.from("agent_states").update(patch).eq("id", existing.id)
+    : await admin.from("agent_states").insert({ case_id, agent_type, party_id, ...patch });
+  if (isaretErr) {
+    console.error(`[orchestrator-run] ${agent_type} atlandı işareti yazılamadı: ${isaretErr.message}`);
   }
 }
 
@@ -172,8 +176,14 @@ Deno.serve(async (req) => {
           query = party_id ? query.eq("party_id", party_id) : query.is("party_id", null);
           const { data: existing } = await query.maybeSingle();
           const patch = { status: "failed", error_message: errorSummary };
-          if (existing?.id) await finalAdmin.from("agent_states").update(patch).eq("id", existing.id);
-          else await finalAdmin.from("agent_states").insert({ case_id: finalCaseId, agent_type, party_id, ...patch });
+          /* ADIMIN KENDİ 'failed' SATIRI: yazılamazsa o adımın kartı panelde
+             KALICI olarak "çalışıyor" görünür — arabulucu bitmeyen bir adım
+             bekler. `allSettled` sessiz düşüşü 'fulfilled' sayar, bu yüzden
+             hata burada okunup FIRLATILIR ki settled sonucu gerçeği göstersin. */
+          const { error: adimErr } = existing?.id
+            ? await finalAdmin.from("agent_states").update(patch).eq("id", existing.id)
+            : await finalAdmin.from("agent_states").insert({ case_id: finalCaseId, agent_type, party_id, ...patch });
+          if (adimErr) throw new Error(`adım 'failed' satırı yazılamadı: ${adimErr.message}`);
         })(),
         caseRow.assigned_mediator_id
           ? finalAdmin.rpc("create_notification", {
@@ -188,6 +198,20 @@ Deno.serve(async (req) => {
       // Terminal durum burada yazıldıysa finally üzerine yazmasın. Yazım düştüyse
       // bayrak açılmaz ve finally satırı yine de terminal duruma getirir.
       terminalWritten = settled[0].status === "fulfilled";
+      /* SETTLED SONUÇLARI OKUNUR: yalnız [0] bakılırsa adım satırının ve
+         arabulucu bildiriminin düşmesi hiçbir yere iz bırakmaz. */
+      if (settled[1].status === "rejected") {
+        console.error(`[orchestrator-run] ${agent_type} adım durumu yazılamadı:`,
+          String((settled[1] as PromiseRejectedResult).reason?.message ?? (settled[1] as PromiseRejectedResult).reason).slice(0, 200));
+      }
+      // rpc {error} FIRLATMAZ: bildirim düşerse arabulucu zincirin durduğunu HİÇ duymaz.
+      const bildirim = settled[2].status === "fulfilled"
+        ? (settled[2] as PromiseFulfilledResult<any>).value
+        : null;
+      if (settled[2].status === "rejected" || bildirim?.error) {
+        console.error(`[orchestrator-run] arabulucuya "zincir durdu" bildirimi gönderilemedi:`,
+          String(bildirim?.error?.message ?? (settled[2] as PromiseRejectedResult).reason ?? "").slice(0, 200));
+      }
       return new Response(JSON.stringify({ error: `${agent_type} failed`, detail: errorSummary, steps }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

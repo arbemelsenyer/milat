@@ -74,6 +74,9 @@ serve(async (req) => {
     if (error) throw error;
 
     let approved = 0, rejected = 0;
+    /* SESSİZ YAZIM SAYACI: bu işlev CRON ile gözetimsiz çalışır. supabase-js DB
+       hatasını FIRLATMAZ, `{error}` döndürür — okunmazsa hiçbir yerde iz kalmaz. */
+    let yazilamayan = 0;
     const results: Array<Record<string, unknown>> = [];
 
     for (const row of pending ?? []) {
@@ -87,11 +90,19 @@ serve(async (req) => {
         text.slice(0, 6000),
       );
       if (!/^EVET/i.test(flash.trim())) {
-        await sb.from("pending_pool").update({
+        /* DAMGA YAZILAMAZSA SATIR 'pending' KALIR: sonraki koşum aynı metni
+           yeniden okur ve iki model çağrısı boşa gider. Sessiz geçilmez. */
+        const { error: elemeErr } = await sb.from("pending_pool").update({
           status: "rejected",
           approved: false,
           rejection_reason: flash.slice(0, 500),
         }).eq("id", row.id);
+        if (elemeErr) {
+          console.error(`[dual-ai-validate] eleme damgası yazılamadı (${row.id}): ${elemeErr.message}`);
+          yazilamayan++;
+          results.push({ id: row.id, stage: "flash", verdict: "yazilamadi" });
+          continue;
+        }
         rejected++;
         results.push({ id: row.id, stage: "flash", verdict: "rejected" });
         continue;
@@ -112,31 +123,57 @@ serve(async (req) => {
 
       const score = parsed.relevance_score ?? 0;
       if (parsed.approved && score >= 0.6) {
-        await sb.from("cases_vector_pool").insert({
+        /* HAVUZ YAZIMI BU İŞLEVİN ÜRÜNÜDÜR. Sessizce düşer ve satır yine de
+           'approved' damgalanırsa satır bir daha `status="pending"` sorgusuna
+           GİRMEZ: metin havuza hiç girmeden KALICI olarak kaybolur, üstelik
+           sayaç "onaylandı" der. Bu yüzden damga yazımın ARDINDAN gelir. */
+        const { error: havuzErr } = await sb.from("cases_vector_pool").insert({
           niche_area: niche,
           anonymized_text: parsed.summary ? `${parsed.summary}\n\n---\n${text}` : text,
         });
-        await sb.from("pending_pool").update({
+        if (havuzErr) {
+          console.error(`[dual-ai-validate] havuza yazılamadı (${row.id}): ${havuzErr.message}`);
+          yazilamayan++;
+          // Damga ATILMAZ: satır 'pending' kalır, sonraki koşum yeniden dener.
+          results.push({ id: row.id, stage: "pro", verdict: "yazilamadi", score });
+          continue;
+        }
+        const { error: onayErr } = await sb.from("pending_pool").update({
           status: "approved",
           approved: true,
           relevance_score: score,
           metadata: { keywords: parsed.keywords ?? [], reason: parsed.reason ?? "" },
         }).eq("id", row.id);
+        if (onayErr) {
+          /* Havuza girdi ama damga düştü: satır 'pending' kaldığı için sonraki
+             koşum aynı metni İKİNCİ KEZ havuza yazabilir. Mükerrer kaydın
+             sessiz kalmaması için ayrıca bildirilir. */
+          console.error(`[dual-ai-validate] onay damgası yazılamadı (${row.id}) — mükerrer havuz kaydı riski: ${onayErr.message}`);
+          yazilamayan++;
+          results.push({ id: row.id, stage: "pro", verdict: "damga_yazilamadi", score });
+          continue;
+        }
         approved++;
         results.push({ id: row.id, stage: "pro", verdict: "approved", score });
       } else {
-        await sb.from("pending_pool").update({
+        const { error: retErr } = await sb.from("pending_pool").update({
           status: "rejected",
           approved: false,
           relevance_score: score,
           rejection_reason: (parsed.reason ?? "düşük alaka").slice(0, 500),
         }).eq("id", row.id);
+        if (retErr) {
+          console.error(`[dual-ai-validate] ret damgası yazılamadı (${row.id}): ${retErr.message}`);
+          yazilamayan++;
+          results.push({ id: row.id, stage: "pro", verdict: "yazilamadi", score });
+          continue;
+        }
         rejected++;
         results.push({ id: row.id, stage: "pro", verdict: "rejected" });
       }
     }
 
-    return new Response(JSON.stringify({ processed: pending?.length ?? 0, approved, rejected, results }), {
+    return new Response(JSON.stringify({ processed: pending?.length ?? 0, approved, rejected, yazilamayan, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
