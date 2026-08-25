@@ -1,6 +1,44 @@
 # tasks/lessons.md — Öğrenilen Dersler
 Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
 
+- DERS (25.08.2026) — `supabase-js` HATA FIRLATMAZ; `try/catch` BURADA KORUMA
+  DEĞİLDİR. `try { await supabase.from(x).insert(...) } catch { console.error }`
+  kalıbı bir şeyi korumaz: yazım başarısız olduğunda catch **hiç çalışmaz**,
+  kayda da bir şey düşmez, kullanıcıya "kaydedildi" denir ve veri kaybolur.
+  Tek doğru kalıp `const { error } = await …` ve hatanın **görünür bir yere**
+  gitmesidir (kullanıcı varsa toast, kenar işlevinde yanıt + `console.error`).
+  25.08'de bu tek kusur sınıfı `src`te 27, `supabase/functions`ta 118 yerde
+  bulundu; en ağırları: rol kaldırma ("duran yetki kaldırılmış gösteriliyordu"),
+  davet iptali ("eski bağlantı çalışmaya devam ederdi"), katılım kabulü ("taraf
+  kalıcı olarak dışarıda kalırdı"). KURAL: yeni yazılan her veritabanı yazımında
+  `error` okunur; okunmuyorsa gerekçesi yorumla yazılır.
+- DERS (25.08.2026) — CANLI PAKET DOĞRULAMASI ÖLÜ KODU DA BULUR. `bcbdeb8` ile
+  eklenen 14 hata dizesi canlı pakette arandı; 13'ü vardı, biri yoktu. Dağıtım
+  sorunu değildi — yerel `dist` çıktısında da yoktu, çünkü Rollup o bileşeni
+  (`CaseRoom.RoundsTab`) **ölü kod** olarak atıyordu. Yani dosya düzeyi ölü yüzey
+  taramasının göremediği bir yüzeyi derleyici işaret etti. KURAL: canlı doğrulama
+  yalnız "değişiklik yayında mı" sorusunu değil, "bu kod hiç çalışıyor mu"
+  sorusunu da yanıtlar; eksik çıkan dize kovalanır, "herhalde dağıtım gecikti"
+  denip geçilmez.
+- DERS (25.08.2026) — GÜVENİLMEZ BEKÇİ KURULMAZ. Kenar işlevlerindeki sessiz
+  yazımlar için düzenli-ifadeye dayalı bir tarayıcı tezgâhı denendi: 4 satırlık
+  pencere %50 yanlış alarm, 9 satırlık pencere yanlış negatif riski, deyim-sınırı
+  yaklaşımı 222 bulguyla tamamen bozuldu (çok satırlı zincirler, ternary dalları,
+  destructuring içindeki `{`). Tezgâh **kurulmadı**; yerine düzeltilen işlevlerin
+  sözü tek tek denetlendi ve kalan yığın `todo.md` kuyruğuna sayısıyla yazıldı.
+  KURAL: bir bekçi güvenilir olamıyorsa kurulmaz — yeşil yanan bozuk bir bekçi,
+  bekçisizlikten kötüdür (24.08 bozuk-bekçi dersinin devamı). Kurulan her tarayıcı
+  tezgâhına **kendini koruyan** bir durum eklenir: 0 bulgu da, anormal çok bulgu
+  da tezgâhı düşürmelidir.
+- DERS (25.08.2026) — BASH HEREDOC TERS BÖLÜLERİ YİYOR (bu ortamda). `cat > x
+  <<'EOF'` içinde `\b` yazıldığında dosyaya `` düşüyor; JavaScript'te bu
+  **kelime sınırı değil, backspace karakteri** olur ve `new RegExp(""+ad+"")`
+  hiçbir şey eşleştirmez. Bu yüzden ölü bileşen taraması ilk koşumda 199 yanlış
+  bulgu verdi (her şey ölü göründü). Aynı tuzak python heredoc'unda da var.
+  KURAL: betiğe ters bölü gerekiyorsa `String.fromCharCode(92)` kullan ya da
+  dosyayı Write aracıyla yaz; heredoc'a `\` bırakma. Tarayıcı yazdıktan sonra
+  **bilinen bir doğru cevapla** sına (ör. "PhaseHero kullanılıyor mu" → 1'den
+  büyük olmalı).
 - DERS (17.08.2026) — "REDEPLOY ETTİM AMA DEĞİŞMEDİ" TEŞHİSİNİN İLK ADIMI PUSH
   KONTROLÜDÜR. Hazırlık föyünün saat ve gündem düzeltmeleri redeploy edildikten sonra
   da eski çıktı verdi. Kod doğruydu, redeploy da yapılmıştı. Sebep: commit'ler GitHub'a

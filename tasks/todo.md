@@ -1,10 +1,17 @@
 ## Nerede kaldık
 
-- Tarih: 25.08.2026 (11. blok)
+- Tarih: 25.08.2026 (11. blok) — **§20 gereği kapatıldı (bağlam şişti)**
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
-- Aktif görev: yok
+- Aktif görev: yok — kuyruk temiz, blokaj yok, bekleyen redeploy yok
 - Son tamamlanan iş: **P1 · `bilirkisi-secim` sessiz yazımları (6 yer)**
+- **11. blokta biten işler (sırayla):** `74018e0` P2 ölü bileşenler ·
+  `26f2abd` P1 davet zinciri · `38ee346` P1 kenar ürün yazımları ·
+  `6654b15` P2 toplantı iptali + randevu · `5defbe3` P1 bilirkişi kararı ·
+  `7459384` P1 `bilirkisi-secim`. Hepsi push edildi ve deploy edildi.
+- **Bu oturumun dersleri `tasks/lessons.md`ye yazıldı** (4 yeni ders:
+  supabase-js fırlatmaz · canlı paket doğrulaması ölü kodu bulur ·
+  güvenilmez bekçi kurulmaz · heredoc ters bölüyü yiyor).
 - Doğrulama: `npm run test` **252/252** · tsc temiz · lint **2334**
 - **Açık blokaj: yok**
 - **REDEPLOY DURUMU (§11-B):**
@@ -18,7 +25,8 @@
   - ✅ `cancel-meeting-invite` · `randevu-teklif` — Lovable ajanı deploy etti
     (commit `6654b15`, ikisi de onaylandı).
   - ✅ `bilirkisi-ekranim` — Lovable ajanı deploy etti (commit `5defbe3`).
-  - ⏳ `bilirkisi-secim` — bu commit'ten sonra.
+  - ✅ `bilirkisi-secim` — Lovable ajanı deploy etti (commit `7459384`).
+  - **Bekleyen redeploy YOK.**
 - Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9**.
 - Sıradaki uygulanabilir iş: **P2 · kalan kenar işlevi sessiz yazımları.**
   Öncelik: `taraf-kalem-cikar` · `ajan-nobetci` · `akis-yurut` ·
