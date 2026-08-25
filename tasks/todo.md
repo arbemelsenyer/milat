@@ -48,7 +48,7 @@
   - OK `a27b221` · `extract-document-text` — deploy edildi ve doğrulandı.
     `get_project`: `latest_commit_sha=74ec5862…`, `is_published=true`.
   - **BEKLEYEN REDEPLOY YOK.**
-- Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9**.
+- Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9** · **H-10**.
 - Sıradaki uygulanabilir iş: **kuyruk boş.** Sessiz yazım kusuru kenarda ve ön
   yüzde kapandı, iki tezgâh da kilitli. Yeni P0/P1 adayı kodun gerçek
   durumundan çıkarılmalı. En yakın aday: **H-8 ölü yüzey öbeğinin silinmesi**
@@ -69,6 +69,14 @@ gerçekten çıkarılmış iki belge nöbetçiye görünmez kalıyordu**: o dosy
 "okunabilir belge yok" sayılıyor ve belge imzası değişmediği için kollar
 yeniden koşmuyordu. Üretim verisine dokunmadan **kod hoşgörülü kılındı**
 (`METIN_CIKARILDI` kümesi); yeni yazım tek değerde kalıyor.
+
+**3) BAYAT `akis_hatasi` BİLDİRİMLERİ (P3, HAT H-10).** Panoda 19–20.08 tarihli
+5 bildirim `bekliyor` duruyor; **üçünün de kök nedeni kodda zaten kapatılmış**
+(`hazirlik-foyu` zorunlu girdileri · `hazirlik-foyu-gonder` motor bağı · iç
+çağrı `x-cron-secret` kapısı), kalan ikisi zaten hata değil (biri kasıtlı canlı
+fren testi). `akis_hatasi` nöbetçinin yürüttüğü tiplerden değildir — okunana
+kadar `bekliyor` kalır, kendiliğinden kapanmaz. Temizlik üretim verisi yazımı
+olduğu için (§10) HAT'a yazıldı, beklenmedi.
 
 **2) KAPANMIŞ DOSYADA GÖREV YÜRÜTÜLMESİ (P1).** `agreed` bir dosyada 13.08'den
 beri bekleyen bir `randevu_teklifi` görevi bulundu (`sonuc` boş — hiç

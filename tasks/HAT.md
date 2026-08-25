@@ -103,6 +103,40 @@ resmi takip föyünde "yapıldı" ile "planlandı" ayrımı kurulmamış kalır.
 
 ---
 
+
+### H-10 · 25.08.2026 · P3 — Bayat `akis_hatasi` bildirimleri temizlensin mi?
+**Sorun.** Arabulucunun iş panosunda 19–20.08 tarihli **5 adet `akis_hatasi`**
+satırı `bekliyor` durumunda duruyor (hepsi tek dosyada: `eb70595a`). Bugün
+üçünün de kök nedeni **kodda zaten kapatılmış** durumda:
+
+| bildirim | bugünkü durum |
+|---|---|
+| `hazirlik-foyu` HTTP 400 "case_id, session_id ve party_id gerekli" | `ZORUNLU_GIRDI` tanımlı + `girdiTamamla` oturum merdiveni yazılmış (24.08 onarımı kodda yorumuyla duruyor) |
+| `hazirlik-foyu-gonder` "motora bağlı değil" | `MOTORA_BAGLI` listesinde |
+| `hazirlik-foyu-gonder` HTTP 401 "iç çağrı reddedildi" | `x-cron-secret` iç kapısı eklenmiş |
+
+Kalan ikisi zaten hata değil: biri **kasıtlı** canlı fren testi
+("Arabulucu akışı durdurdu: canlı fren testi"), biri bilgi notu.
+
+`akis_hatasi` nöbetçinin **yürüttüğü tiplerden değildir** — tasarım gereği
+okunana kadar `bekliyor` kalır. Yani bunlar kendiliğinden kapanmaz.
+
+**Seçenekler.**
+| | ne yapılır | bedeli |
+|---|---|---|
+| **A** | Arabulucu panoda kendi kapatır | Kod değişmez; 5 satır arabulucunun karşısında durur |
+| B | Kök nedeni kapanmış bayat bildirimler tek SQL ile `yapildi` yapılır | Üretim verisi yazımı (§10 → Cowork); kanıt kaybolmaz, durum değişir |
+| C | Nöbetçi, kök nedeni geçmiş `akis_hatasi` satırlarını otomatik kapatır | Ajan davranışı değişir (§13 Human Gate); "hangi hata geçmiş sayılır" kuralını ajanın yorumlamasını gerektirir — kaçınılmalı |
+
+**Önerim: A.** Bunlar arabulucuya yazılmış **bildirimlerdir**; okuyup kapatmak
+onun işidir ve sayı beştir. B gerekirse şu tek satırla yapılır (kurucu/Cowork
+çalıştırır, Code çalıştırmaz):
+`update ajan_gorevleri set durum='yapildi', sonuc='kök nedeni kapatıldı (25.08)' where durum='bekliyor' and gorev_tipi='akis_hatasi' and created_at < '2026-08-21';`
+
+**Kararın etkisi.** A/B'de ürün davranışı değişmez. C seçilirse ajan, insana
+yazılmış bir bildirimi insan okumadan kapatma yetkisi kazanır — bu, "ajan
+önerir, insan seçer" ilkesinden sapmadır; önermiyorum.
+
 ---
 
 ## COWORK → CODE` bölümüne yazar. Code her turun başında o
