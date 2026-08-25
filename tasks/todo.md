@@ -239,8 +239,19 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       · **Kalan:** beş iş türü için dakika + dayanak (göç:
       `tests/gecici/kazanim-katsayilari.sql`, Code yazdı çalıştırmadı §10).
 
-- [!] P2 · **Taraf akışı telefonda uçtan uca** · **BLOCKED — gerçek telefon gerekiyor (kurucu)** · Kalan: · Kabul: gerçek telefonda davet →
-      başvuru → belge → Kör Teklif → ödeme bilgisi zinciri kesintisiz tamamlanıyor.
+- [!] P2 · **Taraf akışı telefonda uçtan uca** · **BLOCKED — gerçek cihaz gerekiyor
+      (kurucu)** · Code kısmen doğruladı, kalan kısım cihaz istiyor.
+      · **Code'un yaptığı (25.08, tarayıcıyla):** taraf katılım sayfası canlı bir
+      jetonla açıldı ve dar görünümde ölçüldü. **İçerik akışında yatay taşma
+      YOK**; dokunma hedefleri **70–71 px** (asgari 44 px'in çok üstünde);
+      üç düğme de tam genişlikte, kesilmiyor.
+      · **Ölçülemeyen:** `fixed` konumlu katmanlar (bildirim/toast) bu yöntemle
+      doğru modellenemiyor — gerçek mobil görünümde viewport'a sığarlar ama
+      bunu ancak cihaz gösterir. Taşan olarak görünen iki öge Lovable'ın
+      **düzenleme rozeti** ve toast katmanıydı, uygulamanın kendi içeriği değil.
+      · **Kalan:** gerçek telefonda zincirin tamamı — davet → başvuru → belge →
+      Kör Teklif → ödeme bilgisi. Yalnız katılım adımı doğrulandı.
+
 - [x] P3 · **Kullanılabilirlik bulguları (03.08 saha notu)** · **DONE 25.08.2026 —
       CANLI KANITLI** · §15.1 beş şart da sağlanıyor
       · **ŞART 4 CANLI KANITI (Code kendi doğruladı):** yayınlanan paket
