@@ -171,20 +171,17 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 - [ ] P1 · **Kazanım sayacı yok** · Kabul: baz çizgi alınıyor ve dosya bazında kazanılan
       saat üretiliyor · **Bulgu:** tablo yok, kodda karşılığı yok ("baseline"
       eşleşmeleri CSS sınıf adları). **NOT:** "kazanım" tanımı ürün kararıdır.
-- [ ] P2 · **Ödeme defteri "Kaydet" görünürlüğü — son doğrulama** (§15.5-4, tek açık
-      bloker) · Kabul: ödeme defterinde satır ekleme/düzenleme/silme canlıda uçtan uca
-      çalışıyor ve Kaydet düğmesi her durumda görünür · **Bulgu:** `case_payments`
-      (17 kolon) ve `fee_tariffs` şeması var; §15.5'te "son doğrulama" olarak açık.
-- [x] P2 · **Ücret hesabı tarife tabanının altına inmiyor** · **DONE 25.08.2026
-      (zaten kuruluymuş — doğrulandı ve kilitlendi)** · Kabul: tarife tabanının altında
-      bir ücret kaydedilemiyor; deneme reddediliyor ve sebebi **taban rakamıyla**
-      gösteriliyor · Doğrulama: `tests/ucret-tabani.test.ts` (5 durum) · 280/280 test
-      · **Bulgu:** kural **üç yazım yolunun üçünde de** kuruluymuş
-      (`saveUcretSozlesmesi` · tekil ödeme satırı · `saveStagedRows`); üçü de
-      yazımdan ÖNCE denetliyor ve `return` ile durduruyor, mesajda tabanı gösteriyor
-      (`AAÜT tabanının altına inilemez (taban: …)`). Taban kodda sabit değil:
-      `calculate-mediation-fee` `fee_tariffs` tablosundan okuyor.
-      **Yeniden yazılmadı** — tezgâh gerilemeye karşı kilitledi.
+- [x] P2 · **Ödeme defteri "Kaydet" görünürlüğü** (§15.5-4) · **DONE 25.08.2026
+      (zaten kuruluymuş — doğrulandı ve kilitlendi)** · Doğrulama:
+      `tests/odeme-defteri.test.ts` (5 durum) · 307/307 test
+      · **§15.5'te 28.07'den beri açık duran TEK pilot blokeriydi; kapandı.**
+      · **Bulgu:** defterin dört yazım yolu da kurulu — satır ekle · satır
+      düzenle/Kaydet · toplu kaydet · ücret sözleşmesi Kaydet. Dördü de
+      **koşulsuz** render ediliyor; yalnız işlem sürerken devre dışı kalıyorlar
+      (çift gönderimi önlemek için — doğru davranış, görünürlük kusuru değil).
+      Silme onay istiyor, ödenmiş kayıt değişikliği ayrıca uyarıyor. Dört hata
+      alanı da (`editError` · `rowError` · `stageError` · `contractError`)
+      kullanıcıya gösteriliyor — sessiz başarısızlık yok.
 
 ### Canlı doğrulama maddeleri (kod değil, kanıt üretir)
 - [x] P2 · **§3 otomatik doldurma** · **DONE 25.08.2026 (doğrulandı, bir tuzak
