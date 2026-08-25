@@ -304,7 +304,12 @@ export function ProcessTrackerPanel({ caseRow, open, onOpenChange }: Props) {
     { label: "Diğer Taraf", value: respondents.length ? respondents.map(partyName).join(", ") : "—" },
     { label: "Arabulucu", value: mediatorName || "—" },
     { label: "Arb. Konusu", value: arbKonusu },
-    { label: "Dosya Atama Tarihi", value: fmtDate(assignedAt ?? caseData?.created_at) },
+    // 25.08.2026 — `?? caseData?.created_at` KALDIRILDI. Bu satir resmi tutanak
+    // alanidir; atama kaydi yokken dosyanin ACILIS tarihini "atama tarihi" diye
+    // yazdiriyordu. Atama tarihinin tek kaynagi `case_assignments.assigned_at`tir
+    // (`cases` uzerinde atama zaman damgasi YOK). Kayit yoksa panelin kendi
+    // bilinmiyor gosterimi kullanilir: fmtDate(null) === "—". Tarih UYDURULMAZ.
+    { label: "Dosya Atama Tarihi", value: fmtDate(assignedAt) },
     { label: "Son Gün Tarihi", value: fmtDate(sonGunTarihi) },
   ];
 

@@ -156,12 +156,29 @@ export default function AdminDashboard() {
       return;
     }
 
-    // Insert assignment record
-    await supabase.from('case_assignments').insert({
+    // Atama kaydi. 25.08.2026 — sonucu SESSIZ yutuluyordu; oysa
+    // `case_assignments.assigned_at` atama tarihinin TEK kaynagidir
+    // (`cases` uzerinde atama zaman damgasi yok) ve resmi tutanak alanini
+    // besler. Yazilamazsa tarih kalici olarak kaybolur, panel "—" gosterir.
+    // Atama YAPILMIS sayilir (yetki `cases.assigned_mediator_id`tedir, o
+    // yazildi); burada yalnizca iz eksik kalir, o yuzden uyari veriyoruz.
+    const { error: izHatasi } = await supabase.from('case_assignments').insert({
       case_id: selectedCase.id,
       mediator_id: selectedMediatorId,
       assigned_by: user!.id,
     });
+
+    if (izHatasi) {
+      console.error('[AdminDashboard] case_assignments yazilamadi', izHatasi);
+      toast({
+        variant: 'destructive',
+        title: language === 'tr' ? 'Atama izi yazilamadi' : 'Assignment record failed',
+        description:
+          language === 'tr'
+            ? `Arabulucu atandi ancak atama tarihi kaydedilemedi: ${izHatasi.message}`
+            : `Mediator assigned but the assignment date was not recorded: ${izHatasi.message}`,
+      });
+    }
 
     // Notify case owner + mediator
     try {
