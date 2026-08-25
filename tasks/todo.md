@@ -1,34 +1,56 @@
 ## Nerede kaldık
 
-- Tarih: 25.08.2026 (10. blok) — **`medipact dur` ile kapatıldı**
+- Tarih: 25.08.2026 (11. blok)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
   Karar gereken her madde `tasks/HAT.md`ye yazılır, Code beklemeden devam eder.
-- Aktif görev: yok — kuyruk temiz, blokaj yok
-- Son tamamlanan iş: **P1 · takip föyü oturum satırları** (`ProcessTrackerPanel`)
-- Bu bloğun tamamlananları (sırayla):
-  `0e5b1c9` P1 atama tarihi uydurulmuyor (kaydı bu blokta tamamlandı) ·
-  `825dfb4` P1 bilirkişi önerisi iz bırakıyor ve tarafa ulaşıyor ·
-  `bcbdeb8` P1 sessiz yutulan yazımlar (12 yol) ·
-  `b772c4d` P2 kontrolsüz yazımların kalanı (7 yol) ·
-  `4319e66` P3 `ProcessTrackerPanel` bayat `as any` ·
-  bu commit: P1 föy oturum satırları
-- Doğrulama: `npm run test` **237/237** · tsc temiz · build başarılı · lint **2343**
-  (blok başı 2349 → −6)
+- Aktif görev: yok
+- Son tamamlanan iş: **P2 · canlı dosyanın içindeki ölü bileşenler**
+  (`RoundsTab` + `RiskSummaryCard` kaldırıldı, sembol düzeyi tezgâh kuruldu)
+- Doğrulama: `npm run test` **240/240** · tsc temiz · build başarılı · lint **2334**
 - **Açık blokaj: yok**
-- **Canlı kanıt:** `medipact-ai.lovable.app` bundle'ında `825dfb4` doğrulandı
-  ("Yeni Bilirkişi Önerisi" ×2, "Bilirkişi Önerisi Geri Çekildi", "Taraflarca
-  Onaylandı"). `bcbdeb8` · `b772c4d` · `4319e66` ve bu commit için publish
-  tetiklendi; bundle doğrulaması **sıradaki oturumun ilk işi**.
-- Açık HAT maddesi: **H-1** (kurucuda: `CRON_SECRET`) · **H-4** (önkoşul yok) ·
-  **H-7** (`session_feedback` yapısal olarak imkânsız) · **H-8** (başvuru adası) ·
-  **H-9** (föyün oturum satırları otomatik mi kalsın — bugün yazıldı).
-- **Sıradaki uygulanabilir iş (yeni oturum buradan başlar):**
-  1. Canlı bundle'da son dört commit'in dizelerini doğrula (yukarıdaki liste).
-  2. Canlıda 0/az satırlı tablo taramasının kalanı: `pending_pool` (0 satır ·
-     `MevzuatAdmin`) · `case_process_tracker` (9 dosyada 1 satır).
-  3. `messages` tablosu **kusur DEĞİL** — RLS sağlam, yalnız hiç kullanılmamış;
-     tekrar araştırma.
+- **CANLI DOĞRULAMA TAMAM (10. blok):** `medipact-ai.lovable.app` bundle'ında
+  beş commit de doğrulandı — `825dfb4` (bilirkişi dizeleri) · `bcbdeb8` +
+  `b772c4d` (14 hata dizesinden 13'ü; 14'ü aşağıdaki bulguyu doğurdu) ·
+  `4319e66` (tip değişikliği, build kanıtı) · `c279063` (föy süzgeci
+  `!=="cancelled" && !=="draft"` canlı pakette, bundle `index-BHQT2JIF.js`).
+- Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9** —
+  hiçbiri beklenmiyor.
+- Sıradaki uygulanabilir iş: canlıda 0/az satırlı tablo taramasının kalanı —
+  `pending_pool` (0 satır · `MevzuatAdmin`) · `case_process_tracker`
+  (9 dosyada 1 satır).
+
+### KAPANDI — 25.08 · P2 · CANLI DOSYANIN İÇİNDEKİ ÖLÜ BİLEŞENLER
+**Nasıl bulundu — canlı doğrulama işe yaradı.** `bcbdeb8` ile eklenen 14 hata
+dizesi canlı pakette arandı: **13'ü vardı, biri yoktu** ("Tur durumu
+güncellenemedi"). Dağıtım sorunu değildi — **yerel `dist` çıktısında da yoktu**:
+Rollup onu **ölü kod** olarak atıyordu. Yani derleyici, `tests/olu-yuzey.test.ts`
+taramasının göremediği bir yüzeyi işaret etti.
+
+**Boşluk.** `olu-yuzey.test.ts` **DOSYA** düzeyinde çalışır (`main.tsx`ten
+erişilebilirlik). `CaseRoom.tsx` canlıdır — ama içindeki `RoundsTab` hiçbir
+yerden render edilmiyordu. Dosya düzeyi tarama bunu göremez.
+
+**Kaldırılan iki bileşen:**
+| bileşen | ne yapıyordu | neden kaldırıldı |
+|---|---|---|
+| `CaseRoom.RoundsTab` (75 satır) | Aşama 7 müzakere turları: `negotiation_rounds`e **INSERT + UPDATE** | Hiç render edilmiyordu ama **yazan** bir yüzeydi — merkezin kurallarını atlayan ikinci yol, `MediatorDetail` tuzağının aynısı (`tasks/lessons.md`). Canlı tur yüzeyleri: `MediationEngine.Phase8Negotiation` ve `MeetingNotesPanel`. |
+| `MediationEngine.RiskSummaryCard` (96 satır) | "📊 Karşılaştırmalı Risk Özeti" kartı | Salt sunum; görünümü kokpit panelleri devralmıştı (Aşama 4'te `ComparativeRiskAnalysis` zaten `hidden` sarmalayıcı içinde, yalnız `risk_ozeti` üretiyor). Veri yazmıyordu. |
+| + `riskContainerTone` | yardımcı | Tek tüketicisi `RiskSummaryCard`dı; öksüz kaldı. |
+
+Tablolar **duruyor** (HAT H-3 kararı: kod gider, tablo kalır). `risk_ozeti` verisi
+öksüz değil — dört canlı yerde okunuyor (`AgentControlPanel`, kokpit panelleri).
+
+**TEZGÂH:** `tests/olu-bilesen.test.ts` (3 durum) — üst düzey `function Ad(`
+bildirimlerini tarar, hiçbir yerde kullanılmayanları listeler. Kalan 9 bulgunun
+hepsi zaten ölü **dosyalardadır** ve `olu-yuzey.test.ts` tarafından donduruludur.
+İlk test **tarayıcının kendisini** koruyor: 0 bulgu da, 40'tan fazla bulgu da
+(kelime sınırı regex'i bozulursa her şey ölü görünür) tezgâhı düşürür — ilk
+yazımda tam bu oldu, `` kaçışı düştü ve tarama 199 yanlış bulgu verdi.
+**KANITLANDI:** kaldırma öncesi ağaç `BILESEN_KOK=tests/gecici/bilesen-kanit`e
+açıldı → **2/3 test DÜŞTÜ** ve iki dosyayı adıyla gösterdi; gerçek dizinde 3/3.
+- Doğrulama: **240/240** test · tsc temiz · build başarılı · lint **2334**
+  (2343 → −9: ölü kodun kendi lint hataları da gitti).
 
 ### KAPANDI — 25.08 · P1 · TAKİP FÖYÜ OTURUM SATIRLARI YAPILMAMIŞ OTURUMU YAZDIRMIYOR
 `ProcessTrackerPanel.autoState` föyün "İlk Oturum" / "2. Oturum" satırlarını

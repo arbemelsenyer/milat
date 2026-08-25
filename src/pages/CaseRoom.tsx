@@ -2871,82 +2871,13 @@ function PartyExpertApproval({ caseId, partyId }: { caseId: string; partyId: str
   );
 }
 
-// =================== Stage 7: NEGOTIATION ROUNDS ===================
-function RoundsTab({ caseId, parties }: { caseId: string; parties: any[] }) {
-  const { user } = useAuth();
-  const [rounds, setRounds] = useState<any[]>([]);
-  const [proposal, setProposal] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const load = async () => {
-    const { data } = await supabase
-      .from("negotiation_rounds")
-      .select("*")
-      .eq("case_id", caseId)
-      .order("round_no", { ascending: true });
-    setRounds((data ?? []) as any[]);
-  };
-  useEffect(() => { load(); }, [caseId]);
-
-  const newRound = async () => {
-    if (!proposal.trim()) return;
-    setBusy(true);
-    const nextNo = (rounds[rounds.length - 1]?.round_no ?? 0) + 1;
-    const { error } = await supabase.from("negotiation_rounds").insert({
-      case_id: caseId, round_no: nextNo, status: "open",
-      proposal: { text: proposal, by: user?.id },
-    } as any);
-    setBusy(false);
-    if (error) { toast({ title: "Hata", description: error.message, variant: "destructive" }); return; }
-    setProposal("");
-    toast({ title: `Tur ${nextNo} açıldı` });
-    load();
-  };
-
-  const setStatus = async (id: string, status: string) => {
-    const { error } = await supabase.from("negotiation_rounds").update({ status }).eq("id", id);
-    if (error) { toast({ title: "Tur durumu güncellenemedi", description: error.message, variant: "destructive" }); return; }
-    load();
-  };
-
-  return (
-    <div className="space-y-4">
-      <Card className="p-5 space-y-3">
-        <h3 className="font-semibold">Yeni Müzakere Turu</h3>
-        <Textarea value={proposal} onChange={(e) => setProposal(e.target.value)} placeholder="Tur teklifi / gündem..." />
-        <Button onClick={newRound} disabled={busy || !proposal.trim()}>
-          {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Repeat className="h-4 w-4 mr-1" />}
-          Tur Aç
-        </Button>
-      </Card>
-      <div className="space-y-2">
-        {rounds.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Henüz tur yok.</p>
-        ) : rounds.map((r) => (
-          <Card key={r.id} className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="font-medium">Tur {r.round_no}</div>
-              <Badge variant={r.status === "agreed" ? "default" : r.status === "failed" ? "destructive" : "outline"}>
-                {r.status}
-              </Badge>
-            </div>
-            <p className="text-sm whitespace-pre-wrap">{r.proposal?.text}</p>
-            {r.status === "open" && (
-              <div className="flex gap-2 mt-3">
-                <Button size="sm" variant="outline" onClick={() => setStatus(r.id, "agreed")}>
-                  <Check className="h-3 w-3 mr-1" /> Anlaşıldı
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setStatus(r.id, "failed")}>
-                  <X className="h-3 w-3 mr-1" /> Anlaşılamadı
-                </Button>
-              </div>
-            )}
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
+// 25.08.2026 — `RoundsTab` (Aşama 7: müzakere turları) KALDIRILDI. Hiçbir
+// yerden render edilmiyordu: canlı bundle'da dizeleri bile yoktu (Rollup ölü
+// kod olarak atıyordu). `negotiation_rounds` tablosuna INSERT + UPDATE eden bir
+// yüzeydi, yani merkezin kurallarını atlayan ikinci bir yol — `MediatorDetail`
+// tuzağının aynısı (tasks/lessons.md). Tablo DURUYOR (HAT H-3 kararı: kod gider,
+// tablo kalır). Canlı tur yüzeyleri: `MediationEngine.Phase8Negotiation` ve
+// `MeetingNotesPanel` (status: "note").
 
 // =================== Stage 8: AGREEMENT & OFFICIAL DOCS ===================
 function AgreementTab({ caseRow, parties, onChanged }: { caseRow: any; parties: any[]; onChanged: () => void }) {

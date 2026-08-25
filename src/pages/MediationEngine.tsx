@@ -6000,14 +6000,6 @@ export function normalizeRiskLevel(raw?: string): "low" | "medium" | "high" | "u
   if (l.includes("düş") || l.includes("dus") || l.includes("low")) return "low";
   return "unknown";
 }
-export function riskContainerTone(raw?: string): string {
-  switch (normalizeRiskLevel(raw)) {
-    case "high": return "border-red-400/50 bg-red-50/60 dark:bg-red-950/20";
-    case "medium": return "border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20";
-    case "low": return "border-emerald-400/50 bg-emerald-50/60 dark:bg-emerald-950/20";
-    default: return "border-border bg-muted/30";
-  }
-}
 export function riskBadgeTone(raw?: string): string {
   switch (normalizeRiskLevel(raw)) {
     case "high": return "bg-red-600 text-white";
@@ -6215,102 +6207,10 @@ function RiskAnalysisCard({
   );
 }
 
-function RiskSummaryCard({ summary, sources }: { summary?: any; sources?: any[] }) {
-  if (!summary || typeof summary !== "object") return null;
-  const tone = riskContainerTone(summary.genel_risk_puani);
-  const badgeTone = riskBadgeTone(summary.genel_risk_puani);
-  const missingHeadline =
-    isMissing(summary.genel_uzlasma_orani) && isMissing(summary.genel_risk_puani);
-  return (
-    <div className={`border rounded-lg p-4 space-y-3 ${tone}`}>
-      <div className="flex items-center justify-between">
-        <div className="font-semibold text-sm">📊 Karşılaştırmalı Risk Özeti</div>
-        {summary.genel_risk_puani && (
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badgeTone}`}>{summary.genel_risk_puani} Risk</span>
-        )}
-      </div>
-      {parsePercent(summary.genel_uzlasma_orani) !== null ? (
-        <div>
-          <GaugeMeter
-            label="Genel Anlaşma Oranı"
-            pct={parsePercent(summary.genel_uzlasma_orani)!}
-            valueLabel={summary.genel_uzlasma_orani}
-            riskLabel={summary.genel_risk_puani}
-          />
-          {summary.genel_uzlasma_orani_kaynak && <div className="text-[11px] text-muted-foreground italic mt-0.5">({summary.genel_uzlasma_orani_kaynak})</div>}
-        </div>
-      ) : (
-        <div className="text-sm">
-          <span className="text-xs text-muted-foreground">Genel Anlaşma Oranı: </span>
-          <span className="font-medium">{summary.genel_uzlasma_orani || "Yeterli veri yok"}</span>
-          {summary.genel_uzlasma_orani_kaynak && <span className="text-[11px] text-muted-foreground italic"> ({summary.genel_uzlasma_orani_kaynak})</span>}
-        </div>
-      )}
-      {missingHeadline && (
-        <MissingDataHint>
-          Karşılaştırmalı özet için tarafların risk analizinde eksik alanlar var. Her taraf kartında
-          <b> "Risk Analizini Güncelle"</b> butonuyla analizleri yenileyin; ardından bu raporu
-          <b> "Yeniden Üret"</b> ile tekrar hesaplatın.
-        </MissingDataHint>
-      )}
-      {Array.isArray(summary.taraf_karsilastirma) && summary.taraf_karsilastirma.length > 0 && (
-        <div className="grid sm:grid-cols-2 gap-2">
-          {summary.taraf_karsilastirma.map((t: any, i: number) => (
-            <div key={i} className="border rounded p-2 bg-background text-sm">
-              <div className="font-medium flex items-center gap-2">
-                <span>{t.taraf || `Taraf ${i + 1}`}</span>
-                {t.risk_puani && (
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${riskBadgeTone(t.risk_puani)}`}>{t.risk_puani}</span>
-                )}
-              </div>
-              {t.guclu_yon && <div className="text-xs">✓ {t.guclu_yon}</div>}
-              {t.zayif_yon && <div className="text-xs">✗ {t.zayif_yon}</div>}
-            </div>
-          ))}
-        </div>
-      )}
-      {Array.isArray(summary.ortak_kritik_faktorler) && summary.ortak_kritik_faktorler.filter(Boolean).length > 0 && (
-        <div>
-          <div className="text-xs font-medium mb-1">Ortak Kritik Faktörler</div>
-          <ul className="space-y-1">
-            {summary.ortak_kritik_faktorler.filter(Boolean).map((s: string, i: number) => (
-              <li key={i} className="flex items-start gap-2 rounded-md border border-foreground/15 bg-muted/50 px-2.5 py-1.5 text-sm font-medium">
-                <Brain className="h-4 w-4 mt-0.5 shrink-0 text-foreground/70" />
-                <span>{s}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {Array.isArray(summary.ortak_uzlasma_engelleri) && summary.ortak_uzlasma_engelleri.filter(Boolean).length > 0 && (
-        <div>
-          <div className="text-xs font-medium mb-1">Ortak Uzlaşma Engelleri</div>
-          <ul className="space-y-1">
-            {summary.ortak_uzlasma_engelleri.filter(Boolean).map((s: string, i: number) => (
-              <li key={i} className="flex items-start gap-2 rounded-md border border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20 px-2.5 py-1.5 text-sm">
-                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                <span>{s}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {Array.isArray(summary.kaynak_listesi) && summary.kaynak_listesi.filter(Boolean).length > 0 && (
-        <div className="text-xs">
-          <div className="font-medium mb-1">Kullanılan Kaynaklar</div>
-          <div className="flex flex-wrap gap-1">
-            {summary.kaynak_listesi.filter(Boolean).map((name: string, i: number) => (
-              <SourceChip key={i} name={name} source={matchSource(name, sources)} />
-            ))}
-          </div>
-        </div>
-      )}
-      {summary.arabulucu_onerisi && (
-        <div className="text-sm border-l-2 border-primary/40 pl-2 italic">{summary.arabulucu_onerisi}</div>
-      )}
-    </div>
-  );
-}
+// 25.08.2026 — `RiskSummaryCard` KALDIRILDI. Hiçbir yerden render edilmiyordu.
+// Görünümü kokpit panelleri devraldı (bkz. Aşama 4'teki `hidden` sarmalayıcı:
+// `ComparativeRiskAnalysis` yalnız `risk_ozeti` üretmek için çalışıyor, kart
+// göstermiyor). Salt sunum bileşeniydi; veri yazmıyordu, veri kaybı yok.
 
 
 
