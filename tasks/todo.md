@@ -4,8 +4,8 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P1 · bilirkişi kararından sonraki dört sessiz yazım**
-- Doğrulama: `npm run test` **251/251** · tsc temiz · lint **2334**
+- Son tamamlanan iş: **P1 · `bilirkisi-secim` sessiz yazımları (6 yer)**
+- Doğrulama: `npm run test` **252/252** · tsc temiz · lint **2334**
 - **Açık blokaj: yok**
 - **REDEPLOY DURUMU (§11-B):**
   - ✅ `send-party-invite` · `revoke-party-invite` · `send-meeting-invite` —
@@ -17,13 +17,34 @@
     etti (commit `38ee346`, dördü de onaylandı).
   - ✅ `cancel-meeting-invite` · `randevu-teklif` — Lovable ajanı deploy etti
     (commit `6654b15`, ikisi de onaylandı).
-  - ⏳ `bilirkisi-ekranim` — bu commit'ten sonra.
+  - ✅ `bilirkisi-ekranim` — Lovable ajanı deploy etti (commit `5defbe3`).
+  - ⏳ `bilirkisi-secim` — bu commit'ten sonra.
 - Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9**.
 - Sıradaki uygulanabilir iş: **P2 · kalan kenar işlevi sessiz yazımları.**
-  Öncelik: `bilirkisi-secim` · `taraf-kalem-cikar` · `ajan-nobetci` ·
-  `akis-yurut`. En sonda `agent_states` defter yazımları
+  Öncelik: `taraf-kalem-cikar` · `ajan-nobetci` · `akis-yurut` ·
+  `orchestrator-run` · `dual-ai-validate`. En sonda `agent_states` defter yazımları
   (yüksek hacim, büyük ölçüde en-iyi-çaba) ve `_shared/**` — ona dokunmak
   **39 fonksiyon fan-out redeploy** demektir, ayrı tur olarak planlanmalı.
+
+### KAPANDI — 25.08 · P1 · `bilirkisi-secim` SESSİZ YAZIMLARI (6 YER)
+Bu işlev **büyük ölçüde doğru yazılmıştı**: ana yazımların hepsi (`bilirkisi_secim_beyani`,
+`bilirkisi_taraf_yanitlari`, `case_expert_assignments`, `bilirkisi_onerileri`
+insert, `bilirkisi_evrak_kumesi`) denetleniyor ve 500 dönüyor. Eksik olanlar,
+ana yazımın **hemen ardındaki damgalar ve görev kapanışlarıydı**:
+
+| yer | sessiz kalırsa |
+|---|---|
+| Sunum damgası ×2 (`durum: "taraflara_sunuldu"`) | Adaylar sohbette **sunulmuş** olur ama kayıtta hâlâ taslak durur: sunum tekrarlanabilir, sonraki adım adayları bulamaz. |
+| Atama damgası (`durum: "atandi"`) | Atama satırı yazıldı ama öneri "atandı" görünmez → **aynı aday ikinci kez atanabilir** (mükerrer `case_expert_assignments`). |
+| Atama denetim izi (`action: "assigned"`) | Atamanın denetim kaydı hiç oluşmaz. |
+| Görev kapanışı ×2 (`ajan_gorevleri` → "yapildi") | Kodun **kendi yorumu** "aynı soru tekrar sorulmaz" / "mükerrer hatırlatma olmasın" diyor — kapanış sessizce başarısız olunca tam o söz tutulmuyordu. |
+| Rapor yorumu yazımı | Tarafın rapor görüşü göreve işlenmez. |
+
+**TEZGÂH:** `tests/kenar-sessiz-yazim.test.ts` bir durumla genişletildi (toplam 8).
+Bu durum ayrıca dosyada **çıplak `await admin.from(...)` satırı kalmadığını**
+doğruluyor ve zaten denetli olan üç ana yazımın bozulmadığını kontrol ediyor.
+**KANITLANDI:** `KENAR_KOK=tests/gecici/kenar-kanit` kopyasında **8/8 DÜŞÜYOR**.
+- Doğrulama: **252/252** test · tsc temiz · lint 2334 (değişmedi).
 
 ### KAPANDI — 25.08 · P1 · BİLİRKİŞİ KARARINDAN SONRAKİ DÖRT SESSİZ YAZIM
 `bilirkisi-ekranim` — bilirkişinin kendi kabul/ret kararı (**insan kapısı**).

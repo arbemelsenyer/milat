@@ -394,9 +394,11 @@ Deno.serve(async (req) => {
         /* Arabulucunun cevapladığı bekleyen satır kapanır; aynı soru tekrar sorulmaz. */
         const gorevId = metin((govde as any)?.gorev_id);
         if (gorevId) {
-          await admin.from("ajan_gorevleri")
+          // Kapanmazsa AYNI SORU tekrar sorulur (yorumun sozu bu).
+          const { error: kapatErr } = await admin.from("ajan_gorevleri")
             .update({ durum: "yapildi", sonuc: `yeni alan tarandı (tur ${alanTuru}/${ALAN_TUR_SINIRI})` })
             .eq("id", gorevId);
+          if (kapatErr) console.error(`[bilirkisi-secim] görev kapatılamadı (${gorevId}): ${kapatErr.message}`);
         }
       }
 
@@ -566,7 +568,14 @@ Deno.serve(async (req) => {
         if (hepsiArabulucu) {
           /* İKİ TARAF DA "arabulucu seçsin" dediyse sunum bölümü ATLANIR;
              doğrudan arabulucuya gider (4. bölüm). */
-          await admin.from("bilirkisi_onerileri").update({ durum: "taraflara_sunuldu" }).in("id", idler);
+          // Damga yazilamazsa adaylar sohbette SUNULMUS olur ama kayitta hala
+          // taslak durur: sunum tekrarlanabilir, sonraki adim adaylari bulamaz.
+          const { error: sunumErr } = await admin.from("bilirkisi_onerileri")
+            .update({ durum: "taraflara_sunuldu" }).in("id", idler);
+          if (sunumErr) {
+            console.error(`[bilirkisi-secim] sunum damgası yazılamadı ("${a}"): ${sunumErr.message}`);
+            notlar.push(`${a}: sunum damgası yazılamadı — ${sunumErr.message}`);
+          }
           await anaAjanaBildir(admin, {
             case_id, gorev_tipi: "arabulucu_sorusu", hedef_party_id: null,
             gerekce: `[bilirkisi:arabulucu-secsin:${a}] İki taraf da seçimi size bıraktı. `
@@ -577,7 +586,12 @@ Deno.serve(async (req) => {
           sunulan += satirlar.length;
           continue;
         }
-        await admin.from("bilirkisi_onerileri").update({ durum: "taraflara_sunuldu" }).in("id", idler);
+        const { error: sunumErr2 } = await admin.from("bilirkisi_onerileri")
+          .update({ durum: "taraflara_sunuldu" }).in("id", idler);
+        if (sunumErr2) {
+          console.error(`[bilirkisi-secim] sunum damgası yazılamadı ("${a}"): ${sunumErr2.message}`);
+          notlar.push(`${a}: sunum damgası yazılamadı — ${sunumErr2.message}`);
+        }
         for (const t of taraflar) {
           // Taraf ajanı KENDİ tarafına, kendi sohbetinde sunar.
           await anaAjanaBildir(admin, {
@@ -724,8 +738,10 @@ Deno.serve(async (req) => {
         .eq("hedef_party_id", k.party_id).eq("durum", "bekliyor").limit(50);
       for (const g of (bekleyen ?? []) as any[]) {
         if (!alan || String(g.gerekce ?? "").includes(`[bilirkisi:sunum:${alan}]`)) {
-          await admin.from("ajan_gorevleri")
+          // Kapanmazsa yorumun sozu tutulmaz: MUKERRER HATIRLATMA gider.
+          const { error: kapatErr } = await admin.from("ajan_gorevleri")
             .update({ durum: "yapildi", sonuc: "taraf işaretlemesini yaptı" }).eq("id", g.id);
+          if (kapatErr) console.error(`[bilirkisi-secim] taraf görevi kapatılamadı (${g.id}): ${kapatErr.message}`);
         }
       }
       let yanitOlayNotu = "yanıt değişmedi — olay yazılmadı";
@@ -796,15 +812,25 @@ Deno.serve(async (req) => {
       }).select("id").maybeSingle();
       if (aErr) return json({ error: `Atama yazılamadı: ${aErr.message}` }, 500);
 
-      await admin.from("bilirkisi_onerileri")
+      // Atama satiri yukarida yazildi ve DENETLENDI. Asagidaki ikisi sessizdi:
+      //  - damga yazilamazsa oneri "atandi" gorunmez ve AYNI ADAY IKINCI KEZ
+      //    atanabilir (mukerrer `case_expert_assignments` satiri);
+      //  - iz yazilamazsa atamanin denetim kaydi hic olusmaz.
+      const atamaUyarilari: string[] = [];
+      const { error: damgaErr } = await admin.from("bilirkisi_onerileri")
         .update({ durum: "atandi", arabulucu_onayi: true, arabulucu_onay_zamani: new Date().toISOString() })
         .eq("id", (oneri as any).id);
+      if (damgaErr) atamaUyarilari.push(`öneri "atandı" işaretlenemedi (aynı aday ikinci kez atanabilir): ${damgaErr.message}`);
 
-      await admin.from("expert_assignment_logs").insert({
+      const { error: atamaIzErr } = await admin.from("expert_assignment_logs").insert({
         case_id, assignment_id: (atama as any)?.id ?? null, expert_id,
         actor_id: k.user_id, actor_role: "mediator", action: "assigned",
         details: { note: `"${alan}" alanında atandı` },
       });
+      if (atamaIzErr) atamaUyarilari.push(`atama denetim izi yazılamadı: ${atamaIzErr.message}`);
+      if (atamaUyarilari.length > 0) {
+        console.error("[bilirkisi-secim] atama sonrası eksikler", { case_id, expert_id, atamaUyarilari });
+      }
 
       // Arabulucu + iki tarafın sohbetine "atandı" bildirimi düşer.
       const { taraflar } = await beyanlariOku(admin, case_id);
@@ -1042,8 +1068,9 @@ Deno.serve(async (req) => {
         .find((g) => String(g.gerekce ?? "").includes("[bilirkisi:rapor-sunum]"));
       const guvenli = sinirdanGecir(yorum, "bilirkisi-secim.rapor_yorumu");
       if (hedef) {
-        await admin.from("ajan_gorevleri")
+        const { error: yorumErr } = await admin.from("ajan_gorevleri")
           .update({ durum: "yapildi", sonuc: guvenli.slice(0, 1500) }).eq("id", hedef.id);
+        if (yorumErr) console.error(`[bilirkisi-secim] rapor yorumu yazılamadı (${hedef.id}): ${yorumErr.message}`);
       } else {
         await anaAjanaBildir(admin, {
           case_id, gorev_tipi: "bilirkisi_secimi", hedef_party_id: k.party_id,

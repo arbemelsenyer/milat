@@ -105,4 +105,23 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     expect(g).toMatch(/const\s*\{\s*error\s*\}\s*=\s*await\s+admin\.from\("bilirkisi_onerileri"\)/);
     expect(g).toContain("Kaydedilemedi:");
   });
+
+  it("bilirkişi seçimi: sunum damgası, görev kapanışı ve atama izi sessiz değil", () => {
+    const g = oku("bilirkisi-secim");
+    // Sunum damgasi yazilamazsa adaylar sohbette SUNULMUS olur ama kayitta hala
+    // taslak durur; sonraki adim adaylari bulamaz.
+    for (const im of ["sunumErr", "sunumErr2"]) expect(g, `${im} okunmuyor`).toContain(im);
+    // Gorev kapanmazsa yorumun kendi sozu tutulmaz: mukerrer hatirlatma gider.
+    expect(g, "görev kapanışı sonucu okunmuyor").toContain("kapatErr");
+    // Atama sonrasi damga + iz.
+    for (const im of ["damgaErr", "atamaIzErr"]) expect(g, `${im} okunmuyor`).toContain(im);
+    expect(g).toContain("aynı aday ikinci kez atanabilir");
+    // Bu dosyada CIPLAK `await admin.from(...)` yazimi kalmamali.
+    const ciplak = g.split(String.fromCharCode(10)).filter((l) => /^\s*await\s+admin\.from\(/.test(l));
+    expect(ciplak, `sonucu okunmayan yazım: ${ciplak.join(" | ")}`).toEqual([]);
+    // Zaten denetli olan ana yazimlar bozulmamali.
+    expect(g).toContain("Atama yazılamadı:");
+    expect(g).toContain("Beyan yazılamadı:");
+    expect(g).toContain("Yanıt yazılamadı:");
+  });
 });
