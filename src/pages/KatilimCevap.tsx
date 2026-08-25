@@ -6,6 +6,8 @@ import { useParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+// Aydınlatma metni TEK KAYNAKTAN okunur; `Auth.tsx` de aynı kaynağı kullanır.
+import { KVKK_AYDINLATMA, KVKK_IMHA } from "@/lib/kvkk-metinleri";
 
 type Durum = "yukleniyor" | "acik" | "gecersiz" | "tamam" | "hata";
 
@@ -98,6 +100,24 @@ export default function KatilimCevap() {
               Arabuluculuk, tarafların bir arabulucu eşliğinde anlaşmaya çalıştığı gizli bir
               süreçtir. Katılım kararınızı aşağıdan bildirebilirsiniz.
             </p>
+
+            {/* KVKK AYDINLATMASI — mimari §15.2: "Aydınlatma metni taraf kayıt
+                ekranında gösteriliyor". 25.08'e kadar bu sayfada KVKK'ya dair tek
+                satır yoktu; tarafın gördüğü tek yüzey burasıdır.
+                KARARDAN ÖNCE görünür: özet daima açık, tam metin tek dokunuşla.
+                Metin `@/lib/kvkk-metinleri`den okunur — ikinci kopya yazılmaz. */}
+            <details className="rounded-lg border bg-muted/30 p-4 text-sm">
+              <summary className="cursor-pointer font-medium">
+                {KVKK_AYDINLATMA.baslik}
+              </summary>
+              <p className="pt-3 leading-relaxed text-muted-foreground">
+                {KVKK_AYDINLATMA.govde}
+              </p>
+              <p className="pt-3 leading-relaxed text-muted-foreground">
+                <span className="font-medium text-foreground">{KVKK_IMHA.baslik}: </span>
+                {KVKK_IMHA.govde}
+              </p>
+            </details>
             <div className="space-y-3">
               <button
                 type="button"

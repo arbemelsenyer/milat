@@ -9,6 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
+// KVKK metinleri TEK KAYNAKTAN okunur; taraf katılım ekranı da aynı kaynağı kullanır
+// (mimari §15.2: aydınlatma metni taraf kayıt ekranında da gösterilir).
+import { KVKK_AYDINLATMA, KVKK_IMHA, KVKK_ACIK_RIZA } from '@/lib/kvkk-metinleri';
 import {
   Dialog,
   DialogContent,
@@ -655,9 +658,9 @@ export default function AuthPage() {
       <Dialog open={openModal === 'aydinlatma'} onOpenChange={(o) => !o && setOpenModal(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>KVKK Aydınlatma Metni</DialogTitle>
+            <DialogTitle>{KVKK_AYDINLATMA.baslik}</DialogTitle>
             <DialogDescription className="text-sm leading-relaxed text-foreground/80 pt-2">
-              Medipact AI, arabuluculuk süreçlerindeki verilerin gizliliğini esas alır. Sisteme girilen uyuşmazlık özetleri ve taraflara ait kişisel veriler, akademik analiz amacıyla yapay zeka dil modelleri (Google Gemini API) üzerinden otomatik olarak anonimleştirilerek işlenmektedir. Verileriniz hiçbir reklam ve pazarlama şirketiyle paylaşılmaz.
+              {KVKK_AYDINLATMA.govde}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -669,9 +672,9 @@ export default function AuthPage() {
       <Dialog open={openModal === 'imha'} onOpenChange={(o) => !o && setOpenModal(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Veri Saklama ve İmha Politikası</DialogTitle>
+            <DialogTitle>{KVKK_IMHA.baslik}</DialogTitle>
             <DialogDescription className="text-sm leading-relaxed text-foreground/80 pt-2">
-              Toplanan veriler yalnızca Medipact AI sisteminin çalışması için gerekli olan güvenli altyapıda (Supabase) şifrelenmiş olarak saklanır. Kullanıcı hesabını sildiği veya talep ettiği an tüm veriler kalıcı olarak imha edilir.
+              {KVKK_IMHA.govde}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -683,9 +686,9 @@ export default function AuthPage() {
       <Dialog open={openModal === 'acikRiza'} onOpenChange={(o) => !o && setOpenModal(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Açık Rıza Beyanı</DialogTitle>
+            <DialogTitle>{KVKK_ACIK_RIZA.baslik}</DialogTitle>
             <DialogDescription className="text-sm leading-relaxed text-foreground/80 pt-2">
-              Arabuluculuk Kanunu m. 4 gizlilik esaslarına uyum kapsamında; uyuşmazlıkların (İnşaat, Sağlık, Sigorta vb.) yapay zeka modelleri tarafından anlamsal olarak analiz edilmesine, emsal referanslarla eşleştirilmesine özgür irademle onay veriyorum.
+              {KVKK_ACIK_RIZA.govde}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
