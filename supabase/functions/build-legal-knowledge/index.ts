@@ -201,8 +201,14 @@ async function processSource(admin: any, source: Source): Promise<{ chunks: numb
     kalemler = parseTarifeItems(rawText);
   }
 
-  // Eski kayıtları temizle
-  await admin.from("knowledge_base_chunks").delete().eq("source_url", source.url);
+  /* Eski kayıtları temizle — SESSİZ KALAMAZ. supabase-js DB hatasını FIRLATMAZ;
+     silme düşer ve aşağıdaki insert yine çalışırsa aynı kaynak bilgi tabanına
+     İKİ KEZ girer ve arama sonuçlarını kalıcı olarak çarpıtır. */
+  const { error: temizErr } = await admin.from("knowledge_base_chunks")
+    .delete().eq("source_url", source.url);
+  if (temizErr) {
+    throw new Error(`Önceki parçalar temizlenemedi, mükerrer kayıt riski: ${temizErr.message}`);
+  }
 
   let total = 0;
   const BATCH = 16;

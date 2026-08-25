@@ -261,29 +261,43 @@ Deno.serve(async (req) => {
         : await admin.from("bilirkisi_raporlari").insert(satir);
       if (error) return json({ error: `Rapor yazılamadı: ${error.message}` }, 500);
 
+      /* RAPOR YAZILDI. Bundan sonraki üç yazım akışın SÜRMESİNİ sağlar; her
+         birinin ayrı bir sessiz sonucu var. Çağrı başarısız SAYILMAZ (rapor
+         kaydedildi, yeniden deneme mükerrer satır üretir) — eksikler
+         `uyarilar` ile açıkça dönülür. */
+      const uyarilar: string[] = [];
       if (durum === "teslim") {
         /* AKIŞ SÜRER: rapor gelince ajan devreye girer — arabulucunun sohbetine
            bildirilir, taraf ajanları raporu kendi taraflarına sunar. */
-        await admin.from("akis_olaylari").insert({
+        const { error: olayErr2 } = await admin.from("akis_olaylari").insert({
           case_id, party_id: null, olay_kodu: "bilirkisi_durumu_degisti",
           veri: { adim: "rapor_teslim", alan: metin(gorev.alan) || null }, islendi: false,
         });
-        await admin.from("ajan_gorevleri").insert({
+        // EN AĞIRI: bu olay yazılamazsa ajan raporun geldiğini HİÇ duymaz —
+        // akış durur, rapor dosyada öylece bekler.
+        if (olayErr2) uyarilar.push(`akış olayı yazılamadı (rapor teslim edildi ama akış ilerlemez): ${olayErr2.message}`);
+        const { error: gorevErr2 } = await admin.from("ajan_gorevleri").insert({
           case_id, gorev_tipi: "arabulucu_sorusu", durum: "bekliyor", hedef_party_id: null,
           gerekce: `[kaynak:sistem] [bilirkisi:rapor] Bilirkişi raporunu teslim etti`
             + `${gorev.alan ? ` ("${gorev.alan}" alanı)` : ""}. Taraflara sunulmak üzere hazır.`,
         });
-        const { data: taraflar } = await admin.from("case_parties")
+        if (gorevErr2) uyarilar.push(`arabulucu iş panosuna bildirim yazılamadı: ${gorevErr2.message}`);
+        const { data: taraflar, error: tarafErr } = await admin.from("case_parties")
           .select("id").eq("case_id", case_id).limit(50);
+        if (tarafErr) uyarilar.push(`taraflar okunamadı, rapor taraflara sunulamadı: ${tarafErr.message}`);
         for (const t of (taraflar ?? []) as any[]) {
-          await admin.from("ajan_gorevleri").insert({
+          const { error: sunumErr } = await admin.from("ajan_gorevleri").insert({
             case_id, gorev_tipi: "bilirkisi_secimi", durum: "bekliyor", hedef_party_id: t.id,
             gerekce: `[kaynak:taraf_ajani] [bilirkisi:rapor-sunum] Bilirkişi raporu dosyaya girdi. `
               + `Bilirkişi bölümünden okuyabilir, diyeceğinizi yazabilirsiniz.`,
           });
+          if (sunumErr) uyarilar.push(`rapor tarafa sunulamadı (${t.id}): ${sunumErr.message}`);
+        }
+        if (uyarilar.length > 0) {
+          console.error("[bilirkisi-ekranim] rapor teslimi sonrası eksikler", { case_id, expertId, uyarilar });
         }
       }
-      return json({ ok: true, durum });
+      return json({ ok: true, durum, ...(uyarilar.length > 0 ? { uyarilar } : {}) });
     }
 
     return json({ error: `Tanınmayan adım: ${adim}` }, 400);

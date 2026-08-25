@@ -42,6 +42,8 @@ Deno.serve(async (req) => {
   }
 
   let sent = 0;
+  // İşareti yazılamayan dosyalar: uyarı gitti ama "uyarıldı" damgası düşmedi.
+  const yazilamayan: string[] = [];
   for (const c of rows ?? []) {
     const dl = (c.extension_used && c.deadline_extended) ? c.deadline_extended : c.deadline_total;
     if (!dl) continue;
@@ -60,11 +62,24 @@ Deno.serve(async (req) => {
         });
       } catch (_) { /* continue */ }
     }
-    await admin.from("cases").update({ deadline_warning_sent: true } as any).eq("id", c.id);
+    /* İŞARET ZORUNLUDUR: yukarıdaki sorgu `deadline_warning_sent=false` ile
+       tarıyor. supabase-js DB hatasını FIRLATMAZ; bu yazım sessizce düşerse
+       dosya her cron turunda yeniden "uyarılmamış" sayılır ve tarafa da
+       arabulucuya da AYNI süre uyarısı tekrar tekrar gider. */
+    const { error: isaretErr } = await admin.from("cases")
+      .update({ deadline_warning_sent: true } as any).eq("id", c.id);
+    if (isaretErr) {
+      console.error(`[deadline-reminder-cron] uyarı işareti yazılamadı (${c.id}): ${isaretErr.message}`);
+      yazilamayan.push(String(c.id));
+      continue;
+    }
     sent++;
   }
 
-  return new Response(JSON.stringify({ processed: rows?.length ?? 0, notified: sent }), {
+  return new Response(JSON.stringify({
+    processed: rows?.length ?? 0, notified: sent,
+    ...(yazilamayan.length > 0 ? { isaret_yazilamayan: yazilamayan.length } : {}),
+  }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });

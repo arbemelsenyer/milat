@@ -232,7 +232,11 @@ YALNIZCA aşağıdaki JSON şemasında yanıt ver:
       const deadline_extended = (sure_gun != null && uzatma_gun && uzatma_gun > 0)
         ? new Date(start.getTime() + (sure_gun + uzatma_gun) * 86400000).toISOString() : null;
 
-      await admin.from("cases").update({
+      /* BU İŞLEVİN ÜRÜNÜ YASAL SÜRE ALANLARIDIR. Sessizce düşerse işlev
+         süreyi hesaplayıp döndürür ama dosyada `deadline_total` boş kalır:
+         `deadline-reminder-cron` o dosyayı HİÇ görmez ve taraf ile arabulucu
+         yasal sürenin dolduğundan haberdar edilmez. */
+      const { error: sureErr } = await admin.from("cases").update({
         mediation_type: "dava_sarti",
         mahkeme_turu: result.mahkeme_turu,
         sure_hafta: result.sure_hafta,
@@ -248,6 +252,12 @@ YALNIZCA aşağıdaki JSON şemasında yanıt ver:
         deadline_conflict_note: null,
         deadline_detected_at: new Date().toISOString(),
       } as any).eq("id", case_id);
+      if (sureErr) {
+        console.error(`[detect-legal-deadlines] yasal süre yazılamadı (${case_id}): ${sureErr.message}`);
+        return new Response(JSON.stringify({ error: `Yasal süre kaydedilemedi: ${sureErr.message}` }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Activity log: mark completed. Fire via waitUntil so it can't delay the response,

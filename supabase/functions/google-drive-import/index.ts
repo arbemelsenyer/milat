@@ -195,8 +195,12 @@ Deno.serve(async (req) => {
         if (chunks.length > 800) throw new Error(`Anormal parça sayısı (${chunks.length})`);
 
         const sourceUrl = `gdrive://${f.id}`;
-        // Idempotency: aynı Drive dosyası tekrar içe aktarılıyorsa eski chunk'ları temizle
-        await admin.from("knowledge_base_chunks").delete().eq("source_url", sourceUrl);
+        /* Idempotency: aynı Drive dosyası tekrar içe aktarılıyorsa eski chunk'ları
+           temizle. SESSİZ KALAMAZ: silme düşer ve insert yine çalışırsa aynı
+           belge bilgi tabanına İKİ KEZ girer. */
+        const { error: temizErr } = await admin.from("knowledge_base_chunks")
+          .delete().eq("source_url", sourceUrl);
+        if (temizErr) throw new Error(`Önceki parçalar temizlenemedi, mükerrer kayıt riski: ${temizErr.message}`);
 
         let total = 0;
         const BATCH = 16;

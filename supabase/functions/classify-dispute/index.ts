@@ -206,8 +206,17 @@ KURALLAR:
       const patch: Record<string, unknown> = {};
       if (!mevcutTur) patch.dispute_type = kategori;
       if (alt_uzmanlik !== "yok") patch.dispute_subtype = alt_uzmanlik;
+      /* BU İŞLEVİN ÜRÜNÜ `cases` üzerindeki tür/alt-tür alanıdır. Sessizce
+         düşerse sınıflandırma yapılmış görünür ama dosya türsüz kalır ve
+         `detect-legal-deadlines` gibi türe bağlı adımlar hiç çalışmaz. */
       if (Object.keys(patch).length > 0) {
-        await admin.from("cases").update(patch as any).eq("id", case_id);
+        const { error: turErr } = await admin.from("cases").update(patch as any).eq("id", case_id);
+        if (turErr) {
+          console.error(`[classify-dispute] uyuşmazlık türü yazılamadı (${case_id}): ${turErr.message}`);
+          return new Response(JSON.stringify({ error: `Uyuşmazlık türü kaydedilemedi: ${turErr.message}` }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
       // AKIŞ OLAYI (best-effort): tür önerisi yazıldı. Kategori KODU dışında
       // dosya içeriğinden hiçbir metin olaya girmez.

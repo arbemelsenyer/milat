@@ -576,10 +576,15 @@ Deno.serve(async (req) => {
       return jsonResponse({ job_id: requestBody.resume_job_id, ...result });
     }
 
-    // Yeni iş başlat. Diğer aktif işleri temizle.
-    await admin.from("knowledge_base_jobs")
+    /* Yeni iş başlat. Diğer aktif işleri temizle. SESSİZ KALAMAZ: bu temizlik
+       düşerse eski 'running' işler kuyrukta kalır ve iki iş aynı bilgi tabanına
+       paralel yazar — mükerrer parça üretir. */
+    const { error: temizErr } = await admin.from("knowledge_base_jobs")
       .update({ status: "failed", finished_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .in("status", ["pending", "running"]);
+    if (temizErr) {
+      return jsonResponse({ error: `Önceki işler kapatılamadı, mükerrer koşum riski: ${temizErr.message}` }, 500);
+    }
 
     let books: Book[];
     let mode: "whole_book" | "page_chunked" = "whole_book";

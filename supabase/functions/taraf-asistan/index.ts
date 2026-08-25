@@ -277,15 +277,17 @@ ${belgeBloklari.join("\n\n") || "(yüklenmiş belgeniz yok)"}`;
         last_output: { son_mesaj_zamani: zaman, kullanici: u.user.id },
         updated_at: zaman,
       };
-      if ((mevcut as any)?.id) {
-        await admin.from("agent_states").update(patch).eq("id", (mevcut as any).id);
-      } else {
-        await admin.from("agent_states").insert({ case_id, agent_type: "taraf_asistan", party_id: partyId, ...patch });
-      }
-      await admin.from("agent_worklog").insert({
+      /* İz yazımı sohbeti düşürmez ama SESSİZ de kalmaz: aşağıdaki catch
+         koruma DEĞİLDİR — supabase-js DB hatasını fırlatmaz, `{error}` döner. */
+      const { error: durumErr } = (mevcut as any)?.id
+        ? await admin.from("agent_states").update(patch).eq("id", (mevcut as any).id)
+        : await admin.from("agent_states").insert({ case_id, agent_type: "taraf_asistan", party_id: partyId, ...patch });
+      if (durumErr) console.error(`[taraf-asistan] ajan durumu yazılamadı: ${durumErr.message}`);
+      const { error: izErr } = await admin.from("agent_worklog").insert({
         case_id, party_id: partyId, agent_type: "taraf_asistan", entry_type: "iz",
         content: { olay: "taraf_asistan_sohbet", zaman, kullanici: u.user.id },
       });
+      if (izErr) console.error(`[taraf-asistan] iş defteri izi yazılamadı: ${izErr.message}`);
     } catch (e: any) {
       // İz yazımı sohbeti düşürmez.
       console.error(`[taraf-asistan] iz yazılamadı: ${e?.message ?? e}`);

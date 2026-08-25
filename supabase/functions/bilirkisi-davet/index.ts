@@ -117,12 +117,23 @@ Deno.serve(async (req) => {
       epostaDurumu = "gönderilmedi (e-posta servisi tanımlı değil)";
     }
 
-    await admin.from("expert_assignment_logs").insert({
+    /* DAVET İZİ: `expert_assignment_logs` bilirkişi sürecinin denetim defteri.
+       `ajan-nobetci` rapor gecikme nöbetini bu tablodan okur. Davet e-postası
+       ZATEN gitti; yazım sessizce düşerse davetin hiçbir kaydı kalmaz —
+       arabulucu kimi ne zaman davet ettiğini göremez. Çağrı başarısız
+       sayılmaz (davet gerçekten gitti), eksik açıkça dönülür. */
+    const { error: izErr } = await admin.from("expert_assignment_logs").insert({
       case_id, expert_id, actor_id: uid, actor_role: "mediator", action: "invited",
       details: { note: `Davet ${epostaDurumu}`, alan: alanMetni || null },
     });
+    if (izErr) {
+      console.error(`[bilirkisi-davet] davet izi yazılamadı (${case_id}/${expert_id}): ${izErr.message}`);
+    }
 
-    return json({ ok: true, davet_adresi: davetAdresi, eposta_durumu: epostaDurumu });
+    return json({
+      ok: true, davet_adresi: davetAdresi, eposta_durumu: epostaDurumu,
+      ...(izErr ? { uyari: `Davet gitti ama denetim izi yazılamadı: ${izErr.message}` } : {}),
+    });
   } catch (e: any) {
     const mesaj = String(e?.message ?? e).slice(0, 300);
     console.error("[bilirkisi-davet] hata", mesaj);

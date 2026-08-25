@@ -102,10 +102,18 @@ Deno.serve(async (req) => {
 
     /* TALİMAT ONAYI: talimatla yapılan iş onaylandı — durum 'onaylandi' olur ve
        olağan akış sürer. Onay gelmeden bu iş taraf yüzeyine çıkmamıştı. */
+    /* TALİMAT DAMGASI: `akis-yurut` talimatları `durum` alanıyla tarar.
+       'onaylandi' sessizce yazılamazsa talimat 'uygulandi' durumunda takılı
+       kalır — arabulucu onay verdiğini görür ama onay hiçbir yere işlenmez. */
+    const uyarilar: string[] = [];
     if (talimat_id) {
-      await admin.from("arabulucu_talimatlari").update({
+      const { error: onayErr } = await admin.from("arabulucu_talimatlari").update({
         durum: "onaylandi", karar_zamani: new Date().toISOString(),
       }).eq("id", talimat_id).eq("case_id", caseId);
+      if (onayErr) {
+        console.error(`[akis-onayla] talimat onay damgası yazılamadı (${talimat_id}): ${onayErr.message}`);
+        uyarilar.push(`talimat 'onaylandi' damgası yazılamadı: ${onayErr.message}`);
+      }
     }
 
     /* Adımı bekleten olay(lar) yeniden işlenecek şekilde işaretlenir ve
@@ -122,9 +130,14 @@ Deno.serve(async (req) => {
         .update({ veri: { ...veri, onay_verildi: true }, islendi: false })
         .eq("id", o.id);
       if (!oErr) uyandirilan++;
+      else uyarilar.push(`bekleyen olay uyandırılamadı (${o.id}): ${oErr.message}`);
     }
+    if (uyarilar.length > 0) console.error("[akis-onayla] onay sonrası eksikler", { caseId, uyarilar });
 
-    return json({ onaylandi: true, uyandirilan, talimat_id: talimat_id || null });
+    return json({
+      onaylandi: true, uyandirilan, talimat_id: talimat_id || null,
+      ...(uyarilar.length > 0 ? { uyarilar } : {}),
+    });
   } catch (e: any) {
     const msg = String(e?.message ?? "Bilinmeyen sistem hatası");
     console.error("[akis-onayla] Genel hata:", msg.slice(0, 200));

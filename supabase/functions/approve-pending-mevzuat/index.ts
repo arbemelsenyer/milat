@@ -98,8 +98,15 @@ Deno.serve(async (req) => {
     const title = sanitize(String((row.metadata as any)?.source_title ?? row.source_url ?? "Mevzuat")).slice(0, 300);
     const sourceUrl = row.source_url ?? `pending://${id}`;
 
-    // Idempotency
-    await admin.from("knowledge_base_chunks").delete().eq("source_url", sourceUrl);
+    /* İDEMPOTANLIK SİLMESİ — SESSİZ KALAMAZ. supabase-js DB hatasını FIRLATMAZ;
+       bu silme düşer ve aşağıdaki insert yine de çalışırsa aynı mevzuat bilgi
+       tabanına İKİ KEZ girer ve arama sonuçlarını kalıcı olarak çarpıtır.
+       Bu yüzden silme doğrulanmadan gömme (embedding) üretilmez. */
+    const { error: temizErr } = await admin.from("knowledge_base_chunks")
+      .delete().eq("source_url", sourceUrl);
+    if (temizErr) {
+      return json({ error: `Önceki parçalar temizlenemedi, mükerrer kayıt riski: ${temizErr.message}` }, 500);
+    }
 
     let total = 0;
     const BATCH = 16;
@@ -125,7 +132,18 @@ Deno.serve(async (req) => {
       total += rows.length;
     }
 
-    await admin.from("pending_pool").delete().eq("id", id);
+    /* Kuyruk satırı silinemezse mevzuat bilgi tabanına GİRDİ ama satır
+       onay kuyruğunda durmaya devam eder: aynı metin ikinci kez onaylanabilir
+       ve gömme (embedding) maliyeti boşuna tekrar ödenir. İş başarılı sayılır
+       (parçalar yazıldı) ama eksik açıkça bildirilir. */
+    const { error: kuyrukErr } = await admin.from("pending_pool").delete().eq("id", id);
+    if (kuyrukErr) {
+      console.error(`[approve-pending-mevzuat] kuyruk satırı silinemedi (${id}): ${kuyrukErr.message}`);
+      return json({
+        ok: true, action: "approved", id, chunks: total, source_url: sourceUrl,
+        uyari: `Parçalar yazıldı ama onay kuyruğu satırı silinemedi (tekrar onaylanabilir): ${kuyrukErr.message}`,
+      });
+    }
 
     return json({ ok: true, action: "approved", id, chunks: total, source_url: sourceUrl });
   } catch (e: any) {

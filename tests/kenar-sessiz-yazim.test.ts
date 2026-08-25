@@ -235,4 +235,67 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     expect(g).toContain("video_link yazılamadı");
     expect(g).toContain("bant sorusu yazılamadı");
   });
+
+  it("süre uyarısı: 'uyarıldı' işareti düşerse uyarı tekrar tekrar gönderilmiyor", () => {
+    // Sorgu `deadline_warning_sent=false` ile tariyor: isaret sessizce duserse
+    // dosya her cron turunda yeniden "uyarilmamis" sayilir ve tarafa da
+    // arabulucuya da AYNI sure uyarisi tekrar tekrar gider.
+    const g = oku("deadline-reminder-cron");
+    expect(g, "isaretErr okunmuyor").toContain("isaretErr");
+    // Isaret yazilamazsa `sent` sayaci ARTMAMALI (dal `continue` ile kapanir).
+    const hataIdx = g.indexOf("if (isaretErr)");
+    const sayacIdx = g.indexOf("sent++");
+    expect(hataIdx, "işaret hatası dalı yok").toBeGreaterThan(-1);
+    expect(sayacIdx, "sayaç işaret kontrolünden ÖNCE artıyor").toBeGreaterThan(hataIdx);
+    expect(g.slice(hataIdx, sayacIdx)).toContain("continue");
+  });
+
+  it("bilgi tabanı: idempotanlık silmesi sessizce düşüp mükerrer kayıt üretmiyor", () => {
+    // Silme duser ve insert yine calisirsa ayni kaynak bilgi tabanina IKI KEZ
+    // girer ve arama sonuclarini kalici olarak carpitir.
+    for (const ad of ["approve-pending-mevzuat", "build-legal-knowledge", "google-drive-import"]) {
+      const g = oku(ad);
+      expect(g, `${ad}: temizErr okunmuyor`).toContain("temizErr");
+      expect(g, `${ad}: mükerrer riski bildirilmiyor`).toContain("mükerrer kayıt riski");
+    }
+    // Is kuyrugu temizligi de ayni sinifta.
+    expect(oku("build-knowledge-base"), "iş temizliği denetlenmiyor").toContain("mükerrer koşum riski");
+    // Onay kuyrugu satiri silinemezse tekrar onaylanabilir — bildirilir.
+    expect(oku("approve-pending-mevzuat")).toContain("tekrar onaylanabilir");
+  });
+
+  it("bilirkişi denetim izleri ve rapor teslimi sessiz değil", () => {
+    // `expert_assignment_logs` bilirkisi surecinin denetim defteri; belge acma
+    // kaydi ayrica bir KVKK kaydidir. Rapor teslim olayi yazilamazsa ajan
+    // raporun geldigini HIC duymaz ve akis durur.
+    for (const ad of ["bilirkisi-belge-baglantisi", "bilirkisi-davet"]) {
+      const g = oku(ad);
+      expect(g, `${ad}: izErr okunmuyor`).toContain("izErr");
+      expect(g, `${ad}: eksik çağırana bildirilmiyor`).toContain("denetim izi yazılamadı");
+    }
+    const e = oku("bilirkisi-ekranim");
+    for (const im of ["olayErr2", "gorevErr2", "sunumErr", "tarafErr"]) {
+      expect(e, `${im} okunmuyor`).toContain(im);
+    }
+    expect(e).toContain("rapor teslim edildi ama akış ilerlemez");
+  });
+
+  it("tür/süre tespiti ve onay damgası sessiz kalmıyor", () => {
+    // `cases` uzerindeki tur ve sure alanlari bu islevlerin URUNUDUR: sessizce
+    // duserse islev sonucu doner ama dosyada alan bos kalir ve ona bagli
+    // adimlar (sure nobeti dahil) hic calismaz.
+    const c = oku("classify-dispute");
+    expect(c, "turErr okunmuyor").toContain("turErr");
+    expect(c).toContain("Uyuşmazlık türü kaydedilemedi");
+    const d = oku("detect-legal-deadlines");
+    expect(d, "sureErr okunmuyor").toContain("sureErr");
+    expect(d).toContain("Yasal süre kaydedilemedi");
+    // Onay damgasi: talimat 'uygulandi'da takili kalmamali.
+    const o = oku("akis-onayla");
+    expect(o, "onayErr okunmuyor").toContain("onayErr");
+    expect(o).toMatch(/uyandirilan,\s*talimat_id:\s*talimat_id\s*\|\|\s*null,\s*\n\s*\.\.\.\(uyarilar\.length/);
+    // Yan izler.
+    expect(oku("randevu-teklif"), "linkErr okunmuyor").toContain("linkErr");
+    expect(oku("taraf-asistan"), "iş defteri izi denetlenmiyor").toContain("iş defteri izi yazılamadı");
+  });
 });

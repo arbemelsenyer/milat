@@ -87,15 +87,23 @@ Deno.serve(async (req) => {
       return json({ error: `Bağlantı üretilemedi: ${sErr?.message ?? "bilinmeyen sebep"}` }, 500);
     }
 
-    // Denetim izi: eylemin özeti yazılır, belge İÇERİĞİ ve bağlantı yazılmaz.
-    await admin.from("expert_assignment_logs").insert({
+    /* Denetim izi: eylemin özeti yazılır, belge İÇERİĞİ ve bağlantı yazılmaz.
+       BU BİR KVKK KAYDIDIR: bilirkişinin tarafın belgesine eriştiğinin tek
+       kanıtı bu satırdır. Sessizce düşerse imzalı bağlantı yine verilir ama
+       erişimin HİÇBİR izi kalmaz. Bağlantı zaten üretildiği için çağrı
+       başarısız sayılmaz; eksik açıkça dönülür ve kayda düşer. */
+    const { error: izErr } = await admin.from("expert_assignment_logs").insert({
       case_id: caseId, expert_id: expertId, actor_id: kullanici.id, actor_role: "expert",
       action: "document_opened",
       details: { document_id, file_name: (belge as any).file_name ?? null },
     });
+    if (izErr) {
+      console.error(`[bilirkisi-belge-baglantisi] denetim izi yazılamadı (${caseId}/${document_id}): ${izErr.message}`);
+    }
 
     return json({
       ok: true,
+      ...(izErr ? { uyari: `Belge açıldı ama denetim izi yazılamadı: ${izErr.message}` } : {}),
       url: imzali.signedUrl,
       file_name: (belge as any).file_name ?? null,
       omur_saniye: OMUR_SANIYE,

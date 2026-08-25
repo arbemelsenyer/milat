@@ -701,7 +701,15 @@ async function cevaplaIsle(admin: any, token: string, secimRaw: string): Promise
               const { data: guncel } = await admin.from("case_sessions")
                 .select("video_link").eq("id", (yeniOturum as any).id).maybeSingle();
               if (!String((guncel as any)?.video_link ?? "").trim()) {
-                await admin.from("case_sessions").update({ video_link: url }).eq("id", (yeniOturum as any).id);
+                /* Video odası ÜRETİLDİ. Bağlantı oturuma yazılamazsa taraflara
+                   gönderilen davette bağlantı görünür ama oturum ekranında
+                   görünmez — taraf toplantıya giremez. */
+                const oturumId = String((yeniOturum as { id?: string })?.id ?? "");
+                const { error: linkErr } = await admin.from("case_sessions")
+                  .update({ video_link: url }).eq("id", oturumId);
+                if (linkErr) {
+                  console.error(`[randevu-teklif] video_link yazılamadı (${oturumId}): ${linkErr.message}`);
+                }
               }
             } else {
               console.error("[randevu-teklif] video odası üretilemedi", vRes.status, String((vBody as any)?.error ?? "").slice(0, 200));
