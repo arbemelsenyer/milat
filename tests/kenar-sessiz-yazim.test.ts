@@ -72,4 +72,23 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     expect(g).toContain("Silme tamamlanamadı; hiçbir kayıt yarım bırakılmadı");
     expect(g).toMatch(/const\s*\{\s*error:\s*dErr\s*\}\s*=\s*await\s+admin\.from\("cases"\)\.delete/);
   });
+
+  it("toplantı iptali: oturum iptal edilemezse 'iptal edildi' denmiyor", () => {
+    // Yazilamazsa taraflara "toplanti iptal edildi" e-postasi GITMIS olur ama
+    // oturum sistemde HALA planli gorunur (hatirlatma isleri calismaya devam eder).
+    const g = oku("cancel-meeting-invite");
+    expect(g).toMatch(/const\s*\{\s*error:\s*iptalErr\s*\}\s*=\s*await\s+admin[\s\S]{0,60}case_sessions/);
+    const hataIdx = g.indexOf("if (iptalErr)");
+    expect(hataIdx, "iptal hatası dalı yok").toBeGreaterThan(-1);
+    const blok = g.slice(hataIdx, hataIdx + 600);
+    expect(blok, "hata dalında yine 'cancelled: true' dönülüyor").toContain("cancelled: false");
+    expect(blok).toContain("oturum hâlâ planlı");
+    for (const im of ["izErr", "izErr2"]) expect(g, `${im} okunmuyor`).toContain(im);
+  });
+
+  it("randevu teklifi: görev kapatma ve otomatik onay işareti sessiz değil", () => {
+    const g = oku("randevu-teklif");
+    expect(g, "alternatif görev kapatma sonucu okunmuyor").toContain("gorevErr");
+    expect(g, "otomatik onay işareti sonucu okunmuyor").toContain("isaretErr");
+  });
 });

@@ -266,9 +266,12 @@ async function saatleriSec(admin: any, mediatorId: string, party: any): Promise<
   if (alternatif.secenekler.length > 0) {
     const secilenAlt = alternatif.secenekler.slice(0, 3);
     if (alternatif.gorevId) {
-      await admin.from("ajan_gorevleri")
+      // Sonuc okunmazsa gorev "bekliyor"da kalir ve ayni alternatif ikinci kez
+      // teklife donusebilir; supabase-js firlatmadigi icin sessiz kalirdi.
+      const { error: gorevErr } = await admin.from("ajan_gorevleri")
         .update({ durum: "yapildi", sonuc: `Alternatif saat teklife dönüştü: ${secilenAlt.map((s) => `${s.gun} ${s.saat}`).join(" · ")}` })
         .eq("id", alternatif.gorevId);
+      if (gorevErr) console.error(`[randevu-teklif] alternatif görevi kapatılamadı (${alternatif.gorevId}): ${gorevErr.message}`);
     }
     const bireyselAlt = party?.is_individual === true || party?.party_type === "individual";
     return {
@@ -881,7 +884,11 @@ Deno.serve(async (req) => {
         const isaretli = secenekler.map((s) =>
           s.gun === eslesen.gun && s.saat === eslesen.saat ? { ...s, otomatik_onay: true } : s
         );
-        await admin.from("randevu_teklifleri").update({ secenekler: isaretli } as any).eq("token", token);
+        // Isaret yazilamazsa cevap yine dogru islenir ama kayitta otomatik onay
+        // izi kalmaz; sessiz birakilmaz.
+        const { error: isaretErr } = await admin.from("randevu_teklifleri")
+          .update({ secenekler: isaretli } as any).eq("token", token);
+        if (isaretErr) console.error(`[randevu-teklif] otomatik onay işareti yazılamadı: ${isaretErr.message}`);
         const r = await cevaplaIsle(admin, token, `${eslesen.gun} ${eslesen.saat}`);
         return json({
           token, link, secenekler: isaretli,

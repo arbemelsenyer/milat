@@ -245,11 +245,12 @@ serve(async (req) => {
         });
         const resendId = (resp && (resp as any).id) || null;
         results.push({ party_id: p.id, email: p.email, ok: true });
-        await admin.from("meeting_invite_logs").insert({
+        const { error: izErr } = await admin.from("meeting_invite_logs").insert({
           session_id: sessionId, case_id: session.case_id, party_id: p.id,
           recipient_email: p.email, recipient_name: displayName,
           status: "cancelled", resend_message_id: resendId, error_message: reason,
         });
+        if (izErr) console.error("[cancel-meeting-invite] iptal izi yazılamadı", { party_id: p.id, error: izErr.message });
         if (p.user_id) {
           await admin.rpc("create_notification", {
             p_user_id: p.user_id,
@@ -263,21 +264,33 @@ serve(async (req) => {
         const msg = e?.message ?? "Bilinmeyen hata";
         console.error("[cancel-meeting-invite] gönderim hatası", { party_id: p.id, email: p.email, error: msg });
         results.push({ party_id: p.id, email: p.email, ok: false, error: msg });
-        await admin.from("meeting_invite_logs").insert({
+        const { error: izErr2 } = await admin.from("meeting_invite_logs").insert({
           session_id: sessionId, case_id: session.case_id, party_id: p.id,
           recipient_email: p.email, recipient_name: displayName,
           status: "failed", error_message: `İptal bildirimi: ${msg}`,
         });
+        if (izErr2) console.error("[cancel-meeting-invite] başarısızlık izi yazılamadı", { party_id: p.id, error: izErr2.message });
       }
     }
 
+    // 25.08.2026 — bu yazimin sonucu OKUNMUYORDU ve ardindan kosulsuz
+    // `cancelled: true` donuluyordu. Yazilamazsa taraflara "toplanti iptal
+    // edildi" e-postasi GITMIS olur ama oturum sistemde HALA planli gorunur:
+    // hatirlatma isleri calismaya devam eder, foy oturumu yapilacak sayar.
     // Always cancel the session even if no emails were due
-    await admin.from("case_sessions")
+    const { error: iptalErr } = await admin.from("case_sessions")
       .update({ status: "cancelled" })
       .eq("id", sessionId);
 
     const sent = results.filter((r) => r.ok).length;
     const failed = results.length - sent;
+    if (iptalErr) {
+      console.error("[cancel-meeting-invite] oturum iptal edilemedi", { sessionId, error: iptalErr.message });
+      return new Response(JSON.stringify({
+        success: false, cancelled: false, sent, failed, total: results.length, results,
+        error: `İptal e-postaları gönderildi ancak oturum iptal edilemedi, oturum hâlâ planlı: ${iptalErr.message}`,
+      }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     return new Response(JSON.stringify({
       success: true, cancelled: true, sent, failed, total: results.length, results,
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });

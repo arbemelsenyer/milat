@@ -4,23 +4,35 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P1 · kenar işlevlerinde ürün yazımları** (4 işlev daha)
-- Doğrulama: `npm run test` **248/248** · tsc temiz · lint **2334**
+- Son tamamlanan iş: **P2 · toplantı iptali + randevu teklifi sessiz yazımları**
+- Doğrulama: `npm run test` **250/250** · tsc temiz · lint **2334**
 - **Açık blokaj: yok**
 - **REDEPLOY DURUMU (§11-B):**
   - ✅ `send-party-invite` · `revoke-party-invite` · `send-meeting-invite` —
     Lovable ajanı `supabase--deploy_edge_functions` ile deploy etti (commit
     `26f2abd`, üçü de onaylandı). MCP çağrısı 300 sn'de zaman aşımına uğradı ama
     **iş tamamlandı**; `list_messages` ile doğrulandı.
-  - ⏳ `accept-party-invite` · `party-confidential-analysis` ·
-    `extract-document-text` · `dosya-verilerini-sil` — bu commit'ten sonra
-    redeploy gerekiyor.
+  - ✅ `accept-party-invite` · `party-confidential-analysis` ·
+    `extract-document-text` · `dosya-verilerini-sil` — Lovable ajanı deploy
+    etti (commit `38ee346`, dördü de onaylandı).
+  - ⏳ `cancel-meeting-invite` · `randevu-teklif` — bu commit'ten sonra.
 - Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9**.
 - Sıradaki uygulanabilir iş: **P2 · kalan kenar işlevi sessiz yazımları.**
-  Öncelik: `cancel-meeting-invite` · `randevu-teklif` · `taraf-kalem-cikar` ·
-  `bilirkisi-ekranim` · `bilirkisi-secim`. En sonda `agent_states` defter
-  yazımları (yüksek hacim, büyük ölçüde en-iyi-çaba) ve `_shared/**` —
-  ona dokunmak **39 fonksiyon fan-out redeploy** demektir, ayrı tur.
+  Öncelik: `taraf-kalem-cikar` · `bilirkisi-ekranim` · `bilirkisi-secim` ·
+  `ajan-nobetci` · `akis-yurut`. En sonda `agent_states` defter yazımları
+  (yüksek hacim, büyük ölçüde en-iyi-çaba) ve `_shared/**` — ona dokunmak
+  **39 fonksiyon fan-out redeploy** demektir, ayrı tur olarak planlanmalı.
+
+### KAPANDI — 25.08 · P2 · TOPLANTI İPTALİ + RANDEVU TEKLİFİ SESSİZ YAZIMLARI
+| işlev | sessiz kalırsa |
+|---|---|
+| `cancel-meeting-invite` | `case_sessions.status = "cancelled"` yazımı okunmadan `cancelled: true` dönüyordu. Yazılamazsa taraflara **"toplantı iptal edildi" e-postası gitmiş** olur ama oturum sistemde **hâlâ planlı** görünür: hatırlatma işleri çalışmaya devam eder, föy oturumu yapılacak sayar. Artık 500 + "oturum hâlâ planlı" cümlesi döner; iki iz yazımı da `console.error`a düşer. |
+| `randevu-teklif` | Alternatif saat görevini kapatan yazım sessizce başarısız olursa görev "bekliyor"da kalır ve **aynı alternatif ikinci kez teklife dönüşebilir**. Otomatik onay işareti yazılamazsa cevap doğru işlenir ama kayıtta iz kalmaz. İkisi de artık kayda düşüyor. |
+
+**TEZGÂH:** `tests/kenar-sessiz-yazim.test.ts` iki durumla genişletildi (toplam 6).
+**KANITLANDI:** `KENAR_KOK=tests/gecici/kenar-kanit` kopyasında **6/6 DÜŞÜYOR**;
+gerçek dizinde 6/6 geçiyor.
+- Doğrulama: **250/250** test · tsc temiz · lint 2334 (değişmedi).
 
 ### KAPANDI — 25.08 · P1 · KENAR İŞLEVLERİNDE ÜRÜN YAZIMLARI (4 İŞLEV)
 Davet zincirinden sonra aynı kusur sınıfının **ürün yazımlarına** geçildi: bir
