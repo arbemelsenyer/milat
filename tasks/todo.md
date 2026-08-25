@@ -4,7 +4,10 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P1 · kazanım sayacı (katsayılar parametre) + §15.1 denetimi**
+- Son tamamlanan iş: **P1 · dört maddenin canlı kanıtı Code tarafından toplandı**
+- **PİLOT KUYRUĞU: 9/14 DONE (hepsi §15.1'in beşini de sağlıyor) · 0 bekleyen ·
+  5 BLOCKED.** Beşinin de kodu bitti; engel yalnız **SQL çalıştırma** ve
+  iki değer kararı. Kod tarafında yapılacak iş kalmadı.
 - **PİLOT KUYRUĞU DURUMU: 14 maddeden 9'u DONE, 5'i BLOCKED.** Açık (yapılabilir)
   madde **YOK**. Beşinin de engeli karar ya da kurucu eylemi:
   dördü **HAT H-15** (saklama süreleri · antet/şablon · üyelik-kota · kazanım
@@ -112,7 +115,15 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
-- [~] P1 · **Taraf katılım ekranında aydınlatma metni** · **CANLI DOĞRULAMA BEKLİYOR** (§15.1 şart 4) · kod tarafı 25.08.2026
+- [x] P1 · **Taraf katılım ekranında aydınlatma metni** · **DONE 25.08.2026 —
+      CANLI KANITLI** · §15.1 beş şart da sağlanıyor
+      · **ŞART 4 CANLI KANITI (Code kendi doğruladı):** canlıda bekleyen gerçek
+      bir katılım jetonu bulundu ve `https://medipact-ai.lovable.app/katilim/…`
+      tarayıcıda **açıldı**. Sayfa: "KVKK Aydınlatma Metni" başlığı katılım
+      düğmelerinin **ÜSTÜNDE** görünüyor; açılınca metin tam geliyor
+      (Gemini API cümlesi + Veri Saklama ve İmha Politikası). Yani taraf,
+      "Katılıyorum"a basmadan önce metni görüyor.
+      · kod tarafı 25.08.2026
       · Kabul: `/katilim/:token` sayfasında KVKK aydınlatma metni **karardan önce**
       gösteriliyor ve metin `Auth.tsx` ile **aynı kaynaktan** geliyor (ikinci kopya yok)
       · Doğrulama: `tests/kvkk-taraf-aydinlatma.test.ts` (4 durum) · 275/275 test ·
@@ -218,7 +229,14 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 
 - [!] P2 · **Taraf akışı telefonda uçtan uca** · **BLOCKED — gerçek telefon gerekiyor (kurucu)** · Kalan: · Kabul: gerçek telefonda davet →
       başvuru → belge → Kör Teklif → ödeme bilgisi zinciri kesintisiz tamamlanıyor.
-- [~] P3 · **Kullanılabilirlik bulguları (03.08 saha notu)** · **CANLI DOĞRULAMA BEKLİYOR** (§15.1 şart 4) · kod tarafı 25.08.2026
+- [x] P3 · **Kullanılabilirlik bulguları (03.08 saha notu)** · **DONE 25.08.2026 —
+      CANLI KANITLI** · §15.1 beş şart da sağlanıyor
+      · **ŞART 4 CANLI KANITI (Code kendi doğruladı):** yayınlanan paket
+      (`/assets/index-*.js`) indirildi ve düzeltmelerin canlıya girdiği
+      dizgeleriyle görüldü: `medipact.yeniBasvuru.taslak.v1` (form taslağı) ·
+      `Ana uyuşmazlık türü` ve `Alt uzmanlık alanı` (menülerin erişilebilir
+      adları) · ayrıca `KVKK Aydınlatma Metni` ve `Bilgilendirme Tutanağı`.
+      · kod tarafı 25.08.2026
       · Doğrulama: `tests/form-kaybi-erisilebilirlik.test.ts` (6 durum) · 313/313
       test · tsc temiz · build temiz · lint 2331 (taban)
 

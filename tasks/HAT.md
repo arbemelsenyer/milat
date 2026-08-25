@@ -308,6 +308,91 @@ Seçim: A / B / C / (kendi metniniz)
 Not: (varsa)
 ```
 
+### H-15 · CEVAP · 25.08.2026 — DÖRT KARARIN TAMAMI
+
+**ÖNCE BİR DÜZELTME (Code'a).** H-15'te "tanım yok, tablo yok, kod yok" denen iki
+madde için **tanım MİMARİDE ZATEN VAR**; eksik olan yalnız rakam/kalem:
+· Üyelik-paket-kota → `mimari/13-uyelik-gelir.md` (paketler: Başlangıç /
+  Profesyonel / Merkez lisansı · kota **analiz kotasıdır**, belge üretimi her
+  pakette sınırsız · kota bitince yüzey KAPANMAZ, aşım birim ücretiyle devam
+  eder · "Dosyaya Soru Sor" da analiz kotasına dahil).
+· Kazanım sayacı → `mimari/05-yetenek-envanteri.md` **§5.9** (+ §13 mini anketi).
+Bundan sonra "tanımsız" demeden önce bu iki dosya okunacak.
+
+---
+**1) SAKLAMA SÜRELERİ · Seçim: A — TEK ÇATI, 5 YIL.**
+Not: Code'un önerdiği **1 yıl REDDEDİLDİ.** Gerekçe: `src/pages/Verilerim.tsx`
+tarafa **zaten** "dosya kapanışından sonra 5 yıl" gösteriyor ve `mimari §12.5.9`
+da 5 yıl diyor. 1 yıl yazılsaydı aynı ekranda belge 5 yıl / beyan 1 yıl görünür,
+tutarsız olurdu.
+**Karar:** dosya kapanışı + **5 yıl** (1825 gün) — `oturum_kaydi_dokum` ·
+`case_documents` · `case_notes` · `dosya_kapanis_sonrasi`.
+Mali kayıt **10 yıl** (3650 gün) — ekranda zaten öyle yazıyor.
+Ham ses: kodda anında silinir, süre alanı NULL kalır.
+
+**SQL COWORK TARAFINDAN ÇALIŞTIRILDI (25.08.2026).** `saklama_sureleri` tablosu
+kuruldu, RLS açık, iki politika (`select` herkes · `all` yalnız admin) canlı,
+6 satır girildi ve **değerler yazıldı.** Doğrulama koşuldu:
+`case_documents 1825 · case_notes 1825 · dosya_kapanis_sonrasi 1825 ·
+oturum_kaydi_dokum 1825 · odeme_kayitlari 3650 · oturum_kaydi_ses NULL` —
+hepsi `baslangic = dosya_kapanisi` (ses hariç).
+
+**Code'a kalan üç iş (kurucuya sorma, yap):**
+1. `Verilerim.tsx` sabit metin kullanıyor (`SURE_BELGE`, `SURE_TANIMSIZ` …);
+   **tabloyu okuyacak** hâle getirilecek. Ekrandaki **14 kategori** ile tablodaki
+   **6 tür** birebir değil → eşleme haritası kurulacak, eşleşmeyen kategori
+   kalmayacak. Bugün 10 kategoride tarafa "Belirsiz" yazıyor; bu **bitmeli**.
+2. `saklama_gun` check kısıtı `> 0` olduğu için **0 gün (anında silme)
+   yazılamıyor**. Ya kısıt `>= 0` yapılsın ya da ayrı bir "anında" bayrağı
+   eklensin — `oturum_kaydi_ses` bugün bu yüzden NULL duruyor.
+3. Periyodik imha kolu bu tablodan okuyacak şekilde kurulacak. **NULL süre =
+   dokunma** kuralı korunur.
+
+**Kurucuya AYRI SORULACAK (pilotu bloklamaz):** Kör teklif ve kabul aralığı
+(braket) 5 yıl mı saklansın, yoksa dosya kapanışında **silinsin** mi? Ürünün
+"kör veri" çekirdeğiyle silme daha tutarlı olabilir. Parametre tablosunda tek
+satır değişikliği olduğu için deploy gerektirmez; şimdilik 5 yıl çatısındadır.
+
+---
+**2) ARABULUCUNUN ANTETİ · Seçim: A.**
+Antet (logo + büro adresi) `profiles`a eklenir ve üretilen belgelerin başlığına
+basılır. Şablon **genel kalır** (arabulucuya özel şablon YOK).
+Canlıda doğrulandı: `profiles`ta `iban` ve `banka_adi` **var**, `logo_url` ve
+`adres` **yok** → göç gerekiyor. `src/pages/Profile.tsx` bugün yalnız Ad Soyad ·
+Telefon · E-posta gösteriyor; yeni alanlar oraya eklenecek (dosya yükleme ile
+logo, serbest metin ile adres; sicil no isteğe bağlı).
+
+---
+**3) ÜYELİK / PAKET / KOTA · Seçim: kurucunun onayıyla —
+SAYAÇ ÇALIŞSIN, ENGEL OLMASIN.**
+Pilot 3 ay ücretsiz olduğu için kota kimseyi engellemeyecek. Ama tüketim
+**sayılacak**: paket fiyatı ve kotaya dahil analiz adedi ancak pilot verisiyle
+doğru konur (§13 zaten "platform içi otomatik kullanım sayaçları" diyor).
+**Code'a kalan:** analiz koşumlarını (Dosyaya Soru Sor dahil) arabulucu bazında
+sayan bir tüketim tablosu + `/admin` ekranında "kim kaç analiz tüketti" listesi.
+**YAPILMAYACAK:** paket/fiyat ekranı, kota engeli, aşım ücreti mekanizması,
+ödeme entegrasyonu. Bunlar **pilot sonrası**. Fiyat rakamları kurucuda.
+Bu seçimle madde **pilot kapısından düşer**.
+
+---
+**4) KAZANIM SAYACI · Seçim: B — KALEM KALEM.**
+Tanım §5.9'da yazılı; buradaki karar yalnız **neyin** süresinin sorulacağı.
+Takvim süresi KULLANILMAYACAK (taraf 3 hafta cevap vermezse sayaç eksi gösterir).
+Formül: **üretilen çıktı sayısı × arabulucunun kendi beyan ettiği elle süre.**
+Kayıt ekranında (`/auth`, arabulucu kaydı) **bir kez** üç soru sorulur:
+1. Anlaşma belgesi / son tutanak hazırlamak elle kaç saat sürüyordu?
+2. Dosya analizi + takip föyü çıkarmak elle kaç saat sürüyordu?
+3. Taraf beyanlarını yapılandırmak / özetlemek elle kaç saat sürüyordu?
+Katsayıyı **biz koymuyoruz** — rakam arabulucunun kendi beyanı. Ekranda hesabın
+kendisi görünür ("kendi verdiğiniz 2 saat × 6 belge = 12 saat") → §15.1 camdan
+kutu şartı böyle sağlanır. Sayaç yalnız **süre + işlem tipi** tutar; dosya
+içeriği, taraf adı, tutar sayaca GİRMEZ (§14, constitution m.1).
+Arabulucu kendi sayacını `/dashboard`ta görür; kurucu `/admin`de anonim toplamı.
+**KURUCU TALİMATI: bu madde pilot ÖNCESİ yapılacak, atlanmayacak.**
+Gerekçe: baz çizgi kayıt anında alınır — pilot arabulucuları baz çizgi
+sorulmadan kaydolursa kazanım rakamı bir daha geriye dönük kurulamaz.
+
+---
 ### SQL ÇALIŞTIRILDI · COWORK · 25.08.2026
 `tests/gecici/oturum-kayitlari-politika.sql` **canlıda çalıştırıldı** (Cowork,
 Lovable MCP `query_database`, kurucu izniyle).
