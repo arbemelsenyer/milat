@@ -1,23 +1,87 @@
 ## Nerede kaldık
 
-- Tarih: 25.08.2026 (9. blok)
+- Tarih: 25.08.2026 (10. blok)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
   Karar gereken her madde `tasks/HAT.md`ye yazılır, Code beklemeden devam eder.
   "Bitti, bilgi veriyorum" turu yok.
-- Aktif görev: P1 · `ProcessTrackerPanel` atama adımını ölü tablodan okuyor (araştırılıyor)
-- Son tamamlanan iş: **P2 · ölü yüzey tezgâhı** (`97517c2`) — kanıtlandı
-  (önce: P1 eski şema adası `87d1dc4` · P3 lint kapsamı `e56d122`, ikisi de canlıda)
+- Aktif görev: yok — sıradaki iş seçiliyor
+- Son tamamlanan iş: **P1 · bilirkişi önerisi iz bırakıyor ve tarafa ulaşıyor**
+  (önce: P1 atama tarihi uydurulmuyor `0e5b1c9` · P2 ölü yüzey tezgâhı `97517c2`)
+- Doğrulama: `npm run test` **228/228** · tsc temiz · build başarılı ·
+  lint **2348** (yeni modül 0 hata; baseline 2349 → −1)
+- **Açık blokaj: yok**
 - Açık HAT maddesi: **H-1** (kurucuda: `CRON_SECRET` yenilemesi — Code'un işi
   yalnız yenileme sonrası 200 doğrulaması) · **H-4** (önkoşul yok: kayıt hattı
-  yazılınca)
-- Doğrulama: `npm run test` **219/219** · tsc temiz · build başarılı ·
-  lint **2349** (src 1063 → **1058**, adanın gerçek etkisi −5)
-- **Açık blokaj: yok**
-- Açık HAT maddesi (yeni): **H-7** (`session_feedback` yapısal olarak imkânsız) ·
-  **H-8** (emekliye ayrılmış başvuru adası) — ikisi de beklenmiyor, iş sürüyor.
-- Sıradaki uygulanabilir iş: ölü/terk edilmiş tablodan okuyan **erişilebilir**
-  yüzeyler (`ProcessTrackerPanel` → `case_assignments`).
+  yazılınca) · **H-7** (`session_feedback` yapısal olarak imkânsız) ·
+  **H-8** (emekliye ayrılmış başvuru adası) — hiçbiri beklenmiyor, iş sürüyor.
+- Sıradaki uygulanabilir iş: canlıda 0 satırlı tabloları okuyan **erişilebilir**
+  yüzeyler taraması sürüyor. Kalan adaylar: `pending_pool` (0 satır ·
+  `MevzuatAdmin`) · `case_process_tracker` (9 dosyada **1** satır) ·
+  `messages` (0 satır — RLS sağlam, yalnız kullanılmamış; kusur DEĞİL).
+
+### KAPANDI — 25.08 · P1 · BİLİRKİŞİ ÖNERİSİ İZ BIRAKIYOR VE TARAFA ULAŞIYOR
+Bilirkişi önerisini **iki** yüzey yazıyordu ve ikisi aynı işi yapmıyordu:
+| yüzey | iz | taraf bildirimi | arabulucu oraya düşüyor mu |
+|---|---|---|---|
+| `CaseRoom.ExpertsTab` | ✔ | ✔ | **hayır** — `CaseRedirect` arabulucuyu her zaman `/legal-reasoning`e atar |
+| `MediationEngine.Phase7Expert` | ✘ | ✘ | **evet** — gerçekte kullanılan yol |
+
+Yani tam olan uygulama arabulucunun **giremediği** yüzeydeydi; eksik olan,
+kullandığı yüzeydeydi. Durum `pending` = "Onay Bekliyor" yazılıyor ama onayı
+verecek taraf **hiç haberdar edilmiyordu** → öneri sonsuza dek asılı kalıyordu.
+
+**CANLI KANIT (Lovable SQL, 25.08):**
+- `case_expert_assignments` = **2 satır** (20.08 `onerildi`, 21.08 `pending`) —
+  ikisi de hâlâ onaylanmamış.
+- `expert_assignment_logs` = **0 satır**. RLS sağlam
+  (`can_access_case AND actor_id = auth.uid()`), yani engel politika değil,
+  **çağrının hiç yapılmaması**.
+- `notifications` = 29 satır, dokuz ayrı başlık — **hiçbiri bilirkişi başlığı
+  değil**. Tek bir "Yeni Bilirkişi Önerisi" gönderilmemiş.
+
+**Yapılan.** Yeni paylaşılan modül `src/lib/expert-assignment.ts`:
+`logExpertAction` (hata **yutulmaz**, çağırana döner) + `notifyCaseParties`
+(taraf listesini kendi çeker, kaç bildirim yazıldığını döner).
+- `Phase7Expert.onSelect`: `approvals: {}` + `.select()` eklendi, ardından
+  `proposed` izi ve "Yeni Bilirkişi Önerisi" bildirimi. Toast artık kaç tarafa
+  gittiğini söylüyor; hesabı bağlı taraf yoksa bunu açıkça yazıyor.
+- `Phase7Expert.removeAssignment`: `removed` izi + "Bilirkişi Önerisi Geri
+  Çekildi" bildirimi.
+- `EXPERT_STATUS_LABEL` yalnız `pending`/`accepted` biliyordu; taraf onay akışı
+  `approved`/`rejected`, kenar işlevi `onerildi` yazıyor → ham İngilizce durum
+  ekrana düşüyordu. Dördü de eklendi.
+- `CaseRoom` kendi kopyasını bıraktı, paylaşılan modülü çağırıyor (`izYaz`
+  sarmalayıcısı hatayı kullanıcıya bildiriyor). İkinci kopyanın yeniden doğması
+  testle yasaklandı.
+
+**TEZGÂH:** `tests/bilirkisi-atama-izi.test.ts` (6 durum).
+**KANITLANDI:** kusurlu hâl `BILIRKISI_KOK=tests/gecici/bilirkisi-kanit`
+kopyasında geri getirildi (HEAD'deki iki yüzey) → **6/6 test DÜŞTÜ**; gerçek
+dizinde 6/6 geçiyor.
+- Doğrulama: **228/228** test · tsc temiz · build başarılı · lint **2348**
+  (yeni modülde 0 hata — `as any` kullanılmadı, üretilen tipler yeterliydi).
+
+### KAPANDI — 25.08 · P1 · RESMİ TUTANAKTAKİ "DOSYA ATAMA TARİHİ" UYDURULMUYOR (`0e5b1c9`)
+Bu madde 9. blokta commit edildi ama `todo.md`ye işlenmemişti; kayıt burada
+tamamlanıyor.
+- **Kök neden:** `ProcessTrackerPanel` satırı `fmtDate(assignedAt ?? caseData?.created_at)`
+  ile yazdırıyordu. `assignedAt`in tek kaynağı `case_assignments.assigned_at` ve
+  o tablo canlıda **0 satır** (9/9 dosyada `cases.assigned_mediator_id` DOLU ama
+  tek atama izi yok) → alan HER dosyada sessizce **açılış tarihine** düşüyordu.
+  Bu bir resmi tutanak alanıdır; §7-B.2 gereği etiket–işlev uyumsuzluğu kusurdur.
+- Şema tarandı: `cases` üzerinde atama zaman damgası **yok** → doğru kaynak
+  gerçekten `case_assignments`. Geri çekilme kaldırıldı; kayıt yoksa panelin
+  kendi bilinmiyor gösterimi (`fmtDate(null) === "—"`). Geriye dönük satır da
+  **uydurulmadı**.
+- İkinci kusur: `AdminDashboard.handleAssignMediator` atama izini yazarken hatayı
+  sessiz yutuyordu → yazılamazsa tarih kalıcı kaybolur. Artık yöneticiye bildiriliyor.
+  Kapsam sınırı: atama YAPILMIŞ sayılmaya devam ediyor (yetki
+  `cases.assigned_mediator_id`tedir), eksik kalan yalnız izdir.
+- **TEZGÂH:** `tests/atama-tarihi.test.ts` (3 durum). **KANITLANDI:**
+  `ATAMA_KOK=tests/gecici/atama-kanit` kopyasında her iki kusur için birer test
+  DÜŞTÜ (2/3); gerçek dizinde 3/3.
+- Doğrulama: 222/222 test · tsc temiz · build başarılı.
 
 ### KAPANDI — 25.08 · P2 · ÖLÜ YÜZEY TEZGÂHI (`97517c2`)
 Ada taraması kalıcı tezgâha çevrildi: `tests/olu-yuzey.test.ts`, `src/main.tsx`ten

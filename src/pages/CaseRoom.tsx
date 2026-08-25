@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { logExpertAction } from "@/lib/expert-assignment";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -2465,25 +2466,13 @@ function AnalysisView({ analysis }: { analysis: any }) {
   );
 }
 
-// =================== Expert Audit Log helpers + view ===================
-async function logExpertAction(args: {
-  caseId: string;
-  assignmentId?: string | null;
-  expertId?: string | null;
-  actorId: string;
-  actorRole: string;
-  action: string;
-  details?: Record<string, any>;
-}) {
-  await supabase.from("expert_assignment_logs").insert({
-    case_id: args.caseId,
-    assignment_id: args.assignmentId ?? null,
-    expert_id: args.expertId ?? null,
-    actor_id: args.actorId,
-    actor_role: args.actorRole,
-    action: args.action,
-    details: args.details ?? {},
-  } as any);
+// =================== Expert Audit Log view ===================
+// Denetim izi yazımı `@/lib/expert-assignment`tedir: aynı işi yapan ikinci bir
+// kopya `MediationEngine`de yoktu ve canlıda tek satır iz yazılmamıştı.
+// Yazım hatası artık yutulmuyor; bu sarmalayıcı kullanıcıya bildirir.
+async function izYaz(args: Parameters<typeof logExpertAction>[0]) {
+  const { error } = await logExpertAction(args);
+  if (error) toast({ title: "Denetim izi yazılamadı", description: error, variant: "destructive" });
 }
 
 function ExpertAuditLog({ caseId, refreshKey }: { caseId: string; refreshKey: number }) {
@@ -2676,7 +2665,7 @@ function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string;
       assigned_by: user.id, approvals: {},
     } as any).select().maybeSingle();
     if (error) { toast({ title: "Hata", description: error.message, variant: "destructive" }); return; }
-    await logExpertAction({
+    await izYaz({
       caseId, assignmentId: inserted?.id, expertId: expert.id,
       actorId: user.id, actorRole: "mediator", action: "proposed",
       details: { note: `${expert.full_name} önerildi` },
@@ -2694,7 +2683,7 @@ function ExpertsTab({ caseId, niche, parties }: { caseId: string; niche: string;
   const remove = async (row: any) => {
     if (!user) return;
     await supabase.from("case_expert_assignments").delete().eq("id", row.id);
-    await logExpertAction({
+    await izYaz({
       caseId, assignmentId: row.id, expertId: row.expert_id,
       actorId: user.id, actorRole: "mediator", action: "removed",
       details: { note: `${row.experts?.full_name ?? "bilirkişi"} kaldırıldı` },
@@ -2798,13 +2787,13 @@ function PartyExpertApproval({ caseId, partyId }: { caseId: string; partyId: str
     if (error) { toast({ title: "Hata", description: error.message, variant: "destructive" }); return; }
 
     // Audit log: the party's decision (always) + status change (if any)
-    await logExpertAction({
+    await izYaz({
       caseId, assignmentId: row.id, expertId: row.expert_id,
       actorId: user.id, actorRole: "party", action: decision,
       details: { note: `Taraf kararı: ${decision === "approved" ? "onay" : "red"}` },
     });
     if (nextStatus !== prevStatus) {
-      await logExpertAction({
+      await izYaz({
         caseId, assignmentId: row.id, expertId: row.expert_id,
         actorId: user.id, actorRole: "system", action: "status_changed",
         details: { from: prevStatus, to: nextStatus },

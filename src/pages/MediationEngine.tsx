@@ -26,6 +26,7 @@ import { toast } from "@/components/ui/use-toast";
 import { SourceViewerDialog, ADB_SOURCE_PREFIX, type ViewerSource } from "@/components/SourceViewerDialog";
 import { motion, AnimatePresence, animate, useMotionValue, useMotionValueEvent } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
+import { logExpertAction, notifyCaseParties } from "@/lib/expert-assignment";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getPartyPhone, normalizePhoneForWhatsapp } from "@/lib/phone";
@@ -13195,9 +13196,16 @@ function Phase9Closing({ caseRow, reload }: { caseRow: CaseRow; reload: () => vo
 
 /* ===================== PHASE 7 - EXPERT ===================== */
 
+// Durum sözlüğü, satırı yazan BÜTÜN yolları karşılamalıdır: taraf onay akışı
+// (`CaseRoom.PartyExpertApproval`) approved/rejected yazar, `bilirkisi-secim`
+// kenar işlevi "onerildi" yazar. Eksik anahtar ham İngilizce durum olarak ekrana
+// düşüyordu.
 const EXPERT_STATUS_LABEL: Record<string, string> = {
   pending: "Onay Bekliyor",
+  onerildi: "Onay Bekliyor",
   accepted: "Kabul Edildi",
+  approved: "Taraflarca Onaylandı",
+  rejected: "Reddedildi",
 };
 
 function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
@@ -13233,12 +13241,30 @@ function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
   useEffect(() => { loadAssignment(); }, [loadAssignment]);
 
   async function removeAssignment() {
-    if (!assignment) return;
+    if (!assignment || !user) return;
     setRemoving(true);
-    const { error } = await supabase.from("case_expert_assignments").delete().eq("id", assignment.id);
+    const kaldirilan = assignment;
+    const { error } = await supabase.from("case_expert_assignments").delete().eq("id", kaldirilan.id);
     if (error) toast({ title: "Kaldırma hatası", description: trErr(error.message), variant: "destructive" });
     else {
+      const iz = await logExpertAction({
+        caseId: caseRow.id, assignmentId: kaldirilan.id, expertId: selected,
+        actorId: user.id, actorRole: "mediator", action: "removed",
+        details: { note: `${kaldirilan.expertName} ataması kaldırıldı` },
+      });
+      const bildirim = await notifyCaseParties(
+        caseRow.id,
+        "Bilirkişi Önerisi Geri Çekildi",
+        `Arabulucu ${kaldirilan.expertName} adlı bilirkişi önerisini geri çekti.`,
+      );
       toast({ title: "Bilirkişi ataması kaldırıldı" });
+      if (iz.error || bildirim.error) {
+        toast({
+          title: "Kayıt uyarısı",
+          description: trErr(iz.error ?? bildirim.error ?? ""),
+          variant: "destructive",
+        });
+      }
       setAssignment(null);
       setSelected(null);
     }
@@ -13289,12 +13315,38 @@ function Phase7Expert({ caseRow }: { caseRow: CaseRow }) {
         onSelect={async (e) => {
           if (!user) return;
           setSelected(e.id);
-          const { error } = await supabase.from("case_expert_assignments").insert({
+          const { data: eklenen, error } = await supabase.from("case_expert_assignments").insert({
             case_id: caseRow.id, expert_id: e.id, status: "pending", assigned_by: user.id,
-          } as any);
+            approvals: {},
+          } as any).select().maybeSingle();
           if (error) toast({ title: "Atama hatası", description: trErr(error.message), variant: "destructive" });
           else {
-            toast({ title: "Bilirkişi atandı (taraf onayı bekleniyor)" });
+            const uzmanAdi = e.full_name ?? "Bilirkişi";
+            // Denetim izi + taraf bildirimi: durum "onay bekliyor"dur, onayı
+            // verecek taraf haberdar edilmezse öneri sonsuza dek asılı kalır.
+            const iz = await logExpertAction({
+              caseId: caseRow.id, assignmentId: (eklenen as any)?.id ?? null, expertId: e.id,
+              actorId: user.id, actorRole: "mediator", action: "proposed",
+              details: { note: `${uzmanAdi} önerildi` },
+            });
+            const bildirim = await notifyCaseParties(
+              caseRow.id,
+              "Yeni Bilirkişi Önerisi",
+              `Arabulucu ${uzmanAdi} adlı bilirkişiyi önerdi. Onayınız bekleniyor.`,
+            );
+            toast({
+              title: "Bilirkişi atandı (taraf onayı bekleniyor)",
+              description: bildirim.sent > 0
+                ? `${bildirim.sent} tarafa bildirim gönderildi.`
+                : "Hesabı bağlı taraf bulunamadı — bildirim gönderilmedi.",
+            });
+            if (iz.error || bildirim.error) {
+              toast({
+                title: "Kayıt uyarısı",
+                description: trErr(iz.error ?? bildirim.error ?? ""),
+                variant: "destructive",
+              });
+            }
             loadAssignment();
           }
         }}
