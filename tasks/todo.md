@@ -49,6 +49,8 @@
   - OK `03c445f` · **ön yüz `functions.invoke`** — publish edildi.
   - OK `a27b221` · `extract-document-text` — deploy edildi ve doğrulandı.
     `get_project`: `latest_commit_sha=74ec5862…`, `is_published=true`.
+  - OK `10a70e6` · `dosya-verilerini-sil` — deploy edildi ve `get_message` ile
+    doğrulandı.
   - **BEKLEYEN REDEPLOY YOK.**
 - Açık HAT maddesi: **H-4** · **H-7** · **H-8** · **H-9** · **H-10** ·
   **H-11 (P0 · kabuk bekçisi devre dışı — kanıtlı)** · **H-12 (P1 · depoda
