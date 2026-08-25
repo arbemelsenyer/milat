@@ -180,59 +180,6 @@ yazılmış bir bildirimi insan okumadan kapatma yetkisi kazanır — bu, "ajan
 önerir, insan seçer" ilkesinden sapmadır; önermiyorum.
 
 
-### H-11 · 25.08.2026 · **P0** — Kabuk bekçisi devre dışı bırakılmış (belgesiz gerileme)
-**Sorun.** `~/.claude/hooks/guard-shell.sh` bugün **05:12'de** (bu oturum
-başlamadan önce) koşulsuz `exit 0` eden 296 baytlık bir taslağa indirilmiş.
-Taslağın kendi yorumu şunu iddia ediyor: *"Koruma settings.json içindeki 'ask'
-listesindedir."* **Bu iddia yanlış.**
-
-23.08 kaydı (bkz. `tasks/todo.md`, "BEKÇİ DOSYALARI") bekçinin **bilerek**
-komut-farkındalıklı hâle getirildiğini ve **39 senaryoluk tezgâhla 39/39**
-doğrulandığını gösteriyor. Devre dışı bırakılmasına dair **hiçbir karar kaydı
-yok** — ne `todo.md`de, ne `lessons.md`de, ne HAT'ta.
-
-**KANIT (yeniden üretilebilir).** `tests/gecici/bekci-sinama.mjs` 28 senaryo
-koşuyor. Bugünkü taslakla: **11 olağan iş geçiyor, 17 gerçek tehlikenin 17'si de
-hiç sorulmadan geçiyor.**
-
-Dördü `settings.json` "ask" listesinde de **karşılıksız** — ikisi üstelik
-"allow" listesi yüzünden **otomatik onaylı**:
-
-| sınıf | ask listesinde? | sonuç |
-|---|---|---|
-| `git push --force` · `-f` · `--delete` · `branch -D` | **yok** — üstelik `Bash(git push:*)` **allow**'da | zorlayıcı push **otomatik onaylı** (CLAUDE.md §11 bunu açıkça yasaklıyor) |
-| `DROP` · `TRUNCATE` · `DELETE FROM` (MCP `query_database`) | **yok** | tek savunma bu kancaydı; bugün o araçla sorgu koştum |
-| `rm -rf` · `Remove-Item` · `find -delete` | **yok** | silme onaysız |
-| `cat .env` | yalnız `Read(**/.env)` var (Read aracı) | `Bash(cat:*)` **allow**'da → `cat .env` **otomatik onaylı** |
-
-**Neden kendim geri kurmadım.** `cp` denemesi **auto mode sınıflandırıcısı**
-tarafından engellendi. Engeli başka araçla dolanmak yerine durumu bildiriyorum:
-bu dosya benim kendi izin akışımı yöneten altyapıdır ve geri açmak size yeniden
-onay ekranı çıkaracaktır — muhtemelen kapatılmasının sebebi de budur (§18-A
-yanlış alarm yorgunluğu).
-
-**Seçenekler.**
-| | ne yapılır | bedeli |
-|---|---|---|
-| **A** | `guard-shell.YEDEK.sh` (2665 B, komut-farkındalıklı sürüm) `guard-shell.sh` üstüne kurulur; tezgâh 28/28 doğrular | Gerçek tehlikede yeniden onay ekranı çıkar — **olağan işte çıkmaz** (11 yanlış-alarm senaryosunun hepsi geçiyor) |
-| B | Yalnız iki en kritik sınıf kapatılır (zorlayıcı push + MCP DROP/TRUNCATE) | Daha az onay ekranı; silme ve `.env` açıkta kalır |
-| C | Bugünkü hâl korunur | Yukarıdaki dört sınıf onaysız çalışmaya devam eder |
-
-**Önerim: A.** Yanlış alarm korkusu yersiz: bu sürüm zaten kelimeye değil
-**çalıştırılan komuta** bakıyor (23.08 onarımı). Tezgâhtaki 11 olağan iş —
-`--no-rebase`, commit mesajında geçen "DROP/rm/delete from",
-`git ls-files --error-unmatch .env`, kolon adında "drop" geçen sorgu dâhil —
-**hiçbiri** alarm üretmiyor.
-
-**Kararın etkisi.** C'de kalınırsa zorlayıcı push ve üretim veritabanında
-`DROP`/`TRUNCATE` **hiçbir onay olmadan** çalışabilir. A'da eski koruma geri
-gelir ve bu turdaki tezgâh her seferinde yeniden koşulabilir.
-
-**A seçilirse tek komut yeter (kurucu çalıştırır):**
-`cp ~/.claude/hooks/guard-shell.YEDEK.sh ~/.claude/hooks/guard-shell.sh && node tests/gecici/bekci-sinama.mjs`
-
----
-
 ### H-12 · 25.08.2026 · **P1** — Depoda birikmiş öksüz belgeler (KVKK)
 **Sorun.** Bugün `dosya-verilerini-sil` kolundaki kök neden kapatıldı (silme
 artık depoyu da temizliyor, commit `10a70e6`). Ama **geçmişte birikmiş öksüzler
@@ -361,6 +308,21 @@ Seçim: A / B / C / (kendi metniniz)
 Not: (varsa)
 ```
 
+### H-14 · CEVAP · 25.08.2026
+Seçim: **B** — yalnız arabulucunun kendi sesli notu.
+Not: Taraf sesi **hiçbir koşulda** kaydedilmez ve bu bir söz değil **TEKNİK
+KISIT** olarak kurulur: kod taraf ses akışına erişemesin.
+Üç şart — bu üçü kurulmadan hat canlıya ÇIKMAZ:
+1. Ses dosyası metne çevrildiği **an silinir**; saklanan şey yalnız metindir.
+   Silmenin gerçekleştiği **tezgâhla kanıtlanır**.
+2. Aydınlatma metnine sesli not işlemesi eklenir (hangi hizmete gidiyor, ne
+   kadar kalıyor, ne zaman siliniyor). Metin `src/lib/kvkk-metinleri.ts`
+   içinde **tek yerde** durur.
+3. Arabulucu sesli notu açmadan önce **tek seferlik bir onay** görür.
+
+### H-11 · CEVAP · 25.08.2026
+Seçim: **A** — YEDEK sürüm geri kuruldu (kurucu PowerShell'den yaptı).
+
 ### H-1 · CEVAP · 24.08.2026
 Seçim: **A** — runbook ile yenilenir.
 Not: **BU MADDE CODE'A AİT DEĞİLDİR.** Yeni sırrı kurucu üretir ve girer; Code
@@ -430,6 +392,27 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+
+### H-11 · KAPANDI · 25.08.2026 — Kabuk bekçisi geri kuruldu
+**Seçim: A.** Kurucu `guard-shell.YEDEK.sh` sürümünü PowerShell'den
+`guard-shell.sh` üstüne kurdu (2665 bayt, komut-farkındalıklı sürüm).
+
+**Doğrulama (Code):** `tests/gecici/bekci-sinama.mjs` — **28/28**.
+· 11 olağan iş senaryosunun **hiçbiri** yanlış alarm üretmedi
+(`--no-rebase` · commit mesajında geçen "DROP/rm/delete from" ·
+`git ls-files --error-unmatch .env` · `.gitignore`ta "env" araması ·
+kolon adında "drop" geçen sorgu · normal push · `.env.example` yazımı dâhil).
+· 17 gerçek tehlikenin **17'si de** onay sordu: `rm -rf` · `Remove-Item` ·
+`find -delete` · `push --force` · `--force-with-lease` · `push -f` ·
+`branch -D` · `reset --hard` · `filter-branch` · `push --delete` ·
+`cat .env` · `cat id_rsa` · MCP `DROP TABLE`/`TRUNCATE`/`DELETE FROM` ·
+`psql -c "DROP…"` · `bash -c "rm -rf …"`.
+
+Devre dışı taslakla aynı tezgâh **17 tehlikenin 17'sini de geçiriyordu**;
+açık kapandı. Sonuç `tasks/todo.md`ye işlendi.
+
+---
+
 
 ### H-1 · KAPANDI · 25.08.2026 — `CRON_SECRET` yenilendi
 **Seçim: A** (runbook ile yenileme). Kurucu değeri üretti ve hem *Edge Functions

@@ -4,7 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P2 · ücret tarife tabanı (zaten kuruluymuş, kilitlendi)**
+- Son tamamlanan iş: **P1 · sesli oturum notu (H-14/B) + P0 kabuk bekçisi (H-11)**
 - **SESSİZ ÇAĞRI KUSURU İSTEMCİ YÜZEYİNİN TAMAMINDA KAPANDI:** `.from` ·
   `.rpc` · `.storage` · `.functions.invoke` · iç `fetch`. Kenar (`_shared`
   dâhil) ve ön yüz. Kenarda çıplak `.from(...)`, `.rpc(...)` ve
@@ -119,20 +119,19 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       engellenmedi; karar kurucuda.
       · **Canlı:** publish doğrulandı (`get_project`: `latest_commit_sha=0bfcef82…`).
 
-- [!] P1 · **Sesli oturum notu hattı** · **BLOCKED → HAT H-14** (25.08) · Kabul:
-      arabulucu sesli not girebiliyor; ses kovaya yükleniyor, döküm `dokum_metni`ne
-      yazılıyor ve **arabulucunun onayıyla** föye/analiz zincirine giriyor
-      · **Denenenler / bulunanlar:** yazılı yarı **KURULU ve canlı**
-      (`MeetingNotesPanel` → `analyze-meeting-notes` → `case_notes` phase 7 →
-      orkestratör). Onay kapısı **kurulu** (`kayit_onay_talepleri`/`kayit_onaylari`,
-      `create-video-room` B18 kapısı). Şema **hazır** (`oturum_kayitlari`), 24 saatlik
-      imha kolu **çalışıyor**. Eksik olan yalnız ses hattı.
-      · **Kalan engel:** ses verisinin sistemden çıkıp çıkmayacağı **hukuki/ürün
-      kararıdır** (§7.2/§7.4) — bugünkü aydınlatma metni yalnız METİN analizinden ve
-      Gemini'den söz ediyor, ses kaydı yeni bir işleme türüdür. Önerim: yalnız
-      arabulucunun kendi sesli notu (taraf sesi hiç kaydedilmez).
-      · **Bağlı madde:** HAT **H-4** (kovaya dar okuma politikası) ancak bu hat
-      yazılınca yol düzeni belli olduğu için kapanabilir.
+- [x] P1 · **Sesli oturum notu hattı** · **HAT H-14 kararı B uygulandı** ·
+      **CANLI DOĞRULAMA BEKLİYOR** (§15) · Kabul: arabulucu sesli not girebiliyor;
+      ses metne dökülüp **anında siliniyor**; metin arabulucunun onayıyla föye/analiz
+      zincirine giriyor · Doğrulama: `tests/sesli-not.test.ts` 10/10 · 290/290 test ·
+      tsc temiz · build temiz · lint 2331 (taban) · commit `926c7eb`
+      · Üç şart da kuruldu: (1) ses metne çevrilir çevrilmez siliniyor — döküm
+      başarısız olsa da; (2) aydınlatma metni `kvkk-metinleri.ts`te tek yerde;
+      (3) tek seferlik onay olmadan kayıt başlamıyor. Taraf sesi **teknik olarak**
+      erişilemez (uzak akış API'leri kodda geçmiyor, tezgâh denetliyor).
+      · **KALAN TEK ŞEY:** dökümün canlıda gerçekten çalıştığının kanıtı —
+      `ai.gateway.lovable.dev` üzerinden `input_audio` gönderimi Code tarafından
+      sınanamıyor (mikrofon ve `LOVABLE_API_KEY` gerekiyor; anahtar §12 gereği
+      okunmaz). Kurucudan **tek somut kontrol** isteniyor (aşağıda).
 
 - [ ] P1 · **Saklama süresi parametre tablosu + periyodik imha yok** · Kabul: saklama
       süreleri bir parametre tablosundan okunuyor (kodda sabit değil) ve süresi dolan
@@ -194,6 +193,68 @@ Bir kalem, aşağıdaki **beşi birden** sağlanmadan "bitti" sayılmaz:
 5. **Kırıntı yok** — yarım yüzey, ölü düğme, boş panel bırakılmadı
 
 ---
+
+### KAPANDI — 25.08 · P0 · KABUK BEKÇİSİ GERİ KURULDU (HAT H-11)
+Kurucu `guard-shell.YEDEK.sh` sürümünü PowerShell'den `guard-shell.sh` üstüne
+kurdu (2665 bayt, komut-farkındalıklı sürüm). Code tezgâhı koştu:
+`tests/gecici/bekci-sinama.mjs` — **28/28, DÜŞEN YOK.**
+
+**Yanlış alarm veren senaryo: YOK.** 11 olağan iş senaryosunun hiçbiri onay
+sordurtmadı — `git pull --no-rebase` · commit mesajında geçen "DROP the rm
+feature, delete from queue" · `git ls-files --error-unmatch .env` ·
+`grep -n "env" .gitignore` · kolon adında "drop" geçen SQL · normal push ·
+`.env.example` yazımı · `npm run test` · durum/geçmiş okuma dâhil.
+
+17 gerçek tehlikenin **17'si de** onay sordu: `rm -rf` · `Remove-Item -Recurse`
+· `find -delete` · `push --force` · `--force-with-lease` · `push -f` ·
+`branch -D` · `reset --hard` · `filter-branch` · `push --delete` · `cat .env` ·
+`cat id_rsa` · MCP `DROP TABLE` / `TRUNCATE` / `DELETE FROM` ·
+`psql -c "DROP…"` · `bash -c "rm -rf …"`.
+
+Karşılaştırma: devre dışı taslakla **aynı** tezgâh 17 tehlikenin **17'sini de
+geçiriyordu**. Açık kapandı, HAT H-11 **ARŞİV**e taşındı.
+
+### KAPANDI — 25.08 · P1 · SESLİ OTURUM NOTU (HAT H-14 · karar B)
+Kurucu kararı: **yalnız arabulucunun kendi sesli notu.** "Taraf sesi hiçbir
+koşulda kaydedilmez" bir söz değil **TEKNİK KISIT** olarak kuruldu.
+
+**Teknik kısıt nasıl kuruldu:**
+· İstemci yalnız `getUserMedia({ audio: true, video: false })` çağırıyor —
+  cihazın **kendi mikrofonu**. Taraf sesi ancak WebRTC uzak izinden, ekran/sekme
+  sesinden ya da video sağlayıcı SDK'sından gelebilirdi; **hiçbiri kodda geçmiyor**
+  (`RTCPeerConnection` · `getDisplayMedia` · `ontrack` · `getReceivers` ·
+  `addTrack` · `remoteStream` · `srcObject` · `DailyIframe`).
+· Sunucu tarafı da kapalı: `sesli-not-dokum` çağıranın **dosyanın arabulucusu**
+  olduğunu denetliyor (taraf oturumu 403) ve yol kilidi çağıranın kendi
+  klasörü dışına dokunmasını engelliyor.
+
+**Şart 1 — ses metne çevrildiği an silinir.** Silme, döküm denemesinden sonra
+ve kayıt yazımından **önce** yapılıyor; döküm **başarısız olsa da** siliniyor.
+`storage.remove` hata fırlatmadığı için sonucu okunuyor: silinemezse
+`ses_dosya_yolu` **temizlenmiyor** ki `ajan-nobetci`nin 24 saatlik imha kolu
+dosyayı bulup silebilsin, ayrıca çağırana uyarı gidiyor.
+
+**Şart 2 — aydınlatma metni.** `KVKK_SESLI_NOT` eklendi: hangi hizmete gidiyor
+(Google Gemini API), ne kadar kalıyor (yalnız döküm süresince), ne zaman
+siliniyor (metne çevrildiği anda), taraf sesinin alınmadığı. Metin
+`src/lib/kvkk-metinleri.ts` içinde **tek yerde**; tezgâh gömülü kopya sızmasını
+da engelliyor.
+
+**Şart 3 — tek seferlik onay.** Arabulucu kaydı ilk kez açmadan önce metni
+görüyor; onay yoksa kayıt **başlamıyor**. Onay izi okunamazsa yeniden soruluyor
+(güvenli yön: az değil fazla göstermek).
+
+**Çıkan metni arabulucu onaylıyor:** bileşen `case_notes`a **yazmıyor**, metni
+mevcut not alanına düşürüyor; kayıt yine arabulucunun "Notu Kaydet ve Analiz Et"
+düğmesiyle oluyor — yani föye/analiz zincirine onunla giriyor.
+
+**TEZGÂH:** `tests/sesli-not.test.ts` — 10 durum, üç şartı ve teknik kısıtı
+denetliyor. **Tezgâhın kendisi bir kusur verdi:** ilk yazımda yasak API adlarını
+bileşenin **yorumunda** görüp alarm üretti (yorum onların kullanılmadığını
+anlatıyordu). Denetim yorumları ayıklayıp **çalışan koda** bakacak biçimde
+düzeltildi — 23.08'de `guard-shell.sh`ta öğrenilen kuralın aynısı. Kasıtlı
+ihlal (`RTCPeerConnection` eklenmiş kopya) ile tezgâhın gerçekten yakaladığı
+doğrulandı.
 
 ### KAPANDI — 25.08 · P1 · KVKK SİLMESİ DEPOYU DA TEMİZLİYOR
 **Nasıl bulundu.** Bugün kodda *öksüz dosya* üretilmesini engelledim ama

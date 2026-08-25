@@ -103,43 +103,62 @@ Deno.serve(async (req) => {
     }
     const mime = sesBlob.type || "audio/webm";
 
-    // ── Metne dök ─────────────────────────────────────────────────────────────
+    /* ── Metne dök ────────────────────────────────────────────────────────────
+       İKİ BİÇİM DENENİR. Geçit OpenAI uyumlu bir uçtur ama arkasında Gemini
+       çalışır; ses için iki ayrı gösterim yaygındır:
+         · OpenAI biçimi  → `input_audio: { data, format }`
+         · Gemini biçimi  → `inline_data: { mime_type, data }`
+       Hangisinin kabul edildiğini Code canlıda sınayamıyor (mikrofon + gizli
+       anahtar gerekir, anahtar §12 gereği okunmaz). Tahmin etmek yerine ikisi
+       de sırayla denenir: biri 4xx dönerse öbürü koşulur. Böylece hat, geçidin
+       hangi gösterimi desteklediğine bakmaksızın çalışır. */
+    const SISTEM =
+      "Sana bir arabulucunun kendi sesli notu veriliyor. Görevin YALNIZCA "
+      + "konuşulanı Türkçe metne dökmektir. Yorum ekleme, özetleme, düzeltme "
+      + "yapma, başlık atma. Duyulmayan yeri [anlaşılmadı] yaz. "
+      + "Çıktı yalnız düz metin olsun.";
+    const bicimler: { ad: string; parca: Record<string, unknown> }[] = [
+      {
+        ad: "input_audio",
+        parca: { type: "input_audio", input_audio: { data: b64, format: mime.includes("mp4") ? "mp4" : "webm" } },
+      },
+      {
+        ad: "inline_data",
+        parca: { type: "input_audio", inline_data: { mime_type: mime, data: b64 } },
+      },
+    ];
+
     let metin = "";
     let dokumHatasi = "";
-    try {
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            {
-              role: "system",
-              content:
-                "Sana bir arabulucunun kendi sesli notu veriliyor. Görevin YALNIZCA "
-                + "konuşulanı Türkçe metne dökmektir. Yorum ekleme, özetleme, düzeltme "
-                + "yapma, başlık atma. Duyulmayan yeri [anlaşılmadı] yaz. "
-                + "Çıktı yalnız düz metin olsun.",
-            },
-            {
-              role: "user",
-              content: [
-                { type: "text", text: "Bu sesli notu metne dök:" },
-                { type: "input_audio", input_audio: { data: b64, format: mime.includes("mp4") ? "mp4" : "webm" } },
-              ],
-            },
-          ],
-        }),
-      });
-      if (!res.ok) {
-        dokumHatasi = `model HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`;
-      } else {
+    for (const bicim of bicimler) {
+      try {
+        const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              { role: "system", content: SISTEM },
+              {
+                role: "user",
+                content: [{ type: "text", text: "Bu sesli notu metne dök:" }, bicim.parca],
+              },
+            ],
+          }),
+        });
+        if (!res.ok) {
+          dokumHatasi = `[${bicim.ad}] model HTTP ${res.status}: ${(await res.text()).slice(0, 160)}`;
+          // 4xx: bu gösterim kabul edilmedi — öbürünü dene. 5xx: geçit arızası,
+          // öbür gösterim de kurtarmaz ama denemenin maliyeti düşük.
+          continue;
+        }
         const j = await res.json();
         metin = String(j?.choices?.[0]?.message?.content ?? "").trim();
-        if (!metin) dokumHatasi = "model boş metin döndürdü";
+        if (metin) { dokumHatasi = ""; break; }
+        dokumHatasi = `[${bicim.ad}] model boş metin döndürdü`;
+      } catch (e) {
+        dokumHatasi = `[${bicim.ad}] model çağrılamadı: ${String((e as Error)?.message ?? e).slice(0, 160)}`;
       }
-    } catch (e) {
-      dokumHatasi = `model çağrılamadı: ${String((e as Error)?.message ?? e).slice(0, 200)}`;
     }
 
     /* ── ŞART 1: SES METNE ÇEVRİLDİĞİ AN SİLİNİR ──────────────────────────────
