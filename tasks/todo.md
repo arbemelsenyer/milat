@@ -180,9 +180,25 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 ### Canlı doğrulama maddeleri (kod değil, kanıt üretir)
 - [ ] P2 · **§3 otomatik doldurma tam mı** · Kabul: gerçek bir dosyada §3 kalemlerinin
       hepsi otomatik doluyor; dolmayan kalem varsa adıyla listeleniyor.
-- [ ] P2 · **Orchestrator gerçek dosyada dört adımı tamamlıyor, uydurma künye yok** ·
-      Kabul: gerçek dosyada dört adım `completed`; üretilen raporlarda kaynak künyesi
-      **birebir** doğrulanıyor, uydurma künye **sıfır**.
+- [x] P2 · **Orchestrator dört adımı tamamlıyor, uydurma künye yok** ·
+      **DONE 25.08.2026 (zaten kuruluymuş — canlı kanıtlandı ve kilitlendi)** ·
+      Doğrulama: `tests/orkestrator-kunye.test.ts` (6 durum) · 296/296 test
+      · **CANLI KANIT:** `agent_states` sorgusu — **BEŞ gerçek dosyada** dört adımın
+      dördü de `completed` (classify_dispute · deadline_detect · party_analysis
+      taraf başına · common_ground), orkestratör satırı da `completed`.
+      · **KÜNYE BEKÇİSİ PROMPT RİCASI DEĞİL, DETERMİNİSTİK:** modelin gerçekten
+      gördüğü bağlamda **birebir** geçmeyen Yargıtay/BAM esas-karar numaraları
+      çıktıdan sökülüyor (`sanitizeCitationHallucinations` + `citationInContext`);
+      doğrulanamayan `precedents` kaydı filtreyle **atılıyor**, `sanitizeStringsDeep`
+      ile tüm alanlar taranıyor, kaç künye silindiği kayda düşüyor.
+      · **ZİNCİRİN İKİ UCUNDA DA VAR** — bu kritik: `common-ground-report`, taraf
+      analizindeki künyeyi "taraf düzeyinde denetlenmiş" sayıp bağlam kabul ediyor;
+      taraf ucunda (`party-confidential-analysis`) denetim olmasaydı denetlenmemiş
+      künye rapora **meşru bağlam diye** girerdi. İkisinde de var.
+      · İlk bakışta "rapor denetimsiz" sanmıştım (`sinirDenetle` orada yok); daha
+      derin okuyunca amaca özel **ayrı** bir bekçi olduğu görüldü. Yanlış bulgu
+      bildirilmedi.
+
 - [ ] P2 · **Dava şartı dosyalarında bilgilendirme belgelemesi üretiliyor** · Kabul:
       dava şartı işaretli bir dosyada bilgilendirme belgesi üretiliyor ve indirilebiliyor.
 - [ ] P2 · **Taraf akışı telefonda uçtan uca** · Kabul: gerçek telefonda davet →
