@@ -152,4 +152,29 @@ describe("sessiz yutulan veritabanı yazımı eklenmiyor", () => {
     expect(hataIdx).toBeGreaterThan(-1);
     expect(hataIdx, "hata dalı bildirimin sonrasında — yanlış bildirim yine gider").toBeLessThan(bildirimIdx);
   });
+
+  it("depo çağrıları da sessiz değil (storage da FIRLATMAZ)", () => {
+    /* `storage.remove` hata FIRLATMAZ. Silme sessizce düşer ve kayıt satırı
+       silinirse dosya depoda ÖKSÜZ kalır: artık hiçbir kayıt onu göstermez,
+       hiçbir silme kolu bulamaz (constitution m.10 — süresiz saklama yasağı). */
+    const dosyalar = ["src/pages/MediationEngine.tsx", "src/components/CaseDocuments.tsx"];
+    for (const d of dosyalar) {
+      const g = readFileSync(y(d), "utf-8");
+      const ciplak = g.split(String.fromCharCode(10))
+        .map((l, i) => ({ l, i }))
+        .filter(({ l }) => /^\s*await\s+supabase\.(storage|rpc\()/.test(l))
+        .map(({ i }) => `${d}:${i + 1}`);
+      expect(ciplak, `sonucu okunmayan çağrı: ${ciplak.join(", ")}`).toEqual([]);
+    }
+    // Canli yuzeyde silme sirasi: depo once, dogrulanmadan satir silinmez.
+    const m = readFileSync(y("src/pages/MediationEngine.tsx"), "utf-8");
+    const i = m.indexOf("async function deleteDoc");
+    expect(i, "deleteDoc bulunamadı").toBeGreaterThan(-1);
+    const govde = m.slice(i, i + 900);
+    expect(govde, "depo silmesinin sonucu okunmuyor").toContain("depoErr");
+    expect(govde.indexOf("depoErr"), "satır silmesi depo kontrolünden ÖNCE")
+      .toBeLessThan(govde.indexOf('from("case_documents").delete'));
+    // Geri alma yollari da kayda duser.
+    expect(m).toContain("öksüz dosya");
+  });
 });

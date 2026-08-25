@@ -81,7 +81,9 @@ export function CaseDocuments({ caseId }: CaseDocumentsProps) {
         mime_type: file.type,
       });
       if (kayitErr) {
-        await supabase.storage.from('case-documents').remove([filePath]);
+        // Geri alma da FIRLATMAZ — düşerse öksüz dosya kalır, kayda geçer.
+        const { error: geriErr } = await supabase.storage.from('case-documents').remove([filePath]);
+        if (geriErr) console.error('[CaseDocuments] yüklenen dosya geri alınamadı (öksüz dosya):', geriErr.message);
         toast({
           variant: 'destructive',
           title: language === 'tr' ? 'Kaydedilemedi' : 'Not saved',

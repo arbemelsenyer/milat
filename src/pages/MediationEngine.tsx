@@ -3274,7 +3274,10 @@ function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection,
           file_name: f.name, file_path: path, file_size: f.size, mime_type: f.type, uploaded_by: userId,
         } as any).select("id").single();
         if (insErr) {
-          await supabase.storage.from("case-documents").remove([path]);
+          // Geri alma: satır yazılamadı, yüklenen dosya depoda kalmamalı.
+          // Bu silme de FIRLATMAZ — düşerse öksüz dosya kalır, kayda geçer.
+          const { error: geriErr } = await supabase.storage.from("case-documents").remove([path]);
+          if (geriErr) console.error("[MediationEngine] yüklenen dosya geri alınamadı (öksüz dosya):", geriErr.message);
           throw new Error(`Veritabanı hatası: ${insErr.message}`);
         }
         // Metin çıkarma: beklemesiz (fire-and-forget) — yüklemeyi bloklamaz, hata sessizce loglanır.
@@ -3294,7 +3297,12 @@ function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection,
   }
 
   async function deleteDoc(d: any) {
-    await supabase.storage.from("case-documents").remove([d.file_path]);
+    /* `storage.remove` da hata FIRLATMAZ. Sessizce düşer ve satır silmesi
+       başarılı olursa dosya depoda ÖKSÜZ kalır: artık hiçbir kayıt onu
+       göstermez, hiçbir silme kolu bulamaz (constitution m.10 — süresiz
+       saklama yasağı). Bu yüzden depo silmesi doğrulanmadan satır silinmez. */
+    const { error: depoErr } = await supabase.storage.from("case-documents").remove([d.file_path]);
+    if (depoErr) { setHata(`Silinemedi: ${trErr(depoErr.message)}`); return; }
     const { error } = await supabase.from("case_documents").delete().eq("id", d.id);
     if (error) { setHata(`Silinemedi: ${trErr(error.message)}`); return; }
     loadDocs();
@@ -4951,7 +4959,10 @@ function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
           file_name: f.name, file_path: path, file_size: f.size, mime_type: f.type, uploaded_by: userId,
         } as any).select("id").single();
         if (insErr) {
-          await supabase.storage.from("case-documents").remove([path]);
+          // Geri alma: satır yazılamadı, yüklenen dosya depoda kalmamalı.
+          // Bu silme de FIRLATMAZ — düşerse öksüz dosya kalır, kayda geçer.
+          const { error: geriErr } = await supabase.storage.from("case-documents").remove([path]);
+          if (geriErr) console.error("[MediationEngine] yüklenen dosya geri alınamadı (öksüz dosya):", geriErr.message);
           throw new Error(`Veritabanı hatası: ${insErr.message}`);
         }
         // Metin çıkarma: beklemesiz (fire-and-forget) — yüklemeyi bloklamaz, hata sessizce loglanır.
