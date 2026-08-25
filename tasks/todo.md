@@ -4,7 +4,7 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P2 · dava şartı bilgilendirme belgesi (gerçek boşluk kapatıldı)**
+- Son tamamlanan iş: **P3 · kullanılabilirlik (form kaybı + menü erişilebilir adı)**
 - **SESSİZ ÇAĞRI KUSURU İSTEMCİ YÜZEYİNİN TAMAMINDA KAPANDI:** `.from` ·
   `.rpc` · `.storage` · `.functions.invoke` · iç `fetch`. Kenar (`_shared`
   dâhil) ve ön yüz. Kenarda çıplak `.from(...)`, `.rpc(...)` ve
@@ -223,9 +223,29 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 
 - [ ] P2 · **Taraf akışı telefonda uçtan uca** · Kabul: gerçek telefonda davet →
       başvuru → belge → Kör Teklif → ödeme bilgisi zinciri kesintisiz tamamlanıyor.
-- [ ] P3 · **Kullanılabilirlik bulguları (03.08 saha notu)** · Kabul: dosya açılış formu
-      sayfa boşta kalınca içerik kaybetmiyor; açılır menüler klavyeyle gezilebiliyor ve
-      seçenekler erişilebilirlik ağacında görünüyor.
+- [x] P3 · **Kullanılabilirlik bulguları (03.08 saha notu)** · **DONE 25.08.2026**
+      · Doğrulama: `tests/form-kaybi-erisilebilirlik.test.ts` (6 durum) · 313/313
+      test · tsc temiz · build temiz · lint 2331 (taban)
+
+      **(1) Form kaybı.** Tetikleyici tek yerde değildi: sekme boşta kalıp oturum
+      düşünce `/auth`'a gidiliyor ve dönüşte liste karşılıyor; ayrıca
+      `useEffect(..., [user])` **nesne kimliğine** bağlıydı — jeton yenilenince
+      aynı kullanıcı için yeni nesne üretiliyor ve etki boşuna yeniden koşuyordu.
+      Tetikleyiciyi tek tek kovalamak yerine **asıl zarar** kapatıldı: yeni
+      başvuru formunun üç alanı taslak olarak yerelde tutuluyor, form açılışta
+      taslaktan doluyor, kayıt/iptalde taslak siliniyor. Taslak yazılamazsa
+      (özel pencere, site verisi kapalı) akış kırılmıyor — taslak kolaylıktır,
+      şart değildir. Bağımlılık da `oturumKullaniciId`ye çevrildi.
+      **Taslakta yalnız arabulucunun kendi yazdığı üç alan var; taraf verisi
+      ya da dosya içeriği yok.**
+
+      **(2) Açılır menü erişilebilirliği.** Bulgunun ilk yarısı **eskimiş**:
+      menüler Radix (`@radix-ui/react-select`) — klavye gezinme ve `role="option"`
+      zaten geliyor (bulgu, 14.08'de emekliye ayrılan eski başvuru formuna ait).
+      Ama canlı formda **gerçek** bir açık vardı: `Label`in `htmlFor`u ve
+      tetikleyicinin `id`si olmadığı için menülerin **erişilebilir adı yoktu** —
+      ekran okuyucu "combobox" diyor, neyi seçtiğini söylemiyordu. İki menüye de
+      `aria-label` eklendi.
 
 ### §15.1 — BEŞ KABUL ŞARTI (her madde için ayrı ayrı sağlanmalı)
 Bir kalem, aşağıdaki **beşi birden** sağlanmadan "bitti" sayılmaz:

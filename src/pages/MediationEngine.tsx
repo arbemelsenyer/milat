@@ -459,9 +459,14 @@ export default function MediationEngine() {
     }
   }, [isLoading, user, navigate]);
 
+  /* BAĞIMLILIK `user` NESNESİ DEĞİL, KİMLİĞİ: jeton yenilendiğinde (sekme boşta
+     kalıp geri dönünce) `onAuthStateChange` aynı kullanıcı için YENİ bir nesne
+     üretir; nesne kimliğine bağlı etki boşuna yeniden koşup listeyi yükleme
+     durumuna sokardı. */
+  const oturumKullaniciId = user?.id;
   useEffect(() => {
-    if (user) loadCases();
-  }, [user]);
+    if (oturumKullaniciId) loadCases();
+  }, [oturumKullaniciId]);
 
   useEffect(() => {
     if (caseId) loadCase(caseId); else setActiveCase(null);
@@ -676,8 +681,8 @@ export default function MediationEngine() {
 
           {showNew && (
             <NewCaseForm
-              onCancel={() => setShowNew(false)}
-              onCreated={(id) => { setShowNew(false); loadCases(); openCase(id, 1); }}
+              onCancel={() => { taslagiSil(); setShowNew(false); }}
+              onCreated={(id) => { taslagiSil(); setShowNew(false); loadCases(); openCase(id, 1); }}
               userId={user!.id}
               isMediator={isMediator || isAdmin}
             />
@@ -1095,18 +1100,58 @@ function ConfirmSavePanel({
   );
 }
 
+/* FORM KAYBI ONARIMI (03.08 saha notu: "dosya açılış formunun sayfası boşta
+   kalınca listeye dönüyor").
+   Sebep tek bir yerde değil: sekme boşta kalınca oturum düşerse `/auth`'a
+   gidilir ve dönüşte liste karşılar; jeton yenilenmesi de üst durumu
+   tazeler. Tetikleyiciyi tek tek kovalamak yerine ASIL ZARAR kapatılıyor —
+   yazılan içerik kaybolmasın. Taslak yerelde tutulur, kayıt/iptal olunca
+   silinir. Taslakta yalnız arabulucunun KENDİ yazdığı üç alan var; taraf
+   verisi ya da dosya içeriği yok. */
+const YENI_BASVURU_TASLAK = "medipact.yeniBasvuru.taslak.v1";
+
+type YeniBasvuruTaslak = { title: string; disputeType: string; altUzmanlik: string };
+
+function taslagiOku(): YeniBasvuruTaslak | null {
+  try {
+    const ham = localStorage.getItem(YENI_BASVURU_TASLAK);
+    if (!ham) return null;
+    const t = JSON.parse(ham) as YeniBasvuruTaslak;
+    if (typeof t?.title !== "string") return null;
+    return t;
+  } catch { return null; }
+}
+
+function taslagiSil() {
+  try { localStorage.removeItem(YENI_BASVURU_TASLAK); } catch { /* yoksayılır */ }
+}
+
 function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
   onCancel: () => void; onCreated: (id: string) => void; userId: string; isMediator: boolean;
 }) {
-  const [title, setTitle] = useState("");
-  const [disputeType, setDisputeType] = useState("");
-  const [altUzmanlik, setAltUzmanlik] = useState(ALT_UZMANLIK_YOK);
+  const ilkTaslak = taslagiOku();
+  const [title, setTitle] = useState(ilkTaslak?.title ?? "");
+  const [disputeType, setDisputeType] = useState(ilkTaslak?.disputeType ?? "");
+  const [altUzmanlik, setAltUzmanlik] = useState(ilkTaslak?.altUzmanlik ?? ALT_UZMANLIK_YOK);
   const [busy, setBusy] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [aiSuggestedType, setAiSuggestedType] = useState(false);
   const [aiSuggestedSubtype, setAiSuggestedSubtype] = useState(false);
   // Kayıt, onay paneli onaylanana kadar düşmez.
   const [confirming, setConfirming] = useState(false);
+
+  /* Her tuşta taslağı yaz: sayfa hangi sebeple giderse gitsin içerik dursun.
+     Yazılamazsa (özel pencere, site verisi kapalı) sessizce geçilir — taslak
+     bir kolaylıktır, akışın şartı değildir. */
+  useEffect(() => {
+    try {
+      if (!title && !disputeType && altUzmanlik === ALT_UZMANLIK_YOK) {
+        localStorage.removeItem(YENI_BASVURU_TASLAK);
+        return;
+      }
+      localStorage.setItem(YENI_BASVURU_TASLAK, JSON.stringify({ title, disputeType, altUzmanlik }));
+    } catch { /* yoksayılır */ }
+  }, [title, disputeType, altUzmanlik]);
 
   // Salt ön-doldurma: başlıktan ana tür + alt uzmanlık önerir, hiçbir DB yazımı yok
   // (case_id/persist gönderilmez). Menüler öneriyle işaretlenir, arabulucu onaylar/değiştirir.
@@ -1238,7 +1283,12 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
             {aiSuggestedType && <Badge variant="secondary" className="text-[10px]">AI önerisi</Badge>}
           </Label>
           <Select value={disputeType || undefined} onValueChange={(v) => { setDisputeType(v); setAiSuggestedType(false); }}>
-            <SelectTrigger><SelectValue placeholder="Bir ana tür seçin" /></SelectTrigger>
+            {/* ERİŞİLEBİLİR AD: `Label`in `htmlFor`u yok ve tetikleyicinin `id`si
+                yoktu — ekran okuyucu menüyü ADSIZ okuyordu ("combobox", neyi
+                seçtiği belirsiz). 03.08 saha notundaki erişilebilirlik bulgusu. */}
+            <SelectTrigger aria-label="Ana uyuşmazlık türü">
+              <SelectValue placeholder="Bir ana tür seçin" />
+            </SelectTrigger>
             <SelectContent>
               {ANA_UYUSMAZLIK_TURLERI.map((c) => (
                 <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
@@ -1252,7 +1302,9 @@ function NewCaseForm({ onCancel, onCreated, userId, isMediator }: {
             {aiSuggestedSubtype && <Badge variant="secondary" className="text-[10px]">AI önerisi</Badge>}
           </Label>
           <Select value={altUzmanlik} onValueChange={(v) => { setAltUzmanlik(v); setAiSuggestedSubtype(false); }}>
-            <SelectTrigger><SelectValue placeholder="Yok" /></SelectTrigger>
+            <SelectTrigger aria-label="Alt uzmanlık alanı">
+              <SelectValue placeholder="Yok" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALT_UZMANLIK_YOK}>Yok</SelectItem>
               {ALT_UZMANLIK_ALANLARI.map((c) => (
