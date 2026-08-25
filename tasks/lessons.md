@@ -697,5 +697,14 @@ zaten yeniden üretecek, arabulucu iki kez okuyacaktı.
 döndürür, **fırlatmaz** — `allSettled` onu "fulfilled" sayar. Bildirim
 düşünce arabulucu zincirin durduğunu hiç duymuyordu.
 
-**Tarama:** dosya başına `^\s*await admin\.from\(` deseni sıfır olmalı. Bu,
-tezgâhta her işlev için ayrıca doğrulanıyor (`tests/kenar-sessiz-yazim.test.ts`).
+**Ders 4 — dosyanın kendi sözü tutulmuyordu.** `_shared/anlatim.ts` içindeki
+yorum "hata yutulur ve **yalnız konsola loglanır**" diyordu; `agent_states`
+yazıcılarında da aynı söz vardı. `catch` hiç çalışmadığı için konsola da
+hiçbir şey düşmüyordu. Best-effort demek **sessiz** demek değildir: iş
+bozulmaz ama sebep kayda geçer.
+
+**Tarama — TEK KAPI:** dosya başına değil, **ağaç genelinde**
+`^\s*await <istemci>\.from\(` deseni sıfır olmalı (`_shared` dâhil). Tek tek
+işlev denetimi yeni yazılan bir sessiz yazımı kaçırır; tezgâhtaki
+*KENAR TARAMASI* durumu (`tests/kenar-sessiz-yazim.test.ts`) bütün ağacı
+dolaşır ve kuyruğu kırar.

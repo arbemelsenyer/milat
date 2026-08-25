@@ -3,25 +3,67 @@
 - Tarih: 25.08.2026 (12. blok)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
-- Aktif görev: yok — kenar işlevi sessiz yazımları temizlendi
-- Son tamamlanan iş: **P0 · `ajan-nobetci` sessiz yazımları (15 yer)**
+- Aktif görev: yok
+- Son tamamlanan iş: **P2 · `_shared/anlatim.ts` sessiz yazımları (3 yer)**
+- **SESSİZ YAZIM KUYRUĞU TAMAMEN KAPANDI.** Ağaç genelinde çıplak
+  `await <istemci>.from(...)` yazımı **SIFIR** — tezgâhta tarama testiyle kilitlendi.
 - **12. blokta biten işler (sırayla):** `53b33cc` P1 `taraf-kalem-cikar` ·
   `37c8867` P1 `dual-ai-validate` + `orchestrator-run` · `32fad07` P1
-  `akis-yurut` · `a3de13f` P0 `ajan-nobetci` (15 yer).
-- Doğrulama: `npm run test` **257/257** · tsc temiz · lint **2334** (değişmedi)
+  `akis-yurut` · `a3de13f` P0 `ajan-nobetci` (15 yer) · `04547a5` kayıt ·
+  `62e99b6` P1 kalan 16 yazım (13 işlev) · `69b8bde` P2 `agent_states` (25 yer) ·
+  `19be6fe` P2 `_shared/anlatim.ts` (3 yer, 35 işlev fan-out).
+- Doğrulama: `npm run test` **264/264** · tsc temiz · lint **2333**
+  (taban 2334'tü; `randevu-teklif`te bir `any` kaldırıldı)
 - **Açık blokaj: yok**
 - **REDEPLOY DURUMU (§11-B):**
-  - OK `taraf-kalem-cikar` — Lovable ajanı deploy etti (commit `53b33cc`).
-  - OK `dual-ai-validate` · `orchestrator-run` — deploy edildi (commit `37c8867`).
-  - OK `akis-yurut` — deploy edildi (commit `32fad07`). MCP çağrısı 300 sn'de
-    zaman aşımına uğradı ama iş tamamlandı; `list_messages` ile doğrulandı.
-  - OK `ajan-nobetci` · `orchestrator-run` — deploy edildi (commit `a3de13f`,
-    ikisi de onaylandı; `get_message` ile doğrulandı).
-  - **Bekleyen redeploy YOK.**
+  - OK `taraf-kalem-cikar` (`53b33cc`) · `dual-ai-validate` + `orchestrator-run`
+    (`37c8867`) · `akis-yurut` (`32fad07`) · `ajan-nobetci` + `orchestrator-run`
+    (`a3de13f`) · **13 işlev** (`62e99b6`) — hepsi Lovable ajanıyla deploy
+    edildi ve `get_message` ile doğrulandı.
+  - OK `69b8bde` · **14 işlev** (`agent_states` sürüsü) — deploy edildi ve
+    `get_message` ile doğrulandı.
+  - `19be6fe` · **`_shared/anlatim.ts` FAN-OUT** — 35 tüketici işlevin deploy'u
+    istendi (`umsg_01m0vnqsgze8nrytym1yn27ng9`), sonucu doğrulanacak.
 - Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9**.
-- Sıradaki uygulanabilir iş: **P2 · `agent_states` defter yazımları**
-  (yüksek hacim, büyük ölçüde en-iyi-çaba) ve **`_shared/**`** — ona dokunmak
-  **39 fonksiyon fan-out redeploy** demektir, ayrı tur olarak planlanmalı.
+- Sıradaki uygulanabilir iş: **kuyruk boş.** Sessiz yazım kusuru ağaç genelinde
+  (`_shared` dâhil) kapandı ve tarama testiyle kilitlendi. Yeni P0/P1 adayı
+  kodun gerçek durumundan çıkarılmalı.
+
+### KAPANDI — 25.08 · SESSİZ YAZIM KUYRUĞU TAMAMEN KAPANDI (56 YAZIM · 32 İŞLEV)
+Ortak kusur: `supabase-js` DB hatasını **fırlatmaz**, `{error}` döndürür —
+okunmayınca `try/catch` hiç çalışmaz. Kenar işlevleri gözetimsiz (cron/ajan)
+koştuğu için gören de olmaz.
+
+**TEK KAPI:** ağaç genelinde `^\s*await <istemci>.from(...)` deseni artık
+**SIFIR** ve bu, tezgâhtaki *KENAR TARAMASI* durumuyla kilitlendi — yeni yazılan
+bir sessiz yazım da kuyruğu kırar.
+
+**Bu turun ayırt edici bulgusu: KUYRUK DÖNGÜSÜ.** Kuyruklar `durum="bekliyor"` /
+`islendi_at is null` / `deadline_warning_sent=false` gibi alanlarla taranıyor.
+Kapanış damgası sessizce düşerse iş **başarıyla yapılmış** olur ama kuyrukta
+kalır ve **her turda yeniden koşar**. Ürün karşılığı bir log satırı değil:
+tarafa aynı e-posta tekrar tekrar gider.
+
+| işlev | sessiz kalırsa |
+|---|---|
+| `ajan-nobetci` (15 yer) | **En ağırı.** Ana yürütücünün kapanışı düşerse görev 'bekliyor' kalır → tarafa **aynı e-posta her nöbet turunda yeniden** gider, randevu yeniden teklif edilir, aşama yeniden ilerletilir. Ayrıca hatırlatma sayacı (taraf spam'i), bilirkişi sayımı (mükerrer `bilirkisi_taraf_yanitlari`), braket `islendi_at` (mükerrer taahhüt düşürme). |
+| `akis-yurut` (10 yer) | Talimat durumu düşerse talimat kuyrukta kalır: "uygulandi" düşerse **iş her turda tekrarlanır**; "deneme:1" düşerse **iki deneme sınırı hiç devreye girmez**. |
+| `taraf-kalem-cikar` | Kalem yazılamaz ama belge "işlendi" damgalanırsa mükerrer koşum kapısı o belgeyi bir daha **hiç** okumaz → kalemler **kalıcı kaybolur**. |
+| `dual-ai-validate` | Havuz yazımı düşer ama satır "approved" damgalanırsa metin havuza hiç girmeden **kalıcı kaybolur**, sayaç "onaylandı" der. |
+| `deadline-reminder-cron` | Sorgu `deadline_warning_sent=false` ile tarıyor: işaret düşerse **aynı yasal süre uyarısı her cron turunda** tarafa da arabulucuya da yeniden gider. |
+| `approve-pending-mevzuat` · `build-legal-knowledge` · `google-drive-import` | İdempotanlık **silmesi** düşer ve insert yine çalışırsa aynı kaynak bilgi tabanına **iki kez** girer ve arama sonuçlarını kalıcı çarpıtır. |
+| `bilirkisi-belge-baglantisi` · `bilirkisi-davet` | `expert_assignment_logs` denetim defteri; belge açma kaydı ayrıca bir **KVKK kaydıdır**. Düşerse erişimin hiçbir izi kalmaz. |
+| `bilirkisi-ekranim` (rapor teslimi) | Akış olayı düşerse ajan raporun geldiğini **hiç duymaz** — akış durur, rapor dosyada bekler. |
+| `classify-dispute` · `detect-legal-deadlines` | `cases` üzerindeki tür/süre alanları bu işlevlerin ÜRÜNÜ: düşerse işlev sonuç döndürür ama dosya alanı boş kalır ve süre nöbeti o dosyayı hiç görmez. |
+| `orchestrator-run` | "Atlandı" işareti düşerse panelde kart **boş** kalır. `allSettled` yalnız `[0]` okunuyordu; `rpc` de `{error}` döndürüp **fırlatmadığı** için "zincir durdu" bildirimi iz bırakmadan düşüyordu. |
+| `agent_states` defteri (14 işlev, 25 yer) | Dosyalardaki yorum "hata yutulur ve **yalnız konsola loglanır**" diyordu — ama catch hiç çalışmadığı için konsola da hiçbir şey düşmüyordu: **yazılan sözün kendisi tutulmuyordu.** Defter yazımı asıl işi hâlâ bozmaz, sadece susmaz. |
+
+**TEZGÂH:** `tests/kenar-sessiz-yazim.test.ts` — 8'den **20 duruma** çıktı.
+Her durum, ilgili dosyada çıplak yazım kalmadığını ve daha önce denetli olan
+yazımların bozulmadığını da doğruluyor.
+**KANITLANDI:** `KENAR_KOK=tests/gecici/kenar-kanit` kopyasında yeni durumların
+hepsi **DÜŞÜYOR**. `agent_states` sürüsü regex ile dönüştürüldüğü için ayrıca
+**esbuild sözdizimi kontrolünden** geçirildi (14/14 ayrıştı).
 
 ### KAPANDI — 25.08 · KENAR İŞLEVİ SESSİZ YAZIMLARI — KUYRUK TEMİZLENDİ
 Kuyrukta sayılan beş işlevin hepsi bitti. Ortak kusur: `supabase-js` DB hatasını
