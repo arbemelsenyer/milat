@@ -91,4 +91,18 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     expect(g, "alternatif görev kapatma sonucu okunmuyor").toContain("gorevErr");
     expect(g, "otomatik onay işareti sonucu okunmuyor").toContain("isaretErr");
   });
+
+  it("bilirkişi kararı: karar sonrası dört yazım da sessiz değil", () => {
+    // En agiri `expert_assignment_logs`: `ajan-nobetci` rapor gecikmesini TAM BU
+    // KAYITTAN okur; yazilamazsa 14/21 gunluk rapor nobeti o bilirkisi icin
+    // kalici olarak devre disi kalir.
+    const g = oku("bilirkisi-ekranim");
+    for (const im of ["atamaErr", "izErr", "olayErr", "gorevErr"]) {
+      expect(g, `${im} okunmuyor`).toContain(im);
+    }
+    expect(g, "eksikler çağırana bildirilmiyor").toMatch(/ok:\s*true,\s*durum:\s*yeniDurum,\s*uyarilar/);
+    // Kararin kendisini yazan ilk yazim eskiden beri denetli — bozulmamali.
+    expect(g).toMatch(/const\s*\{\s*error\s*\}\s*=\s*await\s+admin\.from\("bilirkisi_onerileri"\)/);
+    expect(g).toContain("Kaydedilemedi:");
+  });
 });

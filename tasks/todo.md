@@ -4,8 +4,8 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P2 · toplantı iptali + randevu teklifi sessiz yazımları**
-- Doğrulama: `npm run test` **250/250** · tsc temiz · lint **2334**
+- Son tamamlanan iş: **P1 · bilirkişi kararından sonraki dört sessiz yazım**
+- Doğrulama: `npm run test` **251/251** · tsc temiz · lint **2334**
 - **Açık blokaj: yok**
 - **REDEPLOY DURUMU (§11-B):**
   - ✅ `send-party-invite` · `revoke-party-invite` · `send-meeting-invite` —
@@ -15,13 +15,37 @@
   - ✅ `accept-party-invite` · `party-confidential-analysis` ·
     `extract-document-text` · `dosya-verilerini-sil` — Lovable ajanı deploy
     etti (commit `38ee346`, dördü de onaylandı).
-  - ⏳ `cancel-meeting-invite` · `randevu-teklif` — bu commit'ten sonra.
+  - ✅ `cancel-meeting-invite` · `randevu-teklif` — Lovable ajanı deploy etti
+    (commit `6654b15`, ikisi de onaylandı).
+  - ⏳ `bilirkisi-ekranim` — bu commit'ten sonra.
 - Açık HAT maddesi: **H-1** · **H-4** · **H-7** · **H-8** · **H-9**.
 - Sıradaki uygulanabilir iş: **P2 · kalan kenar işlevi sessiz yazımları.**
-  Öncelik: `taraf-kalem-cikar` · `bilirkisi-ekranim` · `bilirkisi-secim` ·
-  `ajan-nobetci` · `akis-yurut`. En sonda `agent_states` defter yazımları
+  Öncelik: `bilirkisi-secim` · `taraf-kalem-cikar` · `ajan-nobetci` ·
+  `akis-yurut`. En sonda `agent_states` defter yazımları
   (yüksek hacim, büyük ölçüde en-iyi-çaba) ve `_shared/**` — ona dokunmak
   **39 fonksiyon fan-out redeploy** demektir, ayrı tur olarak planlanmalı.
+
+### KAPANDI — 25.08 · P1 · BİLİRKİŞİ KARARINDAN SONRAKİ DÖRT SESSİZ YAZIM
+`bilirkisi-ekranim` — bilirkişinin kendi kabul/ret kararı (**insan kapısı**).
+Kararı `bilirkisi_onerileri`ne yazan ilk yazım **zaten denetliydi**; ardından
+gelen dört yazımın sonucu okunmuyordu ve kayıtsız şartsız `ok: true` dönülüyordu.
+Her birinin ayrı bir sessiz sonucu var:
+
+| yazım | sessiz kalırsa |
+|---|---|
+| `case_expert_assignments.status` | Arabulucunun ekranı **hâlâ "Onay Bekliyor"** gösterir; bilirkişi kabul etmiş sayılmaz. |
+| `expert_assignment_logs` (`expert_accepted`) | **En ağırı.** `ajan-nobetci` rapor gecikmesini **tam bu kayıttan** okur (`kabulZamani`; yoksa "kabul tarihi kaydı yok, gecikme sayılmadı" der ve atlar). Yazılamazsa **14/21 günlük rapor nöbeti o bilirkişi için kalıcı olarak devre dışı kalır** — kimse fark etmez. |
+| `akis_olaylari` | Ret hâlinde ajan sıradaki adaya **bu olayla** geçer; yazılamazsa akış durur. |
+| `ajan_gorevleri` | Arabulucu iş panosuna bildirim düşmez. |
+
+**Kapsam sınırı:** çağrı başarısız **sayılmıyor** — karar zaten kaydedildi ve
+yeniden deneme mükerrer satır üretir. Eksikler `uyarilar` dizisiyle açıkça
+dönüyor ve `console.error`a düşüyor.
+
+**TEZGÂH:** `tests/kenar-sessiz-yazim.test.ts` bir durumla genişletildi (toplam 7);
+kararın kendisini yazan ilk denetimin **bozulmadığı** da ayrıca doğrulanıyor.
+**KANITLANDI:** `KENAR_KOK=tests/gecici/kenar-kanit` kopyasında **7/7 DÜŞÜYOR**.
+- Doğrulama: **251/251** test · tsc temiz · lint 2334 (değişmedi).
 
 ### KAPANDI — 25.08 · P2 · TOPLANTI İPTALİ + RANDEVU TEKLİFİ SESSİZ YAZIMLARI
 | işlev | sessiz kalırsa |

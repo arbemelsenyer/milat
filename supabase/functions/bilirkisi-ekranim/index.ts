@@ -158,28 +158,53 @@ Deno.serve(async (req) => {
         .update({ durum: yeniDurum }).eq("id", gorev.id);
       if (error) return json({ error: `Kaydedilemedi: ${error.message}` }, 500);
 
-      await admin.from("case_expert_assignments")
+      /* 25.08.2026 — bilirkişinin kararı (insan kapısı) `bilirkisi_onerileri`ne
+         yazıldı ve o yazım denetleniyor. Ardından gelen DÖRT yazımın sonucu
+         okunmuyordu ve kayıtsız şartsız `ok: true` dönülüyordu. Her birinin ayrı
+         bir sessiz sonucu var, en ağırı ikincisi:
+           - `case_expert_assignments`: yazılamazsa arabulucunun ekranı hâlâ
+             "Onay Bekliyor" gösterir; bilirkişi kabul etmiş sayılmaz.
+           - `expert_assignment_logs` (`expert_accepted`): `ajan-nobetci` rapor
+             gecikmesini TAM BU KAYITTAN okur ("kabul tarihi kaydı yok, gecikme
+             sayılmadı"). Yazılamazsa 14/21 günlük rapor nöbeti o bilirkişi için
+             KALICI OLARAK devre dışı kalır.
+           - `akis_olaylari`: ret hâlinde ajan sıradaki adaya bu olayla geçer;
+             yazılamazsa akış durur.
+           - `ajan_gorevleri`: arabulucu iş panosuna bildirim düşmez.
+         Karar zaten kaydedildiği için çağrı başarısız SAYILMAZ (yeniden deneme
+         mükerrer satır üretir); eksikler `uyarilar` ile açıkça bildirilir. */
+      const uyarilar: string[] = [];
+      const { error: atamaErr } = await admin.from("case_expert_assignments")
         .update({ status: adim === "kabul" ? "approved" : "rejected" })
         .eq("case_id", case_id).eq("expert_id", expertId);
+      if (atamaErr) uyarilar.push(`atama durumu güncellenemedi (arabulucu ekranı eski durumu gösterir): ${atamaErr.message}`);
 
-      await admin.from("expert_assignment_logs").insert({
+      const { error: izErr } = await admin.from("expert_assignment_logs").insert({
         case_id, expert_id: expertId, actor_id: kullanici.id, actor_role: "expert",
         action: adim === "kabul" ? "expert_accepted" : "expert_rejected",
         details: { note: `Bilirkişi görevi ${adim === "kabul" ? "kabul etti" : "reddetti"}` },
       });
+      if (izErr) uyarilar.push(`kabul/ret izi yazılamadı (rapor gecikme nöbeti bu kayda dayanır): ${izErr.message}`);
 
       // Akış olayı: ret hâlinde ajan sıradaki adaya geçer, akış sürer.
-      await admin.from("akis_olaylari").insert({
+      const { error: olayErr } = await admin.from("akis_olaylari").insert({
         case_id, party_id: null, olay_kodu: "bilirkisi_durumu_degisti",
         veri: { adim: yeniDurum, alan: gorev.alan ?? null }, islendi: false,
       });
-      await admin.from("ajan_gorevleri").insert({
+      if (olayErr) uyarilar.push(`akış olayı yazılamadı (ret hâlinde sıradaki adaya geçilmez): ${olayErr.message}`);
+
+      const { error: gorevErr } = await admin.from("ajan_gorevleri").insert({
         case_id, gorev_tipi: "arabulucu_sorusu", durum: "bekliyor", hedef_party_id: null,
         gerekce: `[kaynak:sistem] [bilirkisi:${yeniDurum}] Bilirkişi görevi `
           + `${adim === "kabul" ? "kabul etti" : "reddetti"}.`
           + `${adim === "ret" ? " Sıradaki adaya geçebilirim." : " Evrak kümesini onaya alabilirsiniz."}`,
       });
-      return json({ ok: true, durum: yeniDurum });
+      if (gorevErr) uyarilar.push(`arabulucu iş panosuna bildirim yazılamadı: ${gorevErr.message}`);
+
+      if (uyarilar.length > 0) {
+        console.error("[bilirkisi-ekranim] karar sonrası eksikler", { case_id, expertId, uyarilar });
+      }
+      return json({ ok: true, durum: yeniDurum, uyarilar });
     }
 
     /* ── KABUL KAPISI: kabul edilmeden HİÇBİR belge açılmaz ── */
