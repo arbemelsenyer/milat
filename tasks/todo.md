@@ -4,7 +4,15 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
 - Aktif görev: yok
-- Son tamamlanan iş: **P3 · kullanılabilirlik (form kaybı + menü erişilebilir adı)**
+- Son tamamlanan iş: **P3 · kullanılabilirlik** — pilot kuyruğunun **Code'a ait
+  bütün maddeleri bitti**
+- **PİLOT KUYRUĞU DURUMU: 14 maddeden 9'u DONE, 5'i BLOCKED.** Açık (yapılabilir)
+  madde **YOK**. Beşinin de engeli karar ya da kurucu eylemi:
+  dördü **HAT H-15** (saklama süreleri · antet/şablon · üyelik-kota · kazanım
+  tanımı), biri gerçek telefonda deneme.
+- **Ayrıca kurucu eylemi bekleyen iki SQL** (Code yazdı, §10 gereği çalıştırmadı):
+  `tests/gecici/oturum-kayitlari-politika.sql` (sesli not hattı bu olmadan
+  canlıda çalışmaz) · `tests/gecici/saklama-suresi-politika.sql`
 - **SESSİZ ÇAĞRI KUSURU İSTEMCİ YÜZEYİNİN TAMAMINDA KAPANDI:** `.from` ·
   `.rpc` · `.storage` · `.functions.invoke` · iç `fetch`. Kenar (`_shared`
   dâhil) ve ön yüz. Kenarda çıplak `.from(...)`, `.rpc(...)` ve
@@ -52,7 +60,7 @@
   - OK `10a70e6` · `dosya-verilerini-sil` — deploy edildi ve `get_message` ile
     doğrulandı.
   - **BEKLEYEN REDEPLOY YOK.**
-- Açık HAT maddesi: **H-4** · **H-7** · **H-8** · **H-9** · **H-10** ·
+- Açık HAT maddesi: **H-15 (P1 · pilot kapısındaki son dört karar)** · **H-4** · **H-7** · **H-8** · **H-9** · **H-10** ·
   **H-11 (P0 · kabuk bekçisi devre dışı — kanıtlı)** · **H-12 (P1 · depoda
   birikmiş öksüz belgeler — kök neden kapandı, birikmiş borç kurucu kararı bekliyor)**.
   **H-1 KAPANDI** (25.08, `CRON_SECRET` yenilendi ve canlıda doğrulandı).
@@ -141,12 +149,12 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       sınanamıyor (mikrofon ve `LOVABLE_API_KEY` gerekiyor; anahtar §12 gereği
       okunmaz). Kurucudan **tek somut kontrol** isteniyor (aşağıda).
 
-- [ ] P1 · **Saklama süresi parametre tablosu + periyodik imha yok** · Kabul: saklama
+- [!] P1 · **Saklama süresi parametre tablosu + periyodik imha** · **BLOCKED → HAT H-15/1** (hukuki: süre değerleri) · Code göç metnini YAZDI, çalıştırmadı: `tests/gecici/saklama-suresi-politika.sql`. Tablo **değer olmadan** kuruluyor (`saklama_gun` NULL → imha kolu dokunmaz), karar gelmeden hiçbir şey silinmez. Kalan: · Kabul: saklama
       süreleri bir parametre tablosundan okunuyor (kodda sabit değil) ve süresi dolan
       kayıtlar periyodik olarak imha ediliyor; imha kayda geçiyor · **Bulgu:**
       `Auth.tsx`te imha **metni** var ama mekanizma yok; parametre tablosu yok;
       periyodik imha yalnız oturum kaydı için (24 saat) kurulu. constitution m.10.
-- [ ] P1 · **Arabulucunun kendi anteti / IBAN'ı / şablonu yok** · Kabul: arabulucu
+- [!] P1 · **Arabulucunun kendi anteti / şablonu** · **BLOCKED → HAT H-15/2** (ürün) · **IBAN ÇÖZÜLDÜ:** `profiles.iban`/`banka_adi` var ve ödeme bilgisi PDF'ine akıyor. Kalan **antet/logo** (profilde kolon yok) ve arabulucuya özel şablon (şablonlar admin tarafından genel yükleniyor). Önerim A: antet eklensin, şablon genel kalsın. Kalan: · Kabul: arabulucu
       kendi antetini, IBAN'ını ve belge şablonunu bir kez tanımlıyor; üretilen
       tutanak/anlaşma/fatura bu değerleri kullanıyor · **Bulgu:** `mediators`
       tablosunda antet/IBAN/şablon kolonu **yok** (var olanlar: photo_url, bio,
@@ -163,12 +171,12 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       İstemci `OfficialDocumentsPanel`de **pdf · docx · udf** üçünü de sunuyor;
       tüketici şablonu zincirde var.
 
-- [ ] P1 · **Üyelik / paket / kota modeli yok** · Kabul: paket tanımlı, kota sayılıyor,
+- [!] P1 · **Üyelik / paket / kota** · **BLOCKED → HAT H-15/3** (ticari) · Önerim: **pilotta kota YOK** (pilot 5–10 arabuluculu, 3 ay ücretsiz; kota pilot verisi olmadan yanlış kurulur). Bu seçilirse madde pilot kapısından düşer. Kalan: · Kabul: paket tanımlı, kota sayılıyor,
       kota dolunca ilgili işlem engelleniyor ve kullanıcıya sebebi gösteriliyor ·
       **Bulgu:** üyelik/paket/kota tablosu **yok**, kodda karşılığı yok
       ("subscription" eşleşmeleri Supabase auth dinleyicileri).
       **NOT:** ürün/fiyat kararı gerektirir — başlamadan önce HAT'a çıkarılmalı (§7.2).
-- [ ] P1 · **Kazanım sayacı yok** · Kabul: baz çizgi alınıyor ve dosya bazında kazanılan
+- [!] P1 · **Kazanım sayacı** · **BLOCKED → HAT H-15/4** (ürün: "kazanım" tanımı) · Tanım olmadan sayaç ya hiç yapılmaz ya da uydurma rakam üretir; ikincisi kabul edilemez (§15.1). Kalan: · Kabul: baz çizgi alınıyor ve dosya bazında kazanılan
       saat üretiliyor · **Bulgu:** tablo yok, kodda karşılığı yok ("baseline"
       eşleşmeleri CSS sınıf adları). **NOT:** "kazanım" tanımı ürün kararıdır.
 - [x] P2 · **Ödeme defteri "Kaydet" görünürlüğü** (§15.5-4) · **DONE 25.08.2026
@@ -221,7 +229,7 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       `DOC_SET_AGREED`/`FAILED` kümelerine değil, her zaman görünen ayrı bir
       kümeye (`DOC_SET_HER_ZAMAN`) kondu.
 
-- [ ] P2 · **Taraf akışı telefonda uçtan uca** · Kabul: gerçek telefonda davet →
+- [!] P2 · **Taraf akışı telefonda uçtan uca** · **BLOCKED — gerçek telefon gerekiyor (kurucu)** · Kalan: · Kabul: gerçek telefonda davet →
       başvuru → belge → Kör Teklif → ödeme bilgisi zinciri kesintisiz tamamlanıyor.
 - [x] P3 · **Kullanılabilirlik bulguları (03.08 saha notu)** · **DONE 25.08.2026**
       · Doğrulama: `tests/form-kaybi-erisilebilirlik.test.ts` (6 durum) · 313/313

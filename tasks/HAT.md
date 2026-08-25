@@ -229,6 +229,75 @@ yalnız aydınlatmadır. B/C'de rıza kaydı denetlenebilir biçimde tutulur.
 
 ---
 
+---
+
+### H-15 · 25.08.2026 · P1 — Pilot kapısındaki son dört karar
+**Sorun.** Pilot kuyruğunun 14 maddesinden **10'u kapandı**. Kalan beşin biri
+(taraf akışının telefonda denenmesi) kurucunun elinde; **dördü ise iş değil
+KARAR bekliyor.** Code bunları tek başına bitiremez: dördü de ürün/hukuk
+kararıdır (§7.1, §7.2). Karar geldiğinde uygulaması kısadır.
+
+---
+**1) Saklama süreleri (P1 · hukuki).** §15.2: "saklama süreleri **parametre
+tablosundan** okunuyor ve periyodik imha çalışıyor." Bugün süre **kodda
+sabit** ve yalnız oturum kaydı için var (24 saat); diğer türler için süre
+kavramı hiç yok — constitution m.10 açısından açık.
+
+Code tabloyu **yazdı, çalıştırmadı** (§10): `tests/gecici/saklama-suresi-politika.sql`.
+Tablo **değer olmadan** kuruluyor: `saklama_gun` NULL → imha kolu o türe
+**dokunmaz**, yani karar gelmeden hiçbir şey silinmez.
+
+Karar gereken: her tür için kaç gün, sayaç ne zaman başlar.
+| tür | önerim | gerekçe |
+|---|---|---|
+| `oturum_kaydi_ses` | 0 (anında) | Zaten öyle çalışıyor (H-14 şart 1) |
+| `oturum_kaydi_dokum` | dosya kapanışı + 1 yıl | Arabuluculuk dosyası saklama teamülü |
+| `case_documents` | dosya kapanışı + 1 yıl | Taraf belgeleri; itiraz süresi geçsin |
+| `case_notes` | dosya kapanışı + 1 yıl | Analiz zinciriyle birlikte |
+| `dosya_kapanis_sonrasi` | dosya kapanışı + 1 yıl | Anonim kapanış kaydı kalır |
+**Bu bir hukuk kararıdır** — önerim teamüle dayalıdır, hukuki görüş değildir.
+
+---
+**2) Arabulucunun anteti / şablonu (P1 · ürün).** §15.2: "kendi anteti/IBAN'ı/
+şablonuyla uçtan uca dosya yürütüyor."
+· **IBAN: ÇÖZÜLDÜ** — `profiles.iban`/`banka_adi` var ve ödeme bilgisi PDF'ine
+  `get_case_mediator_payment_info` ile akıyor.
+· **Antet/logo: YOK.** `profiles`ta logo ya da adres kolonu yok.
+· **Kendi şablonu: YOK.** Şablonlar admin tarafından **genel** yükleniyor
+  (`admin-upload-template`); arabulucuya özel şablon kavramı yok.
+
+| | ne yapılır | bedeli |
+|---|---|---|
+| **A** | Antet (logo + adres) profile eklenir; belgelerin başlığına basılır. Şablon **genel kalır** | Küçük: bir göç + belge motoruna iki alan. Pilot için yeter |
+| B | Ayrıca arabulucu başına şablon yükleme | Şablon sürüm yönetimi, doğrulama, çakışma — pilot öncesi büyük |
+| C | Bugünkü hâl | Belgeler antetsiz çıkar |
+**Önerim: A.** Pilotta arabulucunun kendi antetiyle belge üretmesi görünür bir
+ihtiyaç; kendi şablonunu yüklemesi değil.
+
+---
+**3) Üyelik / paket / kota (P1 · ticari).** Tablo yok, kod yok. Karar: hangi
+paketler, hangi kota (dosya sayısı? ajan koşumu?), kota dolunca ne olur (engelle
+mi, uyar mı). **Önerim: pilotta kota YOK** — pilot 5–10 arabuluculu ve 3 ay
+ücretsiz; kota mekanizması pilot verisi olmadan yanlış kurulur. Pilot sonrası
+gerçek kullanım rakamlarıyla tasarlanmalı. Bu seçilirse madde "pilot sonrası"
+diye işaretlenir ve pilot kapısından düşer.
+
+---
+**4) Kazanım sayacı (P1 · ürün).** §15.2: "baz çizgi alınıyor ve dosya bazında
+saat üretiyor." Tablo yok, kod yok. Karar: **"kazanım" nedir** — neyin baz
+çizgisi (arabulucunun elle yaptığı sürenin tahmini mi, dava süresi mi), saat
+nasıl sayılır. **Önerim:** dosya başına *ajanın ürettiği çıktıların elle
+hazırlanma süresi tahmini* (belge üretimi, analiz, föy) — sabit katsayılarla,
+kaynağı açıkça yazılarak. Uydurma rakam üretmemek için katsayılar görünür olmalı
+(§15.1 camdan kutu). Katsayıları kurucu verir.
+
+---
+**Kararın etkisi.** 1 karara bağlanmadan periyodik imha kurulamaz (m.10 açık
+kalır). 2/A seçilmezse belgeler antetsiz çıkar. 3'te "pilotta kota yok" denirse
+pilot kapısı bir madde kısalır. 4 tanımsız kalırsa sayaç ya hiç yapılmaz ya da
+uydurma rakam üretir — ikincisi kabul edilemez.
+
+
 ## COWORK → CODE
 
 _Cevaplar buraya yazılır. Biçim:_
