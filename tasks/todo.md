@@ -5,7 +5,15 @@
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
 - Aktif görev: **yok**
-- Son tamamlanan iş (26.08 · 15. blok): **`saklama-imha` P0 düzeltmesi** —
+- Son tamamlanan iş (26.08 · 15. blok): **öksüz dosya sınıfı süpürüldü** —
+  `saklama-imha` düzeltmesinden sonra bütün silme yüzeyleri tarandı. İki yerde
+  daha bulundu (`CaseRoom.deleteMyDoc` **canlıydı**, tarafın kendi belgesini
+  sildiği yüzey; `admin-delete-knowledge` **yarım düzeltilmişti** — H-12'deki 71
+  öksüzün kaynağı). Asıl bulgu üçüncüsü: **tezgâh adıyla kilitliyordu**, bu
+  yüzden `CaseRoom`u hiç görmedi; artık **tarıyor** ve sırayı kilitliyor.
+  Tezgâhın ısırdığı eski kodda kanıtlandı (satır 362 yakalandı). Canlı kanıt:
+  yayındaki yeni pakette (`index-b-1-kF-9.js`) `"Yarım silindi"` **bulundu**.
+- Bir önceki iş (26.08): **`saklama-imha` P0 düzeltmesi** —
   kol ilk kez koşmadan önce canlı parametrelerle denetlendi, **iki geri
   dönüşsüz kusur** bulundu ve kapatıldı: (1) `oturum_kayitlari` **satırı**
   siliniyordu — ses 0 gün olduğu için sorgu tüm satırları kapsıyordu, 7 gün
@@ -16,7 +24,7 @@
   **riskli olmadığını** gösterdi (etkilenen tablo 0 satır), cron'a dokunulmadı.
   Doğrulama: `npm run test` 354/354 · tsc temiz · publish yapıldı ve Lovable'ın
   depo kopyasında yeni kod **okundu**. Açık tek adım: kuru koşum → **HAT H-17**.
-- Bir önceki iş (26.08): **cron teşhisi kapandı.**
+- Daha önce (26.08): **cron teşhisi kapandı.**
   `cron.unschedule` yalan söylememiş — 25.08'de kaydı gerçekten kaldırmış.
   jobid 21'i geri kuran şey `tests/gecici/PILOT-KALAN-GOCLER.sql` **Bölüm 5**'in
   26.08 göç koşumunda yeniden çalışmasıdır (kanıt: jobid 21'in `job_run_details`te
@@ -63,8 +71,9 @@ kotasız çalışıyor. Gerekirse sonra koşulabilir, zararsızdır.
 - Doğrulama (26.08 · dur anında koşuldu): `npm run test` **345/345 (41 dosya)** ·
   `npx tsc --noEmit -p tsconfig.app.json` **temiz (çıkış 0)**.
 - **`main` ile `origin/main` eşit** — bekleyen push yok.
-- **Bekleyen redeploy yok** (§11-B): `saklama-imha` değişti ve publish
-  **yapıldı** (26.08); Lovable depo kopyasında yeni kod doğrulandı.
+- **Bekleyen redeploy yok** (§11-B). 26.08'de üç publish yapıldı:
+  `saklama-imha` (Lovable depo kopyasında yeni kod okundu) · `CaseRoom` (canlı
+  pakette `"Yarım silindi"` dizesi bulundu) · `admin-delete-knowledge`.
 - Açık HAT maddeleri: H-7 · H-8 · H-9 · H-10 · H-12 (P1 · birikmiş öksüz
   belgeler) · H-13 · **H-17 (P1 · `saklama-imha` kuru koşumu — tek komut,
   hiçbir şey silmez; komut metni `tests/gecici/saklama-imha-kuru-kosum.sql`)**.
@@ -72,6 +81,68 @@ kotasız çalışıyor. Gerekirse sonra koşulabilir, zararsızdır.
 - ~~**Sıradaki uygulanabilir iş (P1):** `cron.unschedule` neden yalan söyledi~~
   → **DONE 26.08** (aşağıdaki teşhis bloğu). Soru yanlış kurulmuştu: `unschedule`
   yalan söylemedi, kaydı **başka bir şey geri kurdu**. Kayda dokunulmadı.
+
+### KAPANDI — 26.08 · P1 · ÖKSÜZ DOSYA SINIFI: KALAN İKİ YÜZEY + TEZGÂHIN KENDİ DELİĞİ
+`saklama-imha` düzeltmesi aynı kusurun **ikinci** örneğiydi (ilki 25.08'de
+`dosya-verilerini-sil`). İki kez çıkan bir sınıf üçüncü kez de çıkar — bu yüzden
+**bütün silme yüzeyleri tarandı.** İki yerde daha bulundu, ve asıl bulgu
+üçüncüydü: **tezgâhın kendisi deliğe sahipti.**
+
+**BULGU 1 · `CaseRoom.tsx` → `deleteMyDoc` (canlıydı).**
+Satırı depodan **önce** siliyor, depo silmesi düşerse yalnız `console.warn`
+yazıyordu — kodun yorumu bunu "kullanıcıya yanlış 'silinemedi' gösterilmesin"
+diye **savunuyordu** bile. Sonuç: taraf "silindi" duyar, satır gider, dosya
+kovada kalır ve onu gösteren hiçbir kayıt kalmadığı için **hiçbir silme kolu —
+KVKK silme talebi dahil — bir daha bulamaz** (constitution m.10). Atlanan yüzey,
+tarafın **kendi** belgesini sildiği yüzeydi.
+→ Düzeltildi: önce depo, hata varsa **dur**; satır silmesi düşerse "Yarım
+silindi" denir, gizlenmez.
+
+**BULGU 2 · `admin-delete-knowledge` (yarım düzeltilmişti).**
+25.08'de depo silmesi eklenmiş ve hatası okunmuştu ama **sıra düzeltilmemişti**:
+satırlar hâlâ önce siliniyordu, dolayısıyla depo düştüğünde dosyayı gösteren
+`source_url` satırı zaten yok oluyor ve öksüz **yine doğuyordu.** H-12'de sayılan
+**71 karşılıksız `admin/…` dosyasının** kaynağı bu.
+→ Düzeltildi: önce depo, düşerse hiçbir kayıt silinmez. Ters sıranın bedeli
+kodda **yazıldı**: dosya gidip satır kalırsa kaynağı açılamayan bilgi parçaları
+kalır — görünür ve düzeltilebilir; öksüz kişisel veri ise görünmez ve
+düzeltilemez.
+
+**BULGU 3 (asıl olan) · TEZGÂH ADIYLA KİLİTLİYORDU.**
+`sessiz-yazim.test.ts` silme sırasını yalnız `MediationEngine.tsx`i **adıyla**
+denetliyordu; bu yüzden `CaseRoom` hiç görülmedi. `kenar-sessiz-yazim.test.ts`
+ise `admin-delete-knowledge`ta yalnız "hata okunuyor mu"ya bakıyordu — yani
+kusuru **önleyen özelliği (sıra)** değil, o gün yapılan değişikliği kilitlemişti.
+→ İkisi de düzeltildi: birincisi artık `case_documents` satırını silen **her**
+yüzeyi tarıyor ve sıra/duruş sağlanmıyorsa `dosya:satır` vererek düşüyor;
+ikincisi sırayı ve depo hatasında akışın durduğunu kilitliyor.
+
+**TEZGÂHIN GERÇEKTEN ISIRDIĞI KANITLANDI:** yeni tarama, düzeltme öncesi
+`CaseRoom.tsx` sürümüne uygulandı → **satır 362** yakalandı
+(`depoOnce=false, durduruyor=false`). Yeşil yanan bir tezgâhın işe yaradığı
+ancak eski kodda düştüğü görülerek bilinir.
+
+**Sınıf artık altı yüzeyde aynı:** `dosya-verilerini-sil` · `saklama-imha` ·
+`MediationEngine` (iki yer) · `CaseDocuments` · `CaseRoom` ·
+`admin-delete-knowledge`. Kural her yerde tek: **önce depo, sonra satır; depo
+düşerse satıra dokunma; yarım kalan hâli gizleme.**
+
+**Doğrulama.** `npm run test` **354/354 (41 dosya)** ·
+`npx tsc --noEmit -p tsconfig.app.json` temiz (çıkış 0) ·
+`node tests/gecici/sozdizim.mjs admin-delete-knowledge` → OK ·
+`eslint src/pages/CaseRoom.tsx` → **107 sorun önce, 107 sonra** (yeni sorun yok;
+hepsi önceden var olan `no-explicit-any`).
+
+**CANLI KANIT (§11-B · 25.08'in "canlı paket doğrulaması" dersi).**
+Publish yapıldı, yayındaki paket **indirildi** ve içinde arandı:
+yeni paket `assets/index-b-1-kF-9.js` → **`"Yarım silindi"` bulundu (1 kez)**.
+Yani `CaseRoom` düzeltmesi canlıda. (İlk kontrolde eski paket
+`index-CA912znU.js` dönmüştü ve dize yoktu — yayın inene kadar beklendi,
+"herhalde çıkmıştır" denmedi.)
+
+**Not — H-12 ile ilişkisi:** bu iş öksüz **üretimini** kapatır; canlıda
+**birikmiş** 71 + 6 + 2 öksüz duruyor ve onları silmek üretim verisi silmesidir
+(§7.3) — kararı H-12'de kurucuda, değişmedi.
 
 ### KAPANDI — 26.08 · **P0** · `saklama-imha`: İKİ GERİ DÖNÜŞSÜZ KUSUR (kol hiç koşmadan)
 Teşhis bloğu cron'un **hiç koşmadığını** gösterince sıradaki soru kendiliğinden

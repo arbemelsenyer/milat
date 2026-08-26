@@ -12,6 +12,30 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   yenidir. Yanlış kurulmuş bir soru, cevap bekleyen gerçek bir kapı gibi görünüp
   işi durdurur — en pahalı yanlış alarm türü budur.
 
+- DERS (26.08.2026) — **ADIYLA KİLİTLENEN TEZGÂH, YENİ YÜZEYİ HİÇ GÖRMEZ.**
+  25.08'de "öksüz belge" kusuru dört yüzeyde kapatıldı, ama tezgâh
+  (`sessiz-yazim.test.ts`) silme sırasını yalnız `MediationEngine.tsx`i **adıyla**
+  kilitliyordu. Sonuç: `CaseRoom.tsx` → `deleteMyDoc` taramada atlandı ve 26.08'e
+  kadar satırı depodan **önce** silmeye devam etti — üstelik depo hatası yalnız
+  `console.warn`du. Yani taraf "silindi" duyuyor, satır gidiyor, dosya kovada
+  kalıyor ve onu gösteren hiçbir kayıt olmadığı için **hiçbir silme kolu, KVKK
+  silme talebi dahil, bir daha bulamıyordu.** Üstelik atlanan yüzey, tarafın
+  **kendi** belgesini sildiği yüzeydi. **KURAL:** bir kusur sınıfı N yerde
+  görünebiliyorsa tezgâh **TARAR**, ad saymaz. Bir düzeltme turunda "üç yeri
+  düzelttim" diyorsan, tezgâh o üçünü değil **o deseni içeren her yeri**
+  bulmalıdır; aksi hâlde tezgâh yeşil yanarken kusur canlıda durur.
+
+- DERS (26.08.2026) — TEZGÂH **SEMPTOMU** DEĞİL, **GÜVENLİ KILAN ÖZELLİĞİ**
+  KİLİTLEMELİ. `admin-delete-knowledge` 25.08'de "düzeltildi": depo silmesi
+  eklendi, hatası okundu, tezgâh `depoErr` ve "öksüz dosya" dizelerini aradı ve
+  **geçti**. Ama sıra düzeltilmemişti — satırlar hâlâ önce siliniyordu, dolayısıyla
+  depo silmesi düştüğünde dosyayı gösteren `source_url` satırı zaten yok oluyordu
+  ve öksüz **yine doğuyordu**. Tezgâh, kusuru önleyen şeyi (SIRA) değil, o gün
+  yapılan değişikliği (hatanın okunması) kilitlemişti. **KURAL:** testi yazarken
+  "bu değişikliği mi kilitliyorum, yoksa kusuru imkânsız kılan özelliği mi?"
+  diye sor. Hatayı okumak öksüzü engellemez; **sıra** engeller. H-12'deki 71
+  karşılıksız `admin/…` dosyasının kaynağı bu yarım düzeltmedir.
+
 - DERS (26.08.2026) — "KALDIRDIM AMA DURUYOR" DEDİĞİN ŞEY KALDIRILMAMIŞ DEĞİL,
   **YENİDEN KURULMUŞ** OLABİLİR; SİLME ÇAĞRISINI SUÇLAMADAN ÖNCE KURMA
   ÇAĞRISININ NEREDE DURDUĞUNA BAK. 25.08'de `cron.unschedule` ile kaldırdığım
