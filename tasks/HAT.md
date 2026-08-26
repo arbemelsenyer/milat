@@ -197,6 +197,50 @@ verildiğinde tam komut metni bu maddeye eklenecek.
 
 ---
 
+### H-18 · 26.08.2026 · P1 — Oturum dökümü için "7 günlük UYAP payı" pratikte YOK
+**Sorun.** Bugün H-16'da şöyle dediniz: *"Otomatik süpürme 7 gün: arabulucunun
+tutanağı indirip UYAP'a yükleme payı."* `saklama_sureleri` de buna uyuyor:
+`oturum_kaydi_dokum = 7 gün · dosya_kapanisi`.
+
+Ama **başka bir kol daha aynı veriyi siliyor** ve o kol beklemiyor.
+`ajan-nobetci` → `kayitSilmeKollari`: *"Döküm: süreç bittiğinde (son tutanakla
+birlikte) silinir."* Dosya `agreed`/`failed` olur olmaz `dokum_metni` boşaltılıyor
+ve nöbetçi **3 dakikada bir** koşuyor. Yani oturum dökümü için 7 gün değil,
+**yaklaşık 3 dakika** var. `saklama-imha`nın 7 günlük kolu o satırlara vardığında
+`dokum_silindi_at` çoktan dolu olduğu için hiçbir şey yapmıyor — 7 gün **hiç
+yürürlüğe girmiyor.**
+
+Bu bir kod hatası değil: iki kol iki ayrı kararı uyguluyor. Eski karar (İBA 1.8 /
+B18: "döküm süreç sonuna kadar durur, süreç bitince silinir") nöbetçide;
+25–26.08 kararı ("7 gün pay") parametre tablosunda. **Hangisi geçerli, sizin
+kararınız** — ve nöbetçinin davranışını değiştirmek §13 gereği zaten size ait.
+
+**Not:** bu yalnız **oturum dökümünü** ilgilendirir. Resmî tutanak/belge ayrı
+üretilir ve bu koldan silinmez; ses zaten metne çevrilir çevrilmez siliniyor ve
+o doğru çalışıyor (denetlendi).
+
+**Seçenekler.**
+| | ne yapılır | sonucu |
+|---|---|---|
+| **A** | Nöbetçinin döküm kolu **7 günü bekler** (parametre tablosundan okur, kodda sabit tutmaz); silme tek kolda, `saklama-imha`da toplanır | Söylediğiniz "UYAP payı" gerçekten oluşur; saklama süresi tek yerden yönetilir |
+| B | Parametre 0 güne çekilir; nöbetçinin bugünkü davranışı **doğru** kabul edilir | Çelişki biter, ama döküm kapanışta anında gider — indirilmemişse gitmiştir |
+| C | Bugünkü hâl | Tabloda "7 gün" yazar, gerçekte ~3 dakikadır; kayıt gerçeği anlatmaz |
+
+**Önerim: A.** Sebebi ürün değil, sizin bugünkü gerekçeniz: pay **niye** kondu?
+Arabulucu tutanağı indirip UYAP'a yükleyebilsin diye. Kapanışta anında silinirse
+o pay hiç kullanılamaz — dosya kapandığı an arabulucu ekranı kapatmışsa döküm
+gitmiştir. A ayrıca saklama süresini **tek kaynağa** (parametre tablosu) bağlar;
+bugün iki kol iki ayrı kural uyguluyor ve bu tür ikilik bu hafta üç kez kusur
+üretti.
+
+**Kararın etkisi.** A seçilirse `ajan-nobetci`nin **runtime davranışı** değişir
+(§13) — Code kendiliğinden yapmaz, onayınızla yapar; kişisel veri **daha uzun**
+durur (kapanış + 7 gün), bu bir KVKK kararıdır. B seçilirse veri daha kısa durur
+ama "UYAP payı" sözü kayıttan çıkarılmalıdır. C seçilirse `saklama_sureleri`
+tablosu gerçeği anlatmayan bir değer taşımaya devam eder.
+
+---
+
 ### H-17 · 26.08.2026 · P1 — `saklama-imha` kuru koşumu (tek komut, HİÇBİR ŞEY SİLMEZ)
 **Ne gerekiyor.** `tests/gecici/saklama-imha-kuru-kosum.sql` dosyasındaki iki
 sorguyu Lovable SQL ile çalıştırıp cevabı buraya yapıştırmak. Gövde
