@@ -359,11 +359,20 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
       expect(g, `${ad}: bildirim sonucu okunmuyor`).toContain("bildirimErr");
       expect(g, `${ad}: hata kayda düşmüyor`).toContain("bildirim gönderilemedi");
     }
-    // Depo silmesi: kayit satirlari SILINDI; silme duserse dosya OKSUZ kalir ve
-    // hicbir silme kolu onu bir daha bulamaz (KVKK: suresiz saklama yasagi).
+    /* Depo silmesi ÖNCE gelmeli. Eskiden satırlar önce siliniyordu: depo
+       silmesi düştüğünde dosyayı gösteren `source_url` satırı artık yoktu ve
+       dosya ÖKSÜZ kalıyordu — hiçbir silme kolu onu bir daha bulamaz (KVKK:
+       süresiz saklama yasağı). Tezgâh yalnız "hata okunuyor mu"yu değil,
+       SIRAYI da kilitler; okumak tek başına öksüzü engellemiyordu. */
     const d = oku("admin-delete-knowledge");
     expect(d, "depoErr okunmuyor").toContain("depoErr");
     expect(d).toContain("öksüz dosya");
+    const depoIdx = d.indexOf('storage.from("case-documents").remove(');
+    const satirIdx = d.indexOf('from("knowledge_base_chunks").delete(');
+    expect(depoIdx, "depo silmesi yok").toBeGreaterThan(-1);
+    expect(satirIdx, "satır silmesi yok").toBeGreaterThan(-1);
+    expect(depoIdx, "satır depodan ÖNCE siliniyor — öksüz dosya üretir").toBeLessThan(satirIdx);
+    expect(d, "depo düşerse akış durmuyor").toMatch(/depoErr[\s\S]{0,400}?return json\(/);
     /* `fetch` de HTTP hatasında REDDETMEZ: ateşle-unut iç çağrıda yalnız
        `.catch` varsa sunucunun 500'ü hiçbir yere düşmez. Yorumun sözü
        "hata loglanır" ancak `res.ok` denetlenirse tutulur. */

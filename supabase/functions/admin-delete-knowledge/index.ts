@@ -40,27 +40,42 @@ Deno.serve(async (req) => {
     const source_title: string | undefined = body.source_title;
     if (!source_url && !source_title) return json({ error: "source_url veya source_title gerekli" }, 400);
 
-    let q = admin.from("knowledge_base_chunks").delete({ count: "exact" });
-    if (source_url) q = q.eq("source_url", source_url);
-    else if (source_title) q = q.eq("source_title", source_title);
-    const { error, count } = await q;
-    if (error) return json({ error: error.message }, 500);
+    /* ÖNCE DEPO, SONRA SATIR (26.08.2026 — sıra düzeltildi).
+       Eskiden satırlar önce siliniyor, depo sonra temizleniyordu. Depo silmesi
+       düştüğünde dosyayı gösteren `source_url` satırı ARTIK YOKTU: dosya depoda
+       ÖKSÜZ kalıyor ve ne bu kol ne başka bir silme kolu onu bir daha
+       bulabiliyordu (KVKK: süresiz saklama yasağı, constitution m.10).
+       H-12'de sayılan 71 karşılıksız `admin/…` dosyasının kaynağı bu sıradır.
+       `storage.remove` hata FIRLATMAZ, `{error}` döndürür — okunmadan geçilmez.
 
-    /* Depo temizliği: kayıt satırları SİLİNDİ. Bu silme sessizce düşerse dosya
-       depoda ÖKSÜZ kalır — artık hiçbir kayıt onu göstermediği için ne bu kol
-       ne de başka bir silme kolu onu bir daha bulabilir (KVKK: süresiz saklama).
-       `storage.remove` da hata FIRLATMAZ, `{error}` döndürür. */
-    let depoUyarisi: string | null = null;
+       Ters sıranın bedeli bilinerek kabul edildi: dosya silinip satır silmesi
+       düşerse geriye kaynağı açılamayan bilgi parçaları kalır. Bu görünür ve
+       düzeltilebilir bir arızadır; öksüz kişisel veri ise görünmez ve
+       düzeltilemez. Aynı kural `dosya-verilerini-sil`, `saklama-imha`,
+       `MediationEngine`, `CaseDocuments` ve `CaseRoom` yüzeylerinde de geçerli. */
     if (source_url && source_url.startsWith("storage://case-documents/")) {
       const path = source_url.replace("storage://case-documents/", "");
       const { error: depoErr } = await admin.storage.from("case-documents").remove([path]);
       if (depoErr) {
         console.error(`[admin-delete-knowledge] depo dosyası silinemedi (${path}): ${depoErr.message}`);
-        depoUyarisi = `Kayıtlar silindi ama depodaki dosya silinemedi (öksüz dosya): ${depoErr.message}`;
+        return json({
+          error: `Depodaki dosya silinemedi; öksüz dosya bırakmamak için hiçbir kayıt silinmedi: ${depoErr.message}`,
+        }, 500);
       }
     }
 
-    return json({ ok: true, deleted: count ?? 0, ...(depoUyarisi ? { uyari: depoUyarisi } : {}) });
+    let q = admin.from("knowledge_base_chunks").delete({ count: "exact" });
+    if (source_url) q = q.eq("source_url", source_url);
+    else if (source_title) q = q.eq("source_title", source_title);
+    const { error, count } = await q;
+    if (error) {
+      // Yarım kalan hâli GİZLEME: dosya gitti, parçalar duruyor.
+      return json({
+        error: `Depodaki dosya silindi ama kayıtlar silinemedi, yeniden deneyin: ${error.message}`,
+      }, 500);
+    }
+
+    return json({ ok: true, deleted: count ?? 0 });
   } catch (e: any) {
     console.error("admin-delete-knowledge error", e);
     return json({ error: e.message ?? "Sunucu hatası" }, 500);
