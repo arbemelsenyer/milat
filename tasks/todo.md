@@ -1,6 +1,8 @@
 ## Nerede kaldık
 
-- Tarih: 26.08.2026 (14. blok · **ikinci `dur`**) — kurucu komutuyla kapatıldı
+- Tarih: 26.08.2026 (**15. blok** · `medipact devam`) — H-16 cevabı işlendi,
+  sonra üç iş kendiliğinden çıkarıldı ve bitirildi (§6). Kuyrukta uygulanabilir
+  iş kalmadı; açık her madde kurucu/Cowork kararına bağlı.
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
