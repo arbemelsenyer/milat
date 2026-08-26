@@ -229,6 +229,25 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       **düzenleme rozeti** ve toast katmanıydı, uygulamanın kendi içeriği değil.
       · **Kalan:** gerçek telefonda zincirin tamamı — davet → başvuru → belge →
       Kör Teklif → ödeme bilgisi. Yalnız katılım adımı doğrulandı.
+      · **TELEFON DENEME LİSTESİ (26.08 · kurucu için, ~3 dakika).** Madde
+      "bekliyor" değil **koşulmaya hazır** durumda; sıra yalnız cihazda.
+      Bağlantıyı arabulucu ekranından al: dosya → *Taraflar* → taraf satırındaki
+      **katılım bağlantısını kopyala**, telefona gönder, telefonda aç.
+
+      | # | ne yapılır | beklenen |
+      |---|---|---|
+      | 1 | Bağlantı telefonda açılır | Aydınlatma metni açılır kapanır; üç düğme tam genişlikte, yatay kaydırma **yok** |
+      | 2 | **Katılıyorum** | Başvuru formuna geçilir; klavye açıkken alanlar görünür kalır |
+      | 3 | Bir belge yüklenir (fotoğraf da olur) | Yükleme biter, belge listede görünür |
+      | 4 | **Kör Teklif** adımı | Teklif girilir; karşı tarafın teklifi **görünmez** |
+      | 5 | Ödeme bilgisi ekranı | IBAN ve tutar okunabilir; metin kesilmiyor |
+
+      **Hangi telefon olursa olsun** (iOS/Android fark etmez) — aranan şey
+      cihaza özel hata değil, **gerçek viewport'ta** akışın kırılıp kırılmadığı.
+      · **Bir adım kırılırsa:** ekran görüntüsü + hangi adım (yukarıdaki numara)
+      yeter; Code kök nedeni oradan bulur.
+      · **Beşi de geçerse** madde DONE işaretlenir ve **pilot kuyruğu 14/14 kapanır.**
+
 
 - [x] P3 · **Kullanılabilirlik bulguları (03.08 saha notu)** · **DONE 25.08.2026 —
       CANLI KANITLI** · §15.1 beş şart da sağlanıyor
