@@ -1,11 +1,13 @@
 ## Nerede kaldık
 
-- Tarih: 26.08.2026 (14. blok) — **`medipact dur` ile kapatıldı (kurucu komutu)**
+- Tarih: 26.08.2026 (14. blok · **ikinci `dur`**) — kurucu komutuyla kapatıldı
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
 - Aktif görev: **yok** (`dur` ile kapatıldı, yeni işe geçilmedi)
-- Son tamamlanan iş: **P1 · pilot kuyruğunun kalan üç göçü canlıda çalıştırıldı**
+- Son tamamlanan iş: **H-16 cevabı işlendi** — yanlış kurulmuş blokaj kaldırıldı,
+  `todo.md`/`HAT.md`deki iki yanlış kayıt (7 gün çelişkisi · "cron kaldırıldı")
+  gerçeğe göre düzeltildi, iki ders yazıldı, H-16 ARŞİV'e taşındı.
 - **PİLOT KUYRUĞU: 13/14 DONE · 1 BLOCKED.**
   Kalan tek madde: **taraf akışının gerçek telefonda uçtan uca denenmesi** —
   kurucu eylemi, Code tarafında yapılacak iş **yok**.
@@ -27,24 +29,52 @@ tamamlandılar.
 H-15/3 kararıyla madde pilot kapısından düştü; `/admin` tüketim ekranı zaten
 kotasız çalışıyor. Gerekirse sonra koşulabilir, zararsızdır.
 
-- **AÇIK BLOKAJ (P0 · HAT H-16): saklama süresi değerleri kararla çelişiyor.**
-  `saklama_sureleri` tablosundaki değerler **7 gün**; kurucunun H-15/1 kararı
-  **1825 gün / mali kayıt 3650 gün** diyor. Periyodik imha cron'u bu yüzden
-  **bilerek kurulmamış durumdadır** (aşağıdaki KIL PAYI bloğu). Karar gelene
-  kadar ne değerlere ne cron'a dokunulur.
+- **AÇIK BLOKAJ: yok.** H-16 cevaplandı ve kapandı (26.08) — **çelişki yoktu,
+  soru yanlış kurulmuştu.** 1825/3650 rakamları H-15/1'in *eski* metnindendir;
+  25.08'de "SIFIR SAKLAMA" cevabıyla yürürlükten kaldırılmış, ben o bloğu
+  atlamışım. **7 gün kasıtlıdır** ve değişmeyecek: süreç bitince dosyaya ait her
+  şey silinir, mali kayıt dahil — makbuz Medipact'ten kesilmiyor, ürün yalnız
+  ücret hesabı üretiyor, dolayısıyla mevzuat gereği saklanacak mali kayıt burada
+  **oluşmuyor**. 7 gün, arabulucunun tutanağı indirip UYAP'a yükleme payıdır.
+  Kuru koşumdaki 5 satır da gerçek veri değildi: beşi de 16–18.07 tarihli
+  **deneme dosyası** (MP-2026-1009 · 1011 · 1012 · 1013 · 1014).
+- **DÜZELTME (kurucu canlı sorguladı): cron KALDIRILMAMIŞ.**
+  `select jobid, jobname, schedule, active from cron.job` →
+  **jobid 21 · `saklama-imha-gunluk` · `0 3 * * *` · active = true.**
+  Yani 25.08'de yazdığım "`cron.unschedule`, doğrulandı: 0 kayıt" ifadesi
+  **yanlıştır**; kayıt duruyor ve etkin. Kurucu talimatı: **dokunma, öyle kalsın**
+  (değerler doğru olduğuna göre imha kolunun koşması istenen davranıştır).
 - Doğrulama (26.08 · dur anında koşuldu): `npm run test` **345/345 (41 dosya)** ·
   `npx tsc --noEmit -p tsconfig.app.json` **temiz (çıkış 0)**.
 - **`main` ile `origin/main` eşit** — bekleyen push yok.
 - **Bekleyen redeploy yok** (§11-B) — bu blokta yalnız SQL ve `.md` değişti.
-- Açık HAT maddeleri: **H-16 (P0 · saklama değerleri çelişkisi — YENİ)** ·
-  H-7 · H-8 · H-9 · H-10 · H-12 (P1 · birikmiş öksüz belgeler) · H-13.
-  **H-15 KAPANDI** (dört kararın dördü de uygulandı, ARŞİV'e taşındı).
-- **Sıradaki uygulanabilir iş:** H-16 cevabı geldiğinde — değerler düzeltilirse
-  `saklama-imha-gunluk` cron'u yeniden kurulur (önce **kuru koşum**, sonra
-  `cron.schedule`). Cevap yoksa kuyrukta ondan bağımsız iş kalmadığı için yeni
-  P0/P1 adayı kodun gerçek durumundan çıkarılır (§6).
+- Açık HAT maddeleri: H-7 · H-8 · H-9 · H-10 · H-12 (P1 · birikmiş öksüz
+  belgeler) · H-13. **H-15 ve H-16 KAPANDI** (ikisi de ARŞİV'de).
+- **Sıradaki uygulanabilir iş (P1, kurucu talimatı):** `cron.unschedule`
+  çağrısının neden başarılı görünüp kaydı kaldırmadığını araştır — bu, bu hafta
+  avlanan **sessiz yazım** sınıfının aynısı olabilir (dönüş değeri okunmamış).
+  Bulguyu `tasks/lessons.md`ye yaz. Kayda **dokunma**, yalnız teşhis.
 
-### DUR KAYDI — 26.08.2026 · `medipact dur`
+### DUR KAYDI — 26.08.2026 (2) · `medipact dur`
+Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
+
+- **Bu turda yalnız kayıt düzeltildi, kod değişmedi.** `tasks/todo.md` ·
+  `tasks/HAT.md` · `tasks/lessons.md`. Deploy gerekmez (§11-B: yalnız `.md`).
+- **H-16 KAPANDI.** Açık blokaj kalmadı; P0 yok.
+- **Ağaç durumu — SKILL.md bilmecesi çözüldü:**
+  `.agents/skills/medipact-calisma-duzeni/SKILL.md` silinmiş görünüyor **ama
+  kaybolmamış**: içeriği bayt bayt aynı olarak
+  `.github/.agents/skills/medipact-calisma-duzeni/SKILL.md`de duruyor
+  (`git show HEAD:<eski>` ile karşılaştırıldı → fark yok). Yani bu bir **taşıma**.
+  Yabancı değişiklik olduğu için §11 gereği **dokunulmadı**; commit'lenmesi
+  kurucunun kararıdır, ama silme riski **yoktur**.
+- İzlenmeyen (değişmedi): `.github/.agents/` · `devam.sh` · `gs.sh` ·
+  `Yeni XLSX Worksheet.xlsx` · `repomix-output.xml`.
+- **Sıradaki oturumun ilk işi:** `tasks/HAT.md` → `## COWORK → CODE` oku
+  (şu an boş, tüm cevaplar işlendi). Sonra P1 teşhis: `cron.unschedule` neden
+  yalan söyledi.
+
+### DUR KAYDI — 26.08.2026 (1) · `medipact dur`
 Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
 
 - **Ağaç durumu (commit edilmemiş, bu oturuma ait DEĞİL — §11 gereği dokunulmadı):**
@@ -55,9 +85,11 @@ Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
     `Yeni XLSX Worksheet.xlsx` · `repomix-output.xml`
     (`repomix-output.xml` 25.08'de sır taramasından geçmişti: gerçek jeton yok.)
 - **Sıradaki oturumun ilk işi:** önce `tasks/HAT.md` → `## COWORK → CODE` oku.
-  Ayrıca **tek sorguyla cron'un gerçekten kaldırıldığını teyit et:**
-  `select count(*) from cron.job where jobname='saklama-imha-gunluk'` → **0**
-  olmalı. H-16 cevabı gelmeden yeniden kurulmaz.
+  ~~cron'un kaldırıldığını teyit et → 0 olmalı~~ — **bu talimat geçersizdir.**
+  Kurucu canlıda sorguladı: kayıt **duruyor** (jobid 21, active = true) ve
+  **öyle kalacak**. Değerler doğru olduğu için imha kolunun koşması istenen
+  davranıştır; teyit sorgusu değil, `unschedule`ın neden yalan söylediğinin
+  teşhisi gerekiyor.
 
 ### DUR KAYDI — 25.08.2026 · `medipact dur`
 Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
@@ -387,7 +419,7 @@ düzeltildi — 23.08'de `guard-shell.sh`ta öğrenilen kuralın aynısı. Kası
 ihlal (`RTCPeerConnection` eklenmiş kopya) ile tezgâhın gerçekten yakaladığı
 doğrulandı.
 
-### ⚠ 26.08 · KIL PAYI — SAKLAMA SÜRELERİ 7 GÜNE DÜŞMÜŞ, CRON KALDIRILDI
+### ⚠ 26.08 · YANLIŞ ALARM — 7 GÜN KASITLIYMIŞ, CRON DA KALDIRILAMAMIŞ
 
 **Ne oldu.** Antet ve baz çizgi göçleri çalıştırıldı (aşağıda), ardından
 periyodik imha için cron kaydı kuruldu. **Kuru koşum** (`{"kuru": true}`)
@@ -406,11 +438,19 @@ H-15/1 kararı ve o cevaptaki doğrulama dökümü **1825 gün (5 yıl)**, mali 
 16.07.2026) ve bunların **4 ödeme kaydı** vardı. Cron 03:00'te koşsaydı
 **mali kayıtlar silinecekti** — kurucunun 10 yıl saklanacak dediği veri.
 
-**Yapılan:** cron kaydı **derhal kaldırıldı** (`cron.unschedule`, doğrulandı: 0
-kayıt). **Değerlere DOKUNULMADI** — onlar kurucunun verisidir; kısa süreler
-bilerek konmuş bir deneme de olabilir. Karar kurucunundur:
-· değerler 1825/3650'ye döndürülecekse cron yeniden kurulabilir,
-· 7 gün bilinçli bir denemeyse cron **deneme bitene kadar kurulmamalıdır**.
+**Yapılan:** `cron.unschedule` çağrıldı ve "0 kayıt" diye kaydedildi.
+**Değerlere DOKUNULMADI.**
+
+> **⛔ 26.08 · BU BLOĞUN İKİ İDDİASI DA YANLIŞ ÇIKTI — H-16 cevabı.**
+> **(a) Tehlike yoktu.** 7 gün **kasıtlıdır**; 1825/3650 rakamları H-15/1'in
+> 25.08'de yürürlükten kaldırılmış eski metnindendir, ben o düzeltme bloğunu
+> atlamışım. Mali kayıt da bilerek silinir — makbuz Medipact'ten kesilmiyor.
+> Kuru koşumun gösterdiği 5 satır da gerçek veri değil, beşi de deneme dosyası.
+> **(b) Cron kaldırılmadı.** Kurucu canlıda sorguladı: jobid 21 ·
+> `saklama-imha-gunluk` · `0 3 * * *` · **active = true**. `cron.unschedule`
+> başarılı göründü ama kaydı kaldırmadı; dönüş değerinin okunmamış olması
+> muhtemel — bu hafta avlanan **sessiz yazım** sınıfının aynısı.
+> Kayıt **duruyor ve öyle kalacak** (kurucu talimatı). Kalan iş yalnız teşhis.
 
 **Ders:** kuru koşum olmasaydı bu kayıp sessizce gerçekleşirdi. Bir silme kolunu
 programlamadan önce kuru koşum **zorunludur** — kolun kendisi doğru çalışıyordu,

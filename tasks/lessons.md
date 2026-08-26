@@ -1,6 +1,28 @@
 # tasks/lessons.md — Öğrenilen Dersler
 Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
 
+- DERS (26.08.2026) — HAT'ta BİR MADDEYİ *EN ALTTAKİ* CEVABIYLA OKUMA; ÖNCE
+  "CEVAP DEĞİŞTİ" BLOĞU VAR MI BAK. H-16'yı "değerler kararla çelişiyor" diye
+  **P0 blokaj** olarak açtım ve saklama süresi işini bir gün durdurdum. Çelişki
+  yoktu: dayandığım 1825/3650 rakamları H-15/1'in **25.08'de yürürlükten
+  kaldırılmış** metnindendi, geçerli karar ("SIFIR SAKLAMA") hemen onun üstündeki
+  blokta duruyordu ve ben o bloğu atlamıştım. Kural: bir karara atıf yapmadan
+  önce `tasks/HAT.md`de o `H-<n>` için **birden fazla cevap bloğu** olup
+  olmadığını kontrol et; ⛔/"CEVAP DEĞİŞTİ" işaretli olan **eskidir**, üstteki
+  yenidir. Yanlış kurulmuş bir soru, cevap bekleyen gerçek bir kapı gibi görünüp
+  işi durdurur — en pahalı yanlış alarm türü budur.
+
+- DERS (26.08.2026) — SESSİZ YAZIM SINIFI **SQL FONKSİYON ÇAĞRILARINI DA**
+  KAPSIYOR; `cron.unschedule` başarılı göründü ama kaydı kaldırmadı.
+  25.08'de kaldırdığımı yazdığım `saklama-imha-gunluk` işi canlıda **duruyordu**
+  (jobid 21 · `0 3 * * *` · active = true); bunu kurucu sorgulayınca öğrendik.
+  `cron.unschedule` **boolean döndürür** ve dönüşü okumadan "kaldırıldı,
+  doğrulandı: 0 kayıt" yazmışım — `supabase-js`in hata fırlatmaması dersinin
+  Postgres tarafındaki eşi. Kural: bir kaldırma/silme çağrısından sonra **ayrı
+  bir SELECT ile** yokluğu kanıtla; çağrının kendi dönüşü kanıt değildir, hele
+  hiç okunmadıysa. Durum dosyasına "doğrulandı" kelimesi ancak o SELECT'in
+  çıktısı elde varken yazılır.
+
 - DERS (25.08.2026) — `supabase-js` HATA FIRLATMAZ; `try/catch` BURADA KORUMA
   DEĞİLDİR. `try { await supabase.from(x).insert(...) } catch { console.error }`
   kalıbı bir şeyi korumaz: yazım başarısız olduğunda catch **hiç çalışmaz**,
