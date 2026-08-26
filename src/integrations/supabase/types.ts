@@ -4239,8 +4239,11 @@ export type Database = {
       }
       profiles: {
         Row: {
+          antet_logo_url: string | null
           avatar_url: string | null
           banka_adi: string | null
+          buro_adi: string | null
+          buro_adresi: string | null
           created_at: string
           email: string | null
           full_name: string | null
@@ -4253,8 +4256,11 @@ export type Database = {
           vkn_tckn: string | null
         }
         Insert: {
+          antet_logo_url?: string | null
           avatar_url?: string | null
           banka_adi?: string | null
+          buro_adi?: string | null
+          buro_adresi?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
@@ -4267,8 +4273,11 @@ export type Database = {
           vkn_tckn?: string | null
         }
         Update: {
+          antet_logo_url?: string | null
           avatar_url?: string | null
           banka_adi?: string | null
+          buro_adi?: string | null
+          buro_adresi?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
