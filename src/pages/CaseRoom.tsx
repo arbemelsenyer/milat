@@ -354,20 +354,40 @@ export default function CaseRoom() {
     }
   }
 
-  // Önce DB satırı silinir (mevcut DELETE politikası yeterli); storage'dan kaldırma
-  // başarısız olsa bile liste güncellenir — kullanıcıya yanlış "silinemedi" gösterilmez.
+  /* ÖNCE DEPO, SONRA SATIR (26.08.2026 · H-12 öksüz belge sınıfı).
+     Eskiden ters sıradaydı ve depo silmesi düşerse yalnız `console.warn`
+     yazılıyordu: satır gidiyor, taraf "silindi" duyuyor, dosya kovada KALIYOR
+     ve artık onu gösteren hiçbir kayıt olmadığı için hiçbir silme kolu — KVKK
+     silme talebi dahil — onu bir daha BULAMIYOR (constitution m.10, süresiz
+     saklama yasağı). Canlıda bu sınıftan 6 öksüz dosya bulunmuştu.
+     Aynı düzeltme 25.08'de `dosya-verilerini-sil`, `MediationEngine` ve
+     `CaseDocuments` yüzeylerinde yapıldı; burası o taramada atlanmıştı ve
+     tarafın KENDİ belgesini sildiği yüzey burasıdır.
+     Sıra kritik: depo silmesi doğrulanmadan satıra dokunulmaz — ters sırada
+     dosyayı gösteren indeks yok olur ve veri erişilemez biçimde KALIR. */
   async function deleteMyDoc(d: DocRow) {
     setDocBusy(d.id);
     try {
+      const { error: depoErr } = await supabase.storage.from("case-documents").remove([d.file_path]);
+      if (depoErr) {
+        toast({ title: "Silinemedi", description: depoHataMetni(depoErr), variant: "destructive" });
+        return;
+      }
       const { error } = await supabase.from("case_documents").delete().eq("id", d.id);
-      if (error) throw error;
-      const { error: rmErr } = await supabase.storage.from("case-documents").remove([d.file_path]);
-      if (rmErr) console.warn("[case-documents] storage'dan kaldırılamadı", rmErr.message);
+      if (error) {
+        // Yarım kalan hâli GİZLEME: dosya gitti, satır duruyor; indirme kırılır.
+        toast({
+          title: "Yarım silindi",
+          description: `Dosya silindi ama kaydı kaldırılamadı, yeniden deneyin: ${error.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
       toast({ title: "Belge silindi" });
-      await loadAll();
     } catch (e: any) {
       toast({ title: "Silinemedi", description: e?.message ?? "Bilinmeyen hata", variant: "destructive" });
     } finally {
+      await loadAll();
       setDocBusy(null);
       setDeleteDocTarget(null);
     }

@@ -23,8 +23,8 @@ import { join } from "node:path";
 const KOK = (process.env.SESSIZ_KOK ?? "").replace(/\/+$/, "");
 const y = (goreli: string) => (KOK ? `${KOK}/${goreli}` : goreli);
 
-/** Sonucu hiç kontrol edilmeyen yazımlar — `dosya:satır` kümesi. */
-function kontrolsuzYazimlar(kok: string): string[] {
+/** Kök altındaki tüm kaynak dosyaları (üretilen `integrations` hariç). */
+function kaynakDosyalari(kok: string): string[] {
   const dosyalar: string[] = [];
   (function tara(d: string) {
     for (const ad of readdirSync(d)) {
@@ -33,6 +33,12 @@ function kontrolsuzYazimlar(kok: string): string[] {
       else if (/\.tsx?$/.test(ad) && !p.includes("integrations")) dosyalar.push(p);
     }
   })(kok);
+  return dosyalar;
+}
+
+/** Sonucu hiç kontrol edilmeyen yazımlar — `dosya:satır` kümesi. */
+function kontrolsuzYazimlar(kok: string): string[] {
+  const dosyalar = kaynakDosyalari(kok);
 
   const bulgular: string[] = [];
   for (const f of dosyalar) {
@@ -166,15 +172,37 @@ describe("sessiz yutulan veritabanı yazımı eklenmiyor", () => {
         .map(({ i }) => `${d}:${i + 1}`);
       expect(ciplak, `sonucu okunmayan çağrı: ${ciplak.join(", ")}`).toEqual([]);
     }
-    // Canli yuzeyde silme sirasi: depo once, dogrulanmadan satir silinmez.
-    const m = readFileSync(y("src/pages/MediationEngine.tsx"), "utf-8");
-    const i = m.indexOf("async function deleteDoc");
-    expect(i, "deleteDoc bulunamadı").toBeGreaterThan(-1);
-    const govde = m.slice(i, i + 900);
-    expect(govde, "depo silmesinin sonucu okunmuyor").toContain("depoErr");
-    expect(govde.indexOf("depoErr"), "satır silmesi depo kontrolünden ÖNCE")
-      .toBeLessThan(govde.indexOf('from("case_documents").delete'));
+    /* SİLME SIRASI — TEK YÜZEY DEĞİL, HEPSİ TARANIR.
+       Bu denetim eskiden yalnız `MediationEngine.tsx`i adıyla kilitliyordu;
+       tam bu yüzden `CaseRoom.tsx` → `deleteMyDoc` 25.08 taramasında ATLANDI ve
+       26.08'e kadar satırı depodan ÖNCE silmeye devam etti (depo hatası yalnız
+       `console.warn`du). Adı sabit bir tezgâh, yeni yüzeyi hiç görmez —
+       bu yüzden artık `case_documents` satırını silen HER yer taranır. */
+    const belgeSilenler = kaynakDosyalari(y("src"))
+      .filter((d) => /from\(['"]case_documents['"]\)\s*\.delete\(/.test(readFileSync(d, "utf-8")));
+    expect(belgeSilenler.length, "belge silen yüzey bulunamadı — tarama bozuk").toBeGreaterThan(0);
+    const oksuzUretenler: string[] = [];
+    for (const d of belgeSilenler) {
+      const g = readFileSync(d, "utf-8");
+      const kalip = /from\(['"]case_documents['"]\)\s*\.delete\(/g;
+      let e: RegExpExecArray | null;
+      while ((e = kalip.exec(g)) !== null) {
+        // Satir silmesinden ONCE gelen depo temizligi ayni islevde olmali.
+        const once = g.slice(Math.max(0, e.index - 1500), e.index);
+        const depoVar = /storage\.from\(['"]case-documents['"]\)\s*\.remove\(/.test(once);
+        // Depo hatasi sessiz gecilmemeli: hata okunup AKIS DURMALI.
+        const durduruyor = /depoErr[\s\S]{0,200}?return;/.test(once);
+        if (!depoVar || !durduruyor) {
+          oksuzUretenler.push(`${d}:${g.slice(0, e.index).split("\n").length}`);
+        }
+      }
+    }
+    expect(
+      oksuzUretenler,
+      `satır depodan ÖNCE siliniyor ya da depo hatası akışı durdurmuyor — ÖKSÜZ DOSYA üretir: ${oksuzUretenler.join(", ")}`,
+    ).toEqual([]);
     // Geri alma yollari da kayda duser.
+    const m = readFileSync(y("src/pages/MediationEngine.tsx"), "utf-8");
     expect(m).toContain("öksüz dosya");
   });
 
