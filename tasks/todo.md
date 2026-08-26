@@ -5,7 +5,18 @@
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
 - Aktif görev: **yok**
-- Son tamamlanan iş (26.08 · 15. blok): **cron teşhisi kapandı.**
+- Son tamamlanan iş (26.08 · 15. blok): **`saklama-imha` P0 düzeltmesi** —
+  kol ilk kez koşmadan önce canlı parametrelerle denetlendi, **iki geri
+  dönüşsüz kusur** bulundu ve kapatıldı: (1) `oturum_kayitlari` **satırı**
+  siliniyordu — ses 0 gün olduğu için sorgu tüm satırları kapsıyordu, 7 gün
+  saklanacak dökümler ve KVKK silme damgaları da giderdi; artık satır değil
+  **kolon** boşaltılıyor, damga yazılıyor, ses için depo da temizleniyor.
+  (2) `case_documents` silinirken **depoya dokunulmuyordu** (H-12 öksüz belge
+  kusurunun aynısı); artık önce depo, sonra satır. Canlı ölçüm ilk koşumun
+  **riskli olmadığını** gösterdi (etkilenen tablo 0 satır), cron'a dokunulmadı.
+  Doğrulama: `npm run test` 354/354 · tsc temiz · publish yapıldı ve Lovable'ın
+  depo kopyasında yeni kod **okundu**. Açık tek adım: kuru koşum → **HAT H-17**.
+- Bir önceki iş (26.08): **cron teşhisi kapandı.**
   `cron.unschedule` yalan söylememiş — 25.08'de kaydı gerçekten kaldırmış.
   jobid 21'i geri kuran şey `tests/gecici/PILOT-KALAN-GOCLER.sql` **Bölüm 5**'in
   26.08 göç koşumunda yeniden çalışmasıdır (kanıt: jobid 21'in `job_run_details`te
@@ -52,12 +63,84 @@ kotasız çalışıyor. Gerekirse sonra koşulabilir, zararsızdır.
 - Doğrulama (26.08 · dur anında koşuldu): `npm run test` **345/345 (41 dosya)** ·
   `npx tsc --noEmit -p tsconfig.app.json` **temiz (çıkış 0)**.
 - **`main` ile `origin/main` eşit** — bekleyen push yok.
-- **Bekleyen redeploy yok** (§11-B) — bu blokta yalnız SQL ve `.md` değişti.
+- **Bekleyen redeploy yok** (§11-B): `saklama-imha` değişti ve publish
+  **yapıldı** (26.08); Lovable depo kopyasında yeni kod doğrulandı.
 - Açık HAT maddeleri: H-7 · H-8 · H-9 · H-10 · H-12 (P1 · birikmiş öksüz
-  belgeler) · H-13. **H-15 ve H-16 KAPANDI** (ikisi de ARŞİV'de).
+  belgeler) · H-13 · **H-17 (P1 · `saklama-imha` kuru koşumu — tek komut,
+  hiçbir şey silmez; komut metni `tests/gecici/saklama-imha-kuru-kosum.sql`)**.
+  **H-15 ve H-16 KAPANDI** (ikisi de ARŞİV'de).
 - ~~**Sıradaki uygulanabilir iş (P1):** `cron.unschedule` neden yalan söyledi~~
   → **DONE 26.08** (aşağıdaki teşhis bloğu). Soru yanlış kurulmuştu: `unschedule`
   yalan söylemedi, kaydı **başka bir şey geri kurdu**. Kayda dokunulmadı.
+
+### KAPANDI — 26.08 · **P0** · `saklama-imha`: İKİ GERİ DÖNÜŞSÜZ KUSUR (kol hiç koşmadan)
+Teşhis bloğu cron'un **hiç koşmadığını** gösterince sıradaki soru kendiliğinden
+çıktı: *o zaman ilk koşumda ne olacak?* Kol koşmadan önce **canlı
+parametrelerle** denetlendi ve iki kusur bulundu. İkisi de aynı sınıftan:
+**silme kolu, sildiği şeyin izini yanlış bırakıyor.**
+
+**KUSUR 1 · `oturum_kayitlari` satırı siliniyordu.**
+O tabloda ses ve döküm **aynı satırda, ayrı kolonlarda** durur
+(`ses_dosya_yolu` · `dokum_metni`) ve ayrı silme damgaları vardır
+(`ses_silindi_at` · `dokum_silindi_at`). Canlı parametre
+`oturum_kaydi_ses = 0 gün · olusturma` olduğu için üretilen sorgu şuydu:
+
+```
+delete from oturum_kayitlari where created_at < now()
+```
+
+Yani **dosya kapalı olsun olmasın TÜM satırlar**: 7 gün saklanacak dökümler ve
+KVKK'ya karşı "sildik" demeyi kanıtlayan damgalar da giderdi. Süren bir
+arabuluculuğun o gün tutulmuş oturum notu da dahil — `dosya_kapanisi` freni bu
+türde yok, çünkü başlangıcı `olusturma`.
+
+**Düzeltme:** satır silinmez, **kolon boşaltılır**; damga ve gerekçe yazılır
+(`ajan-nobetci` → `kayitSilmeKollari` deseninin aynısı). Ses için ayrıca
+**depodaki dosya** silinir, sonra damga yazılır (ters sıra: kayıt "silindi" der,
+ses kovada kalır).
+
+**KUSUR 2 · `case_documents` satırı silinirken depoya dokunulmuyordu.**
+25.08'de `dosya-verilerini-sil` kolunda kapatılan **öksüz belge** kusurunun
+birebir aynısı (HAT H-12: canlıda 6 öksüz). Satır gidince dosyayı gösteren kayıt
+kalmaz → hiçbir silme kolu onu bir daha bulamaz → constitution m.10 ihlali.
+**Düzeltme:** ÖNCE depo, SONRA satır; depo silinemezse satıra **dokunulmaz**.
+
+**Ayrıca:** tür başına 500 sınırına dayanıldığında sessiz kırpma yerine uyarı.
+
+**CANLI KANIT (salt okuma) — ilk koşum RİSKLİ DEĞİL, cron'a dokunulmadı:**
+
+| ölçüm | sonuç |
+|---|---|
+| `oturum_kayitlari` toplam satır | **0** |
+| süresi dolmuş kapalı dosyaya ait `case_documents` | **0** |
+| silinecek `case_notes` | 1 |
+| silinecek `case_payments` | 4 |
+
+Yani iki kusurun **bugün ısıracağı veri yok**; ilk koşumda silinecek 5 satır
+16–18.07 tarihli **deneme dosyalarına** aittir (MP-2026-1009 · 1011 · 1012 ·
+1013 · 1014) ve silinmeleri **istenen davranıştır**. Tehlike pilotta **ilk
+gerçek oturum kaydı tutulduğu an** başlardı: o kayıt aynı gece 03:00'te yok
+olurdu. Bu yüzden cron kapatılmadı, **kol düzeltildi**.
+
+**Doğrulama.** `npm run test` **354/354 (41 dosya)** — `tests/saklama-imha.test.ts`
+9 → **18** test; yeni kilitler: oturum kolunda `.delete(` **yok**, `.update(`
+**var** · özel kol genel silmeden **önce** geliyor · her iki kovada `remove(`
+çağrısı var · belge deposu satırdan **önce** temizleniyor · depo düşerse satıra
+dokunulmuyor · kova adları `ajan-nobetci` ve `dosya-verilerini-sil` ile **aynı**
+(sürüklenme kilidi) · sınıra dayanınca uyarı.
+`npx tsc --noEmit -p tsconfig.app.json` temiz (çıkış 0).
+`node tests/gecici/sozdizim.mjs saklama-imha` → OK.
+
+**Dağıtım (§11-B).** `supabase/functions/saklama-imha/**` değişti → publish
+yapıldı (`deploy_project`, 26.08). **Kanıt:** Lovable'ın depo kopyası
+`read_file` ile okundu, **yeni kod orada** — GitHub senkronu ve yayın indi.
+
+**Açık kalan tek adım → HAT H-17 (Cowork).** Kuru koşum (`{"kuru": true}`)
+`x-cron-secret` istiyor; sır Vault'ta, Code sır okumaz/SQL çalıştırmaz (§10).
+Komut metni **yazıldı**: `tests/gecici/saklama-imha-kuru-kosum.sql`. Beklenen:
+`case_notes → 1` · `odeme_kayitlari → 4` · gerisi temiz/atlandı ·
+`toplam_silinen: 0`. Kuru koşum yapılmasa da cron **27.08 03:00 UTC**'de koşar
+ve sonucu `cron.job_run_details`e düşer; kuru koşum onu **önceden** görmek için.
 
 ### KAPANDI — 26.08 · P1 · TEŞHİS: CRON'U KALDIRAN DEĞİL, **GERİ KURAN** VAR
 Kurucu talimatıyla açılan tek iş: "`cron.unschedule` neden başarılı görünüp

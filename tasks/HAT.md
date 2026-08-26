@@ -197,6 +197,30 @@ verildiğinde tam komut metni bu maddeye eklenecek.
 
 ---
 
+### H-17 · 26.08.2026 · P1 — `saklama-imha` kuru koşumu (tek komut, HİÇBİR ŞEY SİLMEZ)
+**Ne gerekiyor.** `tests/gecici/saklama-imha-kuru-kosum.sql` dosyasındaki iki
+sorguyu Lovable SQL ile çalıştırıp cevabı buraya yapıştırmak. Gövde
+`{"kuru": true}` — kol yalnız **sayar**, silmez.
+
+**Neden Code yapamıyor.** Kol `x-cron-secret` istiyor; sır Vault'ta ve Code sır
+okumaz/SQL çalıştırmaz (§10, §12). Sorgu sırrı düz metne dökmez, Vault'tan okur.
+
+**Neden şimdi.** Kolun davranışı bugün **değişti** (satır silme → kolon boşaltma
++ depo temizliği; iki P0 kusur düzeltildi, commit'te ayrıntısı var). Cron
+**27.08 03:00**'te ilk kez gerçekten koşacak. 25.08 dersi: bir silme kolu
+koşmadan önce kuru koşum zorunludur.
+
+**Beklenen.** `case_notes → 1` · `odeme_kayitlari → 4` · geri kalan hepsi
+"temiz"/"atlandı" · `toplam_silinen: 0`. Bu beş satır 16–18.07 tarihli **deneme
+dosyalarına** aittir; silinmeleri istenen davranıştır.
+
+**Kararın etkisi.** Beklenen sayılar çıkarsa yapılacak bir şey yok, cron kendi
+koşar. **Farklı ya da daha büyük** bir sayı çıkarsa cron koşmadan önce haber
+verin — Code kök nedeni bulur. Kuru koşum hiç yapılmazsa kol yarın canlı veriye
+ilk kez **doğrulanmamış** olarak dokunur.
+
+---
+
 ### H-13 · 25.08.2026 · P2 — Taraf katılımı açık rıza ile KAPILANSIN mı?
 **Sorun.** Bugün mimari §15.2'nin "aydınlatma metni taraf kayıt ekranında
 gösteriliyor" şartı sağlandı: `/katilim/:token` sayfasında KVKK aydınlatması ve
