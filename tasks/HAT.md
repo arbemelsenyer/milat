@@ -258,6 +258,21 @@ koşmadan önce kuru koşum zorunludur.
 "temiz"/"atlandı" · `toplam_silinen: 0`. Bu beş satır 16–18.07 tarihli **deneme
 dosyalarına** aittir; silinmeleri istenen davranıştır.
 
+**AYRICA — bu koşum hangi sürümün dağıtıldığını da gösterir.** `saklama-imha`
+26.08'de değişti ve publish yapıldı, ama §11-B'nin kendi kuralı "GitHub senkronu
+edge function'ı otomatik deploy ETMEZ" diyor; ön yüz yayınının fonksiyonu da
+yenileyip yenilemediğini **doğrulayamadım** (kolu çağırmak sır istiyor). Cevabın
+biçimi bunu tek başına söyler:
+
+| `oturum_kaydi_ses` satırı | ne demek |
+|---|---|
+| `{"durum":"temiz","silinen":0}` | **YENİ kod dağıtılmış** — düzeltme canlıda |
+| `{"durum":"kuru","silinecek":0}` | **ESKİ kod duruyor** — fonksiyon yeniden dağıtılmalı |
+
+İkincisi çıkarsa haber verin: kol eski hâliyle koşarsa `oturum_kayitlari`
+**satırlarını** siler. Bugün o tablo boş olduğu için zarar yok, ama pilotta ilk
+oturum kaydı tutulduktan sonra tehlikelidir.
+
 **Kararın etkisi.** Beklenen sayılar çıkarsa yapılacak bir şey yok, cron kendi
 koşar. **Farklı ya da daha büyük** bir sayı çıkarsa cron koşmadan önce haber
 verin — Code kök nedeni bulur. Kuru koşum hiç yapılmazsa kol yarın canlı veriye
