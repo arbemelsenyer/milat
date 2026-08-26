@@ -324,6 +324,59 @@ Seçim: A / B / C / (kendi metniniz)
 Not: (varsa)
 ```
 
+### H-17 · CEVAP · 26.08.2026 — KURU KOŞUM ÇALIŞTIRILDI, BEKLENENLE UYUŞUYOR
+Cowork `tests/gecici/saklama-imha-kuru-kosum.sql`'i canlıda çalıştırdı
+(Lovable MCP · istek no 11402). **HTTP 200.** Cevabın tamamı:
+
+```
+{"ok":true,"kuru":true,"toplam_silinen":0,"sonuc":[
+ {"tur":"oturum_kaydi_ses","durum":"kuru","silinecek":0},
+ {"tur":"oturum_kaydi_dokum","durum":"kuru","silinecek":0},
+ {"tur":"case_documents","durum":"kuru","silinecek":0},
+ {"tur":"case_notes","durum":"kuru","silinecek":1},
+ {"tur":"dosya_kapanis_sonrasi","durum":"atlandı","sebep":"bu tür başka bir kolun işi (dosya-verilerini-sil)"},
+ {"tur":"odeme_kayitlari","durum":"kuru","silinecek":4},
+ {"tur":"onay_kayitlari","durum":"atlandı","sebep":"süre girilmemiş"},
+ {"tur":"anonim_kapanis_istatistigi","durum":"atlandı","sebep":"süre girilmemiş"}
+]}
+```
+
+**Sayılar beklediğinin aynısı:** `case_notes 1` · `odeme_kayitlari 4` ·
+diğer hepsi 0 · `toplam_silinen 0` · `uyarilar` alanı YOK.
+
+**TEK FARK (kusur değil, not):** beklenen dökümde `oturum_kaydi_ses`,
+`oturum_kaydi_dokum` ve `case_documents` için `"temiz"` öngörülmüştü; canlı cevap
+`"kuru", silinecek: 0` döndürdü. Sayı aynı, yalnız durum etiketi farklı —
+`"temiz"` yolu ancak süresi dolmuş kapalı dosya HİÇ yokken yazılıyor. Beklenti
+metnini düzeltmek yeter.
+
+**Dağıtım sorusu (senin doğrulayamadığın kısım):** cevabın biçimi 26.08
+düzeltmesinin canlıda olduğunu gösteriyor — `dosya_kapanis_sonrasi` için
+"bu tür başka bir kolun işi" gerekçesi yeni sürümün imzasıdır. Bunu kanıt say.
+
+**SONUÇ: yarın 03:00 UTC koşumu güvenli.** Silinecek 5 satır 16–18.07 tarihli
+DENEME dosyalarına ait (MP-2026-1011 · MP-2026-1014); Cowork bunu `cases`
+tablosundan ayrıca doğruladı, gerçek dosya yok. Cron'a dokunulmayacak.
+
+### H-18 · CEVAP · 26.08.2026 — TEK KURAL: 7 GÜN. NÖBETÇİ KAPANIŞTA SİLMEYECEK.
+Seçim: **`saklama-imha` haklı, `ajan-nobetci` düzeltilecek.**
+
+Gerekçe kurucunun kendi cümlesidir: 7 gün **UYAP payıdır** — arabulucu imzalı
+tutanağı indirip UYAP'a yükleyecek kadar zamanı olsun diye kondu. Dökümü
+kapanıştan ~3 dakika sonra silen bir kol o payı fiilen sıfırlar; kararı
+uygulamış olmaz, deler.
+
+**Uygulanacak:**
+- `ajan-nobetci`nin dosya kapanışında döküm silen kolu **kaldırılacak** (ya da
+  yalnız `saklama_sureleri`ne bakacak hâle getirilecek). Kapanış anında silme yok.
+- Silmenin tek yetkilisi `saklama-imha`dır: kapanış + 7 gün, ya da arabulucu
+  **"Dosyayı kapat ve tüm verileri sil"** derse anında.
+- **İSTİSNA DEĞİŞMEDİ:** ham ses metne çevrilir çevrilmez silinmeye devam eder
+  (H-14 şart 1). Bu 7 güne tabi değildir.
+- Genel kural: bir veri türünün kaç gün tutulacağına **tek yerden** karar verilir
+  (`saklama_sureleri`); başka hiçbir kol kendi süresini kendi taşımaz. Bunu
+  `tasks/lessons.md`ye yaz — bugün iki kol iki ayrı kararı uyguluyordu.
+
 ### H-15/1 · CEVAP DEĞİŞTİ · 25.08.2026 — SIFIR SAKLAMA
 **Bu blok, aşağıdaki "TEK ÇATI 5 YIL" kararının YERİNE GEÇER. 5 yıl artık geçersizdir.**
 
