@@ -86,7 +86,13 @@ kotasız çalışıyor. Gerekirse sonra koşulabilir, zararsızdır.
 - Doğrulama (26.08 · dur anında koşuldu): `npm run test` **345/345 (41 dosya)** ·
   `npx tsc --noEmit -p tsconfig.app.json` **temiz (çıkış 0)**.
 - **`main` ile `origin/main` eşit** — bekleyen push yok.
-- **Bekleyen redeploy yok** (§11-B). 26.08'de üç publish yapıldı:
+- **YAYIN DURUMU (§11-B) — bir tanesi henüz inmedi.**
+  Antet değişikliği (`Profile.tsx`) **push edildi ve publish çağrıldı**, ama
+  ~15 dakika sonra canlı paket hâlâ `index-b-1-kF-9.js` ve içinde
+  `"Büro Antedi"` **yok** — yayın kuyrukta. Bir sonraki oturumun ilk işi bunu
+  doğrulamak: canlı paketi indir, dizeyi ara; yoksa `deploy_project` tekrar
+  çağır. "Herhalde çıkmıştır" **denmeyecek** (25.08 dersi).
+  Önceki üç publish **doğrulandı**:
   `saklama-imha` (Lovable depo kopyasında yeni kod okundu) · `CaseRoom` (canlı
   pakette `"Yarım silindi"` dizesi bulundu) · `admin-delete-knowledge`.
 - Açık HAT maddeleri: H-7 · H-8 · H-9 · H-10 · H-12 (P1 · birikmiş öksüz
