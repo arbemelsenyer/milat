@@ -5,7 +5,16 @@
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
 - Aktif görev: **yok**
-- Son tamamlanan iş (26.08 · 15. blok): **öksüz dosya sınıfı süpürüldü** —
+- Son tamamlanan iş (26.08 · 15. blok): **antet gerçekten doldurulabilir oldu.**
+  Bu blokta DONE işaretlediğim antet maddesi **yanlış DONE'du**: göç kolonları
+  ekledi, belge üreticisi okuyordu, ama alanları **yazan hiçbir yüzey yoktu** —
+  arabulucu büro adını hiçbir yerden giremiyordu, her belge antetsiz basılıyordu.
+  `Profile.tsx`e yalnız arabuluculara görünen "Büro Antedi" bölümü eklendi
+  (ad · adres · logo), uzantı kapısı kovanın **canlıdan okunan** politikasına
+  hizalandı (SVG tuzağı), bayat `types.ts` canlı şemayla eşitlendi ve
+  `tests/antet.test.ts` yazıldı — antedin hiç tezgâhı yoktu, yanlış DONE'u bu
+  mümkün kılmıştı.
+- Bir önceki iş (26.08): **öksüz dosya sınıfı süpürüldü** —
   `saklama-imha` düzeltmesinden sonra bütün silme yüzeyleri tarandı. İki yerde
   daha bulundu (`CaseRoom.deleteMyDoc` **canlıydı**, tarafın kendi belgesini
   sildiği yüzey; `admin-delete-knowledge` **yarım düzeltilmişti** — H-12'deki 71
@@ -13,7 +22,7 @@
   yüzden `CaseRoom`u hiç görmedi; artık **tarıyor** ve sırayı kilitliyor.
   Tezgâhın ısırdığı eski kodda kanıtlandı (satır 362 yakalandı). Canlı kanıt:
   yayındaki yeni pakette (`index-b-1-kF-9.js`) `"Yarım silindi"` **bulundu**.
-- Bir önceki iş (26.08): **`saklama-imha` P0 düzeltmesi** —
+- Daha önce (26.08): **`saklama-imha` P0 düzeltmesi** —
   kol ilk kez koşmadan önce canlı parametrelerle denetlendi, **iki geri
   dönüşsüz kusur** bulundu ve kapatıldı: (1) `oturum_kayitlari` **satırı**
   siliniyordu — ses 0 gün olduğu için sorgu tüm satırları kapsıyordu, 7 gün
@@ -34,6 +43,10 @@
 - **PİLOT KUYRUĞU: 13/14 DONE · 1 BLOCKED.**
   Kalan tek madde: **taraf akışının gerçek telefonda uçtan uca denenmesi** —
   kurucu eylemi, Code tarafında yapılacak iş **yok**.
+- **KURUCU İÇİN İKİ KISA KONTROL (ikisi de oturum gerektiriyor, Code yapamaz):**
+  1. Arabulucu hesabıyla `/profile` → **Büro Antedi**: ad + adres gir, kaydet;
+     sonra bir tutanak üret — antet ve "düzenlenme yeri" dolu gelmeli. (~1 dk)
+  2. Telefon deneme listesi (aşağıdaki BLOCKED madde). (~3 dk)
 
 ### 26.08'de canlıda çalıştırılan göçler (hepsi eklemeli, veri silmiyor)
 
@@ -81,6 +94,53 @@ kotasız çalışıyor. Gerekirse sonra koşulabilir, zararsızdır.
 - ~~**Sıradaki uygulanabilir iş (P1):** `cron.unschedule` neden yalan söyledi~~
   → **DONE 26.08** (aşağıdaki teşhis bloğu). Soru yanlış kurulmuştu: `unschedule`
   yalan söylemedi, kaydı **başka bir şey geri kurdu**. Kayda dokunulmadı.
+
+### KAPANDI — 26.08 · P1 · ANTET "DONE" İŞARETLİYDİ AMA **DOLDURULAMIYORDU**
+Bu maddeyi bu blokta **ben** DONE işaretlemiştim ve yanlıştı.
+
+**Ne yazmıştım:** *"göç koştuğu an ek kod gerekmeden tamamlandılar"* — kolonlar
+gelince belge üreticisi antedi kendiliğinden basacaktı. **Okuma yarısı için
+doğruydu.** Ama antedi **yazan** yüzey hiç yoktu: `Profile.tsx` yalnız
+`full_name` ve `phone` güncelliyordu, `buro_adi` · `buro_adresi` ·
+`antet_logo_url` alanlarını dolduran **tek bir yer bile** yoktu. Yani arabulucu
+büro adını hiçbir yerden giremiyordu ve **her resmî belge antetsiz basılıyordu.**
+Göç koştu, üretici okudu, kabul kriteri "kolon sayısı = 3" ile doğrulandı — üçü
+de doğruydu ve ürün yine çalışmıyordu.
+
+**Neden kimse görmedi:** antedi denetleyen **hiçbir tezgâh yoktu**. Kabul
+kriterim şemayı ölçüyordu, davranışı değil.
+
+**Yapılan.** `Profile.tsx`e **yalnız arabuluculara görünen** "Büro Antedi"
+bölümü eklendi: büro adı · büro adresi (belgede "düzenlenme yeri" olarak da
+kullanılıyor) · logo yükleme/kaldırma. Taraf bu bölümü ne görür ne yazar; antet
+yazımı `isMediator` kapısının arkasındadır. Yükleme ve profil yazımının
+sonuçları okunuyor (25.08 sessiz yazım dersi).
+
+**Uzantı kapısı tahmin edilmedi.** `avatars` kovasının INSERT/UPDATE politikası
+canlıdan okundu: yalnız `jpg · jpeg · png · gif · webp`. İstemci aynı beşe
+daraltıldı — aksi hâlde **tipik logo biçimi olan SVG** istemciden geçer,
+sunucuda RLS'e takılır ve kullanıcıya anlamsız bir depo hatası dönerdi.
+Yeni kova açılmadı (SQL gerektirirdi, §10); logo taraf verisi değildir.
+
+**`types.ts` bayattı.** Göç 26.08'de koştu ama üretilen tip dosyası
+güncellenmemişti; alanları yazan ilk kod `TS2353` ile düştü. Üç kolon **canlı
+şemadan doğrulanarak** eklendi (üçü de `text`, hepsi nullable). Bu bir yama
+değil: bir sonraki tip üretimi aynı sonucu verir.
+
+**Tezgâh: `tests/antet.test.ts` (yeni, 5 test).** Kilitlenen şey: üç alanı
+**yazan** yüzey var · üç alanı **okuyan** üretici duruyor · antet `isMediator`
+kapısının arkasında · yazım sonuçları okunuyor · `types.ts` canlı şemayla
+uyumlu. **Kural olarak yazıldı:** bir alanı OKUYAN kol kadar YAZAN yüzey de
+kilitlenir; yalnız okuma denetlenirse veri hiç girilemese bile tezgâh yeşil yanar.
+
+**Doğrulama.** `npm run test` **359/359 (42 dosya)** ·
+`npx tsc --noEmit -p tsconfig.app.json` temiz · `eslint src/pages/Profile.tsx`
+**temiz (0 sorun)**.
+
+**Kalan tek adım (kurucu, ~1 dakika):** arabulucu hesabıyla `/profile` açılıp
+büro adı + adres girilir, istenirse logo yüklenir, kaydedilir; sonra bir tutanak
+üretilip antedin ve "düzenlenme yeri" satırının dolu geldiği görülür. Code bunu
+kendi yapamaz: arabulucu oturumu gerekiyor.
 
 ### KAPANDI — 26.08 · P1 · ÖKSÜZ DOSYA SINIFI: KALAN İKİ YÜZEY + TEZGÂHIN KENDİ DELİĞİ
 `saklama-imha` düzeltmesi aynı kusurun **ikinci** örneğiydi (ilki 25.08'de

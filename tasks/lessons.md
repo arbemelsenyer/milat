@@ -12,6 +12,20 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   yenidir. Yanlış kurulmuş bir soru, cevap bekleyen gerçek bir kapı gibi görünüp
   işi durdurur — en pahalı yanlış alarm türü budur.
 
+- DERS (26.08.2026) — **ŞEMAYI ÖLÇEN KABUL KRİTERİ, DAVRANIŞI ÖLÇMEZ:
+  "OKUYAN VAR" DEMEK "ÇALIŞIYOR" DEMEK DEĞİLDİR.** Antet maddesini bugün DONE
+  işaretledim; kriterim `antet_kolon = 3` idi ve gerçekten 3'tü. Belge üreticisi
+  de alanları okuyordu. Ama alanları **yazan hiçbir yüzey yoktu** — arabulucu
+  büro adını hiçbir yerden giremiyordu, dolayısıyla her resmî belge **antetsiz**
+  basılıyordu. Göç doğru, okuma doğru, kriter yeşil, ürün çalışmıyor.
+  **KURAL 1:** kabul kriteri **şemayı değil, kullanıcının yapabildiği işi**
+  ölçmeli — "kolon var" değil, "arabulucu büro adını girip belgede görebiliyor".
+  **KURAL 2:** bir alanı OKUYAN kol yazıldığında, o alanı **YAZAN** yüzeyin
+  nerede olduğu aynı turda sorulur. Okuma yarısı çoğu zaman bedava gelir (göçle
+  birlikte kendiliğinden çalışır) ve tam bu yüzden yazma yarısının eksikliğini
+  **gizler**. **KURAL 3:** denetleyen tezgâhı olmayan bir madde DONE
+  işaretlenmez; antedin hiç tezgâhı yoktu, yanlış DONE'u bu mümkün kıldı.
+
 - DERS (26.08.2026) — **ADIYLA KİLİTLENEN TEZGÂH, YENİ YÜZEYİ HİÇ GÖRMEZ.**
   25.08'de "öksüz belge" kusuru dört yüzeyde kapatıldı, ama tezgâh
   (`sessiz-yazim.test.ts`) silme sırasını yalnız `MediationEngine.tsx`i **adıyla**
