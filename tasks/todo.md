@@ -86,12 +86,15 @@ kotasız çalışıyor. Gerekirse sonra koşulabilir, zararsızdır.
 - Doğrulama (26.08 · dur anında koşuldu): `npm run test` **345/345 (41 dosya)** ·
   `npx tsc --noEmit -p tsconfig.app.json` **temiz (çıkış 0)**.
 - **`main` ile `origin/main` eşit** — bekleyen push yok.
-- **YAYIN DURUMU (§11-B) — bir tanesi henüz inmedi.**
-  Antet değişikliği (`Profile.tsx`) **push edildi ve publish çağrıldı**, ama
-  ~15 dakika sonra canlı paket hâlâ `index-b-1-kF-9.js` ve içinde
-  `"Büro Antedi"` **yok** — yayın kuyrukta. Bir sonraki oturumun ilk işi bunu
-  doğrulamak: canlı paketi indir, dizeyi ara; yoksa `deploy_project` tekrar
-  çağır. "Herhalde çıkmıştır" **denmeyecek** (25.08 dersi).
+- **YAYIN: dördü de doğrulandı (§11-B).** Canlı paket `index-CpI5Ozyh.js`
+  indirildi ve içinde arandı: `"Büro Antedi"` ✓ · `"Antet Logosu"` ✓ ·
+  `"Yarım silindi"` ✓.
+  · **ARAÇ NOTU — `deploy_project` bir kez "pending" deyip İNMEYEBİLİYOR.**
+  Antet yayını ilk çağrıda ~25 dakika boyunca inmedi; `get_project`
+  `status: completed` · `error: null` diyordu, yani derleme sorunsuzdu ama
+  üretim adresi eski paketi sunmaya devam ediyordu. **İkinci** `deploy_project`
+  çağrısında 25 saniyede indi. Kural: yayını dizeyle doğrula; inmediyse
+  bekleme, **tekrar çağır**. "pending" bir kanıt değildir.
   Önceki üç publish **doğrulandı**:
   `saklama-imha` (Lovable depo kopyasında yeni kod okundu) · `CaseRoom` (canlı
   pakette `"Yarım silindi"` dizesi bulundu) · `admin-delete-knowledge`.
