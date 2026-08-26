@@ -1,102 +1,63 @@
 ## Nerede kaldık
 
-- Tarih: 25.08.2026 (13. blok) — **`medipact dur` ile kapatıldı (kurucu komutu)**
+- Tarih: 26.08.2026 (14. blok) — **`medipact dur` ile kapatıldı (kurucu komutu)**
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
-- **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok**.
-- Aktif görev: yok
-- Son tamamlanan iş: **P1 · H-15'in dört kararı uygulandı + saklama canlıda**
-- **PİLOT KUYRUĞU: 11/14 DONE · 3 BLOCKED.** Dördünün de **kodu bitti**;
-  engel yalnız **SQL çalıştırma** (üç göç + bir cron) ve bir gerçek telefon.
-- **CANLIDA DOĞRULANAN (Code sorguladı):** `saklama_sureleri` tablosu ✓ değerli
-  (6/6) · `Sesli not%` kova politikası ✓ (hat artık çalışabilir).
-  **Henüz çalıştırılmamış:** antet kolonları · `arabulucu_baz_cizgi` ·
-  `saklama-imha` cron kaydı · `saklama_gun >= 0` kısıtı.
-  (`paket_kotalari` **isteğe bağlı** — pilotta kota uygulanmıyor.)
-- **KALAN ÜÇ MADDE:** antet (göç) · kazanım (göç) · taraf akışı telefonda
-  (gerçek cihaz). Üçünün de **kodu bitti ve canlıda**; hiçbirinde Code
-  tarafında yapılacak iş kalmadı.
-- **GÖÇ SONRASI DOĞRULAMA TEK KOMUTA İNDİRİLDİ:**
-  `node tests/gecici/goc-sonrasi-dogrula.mjs` — çalıştırılacak SQL'i ve beklenen
-  sayıları basar (salt okuma). Göç koştuktan sonra bu sorgu, iki maddenin
-  gerçekten kapandığını tek bakışta gösterir; sonra `todo.md`de DONE işaretlenir.
-- **KOD İKİ MADDEDE DE GÖÇÜ BEKLEMEDEN ÇALIŞIYOR:** antet alanları göç gelmeden
-  boş basılıyor, kolonlar gelince kendiliğinden doluyor; baz çizgi kartı tablo
-  yokken hiç görünmüyor, gelince çıkıyor. Yani göç koştuğu an ikisi de ek kod
-  gerektirmeden tamamlanır.
-- **BEŞİ TEK DOSYADA TOPLANDI:** `tests/gecici/PILOT-KALAN-GOCLER.sql` — tek
-  yapıştırma, sırayla koşar, her bölüm `if not exists` / `on conflict` ile
-  korumalı (ikinci kez çalıştırmak zararsız). **Bağımlılıkları canlıda
-  doğrulandı** (`has_role` · `app_role` · `pg_cron` · `pg_net` · Vault sırrı ·
-  `profiles` · `auth.users`) → koşarken patlamaz.
-  **Hiçbiri davranış değiştirmez:** tablolar değer olmadan/sınırsız kurulur —
-  kota kimseyi engellemez, kazanım rakam üretmez, antet alanları boş gelir.
-  `kazanim-katsayilari.sql` **çalıştırılmayacak** (H-15/4 ile geçersiz).
-- **PİLOT KUYRUĞU: 9/14 DONE (hepsi §15.1'in beşini de sağlıyor) · 0 bekleyen ·
-  5 BLOCKED.** Beşinin de kodu bitti; engel yalnız **SQL çalıştırma** ve
-  iki değer kararı. Kod tarafında yapılacak iş kalmadı.
-- **PİLOT KUYRUĞU DURUMU: 14 maddeden 9'u DONE, 5'i BLOCKED.** Açık (yapılabilir)
-  madde **YOK**. Beşinin de engeli karar ya da kurucu eylemi:
-  dördü **HAT H-15** (saklama süreleri · antet/şablon · üyelik-kota · kazanım
-  tanımı), biri gerçek telefonda deneme.
-- **Ayrıca kurucu eylemi bekleyen iki SQL** (Code yazdı, §10 gereği çalıştırmadı):
-  `tests/gecici/oturum-kayitlari-politika.sql` (sesli not hattı bu olmadan
-  canlıda çalışmaz) · `tests/gecici/saklama-suresi-politika.sql`
-- **SESSİZ ÇAĞRI KUSURU İSTEMCİ YÜZEYİNİN TAMAMINDA KAPANDI:** `.from` ·
-  `.rpc` · `.storage` · `.functions.invoke` · iç `fetch`. Kenar (`_shared`
-  dâhil) ve ön yüz. Kenarda çıplak `.from(...)`, `.rpc(...)` ve
-  `.storage` çağrısı **SIFIR**; ön yüzde `tests/sessiz-yazim.test.ts`
-  **DONDURULMUŞ listesi BOŞ**. Üçü de tarama testiyle kilitlendi.
-- **12. blokta biten işler (sırayla):** `53b33cc` P1 `taraf-kalem-cikar` ·
-  `37c8867` P1 `dual-ai-validate` + `orchestrator-run` · `32fad07` P1
-  `akis-yurut` · `a3de13f` P0 `ajan-nobetci` (15 yer) · `04547a5` kayıt ·
-  `62e99b6` P1 kalan 16 yazım (13 işlev) · `69b8bde` P2 `agent_states` (25 yer) ·
-  `19be6fe` P2 `_shared/anlatim.ts` (3 yer, 35 işlev fan-out) · `cc0acbb` kayıt ·
-  `10bdb83` P1 ön yüz (4 dosya) · `4f16648` kayıt · `1233489` P1 sessiz `rpc`
-  + depo (12 yer, 9 işlev) · `bc558eb` P1 ön yüz depo çağrıları (4 yer) ·
-  `8e8e416` kayıt · `7974bac` kayıt · `03c445f` P1 `functions.invoke` (9 yer) ·
-  `a27b221` P2 `fetch` iç çağrısı (1 yer) · `b899149` P1 belge durumu sözlük
-  çatalı · kapanmış dosyada görev yürütülmesi.
-- **Bu oturumun dersleri `tasks/lessons.md`ye yazıldı** (3 yeni ders: sessiz
-  yazım kuyruk döngüsü kurar · öz denetim eşiği kusurla birlikte düşer ·
-  `rpc`/`storage` de fırlatmaz).
-- Doğrulama (25.08 · dur anında yeniden koşuldu): `npm run test` **270/270 (30 dosya)** ·
-  `npx tsc --noEmit -p tsconfig.app.json` **temiz (çıkış 0)**. Bu oturumda kod
-  değişmedi; son iki commit (`1d06303`, `152e2c0`) yalnız kayıttır.
-- **CANLI:** son 2 saatte 42 cron yanıtı, hepsi **200**; işlenmemiş olay 0,
-  bekleyen talimat 0, metin hatası 0.
-  (taban 2334'tü; `randevu-teklif`te bir `any` kaldırıldı)
-- **Açık blokaj: yok**
-- **REDEPLOY DURUMU (§11-B):**
-  - OK `taraf-kalem-cikar` (`53b33cc`) · `dual-ai-validate` + `orchestrator-run`
-    (`37c8867`) · `akis-yurut` (`32fad07`) · `ajan-nobetci` + `orchestrator-run`
-    (`a3de13f`) · **13 işlev** (`62e99b6`) — hepsi Lovable ajanıyla deploy
-    edildi ve `get_message` ile doğrulandı.
-  - OK `69b8bde` · **14 işlev** (`agent_states` sürüsü) — deploy edildi ve
-    `get_message` ile doğrulandı.
-  - OK `19be6fe` · **`_shared/anlatim.ts` FAN-OUT** — 35 tüketici işlevin hepsi
-    deploy edildi ve `get_message` ile doğrulandı.
-  - OK `10bdb83` · **ön yüz (`src/**`)** — Lovable `deploy_project` ile publish
-    edildi. `get_project` doğruladı: `latest_commit_sha=10bdb833…`,
-    `is_published=true`, canlı sayfa açılıyor.
-  - OK `1233489` · **9 işlev** (sessiz `rpc` + `storage`) — deploy edildi ve
-    `get_message` ile doğrulandı.
-  - OK `bc558eb` · **ön yüz depo çağrıları** — publish edildi. `get_project`
-    doğruladı: `latest_commit_sha=bc558eb9…`, `is_published=true`.
-  - OK `03c445f` · **ön yüz `functions.invoke`** — publish edildi.
-  - OK `a27b221` · `extract-document-text` — deploy edildi ve doğrulandı.
-    `get_project`: `latest_commit_sha=74ec5862…`, `is_published=true`.
-  - OK `10a70e6` · `dosya-verilerini-sil` — deploy edildi ve `get_message` ile
-    doğrulandı.
-  - **BEKLEYEN REDEPLOY YOK.**
-- Açık HAT maddesi: **H-15 (P1 · pilot kapısındaki son dört karar)** · **H-4** · **H-7** · **H-8** · **H-9** · **H-10** ·
-  **H-11 (P0 · kabuk bekçisi devre dışı — kanıtlı)** · **H-12 (P1 · depoda
-  birikmiş öksüz belgeler — kök neden kapandı, birikmiş borç kurucu kararı bekliyor)**.
-  **H-1 KAPANDI** (25.08, `CRON_SECRET` yenilendi ve canlıda doğrulandı).
-- Sıradaki uygulanabilir iş: **PİLOT KUYRUĞU** (aşağıda, 13 madde).
-  En üstteki: taraf katılım ekranında aydınlatma metni. ESKİ NOT: Sessiz yazım kusuru kenarda ve ön
-  yüzde kapandı, iki tezgâh da kilitli. Yeni P0/P1 adayı kodun gerçek
-  durumundan çıkarılmalı. En yakın aday: **H-8 ölü yüzey öbeğinin silinmesi**
-  (37 dosya) — ama silme kararı kurucudadır, HAT'ta açık bekliyor.
+- **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
+  durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
+- Aktif görev: **yok** (`dur` ile kapatıldı, yeni işe geçilmedi)
+- Son tamamlanan iş: **P1 · pilot kuyruğunun kalan üç göçü canlıda çalıştırıldı**
+- **PİLOT KUYRUĞU: 13/14 DONE · 1 BLOCKED.**
+  Kalan tek madde: **taraf akışının gerçek telefonda uçtan uca denenmesi** —
+  kurucu eylemi, Code tarafında yapılacak iş **yok**.
+
+### 26.08'de canlıda çalıştırılan göçler (hepsi eklemeli, veri silmiyor)
+
+| ne | doğrulanan sonuç |
+|---|---|
+| `profiles` + `buro_adi` · `buro_adresi` · `antet_logo_url` | `antet_kolon = 3` |
+| `arabulucu_baz_cizgi` tablosu + 3 RLS politikası | `baz_cizgi_tablo = 1` · `baz_cizgi_politika = 3` |
+| `saklama_sureleri` kısıtı `> 0` → `>= 0` | `sifir_gun_yazilabilir = 1` |
+
+Bu üç göçle **antet** ve **kazanım sayacı** maddeleri kapandı: kod ikisinde de
+göçü beklemeden yazılmıştı (antet alanları kolon yokken boş basılıyordu, baz
+çizgi kartı tablo yokken hiç görünmüyordu), göç koştuğu an **ek kod gerekmeden**
+tamamlandılar.
+
+**Çalıştırılmayan:** `PILOT-KALAN-GOCLER.sql` **Bölüm 3** (kota tabloları) —
+H-15/3 kararıyla madde pilot kapısından düştü; `/admin` tüketim ekranı zaten
+kotasız çalışıyor. Gerekirse sonra koşulabilir, zararsızdır.
+
+- **AÇIK BLOKAJ (P0 · HAT H-16): saklama süresi değerleri kararla çelişiyor.**
+  `saklama_sureleri` tablosundaki değerler **7 gün**; kurucunun H-15/1 kararı
+  **1825 gün / mali kayıt 3650 gün** diyor. Periyodik imha cron'u bu yüzden
+  **bilerek kurulmamış durumdadır** (aşağıdaki KIL PAYI bloğu). Karar gelene
+  kadar ne değerlere ne cron'a dokunulur.
+- Doğrulama (26.08 · dur anında koşuldu): `npm run test` **345/345 (41 dosya)** ·
+  `npx tsc --noEmit -p tsconfig.app.json` **temiz (çıkış 0)**.
+- **`main` ile `origin/main` eşit** — bekleyen push yok.
+- **Bekleyen redeploy yok** (§11-B) — bu blokta yalnız SQL ve `.md` değişti.
+- Açık HAT maddeleri: **H-16 (P0 · saklama değerleri çelişkisi — YENİ)** ·
+  H-7 · H-8 · H-9 · H-10 · H-12 (P1 · birikmiş öksüz belgeler) · H-13.
+  **H-15 KAPANDI** (dört kararın dördü de uygulandı, ARŞİV'e taşındı).
+- **Sıradaki uygulanabilir iş:** H-16 cevabı geldiğinde — değerler düzeltilirse
+  `saklama-imha-gunluk` cron'u yeniden kurulur (önce **kuru koşum**, sonra
+  `cron.schedule`). Cevap yoksa kuyrukta ondan bağımsız iş kalmadığı için yeni
+  P0/P1 adayı kodun gerçek durumundan çıkarılır (§6).
+
+### DUR KAYDI — 26.08.2026 · `medipact dur`
+Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
+
+- **Ağaç durumu (commit edilmemiş, bu oturuma ait DEĞİL — §11 gereği dokunulmadı):**
+  - silinmiş ama commit edilmemiş: `.agents/skills/medipact-calisma-duzeni/SKILL.md`
+    — oturum başından beri silinmiş görünüyor; geri alınacak mı silinecek mi
+    **kurucunun kararı**.
+  - izlenmeyen: `.github/.agents/` · `devam.sh` · `gs.sh` ·
+    `Yeni XLSX Worksheet.xlsx` · `repomix-output.xml`
+    (`repomix-output.xml` 25.08'de sır taramasından geçmişti: gerçek jeton yok.)
+- **Sıradaki oturumun ilk işi:** önce `tasks/HAT.md` → `## COWORK → CODE` oku.
+  Ayrıca **tek sorguyla cron'un gerçekten kaldırıldığını teyit et:**
+  `select count(*) from cron.job where jobname='saklama-imha-gunluk'` → **0**
+  olmalı. H-16 cevabı gelmeden yeniden kurulmaz.
 
 ### DUR KAYDI — 25.08.2026 · `medipact dur`
 Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
@@ -203,19 +164,19 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
         ile aynı: sır Vault'tan okunur, komuta düz metin yazılmaz (H-1 kuralı).
         Günde bir, 03:00. Önce `{"kuru": true}` ile ne silineceği görülebilir.
 
-- [!] P1 · **Arabulucunun kendi anteti / şablonu** · **KOD YARISI BİTTİ ·
-      BLOCKED → HAT H-15/2** (yalnız göçün çalıştırılması) · 338/338 test
-      · **IBAN ÇÖZÜLDÜ:** `profiles.iban`/`banka_adi` var, ödeme bilgisi PDF'ine
-      `get_case_mediator_payment_info` ile akıyor.
-      · **ANTET KODU YAZILDI ve göçten ÖNCE de çalışıyor:**
-      `generate-official-document` artık `profiles`i `select("*")` ile çekiyor.
-      Olmayan bir kolonu **adıyla** seçmek sorguyu düşürür ve belge üretimini
-      komple kırardı; `*` ile kod göçten önce de sonra da çalışır — kolonlar
-      gelince alanlar **kendiliğinden** dolar. Doldurma haritasına `buro_adi` ·
-      `buro_adresi` · `antet_logo_url` girdi ve **`tutanak_yeri` artık büro
-      adresinden doluyor** (eskiden sabit boştu).
-      · **Kalan:** `tests/gecici/antet-alanlari.sql` çalıştırılacak. Arabulucuya
-      özel ŞABLON kapsam dışı (H-15/2 önerisi A: şablon genel kalır).
+- [x] P1 · **Arabulucunun kendi anteti / şablonu** · **DONE 26.08.2026**
+      · Kabul: `profiles`ta antet kolonları var ve belge motoru onları basıyor.
+      · **Doğrulama (canlı sorgu):** `antet_kolon = 3` — `buro_adi` ·
+      `buro_adresi` · `antet_logo_url` göçü 26.08'de çalıştırıldı.
+      · **IBAN zaten çözülüydü:** `profiles.iban`/`banka_adi` ödeme bilgisi
+      PDF'ine `get_case_mediator_payment_info` ile akıyor.
+      · **Kod göçten ÖNCE de sonra da çalışıyor:** `generate-official-document`
+      `profiles`i `select("*")` ile çekiyor. Olmayan bir kolonu **adıyla**
+      seçmek sorguyu düşürür ve belge üretimini komple kırardı; `*` ile kolonlar
+      gelince alanlar **kendiliğinden** doldu. `tutanak_yeri` artık büro
+      adresinden geliyor (eskiden sabit boştu).
+      · Tezgâh: `tests/belge-motoru.test.ts`. Arabulucuya özel ŞABLON kapsam
+      dışı — H-15/2 seçimi A: şablon genel kalır.
 
 - [x] P1 · **Üyelik / paket / kota** · **DONE 26.08.2026 — KURUCU KARARIYLA
       PİLOT KAPISINDAN DÜŞTÜ + Code'a düşen iş yapıldı**
@@ -238,22 +199,23 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       pilotta kota uygulanmadığı için gerekli değil; kota kapısı tablo yokken de
       "sınırsız" der. Pilot sonrası paket tasarımı yapılırken çalıştırılır.
 
-- [!] P1 · **Kazanım sayacı** · **KOD YARISI BİTTİ · BLOCKED → HAT H-15/4**
-      (yalnız katsayı DEĞERLERİ) · Doğrulama: `tests/kazanim-sayaci.test.ts`
-      (9 durum) · 331/331 test
-      · **Engel aşıldı:** madde "kazanım"ın tanımını bekliyordu. Tanımı beklemek
-      yerine **tanım veriye taşındı**: katsayılar `kazanim_katsayilari`
-      tablosunda durur, kurucu girer. Böylece karar beklenmeden kod hazır oldu.
-      · **CAMDAN KUTU YAPISAL OLARAK SAĞLANDI (tezgâhla kilitli):** katsayı
-      kodda sabit **değil** · katsayı girilmemişse o kalem **saate çevrilmez**
-      (adet yine gösterilir) · **hiç** katsayı yoksa toplam **verilmez**,
-      "yeterli veri yok" denir · her kalem **adet + katsayı + DAYANAK** ile
-      döner, yani toplamın nereden geldiği satır satır görülür · rakamın
-      **TAHMİN** olduğu gizlenmez · sayılacak tablo haritadan gelir.
+- [x] P1 · **Kazanım sayacı** · **DONE 26.08.2026 — H-15/4 seçimi B**
+      · Kabul: baz çizgi arabulucudan alınıyor ve dosya bazında saat üretiyor.
+      · **Doğrulama (canlı sorgu):** `baz_cizgi_tablo = 1` ·
+      `baz_cizgi_politika = 3` — göç 26.08'de çalıştırıldı.
+      · **TASARIM DEĞİŞTİ:** eski `kazanim_katsayilari` tasarımı (katsayıyı
+      yönetici girer) H-15/4 kararıyla **geçersiz**; o SQL çalıştırılmadı.
+      Yerine `arabulucu_baz_cizgi`: katsayıyı **arabulucunun kendisi** bir kez
+      beyan eder (`src/components/mediation/BazCizgiSorulari.tsx`, §5.9'un üç
+      sorusu, ilk ekranda kapatılamaz).
+      · **CAMDAN KUTU (tezgâhla kilitli):** katsayı kodda sabit **değil** ·
+      beyan yoksa saat **üretilmez** ("yeterli veri yok") · sonuç
+      *"kendi verdiğiniz X saat × N = Y saat"* biçiminde, hesabı görünür döner ·
+      rakamın **TAHMİN** olduğu gizlenmez.
       *"Bu dosyada 7 saat kazandınız" demek, 7'nin nereden geldiği
       gösterilemiyorsa uydurmadır (§15.1).*
-      · **Kalan:** beş iş türü için dakika + dayanak (göç:
-      `tests/gecici/kazanim-katsayilari.sql`, Code yazdı çalıştırmadı §10).
+      · Tezgâh: `tests/kazanim-sayaci.test.ts` · RLS: arabulucu yalnız kendi
+      satırını görür/yazar.
 
 - [!] P2 · **Taraf akışı telefonda uçtan uca** · **BLOCKED — gerçek cihaz gerekiyor
       (kurucu)** · Code kısmen doğruladı, kalan kısım cihaz istiyor.

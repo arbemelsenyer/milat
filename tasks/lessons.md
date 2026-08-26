@@ -852,3 +852,33 @@ SQL için `.replace(/--.*$/gm, "")`, ve kolon denetiminde yalnız
 yazmak zorunda kalıyor (neyin neden yasak olduğunu anlatmak için). Yani bu hata
 rastlantı değil, **kalıbın kendisinden doğuyor**. Bu yüzden "yorumları ayıkla"
 adımı, yasak-desen denetimi yazarken opsiyonel değil **zorunlu** sayılmalıdır.
+
+
+## 26.08.2026 — Yıkıcı bir kolu programlamadan önce KURU KOŞUM zorunludur
+
+`saklama-imha` kolu yazıldı, tezgâhla sınandı, deploy edildi ve doğru çalışıyordu.
+Ardından günlük cron kaydı kuruldu. Koşmadan önce **kuru koşum** (`{"kuru": true}`)
+yapıldı — ve tehlikeyi o yakaladı:
+
+```
+case_notes      → silinecek 1
+odeme_kayitlari → silinecek 4
+```
+
+Kol doğruydu. **Yanlış olan parametreydi:** `saklama_sureleri` tablosundaki
+değerler 7 güne düşmüştü, oysa kurucunun kararı 1825 gün / mali kayıt 3650 gün
+diyordu. Canlıda 5 dosya 7 günden eski kapanmıştı; cron 03:00'te koşsaydı
+**4 mali kayıt geri dönüşsüz silinecekti.**
+
+**KURAL:** silen/geri döndürülemez bir işi **programlamadan** önce, o işin
+**gerçek veriyle ne yapacağı** görülür. Kuru koşum kipi olmayan bir silme koluna
+cron takılmaz — önce kuru koşum kipi yazılır.
+
+**Asıl ders daha genel:** bir kolun **kodunun** doğrulanmış olması, o kolun
+**beslendiği verinin** doğrulandığı anlamına gelmez. Tezgâh kodu sınar, veriyi
+sınamaz. Parametreyle çalışan her yıkıcı iş için doğrulama iki ayaklıdır:
+kod (tezgâh) **ve** o an canlıda duran değer (kuru koşum).
+
+Bir yan ders: parametre kurucunun verisidir. Değer beklenmedik çıktığında
+**düzeltilmez** — iş durdurulur, olduğu gibi bildirilir. "Herhalde yanlış girildi"
+diyip 7'yi 1825 yapmak, kurucunun bilerek kurduğu bir denemeyi sessizce bozabilirdi.

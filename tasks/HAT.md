@@ -231,71 +231,48 @@ yalnız aydınlatmadır. B/C'de rıza kaydı denetlenebilir biçimde tutulur.
 
 ---
 
-### H-15 · 25.08.2026 · P1 — Pilot kapısındaki son dört karar
-**Sorun.** Pilot kuyruğunun 14 maddesinden **10'u kapandı**. Kalan beşin biri
-(taraf akışının telefonda denenmesi) kurucunun elinde; **dördü ise iş değil
-KARAR bekliyor.** Code bunları tek başına bitiremez: dördü de ürün/hukuk
-kararıdır (§7.1, §7.2). Karar geldiğinde uygulaması kısadır.
+### H-16 · 26.08.2026 · **P0** — Saklama süresi DEĞERLERİ kararla çelişiyor
 
----
-**1) Saklama süreleri (P1 · hukuki).** §15.2: "saklama süreleri **parametre
-tablosundan** okunuyor ve periyodik imha çalışıyor." Bugün süre **kodda
-sabit** ve yalnız oturum kaydı için var (24 saat); diğer türler için süre
-kavramı hiç yok — constitution m.10 açısından açık.
+**Bu H-15/1'in tekrarı değil.** O soru ("her tür kaç gün saklanacak?") cevaplandı
+ve uygulandı. Yeni soru şu: **canlıdaki değerler o karara uymuyor.**
 
-Code tabloyu **yazdı, çalıştırmadı** (§10): `tests/gecici/saklama-suresi-politika.sql`.
-Tablo **değer olmadan** kuruluyor: `saklama_gun` NULL → imha kolu o türe
-**dokunmaz**, yani karar gelmeden hiçbir şey silinmez.
+**Sorun.** `saklama_sureleri` tablosundaki `saklama_gun` değerleri bugün
+**7 GÜN**. Kararınız ve o cevaptaki doğrulama dökümü ise **1825 gün (5 yıl)**,
+mali kayıt için **3650 gün (10 yıl)** diyordu. Değerler karardan sonra değişmiş.
 
-Karar gereken: her tür için kaç gün, sayaç ne zaman başlar.
-| tür | önerim | gerekçe |
+**Nasıl yakalandı.** `saklama-imha-gunluk` cron kaydı kuruldu; koşmadan önce
+**kuru koşum** (`{"kuru": true}`) yapıldı ve ne silineceğini gösterdi:
+
+```
+case_notes      → silinecek 1
+odeme_kayitlari → silinecek 4
+```
+
+Canlıda **5 dosya** 7 günden eski kapanmış (en eskisi 16.07.2026). Cron 03:00'te
+koşsaydı **4 mali kayıt silinecekti** — sizin 10 yıl saklanacak dediğiniz veri.
+Geri dönüşü yoktu.
+
+**Yapılan.** Cron **derhal kaldırıldı** (`cron.unschedule` → doğrulandı: 0 kayıt).
+**Değerlere DOKUNULMADI** — onlar sizin verinizdir ve kısa süre bilerek konmuş
+bir deneme de olabilir. İmha kolu bu yüzden **bilerek kurulmamış** durumdadır.
+
+**Seçenekler**
+
+| | ne yapılır | sonucu |
 |---|---|---|
-| `oturum_kaydi_ses` | 0 (anında) | Zaten öyle çalışıyor (H-14 şart 1) |
-| `oturum_kaydi_dokum` | dosya kapanışı + 1 yıl | Arabuluculuk dosyası saklama teamülü |
-| `case_documents` | dosya kapanışı + 1 yıl | Taraf belgeleri; itiraz süresi geçsin |
-| `case_notes` | dosya kapanışı + 1 yıl | Analiz zinciriyle birlikte |
-| `dosya_kapanis_sonrasi` | dosya kapanışı + 1 yıl | Anonim kapanış kaydı kalır |
-**Bu bir hukuk kararıdır** — önerim teamüle dayalıdır, hukuki görüş değildir.
+| **A** | Değerler 1825 / mali 3650'ye döndürülür; sonra kuru koşum, sonra cron | Karar uygulanmış olur; m.10 (süresiz saklama yasağı) kapanır |
+| B | 7 gün bilinçli bir denemedir | Cron deneme bitene kadar **kurulmaz**; m.10 açık kalır |
+| C | Başka süreler verilir | Aynı akış: değer → kuru koşum → cron |
 
----
-**2) Arabulucunun anteti / şablonu (P1 · ürün).** §15.2: "kendi anteti/IBAN'ı/
-şablonuyla uçtan uca dosya yürütüyor."
-· **IBAN: ÇÖZÜLDÜ** — `profiles.iban`/`banka_adi` var ve ödeme bilgisi PDF'ine
-  `get_case_mediator_payment_info` ile akıyor.
-· **Antet/logo: YOK.** `profiles`ta logo ya da adres kolonu yok.
-· **Kendi şablonu: YOK.** Şablonlar admin tarafından **genel** yükleniyor
-  (`admin-upload-template`); arabulucuya özel şablon kavramı yok.
+**Önerim: A.** 7 gün bir arabuluculuk dosyası için teamüle aykırı ve mali kayıt
+saklama yükümlülüğüyle çelişir. **Bu bir hukuk kararıdır** — önerim teamüle
+dayalıdır, hukuki görüş değildir.
 
-| | ne yapılır | bedeli |
-|---|---|---|
-| **A** | Antet (logo + adres) profile eklenir; belgelerin başlığına basılır. Şablon **genel kalır** | Küçük: bir göç + belge motoruna iki alan. Pilot için yeter |
-| B | Ayrıca arabulucu başına şablon yükleme | Şablon sürüm yönetimi, doğrulama, çakışma — pilot öncesi büyük |
-| C | Bugünkü hâl | Belgeler antetsiz çıkar |
-**Önerim: A.** Pilotta arabulucunun kendi antetiyle belge üretmesi görünür bir
-ihtiyaç; kendi şablonunu yüklemesi değil.
+**Kararın etkisi.** Karar gelene kadar periyodik imha **çalışmaz**: veri silinmez
+ama constitution m.10 açık kalır. Yanlış değerle çalıştırılırsa geri dönüşü
+olmayan veri kaybı olur — bugün kıl payı kaçırıldı.
 
----
-**3) Üyelik / paket / kota (P1 · ticari).** Tablo yok, kod yok. Karar: hangi
-paketler, hangi kota (dosya sayısı? ajan koşumu?), kota dolunca ne olur (engelle
-mi, uyar mı). **Önerim: pilotta kota YOK** — pilot 5–10 arabuluculu ve 3 ay
-ücretsiz; kota mekanizması pilot verisi olmadan yanlış kurulur. Pilot sonrası
-gerçek kullanım rakamlarıyla tasarlanmalı. Bu seçilirse madde "pilot sonrası"
-diye işaretlenir ve pilot kapısından düşer.
-
----
-**4) Kazanım sayacı (P1 · ürün).** §15.2: "baz çizgi alınıyor ve dosya bazında
-saat üretiyor." Tablo yok, kod yok. Karar: **"kazanım" nedir** — neyin baz
-çizgisi (arabulucunun elle yaptığı sürenin tahmini mi, dava süresi mi), saat
-nasıl sayılır. **Önerim:** dosya başına *ajanın ürettiği çıktıların elle
-hazırlanma süresi tahmini* (belge üretimi, analiz, föy) — sabit katsayılarla,
-kaynağı açıkça yazılarak. Uydurma rakam üretmemek için katsayılar görünür olmalı
-(§15.1 camdan kutu). Katsayıları kurucu verir.
-
----
-**Kararın etkisi.** 1 karara bağlanmadan periyodik imha kurulamaz (m.10 açık
-kalır). 2/A seçilmezse belgeler antetsiz çıkar. 3'te "pilotta kota yok" denirse
-pilot kapısı bir madde kısalır. 4 tanımsız kalırsa sayaç ya hiç yapılmaz ya da
-uydurma rakam üretir — ikincisi kabul edilemez.
+**Değerlere ve cron'a karar gelene kadar dokunulmayacak.**
 
 
 ## COWORK → CODE
@@ -579,6 +556,19 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+
+### H-15 · KAPANDI · 26.08.2026 — Pilot kapısındaki dört kararın dördü de uygulandı
+
+| karar | seçim | uygulama |
+|---|---|---|
+| 1 · Saklama süreleri | tablo + süreler | `saklama_sureleri` kuruldu, `saklama-imha` yazıldı ve deploy edildi. **Değer çelişkisi H-16'ya taşındı.** |
+| 2 · Antet / şablon | **A** | `profiles`a üç kolon (`antet_kolon = 3`); belge motoru basıyor; şablon genel kaldı |
+| 3 · Üyelik / kota | pilotta kota yok | Madde pilot kapısından düştü; `/admin` **tüketim sayacı** yapıldı (engel yok, yalnız sayı) |
+| 4 · Kazanım sayacı | **B** | `arabulucu_baz_cizgi` (`baz_cizgi_tablo = 1`, 3 politika); katsayıyı arabulucu beyan eder, hesap görünür döner |
+
+Kapanış kaydı: `tasks/todo.md` → pilot kuyruğu 13/14 DONE.
+**Devam eden tek açık uç H-16'dır** (saklama değerleri).
+
 
 ### H-14 · KAPANDI · 25.08.2026 — Sesli oturum notu (karar B uygulandı)
 **Seçim: B** — yalnız arabulucunun kendi sesli notu. Üç şart da kuruldu ve
