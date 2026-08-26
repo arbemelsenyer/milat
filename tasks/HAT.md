@@ -521,9 +521,13 @@ eski metnindendir — soruyu yazarken "SIFIR SAKLAMA" düzeltme bloğu atlanmı�
 Ayrıca cron **kaldırılmamış**: canlıda jobid 21 · `saklama-imha-gunluk` ·
 `0 3 * * *` · active = true. Kurucu talimatı: **değerlere de cron'a da dokunma.**
 `tasks/todo.md`deki yanlış blokaj ve "cron kurulmadı" kaydı düzeltildi.
-**Kalan tek iş (P1, teşhis):** `cron.unschedule` neden başarılı görünüp kaydı
-kaldırmadı — muhtemelen dönüş değeri okunmadı, bu haftaki *sessiz yazım*
-sınıfının aynısı.
+**Teşhis de kapandı (26.08).** `cron.unschedule` **yalan söylememiş** — 25.08'de
+kaydı gerçekten kaldırmış. Kaydı geri kuran şey
+`tests/gecici/PILOT-KALAN-GOCLER.sql` **Bölüm 5**'tir: 26.08 göç koşumunda o
+bölüm de koştu. Kanıt: jobid 21'in `cron.job_run_details`te **hiç koşumu yok**,
+oysa günlük dolu (jobid 7 → 5872 koşum, sonuncusu bugün 13:27) ve `0 3 * * *`
+işi bugün 03:00'te var olsaydı koşardı → kayıt bugün 03:00'ten **sonra** doğmuş.
+Ayrıntı `tasks/todo.md` teşhis bloğunda, üç kural `tasks/lessons.md`de.
 
 <details><summary>H-16 · sorunun ve cevabın tam metni</summary>
 

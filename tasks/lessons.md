@@ -12,16 +12,51 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   yenidir. Yanlış kurulmuş bir soru, cevap bekleyen gerçek bir kapı gibi görünüp
   işi durdurur — en pahalı yanlış alarm türü budur.
 
-- DERS (26.08.2026) — SESSİZ YAZIM SINIFI **SQL FONKSİYON ÇAĞRILARINI DA**
-  KAPSIYOR; `cron.unschedule` başarılı göründü ama kaydı kaldırmadı.
-  25.08'de kaldırdığımı yazdığım `saklama-imha-gunluk` işi canlıda **duruyordu**
-  (jobid 21 · `0 3 * * *` · active = true); bunu kurucu sorgulayınca öğrendik.
-  `cron.unschedule` **boolean döndürür** ve dönüşü okumadan "kaldırıldı,
-  doğrulandı: 0 kayıt" yazmışım — `supabase-js`in hata fırlatmaması dersinin
-  Postgres tarafındaki eşi. Kural: bir kaldırma/silme çağrısından sonra **ayrı
-  bir SELECT ile** yokluğu kanıtla; çağrının kendi dönüşü kanıt değildir, hele
-  hiç okunmadıysa. Durum dosyasına "doğrulandı" kelimesi ancak o SELECT'in
-  çıktısı elde varken yazılır.
+- DERS (26.08.2026) — "KALDIRDIM AMA DURUYOR" DEDİĞİN ŞEY KALDIRILMAMIŞ DEĞİL,
+  **YENİDEN KURULMUŞ** OLABİLİR; SİLME ÇAĞRISINI SUÇLAMADAN ÖNCE KURMA
+  ÇAĞRISININ NEREDE DURDUĞUNA BAK. 25.08'de `cron.unschedule` ile kaldırdığım
+  `saklama-imha-gunluk` işi 26.08'de canlıda **jobid 21 · active = true** olarak
+  bulundu; ilk teşhisim "`unschedule` yalan söyledi, dönüşü okumamışım" oldu ve
+  bunu ders olarak yazdım. **Yanlıştı.** Canlı kanıt (salt okuma):
+
+  | sorgu | çıktı | ne anlatıyor |
+  |---|---|---|
+  | `select jobid from cron.job` | 1·2·3·4·7·9·10·**21** | 11–20 arası **hiç yok** → önceki kaldırmalar gerçekten işlemiş |
+  | `cron.job_run_details where jobid=21` | **0 satır** | jobid 21 **hiç koşmamış** |
+  | aynı tablo, tüm işler | jobid 7 → 5872 koşum, sonuncusu bugün 13:27 | koşum günlüğü **açık ve dolu**; "0 satır" araç arızası değil |
+  | jobid 2 bugün 02:00, jobid 3 bugün 08:00 koştu | — | bugün 03:00'te var olsaydı **koşardı** |
+
+  Yani kayıt **bugün 03:00'ten SONRA doğdu.** Kaynağı bulundu:
+  `tests/gecici/PILOT-KALAN-GOCLER.sql` → **BÖLÜM 5** hâlâ
+  `select cron.schedule('saklama-imha-gunluk','0 3 * * *', …)` içeriyor. 25.08'de
+  işi kaldırdım ama **onu kuran dosyadan çıkarmadım**; 26.08'de aynı dosya antet
+  (Bölüm 1), kazanım (Bölüm 2) ve saklama kısıtı (Bölüm 4) için yeniden koşunca
+  Bölüm 5 de koştu ve işi geri kurdu. `todo.md`de "çalıştırılmayan: Bölüm 3"
+  yazmışım — Bölüm 5'i hiç saymamışım.
+
+  **KURAL 1:** canlıda bir kaydı kaldırdığında, o kaydı **kuran betiği de** aynı
+  turda düzelt (bölümü çıkar ya da başına "KOŞMA" koy). Yoksa betik bir sonraki
+  koşumda kararını sessizce geri alır. "Kaldırdım" bir durum değil, betik yeniden
+  koşana kadar süren bir **iddiadır**.
+
+  **KURAL 2:** çok bölümlü bir betiği kısmen koşturduğunda, **koşan bölümleri
+  değil, koşmayanları** tek tek say ve yaz. "Bölüm 3 hariç hepsi" ile "Bölüm 1,
+  2, 4 koştu" aynı şey değildir; ikincisini yazınca Bölüm 5 kayboldu.
+
+  **KURAL 3 (asıl acı olan):** kanıt zaten elimdeydi.
+  `tests/gecici/goc-sonrasi-dogrula.mjs` beş kolon döndürüyor ve beşincisi
+  `imha_cron` (beklenen 1). 26.08'de bu betiği koşturdum, `todo.md`ye **üç**
+  kolonun sonucunu yazdım, `imha_cron`u okumadım. Cron'un geri geldiğini kendi
+  doğrulama çıktım söylüyordu. Bir doğrulama betiğinin **her** kolonu okunur ve
+  kaydedilir; ilgilendiğin üçünü alıp gerisini geçmek doğrulamayı iptal eder.
+
+  **Not — bir önceki teşhisin düzeltmesi:** `cron.unschedule`ın dönüşünü okumadan
+  "doğrulandı" yazmak yine de kötü alışkanlıktır (ayrı bir `SELECT` ile yokluk
+  kanıtlanır), ama bu olayda **yalan söyleyen o değildi**. Kendi hatanı ararken
+  ilk akla gelen sınıfa ("sessiz yazım") yapıştırma: o hafta avladığın kusur
+  sınıfı, önündeki olayın açıklaması olmak zorunda değil. Teşhis, hipotezle değil
+  **zaman damgasıyla** kapanır — burada kapatan şey `job_run_details`in boş
+  olmasıydı.
 
 - DERS (25.08.2026) — `supabase-js` HATA FIRLATMAZ; `try/catch` BURADA KORUMA
   DEĞİLDİR. `try { await supabase.from(x).insert(...) } catch { console.error }`

@@ -4,10 +4,14 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: **yok** (`dur` ile kapatıldı, yeni işe geçilmedi)
-- Son tamamlanan iş: **H-16 cevabı işlendi** — yanlış kurulmuş blokaj kaldırıldı,
-  `todo.md`/`HAT.md`deki iki yanlış kayıt (7 gün çelişkisi · "cron kaldırıldı")
-  gerçeğe göre düzeltildi, iki ders yazıldı, H-16 ARŞİV'e taşındı.
+- Aktif görev: **yok**
+- Son tamamlanan iş (26.08 · 15. blok): **cron teşhisi kapandı.**
+  `cron.unschedule` yalan söylememiş — 25.08'de kaydı gerçekten kaldırmış.
+  jobid 21'i geri kuran şey `tests/gecici/PILOT-KALAN-GOCLER.sql` **Bölüm 5**'in
+  26.08 göç koşumunda yeniden çalışmasıdır (kanıt: jobid 21'in `job_run_details`te
+  hiç koşumu yok, oysa günlük dolu ve `0 3 * * *` işi bugün 03:00'te var olsaydı
+  koşardı). Canlıda **hiçbir şeye dokunulmadı**; üç kural `lessons.md`ye yazıldı;
+  önceki yanlış teşhis ("sessiz yazım sınıfı") geri alındı.
 - **PİLOT KUYRUĞU: 13/14 DONE · 1 BLOCKED.**
   Kalan tek madde: **taraf akışının gerçek telefonda uçtan uca denenmesi** —
   kurucu eylemi, Code tarafında yapılacak iş **yok**.
@@ -38,22 +42,63 @@ kotasız çalışıyor. Gerekirse sonra koşulabilir, zararsızdır.
   **oluşmuyor**. 7 gün, arabulucunun tutanağı indirip UYAP'a yükleme payıdır.
   Kuru koşumdaki 5 satır da gerçek veri değildi: beşi de 16–18.07 tarihli
   **deneme dosyası** (MP-2026-1009 · 1011 · 1012 · 1013 · 1014).
-- **DÜZELTME (kurucu canlı sorguladı): cron KALDIRILMAMIŞ.**
-  `select jobid, jobname, schedule, active from cron.job` →
-  **jobid 21 · `saklama-imha-gunluk` · `0 3 * * *` · active = true.**
-  Yani 25.08'de yazdığım "`cron.unschedule`, doğrulandı: 0 kayıt" ifadesi
-  **yanlıştır**; kayıt duruyor ve etkin. Kurucu talimatı: **dokunma, öyle kalsın**
-  (değerler doğru olduğuna göre imha kolunun koşması istenen davranıştır).
+- **cron: KAYIT DURUYOR (jobid 21, active = true) — ama kaldırılmadığı için değil,
+  YENİDEN KURULDUĞU için. Teşhis 26.08'de kapatıldı, kanıt aşağıda.**
+  25.08'deki `cron.unschedule` **çalışmıştı**; işi geri getiren şey
+  `tests/gecici/PILOT-KALAN-GOCLER.sql` → **BÖLÜM 5**'in 26.08 göç koşumunda
+  yeniden çalışmasıdır. Kaldırdığım kaydı **kuran betikten çıkarmamıştım**.
+  Kurucu talimatı: **dokunma, öyle kalsın** — değerler doğru olduğuna göre imha
+  kolunun koşması istenen davranıştır. Ders `tasks/lessons.md`ye yazıldı.
 - Doğrulama (26.08 · dur anında koşuldu): `npm run test` **345/345 (41 dosya)** ·
   `npx tsc --noEmit -p tsconfig.app.json` **temiz (çıkış 0)**.
 - **`main` ile `origin/main` eşit** — bekleyen push yok.
 - **Bekleyen redeploy yok** (§11-B) — bu blokta yalnız SQL ve `.md` değişti.
 - Açık HAT maddeleri: H-7 · H-8 · H-9 · H-10 · H-12 (P1 · birikmiş öksüz
   belgeler) · H-13. **H-15 ve H-16 KAPANDI** (ikisi de ARŞİV'de).
-- **Sıradaki uygulanabilir iş (P1, kurucu talimatı):** `cron.unschedule`
-  çağrısının neden başarılı görünüp kaydı kaldırmadığını araştır — bu, bu hafta
-  avlanan **sessiz yazım** sınıfının aynısı olabilir (dönüş değeri okunmamış).
-  Bulguyu `tasks/lessons.md`ye yaz. Kayda **dokunma**, yalnız teşhis.
+- ~~**Sıradaki uygulanabilir iş (P1):** `cron.unschedule` neden yalan söyledi~~
+  → **DONE 26.08** (aşağıdaki teşhis bloğu). Soru yanlış kurulmuştu: `unschedule`
+  yalan söylemedi, kaydı **başka bir şey geri kurdu**. Kayda dokunulmadı.
+
+### KAPANDI — 26.08 · P1 · TEŞHİS: CRON'U KALDIRAN DEĞİL, **GERİ KURAN** VAR
+Kurucu talimatıyla açılan tek iş: "`cron.unschedule` neden başarılı görünüp
+kaydı kaldırmadı?" **Cevap: kaldırmıştı.** Soru yanlış kurulmuştu.
+
+**Kanıt (canlı, salt okuma — hiçbir şey yazılmadı/silinmedi):**
+
+| sorgu | çıktı | ne anlatıyor |
+|---|---|---|
+| `select jobid, jobname, username, active from cron.job` | 1 · 2 · 3 · 4 · 7 · 9 · 10 · **21** | **11–20 arası hiç yok** → önceki kaldırmalar gerçekten işlemiş |
+| `cron.job_run_details where jobid = 21` | **0 satır** | jobid 21 **hiç koşmamış** |
+| `job_run_details` genel | jobid 7 → 5872 koşum, sonuncusu **bugün 13:27** | günlük açık ve dolu; "0 satır" araç arızası değil |
+| bugün koşanlar | jobid 2 → 02:00 · jobid 3 → 08:00 | bugün **03:00'te var olsaydı koşardı** |
+
+Zamanlaması `0 3 * * *` olan bir iş bugün 03:00'te koşmadıysa **o saatte yoktu**.
+Yani jobid 21 **bugün 03:00'ten sonra doğdu** — 25.08'den beri duran bir kayıt
+değil.
+
+**Kök neden.** `tests/gecici/PILOT-KALAN-GOCLER.sql` → **BÖLÜM 5** hâlâ
+`select cron.schedule('saklama-imha-gunluk', '0 3 * * *', …)` içeriyor.
+25.08'de işi canlıdan kaldırdım ama **onu kuran betikten çıkarmadım.** 26.08'de
+aynı dosya antet (Bölüm 1), kazanım (Bölüm 2) ve saklama kısıtı (Bölüm 4) için
+yeniden koşturulunca Bölüm 5 de koştu ve kaydı geri kurdu. Yukarıda bu blokta
+"**Çalıştırılmayan:** Bölüm 3" yazmışım — koşmayanları saymak yerine bir tanesini
+saymışım, Bölüm 5 aradan düşmüş.
+
+**İkinci kusur — kanıt zaten elimdeydi.** `tests/gecici/goc-sonrasi-dogrula.mjs`
+**beş** kolon döndürür ve beşincisi `imha_cron` (beklenen 1). 26.08'de bu betiği
+koşturdum, `todo.md`ye **üç** kolonun sonucunu yazdım, `imha_cron`u okumadım.
+Cron'un geri geldiğini kendi doğrulama çıktım söylüyordu.
+
+**Sonuç / eylem.** Kurucu talimatı gereği **canlıda hiçbir şeye dokunulmadı**:
+jobid 21 duruyor ve etkin, `saklama_sureleri` değerleri 7 gün (teyit edildi:
+`case_documents` · `case_notes` · `dosya_kapanis_sonrasi` · `odeme_kayitlari` ·
+`oturum_kaydi_dokum` = 7 · `oturum_kaydi_ses` = 0 · iki tür `null`). İstenen
+davranış budur. Üç kural `tasks/lessons.md`ye yazıldı (kaldırdığın kaydı kuran
+betiği de düzelt · koşmayan bölümleri tek tek say · doğrulama betiğinin **her**
+kolonunu oku).
+
+**Önceki teşhis geri alındı:** "sessiz yazım sınıfı `cron.unschedule`ı da
+kapsıyor" dersi bu olayda **yanlış teşhisti**; lessons.md'deki madde düzeltildi.
 
 ### DUR KAYDI — 26.08.2026 (2) · `medipact dur`
 Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
@@ -88,8 +133,8 @@ Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
   ~~cron'un kaldırıldığını teyit et → 0 olmalı~~ — **bu talimat geçersizdir.**
   Kurucu canlıda sorguladı: kayıt **duruyor** (jobid 21, active = true) ve
   **öyle kalacak**. Değerler doğru olduğu için imha kolunun koşması istenen
-  davranıştır; teyit sorgusu değil, `unschedule`ın neden yalan söylediğinin
-  teşhisi gerekiyor.
+  davranıştır. (26.08: teşhis kapandı — `unschedule` yalan söylememiş, kaydı
+  `PILOT-KALAN-GOCLER.sql` Bölüm 5 geri kurmuş.)
 
 ### DUR KAYDI — 25.08.2026 · `medipact dur`
 Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
@@ -446,11 +491,12 @@ H-15/1 kararı ve o cevaptaki doğrulama dökümü **1825 gün (5 yıl)**, mali 
 > 25.08'de yürürlükten kaldırılmış eski metnindendir, ben o düzeltme bloğunu
 > atlamışım. Mali kayıt da bilerek silinir — makbuz Medipact'ten kesilmiyor.
 > Kuru koşumun gösterdiği 5 satır da gerçek veri değil, beşi de deneme dosyası.
-> **(b) Cron kaldırılmadı.** Kurucu canlıda sorguladı: jobid 21 ·
-> `saklama-imha-gunluk` · `0 3 * * *` · **active = true**. `cron.unschedule`
-> başarılı göründü ama kaydı kaldırmadı; dönüş değerinin okunmamış olması
-> muhtemel — bu hafta avlanan **sessiz yazım** sınıfının aynısı.
-> Kayıt **duruyor ve öyle kalacak** (kurucu talimatı). Kalan iş yalnız teşhis.
+> **(b) Cron duruyor — ama kaldırılmadığı için değil, geri kurulduğu için.**
+> Kurucu canlıda sorguladı: jobid 21 · `saklama-imha-gunluk` · `0 3 * * *` ·
+> **active = true**. İlk teşhisim "`unschedule` yalan söyledi" idi; **yanlıştı**
+> (26.08 teşhis bloğuna bak). `unschedule` 25.08'de gerçekten kaldırmıştı;
+> kaydı 26.08 göç koşumunda `PILOT-KALAN-GOCLER.sql` **Bölüm 5** geri kurdu.
+> Kayıt **duruyor ve öyle kalacak** (kurucu talimatı).
 
 **Ders:** kuru koşum olmasaydı bu kayıp sessizce gerçekleşirdi. Bir silme kolunu
 programlamadan önce kuru koşum **zorunludur** — kolun kendisi doğru çalışıyordu,
