@@ -406,6 +406,35 @@ düzeltildi — 23.08'de `guard-shell.sh`ta öğrenilen kuralın aynısı. Kası
 ihlal (`RTCPeerConnection` eklenmiş kopya) ile tezgâhın gerçekten yakaladığı
 doğrulandı.
 
+### ⚠ 26.08 · KIL PAYI — SAKLAMA SÜRELERİ 7 GÜNE DÜŞMÜŞ, CRON KALDIRILDI
+
+**Ne oldu.** Antet ve baz çizgi göçleri çalıştırıldı (aşağıda), ardından
+periyodik imha için cron kaydı kuruldu. **Kuru koşum** (`{"kuru": true}`)
+silmeden önce ne silineceğini gösterdi ve tehlikeyi yakaladı:
+
+```
+case_notes      → silinecek 1
+odeme_kayitlari → silinecek 4
+```
+
+**Sebep:** `saklama_sureleri` tablosundaki değerler **7 GÜN**. Oysa kurucunun
+H-15/1 kararı ve o cevaptaki doğrulama dökümü **1825 gün (5 yıl)**, mali kayıt
+**3650 gün (10 yıl)** diyor. Değerler karardan sonra değişmiş.
+
+**Risk gerçekti:** canlıda **5 dosya** 7 günden eski kapanmış (en eskisi
+16.07.2026) ve bunların **4 ödeme kaydı** vardı. Cron 03:00'te koşsaydı
+**mali kayıtlar silinecekti** — kurucunun 10 yıl saklanacak dediği veri.
+
+**Yapılan:** cron kaydı **derhal kaldırıldı** (`cron.unschedule`, doğrulandı: 0
+kayıt). **Değerlere DOKUNULMADI** — onlar kurucunun verisidir; kısa süreler
+bilerek konmuş bir deneme de olabilir. Karar kurucunundur:
+· değerler 1825/3650'ye döndürülecekse cron yeniden kurulabilir,
+· 7 gün bilinçli bir denemeyse cron **deneme bitene kadar kurulmamalıdır**.
+
+**Ders:** kuru koşum olmasaydı bu kayıp sessizce gerçekleşirdi. Bir silme kolunu
+programlamadan önce kuru koşum **zorunludur** — kolun kendisi doğru çalışıyordu,
+yanlış olan parametreydi ve parametreyi ancak kuru koşum gösterdi.
+
 ### KAPANDI — 25.08 · P1 · KVKK SİLMESİ DEPOYU DA TEMİZLİYOR
 **Nasıl bulundu.** Bugün kodda *öksüz dosya* üretilmesini engelledim ama
 **mevcut öksüzleri hiç kontrol etmemiştim.** Kontrol edince kök neden çıktı:
