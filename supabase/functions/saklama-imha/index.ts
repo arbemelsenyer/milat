@@ -13,6 +13,29 @@
 // Sayaç başlangıcı iki türlü olabilir (`baslangic` kolonu):
 //   · 'olusturma'      → satırın `created_at`i
 //   · 'dosya_kapanisi' → dosyanın `closed_at`i (kapanmamış dosyaya DOKUNULMAZ)
+//
+// ── 26.08.2026 · İKİ P0 KUSUR DÜZELTİLDİ (kol hiç koşmadan yakalandı) ───────
+// Kol 27.08 03:00'te ilk kez gerçekten koşacaktı (cron jobid 21). Koşmadan önce
+// CANLI PARAMETRELERLE denetlendi ve iki geri dönüşsüz kusur bulundu:
+//
+// (1) `oturum_kayitlari` SATIRI SİLİNİYORDU. Oysa o tabloda ses ve döküm AYNI
+//     SATIRDA, ayrı kolonlarda durur (`ses_dosya_yolu` · `dokum_metni`) ve ayrı
+//     silme damgaları vardır (`ses_silindi_at` · `dokum_silindi_at`). Canlı
+//     parametre `oturum_kaydi_ses = 0 gün · olusturma` olduğu için üretilen
+//     sorgu şuydu: `delete from oturum_kayitlari where created_at < now()`.
+//     Yani DOSYA KAPANMIŞ OLSUN OLMASIN TÜM SATIRLAR — 7 gün saklanacak
+//     dökümler ve KVKK uyumunu kanıtlayan silme damgaları da giderdi.
+//     Doğrusu: satır silinmez, KOLON boşaltılır — `ajan-nobetci`in kayıt silme
+//     kolundaki (`kayitSilmeKollari`) desenin aynısı. Ses için ayrıca DEPODAKİ
+//     dosya silinir; sonra damga yazılır.
+//
+// (2) `case_documents` satırları silinirken DEPOYA DOKUNULMUYORDU — 25.08'de
+//     `dosya-verilerini-sil` kolunda kapatılan öksüz-belge kusurunun aynısı
+//     (HAT H-12: canlıda 6 öksüz). Satır gidince dosyayı gösteren kayıt kalmaz,
+//     hiçbir silme kolu onu bir daha bulamaz → constitution m.10 ihlali.
+//     Doğrusu: ÖNCE depo, SONRA satır. Depo silinemezse satıra DOKUNULMAZ.
+//
+// Ortak kural: bir silme kolu, sildiği şeyin İZİNİ de doğru bırakmalıdır.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
@@ -22,6 +45,16 @@ const corsHeaders = {
 
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+/* Kova adları KODDA sabittir (parametre tablosundan yalnız SÜRE okunur).
+   `oturum-kayitlari` → ajan-nobetci/index.ts `KAYIT_BUCKET` ile aynı olmalı.
+   `case-documents`   → dosya-verilerini-sil/index.ts `BELGE_KOVASI` ile aynı. */
+const KAYIT_KOVASI = "oturum-kayitlari";
+const BELGE_KOVASI = "case-documents";
+
+/** Tek koşumda tür başına en çok kaç satır işlenir. Kalanı bir sonraki koşum
+ *  alır; sınıra dayanıldığında SESSİZ GEÇİLMEZ, uyarı yazılır. */
+const TUR_BASINA_SINIR = 500;
 
 type Sure = {
   veri_turu: string;
@@ -34,7 +67,10 @@ type Sure = {
  *  kötü niyetli satır rastgele bir tabloyu sildiremez. */
 const TUR_HARITASI: Record<string, { tablo: string; zaman: string } | null> = {
   // Ham ses zaten metne çevrilir çevrilmez siliniyor (H-14 şart 1); burada
-  // yalnız o silmeden KAÇAN dosyaların satırı temizlenir.
+  // yalnız o silmeden KAÇAN dosyalar temizlenir.
+  // ⚠ Aşağıdaki üç tür döngüde ÖZEL işlenir (satır silinmez / önce depo gelir);
+  //   eşleme yalnız "tanınan tür" sayılmaları ve tablo adının tek yerde durması
+  //   için burada durur. Yeni tür eklerken hangi kola düştüğüne bak.
   oturum_kaydi_ses: { tablo: "oturum_kayitlari", zaman: "created_at" },
   oturum_kaydi_dokum: { tablo: "oturum_kayitlari", zaman: "created_at" },
   case_documents: { tablo: "case_documents", zaman: "created_at" },
@@ -106,43 +142,128 @@ Deno.serve(async (req) => {
 
       const sinir = new Date(Date.now() - s.saklama_gun * 86_400_000).toISOString();
 
+      /* KAPSAM — bu türün hangi satırları süresini doldurdu?
+         · 'dosya_kapanisi' → süresi dolmuş KAPALI dosyaların satırları
+                              (kapanmamış dosyaya DOKUNULMAZ)
+         · 'olusturma'      → satırın kendi zaman kolonu sınırın gerisinde
+         Kapsam bir kez kurulur, üç kol da aynı kapsamı kullanır. */
+      let kapsamIdler: string[] | null = null;
       if (s.baslangic === "dosya_kapanisi") {
-        /* Sayaç dosyanın KAPANIŞINDAN başlar: kapanmamış dosyaya dokunulmaz.
-           Önce süresi dolmuş kapalı dosyalar bulunur, sonra onların satırları. */
         const { data: dosyalar, error: dErr } = await admin.from("cases")
-          .select("id").not("closed_at", "is", null).lt("closed_at", sinir).limit(500);
+          .select("id").not("closed_at", "is", null).lt("closed_at", sinir)
+          .limit(TUR_BASINA_SINIR);
         if (dErr) {
           uyarilar.push(`${tur}: kapanmış dosyalar okunamadı — ${dErr.message}`);
           continue;
         }
-        const idler = ((dosyalar ?? []) as { id: string }[]).map((d) => d.id);
-        if (idler.length === 0) {
+        kapsamIdler = ((dosyalar ?? []) as { id: string }[]).map((d) => d.id);
+        // SESSİZ KIRPMA YOK: sınıra dayandıysak kalan bir sonraki koşuma kalır, söyle.
+        if (kapsamIdler.length === TUR_BASINA_SINIR) {
+          uyarilar.push(`${tur}: kapanmış dosya listesi ${TUR_BASINA_SINIR} sınırına dayandı; kalanı bir sonraki koşumda`);
+        }
+        if (kapsamIdler.length === 0) {
           sonuc.push({ tur, durum: "temiz", silinen: 0 });
           continue;
         }
-        if (kuru) {
-          const { count } = await admin.from(hedef.tablo)
-            .select("id", { count: "exact", head: true }).in("case_id", idler);
-          sonuc.push({ tur, durum: "kuru", silinecek: count ?? 0 });
-          continue;
+      }
+      /** Verilen sorguyu bu türün kapsamıyla daraltır. */
+      // deno-lint-ignore no-explicit-any
+      const kapsamla = (q: any) =>
+        kapsamIdler ? q.in("case_id", kapsamIdler) : q.lt(hedef.zaman, sinir);
+
+      /* ── ÖZEL KOL 1 · OTURUM KAYDI — SATIR SİLİNMEZ, KOLON BOŞALTILIR ─────
+         Ses ve döküm AYNI satırda ayrı kolonlardadır. Satırı silmek ötekini de
+         götürür ve "ne zaman/neden silindi" damgasını yok eder — yani KVKK'ya
+         karşı sildiğimizin kanıtını. Bkz. başlıktaki kusur (1). */
+      if (tur === "oturum_kaydi_ses" || tur === "oturum_kaydi_dokum") {
+        const sesMi = tur === "oturum_kaydi_ses";
+        const damga = sesMi ? "ses_silindi_at" : "dokum_silindi_at";
+        // Zaten silinmiş olanı tekrar işleme: damgası dolu satır atlanır.
+        const { data: satirlar, error: okErr } = await kapsamla(
+          admin.from("oturum_kayitlari").select("id, ses_dosya_yolu"),
+        ).is(damga, null).limit(TUR_BASINA_SINIR);
+        if (okErr) { uyarilar.push(`${tur}: kayıtlar okunamadı — ${okErr.message}`); continue; }
+        const bekleyen = (satirlar ?? []) as { id: string; ses_dosya_yolu: string | null }[];
+        if (bekleyen.length === 0) { sonuc.push({ tur, durum: "temiz", silinen: 0 }); continue; }
+        if (kuru) { sonuc.push({ tur, durum: "kuru", silinecek: bekleyen.length }); continue; }
+
+        if (sesMi) {
+          /* ÖNCE DEPO, SONRA damga. Ters sırada damga yazılıp dosya kalırsa
+             kayıt "silindi" der ama ses kovada durur — en kötü hâl. */
+          const yollar = bekleyen
+            .map((r) => String(r.ses_dosya_yolu ?? "").trim())
+            .filter((y) => y.length > 0);
+          if (yollar.length > 0) {
+            const { error: depoErr } = await admin.storage.from(KAYIT_KOVASI).remove(yollar);
+            if (depoErr) {
+              uyarilar.push(`${tur}: ses dosyaları depodan silinemedi — ${depoErr.message}; satırlara DOKUNULMADI`);
+              sonuc.push({ tur, durum: "atlandı", sebep: "depo temizlenemedi" });
+              continue;
+            }
+          }
         }
-        const { error: silErr, count } = await admin.from(hedef.tablo)
-          .delete({ count: "exact" }).in("case_id", idler);
-        if (silErr) { uyarilar.push(`${tur}: silinemedi — ${silErr.message}`); continue; }
+        const simdi = new Date().toISOString();
+        const not = `Saklama süresi doldu (${s.saklama_gun} gün · ${s.baslangic}).`;
+        const yama = sesMi
+          ? { ses_dosya_yolu: null, ses_silindi_at: simdi, ses_silme_notu: not }
+          : { dokum_metni: null, dokum_silindi_at: simdi, dokum_silme_notu: not };
+        const { error: yErr, count } = await admin.from("oturum_kayitlari")
+          .update(yama, { count: "exact" }).in("id", bekleyen.map((r) => r.id));
+        if (yErr) { uyarilar.push(`${tur}: silme damgası yazılamadı — ${yErr.message}`); continue; }
         toplamSilinen += count ?? 0;
-        sonuc.push({ tur, durum: "silindi", silinen: count ?? 0 });
+        sonuc.push({
+          tur, durum: "silindi", silinen: count ?? 0,
+          ne: sesMi ? "ses kolonu + depodaki dosya" : "döküm kolonu",
+        });
         continue;
       }
 
-      // baslangic === 'olusturma'
+      /* ── ÖZEL KOL 2 · BELGELER — ÖNCE DEPO, SONRA SATIR ───────────────────
+         Satır önce silinirse dosyayı gösteren kayıt kalmaz; dosya kovada
+         süresiz öksüz kalır ve hiçbir silme kolu onu bulamaz
+         (HAT H-12 · constitution m.10). Bkz. başlıktaki kusur (2). */
+      if (tur === "case_documents") {
+        const { data: belgeler, error: bErr } = await kapsamla(
+          admin.from("case_documents").select("id, file_path"),
+        ).limit(TUR_BASINA_SINIR);
+        if (bErr) { uyarilar.push(`${tur}: belgeler okunamadı — ${bErr.message}`); continue; }
+        const bekleyen = (belgeler ?? []) as { id: string; file_path: string | null }[];
+        if (bekleyen.length === 0) { sonuc.push({ tur, durum: "temiz", silinen: 0 }); continue; }
+        if (kuru) { sonuc.push({ tur, durum: "kuru", silinecek: bekleyen.length }); continue; }
+
+        const yollar = bekleyen
+          .map((b) => String(b.file_path ?? "").trim())
+          .filter((y) => y.length > 0);
+        if (yollar.length > 0) {
+          const { error: depoErr } = await admin.storage.from(BELGE_KOVASI).remove(yollar);
+          if (depoErr) {
+            uyarilar.push(`${tur}: belgeler depodan silinemedi — ${depoErr.message}; satırlara DOKUNULMADI`);
+            sonuc.push({ tur, durum: "atlandı", sebep: "depo temizlenemedi" });
+            continue;
+          }
+        }
+        const { error: silErr, count } = await admin.from("case_documents")
+          .delete({ count: "exact" }).in("id", bekleyen.map((b) => b.id));
+        if (silErr) { uyarilar.push(`${tur}: silinemedi — ${silErr.message}`); continue; }
+        toplamSilinen += count ?? 0;
+        sonuc.push({ tur, durum: "silindi", silinen: count ?? 0, ne: "depodaki dosya + satır" });
+        continue;
+      }
+
+      /* ── GENEL KOL · düz satır silme (case_notes · odeme_kayitlari) ───────
+         Bu türlerin depoda karşılığı YOKTUR; satır gidince arkada dosya kalmaz.
+         Yeni bir tür eklerken önce şunu sor: bu satır bir DOSYAYI mı işaret
+         ediyor? Ediyorsa buraya değil, yukarıdaki depo kollarına benzemeli. */
       if (kuru) {
-        const { count } = await admin.from(hedef.tablo)
-          .select("id", { count: "exact", head: true }).lt(hedef.zaman, sinir);
+        const { count } = await kapsamla(
+          admin.from(hedef.tablo).select("id", { count: "exact", head: true }),
+        );
         sonuc.push({ tur, durum: "kuru", silinecek: count ?? 0 });
         continue;
       }
-      const { error: silErr, count } = await admin.from(hedef.tablo)
-        .delete({ count: "exact" }).lt(hedef.zaman, sinir);
+      const { error: silErr, count } = await kapsamla(
+        admin.from(hedef.tablo).delete({ count: "exact" }),
+      );
       if (silErr) { uyarilar.push(`${tur}: silinemedi — ${silErr.message}`); continue; }
       toplamSilinen += count ?? 0;
       sonuc.push({ tur, durum: "silindi", silinen: count ?? 0 });
