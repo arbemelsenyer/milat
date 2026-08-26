@@ -1,12 +1,18 @@
 ## Nerede kaldık
 
-- Tarih: 26.08.2026 (**15. blok** · `medipact devam`) — H-16 cevabı işlendi,
-  sonra üç iş kendiliğinden çıkarıldı ve bitirildi (§6). Kuyrukta uygulanabilir
-  iş kalmadı; açık her madde kurucu/Cowork kararına bağlı.
+- Tarih: **27.08.2026 · 02:40** (15. blok) — `medipact dur` ile kapatıldı.
+  H-16 cevabı işlendi, sonra dört iş kendiliğinden çıkarılıp bitirildi (§6);
+  kapanışta Cowork'ün **H-17 ve H-18 cevapları** geldi ve kaydedildi.
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: **yok**
+- Aktif görev: **yok** (`dur` ile kapatıldı, yeni işe geçilmedi)
+- **SIRADAKİ İŞ (P0, dağıtım):** `saklama-imha` canlıda **ESKİ sürüm** —
+  kuru koşum bunu gösterdi (üç tür `"kuru"` döndü, yeni kod `"temiz"` derdi).
+  Yeniden dağıt, kuru koşumu tekrar aldır. Bugün veri riski **yok**
+  (`oturum_kayitlari` 0 satır); risk pilotta ilk oturum kaydıyla başlar.
+- **SONRAKİ İŞ (P1, onaylı):** H-18 — `ajan-nobetci` kapanışta dökümü
+  silmeyecek; süre tek yerden (`saklama_sureleri`) okunacak.
 - Son tamamlanan iş (26.08 · 15. blok): **antet gerçekten doldurulabilir oldu.**
   Bu blokta DONE işaretlediğim antet maddesi **yanlış DONE'du**: göç kolonları
   ekledi, belge üreticisi okuyordu, ama alanları **yazan hiçbir yüzey yoktu** —
@@ -99,12 +105,72 @@ kotasız çalışıyor. Gerekirse sonra koşulabilir, zararsızdır.
   `saklama-imha` (Lovable depo kopyasında yeni kod okundu) · `CaseRoom` (canlı
   pakette `"Yarım silindi"` dizesi bulundu) · `admin-delete-knowledge`.
 - Açık HAT maddeleri: H-7 · H-8 · H-9 · H-10 · H-12 (P1 · birikmiş öksüz
-  belgeler) · H-13 · **H-17 (P1 · `saklama-imha` kuru koşumu — tek komut,
-  hiçbir şey silmez; komut metni `tests/gecici/saklama-imha-kuru-kosum.sql`)**.
+  belgeler) · H-13 — **hepsi kurucu kararı bekliyor.**
+  **H-17 CEVAPLANDI ama KAPANMADI:** kuru koşum sayıları doğru çıktı, fakat
+  cevabın kendisi canlıda **eski sürümün** koştuğunu gösterdi; yeniden dağıtım
+  ve ikinci kuru koşum gerekiyor.
+  **H-18 CEVAPLANDI, uygulama bekliyor** (kod işi, onaylı).
   **H-15 ve H-16 KAPANDI** (ikisi de ARŞİV'de).
 - ~~**Sıradaki uygulanabilir iş (P1):** `cron.unschedule` neden yalan söyledi~~
   → **DONE 26.08** (aşağıdaki teşhis bloğu). Soru yanlış kurulmuştu: `unschedule`
   yalan söylemedi, kaydı **başka bir şey geri kurdu**. Kayda dokunulmadı.
+
+### DUR KAYDI — 27.08.2026 · 02:40 · `medipact dur`
+Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
+
+**Bu turda Cowork iki cevap yazdı** (ben çalışırken); ikisi de commit'lendi.
+
+**H-17 · kuru koşum ÇALIŞTIRILDI — sayılar doğru, ama madde KAPANMADI.**
+HTTP 200, `toplam_silinen: 0`, `uyarilar` yok. Sayılar beklenenin aynısı:
+`case_notes → 1` · `odeme_kayitlari → 4` · geri kalan 0. Yani **03:00 UTC koşumu
+güvenli**; silinecek 5 satır 16–18.07 tarihli deneme dosyalarına ait (Cowork
+`cases` tablosundan ayrıca doğruladı, gerçek dosya yok).
+
+> **DÜZELTME · Cowork'ün dağıtım çıkarımı yanlış: canlıda ESKİ kod duruyor.**
+> Cowork, `dosya_kapanis_sonrasi` için dönen "bu tür başka bir kolun işi"
+> gerekçesini yeni sürümün imzası saydı. **O dize eski kodda da vardı**
+> (`git show HEAD~7:supabase/functions/saklama-imha/index.ts` → 1 eşleşme).
+> H-17'de verilen gerçek ayırt edici ise tersini söylüyor: yeni kolda 0 satır
+> bulununca **`"temiz"`** yazılır, `"kuru"` yalnız eski koddaki sayım dalından
+> çıkar. Canlı cevapta `oturum_kaydi_ses` · `oturum_kaydi_dokum` ·
+> `case_documents` **üçü de `"kuru", silinecek: 0`** döndü → **eski sürüm.**
+> Yani ön yüz publish'i edge function'ı yenilememiş (§11-B bunu zaten söylüyor).
+> Cevaptaki "temiz/kuru yalnız etiket farkı, beklenti metnini düzeltmek yeter"
+> değerlendirmesi de bu yüzden geçersiz: etiket farkı yazım ayrıntısı değil,
+> **hangi sürümün koştuğunun göstergesiydi.**
+>
+> **Tehlike bugün YOK:** eski kol `oturum_kayitlari` **satırlarını** siler ama o
+> tablo canlıda **0 satır**; 03:00'te silinecek 5 satır iki sürümde de aynı.
+> Tehlike **pilotta ilk gerçek oturum kaydı tutulduğu an** başlar.
+
+**H-18 · CEVAPLANDI — uygulama bekliyor (kod işi, bu turda YAPILMADI).**
+Karar: **`saklama-imha` haklı, `ajan-nobetci` düzeltilecek.** Gerekçe kurucunun
+kendi cümlesi: 7 gün **UYAP payıdır**; dökümü kapanıştan ~3 dakika sonra silen
+bir kol o payı uygulamış olmaz, **deler**.
+Uygulanacaklar: `ajan-nobetci`nin kapanışta döküm silen kolu **kaldırılacak**
+(ya da yalnız `saklama_sureleri`ne bakacak hâle getirilecek) · silmenin tek
+yetkilisi `saklama-imha` (kapanış + 7 gün, ya da arabulucu "tüm verileri sil"
+derse anında) · **istisna değişmedi:** ham ses metne çevrilir çevrilmez silinir
+(H-14 şart 1), 7 güne tabi değildir. Genel kural `lessons.md`ye yazıldı.
+
+**Ağaç durumu.** `main` = `origin/main`. Commit edilmemiş **kendi** işim yok.
+Bu oturuma ait olmayan, §11 gereği **dokunulmayan** yabancı değişiklikler:
+silinmiş ama commit edilmemiş `.agents/skills/medipact-calisma-duzeni/SKILL.md`
+(içeriği `.github/.agents/…` altında bayt bayt duruyor — **taşıma**, kayıp yok) ·
+izlenmeyen `.github/.agents/` · `devam.sh` · `gs.sh` ·
+`Yeni XLSX Worksheet.xlsx` · `repomix-output.xml`.
+
+**Doğrulama (dur anında koşuldu):** `npm run test` **359/359 (42 dosya)**.
+`tsc` ve `eslint` bu turda değişiklik olmadığı için yeniden koşulmadı; son
+sonuçları önceki bloklarda: tsc temiz (çıkış 0), eslint yeni sorun yok.
+
+**SIRADAKİ OTURUMUN İŞ SIRASI:**
+1. **`saklama-imha` yeniden dağıt** ve kuru koşumu **tekrar** aldır (H-17).
+   Üç tür `"temiz"` dönene kadar madde kapanmaz. Yalnız yayın kuyruğu işi;
+   "pending" kanıt değil, gerekirse `deploy_project`'i **tekrar** çağır.
+2. **H-18'i uygula:** `ajan-nobetci`nin kapanışta döküm silen kolunu kaldır,
+   süreyi `saklama_sureleri`den okut, tezgâhla kilitle. Kurucu onayı **var**.
+3. Kalan HAT maddeleri hâlâ kurucuda: H-7 · H-8 · H-9 · H-10 · H-12 · H-13.
 
 ### KAPANDI — 26.08 · P1 · ANTET "DONE" İŞARETLİYDİ AMA **DOLDURULAMIYORDU**
 Bu maddeyi bu blokta **ben** DONE işaretlemiştim ve yanlıştı.

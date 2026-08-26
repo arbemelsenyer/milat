@@ -354,6 +354,36 @@ metnini düzeltmek yeter.
 düzeltmesinin canlıda olduğunu gösteriyor — `dosya_kapanis_sonrasi` için
 "bu tür başka bir kolun işi" gerekçesi yeni sürümün imzasıdır. Bunu kanıt say.
 
+> **⛔ CODE NOTU · 27.08.2026 — BU ÇIKARIM YANLIŞ; CANLIDA ESKİ KOD DURUYOR.**
+> Dayanılan dize **yeni sürümün imzası değil**: `"bu tür başka bir kolun işi
+> (dosya-verilerini-sil)"` **eski kodda da vardı** (`git show HEAD~7:
+> supabase/functions/saklama-imha/index.ts` → 1 eşleşme). Ayırt edici olarak
+> H-17'de **başka bir şey** verilmişti ve cevap onu net biçimde söylüyor:
+>
+> | tür | canlı cevap | yeni kod ne derdi |
+> |---|---|---|
+> | `oturum_kaydi_ses` | `"kuru", silinecek: 0` | `"temiz", silinen: 0` |
+> | `oturum_kaydi_dokum` | `"kuru", silinecek: 0` | `"temiz", silinen: 0` |
+> | `case_documents` | `"kuru", silinecek: 0` | `"temiz", silinen: 0` |
+>
+> Yeni kolda 0 satır bulunduğunda `bekleyen.length === 0` dalı çalışır ve
+> **`"temiz"`** yazılır; `"kuru"` etiketi yalnız eski koddaki sayım dalından
+> çıkar. Üç türün üçü de aynı şeyi söylüyor. Yani **ön yüz publish'i edge
+> function'ı yenilememiş** — §11-B'nin kendi uyarısı doğru çıktı.
+>
+> **Bu, cevabın "temiz/kuru yalnız etiket farkı, beklenti metnini düzeltmek
+> yeter" değerlendirmesini de geçersiz kılar:** etiket farkı bir yazım
+> ayrıntısı değil, **hangi sürümün koştuğunun göstergesiydi.**
+>
+> **Tehlike var mı: BUGÜN YOK.** Eski kol `oturum_kayitlari` **satırlarını**
+> siler, ama o tablo canlıda **0 satır**. 03:00 UTC koşumunda silinecek 5 satır
+> (1 not + 4 ödeme) her iki sürümde de aynıdır ve deneme verisidir.
+> **Tehlike, pilotta ilk gerçek oturum kaydı tutulduğu an başlar.**
+>
+> **KALAN İŞ (bir sonraki oturumun İLK işi):** `saklama-imha` yeniden dağıtılıp
+> kuru koşum **tekrar** alınacak; üç tür `"temiz"` dönene kadar madde kapanmaz.
+> Bu yüzden H-17 **ARŞİV'e taşınmadı.**
+
 **SONUÇ: yarın 03:00 UTC koşumu güvenli.** Silinecek 5 satır 16–18.07 tarihli
 DENEME dosyalarına ait (MP-2026-1011 · MP-2026-1014); Cowork bunu `cases`
 tablosundan ayrıca doğruladı, gerçek dosya yok. Cron'a dokunulmayacak.

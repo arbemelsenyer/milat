@@ -12,6 +12,36 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   yenidir. Yanlış kurulmuş bir soru, cevap bekleyen gerçek bir kapı gibi görünüp
   işi durdurur — en pahalı yanlış alarm türü budur.
 
+- DERS (27.08.2026 · **kurucu talimatı, H-18 cevabı**) — **BİR VERİ TÜRÜNÜN KAÇ
+  GÜN TUTULACAĞINA TEK YERDEN KARAR VERİLİR** (`saklama_sureleri`); başka hiçbir
+  kol kendi süresini kendi taşımaz. 26.08'de iki kol iki ayrı kararı uyguluyordu:
+  `saklama_sureleri` "döküm 7 gün" derken `ajan-nobetci` dökümü dosya kapanır
+  kapanmaz siliyordu (nöbetçi 3 dakikada bir koşuyor). Sonuç: tabloda 7 gün
+  yazıyor, gerçekte ~3 dakika. Kurucunun kararı: **`saklama-imha` haklı,
+  `ajan-nobetci` düzeltilecek** — 7 gün **UYAP payıdır**, arabulucu imzalı
+  tutanağı indirip yükleyecek kadar zamanı olsun diye kondu; kapanışta silen bir
+  kol o payı uygulamış olmaz, **deler**. İstisna değişmedi: ham ses metne
+  çevrilir çevrilmez silinmeye devam eder (H-14 şart 1), 7 güne tabi değildir.
+  **KURAL:** yeni bir silme/saklama kolu yazarken süreyi koda yazma; parametre
+  tablosundan oku. Süreyi kodda taşıyan her kol, bir gün tablodaki kararla
+  çelişir ve çelişkiyi kimse fark etmez.
+
+- DERS (27.08.2026) — **YAYIN "pending" DEMESİ İNDİĞİ ANLAMINA GELMEZ; VE BİR
+  SÜRÜMÜ AYIRT EDEN ŞEY, O SÜRÜMDE *DEĞİŞEN* DİZEDİR.** İki ayrı tuzak, aynı gün:
+  (1) `deploy_project` "pending" döndü, `get_project` `status: completed` ·
+  `error: null` dedi, derleme sorunsuzdu — ama üretim adresi **25 dakika boyunca**
+  eski paketi sunmaya devam etti. **İkinci** `deploy_project` çağrısında 25
+  saniyede indi. Kural: yayını **dizeyle** doğrula; inmediyse bekleme, tekrar
+  çağır.
+  (2) Ön yüz publish'i **edge function'ı yenilemedi** (§11-B bunu zaten söylüyor).
+  Bu, kuru koşumun cevabından anlaşıldı — ama Cowork ters okudu: dağıtımın
+  kanıtı olarak **her iki sürümde de bulunan** bir gerekçe dizesini gösterdi.
+  Gerçek ayırt edici, düzeltmenin **değiştirdiği** çıktıydı (`"kuru"` → `"temiz"`).
+  **KURAL:** "yeni sürüm canlıda mı?" sorusu, yalnız yeni sürümde **var olan ya
+  da değişen** bir çıktıyla yanıtlanır. Eski sürümde de bulunan bir dize hiçbir
+  şeyi kanıtlamaz — ve bu tuzak, kanıt diye sunulduğunda tehlikelidir:
+  düzeltilmemiş bir silme kolu "dağıtıldı" sayılıyordu.
+
 - DERS (26.08.2026) — **ŞEMAYI ÖLÇEN KABUL KRİTERİ, DAVRANIŞI ÖLÇMEZ:
   "OKUYAN VAR" DEMEK "ÇALIŞIYOR" DEMEK DEĞİLDİR.** Antet maddesini bugün DONE
   işaretledim; kriterim `antet_kolon = 3` idi ve gerçekten 3'tü. Belge üreticisi
