@@ -5,9 +5,25 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: **H-18 uygulaması (P1)** — `ajan-nobetci` kapanışta dökümü
-  silmeyecek; süre tek yerden (`saklama_sureleri`) okunacak.
-- Son tamamlanan iş (27.08 · 16. blok): **`saklama-imha` canlıda YENİLENDİ ve
+- Aktif görev: **yok** — bu blokta üç iş de bitti (P0 · P1 · P2), üçü de canlı
+  ya da tezgâh kanıtlı.
+- Son tamamlanan iş (27.08 · 16. blok · 3/3): **H-18 uygulandı — nöbetçi artık
+  oturum kaydı SİLMİYOR, canlı kanıtlı.** `kayitSilmeKollari` + `KAYIT_BUCKET`
+  + çağrı yeri + iki sayaç kaldırıldı. Kapanışta döküm silen kolun yanında,
+  sesi kapanıştan **24 saat** sonra silen kol da gitti: kurucunun kuralı — bir
+  veri türünün süresine **tek yerden** karar verilir — onu da kapsıyor.
+  Değişmeyen istisna: ham ses metne çevrilir çevrilmez siliniyor (H-14 şart 1).
+  **Canlı kanıt:** nöbetçi 3 dakikada bir koşuyor; 08:48 · 08:51 · 08:54
+  koşumlarında `ses_kaydi_silindi`/`dokum_silindi` alanları **vardı**, 08:57
+  koşumunda **yok** — yeni sürüm indi. Tezgâh kilidi: `saklama-imha.test.ts`
+  içindeki "H-18" bölümü kolun sessizce geri gelmesini engelliyor.
+  Doğrulama: `npm run test` 363/363 · tsc temiz · commit `5527fff`.
+- Bir önceki iş (27.08 · P2): **CRLF tuzağı kapandı.** `tests/kaynak.ts`
+  eklendi (`kaynakOku` — CRLF'i LF'e çevirir) ve `tests/` içindeki **31**
+  dosya ona bağlandı. Ürün kodunda değişiklik yok. Doğrulama: 363/363 · tsc
+  temiz · `npx eslint tests/` → kalan 18 hata beş dosyada ve **hepsi önceden
+  vardı** (dokunulmayan satırlarda). Commit `be29b2b`.
+- Daha önce (27.08 · P0): **`saklama-imha` canlıda YENİLENDİ ve
   kuru koşumla kanıtlandı — H-17 KAPANDI.**
   Fonksiyon Lovable'dan yeniden dağıtıldı; cevaba **`surum` alanı** eklendi
   (`"2026-08-26-kolon-depo"`) — 26.08'in dersi buydu: hangi sürümün koştuğunu
@@ -493,13 +509,22 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       `b48e669`) → kuru koşum istek **11612**, HTTP **200**,
       `{"ok":true,"surum":"2026-08-26-kolon-depo",...}` üç tür `"temiz"`
       · `npm run test` **359/359** · `tsc --noEmit` temiz
-- [ ] P2 · **CRLF tuzağı: kaynak okuyan öteki tezgâhlar** · Depoda 341 izlenen
+- [x] P1 · **`ajan-nobetci` kapanışta döküm silmiyor (H-18)** · Kabul: nöbetçi
+      gövdesinde `dokum_silindi_at` · `ses_silindi_at` · `oturum-kayitlari` ve
+      24 saatlik süre sabiti YOK; süreye tek karar veren `saklama_sureleri`
+      · **DONE 27.08.2026 — CANLI KANITLI** · Doğrulama: nöbetçinin 08:57 UTC
+      koşumunda eski sayaçlar (`ses_kaydi_silindi`/`dokum_silindi`) **düştü**,
+      08:54 ve öncesinde **vardı** → yeni sürüm canlıda. `npm run test`
+      **363/363** · `tsc --noEmit` temiz · commit `5527fff`
+- [x] P2 · **CRLF tuzağı: kaynak okuyan öteki tezgâhlar** · Depoda 341 izlenen
       dosya CRLF (`core.autocrlf=true`); `readFileSync(..., "utf-8")` ile kaynak
       okuyup **çok satırlı** dizgi arayan her tezgâh, kod doğruyken kırmızı
-      yanabilir — 27.08'de `tests/saklama-imha.test.ts`te oldu ve orada
-      düzeltildi. Kabul: `tests/` içinde kaynak okuyan tezgâhlar tek bir
-      normalleştiren okuyucudan geçiyor (ya da `.gitattributes` ile satır sonu
-      tekleşiyor) ve `npm run test` yeşil kalıyor
+      yanabilirdi — 27.08'de `tests/saklama-imha.test.ts`te oldu. Kabul: `tests/`
+      içinde kaynak okuyan tezgâhlar tek bir normalleştiren okuyucudan geçiyor
+      ve `npm run test` yeşil kalıyor · **DONE 27.08.2026** · Doğrulama:
+      `tests/kaynak.ts` (`kaynakOku`) eklendi, **31** tezgâh ona bağlandı;
+      363/363 · tsc temiz · `npx eslint tests/` → kalan 18 hatanın hepsi
+      önceden vardı · commit `be29b2b`
 - [x] P1 · **Taraf katılım ekranında aydınlatma metni** · **DONE 25.08.2026 —
       CANLI KANITLI** · §15.1 beş şart da sağlanıyor
       · **ŞART 4 CANLI KANITI (Code kendi doğruladı):** canlıda bekleyen gerçek

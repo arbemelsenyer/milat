@@ -197,50 +197,6 @@ verildiğinde tam komut metni bu maddeye eklenecek.
 
 ---
 
-### H-18 · 26.08.2026 · P1 — Oturum dökümü için "7 günlük UYAP payı" pratikte YOK
-**Sorun.** Bugün H-16'da şöyle dediniz: *"Otomatik süpürme 7 gün: arabulucunun
-tutanağı indirip UYAP'a yükleme payı."* `saklama_sureleri` de buna uyuyor:
-`oturum_kaydi_dokum = 7 gün · dosya_kapanisi`.
-
-Ama **başka bir kol daha aynı veriyi siliyor** ve o kol beklemiyor.
-`ajan-nobetci` → `kayitSilmeKollari`: *"Döküm: süreç bittiğinde (son tutanakla
-birlikte) silinir."* Dosya `agreed`/`failed` olur olmaz `dokum_metni` boşaltılıyor
-ve nöbetçi **3 dakikada bir** koşuyor. Yani oturum dökümü için 7 gün değil,
-**yaklaşık 3 dakika** var. `saklama-imha`nın 7 günlük kolu o satırlara vardığında
-`dokum_silindi_at` çoktan dolu olduğu için hiçbir şey yapmıyor — 7 gün **hiç
-yürürlüğe girmiyor.**
-
-Bu bir kod hatası değil: iki kol iki ayrı kararı uyguluyor. Eski karar (İBA 1.8 /
-B18: "döküm süreç sonuna kadar durur, süreç bitince silinir") nöbetçide;
-25–26.08 kararı ("7 gün pay") parametre tablosunda. **Hangisi geçerli, sizin
-kararınız** — ve nöbetçinin davranışını değiştirmek §13 gereği zaten size ait.
-
-**Not:** bu yalnız **oturum dökümünü** ilgilendirir. Resmî tutanak/belge ayrı
-üretilir ve bu koldan silinmez; ses zaten metne çevrilir çevrilmez siliniyor ve
-o doğru çalışıyor (denetlendi).
-
-**Seçenekler.**
-| | ne yapılır | sonucu |
-|---|---|---|
-| **A** | Nöbetçinin döküm kolu **7 günü bekler** (parametre tablosundan okur, kodda sabit tutmaz); silme tek kolda, `saklama-imha`da toplanır | Söylediğiniz "UYAP payı" gerçekten oluşur; saklama süresi tek yerden yönetilir |
-| B | Parametre 0 güne çekilir; nöbetçinin bugünkü davranışı **doğru** kabul edilir | Çelişki biter, ama döküm kapanışta anında gider — indirilmemişse gitmiştir |
-| C | Bugünkü hâl | Tabloda "7 gün" yazar, gerçekte ~3 dakikadır; kayıt gerçeği anlatmaz |
-
-**Önerim: A.** Sebebi ürün değil, sizin bugünkü gerekçeniz: pay **niye** kondu?
-Arabulucu tutanağı indirip UYAP'a yükleyebilsin diye. Kapanışta anında silinirse
-o pay hiç kullanılamaz — dosya kapandığı an arabulucu ekranı kapatmışsa döküm
-gitmiştir. A ayrıca saklama süresini **tek kaynağa** (parametre tablosu) bağlar;
-bugün iki kol iki ayrı kural uyguluyor ve bu tür ikilik bu hafta üç kez kusur
-üretti.
-
-**Kararın etkisi.** A seçilirse `ajan-nobetci`nin **runtime davranışı** değişir
-(§13) — Code kendiliğinden yapmaz, onayınızla yapar; kişisel veri **daha uzun**
-durur (kapanış + 7 gün), bu bir KVKK kararıdır. B seçilirse veri daha kısa durur
-ama "UYAP payı" sözü kayıttan çıkarılmalıdır. C seçilirse `saklama_sureleri`
-tablosu gerçeği anlatmayan bir değer taşımaya devam eder.
-
----
-
 ### H-13 · 25.08.2026 · P2 — Taraf katılımı açık rıza ile KAPILANSIN mı?
 **Sorun.** Bugün mimari §15.2'nin "aydınlatma metni taraf kayıt ekranında
 gösteriliyor" şartı sağlandı: `/katilim/:token` sayfasında KVKK aydınlatması ve
@@ -284,25 +240,6 @@ _Cevaplar buraya yazılır. Biçim:_
 Seçim: A / B / C / (kendi metniniz)
 Not: (varsa)
 ```
-
-### H-18 · CEVAP · 26.08.2026 — TEK KURAL: 7 GÜN. NÖBETÇİ KAPANIŞTA SİLMEYECEK.
-Seçim: **`saklama-imha` haklı, `ajan-nobetci` düzeltilecek.**
-
-Gerekçe kurucunun kendi cümlesidir: 7 gün **UYAP payıdır** — arabulucu imzalı
-tutanağı indirip UYAP'a yükleyecek kadar zamanı olsun diye kondu. Dökümü
-kapanıştan ~3 dakika sonra silen bir kol o payı fiilen sıfırlar; kararı
-uygulamış olmaz, deler.
-
-**Uygulanacak:**
-- `ajan-nobetci`nin dosya kapanışında döküm silen kolu **kaldırılacak** (ya da
-  yalnız `saklama_sureleri`ne bakacak hâle getirilecek). Kapanış anında silme yok.
-- Silmenin tek yetkilisi `saklama-imha`dır: kapanış + 7 gün, ya da arabulucu
-  **"Dosyayı kapat ve tüm verileri sil"** derse anında.
-- **İSTİSNA DEĞİŞMEDİ:** ham ses metne çevrilir çevrilmez silinmeye devam eder
-  (H-14 şart 1). Bu 7 güne tabi değildir.
-- Genel kural: bir veri türünün kaç gün tutulacağına **tek yerden** karar verilir
-  (`saklama_sureleri`); başka hiçbir kol kendi süresini kendi taşımaz. Bunu
-  `tasks/lessons.md`ye yaz — bugün iki kol iki ayrı kararı uyguluyordu.
 
 ### H-15/1 · CEVAP DEĞİŞTİ · 25.08.2026 — SIFIR SAKLAMA
 **Bu blok, aşağıdaki "TEK ÇATI 5 YIL" kararının YERİNE GEÇER. 5 yıl artık geçersizdir.**
@@ -575,6 +512,104 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+### H-18 · KAPANDI · 27.08.2026 — NÖBETÇİNİN SİLME KOLU KALDIRILDI, CANLI KANITLI
+Kurucu kararı uygulandı: `ajan-nobetci` artık oturum kaydı **silmiyor**.
+Silmenin tek yetkilisi `saklama-imha`dır ve süreyi yalnız `saklama_sureleri`
+tablosundan okur.
+
+**Ne kaldırıldı:** `kayitSilmeKollari` işlevi, `KAYIT_BUCKET` sabiti, çağrı yeri
+ve iki sayaç (`ses_kaydi_silindi` · `dokum_silindi`). Kapanışta döküm silen kolun
+yanında, sesi kapanıştan **24 saat** sonra silen kol da gitti: aynı kural — bir
+veri türünün süresine **tek yerden** karar verilir — onu da kapsıyor. Yerine,
+hangi kolun neyi ne zaman sildiğini yazan bir gerekçe bloğu bırakıldı.
+
+**Değişmeyen istisna:** ham ses metne çevrilir çevrilmez `sesli-not-dokum`
+tarafından silinmeye devam ediyor (H-14 şart 1); 7 güne tabi değildir.
+
+**CANLI KANIT (Code kendi aldı).** Nöbetçi 3 dakikada bir koşuyor; cevabındaki
+sayaçların varlığı sürüm imzası olarak kullanıldı:
+
+| koşum (UTC) | `ses_kaydi_silindi` / `dokum_silindi` alanı |
+|---|---|
+| 08:48 · 08:51 · 08:54 | **VAR** (eski sürüm) |
+| **08:57** | **YOK** (yeni sürüm çalışıyor) |
+
+Yani dağıtım gerçekten indi — 26.08'de H-17'de yaşanan "publish ettim ama edge
+function eskide kaldı" durumu bu kez doğrudan ölçüldü.
+
+**Tezgâh kilidi:** `tests/saklama-imha.test.ts` içindeki
+"H-18 · nöbetçi oturum kaydı SİLMİYOR" bölümü, nöbetçi gövdesinde
+`dokum_silindi_at` · `ses_silindi_at` · `oturum-kayitlari` · 24 saatlik süre
+sabiti **arar ve bulunmamasını şart koşar**; kolun sessizce geri gelmesini
+engeller. Kova sürüklenme kilidi de nöbetçiden, kovayı gerçekten kullanan
+yüzeylere taşındı (`sesli-not-dokum` ↔ `saklama-imha`).
+
+Doğrulama: `npm run test` **363/363** · `tsc --noEmit` temiz · commit `5527fff`.
+Genel kural `tasks/lessons.md`ye yazıldı.
+
+### H-18 · CEVAP · 26.08.2026 — TEK KURAL: 7 GÜN. NÖBETÇİ KAPANIŞTA SİLMEYECEK.
+Seçim: **`saklama-imha` haklı, `ajan-nobetci` düzeltilecek.**
+
+Gerekçe kurucunun kendi cümlesidir: 7 gün **UYAP payıdır** — arabulucu imzalı
+tutanağı indirip UYAP'a yükleyecek kadar zamanı olsun diye kondu. Dökümü
+kapanıştan ~3 dakika sonra silen bir kol o payı fiilen sıfırlar; kararı
+uygulamış olmaz, deler.
+
+**Uygulanacak:**
+- `ajan-nobetci`nin dosya kapanışında döküm silen kolu **kaldırılacak** (ya da
+  yalnız `saklama_sureleri`ne bakacak hâle getirilecek). Kapanış anında silme yok.
+- Silmenin tek yetkilisi `saklama-imha`dır: kapanış + 7 gün, ya da arabulucu
+  **"Dosyayı kapat ve tüm verileri sil"** derse anında.
+- **İSTİSNA DEĞİŞMEDİ:** ham ses metne çevrilir çevrilmez silinmeye devam eder
+  (H-14 şart 1). Bu 7 güne tabi değildir.
+- Genel kural: bir veri türünün kaç gün tutulacağına **tek yerden** karar verilir
+  (`saklama_sureleri`); başka hiçbir kol kendi süresini kendi taşımaz. Bunu
+  `tasks/lessons.md`ye yaz — bugün iki kol iki ayrı kararı uyguluyordu.
+
+### H-18 · 26.08.2026 · P1 — Oturum dökümü için "7 günlük UYAP payı" pratikte YOK
+**Sorun.** Bugün H-16'da şöyle dediniz: *"Otomatik süpürme 7 gün: arabulucunun
+tutanağı indirip UYAP'a yükleme payı."* `saklama_sureleri` de buna uyuyor:
+`oturum_kaydi_dokum = 7 gün · dosya_kapanisi`.
+
+Ama **başka bir kol daha aynı veriyi siliyor** ve o kol beklemiyor.
+`ajan-nobetci` → `kayitSilmeKollari`: *"Döküm: süreç bittiğinde (son tutanakla
+birlikte) silinir."* Dosya `agreed`/`failed` olur olmaz `dokum_metni` boşaltılıyor
+ve nöbetçi **3 dakikada bir** koşuyor. Yani oturum dökümü için 7 gün değil,
+**yaklaşık 3 dakika** var. `saklama-imha`nın 7 günlük kolu o satırlara vardığında
+`dokum_silindi_at` çoktan dolu olduğu için hiçbir şey yapmıyor — 7 gün **hiç
+yürürlüğe girmiyor.**
+
+Bu bir kod hatası değil: iki kol iki ayrı kararı uyguluyor. Eski karar (İBA 1.8 /
+B18: "döküm süreç sonuna kadar durur, süreç bitince silinir") nöbetçide;
+25–26.08 kararı ("7 gün pay") parametre tablosunda. **Hangisi geçerli, sizin
+kararınız** — ve nöbetçinin davranışını değiştirmek §13 gereği zaten size ait.
+
+**Not:** bu yalnız **oturum dökümünü** ilgilendirir. Resmî tutanak/belge ayrı
+üretilir ve bu koldan silinmez; ses zaten metne çevrilir çevrilmez siliniyor ve
+o doğru çalışıyor (denetlendi).
+
+**Seçenekler.**
+| | ne yapılır | sonucu |
+|---|---|---|
+| **A** | Nöbetçinin döküm kolu **7 günü bekler** (parametre tablosundan okur, kodda sabit tutmaz); silme tek kolda, `saklama-imha`da toplanır | Söylediğiniz "UYAP payı" gerçekten oluşur; saklama süresi tek yerden yönetilir |
+| B | Parametre 0 güne çekilir; nöbetçinin bugünkü davranışı **doğru** kabul edilir | Çelişki biter, ama döküm kapanışta anında gider — indirilmemişse gitmiştir |
+| C | Bugünkü hâl | Tabloda "7 gün" yazar, gerçekte ~3 dakikadır; kayıt gerçeği anlatmaz |
+
+**Önerim: A.** Sebebi ürün değil, sizin bugünkü gerekçeniz: pay **niye** kondu?
+Arabulucu tutanağı indirip UYAP'a yükleyebilsin diye. Kapanışta anında silinirse
+o pay hiç kullanılamaz — dosya kapandığı an arabulucu ekranı kapatmışsa döküm
+gitmiştir. A ayrıca saklama süresini **tek kaynağa** (parametre tablosu) bağlar;
+bugün iki kol iki ayrı kural uyguluyor ve bu tür ikilik bu hafta üç kez kusur
+üretti.
+
+**Kararın etkisi.** A seçilirse `ajan-nobetci`nin **runtime davranışı** değişir
+(§13) — Code kendiliğinden yapmaz, onayınızla yapar; kişisel veri **daha uzun**
+durur (kapanış + 7 gün), bu bir KVKK kararıdır. B seçilirse veri daha kısa durur
+ama "UYAP payı" sözü kayıttan çıkarılmalıdır. C seçilirse `saklama_sureleri`
+tablosu gerçeği anlatmayan bir değer taşımaya devam eder.
+
+---
+
 ### H-17 · KAPANDI · 27.08.2026 — YENİDEN DAĞITILDI, KURU KOŞUM DOĞRULADI
 `saklama-imha` Lovable'dan yeniden dağıtıldı (commit `b48e669`) ve cevabına
 kalıcı bir **sürüm imzası** eklendi: `surum: "2026-08-26-kolon-depo"`. Maddeyi
