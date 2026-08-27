@@ -17,60 +17,75 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
+### H-20 · 27.08.2026 · **P1** — Bilgi tabanında TİCARET ve FİKRİ MÜLKİYET mevzuatı YOK
 
-### H-19 · 27.08.2026 · **P0 (KVKK)** — Depoda 6 öksüz belge SİLİNMİŞ dosyalara ait
+**Bu bir depo temizliği maddesi değil.** H-19'da "71 öksüz PDF" diye başladı,
+adlarına bakınca başka bir şey çıktı: bunlar çöp değil, **senin yüklemeye
+çalıştığın ve hiç girmemiş temel mevzuat.**
 
-**SORUN.** `case-documents` kovası bugün ilk kez satır satır depoyla
-karşılaştırıldı. Kovada, hiçbir tabloda karşılığı olmayan **77 dosya** var:
+**BULGU.** 71 dosyanın 12'si sonradan aynı adla başarıyla işlenmiş (sorun yok).
+Kalan **59**'u bilgi tabanında **hiçbir adla yok**. İçlerinden 100 KB üstü
+olanlar:
 
-| küme | adet | ne |
-|---|---|---|
-| dosya klasörleri | **6** | tarafların yüklediği belgeler — **dosyaları `cases` tablosunda ARTIK YOK** |
-| `admin/knowledge/` | **71** | bilgi tabanı PDF'leri; hiçbir `knowledge_base_chunks` satırı işaret etmiyor |
+| kaynak | boyut | deneme | ilk deneme |
+|---|---|---|---|
+| **6102 sayılı Türk Ticaret Kanunu** | 4.7 MB | 2 kez | 02.08.2026 |
+| Sınai Mülkiyet Kanunu | 1.0 MB | 1 | 12.07.2026 |
+| 6769 sayılı Sınai Mülkiyet Kanunu | 881 KB | 1 | 02.08.2026 |
+| 23528 sayılı Sınai Mülkiyet Yönetmeliği | 735 KB | 1 | 02.08.2026 |
+| 5846 sayılı Fikir ve Sanat Eserleri Kanunu | 563 KB | 1 | 02.08.2026 |
+| fikir ve sanat eserleri kanunu | 435 KB | 1 | 12.07.2026 |
+| 6284 sayılı Ailenin Korunması Kanunu | 207 KB | 1 | 02.08.2026 |
+| 7036 sayılı İş Mahkemeleri Kanunu | 176 KB | 2 kez | 01.08.2026 |
+| 7445 sayılı İcra ve İflas Kanunu | 117 KB | 1 | 02.08.2026 |
 
-**AĞIR OLAN 6 TANESİ.** Altısının da dosyası silinmiş, ama belgeler kovada
-duruyor. İçerik kişisel veridir — dosya adlarından görülüyor: bordro, puantaj,
-ücret pusulası, **kıdem tazminatı bordrosu** ve **bir kişinin adı-soyadı**.
-30.06–01.07.2026'da yüklenmişler.
+Ayrıca 01.07'de **Kira Uyuşmazlıkları ve Arabuluculuk** (4.1 MB) **üç kez**
+denenmiş, üçü de girmemiş.
 
-Bu, ürünün kendi kuralının çiğnendiği yerdir: H-15/1 "süreç bitince dosyaya ait
-her şey silinir" diyor, constitution m.10 süresiz saklamayı yasaklıyor. Dosya
-silindi, belge kaldı; kaldığı için de **hiçbir silme kolu onu bir daha
-bulamaz** — sahibini gösteren satır yok.
+**NEDEN GÖREMEDİN.** Yükleme dosyayı önce depoya koyuyor, sonra işliyordu;
+işleme başarısız olunca dosya depoda kalıyor ama hiçbir parça yazılmıyordu.
+`/admin` listesi parçalardan üretildiği için dosya **ekranda hiç görünmüyor**.
+Yani ekranda "yükledim" izi yok, hata da kalıcı bir yere düşmüyor — üst üste
+denemelerin (2 kez, 3 kez) sebebi bu. Yükleme sırası **bugün düzeltildi**
+(H-19, commit `fe9baef`): artık başarısız yükleme arkasında görünmez dosya
+bırakmıyor ve hata çağırana bildiriliyor.
 
-**KUSURUN KENDİSİ ZATEN KAPATILDI.** Bunlar 25–26.08'de düzeltilen "önce satır,
-sonra depo" kusurunun **geride bıraktığı birikimdir**; yeni öksüz üretilmiyor
-(`dosya-verilerini-sil`, `saklama-imha` ve `CaseRoom.deleteMyDoc` artık önce
-depoyu temizliyor). Kalan iş yalnız **birikmiş 77 dosyanın süpürülmesidir.**
+**ETKİSİ.** Medipact'ın kategorileri arasında `ticari` ve `fikri_mülkiyet` var.
+Bu iki alanın **birincil mevzuatı bilgi tabanında yok** — TTK yok, Sınai
+Mülkiyet Kanunu ve Yönetmeliği yok, FSEK yok. Ajanlar bu alanlarda kaynaksız
+çalışıyor. Aile (6284) ve icra (7445) tarafında da boşluk var.
 
-**NEDEN SANA GELDİ.** Silme geri dönüşsüzdür (§7.3). Politika zaten
-kararlaştırılmış durumda (H-15/1 · m.10); sorduğum şey politika değil,
-**bu 77 dosya üzerinde silmeyi çalıştırma izni**.
+**BİLİNEN BİR SEBEP (yalnız en büyüğü için).** İşlev, 800'den fazla parça
+üreten dosyayı reddediyor (`Anormal parça sayısı`). Başarıyla işlenen 5510
+sayılı Kanun 2.4 MB'ta 456 parça verdi; aynı oranla **4.7 MB'lık TTK ~890 parça**
+eder, yani **sınıra takılıyor.** Küçük dosyaların (117 KB–1 MB) reddedilme
+sebebi bu değil; onlarda metin çıkarma ya da geçici embedding hatası olması
+muhtemel ama **kanıtım yok, tahmin yürütmüyorum.**
 
 **SEÇENEKLER.**
-- **A · 6'sını hemen sil, 71'ini ayrı ele al.** Altısı KVKK kapsamında ve
-  sahipsiz; bekletmenin savunulabilir bir gerekçesi yok. Bilgi tabanı
-  dosyaları kişisel veri değil (hukuk literatürü), acelesi yok.
-- **B · 77'sini birlikte sil.** Tek koşumda kova tamamen temizlenir.
-- **C · Şimdilik hiçbiri silinmesin**, pilottan sonra ele alınsın.
+- **A · Sen `/admin`den yeniden yükle, ben sonucu okuyayım.** Yükleme yolu
+  artık hatayı söylüyor; hangi dosya hangi sebeple düşüyor tek denemede
+  görürüz. Sonra kök nedeni ben düzeltirim. En küçük adım, en çok bilgi.
+- **B · Önce 800 parça sınırını büyütelim, sonra yükle.** TTK'yı kesin çözer
+  ama küçük dosyaların sebebini açıklamaz; ayrıca sınırın niye konduğunu
+  (maliyet/zaman aşımı) bilmeden büyütmek yeni bir sorun doğurabilir.
+- **C · Depodaki dosyaları sunucu tarafından yeniden işleyen bir kol yazayım.**
+  Dosyalar zaten depoda; senin elle yüklemene gerek kalmaz. Ama yeni kalıcı
+  kod demek ve sınırın sebebini yine bilmiyoruz.
 
-**ÖNERİM: A.** Altı dosya KVKK riski taşıyor ve bekleyerek hiçbir şey
-kazanılmıyor — üstelik pilotta ilk denetim sorusu tam burası olur. 71 bilgi
-tabanı dosyası ise "gerçekten artık gerekmiyor mu" sorusunu hak ediyor:
-50'si hâlâ chunk'larla bağlı, silinecek olanlar bağsız olanlar; yanlışlıkla
-silinirse yeniden yüklenebilir ama emek ister.
+**ÖNERİM: A.** Bir dosya yüklemen ~1 dakika sürüyor ve bugünkü düzeltmeden
+sonra ilk kez **gerçek hata mesajını** göreceğiz. Tahminle sınır büyütmektense
+sebebi görüp doğru yeri düzeltmek daha az iş. En büyüğüyle başla (TTK): sınır
+hatası gelirse tahminim doğrulanmış olur, başka bir hata gelirse tahminimi
+atarım.
 
-**KARARIN ETKİSİ.** A ya da B seçilirse taraf belgeleri geri getirilemez —
-zaten dosyaları silinmiş olduğu için ürün açısından erişilebilir değiller.
-C seçilirse kişisel veri sahipsiz biçimde kovada beklemeye devam eder ve
-KVKK/m.10 uyumsuzluğu pilot boyunca açık kalır.
+**KARARIN ETKİSİ.** Hiçbir seçenek veri silmiyor; bu madde **P1 ve geri
+dönüşsüz değil.** Ertelenirse ticari ve fikri mülkiyet uyuşmazlıklarında
+ajanlar mevzuatsız çalışmaya devam eder.
 
-**NASIL ÇALIŞTIRILIR (Code hazırladı, koşmadı).** Silinecek yolların tam
-listesi ve dökümü `tests/sabit/oksuz-belge-supurgesi.sql` dosyasındadır;
-önce **kuru döküm** alınır (hiçbir şey silmez), liste gözle onaylanır, sonra
-silme koşulur. Depo nesnesi SQL ile değil **depo API'siyle** silinmelidir;
-aksi hâlde satır gider, dosya kalır — yani aynı kusurun tersi üretilir.
-
+**DEPODAKİ 59 DOSYA ŞİMDİLİK DURUYOR** — silmek için sebep yok, çünkü yeniden
+yükleme kaynağı olarak işe yarayabilirler. Kaynaklar bilgi tabanına girdikten
+sonra ayrıca süpürülür; o zaman KVKK değil yalnızca yer meselesi olur (~33 MB).
 
 ### H-7 · 25.08.2026 · P1 — Geri bildirim (`session_feedback`) yapısal olarak imkânsız
 **Sorun.** Adanın **altıncı** yüzeyi: `SessionFeedback.tsx` hiçbir yerden import
@@ -566,6 +581,112 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+### H-19 · KAPANDI · 27.08.2026 — SEÇENEK A UYGULANDI, 6 BELGE SİLİNDİ
+**Kurucu kararı: A** — "6'sını hemen sil, 71 bilgi tabanı dosyasını ayrı ele al."
+
+**YAPILDI VE DOĞRULANDI.** Altı öksüz belge `case-documents` kovasından **depo
+API'siyle** silindi (`storage.from("case-documents").remove([...])`); SQL ile
+`storage.objects` satırı silme yoluna hiç gidilmedi — o yol satırı götürür,
+dosyayı S3'te bırakır ve düzeltmeye çalıştığımız kusurun tersini üretirdi.
+
+**KANIT (ajanın raporu değil, Code'un kendi ölçümü):**
+
+| ölçüm | önce | sonra |
+|---|---|---|
+| kovadaki toplam nesne | 149 | **143** (tam 6 azaldı) |
+| "dosya belgesi" öksüzü | 6 | **0** |
+| `admin/knowledge/` öksüzü | 71 | 71 (dokunulmadı) |
+
+**Geçici araç geride bırakılmadı.** Silme, tek seferlik bir edge function ile
+yapıldı ve iş biter bitmez kaldırıldı; doğrulandı: fonksiyona çağrı **404
+`NOT_FOUND`** dönüyor. Yani arkada "keyfi depo yolu silen" bir uç kalmadı.
+
+---
+
+**YAN BULGU — ve bu maddenin asıl kazancı: ÖKSÜZ ÜRETİMİ HÂLÂ SÜRÜYORDU.**
+Madde açılırken "kusur 25–26.08'de kapatıldı, yeni öksüz üretilmiyor" yazmıştım.
+**Bu yanlıştı.** Kapatılan yalnız SİLME kollarıydı; **yazma kolu** hâlâ öksüz
+üretiyordu:
+
+`admin-upload-knowledge` dosyayı **en başta** depoya yüklüyor, sonra metni
+çıkarıp parçalıyordu. Çıkarma / parçalama / embedding başarısız olunca işlev
+hata dönüyor, ama **dosya depoda kalıyordu**. Hiçbir `knowledge_base_chunks`
+satırı onu göstermediği için:
+- `/admin` bilgi tabanı listesi **parçalardan** üretilir → dosya **ekranda hiç
+  görünmez**, kurucu onu silemez bile;
+- `admin-delete-knowledge` yalnız `source_url`u bilinen dosyayı siler;
+- yani dosya süresiz kalır → constitution m.10.
+
+**Düzeltildi (commit `fe9baef`):** yol baştan hesaplanıyor, dosya **en son**,
+parçalar yazıldıktan sonra yükleniyor. Ters sıranın en kötü hâli artık "kayıt
+var, dosya yok" — bu **görünür ve silinebilir** bir durumdur, üstelik yükleme
+hatası zaten ölümcül sayılmıyordu; artık çağırana `uyari` alanıyla bildiriliyor.
+Cevaba `surum: "2026-08-27-yukleme-sonda"` eklendi ki dağıtım dışarıdan
+doğrulanabilsin.
+
+Kural tek cümleyle: **dosyayı gösteren kayıt, dosyanın kendisinden önce var
+olmalı ve ondan sonra yok olmalıdır.** Silerken önce dosya gider, yazarken en
+son dosya gelir — `saklama-imha`daki "önce depo, sonra satır" kuralının aynadaki
+hâli. `tests/bilgi-yukleme-oksuz.test.ts` bunu kilitliyor ve **ısırdığı
+kanıtlandı** (eski sıra geri konunca iki denetim de kırmızı yandı).
+
+Doğrulama: `npm run test` **370/370** · `tsc --noEmit` temiz.
+Kalan 71 dosya **H-20**'ye devredildi.
+
+### H-19 · 27.08.2026 · **P0 (KVKK)** — Depoda 6 öksüz belge SİLİNMİŞ dosyalara ait
+
+**SORUN.** `case-documents` kovası bugün ilk kez satır satır depoyla
+karşılaştırıldı. Kovada, hiçbir tabloda karşılığı olmayan **77 dosya** var:
+
+| küme | adet | ne |
+|---|---|---|
+| dosya klasörleri | **6** | tarafların yüklediği belgeler — **dosyaları `cases` tablosunda ARTIK YOK** |
+| `admin/knowledge/` | **71** | bilgi tabanı PDF'leri; hiçbir `knowledge_base_chunks` satırı işaret etmiyor |
+
+**AĞIR OLAN 6 TANESİ.** Altısının da dosyası silinmiş, ama belgeler kovada
+duruyor. İçerik kişisel veridir — dosya adlarından görülüyor: bordro, puantaj,
+ücret pusulası, **kıdem tazminatı bordrosu** ve **bir kişinin adı-soyadı**.
+30.06–01.07.2026'da yüklenmişler.
+
+Bu, ürünün kendi kuralının çiğnendiği yerdir: H-15/1 "süreç bitince dosyaya ait
+her şey silinir" diyor, constitution m.10 süresiz saklamayı yasaklıyor. Dosya
+silindi, belge kaldı; kaldığı için de **hiçbir silme kolu onu bir daha
+bulamaz** — sahibini gösteren satır yok.
+
+**KUSURUN KENDİSİ ZATEN KAPATILDI.** Bunlar 25–26.08'de düzeltilen "önce satır,
+sonra depo" kusurunun **geride bıraktığı birikimdir**; yeni öksüz üretilmiyor
+(`dosya-verilerini-sil`, `saklama-imha` ve `CaseRoom.deleteMyDoc` artık önce
+depoyu temizliyor). Kalan iş yalnız **birikmiş 77 dosyanın süpürülmesidir.**
+
+**NEDEN SANA GELDİ.** Silme geri dönüşsüzdür (§7.3). Politika zaten
+kararlaştırılmış durumda (H-15/1 · m.10); sorduğum şey politika değil,
+**bu 77 dosya üzerinde silmeyi çalıştırma izni**.
+
+**SEÇENEKLER.**
+- **A · 6'sını hemen sil, 71'ini ayrı ele al.** Altısı KVKK kapsamında ve
+  sahipsiz; bekletmenin savunulabilir bir gerekçesi yok. Bilgi tabanı
+  dosyaları kişisel veri değil (hukuk literatürü), acelesi yok.
+- **B · 77'sini birlikte sil.** Tek koşumda kova tamamen temizlenir.
+- **C · Şimdilik hiçbiri silinmesin**, pilottan sonra ele alınsın.
+
+**ÖNERİM: A.** Altı dosya KVKK riski taşıyor ve bekleyerek hiçbir şey
+kazanılmıyor — üstelik pilotta ilk denetim sorusu tam burası olur. 71 bilgi
+tabanı dosyası ise "gerçekten artık gerekmiyor mu" sorusunu hak ediyor:
+50'si hâlâ chunk'larla bağlı, silinecek olanlar bağsız olanlar; yanlışlıkla
+silinirse yeniden yüklenebilir ama emek ister.
+
+**KARARIN ETKİSİ.** A ya da B seçilirse taraf belgeleri geri getirilemez —
+zaten dosyaları silinmiş olduğu için ürün açısından erişilebilir değiller.
+C seçilirse kişisel veri sahipsiz biçimde kovada beklemeye devam eder ve
+KVKK/m.10 uyumsuzluğu pilot boyunca açık kalır.
+
+**NASIL ÇALIŞTIRILIR (Code hazırladı, koşmadı).** Silinecek yolların tam
+listesi ve dökümü `tests/sabit/oksuz-belge-supurgesi.sql` dosyasındadır;
+önce **kuru döküm** alınır (hiçbir şey silmez), liste gözle onaylanır, sonra
+silme koşulur. Depo nesnesi SQL ile değil **depo API'siyle** silinmelidir;
+aksi hâlde satır gider, dosya kalır — yani aynı kusurun tersi üretilir.
+
+
 ### H-18 · KAPANDI · 27.08.2026 — NÖBETÇİNİN SİLME KOLU KALDIRILDI, CANLI KANITLI
 Kurucu kararı uygulandı: `ajan-nobetci` artık oturum kaydı **silmiyor**.
 Silmenin tek yetkilisi `saklama-imha`dır ve süreyi yalnız `saklama_sureleri`

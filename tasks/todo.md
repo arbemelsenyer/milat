@@ -5,16 +5,24 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: **yok** — bu blokta beş iş bitti, hepsi canlı ya da tezgâh
-  kanıtlı. Kuyrukta Code'un yapabileceği iş kalmadı (bkz. en alttaki BLOCKED
-  madde: kurucunun telefonu gerekiyor).
-- **AÇIK HUMAN GATE: HAT H-19 (P0 · KVKK).** Depoda **77 öksüz dosya** bulundu;
-  altısı **silinmiş dosyalara** ait taraf belgeleri (bordro · puantaj · ücret
-  pusulası · kıdem tazminatı bordrosu · bir kişinin adı-soyadı). Kusurun
-  kendisi 25–26.08'de kapatıldı, yeni öksüz üretilmiyor; kalan iş yalnız
-  **birikimin süpürülmesi**. Silme geri dönüşsüz olduğu için karar kurucuda
-  (§7.3). Kuru döküm ve yordam: `tests/sabit/oksuz-belge-supurgesi.sql`.
-  Önerim HAT'ta: **6'sını hemen sil, 71 bilgi tabanı dosyasını ayrı ele al.**
+- Aktif görev: **yok** — bu blokta yedi iş bitti, hepsi canlı ya da tezgâh
+  kanıtlı. Kuyrukta Code'un tek başına yapabileceği iş kalmadı.
+- **AÇIK MADDE: HAT H-20 (P1) — bilgi tabanında TİCARET ve FİKRİ MÜLKİYET
+  mevzuatı YOK.** H-19'un öksüz dosyalarına ad ad bakınca çıktı: bunlar çöp
+  değil, kurucunun yüklemeye çalıştığı ve **hiç girmemiş** temel mevzuat.
+  59 dosya bilgi tabanında hiçbir adla yok — **6102 TTK** (2 deneme), Sınai
+  Mülkiyet Kanunu + Yönetmeliği, **FSEK**, 6284, 7036 İş Mahkemeleri (2
+  deneme), 7445 İİK; ayrıca "Kira Uyuşmazlıkları ve Arabuluculuk" **3 kez**
+  denenmiş. Neden görülmediği: başarısız yükleme dosyayı depoda bırakıyor ama
+  `/admin` listesi parçalardan üretildiği için dosya ekranda hiç görünmüyordu
+  (bugün düzeltildi). Bilinen tek sebep en büyüğü için: **800 parça sınırı** —
+  başarılı 5510 (2.4 MB) 456 parça verdi, 4.7 MB'lık TTK ~890 eder.
+  Önerim HAT'ta: **A — kurucu `/admin`den yeniden yüklesin**, yükleme yolu
+  artık gerçek hatayı söylüyor; sebebi görüp doğru yeri düzeltirim.
+- **H-19 KAPANDI (seçenek A uygulandı).** 6 öksüz taraf belgesi depo API'siyle
+  silindi. Kanıt Code'un kendi ölçümü: kovadaki nesne **149 → 143** (tam 6),
+  "dosya belgesi" öksüzü **6 → 0**. Silme için açılan tek seferlik fonksiyon
+  kaldırıldı ve **404 döndüğü doğrulandı** — arkada keyfi yol silen uç yok.
 - Son tamamlanan iş (27.08 · P1): **tezgâh temiz bir klonda da koşuyor.**
   Üç tezgâh (`kazanim-sayaci` · `kota-kapisi` · `saklama-imha`)
   `tests/gecici/` içindeki **git'e hiç girmemiş** SQL dosyalarını okuyordu —
@@ -520,11 +528,23 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
-- [!] P0 · **Depodaki 77 öksüz dosya süpürülsün (KVKK)** · HAT **H-19**'da,
-      kurucu kararı bekliyor — silme geri dönüşsüz (§7.3). Teşhis TAM: 6'sı
-      silinmiş dosyalara ait taraf belgesi, 71'i bağsız bilgi tabanı PDF'i.
-      Kuru döküm + yordam `tests/sabit/oksuz-belge-supurgesi.sql`'de hazır;
-      karar gelince Code uygular. Kusurun kaynağı 25–26.08'de kapatıldı.
+- [x] P0 · **Depodaki öksüz taraf belgeleri silindi (H-19 · seçenek A)** ·
+      Kabul: `case-documents` kovasında "dosya belgesi" öksüzü 0 · **DONE
+      27.08.2026 — CANLI KANITLI** · Doğrulama: kovadaki nesne 149 → **143**
+      (tam 6 azaldı), öksüz 6 → **0**; silme depo API'siyle yapıldı (SQL ile
+      `storage.objects` satırı silme yoluna gidilmedi); tek seferlik silme
+      fonksiyonu kaldırıldı ve çağrısı **404** dönüyor
+- [x] P1 · **Bilgi tabanı yüklemesi öksüz bırakmıyor** · Kabul: dosya, parçalar
+      yazıldıktan SONRA yükleniyor; yükleme ile başarı dönüşü arasında hata
+      çıkışı yok · **DONE 27.08.2026** · Doğrulama:
+      `tests/bilgi-yukleme-oksuz.test.ts` yazıldı ve **ısırdığı kanıtlandı**
+      (eski sıra geri konunca iki denetim kırmızı) · `npm run test` **370/370**
+      · tsc temiz · commit `fe9baef` · canlı dağıtım tetiklendi; sürüm imzası
+      `surum: "2026-08-27-yukleme-sonda"` ile doğrulanacak (H-20/A ilk yüklemede)
+- [!] P1 · **Ticaret ve fikri mülkiyet mevzuatı bilgi tabanına girsin** · HAT
+      **H-20**'de, kurucu eylemi bekliyor (bir dosya yüklemesi). Teşhis TAM:
+      59 kaynak hiç girmemiş, en büyüğünün sebebi **800 parça sınırı**.
+      Sebep görülünce kök nedeni Code düzeltir.
 - [x] P1 · **Tezgâh temiz klonda da koşuyor** · Kabul: hiçbir tezgâh
       `tests/gecici/` içinden kalıcı bağımlılık okumuyor ve okuduğu her sabit
       dosya `git ls-files`ta var · **DONE 27.08.2026** · Doğrulama: üç SQL

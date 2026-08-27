@@ -26,6 +26,24 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   SAYIM her hâlde yapılır. Sayılmayan artık, kapandı sanılan kusurun sessizce
   yaşamaya devam etmesidir.
 
+  **AYNI GÜN İKİNCİ KEZ, DAHA AĞIRI:** "yeni öksüz üretilmiyor" cümlesini
+  HAT'a yazdıktan sonra sebebi aradım ve yanıldığımı gördüm — kapattığım
+  yalnız **silme** kollarıydı; **yazma** kolu (`admin-upload-knowledge`) hâlâ
+  öksüz üretiyordu, çünkü dosyayı işlemeden ÖNCE depoya koyuyordu. Bir veri
+  artığı sınıfını kapatırken **hem silen hem YAZAN yüzeyleri** taramak
+  gerekir; artık iki yerden doğar. Ortak kural tek cümle: **dosyayı gösteren
+  kayıt, dosyanın kendisinden ÖNCE var olmalı ve ondan SONRA yok olmalıdır.**
+  Silerken önce dosya gider, yazarken en son dosya gelir.
+
+  **ÜÇÜNCÜ KATMAN — artığın ADINA BAK.** 71 dosyayı "bağsız PDF, silinsin mi"
+  diye Human Gate'e çıkarmıştım. Adlarına bakınca çöp olmadıkları çıktı: Türk
+  Ticaret Kanunu, Sınai Mülkiyet Kanunu, FSEK — kurucunun yüklemeye çalıştığı
+  ve hiç girmemiş temel mevzuat; bazıları 2–3 kez denenmiş. Yani sessiz kusur
+  bir depo artığı değil, **ürün boşluğuydu**: iki uygulama alanının mevzuatı
+  bilgi tabanında yok. **KURAL:** bir artık yığınını "silinsin mi" diye
+  sormadan önce **içinde ne olduğuna bak**; sayı sana sınıfı söyler, ad sana
+  sonucu söyler.
+
 - DERS (27.08.2026) — **BİR EDGE FUNCTION'IN CANLI SÜRÜMÜNÜ, CEVABININ İÇİNDEKİ
   BİR İMZADAN OKU; DAVRANIŞ FARKINDAN ÇIKARIM YAPMA.** 26.08'de `saklama-imha`
   düzeltildi, ön yüz publish edildi, Lovable'ın depo kopyasında yeni kod okundu —
