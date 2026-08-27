@@ -602,6 +602,15 @@ dosya commit'lenmez. Node paketi gerektiren bir betik yazacaksan **proje kökün
 çalıştır** (`node tests/gecici/sozdizim.mjs …`) — `node_modules` böyle çözülür;
 betiği köke taşımak için sebep yoktur.
 
+**KALICI OLAN BURAYA KONMAZ → `tests/sabit/`.** Bir tezgâhın okuduğu dosya ya da
+canlıda çalıştırılan bir göç metni **geçici değildir**; `tests/gecici/` altına
+konursa git'e hiç girmez ve temiz bir klonda tezgâh `ENOENT` ile çöker — kuyruk
+bu makinede yeşil, depoda kırmızı olur. 27.08.2026'da üç tezgâh tam bu
+durumdaydı. Kalıcı SQL/veri `tests/sabit/` altına konur (izlenir; gerekçesi
+`tests/sabit/BENIOKU.md`de) ve `tests/tezgah-tasinabilir.test.ts` bu kuralı
+denetler. Çevre değişkeniyle verilen kanıt kökleri (`KENAR_KOK=…`) kural
+dışıdır: varsayılan koşumda kullanılmazlar.
+
 > Bu bölüm `tests/gecici/sonda.test.ts` başlığındaki "CLAUDE.md §22" atfının
 > karşılığıdır. Kural 23.08'de `a462dc2` ile kuruldu ama bu dosyaya yazılmamıştı;
 > yazılmadığı için 24.08'de çiğnendi (köke `sozdizim-gecici.mjs` yazılıp silindi).

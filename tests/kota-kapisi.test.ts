@@ -14,7 +14,7 @@ import { kaynakOku } from "./kaynak";
  */
 
 const G = kaynakOku("supabase/functions/_shared/kota.ts");
-const SQL = kaynakOku("tests/gecici/kota-tablosu.sql");
+const SQL = kaynakOku("tests/sabit/kota-tablosu.sql");
 
 describe("kota kapısı: kazara kimseyi kilitlemiyor", () => {
   it("limit NULL ise SINIRSIZ", () => {

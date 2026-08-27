@@ -17,7 +17,7 @@ import { kaynakOku } from "./kaynak";
  * ve dosya çalışma ağacına CRLF ile inerse o arama sessizce başarısız olur.
  * 27.08'de tam bu oldu; gerekçenin tamamı `tests/kaynak.ts` başlığındadır. */
 const G = kaynakOku("supabase/functions/saklama-imha/index.ts");
-const SQL = kaynakOku("tests/gecici/saklama-suresi-politika.sql");
+const SQL = kaynakOku("tests/sabit/saklama-suresi-politika.sql");
 
 describe("periyodik imha: güvenli tasarım bozulmuyor", () => {
   it("süre PARAMETRE TABLOSUNDAN okunuyor, kodda sabit değil", () => {

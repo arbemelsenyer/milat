@@ -17,7 +17,7 @@ import { kaynakOku } from "./kaynak";
  */
 
 const G = kaynakOku("supabase/functions/kazanim-sayaci/index.ts");
-const SQL = kaynakOku("tests/gecici/baz-cizgi.sql");
+const SQL = kaynakOku("tests/sabit/baz-cizgi.sql");
 
 describe("kazanım sayacı: rakam arabulucunun kendi beyanı", () => {
   it("katsayı ARABULUCUDAN gelir, yöneticiden değil", () => {

@@ -18,6 +18,60 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 
 ## CODE → COWORK
 
+### H-19 · 27.08.2026 · **P0 (KVKK)** — Depoda 6 öksüz belge SİLİNMİŞ dosyalara ait
+
+**SORUN.** `case-documents` kovası bugün ilk kez satır satır depoyla
+karşılaştırıldı. Kovada, hiçbir tabloda karşılığı olmayan **77 dosya** var:
+
+| küme | adet | ne |
+|---|---|---|
+| dosya klasörleri | **6** | tarafların yüklediği belgeler — **dosyaları `cases` tablosunda ARTIK YOK** |
+| `admin/knowledge/` | **71** | bilgi tabanı PDF'leri; hiçbir `knowledge_base_chunks` satırı işaret etmiyor |
+
+**AĞIR OLAN 6 TANESİ.** Altısının da dosyası silinmiş, ama belgeler kovada
+duruyor. İçerik kişisel veridir — dosya adlarından görülüyor: bordro, puantaj,
+ücret pusulası, **kıdem tazminatı bordrosu** ve **bir kişinin adı-soyadı**.
+30.06–01.07.2026'da yüklenmişler.
+
+Bu, ürünün kendi kuralının çiğnendiği yerdir: H-15/1 "süreç bitince dosyaya ait
+her şey silinir" diyor, constitution m.10 süresiz saklamayı yasaklıyor. Dosya
+silindi, belge kaldı; kaldığı için de **hiçbir silme kolu onu bir daha
+bulamaz** — sahibini gösteren satır yok.
+
+**KUSURUN KENDİSİ ZATEN KAPATILDI.** Bunlar 25–26.08'de düzeltilen "önce satır,
+sonra depo" kusurunun **geride bıraktığı birikimdir**; yeni öksüz üretilmiyor
+(`dosya-verilerini-sil`, `saklama-imha` ve `CaseRoom.deleteMyDoc` artık önce
+depoyu temizliyor). Kalan iş yalnız **birikmiş 77 dosyanın süpürülmesidir.**
+
+**NEDEN SANA GELDİ.** Silme geri dönüşsüzdür (§7.3). Politika zaten
+kararlaştırılmış durumda (H-15/1 · m.10); sorduğum şey politika değil,
+**bu 77 dosya üzerinde silmeyi çalıştırma izni**.
+
+**SEÇENEKLER.**
+- **A · 6'sını hemen sil, 71'ini ayrı ele al.** Altısı KVKK kapsamında ve
+  sahipsiz; bekletmenin savunulabilir bir gerekçesi yok. Bilgi tabanı
+  dosyaları kişisel veri değil (hukuk literatürü), acelesi yok.
+- **B · 77'sini birlikte sil.** Tek koşumda kova tamamen temizlenir.
+- **C · Şimdilik hiçbiri silinmesin**, pilottan sonra ele alınsın.
+
+**ÖNERİM: A.** Altı dosya KVKK riski taşıyor ve bekleyerek hiçbir şey
+kazanılmıyor — üstelik pilotta ilk denetim sorusu tam burası olur. 71 bilgi
+tabanı dosyası ise "gerçekten artık gerekmiyor mu" sorusunu hak ediyor:
+50'si hâlâ chunk'larla bağlı, silinecek olanlar bağsız olanlar; yanlışlıkla
+silinirse yeniden yüklenebilir ama emek ister.
+
+**KARARIN ETKİSİ.** A ya da B seçilirse taraf belgeleri geri getirilemez —
+zaten dosyaları silinmiş olduğu için ürün açısından erişilebilir değiller.
+C seçilirse kişisel veri sahipsiz biçimde kovada beklemeye devam eder ve
+KVKK/m.10 uyumsuzluğu pilot boyunca açık kalır.
+
+**NASIL ÇALIŞTIRILIR (Code hazırladı, koşmadı).** Silinecek yolların tam
+listesi ve dökümü `tests/sabit/oksuz-belge-supurgesi.sql` dosyasındadır;
+önce **kuru döküm** alınır (hiçbir şey silmez), liste gözle onaylanır, sonra
+silme koşulur. Depo nesnesi SQL ile değil **depo API'siyle** silinmelidir;
+aksi hâlde satır gider, dosya kalır — yani aynı kusurun tersi üretilir.
+
+
 ### H-7 · 25.08.2026 · P1 — Geri bildirim (`session_feedback`) yapısal olarak imkânsız
 **Sorun.** Adanın **altıncı** yüzeyi: `SessionFeedback.tsx` hiçbir yerden import
 edilmiyor (geçişli graf taraması: `main.tsx`ten erişilemez). Dahası, erişilebilir

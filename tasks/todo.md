@@ -5,9 +5,27 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: **yok** — bu blokta üç iş de bitti (P0 · P1 · P2), üçü de canlı
-  ya da tezgâh kanıtlı.
-- Son tamamlanan iş (27.08 · 16. blok · 3/3): **H-18 uygulandı — nöbetçi artık
+- Aktif görev: **yok** — bu blokta beş iş bitti, hepsi canlı ya da tezgâh
+  kanıtlı. Kuyrukta Code'un yapabileceği iş kalmadı (bkz. en alttaki BLOCKED
+  madde: kurucunun telefonu gerekiyor).
+- **AÇIK HUMAN GATE: HAT H-19 (P0 · KVKK).** Depoda **77 öksüz dosya** bulundu;
+  altısı **silinmiş dosyalara** ait taraf belgeleri (bordro · puantaj · ücret
+  pusulası · kıdem tazminatı bordrosu · bir kişinin adı-soyadı). Kusurun
+  kendisi 25–26.08'de kapatıldı, yeni öksüz üretilmiyor; kalan iş yalnız
+  **birikimin süpürülmesi**. Silme geri dönüşsüz olduğu için karar kurucuda
+  (§7.3). Kuru döküm ve yordam: `tests/sabit/oksuz-belge-supurgesi.sql`.
+  Önerim HAT'ta: **6'sını hemen sil, 71 bilgi tabanı dosyasını ayrı ele al.**
+- Son tamamlanan iş (27.08 · P1): **tezgâh temiz bir klonda da koşuyor.**
+  Üç tezgâh (`kazanim-sayaci` · `kota-kapisi` · `saklama-imha`)
+  `tests/gecici/` içindeki **git'e hiç girmemiş** SQL dosyalarını okuyordu —
+  yani "363/363 yeşil" yalnız bu makinede doğruydu, temiz klonda üçü de
+  `ENOENT` ile çökerdi. Dosyalar `tests/sabit/` altına alındı (izlenir);
+  ikisi canlıda çalıştırılmış göç metni olduğu için kaydı da kurtarıldı.
+  `tests/tezgah-tasinabilir.test.ts` sınıfı kilitliyor ve **ısırdığı
+  kanıtlandı** (yol geri konunca iki denetim de kırmızı yandı, sonra geri
+  alındı). CLAUDE.md §22'ye kural yazıldı.
+  Doğrulama: `npm run test` **365/365** · tsc temiz · eslint temiz.
+- Bir önceki iş (27.08 · P1): **H-18 uygulandı — nöbetçi artık
   oturum kaydı SİLMİYOR, canlı kanıtlı.** `kayitSilmeKollari` + `KAYIT_BUCKET`
   + çağrı yeri + iki sayaç kaldırıldı. Kapanışta döküm silen kolun yanında,
   sesi kapanıştan **24 saat** sonra silen kol da gitti: kurucunun kuralı — bir
@@ -502,6 +520,16 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
+- [!] P0 · **Depodaki 77 öksüz dosya süpürülsün (KVKK)** · HAT **H-19**'da,
+      kurucu kararı bekliyor — silme geri dönüşsüz (§7.3). Teşhis TAM: 6'sı
+      silinmiş dosyalara ait taraf belgesi, 71'i bağsız bilgi tabanı PDF'i.
+      Kuru döküm + yordam `tests/sabit/oksuz-belge-supurgesi.sql`'de hazır;
+      karar gelince Code uygular. Kusurun kaynağı 25–26.08'de kapatıldı.
+- [x] P1 · **Tezgâh temiz klonda da koşuyor** · Kabul: hiçbir tezgâh
+      `tests/gecici/` içinden kalıcı bağımlılık okumuyor ve okuduğu her sabit
+      dosya `git ls-files`ta var · **DONE 27.08.2026** · Doğrulama: üç SQL
+      `tests/sabit/`e taşındı, `tests/tezgah-tasinabilir.test.ts` yazıldı ve
+      **ısırdığı kanıtlandı** · `npm run test` **365/365** · tsc + eslint temiz
 - [x] P0 · **`saklama-imha` canlıda yenilendi (H-17)** · Kabul: kuru koşum
       `oturum_kaydi_ses` · `oturum_kaydi_dokum` · `case_documents` için
       **`"temiz"`** döndürüyor ve cevapta `surum` alanı var · **DONE 27.08.2026**
