@@ -1,18 +1,34 @@
 ## Nerede kaldık
 
-- Tarih: **27.08.2026 · 02:40** (15. blok) — `medipact dur` ile kapatıldı.
-  H-16 cevabı işlendi, sonra dört iş kendiliğinden çıkarılıp bitirildi (§6);
-  kapanışta Cowork'ün **H-17 ve H-18 cevapları** geldi ve kaydedildi.
+- Tarih: **27.08.2026** (16. blok) — 15. blok elektrik kesintisiyle yarıda
+  kalmıştı; kayıt ile canlı durum **uyuşuyordu**, kaldığı yerden sürüldü.
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: **yok** (`dur` ile kapatıldı, yeni işe geçilmedi)
-- **SIRADAKİ İŞ (P0, dağıtım):** `saklama-imha` canlıda **ESKİ sürüm** —
-  kuru koşum bunu gösterdi (üç tür `"kuru"` döndü, yeni kod `"temiz"` derdi).
-  Yeniden dağıt, kuru koşumu tekrar aldır. Bugün veri riski **yok**
-  (`oturum_kayitlari` 0 satır); risk pilotta ilk oturum kaydıyla başlar.
-- **SONRAKİ İŞ (P1, onaylı):** H-18 — `ajan-nobetci` kapanışta dökümü
+- Aktif görev: **H-18 uygulaması (P1)** — `ajan-nobetci` kapanışta dökümü
   silmeyecek; süre tek yerden (`saklama_sureleri`) okunacak.
+- Son tamamlanan iş (27.08 · 16. blok): **`saklama-imha` canlıda YENİLENDİ ve
+  kuru koşumla kanıtlandı — H-17 KAPANDI.**
+  Fonksiyon Lovable'dan yeniden dağıtıldı; cevaba **`surum` alanı** eklendi
+  (`"2026-08-26-kolon-depo"`) — 26.08'in dersi buydu: hangi sürümün koştuğunu
+  dışarıdan okuyamadığımız için bir gün boyunca eski kodun canlı olduğunu
+  fark edemedik. Kuru koşum (istek 11612, HTTP 200) artık `surum`u döndürüyor
+  ve üç tür de **`"temiz"`**: `oturum_kaydi_ses` · `oturum_kaydi_dokum` ·
+  `case_documents`. Kabul kriteri karşılandı.
+- **03:00 UTC KOŞUMU OLDU — ZARARSIZ, BEKLENDİĞİ GİBİ.** jobid 21 bugün
+  03:00'te koştu (runid 11465, `succeeded`) ve **eski kodla** 5 satır sildi
+  (`case_notes` 1 + `odeme_kayitlari` 4) — H-17 cevabında güvenli sayıldığı
+  gibi, 16–18.07 tarihli DENEME dosyaları. Cevapta `surum` alanı **yoktu**;
+  eski sürümün koştuğunun kesin kanıtı budur. Eski kodun tehlikeli kolu
+  (`oturum_kayitlari` satırı silme) **hiç tetiklenmedi**, çünkü tablo 0 satır.
+  Canlı sayımlar: `oturum_kayitlari 0` · `case_notes 0` · `case_payments 0` ·
+  `case_documents 24` (hepsi açık dosyalara ait, silme kapsamı dışında).
+- **YAN BULGU (düzeltildi):** `npm run test` kırmızıya döndü ama **kod
+  doğruydu** — Lovable'ın dokunduğu dosya `core.autocrlf=true` yüzünden
+  çalışma ağacına **CRLF** olarak indi ve `tests/saklama-imha.test.ts`in çok
+  satırlı dizgi araması eşleşmedi. Tezgâh satır sonunu artık
+  normalleştiriyor. Depoda **341 izlenen dosya CRLF**; kaynak okuyan öteki
+  tezgâhlar aynı tuzağa açık → kuyruğa **P2** olarak yazıldı.
 - Son tamamlanan iş (26.08 · 15. blok): **antet gerçekten doldurulabilir oldu.**
   Bu blokta DONE işaretlediğim antet maddesi **yanlış DONE'du**: göç kolonları
   ekledi, belge üreticisi okuyordu, ama alanları **yazan hiçbir yüzey yoktu** —
@@ -470,6 +486,20 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
+- [x] P0 · **`saklama-imha` canlıda yenilendi (H-17)** · Kabul: kuru koşum
+      `oturum_kaydi_ses` · `oturum_kaydi_dokum` · `case_documents` için
+      **`"temiz"`** döndürüyor ve cevapta `surum` alanı var · **DONE 27.08.2026**
+      · Doğrulama: Lovable `deploy_edge_functions(["saklama-imha"])` (commit
+      `b48e669`) → kuru koşum istek **11612**, HTTP **200**,
+      `{"ok":true,"surum":"2026-08-26-kolon-depo",...}` üç tür `"temiz"`
+      · `npm run test` **359/359** · `tsc --noEmit` temiz
+- [ ] P2 · **CRLF tuzağı: kaynak okuyan öteki tezgâhlar** · Depoda 341 izlenen
+      dosya CRLF (`core.autocrlf=true`); `readFileSync(..., "utf-8")` ile kaynak
+      okuyup **çok satırlı** dizgi arayan her tezgâh, kod doğruyken kırmızı
+      yanabilir — 27.08'de `tests/saklama-imha.test.ts`te oldu ve orada
+      düzeltildi. Kabul: `tests/` içinde kaynak okuyan tezgâhlar tek bir
+      normalleştiren okuyucudan geçiyor (ya da `.gitattributes` ile satır sonu
+      tekleşiyor) ve `npm run test` yeşil kalıyor
 - [x] P1 · **Taraf katılım ekranında aydınlatma metni** · **DONE 25.08.2026 —
       CANLI KANITLI** · §15.1 beş şart da sağlanıyor
       · **ŞART 4 CANLI KANITI (Code kendi doğruladı):** canlıda bekleyen gerçek

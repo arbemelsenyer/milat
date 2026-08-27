@@ -12,8 +12,16 @@ import { readFileSync } from "node:fs";
  * parametreden gelemez, kapanmamış dosyaya dokunulmaz.
  */
 
-const G = readFileSync("supabase/functions/saklama-imha/index.ts", "utf-8");
-const SQL = readFileSync("tests/gecici/saklama-suresi-politika.sql", "utf-8");
+/* Satır sonu NORMALLEŞTİRİLİR. Aşağıdaki denetimlerin bir kısmı ÇOK SATIRLI
+ * dizgi arar (ör. `from("case_documents")` + yeni satır + `.delete(`). Dosya
+ * çalışma ağacına CRLF ile inerse o arama sessizce başarısız olur ve tezgâh,
+ * KOD DOĞRUYKEN kırmızı yanar — 27.08'de tam bu oldu: Lovable'ın dokunduğu
+ * dosya `core.autocrlf=true` yüzünden CRLF olarak geri geldi (depoda 341
+ * dosya CRLF). Kaynak okuyan her tezgâh bu tuzağa açıktır. */
+const oku = (y: string) => readFileSync(y, "utf-8").split("\r\n").join("\n");
+
+const G = oku("supabase/functions/saklama-imha/index.ts");
+const SQL = oku("tests/gecici/saklama-suresi-politika.sql");
 
 describe("periyodik imha: güvenli tasarım bozulmuyor", () => {
   it("süre PARAMETRE TABLOSUNDAN okunuyor, kodda sabit değil", () => {

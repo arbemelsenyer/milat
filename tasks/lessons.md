@@ -1,6 +1,32 @@
 # tasks/lessons.md — Öğrenilen Dersler
 Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
 
+- DERS (27.08.2026) — **BİR EDGE FUNCTION'IN CANLI SÜRÜMÜNÜ, CEVABININ İÇİNDEKİ
+  BİR İMZADAN OKU; DAVRANIŞ FARKINDAN ÇIKARIM YAPMA.** 26.08'de `saklama-imha`
+  düzeltildi, ön yüz publish edildi, Lovable'ın depo kopyasında yeni kod okundu —
+  ve "dağıtıldı" sanıldı. Dağıtılmamıştı: GitHub senkronu edge function'ı
+  yenilemez (§11-B bunu zaten yazıyordu). Yanlışa götüren adım, kanıtı bir
+  **dizgiye** dayandırmaktı: "bu tür başka bir kolun işi" gerekçesi yeni sürümün
+  imzası sayıldı, oysa o dize eski kodda da vardı. Doğru kanıt zaten elde
+  duruyordu (`"temiz"` vs `"kuru"`) ama zayıf olan seçildi. **KURAL:** sürümü
+  ayırt etmesi gereken her kolun cevabında sabit bir `surum` alanı bulunsun;
+  dağıtım doğrulaması o alanı okusun. Eksikse önce onu ekle, sonra doğrula —
+  `saklama-imha`da 27.08'de böyle yapıldı (`surum: "2026-08-26-kolon-depo"`).
+  Yan kural: bir silme kolu bir gün fazladan eski sürümde kalırsa **ne
+  sildiğini** `cron.job_run_details` + `net._http_response` üzerinden geriye
+  dönük oku; tahmin etme.
+
+- DERS (27.08.2026) — **KAYNAK OKUYAN TEZGÂH SATIR SONUNU NORMALLEŞTİRMELİ.**
+  `tests/saklama-imha.test.ts` kırmızı yandı, kod tamamen doğruydu: Lovable'ın
+  dokunduğu dosya `core.autocrlf=true` yüzünden çalışma ağacına **CRLF** olarak
+  indi ve tezgâhın çok satırlı `indexOf` araması eşleşmedi. Depoda **341 izlenen
+  dosya CRLF**, yani bu tuzak yeniden kurulur. **KURAL:** `readFileSync(...,
+  "utf-8")` ile kaynak okuyan her tezgâh okumayı normalleştirsin
+  (CRLF'i LF'e çevirerek — `tests/saklama-imha.test.ts` içindeki `oku()`
+  yardımcısı örnektir). Daha genel ders: bir tezgâh kırmızı yandığında
+  önce "kod mu bozuldu, tezgâh mı yanılıyor" diye sor — buradaki kırmızı,
+  ürünle ilgili hiçbir şey söylemiyordu.
+
 - DERS (26.08.2026) — HAT'ta BİR MADDEYİ *EN ALTTAKİ* CEVABIYLA OKUMA; ÖNCE
   "CEVAP DEĞİŞTİ" BLOĞU VAR MI BAK. H-16'yı "değerler kararla çelişiyor" diye
   **P0 blokaj** olarak açtım ve saklama süresi işini bir gün durdurdum. Çelişki

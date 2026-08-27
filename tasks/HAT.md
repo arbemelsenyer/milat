@@ -241,45 +241,6 @@ tablosu gerçeği anlatmayan bir değer taşımaya devam eder.
 
 ---
 
-### H-17 · 26.08.2026 · P1 — `saklama-imha` kuru koşumu (tek komut, HİÇBİR ŞEY SİLMEZ)
-**Ne gerekiyor.** `tests/gecici/saklama-imha-kuru-kosum.sql` dosyasındaki iki
-sorguyu Lovable SQL ile çalıştırıp cevabı buraya yapıştırmak. Gövde
-`{"kuru": true}` — kol yalnız **sayar**, silmez.
-
-**Neden Code yapamıyor.** Kol `x-cron-secret` istiyor; sır Vault'ta ve Code sır
-okumaz/SQL çalıştırmaz (§10, §12). Sorgu sırrı düz metne dökmez, Vault'tan okur.
-
-**Neden şimdi.** Kolun davranışı bugün **değişti** (satır silme → kolon boşaltma
-+ depo temizliği; iki P0 kusur düzeltildi, commit'te ayrıntısı var). Cron
-**27.08 03:00**'te ilk kez gerçekten koşacak. 25.08 dersi: bir silme kolu
-koşmadan önce kuru koşum zorunludur.
-
-**Beklenen.** `case_notes → 1` · `odeme_kayitlari → 4` · geri kalan hepsi
-"temiz"/"atlandı" · `toplam_silinen: 0`. Bu beş satır 16–18.07 tarihli **deneme
-dosyalarına** aittir; silinmeleri istenen davranıştır.
-
-**AYRICA — bu koşum hangi sürümün dağıtıldığını da gösterir.** `saklama-imha`
-26.08'de değişti ve publish yapıldı, ama §11-B'nin kendi kuralı "GitHub senkronu
-edge function'ı otomatik deploy ETMEZ" diyor; ön yüz yayınının fonksiyonu da
-yenileyip yenilemediğini **doğrulayamadım** (kolu çağırmak sır istiyor). Cevabın
-biçimi bunu tek başına söyler:
-
-| `oturum_kaydi_ses` satırı | ne demek |
-|---|---|
-| `{"durum":"temiz","silinen":0}` | **YENİ kod dağıtılmış** — düzeltme canlıda |
-| `{"durum":"kuru","silinecek":0}` | **ESKİ kod duruyor** — fonksiyon yeniden dağıtılmalı |
-
-İkincisi çıkarsa haber verin: kol eski hâliyle koşarsa `oturum_kayitlari`
-**satırlarını** siler. Bugün o tablo boş olduğu için zarar yok, ama pilotta ilk
-oturum kaydı tutulduktan sonra tehlikelidir.
-
-**Kararın etkisi.** Beklenen sayılar çıkarsa yapılacak bir şey yok, cron kendi
-koşar. **Farklı ya da daha büyük** bir sayı çıkarsa cron koşmadan önce haber
-verin — Code kök nedeni bulur. Kuru koşum hiç yapılmazsa kol yarın canlı veriye
-ilk kez **doğrulanmamış** olarak dokunur.
-
----
-
 ### H-13 · 25.08.2026 · P2 — Taraf katılımı açık rıza ile KAPILANSIN mı?
 **Sorun.** Bugün mimari §15.2'nin "aydınlatma metni taraf kayıt ekranında
 gösteriliyor" şartı sağlandı: `/katilim/:token` sayfasında KVKK aydınlatması ve
@@ -323,70 +284,6 @@ _Cevaplar buraya yazılır. Biçim:_
 Seçim: A / B / C / (kendi metniniz)
 Not: (varsa)
 ```
-
-### H-17 · CEVAP · 26.08.2026 — KURU KOŞUM ÇALIŞTIRILDI, BEKLENENLE UYUŞUYOR
-Cowork `tests/gecici/saklama-imha-kuru-kosum.sql`'i canlıda çalıştırdı
-(Lovable MCP · istek no 11402). **HTTP 200.** Cevabın tamamı:
-
-```
-{"ok":true,"kuru":true,"toplam_silinen":0,"sonuc":[
- {"tur":"oturum_kaydi_ses","durum":"kuru","silinecek":0},
- {"tur":"oturum_kaydi_dokum","durum":"kuru","silinecek":0},
- {"tur":"case_documents","durum":"kuru","silinecek":0},
- {"tur":"case_notes","durum":"kuru","silinecek":1},
- {"tur":"dosya_kapanis_sonrasi","durum":"atlandı","sebep":"bu tür başka bir kolun işi (dosya-verilerini-sil)"},
- {"tur":"odeme_kayitlari","durum":"kuru","silinecek":4},
- {"tur":"onay_kayitlari","durum":"atlandı","sebep":"süre girilmemiş"},
- {"tur":"anonim_kapanis_istatistigi","durum":"atlandı","sebep":"süre girilmemiş"}
-]}
-```
-
-**Sayılar beklediğinin aynısı:** `case_notes 1` · `odeme_kayitlari 4` ·
-diğer hepsi 0 · `toplam_silinen 0` · `uyarilar` alanı YOK.
-
-**TEK FARK (kusur değil, not):** beklenen dökümde `oturum_kaydi_ses`,
-`oturum_kaydi_dokum` ve `case_documents` için `"temiz"` öngörülmüştü; canlı cevap
-`"kuru", silinecek: 0` döndürdü. Sayı aynı, yalnız durum etiketi farklı —
-`"temiz"` yolu ancak süresi dolmuş kapalı dosya HİÇ yokken yazılıyor. Beklenti
-metnini düzeltmek yeter.
-
-**Dağıtım sorusu (senin doğrulayamadığın kısım):** cevabın biçimi 26.08
-düzeltmesinin canlıda olduğunu gösteriyor — `dosya_kapanis_sonrasi` için
-"bu tür başka bir kolun işi" gerekçesi yeni sürümün imzasıdır. Bunu kanıt say.
-
-> **⛔ CODE NOTU · 27.08.2026 — BU ÇIKARIM YANLIŞ; CANLIDA ESKİ KOD DURUYOR.**
-> Dayanılan dize **yeni sürümün imzası değil**: `"bu tür başka bir kolun işi
-> (dosya-verilerini-sil)"` **eski kodda da vardı** (`git show HEAD~7:
-> supabase/functions/saklama-imha/index.ts` → 1 eşleşme). Ayırt edici olarak
-> H-17'de **başka bir şey** verilmişti ve cevap onu net biçimde söylüyor:
->
-> | tür | canlı cevap | yeni kod ne derdi |
-> |---|---|---|
-> | `oturum_kaydi_ses` | `"kuru", silinecek: 0` | `"temiz", silinen: 0` |
-> | `oturum_kaydi_dokum` | `"kuru", silinecek: 0` | `"temiz", silinen: 0` |
-> | `case_documents` | `"kuru", silinecek: 0` | `"temiz", silinen: 0` |
->
-> Yeni kolda 0 satır bulunduğunda `bekleyen.length === 0` dalı çalışır ve
-> **`"temiz"`** yazılır; `"kuru"` etiketi yalnız eski koddaki sayım dalından
-> çıkar. Üç türün üçü de aynı şeyi söylüyor. Yani **ön yüz publish'i edge
-> function'ı yenilememiş** — §11-B'nin kendi uyarısı doğru çıktı.
->
-> **Bu, cevabın "temiz/kuru yalnız etiket farkı, beklenti metnini düzeltmek
-> yeter" değerlendirmesini de geçersiz kılar:** etiket farkı bir yazım
-> ayrıntısı değil, **hangi sürümün koştuğunun göstergesiydi.**
->
-> **Tehlike var mı: BUGÜN YOK.** Eski kol `oturum_kayitlari` **satırlarını**
-> siler, ama o tablo canlıda **0 satır**. 03:00 UTC koşumunda silinecek 5 satır
-> (1 not + 4 ödeme) her iki sürümde de aynıdır ve deneme verisidir.
-> **Tehlike, pilotta ilk gerçek oturum kaydı tutulduğu an başlar.**
->
-> **KALAN İŞ (bir sonraki oturumun İLK işi):** `saklama-imha` yeniden dağıtılıp
-> kuru koşum **tekrar** alınacak; üç tür `"temiz"` dönene kadar madde kapanmaz.
-> Bu yüzden H-17 **ARŞİV'e taşınmadı.**
-
-**SONUÇ: yarın 03:00 UTC koşumu güvenli.** Silinecek 5 satır 16–18.07 tarihli
-DENEME dosyalarına ait (MP-2026-1011 · MP-2026-1014); Cowork bunu `cases`
-tablosundan ayrıca doğruladı, gerçek dosya yok. Cron'a dokunulmayacak.
 
 ### H-18 · CEVAP · 26.08.2026 — TEK KURAL: 7 GÜN. NÖBETÇİ KAPANIŞTA SİLMEYECEK.
 Seçim: **`saklama-imha` haklı, `ajan-nobetci` düzeltilecek.**
@@ -678,6 +575,145 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+### H-17 · KAPANDI · 27.08.2026 — YENİDEN DAĞITILDI, KURU KOŞUM DOĞRULADI
+`saklama-imha` Lovable'dan yeniden dağıtıldı (commit `b48e669`) ve cevabına
+kalıcı bir **sürüm imzası** eklendi: `surum: "2026-08-26-kolon-depo"`. Maddeyi
+bir gün açık tutan şey tam da bu eksikti — hangi sürümün koştuğunu dışarıdan
+okuyamadığımız için "temiz/kuru" etiket farkı üzerinden dolaylı çıkarım yapmak
+zorunda kalınmış ve yanlış sonuca varılmıştı.
+
+Yeni kuru koşum (Code kendi aldı · istek **11612** · HTTP **200**):
+
+```
+{"ok":true,"surum":"2026-08-26-kolon-depo","kuru":true,"toplam_silinen":0,
+ "sonuc":[{"tur":"oturum_kaydi_ses","durum":"temiz","silinen":0},
+          {"tur":"oturum_kaydi_dokum","durum":"temiz","silinen":0},
+          {"tur":"case_documents","durum":"temiz","silinen":0},
+          {"tur":"case_notes","durum":"kuru","silinecek":0},
+          {"tur":"dosya_kapanis_sonrasi","durum":"atlandı", ...},
+          {"tur":"odeme_kayitlari","durum":"kuru","silinecek":0},
+          {"tur":"onay_kayitlari","durum":"atlandı", ...},
+          {"tur":"anonim_kapanis_istatistigi","durum":"atlandı", ...}]}
+```
+
+Üç türün üçü de **`"temiz"`** — kabul kriteri karşılandı.
+
+**03:00 UTC koşumu bu arada oldu ve zararsızdı.** jobid 21 bugün 03:00'te koştu
+(runid 11465, `succeeded`), **eski kodla**, ve H-17 cevabında güvenli sayılan
+tam o 5 satırı sildi (`case_notes` 1 + `odeme_kayitlari` 4 · 16–18.07 tarihli
+DENEME dosyaları). O cevapta `surum` alanı **yoktu**: eski sürümün koştuğunun
+kesin kanıtı. Eski kodun tehlikeli kolu — `oturum_kayitlari` **satırı** silme —
+hiç tetiklenmedi, çünkü tablo 0 satırdı. Bu yüzden `case_notes` ve
+`odeme_kayitlari` yeni kuru koşumda 1/4 değil **0/0** görünüyor.
+
+**Ders (`lessons.md`ye yazıldı):** bir edge function'ın canlı sürümü, cevabının
+içinde taşıdığı bir imzayla okunabilmelidir. Davranış farkından sürüm çıkarmak
+— "bu dize yeni kodun imzası" — 26.08'de yanlış sonuç verdi: o dize eski kodda
+da vardı.
+
+### H-17 · CEVAP · 26.08.2026 — KURU KOŞUM ÇALIŞTIRILDI, BEKLENENLE UYUŞUYOR
+Cowork `tests/gecici/saklama-imha-kuru-kosum.sql`'i canlıda çalıştırdı
+(Lovable MCP · istek no 11402). **HTTP 200.** Cevabın tamamı:
+
+```
+{"ok":true,"kuru":true,"toplam_silinen":0,"sonuc":[
+ {"tur":"oturum_kaydi_ses","durum":"kuru","silinecek":0},
+ {"tur":"oturum_kaydi_dokum","durum":"kuru","silinecek":0},
+ {"tur":"case_documents","durum":"kuru","silinecek":0},
+ {"tur":"case_notes","durum":"kuru","silinecek":1},
+ {"tur":"dosya_kapanis_sonrasi","durum":"atlandı","sebep":"bu tür başka bir kolun işi (dosya-verilerini-sil)"},
+ {"tur":"odeme_kayitlari","durum":"kuru","silinecek":4},
+ {"tur":"onay_kayitlari","durum":"atlandı","sebep":"süre girilmemiş"},
+ {"tur":"anonim_kapanis_istatistigi","durum":"atlandı","sebep":"süre girilmemiş"}
+]}
+```
+
+**Sayılar beklediğinin aynısı:** `case_notes 1` · `odeme_kayitlari 4` ·
+diğer hepsi 0 · `toplam_silinen 0` · `uyarilar` alanı YOK.
+
+**TEK FARK (kusur değil, not):** beklenen dökümde `oturum_kaydi_ses`,
+`oturum_kaydi_dokum` ve `case_documents` için `"temiz"` öngörülmüştü; canlı cevap
+`"kuru", silinecek: 0` döndürdü. Sayı aynı, yalnız durum etiketi farklı —
+`"temiz"` yolu ancak süresi dolmuş kapalı dosya HİÇ yokken yazılıyor. Beklenti
+metnini düzeltmek yeter.
+
+**Dağıtım sorusu (senin doğrulayamadığın kısım):** cevabın biçimi 26.08
+düzeltmesinin canlıda olduğunu gösteriyor — `dosya_kapanis_sonrasi` için
+"bu tür başka bir kolun işi" gerekçesi yeni sürümün imzasıdır. Bunu kanıt say.
+
+> **⛔ CODE NOTU · 27.08.2026 — BU ÇIKARIM YANLIŞ; CANLIDA ESKİ KOD DURUYOR.**
+> Dayanılan dize **yeni sürümün imzası değil**: `"bu tür başka bir kolun işi
+> (dosya-verilerini-sil)"` **eski kodda da vardı** (`git show HEAD~7:
+> supabase/functions/saklama-imha/index.ts` → 1 eşleşme). Ayırt edici olarak
+> H-17'de **başka bir şey** verilmişti ve cevap onu net biçimde söylüyor:
+>
+> | tür | canlı cevap | yeni kod ne derdi |
+> |---|---|---|
+> | `oturum_kaydi_ses` | `"kuru", silinecek: 0` | `"temiz", silinen: 0` |
+> | `oturum_kaydi_dokum` | `"kuru", silinecek: 0` | `"temiz", silinen: 0` |
+> | `case_documents` | `"kuru", silinecek: 0` | `"temiz", silinen: 0` |
+>
+> Yeni kolda 0 satır bulunduğunda `bekleyen.length === 0` dalı çalışır ve
+> **`"temiz"`** yazılır; `"kuru"` etiketi yalnız eski koddaki sayım dalından
+> çıkar. Üç türün üçü de aynı şeyi söylüyor. Yani **ön yüz publish'i edge
+> function'ı yenilememiş** — §11-B'nin kendi uyarısı doğru çıktı.
+>
+> **Bu, cevabın "temiz/kuru yalnız etiket farkı, beklenti metnini düzeltmek
+> yeter" değerlendirmesini de geçersiz kılar:** etiket farkı bir yazım
+> ayrıntısı değil, **hangi sürümün koştuğunun göstergesiydi.**
+>
+> **Tehlike var mı: BUGÜN YOK.** Eski kol `oturum_kayitlari` **satırlarını**
+> siler, ama o tablo canlıda **0 satır**. 03:00 UTC koşumunda silinecek 5 satır
+> (1 not + 4 ödeme) her iki sürümde de aynıdır ve deneme verisidir.
+> **Tehlike, pilotta ilk gerçek oturum kaydı tutulduğu an başlar.**
+>
+> **KALAN İŞ (bir sonraki oturumun İLK işi):** `saklama-imha` yeniden dağıtılıp
+> kuru koşum **tekrar** alınacak; üç tür `"temiz"` dönene kadar madde kapanmaz.
+> Bu yüzden H-17 **ARŞİV'e taşınmadı.**
+
+**SONUÇ: yarın 03:00 UTC koşumu güvenli.** Silinecek 5 satır 16–18.07 tarihli
+DENEME dosyalarına ait (MP-2026-1011 · MP-2026-1014); Cowork bunu `cases`
+tablosundan ayrıca doğruladı, gerçek dosya yok. Cron'a dokunulmayacak.
+
+### H-17 · 26.08.2026 · P1 — `saklama-imha` kuru koşumu (tek komut, HİÇBİR ŞEY SİLMEZ)
+**Ne gerekiyor.** `tests/gecici/saklama-imha-kuru-kosum.sql` dosyasındaki iki
+sorguyu Lovable SQL ile çalıştırıp cevabı buraya yapıştırmak. Gövde
+`{"kuru": true}` — kol yalnız **sayar**, silmez.
+
+**Neden Code yapamıyor.** Kol `x-cron-secret` istiyor; sır Vault'ta ve Code sır
+okumaz/SQL çalıştırmaz (§10, §12). Sorgu sırrı düz metne dökmez, Vault'tan okur.
+
+**Neden şimdi.** Kolun davranışı bugün **değişti** (satır silme → kolon boşaltma
++ depo temizliği; iki P0 kusur düzeltildi, commit'te ayrıntısı var). Cron
+**27.08 03:00**'te ilk kez gerçekten koşacak. 25.08 dersi: bir silme kolu
+koşmadan önce kuru koşum zorunludur.
+
+**Beklenen.** `case_notes → 1` · `odeme_kayitlari → 4` · geri kalan hepsi
+"temiz"/"atlandı" · `toplam_silinen: 0`. Bu beş satır 16–18.07 tarihli **deneme
+dosyalarına** aittir; silinmeleri istenen davranıştır.
+
+**AYRICA — bu koşum hangi sürümün dağıtıldığını da gösterir.** `saklama-imha`
+26.08'de değişti ve publish yapıldı, ama §11-B'nin kendi kuralı "GitHub senkronu
+edge function'ı otomatik deploy ETMEZ" diyor; ön yüz yayınının fonksiyonu da
+yenileyip yenilemediğini **doğrulayamadım** (kolu çağırmak sır istiyor). Cevabın
+biçimi bunu tek başına söyler:
+
+| `oturum_kaydi_ses` satırı | ne demek |
+|---|---|
+| `{"durum":"temiz","silinen":0}` | **YENİ kod dağıtılmış** — düzeltme canlıda |
+| `{"durum":"kuru","silinecek":0}` | **ESKİ kod duruyor** — fonksiyon yeniden dağıtılmalı |
+
+İkincisi çıkarsa haber verin: kol eski hâliyle koşarsa `oturum_kayitlari`
+**satırlarını** siler. Bugün o tablo boş olduğu için zarar yok, ama pilotta ilk
+oturum kaydı tutulduktan sonra tehlikelidir.
+
+**Kararın etkisi.** Beklenen sayılar çıkarsa yapılacak bir şey yok, cron kendi
+koşar. **Farklı ya da daha büyük** bir sayı çıkarsa cron koşmadan önce haber
+verin — Code kök nedeni bulur. Kuru koşum hiç yapılmazsa kol yarın canlı veriye
+ilk kez **doğrulanmamış** olarak dokunur.
+
+---
+
 
 ### H-16 · KAPANDI · 26.08.2026 — Çelişki yokmuş; soru yanlış kurulmuştu
 
