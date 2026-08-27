@@ -90,8 +90,9 @@ describe("periyodik imha: güvenli tasarım bozulmuyor", () => {
    gelmesini engeller — ikisi de "silme kolu, sildiği şeyin izini yanlış
    bırakıyor" sınıfındandır.
    ──────────────────────────────────────────────────────────────────────────── */
-const NOBETCI = readFileSync("supabase/functions/ajan-nobetci/index.ts", "utf-8");
-const DOSYA_SIL = readFileSync("supabase/functions/dosya-verilerini-sil/index.ts", "utf-8");
+const NOBETCI = oku("supabase/functions/ajan-nobetci/index.ts");
+const DOSYA_SIL = oku("supabase/functions/dosya-verilerini-sil/index.ts");
+const SESLI_NOT = oku("supabase/functions/sesli-not-dokum/index.ts");
 
 /** Yorumlar çıkarılmış gövde: sıra denetimleri yorum metnine takılmasın. */
 const GOVDE = G.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
@@ -147,10 +148,49 @@ describe("KUSUR 2 · belge silinirken ÖNCE depo, SONRA satır", () => {
   });
 });
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   H-18 (27.08.2026 · kurucu kararı) — SÜREYİ TEK YER BİLİR.
+   `ajan-nobetci` dosya kapanır kapanmaz dökümü siliyor, sesi de kapanıştan
+   24 saat sonra siliyordu; iki süre de KODDA SABİTTİ. Aynı anda
+   `saklama_sureleri` "döküm 7 gün" diyordu — nöbetçi 3 dakikada bir koştuğu
+   için gerçekte döküm ~3 dakika yaşıyordu, yani 7 günlük UYAP payı deliniyordu.
+   Kol kaldırıldı. Aşağıdaki denetimler geri gelmesini engeller.
+   ──────────────────────────────────────────────────────────────────────────── */
+describe("H-18 · nöbetçi oturum kaydı SİLMİYOR", () => {
+  const NOBETCI_GOVDE = NOBETCI
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+  it("kapanışta döküm silen kol yok", () => {
+    expect(NOBETCI_GOVDE, "nöbetçi dökümü yine siliyor").not.toContain("dokum_silindi_at");
+    expect(NOBETCI_GOVDE, "nöbetçi döküm metnini yine boşaltıyor").not.toContain("dokum_metni");
+  });
+
+  it("ses silen kol yok", () => {
+    expect(NOBETCI_GOVDE, "nöbetçi sesi yine siliyor").not.toContain("ses_silindi_at");
+    expect(NOBETCI_GOVDE, "nöbetçi kayıt kovasına yine dokunuyor")
+      .not.toContain("oturum-kayitlari");
+  });
+
+  it("nöbetçide kendi taşıdığı 24 saatlik süre sabiti kalmadı", () => {
+    expect(NOBETCI_GOVDE, "24 saatlik silme sayacı hâlâ kodda")
+      .not.toMatch(/24\s*\*\s*3600\s*\*\s*1000/);
+  });
+
+  it("silme yetkisi bu kolda ve süre parametre tablosundan geliyor", () => {
+    // Tersi de doğrulanır: yetkiyi devraldığımız kol gerçekten siliyor.
+    expect(GOVDE).toContain("dokum_silindi_at");
+    expect(GOVDE).toContain('from("saklama_sureleri")');
+  });
+});
+
 describe("kova adları öteki kollarla AYNI (sürüklenme kilidi)", () => {
-  it("ses kovası ajan-nobetci ile aynı", () => {
+  it("ses kovası sesli-not-dokum ile aynı", () => {
+    /* Eskiden kilit `ajan-nobetci`ye bakardı; o kol 27.08'de H-18 ile
+       kaldırıldı (kendi süresini kendi taşıyordu). Kovayı YAZAN yüzey
+       `sesli-not-dokum`, SİLEN yüzey buradır — kilit ikisi arasındadır. */
     const burada = G.match(/const KAYIT_KOVASI = "([^"]+)"/)?.[1];
-    const orada = NOBETCI.match(/const KAYIT_BUCKET = "([^"]+)"/)?.[1];
+    const orada = SESLI_NOT.match(/const KOVA = "([^"]+)"/)?.[1];
     expect(burada).toBeTruthy();
     expect(burada).toBe(orada);
   });

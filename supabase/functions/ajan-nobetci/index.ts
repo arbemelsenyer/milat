@@ -2069,96 +2069,35 @@ async function braketKollari(admin: any, dosya: any, taraflar: any[]): Promise<B
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   KAYIT SİLME KOLU (İBA 1.8 / B18 · constitution m.10 süresiz saklama yasağı)
-   · Ses kaydı: süreç bitiminden 24 SAAT sonra kalıcı silinir (dosya + satır).
-   · Döküm: süreç sonuna kadar durur, süreç bitince silinir.
-   Silme AJANIN turunda otomatik yapılır ve kayda yazılır: satırdaki silinme
-   zamanı + silme notu, ayrıca "yapılmayanlar" listesine gerekçe düşer.
-   Kayıt/döküm hattı henüz kurulmadığı için tablo boşsa kol sessizce geçer.
+   KAYIT SİLME KOLU KALDIRILDI — 27.08.2026 · HAT H-18 (kurucu kararı)
+
+   NE VARDI: nöbetçi, dosya kapanır kapanmaz dökümü siliyor; sesi de kapanıştan
+   24 saat sonra siliyordu. İki süre de KODDA SABİTTİ.
+
+   NEDEN GİTTİ: aynı iki veri türünün süresi `saklama_sureleri` tablosunda da
+   yazılıydı — döküm için **7 gün**. Nöbetçi 3 dakikada bir koştuğu için
+   gerçekte tabloda 7 gün yazarken döküm ~3 dakika yaşıyordu. Kurucunun kararı:
+   7 gün **UYAP payıdır** — arabulucu imzalı tutanağı indirip UYAP'a yükleyecek
+   kadar zamanı olsun diye kondu; kapanışta silen bir kol o payı uygulamış
+   olmaz, **deler**.
+
+   ARTIK KİM SİLİYOR:
+     · Döküm ve ses → `saklama-imha` (günlük kol). Süreyi YALNIZ
+       `saklama_sureleri`nden okur; kodda süre sabiti yoktur.
+     · Arabulucu "Dosyayı kapat ve tüm verileri sil" derse → anında
+       (`dosya-verilerini-sil`).
+     · Ham ses metne çevrilir çevrilmez → `sesli-not-dokum` (H-14 şart 1).
+       Bu istisna DEĞİŞMEDİ ve 7 güne tabi değildir.
+
+   KURAL (lessons.md'ye de yazıldı): bir veri türünün kaç gün tutulacağına
+   TEK YERDEN karar verilir. Buraya yeniden bir silme kolu ekleme; süreyi
+   değiştirmek gerekiyorsa `saklama_sureleri` satırını değiştir.
+
+   `KAYIT_BUCKET` sabiti de bu kolla birlikte gitti: nöbetçi artık
+   `oturum-kayitlari` kovasına DOKUNMUYOR. Kova adının sürüklenmemesi
+   `tests/saklama-imha.test.ts` içinde artık kovayı gerçekten kullanan
+   yüzeylere (`sesli-not-dokum` · `saklama-imha`) karşı kilitlidir.
    ──────────────────────────────────────────────────────────────────────────── */
-/* KAYIT KOVASI — ÖZEL VE İSTEMCİYE KAPALI (24.08.2026'da açıldı)
-   Bu kova canlıda YOKTU; silme kolu var olmayan bir kovadan silmeye çalışıyordu.
-   Kayıt hattı devreye girseydi silme her turda hata verir, `ses_silindi_at` hiç
-   yazılmaz ve kayıt süresiz kalırdı — tarafa onay metninde verilen "ses kaydı
-   süreç bitiminden 24 saat sonra kalıcı olarak silinir" sözü ve constitution
-   m.10 (süresiz saklama yasağı) çiğnenirdi.
-   Kova ÖZEL açıldı ve istemciye HİÇBİR politika verilmedi (deny-by-default):
-     · Onay metni "kayıt ve dökümü YALNIZ arabulucu görür" diyor; taraf bu
-       kovadan okuyamamalı.
-     · Yükleme yolu henüz yazılmadığı için dosya yolu düzeni belli değil;
-       politika yazmak için uydurmak gerekirdi — uydurulmadı.
-     · Servis rolü RLS'e tabi değildir: aşağıdaki silme kolu çalışır.
-   KAYIT HATTINI KURACAK KİŞİYE: yol düzenini belirledikten sonra arabulucuya
-   DAR bir okuma politikası ekle. Belge kovasında bunun geniş yazılması 24.08'de
-   canlı bir kör veri sızıntısı doğurmuştu — aynı hatayı tekrarlama. */
-const KAYIT_BUCKET = "oturum-kayitlari";
-
-async function kayitSilmeKollari(
-  admin: any, dosya: any,
-): Promise<{ ses_silindi: number; dokum_silindi: number; sebepler: string[] }> {
-  const sebepler: string[] = [];
-  let sesSilindi = 0;
-  let dokumSilindi = 0;
-
-  const { data: kayitlar, error } = await admin.from("oturum_kayitlari")
-    .select("id, session_id, ses_dosya_yolu, dokum_metni, ses_silindi_at, dokum_silindi_at")
-    .eq("case_id", dosya.id)
-    .or("ses_silindi_at.is.null,dokum_silindi_at.is.null")
-    .limit(50);
-  if (error) {
-    sebepler.push(`kayıt silme kolu çalışmadı: kayıtlar okunamadı — ${error.message}`);
-    return { ses_silindi: 0, dokum_silindi: 0, sebepler };
-  }
-  const bekleyen = (kayitlar ?? []) as any[];
-  if (bekleyen.length === 0) return { ses_silindi: 0, dokum_silindi: 0, sebepler };
-
-  const kapali = dosya?.status === "agreed" || dosya?.status === "failed";
-  if (!kapali) {
-    sebepler.push(`kayıt silinmedi: süreç sürüyor (${bekleyen.length} kayıt bekliyor)`);
-    return { ses_silindi: 0, dokum_silindi: 0, sebepler };
-  }
-  const bitisIso = dosya?.closed_at ?? null;
-  const bitis = bitisIso ? new Date(String(bitisIso)).getTime() : NaN;
-  if (!Number.isFinite(bitis)) {
-    // Tahmini bitiş zamanı ÜRETİLMEZ; silme sayacı başlatılmaz, sebep kayda geçer.
-    sebepler.push("kayıt silinmedi: sürecin bitiş zamanı (closed_at) boş — 24 saat sayacı başlatılamadı");
-    return { ses_silindi: 0, dokum_silindi: 0, sebepler };
-  }
-  const simdi = Date.now();
-  const sesSilmeZamani = bitis + 24 * 3600 * 1000;
-
-  for (const k of bekleyen) {
-    // Döküm: süreç bittiğinde (son tutanakla birlikte) silinir.
-    if (!k.dokum_silindi_at) {
-      const { error: dErr } = await admin.from("oturum_kayitlari").update({
-        dokum_metni: null,
-        dokum_silindi_at: new Date().toISOString(),
-        dokum_silme_notu: `Döküm süreç sonunda silindi (süreç bitişi ${String(bitisIso)}).`,
-      }).eq("id", k.id);
-      if (dErr) sebepler.push(`döküm silinemedi (${k.id}): ${dErr.message}`);
-      else dokumSilindi++;
-    }
-    // Ses: süreç bitiminden 24 saat sonra.
-    if (!k.ses_silindi_at) {
-      if (simdi < sesSilmeZamani) {
-        sebepler.push(`ses kaydı silinmedi (${k.id}): süreç bitiminden 24 saat geçmedi`);
-        continue;
-      }
-      if (k.ses_dosya_yolu) {
-        const { error: sErr } = await admin.storage.from(KAYIT_BUCKET).remove([String(k.ses_dosya_yolu)]);
-        if (sErr) { sebepler.push(`ses dosyası silinemedi (${k.id}): ${sErr.message}`); continue; }
-      }
-      const { error: uErr } = await admin.from("oturum_kayitlari").update({
-        ses_dosya_yolu: null,
-        ses_silindi_at: new Date().toISOString(),
-        ses_silme_notu: `Ses kaydı süreç bitiminden 24 saat sonra kalıcı silindi (süreç bitişi ${String(bitisIso)}).`,
-      }).eq("id", k.id);
-      if (uErr) sebepler.push(`ses silme kaydı yazılamadı (${k.id}): ${uErr.message}`);
-      else sesSilindi++;
-    }
-  }
-  return { ses_silindi: sesSilindi, dokum_silindi: dokumSilindi, sebepler };
-}
 
 // 'ozel_oturum': arabulucunun ekrandan açtığı görev. Ajan YALNIZ o tarafa teklif
 // gönderir; seçeneklere ozel_oturum işareti konur ve randevu-teklif cevabı
@@ -3099,9 +3038,6 @@ Deno.serve(async (req) => {
     // Bilirkişi kolları (20.08) sayaçları
     let bilirkisiHatirlatildi = 0;
     let bilirkisiSayildi = 0;
-    // Kayıt protokolü (B18) silme sayaçları
-    let sesKaydiSilindi = 0;
-    let dokumSilindi = 0;
     // Otomatik koşum (16.08) sayaçları ve TUR BAŞINA harcama bütçesi.
     let otomatikKosuldu = 0;
     let otomatikAtlandi = 0;
@@ -3237,11 +3173,10 @@ Deno.serve(async (req) => {
         taahhutDustu += braketKol.taahhut_dustu;
         braketKol.sebepler.forEach(sebepEkle);
 
-        // ── KAYIT SİLME (İBA 1.8 / B18): ses 24 saat sonra, döküm süreç sonunda ──
-        const silmeKol = await kayitSilmeKollari(admin, dosya);
-        sesKaydiSilindi += silmeKol.ses_silindi;
-        dokumSilindi += silmeKol.dokum_silindi;
-        silmeKol.sebepler.forEach(sebepEkle);
+        /* ── KAYIT SİLME KOLU KALDIRILDI (27.08.2026 · HAT H-18, kurucu kararı)
+           Nöbetçi artık oturum kaydı SİLMEZ. Silmenin tek yetkilisi
+           `saklama-imha`dır ve süreyi `saklama_sureleri` tablosundan okur.
+           Gerekçe için o kolun başlığındaki H-18 notuna bak. */
 
         /* ── BİLİRKİŞİ KOLLARI (20.08): sessiz kalan tarafın beyanına dayanan
            sayım (§3) ve geciken raporun 14/21 gün hatırlatması (§7).
@@ -3458,8 +3393,6 @@ Deno.serve(async (req) => {
       ortusme_bulundu: ortusmeBulundu,
       bant_sorusu_gonderildi: bantSorusuGonderildi,
       taahhut_dustu: taahhutDustu,
-      ses_kaydi_silindi: sesKaydiSilindi,
-      dokum_silindi: dokumSilindi,
       bilirkisi_hatirlatildi: bilirkisiHatirlatildi,
       bilirkisi_kabul_sayildi: bilirkisiSayildi,
       otomatik_kosuldu: otomatikKosuldu,

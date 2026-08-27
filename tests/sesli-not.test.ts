@@ -118,9 +118,12 @@ describe("sesli not: taraf sesi teknik olarak kaydedilemez", () => {
   });
 
   it("kova adı, imha kolununkiyle aynı (öksüz ses kalmasın)", () => {
-    // `ajan-nobetci` 24 saatlik imha kolu ayni kovayi temizler.
+    /* Kovayı temizleyen kol `saklama-imha`dır. 27.08'de (HAT H-18) nöbetçinin
+       kendi 24 saatlik silme kolu KALDIRILDI — kendi süresini kendi taşıyordu;
+       süre artık yalnız `saklama_sureleri`nde. Bu yüzden kilit nöbetçiye değil,
+       kovayı gerçekten kullanan iki yüzeye bakar. */
     expect(oku(ISLEV)).toContain('const KOVA = "oturum-kayitlari"');
-    expect(oku("supabase/functions/ajan-nobetci/index.ts"))
-      .toContain('const KAYIT_BUCKET = "oturum-kayitlari"');
+    expect(oku("supabase/functions/saklama-imha/index.ts"))
+      .toContain('const KAYIT_KOVASI = "oturum-kayitlari"');
   });
 });

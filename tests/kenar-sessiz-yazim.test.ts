@@ -440,9 +440,11 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     // Gorev silinmez, kapatilir: sebep kayda gecer.
     expect(g.slice(kapaliIdx, yurutIdx)).toContain('durum: "atlandi"');
     expect(g.slice(kapaliIdx, yurutIdx)).toContain("kapaliErr");
-    // Kollardaki mevcut `kapali` denetimleri bozulmamali.
+    /* Kollardaki mevcut `kapali` denetimleri bozulmamali.
+       27.08 (HAT H-18): esik 4'ten 3'e indi — kayit silme kolu KALDIRILDI ve
+       denetimlerinden biri onunla birlikte gitti. Kalan uc kol duruyor. */
     expect(g.match(/status === "agreed" \|\| dosya\?\.status === "failed"/g)?.length ?? 0)
-      .toBeGreaterThanOrEqual(4);
+      .toBeGreaterThanOrEqual(3);
   });
 
   it("KVKK silmesi depoyu da temizliyor (öksüz belge bırakmıyor)", () => {
