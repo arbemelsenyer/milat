@@ -41,6 +41,37 @@ function govdesi(yol: string): string {
     .replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
+describe("kaynak okuma TEK KAPIDAN geçiyor", () => {
+  /* CRLF tuzağı 27.08'de `tests/kaynak.ts` (`kaynakOku`) ile kapatıldı ve o
+     gün 31 tezgâh oraya bağlandı. Ama kuralı KORUYAN bir şey yoktu: yarın
+     yazılan bir tezgâh `readFileSync(..., "utf-8")` deyip aynı tuzağa
+     düşebilirdi ve bunu ancak çok satırlı bir denetim kırmızı yanınca —
+     yani kod doğruyken — fark ederdik.
+
+     Ölçü olarak İTHALE bakılır, çağrıya değil: bu dosya kendi gövdesinde
+     `readFileSync` dizgesini bir düzenli ifade içinde taşıyor, çağrı arayan
+     bir denetim kendi kaynağını suçlar (23.08 `guard-shell.sh` dersi:
+     karar, metinde geçen kelimeye göre değil gerçekte yapılana göre verilir).
+     `readdirSync` · `statSync` · `existsSync` serbesttir: dosya İÇERİĞİ
+     okumazlar, satır sonu tuzağı onları ilgilendirmez. */
+  it("yalnız tests/kaynak.ts readFileSync ithal edebiliyor", () => {
+    const suclu = TEZGAHLAR.filter((t) =>
+      /import\s*\{[^}]*\breadFileSync\b[^}]*\}\s*from\s*"node:fs"/.test(kaynakOku(t)),
+    );
+    expect(
+      suclu,
+      `kaynağı doğrudan okuyan tezgâh (kaynakOku kullan): ${suclu.join(" | ")}`,
+    ).toEqual([]);
+  });
+
+  it("tek kapı gerçekten normalleştiriyor", () => {
+    // Kapı kendisi bozulursa bütün tezgâhlar sessizce tuzağa geri döner.
+    const G = kaynakOku("tests/kaynak.ts");
+    expect(G, "kaynakOku dışa açılmıyor").toContain("export const kaynakOku");
+    expect(G, "CRLF normalleştirmesi kaldırılmış").toMatch(/split\("\\r\\n"\)\.join\("\\n"\)/);
+  });
+});
+
 describe("tezgâh temiz bir klonda da koşar", () => {
   it("hiçbir tezgâh tests/gecici/ içinden kalıcı bağımlılık okumuyor", () => {
     const suclu: string[] = [];
