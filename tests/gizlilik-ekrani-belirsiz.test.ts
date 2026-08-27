@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* GİZLİLİK EKRANI YÖNETİCİ OTURUMUNDA ANLAMLI SONUÇ VEREMEZ (24.08.2026)
 
@@ -17,8 +17,8 @@ import { readFileSync } from "node:fs";
    koşar, yeni veri açmaz) ve yönetici oturumunda sonuçlar "belirsiz" olarak
    işaretlenir. */
 
-const EKRAN = readFileSync("src/pages/PrivacyTests.tsx", "utf-8");
-const RAPOR = readFileSync("src/lib/privacyReport.ts", "utf-8");
+const EKRAN = kaynakOku("src/pages/PrivacyTests.tsx");
+const RAPOR = kaynakOku("src/lib/privacyReport.ts");
 
 describe("gizlilik ekranı — yönetici kapısı", () => {
   it("sayfa artık yalnız yöneticiye kapalı DEĞİL", () => {

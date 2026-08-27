@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 import {
   KAYIT_ONAY_SAAT, KAYIT_ONAY_SURUMU, KAYIT_TEK_KAPI_UYARISI, KAYIT_ONAY_METNI,
 } from "../src/lib/kayitProtokolu";
@@ -21,7 +21,7 @@ const YUZEYLER = [
 describe("kayıt protokolü — iki yüzey tek kaynaktan okur", () => {
   it("hiçbir yüzey sabitleri kendi içinde yeniden TANIMLAMAZ", () => {
     for (const yol of YUZEYLER) {
-      const kaynak = readFileSync(yol, "utf-8");
+      const kaynak = kaynakOku(yol);
       for (const ad of ["KAYIT_ONAY_SAAT", "KAYIT_ONAY_SURUMU", "KAYIT_TEK_KAPI_UYARISI", "KAYIT_ONAY_METNI"]) {
         /* Düz metin araması: şablon dizesinde `\s` kaçış olarak yeniyor ve
            desen sessizce `consts+...` oluyor — bu tezgâh ilk yazımında tam
@@ -36,7 +36,7 @@ describe("kayıt protokolü — iki yüzey tek kaynaktan okur", () => {
 
   it("her yüzey sabitleri ortak modülden içe aktarır", () => {
     for (const yol of YUZEYLER) {
-      const kaynak = readFileSync(yol, "utf-8");
+      const kaynak = kaynakOku(yol);
       expect(kaynak, `${yol} ortak modülü içe aktarmıyor`)
         .toMatch(/from "@\/lib\/kayitProtokolu"/);
     }
@@ -44,14 +44,14 @@ describe("kayıt protokolü — iki yüzey tek kaynaktan okur", () => {
 
   it("harici araç yasağı cümlesi hiçbir yüzeye ELLE yazılmamış", () => {
     for (const yol of YUZEYLER) {
-      const kaynak = readFileSync(yol, "utf-8");
+      const kaynak = kaynakOku(yol);
       expect(kaynak, `${yol} yasak cümlesini kendi içinde taşıyor`)
         .not.toContain("Harici araçlarla");
     }
   });
 
   it("süre ekran metnine ELLE yazılmaz: sabitten türetilir", () => {
-    const kaynak = readFileSync("src/pages/MediationEngine.tsx", "utf-8");
+    const kaynak = kaynakOku("src/pages/MediationEngine.tsx");
     // Yorum satırları hariç, kullanıcıya gösterilen hiçbir yerde çıplak sayı olmamalı.
     const govde = kaynak.split("\n").filter((l) => !l.trim().startsWith("·") && !l.trim().startsWith("*")).join("\n");
     expect(govde).not.toContain(`${KAYIT_ONAY_SAAT} saatlik süre`);

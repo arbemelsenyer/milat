@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* DOSYA KAPANIŞI `closed_at`i GERÇEKTEN DOLDURUR MU (24.08.2026 kusuru)
    `closed_at` sütununu dolduran şey bir veritabanı tetikleyicisidir:
@@ -19,7 +19,7 @@ import { readFileSync } from "node:fs";
 
    Bu tezgâh kaynak metni denetler; tarayıcı ya da veritabanı gerekmez. */
 
-const KAYNAK = readFileSync("src/pages/MediationEngine.tsx", "utf-8");
+const KAYNAK = kaynakOku("src/pages/MediationEngine.tsx");
 
 /** `closeCase` gövdesini kaynaktan çıkarır. */
 function closeCaseGovdesi(): string {

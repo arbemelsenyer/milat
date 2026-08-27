@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* KAZANIM SAYACI — mimari §5.9 · §15.1 camdan kutu · HAT H-15/4 seçim B
  *
@@ -16,8 +16,8 @@ import { readFileSync } from "node:fs";
  * sayaç yalnız süre ve işlem tipi tutar (§14, constitution m.1).
  */
 
-const G = readFileSync("supabase/functions/kazanim-sayaci/index.ts", "utf-8");
-const SQL = readFileSync("tests/gecici/baz-cizgi.sql", "utf-8");
+const G = kaynakOku("supabase/functions/kazanim-sayaci/index.ts");
+const SQL = kaynakOku("tests/gecici/baz-cizgi.sql");
 
 describe("kazanım sayacı: rakam arabulucunun kendi beyanı", () => {
   it("katsayı ARABULUCUDAN gelir, yöneticiden değil", () => {
@@ -110,8 +110,8 @@ describe("kazanım sayacı: rakam arabulucunun kendi beyanı", () => {
        kurulamaz." Kayıt e-posta onayı gerektirdiği için `signUp` anında oturum
        (auth.uid()) yok ve RLS gereği satır yazılamaz; bu yüzden soru
        arabulucunun çalışmaya BAŞLADIĞI ilk ekranda sorulur. */
-    const kart = readFileSync("src/components/mediation/BazCizgiSorulari.tsx", "utf-8");
-    const motor = readFileSync("src/pages/MediationEngine.tsx", "utf-8");
+    const kart = kaynakOku("src/components/mediation/BazCizgiSorulari.tsx");
+    const motor = kaynakOku("src/pages/MediationEngine.tsx");
     // Uc soru da 5.9'daki haliyle sorulmali.
     for (const a of ["belge_saat", "analiz_saat", "beyan_saat"]) {
       expect(kart, `${a} sorulmuyor`).toContain(a);

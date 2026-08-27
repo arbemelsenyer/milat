@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* ANALİZ TÜKETİMİ — HAT H-15/3 ("sayaç çalışsın, engel olmasın") · 26.08.2026
  *
@@ -12,8 +12,8 @@ import { readFileSync } from "node:fs";
  * (paket/fiyat ekranı, kota engeli, aşım ücreti) buraya sızmaz.
  */
 
-const G = readFileSync("src/components/admin/AnalizTuketimi.tsx", "utf-8");
-const ADMIN = readFileSync("src/pages/AdminDashboard.tsx", "utf-8");
+const G = kaynakOku("src/components/admin/AnalizTuketimi.tsx");
+const ADMIN = kaynakOku("src/pages/AdminDashboard.tsx");
 /** Yasak desen denetimi YORUMA DEĞİL KODA bakar (25.08 dersi). */
 const KOD = G.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
 

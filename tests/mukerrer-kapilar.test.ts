@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* MÜKERRER YAZIM KAPILARI — İKİ ORTAK KUSUR (24.08.2026)
 
@@ -24,7 +24,7 @@ const DOSYALAR: [string, string][] = [
 
 describe("mükerrer yazım kapıları — ortak kalıba uyar", () => {
   for (const [ad, yol] of DOSYALAR) {
-    const kaynak = readFileSync(yol, "utf-8");
+    const kaynak = kaynakOku(yol);
 
     it(`${ad}: etiket araması \`startsWith\` DEĞİL`, () => {
       expect(kaynak).not.toContain("startsWith(etiket)");

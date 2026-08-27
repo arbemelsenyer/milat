@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* ÖDEME DEFTERİ — mimari §15.2 + §15.5-4 (25.08.2026)
  *
@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
  * bir Kaydet düğmesi koşullu görünür hâle getirilirse test düşer.
  */
 
-const G = readFileSync("src/pages/MediationEngine.tsx", "utf-8");
+const G = kaynakOku("src/pages/MediationEngine.tsx");
 
 /** Bir düğmenin `disabled` ifadesi YALNIZ meşguliyet bayrağı mı? */
 function yalnizMesguliyet(satir: string, bayrak: string): boolean {

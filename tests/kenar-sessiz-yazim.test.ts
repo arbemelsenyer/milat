@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
+import { readdirSync, existsSync } from "node:fs";
 
 /* KENAR İŞLEVLERİNDE SESSİZ YAZIM — ürün yazımları (25.08.2026)
 
@@ -19,7 +20,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 
 const KOK = (process.env.KENAR_KOK ?? "").replace(/\/+$/, "");
 const y = (goreli: string) => (KOK ? `${KOK}/${goreli}` : goreli);
-const oku = (ad: string) => readFileSync(y(`supabase/functions/${ad}/index.ts`), "utf-8");
+const oku = (ad: string) => kaynakOku(y(`supabase/functions/${ad}/index.ts`));
 
 describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
   it("katılım: taraf bağlanamazsa 'katıldınız' denmiyor", () => {
@@ -326,7 +327,7 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     const ciplak: string[] = [];
     const tara = (yol: string, etiket: string) => {
       if (!existsSync(yol)) return;
-      readFileSync(yol, "utf-8").split(String.fromCharCode(10)).forEach((l, i) => {
+      kaynakOku(yol).split(String.fromCharCode(10)).forEach((l, i) => {
         if (/^\s*await\s+(admin|sb|supabase|client|db)\.from\(/.test(l)) {
           ciplak.push(`${etiket}:${i + 1}`);
         }
@@ -389,7 +390,7 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
       if (!ad.isDirectory()) continue;
       const yol = `${kok}/${ad.name}/index.ts`;
       if (!existsSync(yol)) continue;
-      readFileSync(yol, "utf-8").split(String.fromCharCode(10)).forEach((l, i) => {
+      kaynakOku(yol).split(String.fromCharCode(10)).forEach((l, i) => {
         // `has_role` gibi SALT OKUMA rpc'leri kapsam dışı: sonucu zaten `data` ile okunur.
         if (/^\s*await\s+(admin|sb|supabase|client|finalAdmin)\.(rpc\(|storage[.\s])/.test(l)) {
           ciplak.push(`${ad.name}:${i + 1}`);
@@ -402,7 +403,7 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
   it("anlatım defteri (_shared/anlatim.ts): yazım düşerse konsola düşüyor", () => {
     // Dosyanin kendi sozu "[anlatim] yazilamadi" logudur — ama catch hic
     // calismadigi icin o log HIC dusmuyordu. 35 islev bu katmani kullaniyor.
-    const g = readFileSync(y("supabase/functions/_shared/anlatim.ts"), "utf-8");
+    const g = kaynakOku(y("supabase/functions/_shared/anlatim.ts"));
     for (const im of ["anlatimErr", "yansitErr"]) expect(g, `${im} okunmuyor`).toContain(im);
     expect(g).toContain("catch KORUMA DEĞİLDİR");
   });

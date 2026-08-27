@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* PERİYODİK İMHA — mimari §15.2 · constitution m.10 · HAT H-15/1 (25.08.2026)
  *
@@ -12,16 +12,12 @@ import { readFileSync } from "node:fs";
  * parametreden gelemez, kapanmamış dosyaya dokunulmaz.
  */
 
-/* Satır sonu NORMALLEŞTİRİLİR. Aşağıdaki denetimlerin bir kısmı ÇOK SATIRLI
- * dizgi arar (ör. `from("case_documents")` + yeni satır + `.delete(`). Dosya
- * çalışma ağacına CRLF ile inerse o arama sessizce başarısız olur ve tezgâh,
- * KOD DOĞRUYKEN kırmızı yanar — 27.08'de tam bu oldu: Lovable'ın dokunduğu
- * dosya `core.autocrlf=true` yüzünden CRLF olarak geri geldi (depoda 341
- * dosya CRLF). Kaynak okuyan her tezgâh bu tuzağa açıktır. */
-const oku = (y: string) => readFileSync(y, "utf-8").split("\r\n").join("\n");
-
-const G = oku("supabase/functions/saklama-imha/index.ts");
-const SQL = oku("tests/gecici/saklama-suresi-politika.sql");
+/* Okuma `kaynakOku` üzerinden yapılır: aşağıdaki denetimlerin bir kısmı ÇOK
+ * SATIRLI dizgi arar (ör. `from("case_documents")` + yeni satır + `.delete(`)
+ * ve dosya çalışma ağacına CRLF ile inerse o arama sessizce başarısız olur.
+ * 27.08'de tam bu oldu; gerekçenin tamamı `tests/kaynak.ts` başlığındadır. */
+const G = kaynakOku("supabase/functions/saklama-imha/index.ts");
+const SQL = kaynakOku("tests/gecici/saklama-suresi-politika.sql");
 
 describe("periyodik imha: güvenli tasarım bozulmuyor", () => {
   it("süre PARAMETRE TABLOSUNDAN okunuyor, kodda sabit değil", () => {
@@ -90,9 +86,9 @@ describe("periyodik imha: güvenli tasarım bozulmuyor", () => {
    gelmesini engeller — ikisi de "silme kolu, sildiği şeyin izini yanlış
    bırakıyor" sınıfındandır.
    ──────────────────────────────────────────────────────────────────────────── */
-const NOBETCI = oku("supabase/functions/ajan-nobetci/index.ts");
-const DOSYA_SIL = oku("supabase/functions/dosya-verilerini-sil/index.ts");
-const SESLI_NOT = oku("supabase/functions/sesli-not-dokum/index.ts");
+const NOBETCI = kaynakOku("supabase/functions/ajan-nobetci/index.ts");
+const DOSYA_SIL = kaynakOku("supabase/functions/dosya-verilerini-sil/index.ts");
+const SESLI_NOT = kaynakOku("supabase/functions/sesli-not-dokum/index.ts");
 
 /** Yorumlar çıkarılmış gövde: sıra denetimleri yorum metnine takılmasın. */
 const GOVDE = G.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");

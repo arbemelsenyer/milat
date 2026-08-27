@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readdirSync, readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
 /* SAHİP-TARAF GUARD'I (24.08.2026 · P0 kararı, A seçeneği)
@@ -32,7 +33,7 @@ import { join } from "node:path";
 const MIG_DIZIN = process.env.MIG_DIZIN ?? "supabase/migrations";
 
 const HEPSI = readdirSync(MIG_DIZIN)
-  .map((f) => readFileSync(join(MIG_DIZIN, f), "utf-8"))
+  .map((f) => kaynakOku(join(MIG_DIZIN, f)))
   .join("\n\n");
 
 /* POLİTİKA BLOKLARINI AYRIŞTIR — düz `indexOf("ON public.<tablo>")` YETMEZ:

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* BELGE MOTORU — mimari §3 (otomatik doldurma) + §15.2 (belge zinciri, UDF)
  *
@@ -14,8 +14,8 @@ import { readFileSync } from "node:fs";
  * UYAP çıktısıyla doğrulanmış (`ornek_gercek.udf.udf`).
  */
 
-const ISLEV = readFileSync("supabase/functions/generate-official-document/index.ts", "utf-8");
-const PANEL = readFileSync("src/components/mediation/OfficialDocumentsPanel.tsx", "utf-8");
+const ISLEV = kaynakOku("supabase/functions/generate-official-document/index.ts");
+const PANEL = kaynakOku("src/components/mediation/OfficialDocumentsPanel.tsx");
 
 describe("belge motoru: §3 doldurma + UDF zinciri", () => {
   it("§3 alanları kayıtlı veriden dolduruluyor", () => {
@@ -66,7 +66,7 @@ describe("belge motoru: §3 doldurma + UDF zinciri", () => {
 
   it("tüketici şablonu zincirde var", () => {
     // §15.2 "tuketici dahil" diyor; sablon tipi kodda taninmali.
-    const admin = readFileSync("supabase/functions/admin-upload-template/index.ts", "utf-8");
+    const admin = kaynakOku("supabase/functions/admin-upload-template/index.ts");
     expect(admin).toMatch(/tuketici/);
   });
 

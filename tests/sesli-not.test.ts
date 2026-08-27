@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
+import { readdirSync, existsSync } from "node:fs";
 
 /* SESLİ NOT — HAT H-14 kararı: B (25.08.2026)
  *
@@ -13,7 +14,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
  * Bu tezgâh üçünü de ve teknik kısıtı denetler.
  */
 
-const oku = (y: string) => readFileSync(y, "utf-8");
+const oku = (y: string) => kaynakOku(y);
 const BILESEN = "src/components/mediation/SesliNotKaydi.tsx";
 const ISLEV = "supabase/functions/sesli-not-dokum/index.ts";
 const METIN = "src/lib/kvkk-metinleri.ts";

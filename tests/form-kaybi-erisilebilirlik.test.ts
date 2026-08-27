@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* KULLANILABİLİRLİK — 03.08 saha notu (NOVAPOS koşumu), 25.08'de kapatıldı
  *
@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
  * tetikleyicinin `id`si olmadığı için menünün ERİŞİLEBİLİR ADI yoktu.
  */
 
-const G = readFileSync("src/pages/MediationEngine.tsx", "utf-8");
+const G = kaynakOku("src/pages/MediationEngine.tsx");
 
 describe("dosya açılış formu: içerik kaybolmuyor, menüler adlandırılmış", () => {
   it("form içeriği taslak olarak korunuyor", () => {
@@ -54,7 +54,7 @@ describe("dosya açılış formu: içerik kaybolmuyor, menüler adlandırılmı�
   });
 
   it("menüler Radix — klavye gezinme hazır gelir", () => {
-    const sel = readFileSync("src/components/ui/select.tsx", "utf-8");
+    const sel = kaynakOku("src/components/ui/select.tsx");
     expect(sel).toContain('@radix-ui/react-select');
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* TAKİP FÖYÜ — oturum satırları iptal/taslak kaydı yapılmış gibi göstermiyor
    (25.08.2026)
@@ -25,7 +25,7 @@ import { readFileSync } from "node:fs";
 const KOK = (process.env.FOY_KOK ?? "").replace(/\/+$/, "");
 const y = (goreli: string) => (KOK ? `${KOK}/${goreli}` : goreli);
 
-const panel = () => readFileSync(y("src/components/mediation/ProcessTrackerPanel.tsx"), "utf-8");
+const panel = () => kaynakOku(y("src/components/mediation/ProcessTrackerPanel.tsx"));
 
 function autoStateGovdesi(g: string): string {
   const bas = g.indexOf("const autoState = useMemo(");

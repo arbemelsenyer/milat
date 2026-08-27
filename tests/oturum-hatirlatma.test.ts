@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* OTURUM HATIRLATMASI — TEK KOL TEZGÂHI (24.08.2026)
 
@@ -25,8 +25,8 @@ import { readFileSync } from "node:fs";
    Bu tezgâh iki şeyi sabitler: tek kol kalsın, ve o kolun etiket okuyucusu
    çapalı olmasın. */
 
-const NOBETCI = readFileSync("supabase/functions/ajan-nobetci/index.ts", "utf-8");
-const CRON = readFileSync("supabase/functions/send-session-reminders/index.ts", "utf-8");
+const NOBETCI = kaynakOku("supabase/functions/ajan-nobetci/index.ts");
+const CRON = kaynakOku("supabase/functions/send-session-reminders/index.ts");
 
 describe("hatırlatma kolu — nöbetçi etiketi metnin İÇİNDE arar", () => {
   it("etiket deseni satır başına ÇAPALI değildir", () => {

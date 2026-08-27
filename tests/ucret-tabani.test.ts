@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* AAÜT TABANI — YASAL ASGARİ ÜCRET KORUMASI (mimari §15.2, 25.08.2026)
 
@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
    ayrıca `case_payments` yazan yol sayısı da sayılır. */
 
 const DOSYA = "src/pages/MediationEngine.tsx";
-const g = readFileSync(DOSYA, "utf-8");
+const g = kaynakOku(DOSYA);
 
 /** Bir işlevin gövdesini kabaca alır (sonraki `async function`a kadar). */
 function govde(ad: string): string {
@@ -62,7 +62,7 @@ describe("ücret tarife tabanının altına inilemiyor", () => {
   it("taban, tarife tablosundan geliyor (kodda sabit değil)", () => {
     // `taban` degeri ucret hesabindan gelmeli; kodda sabit sayi olmamali.
     expect(g).toMatch(/const\s+taban\s*=\s*feeResult\?\.net_tahsilat/);
-    const hesap = readFileSync("supabase/functions/calculate-mediation-fee/index.ts", "utf-8");
+    const hesap = kaynakOku("supabase/functions/calculate-mediation-fee/index.ts");
     expect(hesap, "tarife tablosundan okunmuyor").toContain('from("fee_tariffs")');
   });
 });

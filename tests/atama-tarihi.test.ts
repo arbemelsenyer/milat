@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* ATAMA TARİHİ — resmi tutanak alanı uydurulmaz (25.08.2026)
 
@@ -23,8 +23,8 @@ import { readFileSync } from "node:fs";
 const KOK = (process.env.ATAMA_KOK ?? "").replace(/\/+$/, "");
 const y = (goreli: string) => (KOK ? `${KOK}/${goreli}` : goreli);
 
-const panel = () => readFileSync(y("src/components/mediation/ProcessTrackerPanel.tsx"), "utf-8");
-const admin = () => readFileSync(y("src/pages/AdminDashboard.tsx"), "utf-8");
+const panel = () => kaynakOku(y("src/components/mediation/ProcessTrackerPanel.tsx"));
+const admin = () => kaynakOku(y("src/pages/AdminDashboard.tsx"));
 
 describe("atama tarihi uydurulmuyor", () => {
   it("panel atama tarihini created_at'e düşürmüyor", () => {

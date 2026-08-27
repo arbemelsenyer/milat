@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* KOTA KAPISI — mimari §15.2 · HAT H-15/3 (25.08.2026)
  *
@@ -13,8 +13,8 @@ import { readFileSync } from "node:fs";
  * çalışan bir arabulucunun işi bir tablo eksikliği yüzünden durmamalı.
  */
 
-const G = readFileSync("supabase/functions/_shared/kota.ts", "utf-8");
-const SQL = readFileSync("tests/gecici/kota-tablosu.sql", "utf-8");
+const G = kaynakOku("supabase/functions/_shared/kota.ts");
+const SQL = kaynakOku("tests/gecici/kota-tablosu.sql");
 
 describe("kota kapısı: kazara kimseyi kilitlemiyor", () => {
   it("limit NULL ise SINIRSIZ", () => {

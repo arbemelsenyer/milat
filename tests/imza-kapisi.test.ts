@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
+import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 /* ISLAK İMZA KAPISI (HAT H-2 · karar A, 24.08.2026)
@@ -26,7 +27,7 @@ function tsDosyalari(dizin: string): { yol: string; icerik: string }[] {
     for (const ad of readdirSync(d)) {
       const tam = join(d, ad);
       if (statSync(tam).isDirectory()) gez(tam);
-      else if (tam.endsWith(".ts")) cikti.push({ yol: tam, icerik: readFileSync(tam, "utf-8") });
+      else if (tam.endsWith(".ts")) cikti.push({ yol: tam, icerik: kaynakOku(tam) });
     }
   };
   gez(dizin);
@@ -55,7 +56,7 @@ describe("imza kapısı — sunucu tarafı signed_by'a dokunmuyor", () => {
 });
 
 describe("imza yüzeyi — istemci bileşeni kararın şartlarını taşıyor", () => {
-  const PANEL = readFileSync("src/components/mediation/AnlasmaImzaPaneli.tsx", "utf-8");
+  const PANEL = kaynakOku("src/components/mediation/AnlasmaImzaPaneli.tsx");
 
   it("yazma istemciden, kullanıcının kendi oturumuyla gidiyor", () => {
     expect(PANEL).toContain('.from("agreement_documents")');

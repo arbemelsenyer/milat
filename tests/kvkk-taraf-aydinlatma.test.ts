@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* KVKK AYDINLATMASI TARAF EKRANINDA — mimari §15.2 (25.08.2026)
 
@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
    hangisinin geçerli olduğu sorusu doğar. İkisi de `@/lib/kvkk-metinleri`den
    okur; bu tezgâh gömülü kopya sızmasını da engeller. */
 
-const oku = (yol: string) => readFileSync(yol, "utf-8");
+const oku = (yol: string) => kaynakOku(yol);
 const KAYNAK = "src/lib/kvkk-metinleri.ts";
 const TARAF = "src/pages/KatilimCevap.tsx";
 const ARABULUCU = "src/pages/Auth.tsx";

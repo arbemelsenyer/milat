@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync, mkdirSync, writeFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
+import { readdirSync, statSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /* SESSİZ YUTULAN VERİTABANI YAZIMLARI (25.08.2026)
@@ -42,7 +43,7 @@ function kontrolsuzYazimlar(kok: string): string[] {
 
   const bulgular: string[] = [];
   for (const f of dosyalar) {
-    const g = readFileSync(f, "utf-8");
+    const g = kaynakOku(f);
     if (!g.includes("supabase")) continue;
     const satirlar = g.split("\n");
     const YAZIM = /\.\s*(insert|update|delete|upsert)\s*\(/g;
@@ -136,7 +137,7 @@ describe("sessiz yutulan veritabanı yazımı eklenmiyor", () => {
 
   it("resmi belge düzenlemesi 'kaydedildi' derken gerçekten kaydediliyor", () => {
     // `syncEditedRecord` supabase hatasını okumadan HER ZAMAN true dönüyordu.
-    const g = readFileSync(y("src/components/mediation/OfficialDocumentsPanel.tsx"), "utf-8");
+    const g = kaynakOku(y("src/components/mediation/OfficialDocumentsPanel.tsx"));
     const i = g.indexOf("async function syncEditedRecord");
     expect(i, "syncEditedRecord bulunamadı").toBeGreaterThan(-1);
     const govde = g.slice(i, i + 1200);
@@ -145,7 +146,7 @@ describe("sessiz yutulan veritabanı yazımı eklenmiyor", () => {
   });
 
   it("rol kaldırma başarısızsa 'Rol Kaldırıldı' denmiyor", () => {
-    const g = readFileSync(y("src/pages/AdminDashboard.tsx"), "utf-8");
+    const g = kaynakOku(y("src/pages/AdminDashboard.tsx"));
     const i = g.indexOf("const handleRemoveRole");
     expect(i).toBeGreaterThan(-1);
     const govde = g.slice(i, i + 900);
@@ -165,7 +166,7 @@ describe("sessiz yutulan veritabanı yazımı eklenmiyor", () => {
        hiçbir silme kolu bulamaz (constitution m.10 — süresiz saklama yasağı). */
     const dosyalar = ["src/pages/MediationEngine.tsx", "src/components/CaseDocuments.tsx"];
     for (const d of dosyalar) {
-      const g = readFileSync(y(d), "utf-8");
+      const g = kaynakOku(y(d));
       const ciplak = g.split(String.fromCharCode(10))
         .map((l, i) => ({ l, i }))
         .filter(({ l }) => /^\s*await\s+supabase\.(storage|rpc\()/.test(l))
@@ -179,11 +180,11 @@ describe("sessiz yutulan veritabanı yazımı eklenmiyor", () => {
        `console.warn`du). Adı sabit bir tezgâh, yeni yüzeyi hiç görmez —
        bu yüzden artık `case_documents` satırını silen HER yer taranır. */
     const belgeSilenler = kaynakDosyalari(y("src"))
-      .filter((d) => /from\(['"]case_documents['"]\)\s*\.delete\(/.test(readFileSync(d, "utf-8")));
+      .filter((d) => /from\(['"]case_documents['"]\)\s*\.delete\(/.test(kaynakOku(d)));
     expect(belgeSilenler.length, "belge silen yüzey bulunamadı — tarama bozuk").toBeGreaterThan(0);
     const oksuzUretenler: string[] = [];
     for (const d of belgeSilenler) {
-      const g = readFileSync(d, "utf-8");
+      const g = kaynakOku(d);
       const kalip = /from\(['"]case_documents['"]\)\s*\.delete\(/g;
       let e: RegExpExecArray | null;
       while ((e = kalip.exec(g)) !== null) {
@@ -202,7 +203,7 @@ describe("sessiz yutulan veritabanı yazımı eklenmiyor", () => {
       `satır depodan ÖNCE siliniyor ya da depo hatası akışı durdurmuyor — ÖKSÜZ DOSYA üretir: ${oksuzUretenler.join(", ")}`,
     ).toEqual([]);
     // Geri alma yollari da kayda duser.
-    const m = readFileSync(y("src/pages/MediationEngine.tsx"), "utf-8");
+    const m = kaynakOku(y("src/pages/MediationEngine.tsx"));
     expect(m).toContain("öksüz dosya");
   });
 
@@ -217,7 +218,7 @@ describe("sessiz yutulan veritabanı yazımı eklenmiyor", () => {
       "src/pages/MediationEngine.tsx",
     ];
     for (const d of ATESLE_UNUT) {
-      const g = readFileSync(y(d), "utf-8");
+      const g = kaynakOku(y(d));
       const i = g.indexOf("extract-document-text");
       expect(i, `${d}: çağrı bulunamadı`).toBeGreaterThan(-1);
       // Cagrinin hemen ardinda `{ error }` okuyan bir `.then` olmali.
@@ -227,10 +228,10 @@ describe("sessiz yutulan veritabanı yazımı eklenmiyor", () => {
       expect(blok).toContain("çalıştırılamadı");
     }
     // Bekleyen cagrilarda bos/etkisiz catch kalmamali.
-    const a = readFileSync(y("src/pages/AdminDashboard.tsx"), "utf-8");
+    const a = kaynakOku(y("src/pages/AdminDashboard.tsx"));
     expect(a, "atama/rol bildirimlerinin sonucu okunmuyor").toContain("bildirimErr");
     expect(a, "boş catch duruyor").not.toContain("} catch {}");
-    const k = readFileSync(y("src/components/admin/KnowledgeBaseAdmin.tsx"), "utf-8");
+    const k = kaynakOku(y("src/components/admin/KnowledgeBaseAdmin.tsx"));
     expect(k, "iş sürdürme sonucu okunmuyor").toContain("devamErr");
   });
 });

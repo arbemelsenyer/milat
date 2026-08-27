@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
+import { existsSync } from "node:fs";
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -45,7 +46,7 @@ const KAYNAKLAR = tsKaynaklari();
 describe("eski şema adası geri sızmıyor", () => {
   it("hiçbir canlı ön yüz dosyası `mediator_requests`e dokunmuyor", () => {
     const dokunanlar = KAYNAKLAR.filter((y) =>
-      /\.from\(\s*["'`]mediator_requests/.test(readFileSync(y, "utf-8")),
+      /\.from\(\s*["'`]mediator_requests/.test(kaynakOku(y)),
     );
     expect(dokunanlar, `ada geri geldi: ${dokunanlar.join(", ")}`).toEqual([]);
   });
@@ -63,17 +64,17 @@ describe("eski şema adası geri sızmıyor", () => {
 
   it("`submitMediatorRequest` yardımcısı hiçbir yerde tanımlı/çağrılı değil", () => {
     const kalanlar = KAYNAKLAR.filter((y) =>
-      readFileSync(y, "utf-8").includes("submitMediatorRequest"),
+      kaynakOku(y).includes("submitMediatorRequest"),
     );
     expect(kalanlar, `yardımcı geri gelmiş: ${kalanlar.join(", ")}`).toEqual([]);
   });
 
   it("`/mediator/:id` yolu yönlendirmede yok (sayfa silindi)", () => {
-    expect(readFileSync(y("src/App.tsx"), "utf-8")).not.toContain('path="/mediator/:id"');
+    expect(kaynakOku(y("src/App.tsx"))).not.toContain('path="/mediator/:id"');
   });
 
   it("Analytics oturum istatistiğini canlı tablodan (`case_sessions`) okuyor", () => {
-    const analytics = readFileSync(y("src/pages/Analytics.tsx"), "utf-8");
+    const analytics = kaynakOku(y("src/pages/Analytics.tsx"));
     expect(analytics).toContain('.from(\'case_sessions\')');
     expect(analytics).toContain("scheduled_at");
     expect(analytics).not.toContain("scheduled_date");

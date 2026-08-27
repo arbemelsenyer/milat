@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 import { etiketleriAyir as arka, etiketiKoruyarakSuz } from "../supabase/functions/_shared/anlatim";
 import { etiketleriAyir as on, etiketsizGovde } from "../src/lib/etiket";
 
@@ -54,8 +54,8 @@ describe("etiket ayırıcı — arka uç ve ön yüz kopyaları aynı davranır"
 });
 
 describe("tüketiciler etiketi SAYIYLA silmez", () => {
-  const CASEROOM = readFileSync("src/pages/CaseRoom.tsx", "utf-8");
-  const AJAN = readFileSync("src/components/AjanPenceresi.tsx", "utf-8");
+  const CASEROOM = kaynakOku("src/pages/CaseRoom.tsx");
+  const AJAN = kaynakOku("src/components/AjanPenceresi.tsx");
 
   it("tarafın Ajanım paneli ortak ayırıcıyı kullanır", () => {
     expect(CASEROOM).toContain("etiketsizGovde(g.gerekce)");

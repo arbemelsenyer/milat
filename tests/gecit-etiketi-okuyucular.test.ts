@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 import { etiketleriAyir } from "../supabase/functions/_shared/anlatim";
 
 /* GEÇİT ÖN EKİ TÜM ETİKET OKUYUCULARINI ETKİLER (24.08.2026)
@@ -19,7 +19,7 @@ import { etiketleriAyir } from "../supabase/functions/_shared/anlatim";
    TAM İKİ KEZ siliniyordu; üç etiket olunca TARAFA GİDEN metin `[eksik:…]`
    ile başlıyordu. */
 
-const NOBETCI = readFileSync("supabase/functions/ajan-nobetci/index.ts", "utf-8");
+const NOBETCI = kaynakOku("supabase/functions/ajan-nobetci/index.ts");
 
 /* Çapalı etiket deseni: "/^" ile başlayıp hemen köşeli parantez arayan regex.
    Kaçış karmaşasına girmemek için satır bazında, düz dizeyle aranır. */

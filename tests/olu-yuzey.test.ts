@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readdirSync, statSync, readFileSync, existsSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
+import { readdirSync, statSync, existsSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 
 /* ÖLÜ YÜZEY TEZGÂHI — 25.08.2026
@@ -62,7 +63,7 @@ function erisilebilir(): Set<string> {
     const yol = kuyruk.pop()!;
     if (gorulen.has(yol)) continue;
     gorulen.add(yol);
-    for (const m of readFileSync(yol, "utf-8").matchAll(ITHAL)) {
+    for (const m of kaynakOku(yol).matchAll(ITHAL)) {
       const hedef = coz(m[1], yol);
       if (hedef && !gorulen.has(hedef)) kuyruk.push(hedef);
     }
@@ -154,7 +155,7 @@ describe("ölü yüzey tezgâhı", () => {
 
   it("veritabanına yazan her ölü dosya gerekçesiyle kayıtlı", () => {
     const kayitsiz = OLU.filter(
-      (f) => YAZMA.test(readFileSync(y(f), "utf-8")) && !(f in YAZAN_OLU),
+      (f) => YAZMA.test(kaynakOku(y(f))) && !(f in YAZAN_OLU),
     );
     expect(
       kayitsiz,

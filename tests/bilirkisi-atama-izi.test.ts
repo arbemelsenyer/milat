@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* BİLİRKİŞİ ÖNERİSİ — iz ve bildirim (25.08.2026)
 
@@ -19,9 +19,9 @@ import { readFileSync } from "node:fs";
 const KOK = (process.env.BILIRKISI_KOK ?? "").replace(/\/+$/, "");
 const y = (goreli: string) => (KOK ? `${KOK}/${goreli}` : goreli);
 
-const motor = () => readFileSync(y("src/pages/MediationEngine.tsx"), "utf-8");
-const oda = () => readFileSync(y("src/pages/CaseRoom.tsx"), "utf-8");
-const modul = () => readFileSync(y("src/lib/expert-assignment.ts"), "utf-8");
+const motor = () => kaynakOku(y("src/pages/MediationEngine.tsx"));
+const oda = () => kaynakOku(y("src/pages/CaseRoom.tsx"));
+const modul = () => kaynakOku(y("src/lib/expert-assignment.ts"));
 
 /** Phase7Expert gövdesi: bileşen başından dosya sonuna kadar olan dilim yetmez,
  *  bir sonraki üst düzey `function`a kadar kes. */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* BÜRO ANTEDİ — HAT H-15/2 (seçim A) · mimari §3
  * ("arabulucu kimliği/adresi ... belgelere otomatik akar")
@@ -17,9 +17,9 @@ import { readFileSync } from "node:fs";
  * denetlenirse, veri hiç girilemese bile tezgâh yeşil yanar.
  */
 
-const PROFIL = readFileSync("src/pages/Profile.tsx", "utf-8");
-const URETICI = readFileSync("supabase/functions/generate-official-document/index.ts", "utf-8");
-const TIPLER = readFileSync("src/integrations/supabase/types.ts", "utf-8");
+const PROFIL = kaynakOku("src/pages/Profile.tsx");
+const URETICI = kaynakOku("supabase/functions/generate-official-document/index.ts");
+const TIPLER = kaynakOku("src/integrations/supabase/types.ts");
 
 describe("antet: OKUYAN kol kadar YAZAN yüzey de var", () => {
   it("üç alanı da dolduran bir yüzey var", () => {

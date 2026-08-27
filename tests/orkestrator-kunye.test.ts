@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* ORKESTRATÖR DÖRT ADIM + UYDURMA KÜNYE YOK — mimari §15.2 (25.08.2026)
  *
@@ -21,7 +21,7 @@ import { readFileSync } from "node:fs";
  * denetlenmemiş künye rapora meşru bağlam diye girerdi.
  */
 
-const oku = (ad: string) => readFileSync(`supabase/functions/${ad}/index.ts`, "utf-8");
+const oku = (ad: string) => kaynakOku(`supabase/functions/${ad}/index.ts`);
 const ORK = oku("orchestrator-run");
 const RAPOR = oku("common-ground-report");
 const TARAF = oku("party-confidential-analysis");

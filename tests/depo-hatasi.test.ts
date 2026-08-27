@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 import { depoHataTuru, depoHataMetni } from "../src/lib/depoHatasi";
 
 /* DEPO HATASI — DOSYA YOKLUĞU ile YETKİ EKSİKLİĞİ AYRILIR (24.08.2026)
@@ -65,8 +65,8 @@ describe("depo hatası metni", () => {
 });
 
 describe("iki yüzey de ortak çeviriciyi kullanır", () => {
-  const CASEROOM = readFileSync("src/pages/CaseRoom.tsx", "utf-8");
-  const ENGINE = readFileSync("src/pages/MediationEngine.tsx", "utf-8");
+  const CASEROOM = kaynakOku("src/pages/CaseRoom.tsx");
+  const ENGINE = kaynakOku("src/pages/MediationEngine.tsx");
 
   /** Bir işlevin gövdesini kaynaktan çıkarır (assertion'ı o işlevle sınırlar). */
   function govde(kaynak: string, ad: string, sonEk: string): string {

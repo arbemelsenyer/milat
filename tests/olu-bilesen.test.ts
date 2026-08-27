@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
+import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 /* ÖLÜ BİLEŞEN — canlı dosyanın İÇİNDEKİ ölü yüzey (25.08.2026)
@@ -46,7 +47,7 @@ function kullanilmayanBilesenler(kok: string): string[] {
   })(kok);
 
   const kaynaklar = new Map<string, string>();
-  for (const f of dosyalar) kaynaklar.set(f, readFileSync(f, "utf-8"));
+  for (const f of dosyalar) kaynaklar.set(f, kaynakOku(f));
 
   const bulgular: string[] = [];
   for (const [f, g] of kaynaklar) {
@@ -105,8 +106,8 @@ describe("canlı dosyanın içinde ölü bileşen kalmıyor", () => {
   });
 
   it("kaldırılan iki bileşen geri gelmiyor", () => {
-    const oda = readFileSync(y("src/pages/CaseRoom.tsx"), "utf-8");
-    const motor = readFileSync(y("src/pages/MediationEngine.tsx"), "utf-8");
+    const oda = kaynakOku(y("src/pages/CaseRoom.tsx"));
+    const motor = kaynakOku(y("src/pages/MediationEngine.tsx"));
     expect(oda, "RoundsTab geri geldi — negotiation_rounds'a ikinci yazma yolu").not.toContain("function RoundsTab(");
     expect(motor, "RiskSummaryCard geri geldi").not.toContain("function RiskSummaryCard(");
     // Tek tüketicisi RiskSummaryCard olan yardımcı da öksüz kalmıştı.

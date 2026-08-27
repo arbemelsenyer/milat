@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { kaynakOku } from "./kaynak";
 
 /* DAVET ZİNCİRİ — kenar işlevlerinde sessiz yazım (25.08.2026)
 
@@ -26,7 +26,7 @@ import { readFileSync } from "node:fs";
 const KOK = (process.env.DAVET_KOK ?? "").replace(/\/+$/, "");
 const y = (goreli: string) => (KOK ? `${KOK}/${goreli}` : goreli);
 
-const oku = (ad: string) => readFileSync(y(`supabase/functions/${ad}/index.ts`), "utf-8");
+const oku = (ad: string) => kaynakOku(y(`supabase/functions/${ad}/index.ts`));
 
 describe("davet zincirinde sessiz yazım yok", () => {
   it("iptal: jeton rotasyonu başarısızsa 'ok' dönmüyor", () => {
