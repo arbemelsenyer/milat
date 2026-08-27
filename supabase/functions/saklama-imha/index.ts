@@ -274,6 +274,7 @@ Deno.serve(async (req) => {
     }
     return json({
       ok: true,
+      surum: "2026-08-26-kolon-depo",
       kuru,
       toplam_silinen: toplamSilinen,
       sonuc,
