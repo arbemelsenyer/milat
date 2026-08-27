@@ -1,6 +1,31 @@
 # tasks/lessons.md — Öğrenilen Dersler
 Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
 
+- DERS (27.08.2026) — **"BÜTÜN TESTLER YEŞİL" CÜMLESİ, YALNIZ BU MAKİNEDE
+  DOĞRUYSA HİÇBİR ŞEY SÖYLEMEZ.** Üç tezgâh `tests/gecici/` içindeki SQL
+  dosyalarını okuyordu; o klasörün tamamı `.gitignore`dadır (§22), yani
+  dosyalar git'e hiç girmemişti. Temiz bir klonda üçü de `ENOENT` ile çökerdi
+  ve aylardır "363/363" diye kaydettiğim sonuç depoda üretilemezdi. Üstelik o
+  dosyalardan ikisi **canlıda çalıştırılmış göç metniydi**: kaybı, neyin
+  uygulandığının kaydını kaybetmek olurdu. **KURAL:** bir tezgâhın okuduğu her
+  dosya izlenmelidir; kalıcı SQL/veri `tests/sabit/` altına konur,
+  `tests/gecici/` yalnız gerçekten tek kullanımlık sondalar içindir.
+  `tests/tezgah-tasinabilir.test.ts` bunu denetler. Genel biçimi: **bir
+  doğrulamanın kendisi de doğrulanmalıdır** — "kim bu tezgâhı benim makinem
+  dışında koşarsa ne olur?" sorusu sorulmadan yeşil rapor edilmez.
+
+- DERS (27.08.2026) — **BİR SİLME KUSURUNU KAPATMAK, BIRAKTIĞI BİRİKİMİ
+  TEMİZLEMEZ.** 25–26.08'de "önce satır, sonra depo" kusuru üç yüzeyde
+  kapatıldı ve doğru olarak "yeni öksüz üretilmiyor" denildi. Ama depo hiç
+  sayılmadı: bugün `case-documents` kovasında **77 öksüz dosya** çıktı,
+  altısı **silinmiş dosyalara** ait taraf belgesi (bordro, kıdem tazminatı
+  bordrosu, bir kişinin adı-soyadı). Kusur kapandığı gün bunlar zaten oradaydı.
+  **KURAL:** veri kaybı/artığı üreten bir kusur kapatılırken iki iş vardır —
+  (1) akışı düzelt, (2) **geride kalanı say ve süpür**. İkincisi yapılmadan
+  madde DONE yazılmaz; süpürme geri dönüşsüzse Human Gate'e çıkarılır ama
+  SAYIM her hâlde yapılır. Sayılmayan artık, kapandı sanılan kusurun sessizce
+  yaşamaya devam etmesidir.
+
 - DERS (27.08.2026) — **BİR EDGE FUNCTION'IN CANLI SÜRÜMÜNÜ, CEVABININ İÇİNDEKİ
   BİR İMZADAN OKU; DAVRANIŞ FARKINDAN ÇIKARIM YAPMA.** 26.08'de `saklama-imha`
   düzeltildi, ön yüz publish edildi, Lovable'ın depo kopyasında yeni kod okundu —
