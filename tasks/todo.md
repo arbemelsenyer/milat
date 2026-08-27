@@ -7,18 +7,27 @@
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
 - Aktif görev: **yok** — bu blokta yedi iş bitti, hepsi canlı ya da tezgâh
   kanıtlı. Kuyrukta Code'un tek başına yapabileceği iş kalmadı.
-- **AÇIK MADDE: HAT H-20 (P1) — bilgi tabanında TİCARET ve FİKRİ MÜLKİYET
-  mevzuatı YOK.** H-19'un öksüz dosyalarına ad ad bakınca çıktı: bunlar çöp
-  değil, kurucunun yüklemeye çalıştığı ve **hiç girmemiş** temel mevzuat.
-  59 dosya bilgi tabanında hiçbir adla yok — **6102 TTK** (2 deneme), Sınai
-  Mülkiyet Kanunu + Yönetmeliği, **FSEK**, 6284, 7036 İş Mahkemeleri (2
-  deneme), 7445 İİK; ayrıca "Kira Uyuşmazlıkları ve Arabuluculuk" **3 kez**
-  denenmiş. Neden görülmediği: başarısız yükleme dosyayı depoda bırakıyor ama
-  `/admin` listesi parçalardan üretildiği için dosya ekranda hiç görünmüyordu
-  (bugün düzeltildi). Bilinen tek sebep en büyüğü için: **800 parça sınırı** —
-  başarılı 5510 (2.4 MB) 456 parça verdi, 4.7 MB'lık TTK ~890 eder.
-  Önerim HAT'ta: **A — kurucu `/admin`den yeniden yüklesin**, yükleme yolu
-  artık gerçek hatayı söylüyor; sebebi görüp doğru yeri düzeltirim.
+- **DÜZELTME — H-20'nin ilk hâli YANLIŞTI, aynı gün ölçüp geri aldım.**
+  "TTK, FSEK ve Sınai Mülkiyet mevzuatı bilgi tabanında yok" demiştim;
+  **üçü de var.** Öksüz dosya adlarını girmiş kaynaklarla eşleştirirken yalnız
+  zaman damgası önekini atmıştım, oysa başarılı yüklemeler **yeni yol
+  düzeniyle** (`kategori/dosya_adi`) kaydedilmiş — iki liste hiç örtüşmedi ve
+  "hiç yok" diye okudum. Depoda öksüz olması, kaynağın bilgi tabanında
+  olmadığı anlamına gelmiyormuş. **TTK 7 bölüm hâlinde, 664 parça** — kurucu
+  800 parça sınırını kanunu bölerek zaten çözmüş.
+- **AÇIK MADDE: HAT H-20 (P1) — "girdi sanılan" boş kaynaklar.** Asıl kusur
+  buymuş ve daha ağır: tek kapı `parça sayısı sıfır mı` idi. Metin katmanı
+  olmayan (taranmış) PDF sıfır değil **birkaç** parça verir; yükleme başarılı
+  sayılır, kaynak `/admin` listesinde **görünür**, ama ajanlar içinden hiçbir
+  şey bulamaz — açık hatadan kötü, çünkü hata görülür boşluk görülmez.
+  Canlıda üç kaynak böyle: 4.1 MB kira eğitim dokümanı → **5 parça**,
+  "2004 sayılı İİK" 117 KB → **2 parça** (sağlıklı kanun PDF'i 0.12–0.19
+  parça/KB). **Düzeltildi** (`d0a82c4`): 1 MB üstü dosya 10'dan az parça
+  verirse reddediliyor, sebebi söyleniyor; meşru sunum PDF'leri (0.016–0.021)
+  engellenmesin diye eşik yoğunluğa değil tartışmasız uca konuldu.
+  **Kurucudan istenen (karar değil, yükleme işi):** İİK'nın metin katmanlı tam
+  nüshası · kira eğitim dokümanının metin katmanlı sürümü (varsa) ·
+  **7036 sayılı İş Mahkemeleri Kanunu** (kaynak listesinde hiç yok, 176 KB).
 - **H-19 KAPANDI (seçenek A uygulandı).** 6 öksüz taraf belgesi depo API'siyle
   silindi. Kanıt Code'un kendi ölçümü: kovadaki nesne **149 → 143** (tam 6),
   "dosya belgesi" öksüzü **6 → 0**. Silme için açılan tek seferlik fonksiyon
@@ -541,10 +550,22 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       (eski sıra geri konunca iki denetim kırmızı) · `npm run test` **370/370**
       · tsc temiz · commit `fe9baef` · canlı dağıtım tetiklendi; sürüm imzası
       `surum: "2026-08-27-yukleme-sonda"` ile doğrulanacak (H-20/A ilk yüklemede)
-- [!] P1 · **Ticaret ve fikri mülkiyet mevzuatı bilgi tabanına girsin** · HAT
-      **H-20**'de, kurucu eylemi bekliyor (bir dosya yüklemesi). Teşhis TAM:
-      59 kaynak hiç girmemiş, en büyüğünün sebebi **800 parça sınırı**.
-      Sebep görülünce kök nedeni Code düzeltir.
+- [x] P1 · **Sessiz boş yükleme yakalanıyor** · Kabul: 1 MB üstü dosya 10'dan
+      az parça verirse reddediliyor ve sebebi söyleniyor; eşik altındaki
+      şüpheli yoğunluk `yogunluk_uyarisi` ile bildiriliyor · **DONE
+      27.08.2026** · Doğrulama: `tests/bilgi-yukleme-oksuz.test.ts` (3 yeni
+      denetim) · `npm run test` **375/375** · tsc temiz · commit `d0a82c4`
+- [x] P2 · **Kaynak okuma tek kapıdan geçiyor (bekçili)** · Kabul: `tests/`
+      içinde yalnız `tests/kaynak.ts` `readFileSync` ithal edebiliyor ve tek
+      kapı normalleştirmeye devam ediyor · **DONE 27.08.2026** · Doğrulama:
+      `tezgah-tasinabilir.test.ts`e iki denetim eklendi, **ısırdığı kanıtlandı**
+      (bir tezgâh ham okumaya döndürülünce kırmızı yandı) · 372/372 · tsc +
+      eslint temiz · commit `81be897`
+- [!] P1 · **Üç kaynak bilgi tabanına yüklensin** · HAT **H-20**'de; karar
+      değil, kurucunun yapacağı yükleme işi: İİK tam metni (mevcut nüsha 2
+      parça) · kira eğitim dokümanının metin katmanlı sürümü · 7036 sayılı İş
+      Mahkemeleri Kanunu (hiç yok). Yüklendikten sonra parça sayılarını Code
+      canlıdan doğrular.
 - [x] P1 · **Tezgâh temiz klonda da koşuyor** · Kabul: hiçbir tezgâh
       `tests/gecici/` içinden kalıcı bağımlılık okumuyor ve okuduğu her sabit
       dosya `git ls-files`ta var · **DONE 27.08.2026** · Doğrulama: üç SQL

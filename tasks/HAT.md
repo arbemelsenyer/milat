@@ -17,75 +17,81 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
-### H-20 · 27.08.2026 · **P1** — Bilgi tabanında TİCARET ve FİKRİ MÜLKİYET mevzuatı YOK
+### H-20 · 27.08.2026 · P1 — **DÜZELTME:** mevzuat duruyor; asıl kusur "girdi sanılan boş kaynaklar"
 
-**Bu bir depo temizliği maddesi değil.** H-19'da "71 öksüz PDF" diye başladı,
-adlarına bakınca başka bir şey çıktı: bunlar çöp değil, **senin yüklemeye
-çalıştığın ve hiç girmemiş temel mevzuat.**
+> ⛔ **BU MADDENİN İLK HÂLİ YANLIŞTI. Aynı gün, sormadan önce ölçtüm ve
+> yanıldığımı gördüm.** Sana "Türk Ticaret Kanunu, Fikir ve Sanat Eserleri
+> Kanunu ve Sınai Mülkiyet mevzuatı bilgi tabanında yok" demiştim.
+> **Üçü de var.** Hata bendeydi: öksüz dosya adlarını girmiş kaynaklarla
+> eşleştirirken yalnız zaman damgası önekini atmıştım, oysa başarılı
+> yüklemeler **yeni yol düzeniyle** (`kategori/dosya_adi`) ve farklı harf
+> dönüşümüyle kaydedilmiş. İki liste bu yüzden hiç örtüşmedi ve ben "hiç yok"
+> diye okudum. Depoda öksüz dosya olması, kaynağın bilgi tabanında olmadığı
+> anlamına gelmiyormuş — çoğu, **sonradan başarıyla yeniden yüklenmiş
+> denemelerin artığı.**
 
-**BULGU.** 71 dosyanın 12'si sonradan aynı adla başarıyla işlenmiş (sorun yok).
-Kalan **59**'u bilgi tabanında **hiçbir adla yok**. İçlerinden 100 KB üstü
-olanlar:
+**GERÇEKTE NE VAR (sayımı bu kez kaynak listesinden yaptım):**
 
-| kaynak | boyut | deneme | ilk deneme |
+| kaynak | durum |
+|---|---|
+| **6102 Türk Ticaret Kanunu** | **VAR** — 7 bölüm hâlinde, toplam **664 parça** |
+| 5846 Fikir ve Sanat Eserleri Kanunu | VAR (82 parça) |
+| 6769 Sınai Mülkiyet Kanunu + 23528 Yönetmelik | VAR (158 + 133) |
+| 6284 Ailenin Korunması + Uygulama Yönetmeliği | VAR (18 + 32) |
+| 4857 İş K. · 6098 TBK · 5510 SGK · 6356 Sendikalar · 4721 TMK · 6100 HMK | VAR |
+
+**Üstelik 800 parça sınırını sen zaten çözmüşsün:** TTK'yı tek dosya olarak
+yükleyemeyince **7 parçaya bölüp** yüklemişsin. Yani benim "sınıra takılıyor"
+tahminim doğruydu ama sorun çoktan aşılmıştı; sana gereksiz bir iş öneriyordum.
+Hata metni artık bu çözümü kendisi söylüyor (commit `d0a82c4`).
+
+---
+
+**ASIL KUSUR BAŞKA YERDEYMİŞ — VE DAHA AĞIR.**
+
+Kaynak listesinde parça sayıları tuhaftı. Ölçünce çıktı: bazı kaynaklar
+**"girmiş" görünüyor ama neredeyse boş.**
+
+| kaynak | boyut | parça | parça/KB |
 |---|---|---|---|
-| **6102 sayılı Türk Ticaret Kanunu** | 4.7 MB | 2 kez | 02.08.2026 |
-| Sınai Mülkiyet Kanunu | 1.0 MB | 1 | 12.07.2026 |
-| 6769 sayılı Sınai Mülkiyet Kanunu | 881 KB | 1 | 02.08.2026 |
-| 23528 sayılı Sınai Mülkiyet Yönetmeliği | 735 KB | 1 | 02.08.2026 |
-| 5846 sayılı Fikir ve Sanat Eserleri Kanunu | 563 KB | 1 | 02.08.2026 |
-| fikir ve sanat eserleri kanunu | 435 KB | 1 | 12.07.2026 |
-| 6284 sayılı Ailenin Korunması Kanunu | 207 KB | 1 | 02.08.2026 |
-| 7036 sayılı İş Mahkemeleri Kanunu | 176 KB | 2 kez | 01.08.2026 |
-| 7445 sayılı İcra ve İflas Kanunu | 117 KB | 1 | 02.08.2026 |
+| Kira Uyuşmazlıkları ve Arabuluculuk (eğitim dokümanı) | 4.1 MB | **5** | 0.0012 |
+| "2004 sayılı İcra ve İflas Kanunu" | 117 KB | **2** | 0.0171 |
+| sağlıklı kanun PDF'leri (karşılaştırma) | — | — | 0.12–0.19 |
 
-Ayrıca 01.07'de **Kira Uyuşmazlıkları ve Arabuluculuk** (4.1 MB) **üç kez**
-denenmiş, üçü de girmemiş.
+Sebep: tek kapı `parça sayısı sıfır mı` idi. Metin katmanı olmayan (taranmış)
+bir PDF **sıfır değil birkaç** parça verir; yükleme "başarılı" sayılır, kaynak
+`/admin` listesinde **görünür**, sen "yükledim" dersin — ama ajanlar o
+kaynaktan hiçbir şey bulamaz. **Açık hatadan daha kötüdür: hata görülür,
+boşluk görülmez.**
 
-**NEDEN GÖREMEDİN.** Yükleme dosyayı önce depoya koyuyor, sonra işliyordu;
-işleme başarısız olunca dosya depoda kalıyor ama hiçbir parça yazılmıyordu.
-`/admin` listesi parçalardan üretildiği için dosya **ekranda hiç görünmüyor**.
-Yani ekranda "yükledim" izi yok, hata da kalıcı bir yere düşmüyor — üst üste
-denemelerin (2 kez, 3 kez) sebebi bu. Yükleme sırası **bugün düzeltildi**
-(H-19, commit `fe9baef`): artık başarısız yükleme arkasında görünmez dosya
-bırakmıyor ve hata çağırana bildiriliyor.
+**DÜZELTİLDİ (commit `d0a82c4`).** 1 MB'tan büyük bir dosya 10'dan az parça
+veriyorsa artık **reddediliyor** ve sebebi söyleniyor ("taranmış PDF, metin
+katmanı yok"). Eşik yoğunluğa değil tartışmasız bir uca konuldu ki meşru sunum
+PDF'leri (0.016–0.021) engellenmesin; onlar için reddetme yok, `yogunluk_uyarisi`
+var. Tezgâh: `tests/bilgi-yukleme-oksuz.test.ts` · 375/375 yeşil.
 
-**ETKİSİ.** Medipact'ın kategorileri arasında `ticari` ve `fikri_mülkiyet` var.
-Bu iki alanın **birincil mevzuatı bilgi tabanında yok** — TTK yok, Sınai
-Mülkiyet Kanunu ve Yönetmeliği yok, FSEK yok. Ajanlar bu alanlarda kaynaksız
-çalışıyor. Aile (6284) ve icra (7445) tarafında da boşluk var.
+---
 
-**BİLİNEN BİR SEBEP (yalnız en büyüğü için).** İşlev, 800'den fazla parça
-üreten dosyayı reddediyor (`Anormal parça sayısı`). Başarıyla işlenen 5510
-sayılı Kanun 2.4 MB'ta 456 parça verdi; aynı oranla **4.7 MB'lık TTK ~890 parça**
-eder, yani **sınıra takılıyor.** Küçük dosyaların (117 KB–1 MB) reddedilme
-sebebi bu değil; onlarda metin çıkarma ya da geçici embedding hatası olması
-muhtemel ama **kanıtım yok, tahmin yürütmüyorum.**
+**SENDEN İSTEDİĞİM (kısa ve somut):**
 
-**SEÇENEKLER.**
-- **A · Sen `/admin`den yeniden yükle, ben sonucu okuyayım.** Yükleme yolu
-  artık hatayı söylüyor; hangi dosya hangi sebeple düşüyor tek denemede
-  görürüz. Sonra kök nedeni ben düzeltirim. En küçük adım, en çok bilgi.
-- **B · Önce 800 parça sınırını büyütelim, sonra yükle.** TTK'yı kesin çözer
-  ama küçük dosyaların sebebini açıklamaz; ayrıca sınırın niye konduğunu
-  (maliyet/zaman aşımı) bilmeden büyütmek yeni bir sorun doğurabilir.
-- **C · Depodaki dosyaları sunucu tarafından yeniden işleyen bir kol yazayım.**
-  Dosyalar zaten depoda; senin elle yüklemene gerek kalmaz. Ama yeni kalıcı
-  kod demek ve sınırın sebebini yine bilmiyoruz.
+1. **İcra ve İflas Kanunu** — bilgi tabanındaki nüsha 117 KB / 2 parça, yani
+   pratikte yok. İİK Türkiye'nin en uzun kanunlarından biri; bu dosya İİK'nın
+   tam metni olamaz. Metin katmanlı tam bir nüshayı `/admin`den yükle.
+   Büyükse TTK'da yaptığın gibi bölerek yükle.
+2. **Kira Uyuşmazlıkları ve Arabuluculuk** eğitim dokümanı — 4.1 MB'lık nüsha
+   taranmış görünüyor (5 parça). Kira senin ana kategorilerinden biri.
+   Metin katmanlı bir sürümü varsa yükle; yoksa bırakalım, ben ısrar etmem.
+3. **7036 sayılı İş Mahkemeleri Kanunu** — kaynak listesinde hiç yok. İşçi
+   uyuşmazlıklarında zorunlu arabuluculuğun usul kanunu bu; eksikliği en çok
+   burada hissedilir. 176 KB, küçük bir dosya.
 
-**ÖNERİM: A.** Bir dosya yüklemen ~1 dakika sürüyor ve bugünkü düzeltmeden
-sonra ilk kez **gerçek hata mesajını** göreceğiz. Tahminle sınır büyütmektense
-sebebi görüp doğru yeri düzeltmek daha az iş. En büyüğüyle başla (TTK): sınır
-hatası gelirse tahminim doğrulanmış olur, başka bir hata gelirse tahminimi
-atarım.
+Üçü de yükleme işi; **karar gerektirmiyor**, o yüzden bu madde bir Human Gate
+değil, sana bırakılmış bir iş listesi. Yükledikten sonra bana söyle,
+parça sayılarını canlıdan doğrularım.
 
-**KARARIN ETKİSİ.** Hiçbir seçenek veri silmiyor; bu madde **P1 ve geri
-dönüşsüz değil.** Ertelenirse ticari ve fikri mülkiyet uyuşmazlıklarında
-ajanlar mevzuatsız çalışmaya devam eder.
-
-**DEPODAKİ 59 DOSYA ŞİMDİLİK DURUYOR** — silmek için sebep yok, çünkü yeniden
-yükleme kaynağı olarak işe yarayabilirler. Kaynaklar bilgi tabanına girdikten
-sonra ayrıca süpürülür; o zaman KVKK değil yalnızca yer meselesi olur (~33 MB).
+**DEPODAKİ 59 ÖKSÜZ DOSYA:** artık "eksik mevzuat" olmadıkları anlaşıldı —
+çoğu başarılı yeniden yüklemelerin artığı. Silinmeleri KVKK meselesi değil,
+yalnızca ~33 MB yer meselesi. Acelesi yok; pilottan sonra süpürülür.
 
 ### H-7 · 25.08.2026 · P1 — Geri bildirim (`session_feedback`) yapısal olarak imkânsız
 **Sorun.** Adanın **altıncı** yüzeyi: `SessionFeedback.tsx` hiçbir yerden import

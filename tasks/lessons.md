@@ -1,6 +1,32 @@
 # tasks/lessons.md — Öğrenilen Dersler
 Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
 
+- DERS (27.08.2026) — **"YOK" DEMEDEN ÖNCE, ARADIĞIN ADIN TEK BİÇİMİ OLDUĞUNU
+  VARSAYMA.** Kurucuya "Türk Ticaret Kanunu, FSEK ve Sınai Mülkiyet mevzuatı
+  bilgi tabanında yok" dedim. Üçü de vardı. Öksüz depo dosyalarının adlarını
+  girmiş kaynaklarla eşleştirirken yalnız zaman damgası önekini attım; oysa
+  başarılı yüklemeler **yeni yol düzeniyle** (`kategori/dosya_adi`) ve farklı
+  harf dönüşümüyle kaydedilmişti. İki liste hiç örtüşmedi, ben de bunu "hiç
+  yok" diye okudum. **KURAL:** bir şeyin yokluğunu iddia eden sorgu, önce
+  **var olduğunu bildiğin bir örnek üzerinde** sınanır — sorgu onu da "yok"
+  diyorsa sorgu bozuktur, veri değil. Bu oturumda tam bu adım kurtardı:
+  6769'un girmiş olduğunu görünce eşleştirmenin çöktüğünü anladım. Yokluk
+  iddiası, varlık iddiasından daha kolay yanlış çıkar; çünkü aramanın kendisi
+  sessizce başarısız olabilir.
+
+- DERS (27.08.2026) — **SIFIR KONTROLÜ, BOŞLUK KONTROLÜ DEĞİLDİR.**
+  `admin-upload-knowledge` yalnız "parça sayısı sıfır mı" diye bakıyordu.
+  Metin katmanı olmayan taranmış bir PDF sıfır değil **birkaç** parça verir:
+  yükleme başarılı sayılır, kaynak `/admin` listesinde görünür, kurucu
+  "yükledim" der, ama ajanlar içinden hiçbir şey bulamaz. Canlıda 4.1 MB'lık
+  bir doküman **5 parça**, "İİK" diye duran 117 KB'lık dosya **2 parça**
+  vermişti. **Açık hatadan daha kötüdür: hata görülür, boşluk görülmez.**
+  **KURAL:** bir üretim adımının çıktısını denetlerken "hiç yok mu" değil
+  "**olması gerekenin yanına yaklaşıyor mu**" diye sor; ölçüyü sağlıklı
+  örneklerden çıkar (burada sağlıklı kanun PDF'leri 0.12–0.19 parça/KB,
+  bozuklar 0.0012–0.017). Eşiği koyarken meşru uçları da ölç (sunum PDF'leri
+  0.016–0.021) ve reddi tartışmasız uca koy, şüpheliyi reddetme — SÖYLE.
+
 - DERS (27.08.2026) — **"BÜTÜN TESTLER YEŞİL" CÜMLESİ, YALNIZ BU MAKİNEDE
   DOĞRUYSA HİÇBİR ŞEY SÖYLEMEZ.** Üç tezgâh `tests/gecici/` içindeki SQL
   dosyalarını okuyordu; o klasörün tamamı `.gitignore`dadır (§22), yani
