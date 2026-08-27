@@ -288,7 +288,43 @@ Deno.serve(async (req) => {
 
     const chunks = chunkText(fullText);
     if (!chunks.length) return json({ error: "Bu dosya işlenemedi, lütfen başka bir dosya deneyin" }, 400);
-    if (chunks.length > 800) return json({ error: `Anormal parça sayısı (${chunks.length}). Daha küçük bir dosya deneyin.` }, 400);
+    if (chunks.length > 800) {
+      return json({
+        error: `Anormal parça sayısı (${chunks.length}). Daha küçük bir dosya deneyin.`,
+        ipucu: "Uzun bir kanunu bölüm bölüm yüklemek işe yarar — 6102 sayılı TTK 7 parça hâlinde bu şekilde girdi.",
+      }, 400);
+    }
+
+    /* ── 27.08.2026 · SESSİZ BOŞ YÜKLEME (canlıda 3 kaynak böyle girmişti) ───
+       Buraya kadar tek kapı `chunks.length === 0` idi. Ama bir PDF'in metin
+       katmanı yoksa ya da bozuksa çıkarım BİRKAÇ parça verir — sıfır değil.
+       O zaman yükleme "başarılı" sayılır, kaynak `/admin` listesinde GÖRÜNÜR,
+       kurucu "yükledim" der; ama ajanlar o kaynaktan hiçbir şey bulamaz.
+       Bu, açık hatadan DAHA KÖTÜDÜR: hata görülür, boşluk görülmez.
+
+       Canlıda 27.08'de ölçülen (parça/KB):
+         · 4.1 MB eğitim dokümanı  →   5 parça (0.0012)  ← neredeyse boş
+         · 117 KB "2004 sayılı İİK" →   2 parça (0.0171)  ← İİK bu boyutta olamaz
+         · sağlıklı kanun PDF'leri  → 0.12–0.19 arası
+         · sunum PDF'leri (az metin) → 0.016–0.021        ← meşru, engellenmemeli
+
+       Eşik bu yüzden YOĞUNLUĞA değil, tartışmasız bir uca konuldu: 1 MB'tan
+       büyük bir dosya 10'dan az parça veriyorsa metin katmanı yok demektir.
+       Sunum PDF'leri bu eşiğin çok üstünde kalır, yani meşru yükleme
+       engellenmez. Eşiğin altındaki şüpheli durumlar reddedilmez, `uyari`
+       ile bildirilir — karar kurucunun. */
+    const KB = bytes.length / 1024;
+    const yogunluk = chunks.length / Math.max(KB, 1);
+    if (bytes.length >= 1024 * 1024 && chunks.length < 10) {
+      return json({
+        error:
+          `Bu PDF'ten metin çıkmıyor: ${Math.round(KB)} KB'lık dosyadan yalnız ` +
+          `${chunks.length} parça üretilebildi. Dosya büyük ihtimalle TARANMIŞ ` +
+          `(görüntü) bir PDF ve metin katmanı yok. Metin katmanlı bir sürümünü yükleyin.`,
+        parca: chunks.length,
+        kb: Math.round(KB),
+      }, 400);
+    }
 
     // Sayfa hesabı: yalnızca PDF'te (pageTexts varsa) yapılır; DOCX/TXT'te page hiç yazılmaz.
     // Tam eşleşme bulunamayan chunk'lar için page null kalır (tahmin yok).
@@ -373,6 +409,17 @@ Deno.serve(async (req) => {
       source_title: title,
       source_url: sourceUrl,
       ...(upErr ? { uyari: `Parçalar yazıldı ama dosyanın kendisi yüklenemedi: ${upErr.message}. Kaynak metni aranabilir, ancak "kaynağı göster" çalışmayacak.` } : {}),
+      /* Reddetme eşiğinin altında ama yine de şüpheli yoğunluk: engelleme,
+         SÖYLE. Kurucu "girdi" sanıp geçmesin. */
+      ...(yogunluk < 0.05
+        ? {
+          yogunluk_uyarisi:
+            `${Math.round(KB)} KB'lık dosyadan yalnız ${chunks.length} parça çıktı. ` +
+            `Sağlıklı bir kanun metninde bu oran çok daha yüksektir; dosyanın ` +
+            `metin katmanı eksik olabilir. Kaynağı listede görseniz de ajanlar ` +
+            `içinden çok az şey bulabilir — içeriği bir kontrol edin.`,
+        }
+        : {}),
       category,
       chunks: total,
       deleted_chunks: deletedCount,
