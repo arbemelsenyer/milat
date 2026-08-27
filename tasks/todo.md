@@ -1,12 +1,19 @@
 ## Nerede kaldık
 
-- Tarih: **27.08.2026** (16. blok) — 15. blok elektrik kesintisiyle yarıda
-  kalmıştı; kayıt ile canlı durum **uyuşuyordu**, kaldığı yerden sürüldü.
+- Tarih: **27.08.2026** (16. blok) — `medipact dur` ile kapatıldı.
+  15. blok elektrik kesintisiyle yarıda kalmıştı; kayıt ile canlı durum
+  **uyuşuyordu**, kaldığı yerden sürüldü ve blok dokuz işle kapandı.
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: **yok** — bu blokta yedi iş bitti, hepsi canlı ya da tezgâh
-  kanıtlı. Kuyrukta Code'un tek başına yapabileceği iş kalmadı.
+- Aktif görev: **yok** (`dur` ile kapatıldı). Çalışma ağacı temiz, her iş
+  commit'li ve push'lu; son commit `d93a176`.
+- **SIRADAKİ İŞ — Code'un tek başına yapabileceği iş YOK.** Kuyrukta kalan iki
+  madde de kurucu eylemi bekliyor:
+  1. **HAT H-20** — iki dosya yüklemesi (İİK tam metni · kira eğitim
+     dokümanının metin katmanlı sürümü). Karar değil, yükleme işi.
+  2. **Taraf akışının gerçek telefonda denenmesi** — BLOCKED, cihaz gerekiyor.
+  Yükleme yapılınca Code parça sayılarını canlıdan doğrular ve devam eder.
 - **DÜZELTME — H-20'nin ilk hâli YANLIŞTI, aynı gün ölçüp geri aldım.**
   "TTK, FSEK ve Sınai Mülkiyet mevzuatı bilgi tabanında yok" demiştim;
   **üçü de var.** Öksüz dosya adlarını girmiş kaynaklarla eşleştirirken yalnız
@@ -128,6 +135,48 @@
   1. Arabulucu hesabıyla `/profile` → **Büro Antedi**: ad + adres gir, kaydet;
      sonra bir tutanak üret — antet ve "düzenlenme yeri" dolu gelmeli. (~1 dk)
   2. Telefon deneme listesi (aşağıdaki BLOCKED madde). (~3 dk)
+
+### DUR KAYDI — 27.08.2026 · 16. blok · `medipact dur`
+
+**Blok dokuz işle kapandı; hepsi commit'li ve push'lu. Çalışma ağacı temiz.**
+Son commit `d93a176`. Doğrulama: `npm run test` **375/375** ·
+`npx tsc --noEmit -p tsconfig.app.json` temiz · `npx eslint tests/` → kalan
+18 hata beş dosyada ve **hepsi bu bloktan önce vardı**.
+
+| # | iş | öncelik | commit | kanıt |
+|---|---|---|---|---|
+| 1 | `saklama-imha` canlıda yenilendi (H-17 kapandı) | P0 | `71ce868` | kuru koşum 11612, üç tür `"temiz"`, cevapta `surum` |
+| 2 | `ajan-nobetci` kapanışta döküm silmiyor (H-18 kapandı) | P1 | `5527fff` | 08:57 koşumunda eski sayaçlar düştü |
+| 3 | CRLF tuzağı kapandı (`tests/kaynak.ts` + 31 tezgâh) | P2 | `be29b2b` | 363/363 |
+| 4 | Tezgâh temiz klonda da koşuyor (`tests/sabit/`) | P1 | `3334af8` | bekçi ısırdı, sonra geri alındı |
+| 5 | 6 öksüz taraf belgesi silindi (H-19 · seçenek A) | P0 | — | kovadaki nesne 149 → **143**, öksüz 6 → **0** |
+| 6 | Bilgi tabanı yüklemesi öksüz bırakmıyor | P1 | `fe9baef` | bekçi ısırdı |
+| 7 | Kaynak okuma tek kapıdan geçiyor (bekçili) | P2 | `81be897` | bekçi ısırdı |
+| 8 | Sessiz boş yükleme yakalanıyor | P1 | `d0a82c4` | 375/375 |
+| 9 | H-20 iki kez düzeltildi (yanlış "yok" iddiaları) | kayıt | `c95d46d` · `d93a176` | canlı sayım |
+
+**CANLIYA ÇIKAN DAĞITIMLAR (§11-B):** `saklama-imha` · `ajan-nobetci` ·
+`admin-upload-knowledge` (iki kez). Öncelikli ikisinin yeni sürümde koştuğu
+canlı cevaplardan doğrulandı; `admin-upload-knowledge` admin oturumu
+gerektirdiği için **sürümü Code doğrulayamadı** — kurucunun ilk yüklemesindeki
+`surum: "2026-08-27-yukleme-sonda"` alanı bunu kesinleştirecek.
+
+**BU BLOKTA İKİ KEZ YANILDIM, İKİSİNİ DE KENDİM YAKALADIM.**
+Kurucuya "TTK, FSEK, Sınai Mülkiyet mevzuatı bilgi tabanında yok" dedim —
+üçü de vardı (TTK 7 bölüm, 664 parça; sınırı kurucu bölerek zaten çözmüş).
+Düzelttikten sonra "7036 hiç yok" dedim — o da vardı (12 parça, URL kaynaklı).
+Aynı hata iki kılıkta: önce **ad biçimini**, sonra **kaynak türünü** daralttım.
+İkisi de `lessons.md`ye yazıldı. Kural: daraltılmış bir arama bulamadığında
+"yok" der; oysa söylediği yalnızca **"baktığım yerde yok"**tur.
+
+**AÇIK BLOKAJ: yok.** Kuyrukta Code'un tek başına yapabileceği iş kalmadı;
+iki madde de kurucu eylemi bekliyor (H-20 iki yükleme · telefon denemesi).
+
+**YENİ OTURUM NE YAPAR:** `tasks/HAT.md` → `## COWORK → CODE` bölümünü oku.
+H-20'ye cevap/yükleme gelmişse parça sayılarını canlıdan doğrula ve devam et.
+Gelmemişse §6 ile kodun gerçek durumundan yeni P0/P1 aday çıkar — bu blokta
+üç iş (tezgâh taşınabilirliği · öksüz yazma kolu · sessiz boş yükleme) tam
+böyle bulundu.
 
 ### 26.08'de canlıda çalıştırılan göçler (hepsi eklemeli, veri silmiyor)
 
