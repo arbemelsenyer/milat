@@ -254,14 +254,25 @@ Deno.serve(async (req) => {
 
     const bytes = new Uint8Array(await file.arrayBuffer());
 
-    // Deterministik yol: aynı kategori + aynı dosya adı => aynı source_url (zaman damgası yok)
+    /* Deterministik yol: aynı kategori + aynı dosya adı => aynı source_url
+       (zaman damgası yok). Yol BURADA hesaplanır ama dosya BURADA YÜKLENMEZ.
+
+       ── 27.08.2026 · ÖKSÜZ ÜRETEN SIRA DÜZELTİLDİ (HAT H-19'un yan bulgusu) ──
+       Eskiden dosya en başta depoya yüklenirdi; metin çıkarma, parçalama ya da
+       embedding başarısız olunca işlev hata döner, ama DOSYA DEPODA KALIRDI.
+       Hiçbir `knowledge_base_chunks` satırı onu göstermediği için:
+         · `/admin` bilgi tabanı listesi parçalardan üretilir → dosya EKRANDA
+           GÖRÜNMEZ, yani kurucu onu silemez bile;
+         · `admin-delete-knowledge` yalnız `source_url`u bilinen dosyayı siler;
+         · yani dosya süresiz kalır → constitution m.10.
+       Canlıda 27.08'de bu sınıftan **71 dosya** sayıldı (HAT H-19).
+
+       Doğrusu: önce işle ve parçaları yaz, EN SON dosyayı yükle. Ters sıranın
+       en kötü hâli artık "kayıt var, dosya yok" — bu GÖRÜNÜR ve silinebilir
+       bir durumdur; yükleme hatası zaten ölümcül sayılmıyordu. */
     const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const safeCategory = category.replace(/[^a-zA-Z0-9._-]/g, "_");
     const storagePath = `admin/knowledge/${safeCategory}/${safeFileName}`;
-    const { error: upErr } = await admin.storage
-      .from("case-documents")
-      .upload(storagePath, bytes, { contentType: file.type || "application/octet-stream", upsert: true });
-    if (upErr) console.error("Storage upload failed (non-fatal):", upErr.message);
     const sourceUrl = `storage://case-documents/${storagePath}`;
 
     // Extract text
@@ -347,10 +358,21 @@ Deno.serve(async (req) => {
       total += rows.length;
     }
 
+    /* 4) EN SON: dosyanın kendisi. Buraya gelindiyse parçalar yazıldı, yani
+       dosyayı gösteren kayıt VAR — yükleme başarısız olsa bile öksüz dosya
+       oluşmaz ve kurucu kaydı ekranda görüp silebilir. Sıranın gerekçesi
+       yukarıdaki `storagePath` bloğundadır. */
+    const { error: upErr } = await admin.storage
+      .from("case-documents")
+      .upload(storagePath, bytes, { contentType: file.type || "application/octet-stream", upsert: true });
+    if (upErr) console.error("Storage upload failed (non-fatal):", upErr.message);
+
     return json({
       ok: true,
+      surum: "2026-08-27-yukleme-sonda",
       source_title: title,
       source_url: sourceUrl,
+      ...(upErr ? { uyari: `Parçalar yazıldı ama dosyanın kendisi yüklenemedi: ${upErr.message}. Kaynak metni aranabilir, ancak "kaynağı göster" çalışmayacak.` } : {}),
       category,
       chunks: total,
       deleted_chunks: deletedCount,
