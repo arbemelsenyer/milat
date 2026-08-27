@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -637,6 +637,33 @@ export type Database = {
         }
         Relationships: []
       }
+      arabulucu_baz_cizgi: {
+        Row: {
+          analiz_saat: number | null
+          belge_saat: number | null
+          beyan_saat: number | null
+          created_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          analiz_saat?: number | null
+          belge_saat?: number | null
+          beyan_saat?: number | null
+          created_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          analiz_saat?: number | null
+          belge_saat?: number | null
+          beyan_saat?: number | null
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       arabulucu_kontrol_tercihleri: {
         Row: {
           aciklama_surumu: string
@@ -679,6 +706,35 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "cases"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      arabulucu_paketleri: {
+        Row: {
+          baslangic: string
+          bitis: string | null
+          paket_kod: string
+          user_id: string
+        }
+        Insert: {
+          baslangic?: string
+          bitis?: string | null
+          paket_kod: string
+          user_id: string
+        }
+        Update: {
+          baslangic?: string
+          bitis?: string | null
+          paket_kod?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arabulucu_paketleri_paket_kod_fkey"
+            columns: ["paket_kod"]
+            isOneToOne: false
+            referencedRelation: "uyelik_paketleri"
+            referencedColumns: ["kod"]
           },
         ]
       }
@@ -3932,6 +3988,44 @@ export type Database = {
           },
         ]
       }
+      paket_kotalari: {
+        Row: {
+          dolunca: string
+          id: string
+          kota_turu: string
+          limit_deger: number | null
+          paket_kod: string
+          periyot: string
+          updated_at: string
+        }
+        Insert: {
+          dolunca?: string
+          id?: string
+          kota_turu: string
+          limit_deger?: number | null
+          paket_kod: string
+          periyot?: string
+          updated_at?: string
+        }
+        Update: {
+          dolunca?: string
+          id?: string
+          kota_turu?: string
+          limit_deger?: number | null
+          paket_kod?: string
+          periyot?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paket_kotalari_paket_kod_fkey"
+            columns: ["paket_kod"]
+            isOneToOne: false
+            referencedRelation: "uyelik_paketleri"
+            referencedColumns: ["kod"]
+          },
+        ]
+      }
       party_analyses: {
         Row: {
           analysis: Json
@@ -4782,6 +4876,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      uyelik_paketleri: {
+        Row: {
+          ad: string
+          aktif: boolean
+          created_at: string
+          id: string
+          kod: string
+        }
+        Insert: {
+          ad: string
+          aktif?: boolean
+          created_at?: string
+          id?: string
+          kod: string
+        }
+        Update: {
+          ad?: string
+          aktif?: boolean
+          created_at?: string
+          id?: string
+          kod?: string
+        }
+        Relationships: []
       }
       yz_beyan_onaylari: {
         Row: {
