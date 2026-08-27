@@ -14,6 +14,16 @@ Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
   iddiası, varlık iddiasından daha kolay yanlış çıkar; çünkü aramanın kendisi
   sessizce başarısız olabilir.
 
+  **AYNI GÜN İKİNCİ KEZ, BAŞKA BİR BOYUTTA.** İlk yanılgıyı düzelttikten sonra
+  "7036 sayılı İş Mahkemeleri Kanunu hiç yok" dedim; o da vardı. Bu kez ad
+  biçimini değil **kaynak türünü** daralttım: yalnız depodan beslenen
+  kaynaklara baktım, URL'den beslenenleri hiç saymadım. Aynı hata iki farklı
+  kılıkta geldi. **KURAL:** bir varlığı ararken sorguyu **taşıyıcıya göre
+  değil, ŞEYİN KENDİSİNE göre** kur — dosya yoluna/kaynak türüne değil
+  başlığa/kimliğe bak, ve aramayı bütün taşıyıcılar üzerinde çalıştır.
+  Daraltılmış her arama, bulamadığında "yok" der; oysa söylediği yalnızca
+  "baktığım yerde yok"tur.
+
 - DERS (27.08.2026) — **SIFIR KONTROLÜ, BOŞLUK KONTROLÜ DEĞİLDİR.**
   `admin-upload-knowledge` yalnız "parça sayısı sıfır mı" diye bakıyordu.
   Metin katmanı olmayan taranmış bir PDF sıfır değil **birkaç** parça verir:

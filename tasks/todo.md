@@ -26,8 +26,14 @@
   verirse reddediliyor, sebebi söyleniyor; meşru sunum PDF'leri (0.016–0.021)
   engellenmesin diye eşik yoğunluğa değil tartışmasız uca konuldu.
   **Kurucudan istenen (karar değil, yükleme işi):** İİK'nın metin katmanlı tam
-  nüshası · kira eğitim dokümanının metin katmanlı sürümü (varsa) ·
-  **7036 sayılı İş Mahkemeleri Kanunu** (kaynak listesinde hiç yok, 176 KB).
+  nüshası (mevcut tek nüsha 2 parça) · kira eğitim dokümanının metin katmanlı
+  sürümü (varsa; 4.1 MB → 5 parça).
+- **İKİNCİ DÜZELTME:** "7036 sayılı İş Mahkemeleri Kanunu hiç yok" da yanlıştı
+  — **var**, 12 parça, adalet.gov.tr'den. Aynı hatayı ikinci kez, başka bir
+  boyutta yaptım: bu kez yalnız **depodan** beslenen kaynaklara bakıp URL'den
+  beslenenleri saymadım. Doğru yöntem, kaynağı geldiği yere göre değil
+  **başlığa göre bütün kaynaklarda** aramak. Öyle arayınca liste üçten ikiye
+  indi. Ders `lessons.md`ye yazıldı.
 - **H-19 KAPANDI (seçenek A uygulandı).** 6 öksüz taraf belgesi depo API'siyle
   silindi. Kanıt Code'un kendi ölçümü: kovadaki nesne **149 → 143** (tam 6),
   "dosya belgesi" öksüzü **6 → 0**. Silme için açılan tek seferlik fonksiyon

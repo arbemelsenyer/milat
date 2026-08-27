@@ -72,22 +72,27 @@ var. Tezgâh: `tests/bilgi-yukleme-oksuz.test.ts` · 375/375 yeşil.
 
 ---
 
-**SENDEN İSTEDİĞİM (kısa ve somut):**
+**İKİNCİ DÜZELTME — 7036 DA VARMIŞ.** Yukarıdaki listede "7036 sayılı İş
+Mahkemeleri Kanunu kaynak listesinde hiç yok" yazmıştım. **Var**: 12 parça,
+adalet.gov.tr'den girmiş. Aynı hatayı ikinci kez, başka bir boyutta yaptım —
+bu kez yalnız **depodan** beslenen kaynaklara bakıp URL'den beslenenleri
+saymadım. Doğru yöntem, kaynağı geldiği yere göre değil **başlığa göre bütün
+kaynaklarda** aramaktı; öyle arayınca liste üçten ikiye indi.
 
-1. **İcra ve İflas Kanunu** — bilgi tabanındaki nüsha 117 KB / 2 parça, yani
-   pratikte yok. İİK Türkiye'nin en uzun kanunlarından biri; bu dosya İİK'nın
-   tam metni olamaz. Metin katmanlı tam bir nüshayı `/admin`den yükle.
-   Büyükse TTK'da yaptığın gibi bölerek yükle.
+**SENDEN İSTEDİĞİM (iki madde, karar değil yükleme işi):**
+
+1. **İcra ve İflas Kanunu** — bütün kaynaklarda arandı: tek nüsha var, o da
+   117 KB / **2 parça**. İİK Türkiye'nin en uzun kanunlarından biri; bu dosya
+   İİK'nın tam metni olamaz. Metin katmanlı tam bir nüshayı `/admin`den yükle;
+   büyükse TTK'da yaptığın gibi bölerek.
 2. **Kira Uyuşmazlıkları ve Arabuluculuk** eğitim dokümanı — 4.1 MB'lık nüsha
-   taranmış görünüyor (5 parça). Kira senin ana kategorilerinden biri.
-   Metin katmanlı bir sürümü varsa yükle; yoksa bırakalım, ben ısrar etmem.
-3. **7036 sayılı İş Mahkemeleri Kanunu** — kaynak listesinde hiç yok. İşçi
-   uyuşmazlıklarında zorunlu arabuluculuğun usul kanunu bu; eksikliği en çok
-   burada hissedilir. 176 KB, küçük bir dosya.
+   **5 parça** vermiş, yani taranmış görünüyor. Kira senin ana
+   kategorilerinden biri. Metin katmanlı bir sürümü varsa yükle; yoksa
+   bırakalım, ısrar etmem — yanındaki 6 kira sunumu ve Yargıtay kararı duruyor.
 
-Üçü de yükleme işi; **karar gerektirmiyor**, o yüzden bu madde bir Human Gate
-değil, sana bırakılmış bir iş listesi. Yükledikten sonra bana söyle,
-parça sayılarını canlıdan doğrularım.
+Yükledikten sonra söyle, parça sayılarını canlıdan doğrularım. Artık yükleme
+yolu da yardımcı: taranmış PDF baştan reddediliyor, düşük yoğunluk uyarı
+veriyor (commit `d0a82c4`).
 
 **DEPODAKİ 59 ÖKSÜZ DOSYA:** artık "eksik mevzuat" olmadıkları anlaşıldı —
 çoğu başarılı yeniden yüklemelerin artığı. Silinmeleri KVKK meselesi değil,
