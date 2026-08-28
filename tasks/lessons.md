@@ -1112,3 +1112,42 @@ kod (tezgâh) **ve** o an canlıda duran değer (kuru koşum).
 Bir yan ders: parametre kurucunun verisidir. Değer beklenmedik çıktığında
 **düzeltilmez** — iş durdurulur, olduğu gibi bildirilir. "Herhalde yanlış girildi"
 diyip 7'yi 1825 yapmak, kurucunun bilerek kurduğu bir denemeyi sessizce bozabilirdi.
+
+## 28.08.2026 — Bir kusuru kapatırken KARDEŞLERİNİ ara
+
+27.08'de "sessiz boş yükleme" kusuru bulunup `admin-upload-knowledge`te
+kapatıldı ve iş DONE yazıldı. Ertesi gün aynı açığın **üç yolda daha**
+durduğu ölçüldü: `build-legal-knowledge` · `build-knowledge-base` (iki mod) ·
+`google-drive-import`. Dördünde de tek kapı `chunks.length === 0` idi.
+Kusur canlıya iki boş mevzuat kaynağı sokmuştu ve bunlar `/admin` listesinde
+**görünüyordu**.
+
+**Ders:** bir kusur bulunduğunda "bu davranışı başka kim yapıyor?" sorusu
+düzeltmenin **parçasıdır**, ayrı bir iş değil. Doğru arama, kusurun bulunduğu
+dosyada değil, kusurun **eylemi** üzerinde yapılır — burada
+`grep -rl 'from("knowledge_base_chunks")' supabase/functions/`. Dosya adına
+göre aramak yalnız bakılan yeri kapatır.
+
+**İkinci ders — eşik kopyası çatallanır.** Aynı eşiği üç dosyada ayrı ayrı
+tutmak, projenin `extraction_status` sözlük çatalıyla aynı ailedendir: kopyalar
+kaçınılmaz olarak birbirinden ayrılır. Eşik `_shared/metin-katmani.ts`e alındı
+ve tezgâh kopyanın geri gelmesini engelliyor.
+
+**Üçüncü ders — kapı SİLMENİN önüne konur.** Bu yolların hepsi yazmadan önce
+eski parçaları `source_url` üzerinden siliyordu. Kapı silmenin arkasında
+kalsaydı reddetme işe yaramaz, üstüne kötü bir koşum SAĞLAM bir kaynağı
+boşuyla değiştirirdi. Reddetmenin değeri, reddederken **hiçbir şeyi
+bozmamasındadır.**
+
+## 28.08.2026 — Kurucudan iş istemeden önce "bunu ben yapabilir miyim" diye sor
+
+H-20'de kurucudan "metin katmanlı bir İİK nüshası yükle" istenmişti. Oysa
+kanunun resmî kaynağı (`mevzuat.gov.tr`) URL'den beslenen yola eklenebilir
+durumdaydı; nüshanın metin katmanı olup olmadığı da PDF'in kendi yapısından
+ölçülebiliyordu (yazı tipi nesnesi sayısı vs. görüntü kodlayıcısı sayısı).
+Kurucuya kalan iş "dosya bul ve yükle"den "düğmeye bas"a indi.
+
+**Ders:** Human Gate'e çıkmadan önce isteğin **hangi kısmının** gerçekten
+insan gerektirdiğini ayır. Çoğu zaman insan gereken kısım karardır; malzemeyi
+bulmak değildir.
+

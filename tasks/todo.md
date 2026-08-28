@@ -1,572 +1,78 @@
 ## Nerede kaldık
 
-- Tarih: **27.08.2026** (16. blok) — `medipact dur` ile kapatıldı.
-  15. blok elektrik kesintisiyle yarıda kalmıştı; kayıt ile canlı durum
-  **uyuşuyordu**, kaldığı yerden sürüldü ve blok dokuz işle kapandı.
+- Tarih: **28.08.2026** (17. blok) — `medipact dur` ile kapatıldı.
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: **yok** (`dur` ile kapatıldı). Çalışma ağacı temiz, her iş
-  commit'li ve push'lu; son commit `d93a176`.
-- **SIRADAKİ İŞ — Code'un tek başına yapabileceği iş YOK.** Kuyrukta kalan iki
-  madde de kurucu eylemi bekliyor:
-  1. **HAT H-20** — iki dosya yüklemesi (İİK tam metni · kira eğitim
-     dokümanının metin katmanlı sürümü). Karar değil, yükleme işi.
-  2. **Taraf akışının gerçek telefonda denenmesi** — BLOCKED, cihaz gerekiyor.
-  Yükleme yapılınca Code parça sayılarını canlıdan doğrular ve devam eder.
-- **DÜZELTME — H-20'nin ilk hâli YANLIŞTI, aynı gün ölçüp geri aldım.**
-  "TTK, FSEK ve Sınai Mülkiyet mevzuatı bilgi tabanında yok" demiştim;
-  **üçü de var.** Öksüz dosya adlarını girmiş kaynaklarla eşleştirirken yalnız
-  zaman damgası önekini atmıştım, oysa başarılı yüklemeler **yeni yol
-  düzeniyle** (`kategori/dosya_adi`) kaydedilmiş — iki liste hiç örtüşmedi ve
-  "hiç yok" diye okudum. Depoda öksüz olması, kaynağın bilgi tabanında
-  olmadığı anlamına gelmiyormuş. **TTK 7 bölüm hâlinde, 664 parça** — kurucu
-  800 parça sınırını kanunu bölerek zaten çözmüş.
-- **AÇIK MADDE: HAT H-20 (P1) — "girdi sanılan" boş kaynaklar.** Asıl kusur
-  buymuş ve daha ağır: tek kapı `parça sayısı sıfır mı` idi. Metin katmanı
-  olmayan (taranmış) PDF sıfır değil **birkaç** parça verir; yükleme başarılı
-  sayılır, kaynak `/admin` listesinde **görünür**, ama ajanlar içinden hiçbir
-  şey bulamaz — açık hatadan kötü, çünkü hata görülür boşluk görülmez.
-  Canlıda üç kaynak böyle: 4.1 MB kira eğitim dokümanı → **5 parça**,
-  "2004 sayılı İİK" 117 KB → **2 parça** (sağlıklı kanun PDF'i 0.12–0.19
-  parça/KB). **Düzeltildi** (`d0a82c4`): 1 MB üstü dosya 10'dan az parça
-  verirse reddediliyor, sebebi söyleniyor; meşru sunum PDF'leri (0.016–0.021)
-  engellenmesin diye eşik yoğunluğa değil tartışmasız uca konuldu.
-  **Kurucudan istenen (karar değil, yükleme işi):** İİK'nın metin katmanlı tam
-  nüshası (mevcut tek nüsha 2 parça) · kira eğitim dokümanının metin katmanlı
-  sürümü (varsa; 4.1 MB → 5 parça).
-- **İKİNCİ DÜZELTME:** "7036 sayılı İş Mahkemeleri Kanunu hiç yok" da yanlıştı
-  — **var**, 12 parça, adalet.gov.tr'den. Aynı hatayı ikinci kez, başka bir
-  boyutta yaptım: bu kez yalnız **depodan** beslenen kaynaklara bakıp URL'den
-  beslenenleri saymadım. Doğru yöntem, kaynağı geldiği yere göre değil
-  **başlığa göre bütün kaynaklarda** aramak. Öyle arayınca liste üçten ikiye
-  indi. Ders `lessons.md`ye yazıldı.
-- **H-19 KAPANDI (seçenek A uygulandı).** 6 öksüz taraf belgesi depo API'siyle
-  silindi. Kanıt Code'un kendi ölçümü: kovadaki nesne **149 → 143** (tam 6),
-  "dosya belgesi" öksüzü **6 → 0**. Silme için açılan tek seferlik fonksiyon
-  kaldırıldı ve **404 döndüğü doğrulandı** — arkada keyfi yol silen uç yok.
-- Son tamamlanan iş (27.08 · P1): **tezgâh temiz bir klonda da koşuyor.**
-  Üç tezgâh (`kazanim-sayaci` · `kota-kapisi` · `saklama-imha`)
-  `tests/gecici/` içindeki **git'e hiç girmemiş** SQL dosyalarını okuyordu —
-  yani "363/363 yeşil" yalnız bu makinede doğruydu, temiz klonda üçü de
-  `ENOENT` ile çökerdi. Dosyalar `tests/sabit/` altına alındı (izlenir);
-  ikisi canlıda çalıştırılmış göç metni olduğu için kaydı da kurtarıldı.
-  `tests/tezgah-tasinabilir.test.ts` sınıfı kilitliyor ve **ısırdığı
-  kanıtlandı** (yol geri konunca iki denetim de kırmızı yandı, sonra geri
-  alındı). CLAUDE.md §22'ye kural yazıldı.
-  Doğrulama: `npm run test` **365/365** · tsc temiz · eslint temiz.
-- Bir önceki iş (27.08 · P1): **H-18 uygulandı — nöbetçi artık
-  oturum kaydı SİLMİYOR, canlı kanıtlı.** `kayitSilmeKollari` + `KAYIT_BUCKET`
-  + çağrı yeri + iki sayaç kaldırıldı. Kapanışta döküm silen kolun yanında,
-  sesi kapanıştan **24 saat** sonra silen kol da gitti: kurucunun kuralı — bir
-  veri türünün süresine **tek yerden** karar verilir — onu da kapsıyor.
-  Değişmeyen istisna: ham ses metne çevrilir çevrilmez siliniyor (H-14 şart 1).
-  **Canlı kanıt:** nöbetçi 3 dakikada bir koşuyor; 08:48 · 08:51 · 08:54
-  koşumlarında `ses_kaydi_silindi`/`dokum_silindi` alanları **vardı**, 08:57
-  koşumunda **yok** — yeni sürüm indi. Tezgâh kilidi: `saklama-imha.test.ts`
-  içindeki "H-18" bölümü kolun sessizce geri gelmesini engelliyor.
-  Doğrulama: `npm run test` 363/363 · tsc temiz · commit `5527fff`.
-- Bir önceki iş (27.08 · P2): **CRLF tuzağı kapandı.** `tests/kaynak.ts`
-  eklendi (`kaynakOku` — CRLF'i LF'e çevirir) ve `tests/` içindeki **31**
-  dosya ona bağlandı. Ürün kodunda değişiklik yok. Doğrulama: 363/363 · tsc
-  temiz · `npx eslint tests/` → kalan 18 hata beş dosyada ve **hepsi önceden
-  vardı** (dokunulmayan satırlarda). Commit `be29b2b`.
-- Daha önce (27.08 · P0): **`saklama-imha` canlıda YENİLENDİ ve
-  kuru koşumla kanıtlandı — H-17 KAPANDI.**
-  Fonksiyon Lovable'dan yeniden dağıtıldı; cevaba **`surum` alanı** eklendi
-  (`"2026-08-26-kolon-depo"`) — 26.08'in dersi buydu: hangi sürümün koştuğunu
-  dışarıdan okuyamadığımız için bir gün boyunca eski kodun canlı olduğunu
-  fark edemedik. Kuru koşum (istek 11612, HTTP 200) artık `surum`u döndürüyor
-  ve üç tür de **`"temiz"`**: `oturum_kaydi_ses` · `oturum_kaydi_dokum` ·
-  `case_documents`. Kabul kriteri karşılandı.
-- **03:00 UTC KOŞUMU OLDU — ZARARSIZ, BEKLENDİĞİ GİBİ.** jobid 21 bugün
-  03:00'te koştu (runid 11465, `succeeded`) ve **eski kodla** 5 satır sildi
-  (`case_notes` 1 + `odeme_kayitlari` 4) — H-17 cevabında güvenli sayıldığı
-  gibi, 16–18.07 tarihli DENEME dosyaları. Cevapta `surum` alanı **yoktu**;
-  eski sürümün koştuğunun kesin kanıtı budur. Eski kodun tehlikeli kolu
-  (`oturum_kayitlari` satırı silme) **hiç tetiklenmedi**, çünkü tablo 0 satır.
-  Canlı sayımlar: `oturum_kayitlari 0` · `case_notes 0` · `case_payments 0` ·
-  `case_documents 24` (hepsi açık dosyalara ait, silme kapsamı dışında).
-- **YAN BULGU (düzeltildi):** `npm run test` kırmızıya döndü ama **kod
-  doğruydu** — Lovable'ın dokunduğu dosya `core.autocrlf=true` yüzünden
-  çalışma ağacına **CRLF** olarak indi ve `tests/saklama-imha.test.ts`in çok
-  satırlı dizgi araması eşleşmedi. Tezgâh satır sonunu artık
-  normalleştiriyor. Depoda **341 izlenen dosya CRLF**; kaynak okuyan öteki
-  tezgâhlar aynı tuzağa açık → kuyruğa **P2** olarak yazıldı.
-- Son tamamlanan iş (26.08 · 15. blok): **antet gerçekten doldurulabilir oldu.**
-  Bu blokta DONE işaretlediğim antet maddesi **yanlış DONE'du**: göç kolonları
-  ekledi, belge üreticisi okuyordu, ama alanları **yazan hiçbir yüzey yoktu** —
-  arabulucu büro adını hiçbir yerden giremiyordu, her belge antetsiz basılıyordu.
-  `Profile.tsx`e yalnız arabuluculara görünen "Büro Antedi" bölümü eklendi
-  (ad · adres · logo), uzantı kapısı kovanın **canlıdan okunan** politikasına
-  hizalandı (SVG tuzağı), bayat `types.ts` canlı şemayla eşitlendi ve
-  `tests/antet.test.ts` yazıldı — antedin hiç tezgâhı yoktu, yanlış DONE'u bu
-  mümkün kılmıştı.
-- Bir önceki iş (26.08): **öksüz dosya sınıfı süpürüldü** —
-  `saklama-imha` düzeltmesinden sonra bütün silme yüzeyleri tarandı. İki yerde
-  daha bulundu (`CaseRoom.deleteMyDoc` **canlıydı**, tarafın kendi belgesini
-  sildiği yüzey; `admin-delete-knowledge` **yarım düzeltilmişti** — H-12'deki 71
-  öksüzün kaynağı). Asıl bulgu üçüncüsü: **tezgâh adıyla kilitliyordu**, bu
-  yüzden `CaseRoom`u hiç görmedi; artık **tarıyor** ve sırayı kilitliyor.
-  Tezgâhın ısırdığı eski kodda kanıtlandı (satır 362 yakalandı). Canlı kanıt:
-  yayındaki yeni pakette (`index-b-1-kF-9.js`) `"Yarım silindi"` **bulundu**.
-- Daha önce (26.08): **`saklama-imha` P0 düzeltmesi** —
-  kol ilk kez koşmadan önce canlı parametrelerle denetlendi, **iki geri
-  dönüşsüz kusur** bulundu ve kapatıldı: (1) `oturum_kayitlari` **satırı**
-  siliniyordu — ses 0 gün olduğu için sorgu tüm satırları kapsıyordu, 7 gün
-  saklanacak dökümler ve KVKK silme damgaları da giderdi; artık satır değil
-  **kolon** boşaltılıyor, damga yazılıyor, ses için depo da temizleniyor.
-  (2) `case_documents` silinirken **depoya dokunulmuyordu** (H-12 öksüz belge
-  kusurunun aynısı); artık önce depo, sonra satır. Canlı ölçüm ilk koşumun
-  **riskli olmadığını** gösterdi (etkilenen tablo 0 satır), cron'a dokunulmadı.
-  Doğrulama: `npm run test` 354/354 · tsc temiz · publish yapıldı ve Lovable'ın
-  depo kopyasında yeni kod **okundu**. Açık tek adım: kuru koşum → **HAT H-17**.
-- Daha önce (26.08): **cron teşhisi kapandı.**
-  `cron.unschedule` yalan söylememiş — 25.08'de kaydı gerçekten kaldırmış.
-  jobid 21'i geri kuran şey `tests/gecici/PILOT-KALAN-GOCLER.sql` **Bölüm 5**'in
-  26.08 göç koşumunda yeniden çalışmasıdır (kanıt: jobid 21'in `job_run_details`te
-  hiç koşumu yok, oysa günlük dolu ve `0 3 * * *` işi bugün 03:00'te var olsaydı
-  koşardı). Canlıda **hiçbir şeye dokunulmadı**; üç kural `lessons.md`ye yazıldı;
-  önceki yanlış teşhis ("sessiz yazım sınıfı") geri alındı.
-- **PİLOT KUYRUĞU: 13/14 DONE · 1 BLOCKED.**
-  Kalan tek madde: **taraf akışının gerçek telefonda uçtan uca denenmesi** —
-  kurucu eylemi, Code tarafında yapılacak iş **yok**.
-- **KURUCU İÇİN İKİ KISA KONTROL (ikisi de oturum gerektiriyor, Code yapamaz):**
-  1. Arabulucu hesabıyla `/profile` → **Büro Antedi**: ad + adres gir, kaydet;
-     sonra bir tutanak üret — antet ve "düzenlenme yeri" dolu gelmeli. (~1 dk)
-  2. Telefon deneme listesi (aşağıdaki BLOCKED madde). (~3 dk)
-
-### DUR KAYDI — 27.08.2026 · 16. blok · `medipact dur`
-
-**Blok dokuz işle kapandı; hepsi commit'li ve push'lu. Çalışma ağacı temiz.**
-Son commit `d93a176`. Doğrulama: `npm run test` **375/375** ·
-`npx tsc --noEmit -p tsconfig.app.json` temiz · `npx eslint tests/` → kalan
-18 hata beş dosyada ve **hepsi bu bloktan önce vardı**.
-
-| # | iş | öncelik | commit | kanıt |
-|---|---|---|---|---|
-| 1 | `saklama-imha` canlıda yenilendi (H-17 kapandı) | P0 | `71ce868` | kuru koşum 11612, üç tür `"temiz"`, cevapta `surum` |
-| 2 | `ajan-nobetci` kapanışta döküm silmiyor (H-18 kapandı) | P1 | `5527fff` | 08:57 koşumunda eski sayaçlar düştü |
-| 3 | CRLF tuzağı kapandı (`tests/kaynak.ts` + 31 tezgâh) | P2 | `be29b2b` | 363/363 |
-| 4 | Tezgâh temiz klonda da koşuyor (`tests/sabit/`) | P1 | `3334af8` | bekçi ısırdı, sonra geri alındı |
-| 5 | 6 öksüz taraf belgesi silindi (H-19 · seçenek A) | P0 | — | kovadaki nesne 149 → **143**, öksüz 6 → **0** |
-| 6 | Bilgi tabanı yüklemesi öksüz bırakmıyor | P1 | `fe9baef` | bekçi ısırdı |
-| 7 | Kaynak okuma tek kapıdan geçiyor (bekçili) | P2 | `81be897` | bekçi ısırdı |
-| 8 | Sessiz boş yükleme yakalanıyor | P1 | `d0a82c4` | 375/375 |
-| 9 | H-20 iki kez düzeltildi (yanlış "yok" iddiaları) | kayıt | `c95d46d` · `d93a176` | canlı sayım |
-
-**CANLIYA ÇIKAN DAĞITIMLAR (§11-B):** `saklama-imha` · `ajan-nobetci` ·
-`admin-upload-knowledge` (iki kez). Öncelikli ikisinin yeni sürümde koştuğu
-canlı cevaplardan doğrulandı; `admin-upload-knowledge` admin oturumu
-gerektirdiği için **sürümü Code doğrulayamadı** — kurucunun ilk yüklemesindeki
-`surum: "2026-08-27-yukleme-sonda"` alanı bunu kesinleştirecek.
-
-**BU BLOKTA İKİ KEZ YANILDIM, İKİSİNİ DE KENDİM YAKALADIM.**
-Kurucuya "TTK, FSEK, Sınai Mülkiyet mevzuatı bilgi tabanında yok" dedim —
-üçü de vardı (TTK 7 bölüm, 664 parça; sınırı kurucu bölerek zaten çözmüş).
-Düzelttikten sonra "7036 hiç yok" dedim — o da vardı (12 parça, URL kaynaklı).
-Aynı hata iki kılıkta: önce **ad biçimini**, sonra **kaynak türünü** daralttım.
-İkisi de `lessons.md`ye yazıldı. Kural: daraltılmış bir arama bulamadığında
-"yok" der; oysa söylediği yalnızca **"baktığım yerde yok"**tur.
-
-**AÇIK BLOKAJ: yok.** Kuyrukta Code'un tek başına yapabileceği iş kalmadı;
-iki madde de kurucu eylemi bekliyor (H-20 iki yükleme · telefon denemesi).
-
-**YENİ OTURUM NE YAPAR:** `tasks/HAT.md` → `## COWORK → CODE` bölümünü oku.
-H-20'ye cevap/yükleme gelmişse parça sayılarını canlıdan doğrula ve devam et.
-Gelmemişse §6 ile kodun gerçek durumundan yeni P0/P1 aday çıkar — bu blokta
-üç iş (tezgâh taşınabilirliği · öksüz yazma kolu · sessiz boş yükleme) tam
-böyle bulundu.
-
-### 26.08'de canlıda çalıştırılan göçler (hepsi eklemeli, veri silmiyor)
-
-| ne | doğrulanan sonuç |
-|---|---|
-| `profiles` + `buro_adi` · `buro_adresi` · `antet_logo_url` | `antet_kolon = 3` |
-| `arabulucu_baz_cizgi` tablosu + 3 RLS politikası | `baz_cizgi_tablo = 1` · `baz_cizgi_politika = 3` |
-| `saklama_sureleri` kısıtı `> 0` → `>= 0` | `sifir_gun_yazilabilir = 1` |
-
-Bu üç göçle **antet** ve **kazanım sayacı** maddeleri kapandı: kod ikisinde de
-göçü beklemeden yazılmıştı (antet alanları kolon yokken boş basılıyordu, baz
-çizgi kartı tablo yokken hiç görünmüyordu), göç koştuğu an **ek kod gerekmeden**
-tamamlandılar.
-
-**Çalıştırılmayan:** `PILOT-KALAN-GOCLER.sql` **Bölüm 3** (kota tabloları) —
-H-15/3 kararıyla madde pilot kapısından düştü; `/admin` tüketim ekranı zaten
-kotasız çalışıyor. Gerekirse sonra koşulabilir, zararsızdır.
-
-- **AÇIK BLOKAJ: yok.** H-16 cevaplandı ve kapandı (26.08) — **çelişki yoktu,
-  soru yanlış kurulmuştu.** 1825/3650 rakamları H-15/1'in *eski* metnindendir;
-  25.08'de "SIFIR SAKLAMA" cevabıyla yürürlükten kaldırılmış, ben o bloğu
-  atlamışım. **7 gün kasıtlıdır** ve değişmeyecek: süreç bitince dosyaya ait her
-  şey silinir, mali kayıt dahil — makbuz Medipact'ten kesilmiyor, ürün yalnız
-  ücret hesabı üretiyor, dolayısıyla mevzuat gereği saklanacak mali kayıt burada
-  **oluşmuyor**. 7 gün, arabulucunun tutanağı indirip UYAP'a yükleme payıdır.
-  Kuru koşumdaki 5 satır da gerçek veri değildi: beşi de 16–18.07 tarihli
-  **deneme dosyası** (MP-2026-1009 · 1011 · 1012 · 1013 · 1014).
-- **cron: KAYIT DURUYOR (jobid 21, active = true) — ama kaldırılmadığı için değil,
-  YENİDEN KURULDUĞU için. Teşhis 26.08'de kapatıldı, kanıt aşağıda.**
-  25.08'deki `cron.unschedule` **çalışmıştı**; işi geri getiren şey
-  `tests/gecici/PILOT-KALAN-GOCLER.sql` → **BÖLÜM 5**'in 26.08 göç koşumunda
-  yeniden çalışmasıdır. Kaldırdığım kaydı **kuran betikten çıkarmamıştım**.
-  Kurucu talimatı: **dokunma, öyle kalsın** — değerler doğru olduğuna göre imha
-  kolunun koşması istenen davranıştır. Ders `tasks/lessons.md`ye yazıldı.
-- Doğrulama (26.08 · dur anında koşuldu): `npm run test` **345/345 (41 dosya)** ·
-  `npx tsc --noEmit -p tsconfig.app.json` **temiz (çıkış 0)**.
-- **`main` ile `origin/main` eşit** — bekleyen push yok.
-- **YAYIN: dördü de doğrulandı (§11-B).** Canlı paket `index-CpI5Ozyh.js`
-  indirildi ve içinde arandı: `"Büro Antedi"` ✓ · `"Antet Logosu"` ✓ ·
-  `"Yarım silindi"` ✓.
-  · **ARAÇ NOTU — `deploy_project` bir kez "pending" deyip İNMEYEBİLİYOR.**
-  Antet yayını ilk çağrıda ~25 dakika boyunca inmedi; `get_project`
-  `status: completed` · `error: null` diyordu, yani derleme sorunsuzdu ama
-  üretim adresi eski paketi sunmaya devam ediyordu. **İkinci** `deploy_project`
-  çağrısında 25 saniyede indi. Kural: yayını dizeyle doğrula; inmediyse
-  bekleme, **tekrar çağır**. "pending" bir kanıt değildir.
-  Önceki üç publish **doğrulandı**:
-  `saklama-imha` (Lovable depo kopyasında yeni kod okundu) · `CaseRoom` (canlı
-  pakette `"Yarım silindi"` dizesi bulundu) · `admin-delete-knowledge`.
-- Açık HAT maddeleri: H-7 · H-8 · H-9 · H-10 · H-12 (P1 · birikmiş öksüz
-  belgeler) · H-13 — **hepsi kurucu kararı bekliyor.**
-  **H-17 CEVAPLANDI ama KAPANMADI:** kuru koşum sayıları doğru çıktı, fakat
-  cevabın kendisi canlıda **eski sürümün** koştuğunu gösterdi; yeniden dağıtım
-  ve ikinci kuru koşum gerekiyor.
-  **H-18 CEVAPLANDI, uygulama bekliyor** (kod işi, onaylı).
-  **H-15 ve H-16 KAPANDI** (ikisi de ARŞİV'de).
-- ~~**Sıradaki uygulanabilir iş (P1):** `cron.unschedule` neden yalan söyledi~~
-  → **DONE 26.08** (aşağıdaki teşhis bloğu). Soru yanlış kurulmuştu: `unschedule`
-  yalan söylemedi, kaydı **başka bir şey geri kurdu**. Kayda dokunulmadı.
-
-### DUR KAYDI — 27.08.2026 · 02:40 · `medipact dur`
-Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
-
-**Bu turda Cowork iki cevap yazdı** (ben çalışırken); ikisi de commit'lendi.
-
-**H-17 · kuru koşum ÇALIŞTIRILDI — sayılar doğru, ama madde KAPANMADI.**
-HTTP 200, `toplam_silinen: 0`, `uyarilar` yok. Sayılar beklenenin aynısı:
-`case_notes → 1` · `odeme_kayitlari → 4` · geri kalan 0. Yani **03:00 UTC koşumu
-güvenli**; silinecek 5 satır 16–18.07 tarihli deneme dosyalarına ait (Cowork
-`cases` tablosundan ayrıca doğruladı, gerçek dosya yok).
-
-> **DÜZELTME · Cowork'ün dağıtım çıkarımı yanlış: canlıda ESKİ kod duruyor.**
-> Cowork, `dosya_kapanis_sonrasi` için dönen "bu tür başka bir kolun işi"
-> gerekçesini yeni sürümün imzası saydı. **O dize eski kodda da vardı**
-> (`git show HEAD~7:supabase/functions/saklama-imha/index.ts` → 1 eşleşme).
-> H-17'de verilen gerçek ayırt edici ise tersini söylüyor: yeni kolda 0 satır
-> bulununca **`"temiz"`** yazılır, `"kuru"` yalnız eski koddaki sayım dalından
-> çıkar. Canlı cevapta `oturum_kaydi_ses` · `oturum_kaydi_dokum` ·
-> `case_documents` **üçü de `"kuru", silinecek: 0`** döndü → **eski sürüm.**
-> Yani ön yüz publish'i edge function'ı yenilememiş (§11-B bunu zaten söylüyor).
-> Cevaptaki "temiz/kuru yalnız etiket farkı, beklenti metnini düzeltmek yeter"
-> değerlendirmesi de bu yüzden geçersiz: etiket farkı yazım ayrıntısı değil,
-> **hangi sürümün koştuğunun göstergesiydi.**
->
-> **Tehlike bugün YOK:** eski kol `oturum_kayitlari` **satırlarını** siler ama o
-> tablo canlıda **0 satır**; 03:00'te silinecek 5 satır iki sürümde de aynı.
-> Tehlike **pilotta ilk gerçek oturum kaydı tutulduğu an** başlar.
-
-**H-18 · CEVAPLANDI — uygulama bekliyor (kod işi, bu turda YAPILMADI).**
-Karar: **`saklama-imha` haklı, `ajan-nobetci` düzeltilecek.** Gerekçe kurucunun
-kendi cümlesi: 7 gün **UYAP payıdır**; dökümü kapanıştan ~3 dakika sonra silen
-bir kol o payı uygulamış olmaz, **deler**.
-Uygulanacaklar: `ajan-nobetci`nin kapanışta döküm silen kolu **kaldırılacak**
-(ya da yalnız `saklama_sureleri`ne bakacak hâle getirilecek) · silmenin tek
-yetkilisi `saklama-imha` (kapanış + 7 gün, ya da arabulucu "tüm verileri sil"
-derse anında) · **istisna değişmedi:** ham ses metne çevrilir çevrilmez silinir
-(H-14 şart 1), 7 güne tabi değildir. Genel kural `lessons.md`ye yazıldı.
-
-**Ağaç durumu.** `main` = `origin/main`. Commit edilmemiş **kendi** işim yok.
-Bu oturuma ait olmayan, §11 gereği **dokunulmayan** yabancı değişiklikler:
-silinmiş ama commit edilmemiş `.agents/skills/medipact-calisma-duzeni/SKILL.md`
-(içeriği `.github/.agents/…` altında bayt bayt duruyor — **taşıma**, kayıp yok) ·
-izlenmeyen `.github/.agents/` · `devam.sh` · `gs.sh` ·
-`Yeni XLSX Worksheet.xlsx` · `repomix-output.xml`.
-
-**Doğrulama (dur anında koşuldu):** `npm run test` **359/359 (42 dosya)**.
-`tsc` ve `eslint` bu turda değişiklik olmadığı için yeniden koşulmadı; son
-sonuçları önceki bloklarda: tsc temiz (çıkış 0), eslint yeni sorun yok.
-
-**SIRADAKİ OTURUMUN İŞ SIRASI:**
-1. **`saklama-imha` yeniden dağıt** ve kuru koşumu **tekrar** aldır (H-17).
-   Üç tür `"temiz"` dönene kadar madde kapanmaz. Yalnız yayın kuyruğu işi;
-   "pending" kanıt değil, gerekirse `deploy_project`'i **tekrar** çağır.
-2. **H-18'i uygula:** `ajan-nobetci`nin kapanışta döküm silen kolunu kaldır,
-   süreyi `saklama_sureleri`den okut, tezgâhla kilitle. Kurucu onayı **var**.
-3. Kalan HAT maddeleri hâlâ kurucuda: H-7 · H-8 · H-9 · H-10 · H-12 · H-13.
-
-### KAPANDI — 26.08 · P1 · ANTET "DONE" İŞARETLİYDİ AMA **DOLDURULAMIYORDU**
-Bu maddeyi bu blokta **ben** DONE işaretlemiştim ve yanlıştı.
-
-**Ne yazmıştım:** *"göç koştuğu an ek kod gerekmeden tamamlandılar"* — kolonlar
-gelince belge üreticisi antedi kendiliğinden basacaktı. **Okuma yarısı için
-doğruydu.** Ama antedi **yazan** yüzey hiç yoktu: `Profile.tsx` yalnız
-`full_name` ve `phone` güncelliyordu, `buro_adi` · `buro_adresi` ·
-`antet_logo_url` alanlarını dolduran **tek bir yer bile** yoktu. Yani arabulucu
-büro adını hiçbir yerden giremiyordu ve **her resmî belge antetsiz basılıyordu.**
-Göç koştu, üretici okudu, kabul kriteri "kolon sayısı = 3" ile doğrulandı — üçü
-de doğruydu ve ürün yine çalışmıyordu.
-
-**Neden kimse görmedi:** antedi denetleyen **hiçbir tezgâh yoktu**. Kabul
-kriterim şemayı ölçüyordu, davranışı değil.
-
-**Yapılan.** `Profile.tsx`e **yalnız arabuluculara görünen** "Büro Antedi"
-bölümü eklendi: büro adı · büro adresi (belgede "düzenlenme yeri" olarak da
-kullanılıyor) · logo yükleme/kaldırma. Taraf bu bölümü ne görür ne yazar; antet
-yazımı `isMediator` kapısının arkasındadır. Yükleme ve profil yazımının
-sonuçları okunuyor (25.08 sessiz yazım dersi).
-
-**Uzantı kapısı tahmin edilmedi.** `avatars` kovasının INSERT/UPDATE politikası
-canlıdan okundu: yalnız `jpg · jpeg · png · gif · webp`. İstemci aynı beşe
-daraltıldı — aksi hâlde **tipik logo biçimi olan SVG** istemciden geçer,
-sunucuda RLS'e takılır ve kullanıcıya anlamsız bir depo hatası dönerdi.
-Yeni kova açılmadı (SQL gerektirirdi, §10); logo taraf verisi değildir.
-
-**`types.ts` bayattı.** Göç 26.08'de koştu ama üretilen tip dosyası
-güncellenmemişti; alanları yazan ilk kod `TS2353` ile düştü. Üç kolon **canlı
-şemadan doğrulanarak** eklendi (üçü de `text`, hepsi nullable). Bu bir yama
-değil: bir sonraki tip üretimi aynı sonucu verir.
-
-**Tezgâh: `tests/antet.test.ts` (yeni, 5 test).** Kilitlenen şey: üç alanı
-**yazan** yüzey var · üç alanı **okuyan** üretici duruyor · antet `isMediator`
-kapısının arkasında · yazım sonuçları okunuyor · `types.ts` canlı şemayla
-uyumlu. **Kural olarak yazıldı:** bir alanı OKUYAN kol kadar YAZAN yüzey de
-kilitlenir; yalnız okuma denetlenirse veri hiç girilemese bile tezgâh yeşil yanar.
-
-**Doğrulama.** `npm run test` **359/359 (42 dosya)** ·
-`npx tsc --noEmit -p tsconfig.app.json` temiz · `eslint src/pages/Profile.tsx`
-**temiz (0 sorun)**.
-
-**Kalan tek adım (kurucu, ~1 dakika):** arabulucu hesabıyla `/profile` açılıp
-büro adı + adres girilir, istenirse logo yüklenir, kaydedilir; sonra bir tutanak
-üretilip antedin ve "düzenlenme yeri" satırının dolu geldiği görülür. Code bunu
-kendi yapamaz: arabulucu oturumu gerekiyor.
-
-### KAPANDI — 26.08 · P1 · ÖKSÜZ DOSYA SINIFI: KALAN İKİ YÜZEY + TEZGÂHIN KENDİ DELİĞİ
-`saklama-imha` düzeltmesi aynı kusurun **ikinci** örneğiydi (ilki 25.08'de
-`dosya-verilerini-sil`). İki kez çıkan bir sınıf üçüncü kez de çıkar — bu yüzden
-**bütün silme yüzeyleri tarandı.** İki yerde daha bulundu, ve asıl bulgu
-üçüncüydü: **tezgâhın kendisi deliğe sahipti.**
-
-**BULGU 1 · `CaseRoom.tsx` → `deleteMyDoc` (canlıydı).**
-Satırı depodan **önce** siliyor, depo silmesi düşerse yalnız `console.warn`
-yazıyordu — kodun yorumu bunu "kullanıcıya yanlış 'silinemedi' gösterilmesin"
-diye **savunuyordu** bile. Sonuç: taraf "silindi" duyar, satır gider, dosya
-kovada kalır ve onu gösteren hiçbir kayıt kalmadığı için **hiçbir silme kolu —
-KVKK silme talebi dahil — bir daha bulamaz** (constitution m.10). Atlanan yüzey,
-tarafın **kendi** belgesini sildiği yüzeydi.
-→ Düzeltildi: önce depo, hata varsa **dur**; satır silmesi düşerse "Yarım
-silindi" denir, gizlenmez.
-
-**BULGU 2 · `admin-delete-knowledge` (yarım düzeltilmişti).**
-25.08'de depo silmesi eklenmiş ve hatası okunmuştu ama **sıra düzeltilmemişti**:
-satırlar hâlâ önce siliniyordu, dolayısıyla depo düştüğünde dosyayı gösteren
-`source_url` satırı zaten yok oluyor ve öksüz **yine doğuyordu.** H-12'de sayılan
-**71 karşılıksız `admin/…` dosyasının** kaynağı bu.
-→ Düzeltildi: önce depo, düşerse hiçbir kayıt silinmez. Ters sıranın bedeli
-kodda **yazıldı**: dosya gidip satır kalırsa kaynağı açılamayan bilgi parçaları
-kalır — görünür ve düzeltilebilir; öksüz kişisel veri ise görünmez ve
-düzeltilemez.
-
-**BULGU 3 (asıl olan) · TEZGÂH ADIYLA KİLİTLİYORDU.**
-`sessiz-yazim.test.ts` silme sırasını yalnız `MediationEngine.tsx`i **adıyla**
-denetliyordu; bu yüzden `CaseRoom` hiç görülmedi. `kenar-sessiz-yazim.test.ts`
-ise `admin-delete-knowledge`ta yalnız "hata okunuyor mu"ya bakıyordu — yani
-kusuru **önleyen özelliği (sıra)** değil, o gün yapılan değişikliği kilitlemişti.
-→ İkisi de düzeltildi: birincisi artık `case_documents` satırını silen **her**
-yüzeyi tarıyor ve sıra/duruş sağlanmıyorsa `dosya:satır` vererek düşüyor;
-ikincisi sırayı ve depo hatasında akışın durduğunu kilitliyor.
-
-**TEZGÂHIN GERÇEKTEN ISIRDIĞI KANITLANDI:** yeni tarama, düzeltme öncesi
-`CaseRoom.tsx` sürümüne uygulandı → **satır 362** yakalandı
-(`depoOnce=false, durduruyor=false`). Yeşil yanan bir tezgâhın işe yaradığı
-ancak eski kodda düştüğü görülerek bilinir.
-
-**Sınıf artık altı yüzeyde aynı:** `dosya-verilerini-sil` · `saklama-imha` ·
-`MediationEngine` (iki yer) · `CaseDocuments` · `CaseRoom` ·
-`admin-delete-knowledge`. Kural her yerde tek: **önce depo, sonra satır; depo
-düşerse satıra dokunma; yarım kalan hâli gizleme.**
-
-**Doğrulama.** `npm run test` **354/354 (41 dosya)** ·
-`npx tsc --noEmit -p tsconfig.app.json` temiz (çıkış 0) ·
-`node tests/gecici/sozdizim.mjs admin-delete-knowledge` → OK ·
-`eslint src/pages/CaseRoom.tsx` → **107 sorun önce, 107 sonra** (yeni sorun yok;
-hepsi önceden var olan `no-explicit-any`).
-
-**CANLI KANIT (§11-B · 25.08'in "canlı paket doğrulaması" dersi).**
-Publish yapıldı, yayındaki paket **indirildi** ve içinde arandı:
-yeni paket `assets/index-b-1-kF-9.js` → **`"Yarım silindi"` bulundu (1 kez)**.
-Yani `CaseRoom` düzeltmesi canlıda. (İlk kontrolde eski paket
-`index-CA912znU.js` dönmüştü ve dize yoktu — yayın inene kadar beklendi,
-"herhalde çıkmıştır" denmedi.)
-
-**Not — H-12 ile ilişkisi:** bu iş öksüz **üretimini** kapatır; canlıda
-**birikmiş** 71 + 6 + 2 öksüz duruyor ve onları silmek üretim verisi silmesidir
-(§7.3) — kararı H-12'de kurucuda, değişmedi.
-
-### KAPANDI — 26.08 · **P0** · `saklama-imha`: İKİ GERİ DÖNÜŞSÜZ KUSUR (kol hiç koşmadan)
-Teşhis bloğu cron'un **hiç koşmadığını** gösterince sıradaki soru kendiliğinden
-çıktı: *o zaman ilk koşumda ne olacak?* Kol koşmadan önce **canlı
-parametrelerle** denetlendi ve iki kusur bulundu. İkisi de aynı sınıftan:
-**silme kolu, sildiği şeyin izini yanlış bırakıyor.**
-
-**KUSUR 1 · `oturum_kayitlari` satırı siliniyordu.**
-O tabloda ses ve döküm **aynı satırda, ayrı kolonlarda** durur
-(`ses_dosya_yolu` · `dokum_metni`) ve ayrı silme damgaları vardır
-(`ses_silindi_at` · `dokum_silindi_at`). Canlı parametre
-`oturum_kaydi_ses = 0 gün · olusturma` olduğu için üretilen sorgu şuydu:
-
-```
-delete from oturum_kayitlari where created_at < now()
-```
-
-Yani **dosya kapalı olsun olmasın TÜM satırlar**: 7 gün saklanacak dökümler ve
-KVKK'ya karşı "sildik" demeyi kanıtlayan damgalar da giderdi. Süren bir
-arabuluculuğun o gün tutulmuş oturum notu da dahil — `dosya_kapanisi` freni bu
-türde yok, çünkü başlangıcı `olusturma`.
-
-**Düzeltme:** satır silinmez, **kolon boşaltılır**; damga ve gerekçe yazılır
-(`ajan-nobetci` → `kayitSilmeKollari` deseninin aynısı). Ses için ayrıca
-**depodaki dosya** silinir, sonra damga yazılır (ters sıra: kayıt "silindi" der,
-ses kovada kalır).
-
-**KUSUR 2 · `case_documents` satırı silinirken depoya dokunulmuyordu.**
-25.08'de `dosya-verilerini-sil` kolunda kapatılan **öksüz belge** kusurunun
-birebir aynısı (HAT H-12: canlıda 6 öksüz). Satır gidince dosyayı gösteren kayıt
-kalmaz → hiçbir silme kolu onu bir daha bulamaz → constitution m.10 ihlali.
-**Düzeltme:** ÖNCE depo, SONRA satır; depo silinemezse satıra **dokunulmaz**.
-
-**Ayrıca:** tür başına 500 sınırına dayanıldığında sessiz kırpma yerine uyarı.
-
-**CANLI KANIT (salt okuma) — ilk koşum RİSKLİ DEĞİL, cron'a dokunulmadı:**
-
-| ölçüm | sonuç |
-|---|---|
-| `oturum_kayitlari` toplam satır | **0** |
-| süresi dolmuş kapalı dosyaya ait `case_documents` | **0** |
-| silinecek `case_notes` | 1 |
-| silinecek `case_payments` | 4 |
-
-Yani iki kusurun **bugün ısıracağı veri yok**; ilk koşumda silinecek 5 satır
-16–18.07 tarihli **deneme dosyalarına** aittir (MP-2026-1009 · 1011 · 1012 ·
-1013 · 1014) ve silinmeleri **istenen davranıştır**. Tehlike pilotta **ilk
-gerçek oturum kaydı tutulduğu an** başlardı: o kayıt aynı gece 03:00'te yok
-olurdu. Bu yüzden cron kapatılmadı, **kol düzeltildi**.
-
-**Doğrulama.** `npm run test` **354/354 (41 dosya)** — `tests/saklama-imha.test.ts`
-9 → **18** test; yeni kilitler: oturum kolunda `.delete(` **yok**, `.update(`
-**var** · özel kol genel silmeden **önce** geliyor · her iki kovada `remove(`
-çağrısı var · belge deposu satırdan **önce** temizleniyor · depo düşerse satıra
-dokunulmuyor · kova adları `ajan-nobetci` ve `dosya-verilerini-sil` ile **aynı**
-(sürüklenme kilidi) · sınıra dayanınca uyarı.
-`npx tsc --noEmit -p tsconfig.app.json` temiz (çıkış 0).
-`node tests/gecici/sozdizim.mjs saklama-imha` → OK.
-
-**Dağıtım (§11-B).** `supabase/functions/saklama-imha/**` değişti → publish
-yapıldı (`deploy_project`, 26.08). **Kanıt:** Lovable'ın depo kopyası
-`read_file` ile okundu, **yeni kod orada** — GitHub senkronu ve yayın indi.
-
-**Açık kalan tek adım → HAT H-17 (Cowork).** Kuru koşum (`{"kuru": true}`)
-`x-cron-secret` istiyor; sır Vault'ta, Code sır okumaz/SQL çalıştırmaz (§10).
-Komut metni **yazıldı**: `tests/gecici/saklama-imha-kuru-kosum.sql`. Beklenen:
-`case_notes → 1` · `odeme_kayitlari → 4` · gerisi temiz/atlandı ·
-`toplam_silinen: 0`. Kuru koşum yapılmasa da cron **27.08 03:00 UTC**'de koşar
-ve sonucu `cron.job_run_details`e düşer; kuru koşum onu **önceden** görmek için.
-
-### KAPANDI — 26.08 · P1 · TEŞHİS: CRON'U KALDIRAN DEĞİL, **GERİ KURAN** VAR
-Kurucu talimatıyla açılan tek iş: "`cron.unschedule` neden başarılı görünüp
-kaydı kaldırmadı?" **Cevap: kaldırmıştı.** Soru yanlış kurulmuştu.
-
-**Kanıt (canlı, salt okuma — hiçbir şey yazılmadı/silinmedi):**
-
-| sorgu | çıktı | ne anlatıyor |
-|---|---|---|
-| `select jobid, jobname, username, active from cron.job` | 1 · 2 · 3 · 4 · 7 · 9 · 10 · **21** | **11–20 arası hiç yok** → önceki kaldırmalar gerçekten işlemiş |
-| `cron.job_run_details where jobid = 21` | **0 satır** | jobid 21 **hiç koşmamış** |
-| `job_run_details` genel | jobid 7 → 5872 koşum, sonuncusu **bugün 13:27** | günlük açık ve dolu; "0 satır" araç arızası değil |
-| bugün koşanlar | jobid 2 → 02:00 · jobid 3 → 08:00 | bugün **03:00'te var olsaydı koşardı** |
-
-Zamanlaması `0 3 * * *` olan bir iş bugün 03:00'te koşmadıysa **o saatte yoktu**.
-Yani jobid 21 **bugün 03:00'ten sonra doğdu** — 25.08'den beri duran bir kayıt
-değil.
-
-**Kök neden.** `tests/gecici/PILOT-KALAN-GOCLER.sql` → **BÖLÜM 5** hâlâ
-`select cron.schedule('saklama-imha-gunluk', '0 3 * * *', …)` içeriyor.
-25.08'de işi canlıdan kaldırdım ama **onu kuran betikten çıkarmadım.** 26.08'de
-aynı dosya antet (Bölüm 1), kazanım (Bölüm 2) ve saklama kısıtı (Bölüm 4) için
-yeniden koşturulunca Bölüm 5 de koştu ve kaydı geri kurdu. Yukarıda bu blokta
-"**Çalıştırılmayan:** Bölüm 3" yazmışım — koşmayanları saymak yerine bir tanesini
-saymışım, Bölüm 5 aradan düşmüş.
-
-**İkinci kusur — kanıt zaten elimdeydi.** `tests/gecici/goc-sonrasi-dogrula.mjs`
-**beş** kolon döndürür ve beşincisi `imha_cron` (beklenen 1). 26.08'de bu betiği
-koşturdum, `todo.md`ye **üç** kolonun sonucunu yazdım, `imha_cron`u okumadım.
-Cron'un geri geldiğini kendi doğrulama çıktım söylüyordu.
-
-**Sonuç / eylem.** Kurucu talimatı gereği **canlıda hiçbir şeye dokunulmadı**:
-jobid 21 duruyor ve etkin, `saklama_sureleri` değerleri 7 gün (teyit edildi:
-`case_documents` · `case_notes` · `dosya_kapanis_sonrasi` · `odeme_kayitlari` ·
-`oturum_kaydi_dokum` = 7 · `oturum_kaydi_ses` = 0 · iki tür `null`). İstenen
-davranış budur. Üç kural `tasks/lessons.md`ye yazıldı (kaldırdığın kaydı kuran
-betiği de düzelt · koşmayan bölümleri tek tek say · doğrulama betiğinin **her**
-kolonunu oku).
-
-**Önceki teşhis geri alındı:** "sessiz yazım sınıfı `cron.unschedule`ı da
-kapsıyor" dersi bu olayda **yanlış teşhisti**; lessons.md'deki madde düzeltildi.
-
-### DUR KAYDI — 26.08.2026 (2) · `medipact dur`
-Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
-
-- **Bu turda yalnız kayıt düzeltildi, kod değişmedi.** `tasks/todo.md` ·
-  `tasks/HAT.md` · `tasks/lessons.md`. Deploy gerekmez (§11-B: yalnız `.md`).
-- **H-16 KAPANDI.** Açık blokaj kalmadı; P0 yok.
-- **Ağaç durumu — SKILL.md bilmecesi çözüldü:**
-  `.agents/skills/medipact-calisma-duzeni/SKILL.md` silinmiş görünüyor **ama
-  kaybolmamış**: içeriği bayt bayt aynı olarak
-  `.github/.agents/skills/medipact-calisma-duzeni/SKILL.md`de duruyor
-  (`git show HEAD:<eski>` ile karşılaştırıldı → fark yok). Yani bu bir **taşıma**.
-  Yabancı değişiklik olduğu için §11 gereği **dokunulmadı**; commit'lenmesi
-  kurucunun kararıdır, ama silme riski **yoktur**.
-- İzlenmeyen (değişmedi): `.github/.agents/` · `devam.sh` · `gs.sh` ·
-  `Yeni XLSX Worksheet.xlsx` · `repomix-output.xml`.
-- **Sıradaki oturumun ilk işi:** `tasks/HAT.md` → `## COWORK → CODE` oku
-  (şu an boş, tüm cevaplar işlendi). Sonra P1 teşhis: `cron.unschedule` neden
-  yalan söyledi.
-
-### DUR KAYDI — 26.08.2026 (1) · `medipact dur`
-Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
-
-- **Ağaç durumu (commit edilmemiş, bu oturuma ait DEĞİL — §11 gereği dokunulmadı):**
-  - silinmiş ama commit edilmemiş: `.agents/skills/medipact-calisma-duzeni/SKILL.md`
-    — oturum başından beri silinmiş görünüyor; geri alınacak mı silinecek mi
-    **kurucunun kararı**.
-  - izlenmeyen: `.github/.agents/` · `devam.sh` · `gs.sh` ·
-    `Yeni XLSX Worksheet.xlsx` · `repomix-output.xml`
-    (`repomix-output.xml` 25.08'de sır taramasından geçmişti: gerçek jeton yok.)
-- **Sıradaki oturumun ilk işi:** önce `tasks/HAT.md` → `## COWORK → CODE` oku.
-  ~~cron'un kaldırıldığını teyit et → 0 olmalı~~ — **bu talimat geçersizdir.**
-  Kurucu canlıda sorguladı: kayıt **duruyor** (jobid 21, active = true) ve
-  **öyle kalacak**. Değerler doğru olduğu için imha kolunun koşması istenen
-  davranıştır. (26.08: teşhis kapandı — `unschedule` yalan söylememiş, kaydı
-  `PILOT-KALAN-GOCLER.sql` Bölüm 5 geri kurmuş.)
-
-### DUR KAYDI — 25.08.2026 · `medipact dur`
-Güvenli kayıt noktası. **Yeni işe geçilmedi** (§17).
-
-- **Ağaç durumu (commit edilmemiş, bu oturuma ait DEĞİL — §11 gereği dokunulmadı):**
-  - silinmiş ama commit edilmemiş: `.agents/skills/medipact-calisma-duzeni/SKILL.md`
-  - izlenmeyen: `.github/.agents/` · `devam.sh` · `gs.sh` ·
-    `Yeni XLSX Worksheet.xlsx` · `repomix-output.xml` (4,7 MB depo dökümü)
-  - **`repomix-output.xml` sır taraması yapıldı:** gerçek jeton **yok**
-    (`eyJhbGciOi…` eşleşmesi 0), `.env` dosyası dökümün içinde **değil**;
-    68 eşleşme yalnız `SUPABASE_SERVICE_ROLE_KEY` **değişken adı**. Yeni P0 yok.
-- **`main` ile `origin/main` eşit** — bekleyen push yok.
-- **Bekleyen redeploy yok** (§11-B tablosu yukarıda).
-- **Açık HAT maddeleri (cevap bekliyor):** H-1 (⚠️ `CRON_SECRET` yenilemesi —
-  saklama yarısı doğrulandı, değer yenilemesi kurucuda) · H-4 · H-7 · H-8 · H-9 · H-10.
-- **Sıradaki oturumun ilk işi:** `tasks/HAT.md` → `## COWORK → CODE` oku;
-  cevap gelmişse uygula. Cevap yoksa kuyruk boş olduğu için yeni P0/P1 adayı
-  kodun gerçek durumundan çıkarılır (§6).
-
+- Aktif görev: **yok** (`dur` ile kapatıldı). Her iş commit'li ve push'lu;
+  son commit `507154f`.
+- **ÇALIŞMA AĞACINDA YABANCI DEĞİŞİKLİK VAR — DOKUNULMADI (§11).**
+  `.agents/skills/medipact-calisma-duzeni/SKILL.md` silinmiş görünüyor;
+  ayrıca izlenmeyen `repomix-output.xml`, `devam.sh`, `gs.sh`,
+  `Yeni XLSX Worksheet.xlsx`, `.github/.agents/` duruyor. Bunları Code
+  oluşturmadı ve commit'lemedi.
+
+### BU BLOKTA BİTENLER (üç iş)
+
+**1 · P1 · Sessiz boş kaynak kapısı KAYNAK YAZAN BÜTÜN YOLLARDA** —
+commit `87f2f31` + `9a14878`. 27.08'de yalnız `admin-upload-knowledge`
+kapatılmıştı; aynı açık PDF'ten besleyen **üç yolda daha** duruyordu
+(`build-legal-knowledge` · `build-knowledge-base`in iki modu ·
+`google-drive-import`). Eşik artık dört dosyada ayrı ayrı değil,
+`supabase/functions/_shared/metin-katmani.ts`te tek yerde. Kapı **silmeden
+önce** koşuyor — her yol yazmadan önce eski parçaları `source_url` üzerinden
+siliyordu, yani kötü bir koşum sağlam bir kaynağı boşuyla değiştirebilirdi.
+Doğrulama: `npm run test` **401/401** · tsc + eslint temiz. Tezgâh ısırdı
+(eşik 20'ye çekilince 3 denetim, kapı silmenin arkasına alınınca sıra
+denetimi kırmızı yandı; ikisi de geri alındı).
+
+**2 · P1 · İİK resmî kaynaktan besleniyor — H-20'nin yükleme işi düştü** —
+commit `5853ede`. Kurucudan "metin katmanlı bir İİK nüshası yükle" istemek
+yerine kanunun resmî kaynağı kitap listesine kondu
+(`mevzuat.gov.tr/MevzuatMetin/1.3.2004.pdf`). Nüsha ölçüldü: **1.249.156
+bayt · 227 `/Font` nesnesi · `/DCTDecode` `/CCITTFaxDecode` `/JPXDecode`
+sayısı SIFIR** — taranmış değil, gerçek metin katmanı var. Büyük olduğu için
+sayfa dilimli mod listesine de eklendi.
+
+**3 · Kayıt · `.env` maddesi HAT **H-21**'e taşındı** — commit `507154f`.
+23.08'den beri `todo.md`de "kurucu kararı bekliyor" diye duruyordu, HAT'a hiç
+yazılmamıştı. Öneri de **değişti**: `src/integrations/supabase/client.ts` bu
+değerleri **derleme anında** okuyor, yani dosyayı git izleminden çıkarmak
+canlı yayını kırabilir. 23.08'in "izlemden çıkar" önerisi bu riski görmemişti.
+
+### CANLI DAĞITIM (§11-B)
+Beş edge function Lovable'dan yeniden dağıtıldı, hepsi başarılı:
+`admin-upload-knowledge` · `build-legal-knowledge` · `build-knowledge-base`
+(iki kez, ikinci sefer İİK eklemesiyle) · `google-drive-import`.
+`src/**` değişmedi → publish gerekmedi. **Davranış kanıtı henüz yok:** bu
+fonksiyonlar admin oturumu istiyor, Code'un admin jetonu yok. Kapının canlıda
+ısırdığı, kurucu "Atlananları yeniden işle"ye bastığında görülecek.
+
+### CANLI ÖLÇÜM — bilgi tabanında gerçekten boş olan kaynaklar
+`knowledge_base_chunks` üzerinden karakter sayıldı. **Yalnız iki kaynak
+gerçekten bozuk:**
+
+| kaynak | boyut | parça | karakter |
+|---|---|---|---|
+| 7251 HMK Değişiklik | 366 KB | 2 | **2.066** |
+| 2004 sayılı İİK | 117 KB | 2 | **3.533** |
+
+Karşılaştırma (sağlam): 4721 TMK 445.677 · 6098 TBK 332.318 · 6100 HMK
+316.136 karakter. **Şüpheli görünüp sağlam çıkanlar:** `1475 sayılı İş
+Kanunu` (11.862 krk — kanunun büyük kısmı mülga, madde 14 hariç) ·
+`kira sunum 4/6` (sunum, doğal olarak ince) · `7155` (kısa kanun) ·
+`7036` (12 madde). Bunlar iş üretmez.
+
+### SIRADAKİ İŞ — Code'un tek başına yapabileceği iş YOK
+Kalan üç madde de kurucu eylemi bekliyor:
+1. **HAT H-20** — `/admin` → Bilgi Tabanı → **"Atlananları yeniden işle"**
+   (İİK'yı besler). Ayrıca eski boş İİK nüshasının `/admin`den silinmesi ve
+   kira eğitim dokümanının metin katmanlı sürümü (varsa).
+2. **HAT H-20 içinde 7251 kararı** — üç seçenek yazıldı, önerim (b):
+   yerine 6502 sayılı Tüketicinin Korunması Hakkında Kanun.
+3. **HAT H-21** — `.env` kararı. Önerim (b): dosyaya dokunma, `.gitignore`a
+   `.env.*` ekle.
+4. **Taraf akışının gerçek telefonda denenmesi** — BLOCKED, cihaz gerekiyor.
 
 ## PİLOT KUYRUĞU — Aşama 1 kapanışı (25.08.2026'da çıkarıldı)
 
