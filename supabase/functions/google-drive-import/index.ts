@@ -3,6 +3,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { extractText, getDocumentProxy } from "npm:unpdf@0.12.1";
 import mammoth from "npm:mammoth@1.8.0";
+import { metinKatmaniDegerlendir } from "../_shared/metin-katmani.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -193,6 +194,19 @@ Deno.serve(async (req) => {
         const chunks = chunkText(fullText);
         if (!chunks.length) throw new Error("Yeterli metin çıkarılamadı");
         if (chunks.length > 800) throw new Error(`Anormal parça sayısı (${chunks.length})`);
+        /* METİN KATMANI KAPISI — aşağıdaki idempotanlık silmesinden ÖNCE.
+           Taranmış bir Drive PDF'i sıfır değil BİRKAÇ parça verir; eski tek
+           kapı (`!chunks.length`) onu geçiriyor, kaynak `/admin` listesinde
+           görünüyor ama ajanlar içinde hiçbir şey bulamıyordu. Kapı silmenin
+           arkasında kalırsa kötü bir içe aktarma sağlam bir kaynağı boşuyla
+           değiştirir. Ölçü tek yerde: `_shared/metin-katmani.ts`. */
+        const katman = metinKatmaniDegerlendir({
+          bayt: bytes.length,
+          parcaSayisi: chunks.length,
+          parcaKarakter: chunks.reduce((t, c) => t + c.length, 0),
+          mevzuat: category === "mevzuat",
+        });
+        if (!katman.yeterli) throw new Error(katman.sebep ?? "Metin katmanı yetersiz");
 
         const sourceUrl = `gdrive://${f.id}`;
         /* Idempotency: aynı Drive dosyası tekrar içe aktarılıyorsa eski chunk'ları
@@ -228,7 +242,7 @@ Deno.serve(async (req) => {
           total += rows.length;
         }
         grandTotalChunks += total;
-        results.push({ id: f.id, name: f.name, ok: true, chunks: total });
+        results.push({ id: f.id, name: f.name, ok: true, chunks: total, ...(katman.uyari ? { yogunluk_uyarisi: katman.uyari } : {}) });
       } catch (e: any) {
         console.error("gdrive file failed", f?.name, e?.message);
         results.push({ id: f?.id, name: f?.name, ok: false, error: e?.message ?? "Bilinmeyen hata" });

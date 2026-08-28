@@ -122,6 +122,7 @@ const YOLLAR = [
   "supabase/functions/admin-upload-knowledge/index.ts",
   "supabase/functions/build-legal-knowledge/index.ts",
   "supabase/functions/build-knowledge-base/index.ts",
+  "supabase/functions/google-drive-import/index.ts",
 ];
 
 const govdesi = (yol: string) =>
@@ -129,7 +130,13 @@ const govdesi = (yol: string) =>
     .replace(/\/\*[\s\S]*?\*\//g, " ")
     .replace(/(^|[^:])\/\/.*$/gm, "$1");
 
-describe("kaynak yazan üç yol da tek kapıdan geçiyor", () => {
+describe("PDF'ten kaynak yazan dört yol da tek kapıdan geçiyor", () => {
+  /* `approve-pending-mevzuat` bilerek DIŞARIDA: o yol PDF'ten değil,
+     `pending_pool.raw_content` içindeki HAZIR METİNDEN besleniyor. Orada
+     "bayt / çıkan karakter" oranı daima ~1'dir, yani yoğunluk ölçüsü hiçbir
+     şey söylemez; kısa bir mevzuat metni orada meşru olarak kısadır.
+     `backfill-knowledge-pages` de dışarıda: yeni kaynak yazmaz, yalnız
+     mevcut parçaların sayfa numarasını günceller. */
   for (const yol of YOLLAR) {
     it(`${yol.split("/")[2]} kapıyı çağırıyor`, () => {
       const G = govdesi(yol);
@@ -159,6 +166,15 @@ describe("kapı, SİLMEDEN önce koşuyor", () => {
     expect(kapi).toBeGreaterThan(-1);
     expect(sil).toBeGreaterThan(-1);
     expect(kapi, "kapı silmeden SONRA — kötü koşum sağlam kaynağı götürür").toBeLessThan(sil);
+  });
+
+  it("google-drive-import: kapı, idempotanlık silmesinden önce", () => {
+    const G = govdesi("supabase/functions/google-drive-import/index.ts");
+    const kapi = G.indexOf("metinKatmaniDegerlendir(");
+    const sil = G.indexOf('.delete().eq("source_url"');
+    expect(kapi).toBeGreaterThan(-1);
+    expect(sil).toBeGreaterThan(-1);
+    expect(kapi, "kapı silmeden SONRA — kötü içe aktarma sağlam kaynağı götürür").toBeLessThan(sil);
   });
 
   it("build-knowledge-base: her iki modda da kapı temizlikten önce", () => {
