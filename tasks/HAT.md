@@ -17,6 +17,48 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
+### H-21 · 28.08.2026 · P1 — `.env` deposa girmiş; çıkarmak canlı yayını kırabilir
+
+**Sorun.** `.env` dosyası git'te **izleniyor** (`git ls-files .env` onu
+listeliyor; tek commit `051779e`, uzak depo `github.com/arbemelsenyer/milat`).
+Bu 23.08'de bulunmuş, "kurucu kararı bekliyor" diye `tasks/todo.md`ye yazılmış
+ve orada beş gün beklemiş — HAT'a hiç taşınmamış. Şimdi taşındı.
+
+**23.08'de ölçülen (o turun kaydı):** içindeki üç değişkenin adı `VITE_`
+önekli. Vite bu değişkenleri zaten tarayıcıya giden paketin **içine gömer**,
+yani tasarımı gereği herkese açık değerlerdir; sunucu sırrı değildir. Değerler
+okunmadı, hiçbir yere yazılmadı (§12).
+
+**28.08'de EKLENEN yeni bilgi — 23.08'deki öneriyi değiştiriyor.**
+`src/integrations/supabase/client.ts` bu değerleri **derleme anında**
+`import.meta.env.VITE_SUPABASE_URL` ve `VITE_SUPABASE_PUBLISHABLE_KEY`
+üzerinden okuyor. Dosya git izleminden çıkarılırsa Lovable'ın bulut derlemesi
+bu değerleri **kendi enjekte etmiyorsa** canlı uygulama açılışta veritabanına
+hiç bağlanamaz. 23.08'de önerilen "izlemden çıkar" seçeneği bu riski
+görmemişti. Bunu ölçmenin güvenli yolu yok: ancak deneyerek görülür ve
+denemenin bedeli canlı yayının kırılmasıdır.
+
+**Seçenekler.**
+- **(a)** `git rm --cached .env` + `.gitignore`. Gizlilik kazancı **sıfır**
+  (değerler zaten paketin içinde), risk **canlı yayının kırılması**.
+- **(b)** Olduğu gibi bırak, ama `.gitignore`a `.env.*` (`.env.example` hariç)
+  eklenir ki bundan sonra **başka** bir env dosyası yanlışlıkla girmesin.
+- **(c)** Geçmişten de temizle (geçmiş yeniden yazma). (a)'nın bütün riskini
+  taşır, üstüne uzak depoyu ve varsa klonları etkiler.
+
+**Önerim: (b).** Gerekçe: burada korunacak bir sır yok — `VITE_` değişkeni
+tanım gereği açıktır — ama gelecekte gerçek bir sır içeren bir env dosyasının
+girmesi mümkün ve asıl korunması gereken o. (b) hiçbir şeyi kırmadan o kapıyı
+kapatır.
+
+**Kararın etkisi.** (b) seçilirse canlıda hiçbir şey değişmez, tek satırlık bir
+`.gitignore` düzenlemesi olur ve ben yaparım. (a) veya (c) seçilirse önce
+Lovable'ın derlemede kendi değişkenlerini enjekte edip etmediği doğrulanmalı;
+doğrulanmadan yapılırsa canlı uygulama kırılabilir.
+
+**Not.** Gerçek bir sunucu sırrı (servis anahtarı, API jetonu) bu dosyada
+görülmedi. Görülseydi bu madde P0 olurdu ve anahtar yenileme gerekirdi.
+
 ### H-20 · 27.08.2026 · P1 — **DÜZELTME:** mevzuat duruyor; asıl kusur "girdi sanılan boş kaynaklar"
 
 > ⛔ **BU MADDENİN İLK HÂLİ YANLIŞTI. Aynı gün, sormadan önce ölçtüm ve

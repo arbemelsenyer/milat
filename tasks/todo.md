@@ -3525,9 +3525,15 @@ panelde tek ad) KOD OLARAK yerinde ve yayında; canlı davranış kanıtı yok.
       `foy_onaylandi__gonder` → `HTTP 401 {"error":"Oturum doğrulanamadı"}` · Kabul: iç çağrı
       yetkilendirmesi geçiyor, adım tamamlanıyor.
 
-### HUMAN GATE — 23.08.2026 · gizli dosya deposa girmiş (P0, kurucu kararı bekliyor)
-DEĞİŞMEDİ, hâlâ açık. Ayrıntı ve seçenekler bir önceki blokta duruyor (aşağıda).
-Bu turda dosyaya ve `.gitignore`'a DOKUNULMADI.
+### HUMAN GATE — 23.08.2026 · gizli dosya deposa girmiş → **HAT H-21'e taşındı (28.08)**
+Beş gün `todo.md` içinde "kurucu kararı bekliyor" diye durmuş, HAT'a hiç
+yazılmamıştı; 24.08 daimî talimatı gereği (durma, HAT'a yaz, devam et) şimdi
+**H-21** olarak taşındı ve önerisi **değişti**. 23.08'de "izlemden çıkar"
+öneriliyordu; o öneri, `src/integrations/supabase/client.ts`in bu değerleri
+**derleme anında** okuduğunu görmemişti — dosyayı çıkarmak canlı yayını
+kırabilir. Yeni öneri: dosyaya dokunma, yalnız `.gitignore`a `.env.*` ekle
+ki bundan sonra gerçek bir sır içeren bir env dosyası girmesin.
+Bu turda da dosyaya ve `.gitignore`'a DOKUNULMADI.
 
 ---
 ## Nerede kaldık
