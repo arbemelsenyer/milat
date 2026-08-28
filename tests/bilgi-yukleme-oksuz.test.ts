@@ -81,15 +81,20 @@ describe("sessiz boş yükleme yakalanıyor", () => {
   const G = govdesi(YUKLE);
 
   it("büyük dosya çok az parça verirse REDDEDİLİYOR", () => {
-    expect(G, "boyut eşiği yok").toMatch(/bytes\.length\s*>=\s*1024\s*\*\s*1024/);
-    expect(G, "parça eşiği yok").toMatch(/chunks\.length\s*<\s*10/);
-    expect(G, "sebep söylenmiyor").toContain("TARANMIŞ");
+    /* 28.08.2026: eşik artık bu dosyada değil, `_shared/metin-katmani.ts`te —
+       aynı kusur URL'den besleyen iki yolda da vardı ve üç kopya kaçınılmaz
+       olarak birbirinden ayrılırdı. Eşiğin KENDİSİ `tests/metin-katmani.test.ts`
+       içinde canlı ölçümlerle sınanıyor; burada yalnız bu yolun kapıyı
+       gerçekten çağırdığı ve kararına uyduğu kilitleniyor. */
+    expect(G, "paylaşılan kapı ithal edilmemiş").toContain("_shared/metin-katmani.ts");
+    expect(G, "kapı çağrılmıyor").toContain("metinKatmaniDegerlendir(");
+    expect(G, "kapının reddi uygulanmıyor").toMatch(/if \(!katman\.yeterli\)/);
   });
 
   it("eşiğin altındaki şüphe engellenmiyor ama SÖYLENİYOR", () => {
     // Meşru sunum PDF'leri düşük yoğunluktadır; reddetmek yanlış olur.
     expect(G, "yoğunluk uyarısı yok").toContain("yogunluk_uyarisi");
-    expect(G).toMatch(/yogunluk\s*<\s*0\.05/);
+    expect(G, "uyarı kapıdan gelmiyor").toMatch(/katman\.uyari/);
   });
 
   it("800 parça sınırı, çözümü de söylüyor", () => {

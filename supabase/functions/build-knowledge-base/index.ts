@@ -6,6 +6,7 @@
 // İstemci (KnowledgeBaseAdmin) job running iken bizi resume_job_id ile yeniden çağırır.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { getDocumentProxy } from "npm:unpdf@0.12.1";
+import { metinKatmaniDegerlendir } from "../_shared/metin-katmani.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -263,6 +264,19 @@ async function processBookWhole(
   const fullText = pageTexts.join("\n");
   const chunks = chunkText(fullText);
   if (!chunks.length) return { chunks: 0 };
+  /* METİN KATMANI KAPISI — yazmadan da temizlemeden de ÖNCE. Taranmış bir PDF
+     sıfır değil BİRKAÇ parça verir; eski tek kapı (`!chunks.length`) onu
+     geçiriyordu. Geçen kaynak `/admin` listesinde görünür ama ajanlar içinde
+     hiçbir şey bulamaz, üstelik aşağıdaki temizlik ESKİ SAĞLAM parçaları
+     siler. Canlı kanıt: 7251 (366 KB → 2.066 karakter) ve 2004 İİK
+     (117 KB → 3.533 karakter) tam bu yoldan girmiş. */
+  const katman = metinKatmaniDegerlendir({
+    bayt: buf.length,
+    parcaSayisi: chunks.length,
+    parcaKarakter: chunks.reduce((t, c) => t + c.length, 0),
+    mevzuat: book.category === "mevzuat",
+  });
+  if (!katman.yeterli) throw new Error(katman.sebep ?? "Metin katmanı yetersiz");
   if (chunks.length > MAX_CHUNKS_PER_BOOK) {
     throw new Error(`Anormal parça sayısı (${chunks.length} > ${MAX_CHUNKS_PER_BOOK}). PDF içeriği bozuk veya yanlış indirilmiş olabilir.`);
   }
@@ -389,6 +403,23 @@ async function processBookPageSlice(
   const bookDone = endPage >= totalPages;
   let cleanupNote: string | undefined;
   if (bookDone) {
+    /* METİN KATMANI KAPISI — sayfa dilimli modun karşılığı. Dilim başına ölçmek
+       yanlış olur (bir dilim kitabın parçasıdır); ölçü ancak kitap bitince
+       anlamlıdır. Bu yüzden kapı temizlikten ÖNCE burada: yetersizse eski
+       SAĞLAM parçalar SİLİNMEZ ve kitap `errors` içine düşer — sessiz geçmez. */
+    const { data: yaziliParcalar } = await admin
+      .from("knowledge_base_chunks")
+      .select("chunk_text")
+      .eq("source_url", book.url)
+      .gte("created_at", jobStartedAt);
+    const yazili = (yaziliParcalar ?? []) as Array<{ chunk_text: string }>;
+    const katman = metinKatmaniDegerlendir({
+      bayt: buf.length,
+      parcaSayisi: yazili.length,
+      parcaKarakter: yazili.reduce((t, r) => t + String(r.chunk_text ?? "").length, 0),
+      mevzuat: book.category === "mevzuat",
+    });
+    if (!katman.yeterli) throw new Error(katman.sebep ?? "Metin katmanı yetersiz");
     // Kitabın son sayfa dilimi de tamamlandı: yalnızca bu job'tan ÖNCE var olan eski parçaları
     // temizle. Temizlik başarısız olursa kitabı başarısız saymadan devam et.
     await updateJob(admin, jobId, { current_book: `${book.title} — eski parçalar temizleniyor` });

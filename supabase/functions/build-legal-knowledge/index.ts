@@ -2,6 +2,7 @@
 // knowledge_base_chunks tablosuna ekler. Mevcut build-knowledge-base sistemine dokunmaz.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { extractText, getDocumentProxy } from "npm:unpdf@0.12.1";
+import { metinKatmaniDegerlendir } from "../_shared/metin-katmani.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -61,16 +62,16 @@ function chunkText(text: string, target = 1600, overlap = 150): string[] {
 // gün/hafta/ay/yıl + sayı kombinasyonu içeren chunk'ları işaretle.
 const DEADLINE_RE = /\b\d+\s*(gün|hafta|ay|yıl)\b|\bsüresi (içinde|içerisinde)\b|\ben geç\b/i;
 
-async function fetchPdfText(url: string): Promise<string> {
+async function fetchPdfText(url: string): Promise<{ text: string; bayt: number }> {
   const resp = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 MediPactBot" } });
   if (!resp.ok) throw new Error(`PDF indirilemedi ${resp.status}`);
   const buf = new Uint8Array(await resp.arrayBuffer());
   const pdf = await getDocumentProxy(buf);
   const { text } = await extractText(pdf, { mergePages: true });
-  return Array.isArray(text) ? text.join("\n") : text;
+  return { text: Array.isArray(text) ? text.join("\n") : text, bayt: buf.length };
 }
 
-async function fetchHtmlText(url: string): Promise<string> {
+async function fetchHtmlText(url: string): Promise<{ text: string; bayt: number }> {
   const resp = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 MediPactBot" } });
   if (!resp.ok) throw new Error(`Sayfa indirilemedi ${resp.status}`);
   const html = await resp.text();
@@ -82,7 +83,7 @@ async function fetchHtmlText(url: string): Promise<string> {
     .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
     .replace(/<header[\s\S]*?<\/header>/gi, " ");
   const text = noScripts.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
-  return text.replace(/\s+/g, " ").trim();
+  return { text: text.replace(/\s+/g, " ").trim(), bayt: new TextEncoder().encode(html).length };
 }
 
 // 2026 ücret tarifesinden satır bazlı kalem çıkarımı: {tanim, tutar, birim}
@@ -188,12 +189,24 @@ async function embed(texts: string[]): Promise<number[][]> {
   }
 }
 
-async function processSource(admin: any, source: Source): Promise<{ chunks: number; kalemler?: number }> {
-  const rawText = source.is_html ? await fetchHtmlText(source.url) : await fetchPdfText(source.url);
+async function processSource(admin: any, source: Source): Promise<{ chunks: number; kalemler?: number; uyari?: string }> {
+  const { text: rawText, bayt } = source.is_html ? await fetchHtmlText(source.url) : await fetchPdfText(source.url);
   if (!rawText || rawText.length < 200) throw new Error("İçerik boş veya çok kısa");
 
   const chunks = chunkText(rawText);
   if (!chunks.length) throw new Error("Chunk oluşturulamadı");
+
+  /* METİN KATMANI KAPISI — silmeden ÖNCE. Aşağıdaki `delete` mevcut parçaları
+     götürür; kapı silmeden önce konmazsa kötü bir koşum SAĞLAM bir kaynağı
+     boşuyla değiştirir. Bu, 27.08'de `admin-upload-knowledge`te kapatılan
+     kusurun URL'den beslenen ikizidir. */
+  const katman = metinKatmaniDegerlendir({
+    bayt,
+    parcaSayisi: chunks.length,
+    parcaKarakter: chunks.reduce((t, c) => t + c.length, 0),
+    mevzuat: source.category === "mevzuat",
+  });
+  if (!katman.yeterli) throw new Error(katman.sebep ?? "Metin katmanı yetersiz");
 
   // 2026 tarife için kalem parse
   let kalemler: Array<{ tanim: string; tutar: string; birim: string }> = [];
@@ -241,7 +254,7 @@ async function processSource(admin: any, source: Source): Promise<{ chunks: numb
     if (error) throw new Error(error.message);
     total += rows.length;
   }
-  return { chunks: total, kalemler: source.parse_tarife ? kalemler.length : undefined };
+  return { chunks: total, kalemler: source.parse_tarife ? kalemler.length : undefined, uyari: katman.uyari };
 }
 
 Deno.serve(async (req) => {
@@ -257,12 +270,12 @@ Deno.serve(async (req) => {
       .select("role").eq("user_id", userData.user.id).eq("role", "admin").maybeSingle();
     if (!roleRow) return jsonResponse({ error: "Forbidden" }, 403);
 
-    const results: Array<{ title: string; ok: boolean; chunks?: number; kalemler?: number; error?: string }> = [];
+    const results: Array<{ title: string; ok: boolean; chunks?: number; kalemler?: number; error?: string; yogunluk_uyarisi?: string }> = [];
     for (const src of SOURCES) {
       try {
         console.log(`[legal-kb] processing: ${src.title}`);
-        const { chunks, kalemler } = await processSource(admin, src);
-        results.push({ title: src.title, ok: true, chunks, kalemler });
+        const { chunks, kalemler, uyari } = await processSource(admin, src);
+        results.push({ title: src.title, ok: true, chunks, kalemler, ...(uyari ? { yogunluk_uyarisi: uyari } : {}) });
       } catch (e: any) {
         console.error(`[legal-kb] failed: ${src.title}`, e?.message);
         results.push({ title: src.title, ok: false, error: e?.message ?? String(e) });

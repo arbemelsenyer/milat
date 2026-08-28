@@ -2,6 +2,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { getDocumentProxy } from "npm:unpdf@0.12.1";
 import mammoth from "npm:mammoth@1.8.0";
+import { metinKatmaniDegerlendir } from "../_shared/metin-katmani.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -314,15 +315,18 @@ Deno.serve(async (req) => {
        engellenmez. Eşiğin altındaki şüpheli durumlar reddedilmez, `uyari`
        ile bildirilir — karar kurucunun. */
     const KB = bytes.length / 1024;
-    const yogunluk = chunks.length / Math.max(KB, 1);
-    if (bytes.length >= 1024 * 1024 && chunks.length < 10) {
+    const katman = metinKatmaniDegerlendir({
+      bayt: bytes.length,
+      parcaSayisi: chunks.length,
+      parcaKarakter: chunks.reduce((t, c) => t + c.length, 0),
+      mevzuat: category === "mevzuat",
+    });
+    if (!katman.yeterli) {
       return json({
-        error:
-          `Bu PDF'ten metin çıkmıyor: ${Math.round(KB)} KB'lık dosyadan yalnız ` +
-          `${chunks.length} parça üretilebildi. Dosya büyük ihtimalle TARANMIŞ ` +
-          `(görüntü) bir PDF ve metin katmanı yok. Metin katmanlı bir sürümünü yükleyin.`,
+        error: `Bu dosyadan metin çıkmıyor: ${katman.sebep}`,
         parca: chunks.length,
         kb: Math.round(KB),
+        yogunluk: katman.yogunluk,
       }, 400);
     }
 
@@ -410,16 +414,10 @@ Deno.serve(async (req) => {
       source_url: sourceUrl,
       ...(upErr ? { uyari: `Parçalar yazıldı ama dosyanın kendisi yüklenemedi: ${upErr.message}. Kaynak metni aranabilir, ancak "kaynağı göster" çalışmayacak.` } : {}),
       /* Reddetme eşiğinin altında ama yine de şüpheli yoğunluk: engelleme,
-         SÖYLE. Kurucu "girdi" sanıp geçmesin. */
-      ...(yogunluk < 0.05
-        ? {
-          yogunluk_uyarisi:
-            `${Math.round(KB)} KB'lık dosyadan yalnız ${chunks.length} parça çıktı. ` +
-            `Sağlıklı bir kanun metninde bu oran çok daha yüksektir; dosyanın ` +
-            `metin katmanı eksik olabilir. Kaynağı listede görseniz de ajanlar ` +
-            `içinden çok az şey bulabilir — içeriği bir kontrol edin.`,
-        }
-        : {}),
+         SÖYLE. Kurucu "girdi" sanıp geçmesin. Metin artık tek kapıdan
+         (`_shared/metin-katmani.ts`) geliyor — eşik üç yerde ayrı ayrı
+         tutulmuyor. */
+      ...(katman.uyari ? { yogunluk_uyarisi: katman.uyari } : {}),
       category,
       chunks: total,
       deleted_chunks: deletedCount,
