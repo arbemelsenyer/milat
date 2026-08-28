@@ -50,9 +50,22 @@ const BOOKS: Book[] = [
   { category: "sağlık", title: "Uzman Arabuluculuk - Sağlık", url: "https://adb.adalet.gov.tr/Resimler/SayfaDokuman/1832021210748Saglik.pdf" },
   { category: "spor", title: "Uzman Arabuluculuk - Spor", url: "https://adb.adalet.gov.tr/Resimler/SayfaDokuman/1832021210755Spor.pdf" },
   { category: "sigorta", title: "Uzman Arabuluculuk - Sigorta Hukuku", url: "https://adb.adalet.gov.tr/Resimler/SayfaDokuman/1792021150550Arabuluculuk_Sigorta_Hukuku_Dijital%20(1).pdf" },
+  /* İİK — 28.08.2026, HAT H-20'nin karşılığı. Bilgi tabanındaki tek İİK nüshası
+     117 KB'lık TARANMIŞ bir yüklemeydi: 2 parça, 3.533 karakter, yani pratikte
+     boş. Kurucudan "metin katmanlı bir nüsha yükle" istemek yerine kanunun
+     RESMÎ kaynağı listeye kondu — yükleme işi kalmıyor, düğmeye basmak yetiyor.
+     Nüsha 28.08'de ölçüldü: 1.249.156 bayt · 227 `/Font` nesnesi ·
+     `/DCTDecode` `/CCITTFaxDecode` `/JPXDecode` sayısı SIFIR — yani taranmış
+     değil, gerçek metin katmanı var. Yanılmışsam zarar yok: yeni metin katmanı
+     kapısı yetersiz çıkarımı reddeder ve hiçbir şey silmez. */
+  { category: "mevzuat", title: "2004 sayılı İcra ve İflas Kanunu", url: "https://www.mevzuat.gov.tr/MevzuatMetin/1.3.2004.pdf" },
 ];
 
 // Daha önce whole_book modunda CPU limitine takılan 7 kitap.
+/* Adı "atlananlar" ama işlevi şudur: BÜYÜK PDF'ler — tek koşumda bitmedikleri
+   için sayfa dilimli (page_chunked) modda, devam ederek işlenirler. Yeni büyük
+   bir kaynak eklerken adı buraya da yazılır, yoksa whole_book modunda zaman
+   limitine takılır. */
 const SKIPPED_TITLES = new Set<string>([
   "Arabuluculukta Etkili Taraf Vekilliği",
   "Aile Arabuluculuğu",
@@ -61,6 +74,7 @@ const SKIPPED_TITLES = new Set<string>([
   "Uzman Arabuluculuk - Banka ve Finans",
   "Uzman Arabuluculuk - Fikri Mülkiyet",
   "Uzman Arabuluculuk - Sigorta Hukuku",
+  "2004 sayılı İcra ve İflas Kanunu",
 ]);
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;

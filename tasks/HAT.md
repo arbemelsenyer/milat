@@ -79,12 +79,47 @@ bu kez yalnız **depodan** beslenen kaynaklara bakıp URL'den beslenenleri
 saymadım. Doğru yöntem, kaynağı geldiği yere göre değil **başlığa göre bütün
 kaynaklarda** aramaktı; öyle arayınca liste üçten ikiye indi.
 
-**SENDEN İSTEDİĞİM (iki madde, karar değil yükleme işi):**
+---
 
-1. **İcra ve İflas Kanunu** — bütün kaynaklarda arandı: tek nüsha var, o da
-   117 KB / **2 parça**. İİK Türkiye'nin en uzun kanunlarından biri; bu dosya
-   İİK'nın tam metni olamaz. Metin katmanlı tam bir nüshayı `/admin`den yükle;
-   büyükse TTK'da yaptığın gibi bölerek.
+**ÜÇÜNCÜ TUR — 28.08.2026: İİK YÜKLEMESİ ARTIK GEREKMİYOR, DÜĞMEYE BASMAK
+YETİYOR.** Senden dosya istemek yerine kanunun **resmî kaynağını** kitap
+listesine koydum: `mevzuat.gov.tr/MevzuatMetin/1.3.2004.pdf`. Nüshayı ölçtüm —
+1.249.156 bayt, 227 yazı tipi nesnesi, taranmış görüntü kodlayıcısı (DCT/CCITT/
+JPX) **sıfır**: gerçek metin katmanı var, elimizdeki 117 KB'lık nüshanın aksine.
+
+**Yapman gereken tek şey:** `/admin` → Bilgi Tabanı → **"Atlananları yeniden
+işle"**. Zaten parçası olan kitaplar atlanır, yalnız İİK işlenir; büyük olduğu
+için sayfa dilimli modda, devam ederek. Bitince parça sayısını canlıdan
+doğrularım (sağlıklı sonuç birkaç yüz parça olmalı).
+
+**Yanılmışsam zarar yok:** aynı turda kurulan metin katmanı kapısı yetersiz
+çıkarımı reddeder, sebebini söyler ve **hiçbir şeyi silmez.**
+
+**Ayrıca, işlem bittikten sonra silinecek tek şey:** eski, boş İİK nüshası
+(`/admin` listesinde "2004 sayılı İcra ve İflas Kanunu", 2 parça, depodan
+yüklenmiş olan). İki nüsha aynı adı taşıyacağı için bu adım karışıklığı
+önler; silmeyi `/admin`den sen yaparsın (geri dönüşü olmayan işlem, §7).
+
+**YENİ BULGU — üçüncü boş kaynak:** `7251 sayılı Hukuk Muhakemeleri Kanunu ile
+Bazı Kanunlarda Değişiklik...` da boş: 366 KB PDF'ten **2 parça, 2.066
+karakter**. Kaynağı adalet.gov.tr'deki taranmış nüsha ve `mevzuat.gov.tr`
+bu kanunu PDF olarak vermiyor (HTML'e yönlendiriyor). **Karar senin** —
+seçenekler:
+- **(a)** Kaynağı listeden düşür. Zaten boş; ajanlar ondan hiçbir şey bulamıyor.
+- **(b)** Yerine **6502 sayılı Tüketicinin Korunması Hakkında Kanun**u koy
+  (mevzuat.gov.tr'de 480 KB, metin katmanlı). Tüketici arabuluculuğunun asıl
+  dayanağı zaten bu kanundur; 7251 onu değiştiren kanundur.
+- **(c)** Olduğu gibi bırak.
+- **Önerim: (b).** Tüketici senin dava şartı kategorilerinden biri ve bugün o
+  başlıkta işe yarar tek metin 6100 HMK. **Etkisi:** tüketici dosyalarında
+  ajan cevapları kaynak gösterebilir hâle gelir; bugün gösteremiyor.
+
+---
+
+**SENDEN İSTEDİĞİM (kalan tek madde, karar değil yükleme işi):**
+
+1. ~~**İcra ve İflas Kanunu**~~ — **KAPANDI (28.08), yukarıya bak.** Kaynak
+   resmî adresten besleniyor; sana kalan yalnız `/admin`de düğmeye basmak.
 2. **Kira Uyuşmazlıkları ve Arabuluculuk** eğitim dokümanı — 4.1 MB'lık nüsha
    **5 parça** vermiş, yani taranmış görünüyor. Kira senin ana
    kategorilerinden biri. Metin katmanlı bir sürümü varsa yükle; yoksa

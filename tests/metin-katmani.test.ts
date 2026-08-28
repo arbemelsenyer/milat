@@ -188,3 +188,39 @@ describe("kapı, SİLMEDEN önce koşuyor", () => {
     }
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   İİK — HAT H-20'nin Code tarafı
+   Bilgi tabanındaki tek İİK nüshası taranmıştı (117 KB → 2 parça). Kurucudan
+   dosya istemek yerine kanunun resmî kaynağı kitap listesine kondu; kalan iş
+   `/admin` ekranında düğmeye basmak. Aşağıdaki denetimler bunun sessizce geri
+   alınmasını engeller.
+   ──────────────────────────────────────────────────────────────────────────── */
+describe("İİK resmî kaynaktan besleniyor", () => {
+  const KITAPLAR = kaynakOku("supabase/functions/build-knowledge-base/index.ts");
+
+  it("kitap listesinde ve kategorisi mevzuat", () => {
+    /* Kategori önemli: yoğunluk kuralı YALNIZ mevzuat kaynaklarında koşuyor.
+       Kategori başka bir şey olursa taranmış bir nüsha yine sızabilir. */
+    expect(KITAPLAR).toMatch(
+      /category:\s*"mevzuat",\s*title:\s*"2004 sayılı İcra ve İflas Kanunu"/,
+    );
+  });
+
+  it("kaynak resmî mevzuat adresi, taranmış nüsha değil", () => {
+    expect(KITAPLAR).toContain("https://www.mevzuat.gov.tr/MevzuatMetin/1.3.2004.pdf");
+    expect(KITAPLAR, "depoya yüklenmiş taranmış nüshaya dönülmüş").not.toContain(
+      "1785665680219-2004_say_l___cra_ve__flas_Kanunu.pdf",
+    );
+  });
+
+  it("büyük olduğu için sayfa dilimli modda işleniyor", () => {
+    /* 1.2 MB'lık bir kanun whole_book modunda zaman limitine takılır; adı
+       sayfa modu listesinde olmazsa kaynak hiç girmez ve kimse fark etmez. */
+    const liste = KITAPLAR.slice(
+      KITAPLAR.indexOf("const SKIPPED_TITLES"),
+      KITAPLAR.indexOf("const SUPABASE_URL"),
+    );
+    expect(liste).toContain("2004 sayılı İcra ve İflas Kanunu");
+  });
+});

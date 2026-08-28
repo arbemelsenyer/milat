@@ -616,6 +616,46 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       `tezgah-tasinabilir.test.ts`e iki denetim eklendi, **ısırdığı kanıtlandı**
       (bir tezgâh ham okumaya döndürülünce kırmızı yandı) · 372/372 · tsc +
       eslint temiz · commit `81be897`
+- [x] P1 · **Sessiz boş kaynak kapısı KAYNAK YAZAN BÜTÜN YOLLARDA** · Kabul:
+      PDF'ten kaynak yazan her yol aynı tek kapıdan geçiyor; kapı SİLMEDEN
+      önce koşuyor; kanıtlı bozuk iki kaynak (7251 · İİK) reddediliyor,
+      kanıtlı sağlam dördü geçiyor · **DONE 28.08.2026** · Doğrulama:
+      `tests/metin-katmani.test.ts` (23 denetim, canlı ölçümlerle) ·
+      `npm run test` **398/398** (öncesi 375) · tsc + eslint temiz ·
+      commit `87f2f31` + `9a14878`
+      · **KUSUR:** 27.08'de yalnız `admin-upload-knowledge` kapatılmıştı.
+        Aynı açık, PDF'ten besleyen ÜÇ yolda daha duruyordu:
+        `build-legal-knowledge` · `build-knowledge-base` (iki mod) ·
+        `google-drive-import`. Dördünde de tek kapı `chunks.length === 0` idi.
+      · **CANLI KANIT (28.08, `knowledge_base_chunks` sorgusu):** iki mevzuat
+        kaynağı tam bu açıktan girmiş ve `/admin` listesinde GÖRÜNÜYOR ama
+        içleri neredeyse boş —
+        **7251 HMK Değişiklik: 366 KB PDF → 2 parça, 2.066 karakter** ·
+        **2004 sayılı İİK: 117 KB → 2 parça, 3.533 karakter.**
+        Karşılaştırma: 6100 HMK 316.136 krk · 4721 TMK 445.677 krk ·
+        6098 TBK 332.318 krk.
+      · **İKİNCİ, DAHA AĞIR YÜZ:** her yol yazmadan önce eski parçaları
+        `source_url` üzerinden SİLİYOR. Kapı silmenin arkasında kalsaydı kötü
+        bir koşum SAĞLAM bir kaynağı boşuyla değiştirirdi. Kapı dördünde de
+        silmeden önce; tezgâh sırayı kilitliyor.
+      · **TEK KAPI:** eşik dört dosyada ayrı ayrı değil,
+        `supabase/functions/_shared/metin-katmani.ts`te. İki kural:
+        (1) her kategoride 1 MB üstü dosya 10'dan az parça verirse red —
+        27.08'in "tartışmasız uç" kararı korundu; (2) YALNIZ mevzuat
+        kaynaklarında 40 karakter/KB alt sınırı — kanun metni görsel ağırlıklı
+        olamaz, ama meşru sunum PDF'i (24 krk/KB'ye kadar iner) mevzuat
+        olmadığı için kesilmez.
+      · **KAPSAM DIŞI, GEREKÇESİYLE:** `approve-pending-mevzuat` PDF'ten değil
+        hazır METİNDEN besleniyor (orada yoğunluk ölçüsü hiçbir şey söylemez);
+        `backfill-knowledge-pages` yeni kaynak yazmaz, sayfa numarası günceller.
+        İkisi de tezgâhta yazılı.
+      · **TEZGÂH ISIRDI:** eşik 40→20 çekilince 3 denetim kırmızı yandı; kapı
+        silmenin arkasına alınınca sıra denetimi kırmızı yandı. İkisi de geri
+        alındı.
+      · **AÇIK KALAN (aşağıdaki H-20 maddesi):** kapı bundan sonrasını
+        engelliyor ama CANLIDAKİ iki bozuk kaynağı düzeltmiyor. Onların metin
+        katmanlı nüshayla yeniden beslenmesi gerekiyor.
+
 - [!] P1 · **Üç kaynak bilgi tabanına yüklensin** · HAT **H-20**'de; karar
       değil, kurucunun yapacağı yükleme işi: İİK tam metni (mevcut nüsha 2
       parça) · kira eğitim dokümanının metin katmanlı sürümü · 7036 sayılı İş
