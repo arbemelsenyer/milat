@@ -17,6 +17,52 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
+### H-22 · 29.08.2026 · P3 — bilgi tabanında 71 öksüz dosya (33,2 MB); silinsin mi?
+
+**Sorun.** `case-documents` kovasının `admin/knowledge/` bölümünde, bilgi
+tabanında hiçbir parçanın göstermediği **71 dosya** duruyor (toplam **33,2 MB**,
+en eski **01.07.2026**, en yeni **02.08.2026**). Bunlar 26.08'den önceki iki
+kusurun kalıntısıdır: (a) yükleme kolu dosyayı parçalardan ÖNCE yazıyordu,
+(b) yol düzeni sonradan değişti (`admin/knowledge/<dosya>` → 
+`admin/knowledge/<kategori>/<dosya>`), eski kopyalar sahipsiz kaldı. Üretici
+kollar 26–27.08'de kapatıldı; bu birikim geride kalandır.
+
+**Ne oldukları ölçüldü.** Çoğu bugün bilgi tabanında ZATEN VAR olan mevzuatın
+eski kopyası (6102 TTK 4,6 MB iki kez · 5510 SGK · 6098 TBK · 4857 İş K. ·
+5846 FSEK · 6769 SMK vb.) ve 01–02.07'de yüklenmiş **tutanak/sözleşme şablonu
+.docx** dosyaları. **Kişisel veri İÇERMEZLER** — kamuya açık mevzuat ve boş
+şablonlardır; bu yüzden P0 değil P3'tür. Yine de constitution m.10 (süresiz
+saklama yasağı) kapsamındadır.
+
+**Güvenlik kontrolü yapıldı.** Bu 71 dosyanın **hiçbirini** `document_templates`
+ya da `pending_pool` göstermiyor (ikisi de 0). Yani silinirlerse çalışan hiçbir
+şablon ya da onay havuzu kırılmaz. *(Bu kontrol sırasında ayrı bir açık bulundu
+ve düzeltildi: öksüz süpürgesinin "sahipli yollar" görünümü bu iki tabloyu
+BİLMİYORDU — ileride şablonun kullandığı bir dosyayı öksüz sanıp silebilirdi.
+Görünüm `tests/sabit/oksuz-belge-supurgesi.sql` içinde tamamlandı; sayı yine
+71 çıktı, yani geçmişte zarar oluşmamış.)*
+
+**Seçenekler.**
+- **(a)** Hepsini sil. 33,2 MB geri kazanılır, constitution m.10 tam sağlanır.
+  Geri alınamaz.
+- **(b)** Yalnız mevzuat PDF'lerini sil, `.docx` şablonları bırak. Şablonlar
+  ileride "resmî şablon kütüphanesi" işine yarayabilir diye.
+- **(c)** Dokunma, olduğu gibi bıraksın.
+
+**Önerim: (a).** Gerekçe: bu dosyaların hiçbiri bir yüzeyden erişilebilir
+değil — `/admin` bilgi tabanı listesi parçalardan üretiliyor, dolayısıyla bu
+dosyalar **ekranda görünmüyor bile**. Görünmeyen ve hiçbir kaydın göstermediği
+33 MB'ı tutmanın tek etkisi, saklama sözünün kâğıt üzerinde kalması. Şablonlar
+kaybolmuyor: `document_templates` tablosundaki çalışan şablonlar bu dosyalardan
+BAĞIMSIZ (ölçüldü: 0 bağ).
+
+**Kararın etkisi.** (a) seçilirse silme **depo API'siyle** yapılır — SQL ile
+`storage.objects` satırını silmek yetmez, satır gider dosya kalır ve bir daha
+hiç bulunamaz (betiğin Bölüm 3 uyarısı). Kanıt: silme sonrası Bölüm 1 sayımı
+`bilgi tabani` için **0** dönmelidir. Çalıştıracak liste hazır; kararınızı
+alınca ben yürütürüm. (c) seçilirse kuyruktaki P3 madde kapatılır ve
+constitution m.10 için bilinçli bir istisna olarak kaydedilir.
+
 ### H-21 · 28.08.2026 · P1 — `.env` deposa girmiş; çıkarmak canlı yayını kırabilir
 
 **Sorun.** `.env` dosyası git'te **izleniyor** (`git ls-files .env` onu

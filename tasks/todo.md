@@ -130,13 +130,30 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
         "artık yeni öksüz üretilmiyor" cümlesi YANLIŞTI; düzeltildi ve sesli
         not kovası için 4. bölüm eklendi.
 
-- [ ] P3 · **Bilgi tabanında 71 öksüz PDF (33,2 MB)** · `case-documents`
-      kovasında `admin/knowledge/` altında hiçbir parçanın göstermediği 71
-      nesne duruyor (en eski 01.07, en yeni 02.08). H-19 yalnız "dosya
-      belgesi" kümesini kapsıyordu, bu küme kapsam dışıydı. Kişisel veri
-      değil (kamuya açık mevzuat PDF'leri) ama constitution m.10 kapsamında.
+- [!] P3 · **Bilgi tabanında 71 öksüz dosya (33,2 MB)** · HAT **H-22**'de
+      kurucu kararı bekliyor (§7.3 — geri dönüşü olmayan silme).
+      `case-documents` kovasında `admin/knowledge/` altında hiçbir parçanın
+      göstermediği 71 nesne duruyor (en eski 01.07, en yeni 02.08). H-19
+      yalnız "dosya belgesi" kümesini kapsıyordu, bu küme kapsam dışıydı.
+      Kişisel veri değil (kamuya açık mevzuat + boş şablon) ama constitution
+      m.10 kapsamında. Güvenlik kontrolü YAPILDI: `document_templates` ve
+      `pending_pool` bu 71'in hiçbirini göstermiyor (ikisi de 0), yani silme
+      çalışan hiçbir şablonu kırmaz. Liste hazır; karar gelince Code yürütür.
       · Kabul: `tests/sabit/oksuz-belge-supurgesi.sql` Bölüm 1'de
       `bilgi tabani` satırı 0 dönüyor; silme depo API'siyle yapıldı
+
+- [x] P1 · **Öksüz süpürgesinin sahip listesi eksikti** · Kabul: `case-documents`
+      kovasına yol yazabilen HER tabloyu sahip sayıyor · **DONE 29.08.2026**
+      · **KUSUR:** `v_depo_sahipli_yollar` görünümü dört sahip biliyordu ama
+        `document_templates.source_url` ve `pending_pool.source_url` de
+        `admin/knowledge/` yolu tutabiliyor. Süpürge Bölüm 3 ile çalıştırılsa
+        şablonun kullandığı bir dosyayı **öksüz sanıp silebilirdi** — geri
+        alınamaz. Bu, silme kolundakiyle AYNI sınıf kusur: sahip listesi
+        "aklımdaki tablolar" ile çıkarılmış.
+      · Doğrulama: iki sahip görünüme eklendi; canlıda tekrar sayıldı →
+        öksüz yine **71** (değişmedi), yani geçmişte zarar OLUŞMAMIŞ.
+        Sahip listesi bundan sonra `information_schema.columns` taranarak
+        çıkarılacak (betiğe yazıldı).
 
 - [x] P0 · **KVKK silme kolu depoda üç kaynağı öksüz bırakıyor** · Kabul:
       `dosya-verilerini-sil` depoya işaret eden DÖRT kaynağın hepsini

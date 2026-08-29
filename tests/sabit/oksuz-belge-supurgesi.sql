@@ -23,15 +23,27 @@
 --   DERS: "kusur kapandı, artık üretilmiyor" cümlesi, kapatılan yolun TEK yol
 --   olduğu kanıtlanmadan yazılmaz.
 
--- Bir yol "sahipli" sayılır: dört kaynaktan biri onu gösteriyorsa.
+-- Bir yol "sahipli" sayılır: aşağıdaki kaynaklardan biri onu gösteriyorsa.
 -- Yeni bir dosya sahibi tablo eklenirse BURAYA DA EKLE; yoksa o tablonun
--- dosyaları öksüz sanılıp silinir.
+-- dosyaları öksüz sanılıp SİLİNİR — bu betiğin en tehlikeli hatası budur.
+--
+-- ⚠ 29.08.2026: liste EKSİKTİ. `document_templates.source_url` ve
+--   `pending_pool.source_url` de depoya yol yazabiliyor ama görünümde yoktu;
+--   yani şablonun kullandığı bir dosya "öksüz" sanılıp silinebilirdi. İkisi
+--   eklendi. O gün ölçüldü: bugünkü 71 öksüzün HİÇBİRİNİ bu iki tablo
+--   göstermiyor (şablon 0 · havuz 0), yani geçmişte zarar OLUŞMAMIŞ — ama
+--   kapı açıktı. Sahip listesi bir daha "aklımdaki tablolar" ile değil,
+--   `information_schema.columns` taranarak çıkarılmalıdır.
 create or replace view public.v_depo_sahipli_yollar as
   select file_path as yol from public.case_documents      where file_path  is not null
   union select file_path      from public.agreement_documents where file_path  is not null
   union select dosya_yolu     from public.bilirkisi_raporlari  where dosya_yolu is not null
   union select distinct regexp_replace(source_url, '^.*?(admin/knowledge/[^?]*)$', '\1')
-        from public.knowledge_base_chunks where source_url like '%admin/knowledge/%';
+        from public.knowledge_base_chunks where source_url like '%admin/knowledge/%'
+  union select distinct regexp_replace(source_url, '^.*?(admin/knowledge/[^?]*)$', '\1')
+        from public.document_templates    where source_url like '%admin/knowledge/%'
+  union select distinct regexp_replace(source_url, '^.*?(admin/knowledge/[^?]*)$', '\1')
+        from public.pending_pool          where source_url like '%admin/knowledge/%';
 
 
 -- ═══ BÖLÜM 1 · SAYIM (hiçbir şey silmez) ═══════════════════════════════════
