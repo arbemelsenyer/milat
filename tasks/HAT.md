@@ -17,6 +17,84 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
+### H-24 · 29.08.2026 · **P0 · ZAMANA BAĞLI** — emniyet süpürgesi bu gece 03:00'te 5 gerçek dosyayı silecek
+
+**Durum.** Bugün kurulan emniyet süpürgesi (HAT H-15/1 adım 3) canlıya
+dağıtıldı ve `saklama-imha-gunluk` cron işi **her gece 03:00**'te koşuyor.
+`saklama_sureleri.dosya_kapanis_sonrasi.saklama_gun = 7` olduğu için ilk
+koşumda kapanışı 7 günü geçmiş **5 dosya tamamen silinecek. Geri alınamaz.**
+
+**Silinecek olanın tam ölçüsü (29.08, canlı sayım):**
+
+| ne | adet |
+|---|---|
+| dosya | **5** (kapanış 16–18.07.2026) |
+| taraf satırı (`case_parties`) | **8** |
+| taraf analizi | **8** |
+| anlaşma belgesi (`agreement_documents`) | **13** |
+| oturum | **4** |
+| belge / not | 0 (mevcut kollar zaten süpürmüş) |
+
+**Neden size soruyorum (§7.3).** Politika sizin: "süreç bitince her şey
+silinir" (H-15/1, iki kez teyit edildi) ve bu 5 dosya süresini **40 günden
+fazla** geçmiş. Yani silinmeleri kararın kendisidir. Ama bunlar süpürge
+**var olmadan önce** kapanmış dosyalar ve yeni kurulmuş otomatik bir yok
+edicinin ilk gecesinde, siz görmeden gitmeleri sizi hazırlıksız yakalar.
+Geri dönüşsüz olanı sormadan yapmam (CLAUDE.md §7.3).
+
+**Seçenekler.**
+- **(a) Dokunma — bu gece silinsinler.** Politika neyse o olur. Hiçbir şey
+  yapmanız gerekmez; 03:00'te olur.
+- **(b) Bir süre beklet.** Tek satır, geri alınabilir, dağıtım gerektirmez:
+  ```sql
+  update public.saklama_sureleri set saklama_gun = null
+  where veri_turu = 'dosya_kapanis_sonrasi';
+  ```
+  `NULL = dokunma` sizin tasarladığınız güvenlik valfidir; kod onu zaten
+  biliyor. Bakmak istediğinizde 7'ye geri koyarız, süpürge kaldığı yerden
+  sürer. **Öteki saklama kolları bundan etkilenmez, çalışmaya devam eder.**
+- **(c) Süreyi uzat.** Örneğin 90 gün — o zaman bu 5 dosya da kapsam dışı
+  kalır ve süpürge yalnız bundan sonrası için çalışır.
+
+**Önerim: (b), bu gece için.** Gerekçe: geri alınabilir olan ile geri
+alınamaz olan arasında seçim varken geri alınabilir olan seçilir. KVKK
+uyumunda bir günlük gecikmenin bedeli, yanlışlıkla silinmiş 5 dosyanın
+bedelinden küçüktür. Bakıp "gitsin" derseniz tek satırla açarız.
+
+**Not.** Bu satırı ben yazmayı denedim, izin ekranı engelledi — bilerek
+zorlamadım; zaten sizin kararınız. Siz ya da Cowork çalıştırabilir.
+
+### H-23 · 29.08.2026 · P1 — COWORK İŞİ: `kapanis_istatistigi` tablosu kurulmalı
+
+*(Karar değil, çalıştırma işi — CLAUDE.md §10: SQL metnini Code yazar,
+çalıştırmayı Cowork yapar. Beş satırlık paket:)*
+
+1. **Ne yapılacak.** `tests/sabit/kapanis-istatistigi.sql` canlıda çalıştırılacak.
+   Tablo + RLS + tek okuma politikası kurar. **Hiçbir şey silmez, hiçbir satır
+   değiştirmez.**
+2. **Neden gerekli.** KVKK silmesinin kanıtı bugün **hiçbir yere yazılmıyor**.
+   Kayıt `dosya_kapanis`e yazılıyordu ama o satır `cases`e ON DELETE CASCADE
+   bağlı ve yazım `cases` silindikten SONRA yapılıyordu → 0 satır etkileniyor,
+   `supabase-js` bunu hata saymıyor. Yani ne yazılıyor ne de yazılmadığı
+   söyleniyordu. Kod tarafı düzeltildi (`bdde1b0`) ve artık yazacağı tablo bu.
+   Kurucu kararı (20.08): "kişisel veri içermeyen sayımlar KALIR" — bu tablo o
+   kararın tek dayanağıdır.
+3. **Çalıştırılacak metin.** `tests/sabit/kapanis-istatistigi.sql` (depoda,
+   commit `bdde1b0`). Olduğu gibi çalıştırılır; içinde `create table if not
+   exists` var, tekrar çalıştırmak zararsızdır.
+4. **Başarı kontrolü.** Betiğin sonundaki üç sorgu:
+   `select count(*) from public.kapanis_istatistigi;` → **0** ·
+   `relrowsecurity` → **true** · yabancı anahtar sayısı → **0**.
+   Sonuncusu kritik: tablo `cases`e bağlanırsa aynı kusur geri gelir.
+5. **Sonra Code ne yapacak.** Emniyet süpürgesini kuru koşumda çalıştırıp
+   (`saklama-imha` · `{"kuru":true}`) süresi geçmiş dosya sayısını canlıdan
+   doğrular, sonra gerçek koşumu tetikler ve `kapanis_istatistigi`de satırların
+   oluştuğunu gösterir. Sonucu `tasks/todo.md`ye işler.
+
+**Beklerken durmuyorum** (§23): bu maddeye bağlı olmayan işe devam ediyorum.
+Tablo kurulana kadar silme **çalışır**, yalnız her silmede "anonim kapanış
+kaydı yazılamadı: tablo yok" uyarısı döner — sessiz kalmaz.
+
 ### H-22 · 29.08.2026 · P3 — bilgi tabanında 71 öksüz dosya (33,2 MB); silinsin mi?
 
 **Sorun.** `case-documents` kovasının `admin/knowledge/` bölümünde, bilgi

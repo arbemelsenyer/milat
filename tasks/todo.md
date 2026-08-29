@@ -1,16 +1,65 @@
 ## Nerede kaldık
 
-- Tarih: **28.08.2026** (17. blok) — `medipact dur` ile kapatıldı.
+- Tarih: **29.08.2026** (18. blok) — sürüyor.
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: **yok** (`dur` ile kapatıldı). Her iş commit'li ve push'lu;
-  son commit `507154f`.
+- Aktif görev: yok — bu bloktaki dört iş bitti, hepsi commit'li ve push'lu.
+  Son commit `bdde1b0`.
+- **⏰ ZAMANA BAĞLI · HAT H-24:** emniyet süpürgesi canlıda ve
+  `saklama-imha-gunluk` cron'u **her gece 03:00**'te koşuyor. İlk koşumda
+  kapanışı 7 günü geçmiş **5 gerçek dosya tamamen silinecek** (8 taraf,
+  8 analiz, 13 anlaşma belgesi, 4 oturum). Geri alınamaz. Kurucu kararı
+  bekleniyor; önerim H-24 (b) — `saklama_gun`u geçici NULL yap.
+- Açık blokaj: **HAT H-23** (Cowork: `kapanis_istatistigi` tablosu
+  çalıştırılmalı) · **HAT H-24** (yukarıdaki) · H-20 · H-21 · H-22.
 - **ÇALIŞMA AĞACINDA YABANCI DEĞİŞİKLİK VAR — DOKUNULMADI (§11).**
   `.agents/skills/medipact-calisma-duzeni/SKILL.md` silinmiş görünüyor;
   ayrıca izlenmeyen `repomix-output.xml`, `devam.sh`, `gs.sh`,
-  `Yeni XLSX Worksheet.xlsx`, `.github/.agents/` duruyor. Bunları Code
-  oluşturmadı ve commit'lemedi.
+  `Yeni XLSX Worksheet.xlsx`, `.github/.agents/` duruyor.
+
+### 18. BLOKTA BİTENLER (dört iş — hepsi TEK KUSUR SINIFI)
+
+Bu bloğun tamamı şu sınıftan çıktı: **"kural bir yerde yazıldı, kardeş
+yollarda açık kaldı."** 25.08 ve 28.08'de aynı sınıf iki kez görülmüştü;
+bu blokta dört örneği daha bulundu ve kural üç kez TEK YERE taşındı
+(`_shared/depo-supurge.ts` · `_shared/dosya-silme.ts`).
+
+**1 · P0 · KVKK silme kolu depoda üç kaynağı öksüz bırakıyordu** — `fc40cb1`.
+25.08'de eklenen depo temizliği yalnız `case_documents` içindi; imzalı
+anlaşma taraması, bilirkişi raporu ve kaçan ses kaydı açıkta kalmıştı.
+Tezgâh `types.ts`e karşı bekçili. **Bu kolun ilk tezgâhı** — H-15/1'in
+"tezgâhla kanıtlanacak" şartı 25.08'den beri karşılanmamıştı.
+
+**2 · P0 · "Başvuruyu sil" düğmesi bütün belgeleri kovada bırakıyordu** —
+`10ccfb2`. İstemci doğrudan `cases` satırını siliyor, depoya hiç
+dokunmuyordu; onay penceresi "belgeler de silinecektir" diyordu. Yeni
+`basvuru-sil` kolu kuruldu, yetki aynen korundu. Yan düzeltme: sessiz-yazım
+tarayıcısı yorum metnini kod sanıyordu (§18-A).
+
+**3 · P1 · Öksüz süpürgesinin sahip listesi eksikti** — `89e0f37`.
+`document_templates` ve `pending_pool` sahip sayılmıyordu; süpürge
+çalıştırılsa şablonun kullandığı dosyayı silebilirdi.
+
+**4 · P1 x2 · Emniyet süpürgesi + KVKK silme kanıtı** — `bdde1b0`.
+Kapanıştan sonra hiçbir kol dosyayı silmiyordu (canlı: 5 dosya süresini
+geçmiş, 8 taraf satırı duruyor). Ve silme kanıtı `dosya_kapanis`e, üstelik
+`cases` silindikten SONRA yazılıyordu — o satır cascade ile gittiği için
+yazım sessiz bir hiçlikti.
+
+### CANLI ÖLÇÜMLER (29.08, salt okuma)
+| ne | sonuç |
+|---|---|
+| `case-documents` · "dosya belgesi" öksüz | **0** — iki P0 önleyiciydi |
+| `oturum-kayitlari` kovası | **boş** |
+| `case-documents` · "bilgi tabanı" öksüz | **71** (33,2 MB) → HAT H-22 |
+| kapalı dosya / 7 günü geçmiş | **6 / 5** → HAT H-24 |
+| yayınlanan pakette `basvuru-sil` | **var** · çıplak silme **yok** |
+
+### CANLI DAĞITIM (§11-B)
+`dosya-verilerini-sil` (iki kez) · `basvuru-sil` (ilk dağıtım) ·
+`saklama-imha` — hepsi başarılı. `src/**` değiştiği için publish yapıldı ve
+canlı pakette doğrulandı.
 
 ### BU BLOKTA BİTENLER (üç iş)
 
