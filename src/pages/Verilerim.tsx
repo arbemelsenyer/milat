@@ -3,8 +3,11 @@
    Satır dökümü yoktur; her kategori için sayı, kimin görebildiği ve saklama süresi
    yazılır. Sayılar RLS'in izin verdiği kadarıyla okunur — karşı tarafın hiçbir
    kaydı, adı ya da sayısı bu ekrana gelmez.
-   "Kimin görebildiği" sütunu depodaki GERÇEK politikalardan yazılmıştır; politikası
-   depoda görünmeyen kategorilerde "belirsiz" denir, tahmin yürütülmez. */
+   "Kimin görebildiği" sütunu depodaki GERÇEK politikalardan yazılmıştır.
+   29.08.2026: üç kategoride "belirsiz" yazıyordu; üçünün de politikası
+   `pg_policies`ten okunabiliyordu, yani tahmin değil TEMBELLİKTİ. Artık
+   "belirsiz" yazan kategori yok. Yeni bir kategori eklenirse politikası
+   okunup yazılır; okunamıyorsa sebebiyle söylenir, uydurulmaz (§15.1). */
 
 import { useEffect, useState } from "react";
 import { AppNavbar } from "@/components/AppNavbar";
@@ -25,8 +28,13 @@ type Kategori = {
    Önceden bu ekranda dört sabit metin vardı ve **14 kategorinin 10'unda**
    tarafa "Belirsiz — saklama süresi henüz parametre olarak tanımlanmadı"
    yazıyordu. Kurucu kararıyla (HAT H-15/1) `public.saklama_sureleri` tablosu
-   kuruldu ve değerler girildi: tek çatı **5 yıl** (dosya kapanışından itibaren),
-   mali kayıt **10 yıl**, ham ses anında silinir.
+   kuruldu ve değerler girildi.
+   ⚠ 29.08.2026 — BU YORUM ESKİMİŞTİ. Burada "tek çatı **5 yıl**, mali kayıt
+   **10 yıl**" yazıyordu; H-15/1 o kararı AÇIKÇA GEÇERSİZ KILDI ("5 yıl artık
+   geçersizdir") ve yerine **sıfır saklama** kondu: dosya kapanınca her şey
+   silinir, arabulucu unutursa **7 gün** sonra emniyet süpürgesi siler.
+   Yorum, kodun kendisinden daha uzun yaşayan bir yalan olmuştu — bir sonraki
+   okuyan geçersiz kararı yürürlükte sanabilirdi.
    Bu ekran o tabloyu okur — süre değişince kod değişmez, ekran kendiliğinden
    güncellenir. Sabit metin BIRAKILMADI: "Belirsiz" yalnızca tablo gerçekten
    okunamadığında görünür ve o zaman da sebebi açıkça yazılır (§15.1: veri
@@ -250,6 +258,24 @@ export default function Verilerim() {
             sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
           },
           {
+            /* Ses ve döküm eskiden yalnız sayfanın altındaki SABİT cümlede
+               geçiyordu ("24 saat"). Artık kategori: süresi tablodan geliyor,
+               öteki 14 kategoriyle aynı kapıdan. */
+            ad: "Oturum ses kaydım (alındıysa)",
+            sayi: null,
+            gorebilen: "Hiç kimse — ham ses saklanmaz.",
+            sure: sureMetni(sureler.get("oturum_kaydi_ses"), sureTablosuOkundu),
+            not: "Ham ses dosyası bu sayfadan sayılamaz; metne çevrildikten sonra silindiği için "
+              + "sayılacak bir kayıt kalmaz.",
+          },
+          {
+            ad: "Oturum kaydının metin dökümü",
+            sayi: null,
+            gorebilen: "Arabulucunuz. Karşı taraf göremez.",
+            sure: sureMetni(sureler.get("oturum_kaydi_dokum"), sureTablosuOkundu),
+            not: "Bu kayıtların sayısı bu sayfadan okunamaz; erişim politikası izin vermez.",
+          },
+          {
             ad: "Hakkımda üretilen, yalnız arabulucuya açık analizler",
             sayi: null,
             gorebilen: "Yalnız arabulucunuz ve yönetici. Siz de karşı taraf da göremezsiniz.",
@@ -314,9 +340,16 @@ export default function Verilerim() {
           </div>
         )}
 
+        {/* 29.08.2026 KUSURU: burada tarafa "Ses kaydı alınmışsa oturumdan
+            **24 saat sonra**... silinir" yazıyordu. SABİT SAYIYDI ve YANLIŞTI:
+            canlı tabloda `oturum_kaydi_ses` **0 gün / oluşturma**, yani ham ses
+            metne çevrilir çevrilmez silinir. Üstelik bu 24 saatlik sabit,
+            27.08'de HAT H-18 ile `ajan-nobetci`den bilerek KALDIRILMIŞTI —
+            "süreye tek karar veren `saklama_sureleri`" denmişti. Arka kapı
+            kapatılmış, tarafın gördüğü yüzde aynı sabit kalmıştı.
+            Metin artık kategorilerle AYNI kaynaktan besleniyor. */}
         <p className="text-sm leading-relaxed">
           Bilgilerinizin düzeltilmesini veya silinmesini talep etmek için arabulucunuza başvurabilirsiniz.
-          Ses kaydı alınmışsa oturumdan 24 saat sonra, kayıt dökümü ise süreç sonunda kalıcı olarak silinir.
         </p>
       </main>
     </div>

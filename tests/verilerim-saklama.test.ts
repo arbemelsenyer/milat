@@ -34,6 +34,12 @@ function kurulanTurler(): string[] {
     .map((m) => m[1]);
 }
 
+/** Yorumları atar: bir deseni YORUMDA görüp kusur sanmak yanlış alarmdır
+ *  (CLAUDE.md §18-A). Aranan şey tarafa GÖSTERİLEN metindir. */
+const govdesi = (g: string) =>
+  g.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+
 describe("Verilerim: süre sözü doğru", () => {
   it("SÜRE TABLODAN OKUNUYOR — sabit metin yok", () => {
     /* H-15/1: `SURE_BELGE` · `SURE_MALI` · `SURE_ANALIZ` · `SURE_TANIMSIZ`
@@ -52,6 +58,26 @@ describe("Verilerim: süre sözü doğru", () => {
     for (const satir of sureSatirlari) {
       expect(satir, `süre elle yazılmış: ${satir}`).toContain("sureMetni(");
     }
+  });
+
+  it("TARAFA GÖSTERİLEN METİNDE SABİT SÜRE YOK", () => {
+    /* 29.08 KUSURU: sayfanın altındaki cümlede tarafa "Ses kaydı alınmışsa
+       oturumdan **24 saat sonra** ... silinir" yazıyordu. Sabit sayıydı ve
+       YANLIŞTI — canlı tabloda `oturum_kaydi_ses` **0 gün / oluşturma**, yani
+       ham ses metne çevrilir çevrilmez siliniyor. Üstelik bu 24 saatlik sabit
+       27.08'de HAT H-18 ile `ajan-nobetci`den bilerek KALDIRILMIŞTI; arka kapı
+       kapatılmış, tarafın gördüğü yüz aynı sabitle kalmıştı.
+
+       Kategori süreleri zaten `sureMetni` üzerinden geliyordu; kusur
+       kategorilerin DIŞINDAKİ serbest metindeydi. Bu denetim o boşluğu
+       kapatır: yorumlar atıldıktan sonra, tarafa gösterilen hiçbir metinde
+       elle yazılmış süre olamaz. (`sureMetni` içindeki `${yil} yıl` sayı
+       İÇERMEZ — değer tablodan gelir, o yüzden yakalanmaz.) */
+    const gorunen = govdesi(EKRAN);
+    const sabitler = [...gorunen.matchAll(/[0-9]+\s*(saat|gün|yıl|ay)/g)]
+      .map((m) => m[0]);
+    expect(sabitler, `tarafa gösterilen metinde elle yazılmış süre: ${sabitler.join(", ")}`)
+      .toEqual([]);
   });
 
   it("KALICI KAYIT 'silinir' DİYE ANLATILMIYOR", () => {

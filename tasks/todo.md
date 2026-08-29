@@ -184,6 +184,32 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
+- [x] P1 · **"Verilerim" tarafa SABİT "24 saat" süresi gösteriyordu** ·
+      Kabul: tarafa gösterilen hiçbir metinde elle yazılmış süre yok; ses ve
+      döküm de kategori olarak tablodan besleniyor · **DONE 29.08.2026**
+      · Doğrulama: `npm run test` **430/430** (öncesi 429) · tsc temiz ·
+      build temiz
+      · **KUSUR:** sayfanın altındaki cümle tarafa "Ses kaydı alınmışsa
+        oturumdan **24 saat sonra** ... silinir" diyordu. Sabit sayıydı ve
+        yanlıştı — canlı tabloda `oturum_kaydi_ses` **0 gün / oluşturma**,
+        yani ham ses metne çevrilir çevrilmez siliniyor. Üstelik bu 24 saatlik
+        sabit 27.08'de **HAT H-18 ile `ajan-nobetci`den bilerek kaldırılmıştı**
+        ("süreye tek karar veren `saklama_sureleri`"); arka kapı kapatılmış,
+        tarafın gördüğü yüz aynı sabitle kalmıştı. Bugünkü kusurların kardeşi:
+        kural bir yerde düzeltildi, kardeş yüzey açık kaldı.
+      · Ses ve döküm artık **kategori**: süreleri öteki 14 kategoriyle aynı
+        kapıdan (`sureMetni`) geliyor. Toplam 16 kategori.
+      · İki eskimiş yorum da düzeltildi: dosya başlığı hâlâ "politikası
+        görünmeyen kategorilerde belirsiz denir" diyordu (artık öyle kategori
+        yok) ve tip yorumu **geçersiz kılınmış "5 yıl / 10 yıl" kararını**
+        yürürlükteymiş gibi anlatıyordu.
+      · **BEKÇİ ÖNCE ÖLÜ DOĞDU — ISIRMA SINAVI YAKALADI.** Yazdığım denetim
+        9/9 yeşil yandı; kusuru geri koyunca **yine yeşil yandı**. Sebep:
+        düzenli ifadedeki `` dosyaya **gerçek backspace baytı (0x08)**
+        olarak inmiş, yani bekçi hiçbir şeyle eşleşemiyormuş. Bayt temizlendi,
+        bütün depo kontrol baytına karşı tarandı (**başka yok**), sınav
+        tekrarlandı ve bekçi kırmızı yandı. Ders `lessons.md`ye yazıldı.
+
 - [x] P1 · **H-26 uygulaması: taraf kendi randevu tekliflerini görüyor** ·
       **DONE 29.08.2026** · Kabul: kategori gerçek sayıyı gösteriyor,
       `gorebilen` metni gerçek politikayı anlatıyor, tezgâh kuralı korundu

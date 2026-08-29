@@ -1,6 +1,28 @@
 # tasks/lessons.md — Öğrenilen Dersler
 Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
 
+- DERS (29.08.2026) — **YEŞİL YANAN AMA HİÇ ÇALIŞMAYAN BEKÇİ.** Tarafa
+  gösterilen sabit süreyi yakalayacak bir denetim yazdım; 9/9 yeşil yandı.
+  Sonra kusuru bilerek geri koydum — **yine yeşil yandı.** Sebep: denetimi
+  dosyaya yazarken kullandığım python metninde `` (kelime sınırı) dosyaya
+  **gerçek backspace baytı (0x08)** olarak indi. Düzenli ifade artık "sayı +
+  birim + BACKSPACE" arıyordu; hiçbir metinde öyle bir şey yok, yani bekçi
+  hiç eşleşemiyordu. Aynı kaza aynı gün iki kez daha oldu: `` → 0x01
+  (SQL görünümünde) ve `
+` → gerçek satır sonu (iki tezgâhta).
+  **Kusuru bulan şey, projenin "ısırdığını kanıtla" kuralıydı.** O kural
+  olmasaydı ölü bir bekçi yeşil raporla depoya girecek ve o yüzeyi
+  "korunuyor" sanacaktık — bekçisizlikten kötü, çünkü yanlış güven verir.
+  **KURAL (iki parça):**
+  1. Bir bekçi yazıldığında **ısırdığı kanıtlanmadan** commit edilmez.
+     "Yeşil" kanıt değildir; kırmızıya döndürebilmek kanıttır (24.08 dersi
+     hâlâ geçerli, burada üçüncü kez işe yaradı).
+  2. Kaynak dosyaya düzenli ifade YAZARKEN heredoc/python metin değiştirme
+     kullanma — kaçış dizileri sessizce baytlara dönüşüyor. Ya `Edit`
+     aracıyla yaz, ya da yazdıktan sonra **`od -c` ile o satırı gözle**.
+     Kontrol baytı taraması tek satır:
+     `python -c "b=open(f,'rb').read(); print([x for x in (1,8,11,12) if bytes([x]) in b])"`
+
 - DERS (29.08.2026) — **BİR DÜZELTMEYİ DAĞITTIKTAN SONRA, ONU ÇALIŞTIRACAK
   ZAMANLAYICININ O GÜN ZATEN KOŞMUŞ OLABİLECEĞİNİ HESABA KAT.** Emniyet
   süpürgesini 05:29 UTC'de dağıttım ve "bu gece 03:00'te koşacak" diye
