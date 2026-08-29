@@ -533,6 +533,47 @@ Seçim: A / B / C / (kendi metniniz)
 Not: (varsa)
 ```
 
+### H-25 · CEVAP · 29.08.2026 — ERTELENDİ, PİLOT SONRASI
+Seçim: **hiçbiri şimdi yapılmasın.** Kurucu kararı: **silme ertelendi.**
+
+Gerekçe: 17 dosya · 24,7 MB, tamamı **tekrar eden kamuya açık kanun PDF'i**.
+Kişisel veri yok, KVKK meselesi değil, hiçbir kolu yanıltmıyor, canlı bilgi
+tabanının gösterdiği nüsha aralarında değil. Yani **hiçbir şeyi bozmuyorlar** —
+yalnız yer kaplıyorlar. Buna karşılık silmenin tek yolu depo API'si ve o da
+Lovable ajanına iş vermeyi, yani **kredi harcamayı** gerektiriyor. Kazanç
+(24,7 MB) maliyeti karşılamıyor.
+
+**Ne zaman yapılacak:** başka bir iş için Lovable'a zaten girildiği ilk turda,
+aynı turun içinde. Ya da depo dolmaya başlarsa. **Liste yukarıdaki H-25
+maddesinde duruyor, kaybolmadı.**
+
+**Sana iş yok.** Bu maddeyi kuyruktan düşür, `tasks/todo.md`de "pilot sonrası"
+olarak işaretle, açık blokaj listesinden çıkar. Pilot kapısını bloklamıyor.
+
+### H-26 · CEVAP · 29.08.2026 — (a) SEÇİLDİ ve CANLIDA UYGULANDI
+Seçim: **(a)** — taraf kendi randevu tekliflerini görür.
+
+Gerekçe ayrıca karar değil, **anayasanın kendi kuralıdır** (m.1): *"taraf yalnız
+kendi satırlarını görür (süzgeç SORGUDA)"*. Bu satırlar tarafın kendi verisidir;
+göremiyorsa "Verilerim" sayfasının sözü eksik kalıyordu. Karşı tarafın teklifi
+kapalı — süzgeç `party_id` üzerinden yalnız kendi satırına açılıyor.
+
+**Cowork canlıda çalıştırdı (Lovable MCP):**
+```sql
+create policy "Taraf kendi randevu tekliflerini görür"
+  on public.randevu_teklifleri for select
+  using (exists (select 1 from public.case_parties p
+                 where p.id = randevu_teklifleri.party_id
+                   and p.user_id = auth.uid()));
+```
+**Doğrulama:** `pg_policies` → `randevu_teklifleri` üzerinde artık **iki SELECT
+politikası** var: `mediator_reads_offers` (eskisi, dokunulmadı) ve
+`Taraf kendi randevu tekliflerini görür` (yeni). Yazma politikası KONMADI.
+
+**SIRA SENDE:** `Verilerim.tsx`te `sayi: null`'u geri `sayi: randevu` yap ve o
+kategorinin tezgâh denetimini güncelle (kendi yazdığın madde). Ayrıca
+`tasks/todo.md`deki "H-26 karar bekliyor" satırını kapat.
+
 ### H-15/1 · CEVAP DEĞİŞTİ · 25.08.2026 — SIFIR SAKLAMA
 **Bu blok, aşağıdaki "TEK ÇATI 5 YIL" kararının YERİNE GEÇER. 5 yıl artık geçersizdir.**
 

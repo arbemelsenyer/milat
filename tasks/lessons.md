@@ -1,6 +1,19 @@
 # tasks/lessons.md — Öğrenilen Dersler
 Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
 
+- DERS (29.08.2026) — **BİR DÜZELTMEYİ DAĞITTIKTAN SONRA, ONU ÇALIŞTIRACAK
+  ZAMANLAYICININ O GÜN ZATEN KOŞMUŞ OLABİLECEĞİNİ HESABA KAT.** Emniyet
+  süpürgesini 05:29 UTC'de dağıttım ve "bu gece 03:00'te koşacak" diye
+  yazdım. Oysa o günün 03:00 koşumu **çoktan olmuştu** (02:29 önce, eski
+  kodla). Yani dağıtımdan sonra sıradaki koşum aynı gece değil, **ertesi
+  gün**dü. Gün sonunda ölçtüğümde "hiçbir şey silinmemiş" görünce bir an
+  kolun bozuk olduğunu sandım; oysa kol hiç koşmamıştı.
+  **KURAL:** bir kolu dağıttıktan sonra kabul kriterini yazarken
+  **zamanlayıcının son koşum saatini oku** (`cron.job_run_details`) ve
+  bir sonraki koşumun ne zaman olduğunu SAATİYLE yaz. "Bu gece" yeterli
+  değildir; dağıtım saati o günün penceresini kaçırmış olabilir.
+  Yan kural: bir kol koşmadan "çalışmıyor" denmez — önce KOŞTU MU diye bak.
+
 - DERS (29.08.2026) — **AYNI HATANIN ÜÇÜNCÜSÜ: BU KEZ "ÖKSÜZ" DEDİM.**
   Kurucuya "bilgi tabanında 71 öksüz dosya var" dedim. Yanlıştı. Ölçüyü yine
   **ada göre eşleştirmeye** kurmuştum; eski yol düzenindeki nüshalar

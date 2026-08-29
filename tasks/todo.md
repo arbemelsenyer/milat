@@ -1,19 +1,34 @@
 ## Nerede kaldık
 
-- Tarih: **29.08.2026** (18. blok) — sürüyor.
+- Tarih: **29.08.2026 gece / 30.08 başı** (18. blok) — `medipact dur` ile
+  kapatıldı.
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: yok. Bu blokta **yedi iş** bitti; hepsi commit'li, push'lu,
-  canlıya dağıtıldı ve canlı pakette doğrulandı.
-- Açık blokaj — üçü de dış eylem bekliyor, hiçbiri Code'un yapabileceği iş
-  değil:
-  1. **Emniyet süpürgesi gerçek koşumu** — kuru koşum doğrulandı (silinecek 5).
-     Gerçek koşumu Code tetiklemeyi denedi, izin ekranı engelledi. **Cron
-     bunu bu gece 03:00'te zaten yapacak** (kurucu onayladı, H-24 arşivde).
-  2. **HAT H-25** — 17 kesin tekrar (24,7 MB) Cowork depo API'siyle silecek.
-  3. **HAT H-26** — tarafın kendi randevu tekliflerini görmesi (RLS kararı).
-  Ayrıca eski açıklar: H-20 · H-21.
+- Aktif görev: **yok** (`dur` ile kapatıldı). Bu blokta **yedi iş** bitti;
+  hepsi commit'li, push'lu, canlıya dağıtıldı ve canlı pakette doğrulandı.
+  Son commit bu kayıttır.
+
+### SIRADAKİ UYGULANABİLİR İŞ (yeni oturum buradan başlar)
+**H-26 uygulaması** — kuyruğun en üstünde, tek P1. Karar geldi, politika
+canlıda, Code doğruladı; kalan yalnız `Verilerim.tsx` + tezgâh düzenlemesi.
+Kimseyi beklemiyor.
+
+### ⚠ AÇIK VE ZAMANA BAĞLI: EMNİYET SÜPÜRGESİ HENÜZ KOŞMADI
+`cron.job_run_details` son koşumu **29.08 03:00 UTC** gösteriyor — o koşum
+yeni kolun dağıtımından (05:29 UTC) **önceydi**, yani eski kodla koştu.
+Ölçüm (29.08 22:24 UTC): `cases` **10** · süresi geçmiş **5** ·
+`case_parties` **18** · `kapanis_istatistigi` **0**.
+Yeni sürümle ilk koşum **30.08 03:00 UTC**'de. Yeni oturumun ilk işi bu
+sayıları tekrar ölçüp kabul kriterini kapatmaktır:
+`cases` 10→5 · `case_parties` 18→10 · `kapanis_istatistigi` 0→5
+(`sebep='sure_doldu'`). **Koşum yine olmadıysa** kolu değil önce cron'u
+şüphelen (24.08 dersi: cron "succeeded" fonksiyonun çalıştığı anlamına gelmez).
+
+- Açık blokaj — **ikisi**, ikisi de eski:
+  **H-20** (kurucunun bilgi tabanı yüklemesi) · **H-21** (`.env` kararı).
+  *H-22/23/24 kapandı ve arşivde. H-25 kurucu tarafından **pilot sonrasına
+  ertelendi**, blokaj sayılmaz. H-26 cevaplandı; kalan iş kuyrukta.*
 - **ÇALIŞMA AĞACINDA YABANCI DEĞİŞİKLİK VAR — DOKUNULMADI (§11).**
   `.agents/skills/medipact-calisma-duzeni/SKILL.md` silinmiş görünüyor;
   ayrıca izlenmeyen `repomix-output.xml`, `devam.sh`, `gs.sh`,
@@ -167,6 +182,23 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
+- [ ] P1 · **H-26 uygulaması: taraf kendi randevu tekliflerini görsün** ·
+      **KARAR GELDİ VE CANLIDA UYGULANDI** (H-26 cevabı: seçenek (a); Cowork
+      politikayı çalıştırdı). Code doğruladı: `randevu_teklifleri` üzerinde
+      artık **2 SELECT politikası** var (`mediator_reads_offers` +
+      `Taraf kendi randevu tekliflerini görür`).
+      · **YAPILACAK (bu turda başlanmadı — `medipact dur` verildi):**
+      `src/pages/Verilerim.tsx`te "Randevu tekliflerim ve cevaplarım"
+      kategorisinde `sayi: null` → `sayi: randevu`; `gorebilen` metni
+      "Arabulucunuz ve yönetici. Bu sayfadan siz okuyamıyorsunuz."dan
+      gerçeğe çevrilecek; `not:` satırı kaldırılacak;
+      `tests/verilerim-saklama.test.ts`teki "SESSİZ SIFIR YOK" denetimi
+      randevu yerine **başka bir okunamayan kategoriye** bağlanacak ya da
+      kural "RLS'in süzdüğü kategori sayı göstermez" biçiminde korunacak —
+      denetim SİLİNMEYECEK, yoksa kusur sessizce geri gelebilir.
+      · Kabul: canlıda taraf oturumuyla "Verilerim" açıldığında randevu
+      sayısı **0 değil gerçek sayı** görünüyor; `npm run test` yeşil
+
 - [x] P1 · **"Verilerim" tarafa okunamayan sayıyı gerçek gibi gösteriyordu** ·
       Kabul: RLS'in süzdüğü kategori sayı göstermiyor, okunamadığını söylüyor;
       hiçbir kategoride "Belirsiz" kalmadı · **DONE 29.08.2026**
@@ -236,6 +268,13 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       · **KALAN:** gerçek koşum. Code tetiklemeyi denedi, **izin ekranı
       engelledi** (geri dönüşü olmayan üretim silmesi); zorlanmadı. Kurucu
       ya da Cowork tek satırla çalıştırır — komut aşağıda.
+      · **⚠ 29.08 22:24 UTC ÖLÇÜMÜ — SÜPÜRGE HENÜZ KOŞMADI.** `cron.job_run_details`
+        son koşumu **29.08 03:00 UTC** gösteriyor; o koşum yeni kolun
+        dağıtımından (05:29 UTC) ÖNCEYDİ, yani eski kodla koştu ve dosyaya
+        dokunmadı. Canlı sayım bunu doğruluyor: `cases` **10** · süresi geçmiş
+        **5** · `case_parties` **18** · `kapanis_istatistigi` **0**.
+        Yeni sürümle ilk koşum **30.08 03:00 UTC**'dedir. Kabul kriteri o
+        koşumdan sonra ölçülecek — bu satır o zamana kadar AÇIK kalır.
       · Kabul: koşum sonrası `cases` 10 → **5** · `case_parties` 18 → **10** ·
       `kapanis_istatistigi` 0 → **5** satır (`sebep = 'sure_doldu'`)
       · **İKİNCİ KURU KOŞUM (yeni sürümle, canlı):** kalıcı türler artık doğru
@@ -248,8 +287,14 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
         tetiklenmese de bu gece gerçekleşir. Manuel komut yukarıdaki kuru
         koşumun aynısıdır, `body` yalnız `'{}'` olur.
 
-- [ ] P3 · **17 kesin tekrar silinecek (24,7 MB)** · HAT **H-25**'te tam liste;
-      Cowork depo API'siyle çalıştıracak. Kabul: `admin/` altı 121 → **104**
+- [~] P3 · **17 kesin tekrar silinecek (24,7 MB)** · **PİLOT SONRASI —
+      KURUCU ERTELEDİ (H-25 cevabı, 29.08).** Gerekçe: tamamı tekrar eden
+      kamuya açık kanun PDF'i; kişisel veri yok, hiçbir kolu yanıltmıyor,
+      canlı nüsha aralarında değil. Silmenin tek yolu depo API'si ve o da
+      Lovable kredisi harcıyor; 24,7 MB kazanç maliyeti karşılamıyor.
+      **Pilot kapısını BLOKLAMAZ**, açık blokaj sayılmaz. Liste HAT H-25'te
+      duruyor. Ne zaman: başka bir iş için Lovable'a zaten girilen ilk turda,
+      ya da depo dolmaya başlarsa. Kabul (o gün): `admin/` altı 121 → **104**
       dosya · 65,3 → **40,6 MB** · bilgi tabanı kaynak sayısı DEĞİŞMEMELİ
 
 - [x] P1 · **Kapanıştan sonra emniyet süpürgesi YOK — süresi geçmiş dosyalar
