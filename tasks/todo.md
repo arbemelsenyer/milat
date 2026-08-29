@@ -98,23 +98,68 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
-- [ ] P0 · **"Başvuruyu sil" düğmesi bütün belgeleri kovada bırakıyor** ·
-      `src/pages/MediationEngine.tsx` `deleteCase()` istemciden doğrudan
-      `cases` satırını siliyor; FK cascade çocuk satırları götürüyor ama
-      DEPOYA HİÇ DOKUNULMUYOR. Onay penceresi "belgeler de silinecektir"
-      diyor — söz YANLIŞ. 25.08'de canlıda bulunan 6 öksüz belgenin muhtemel
-      üreticisi bu yol. · Kabul: bu yol da dört depo kaynağını satırlar
-      silinmeden önce temizliyor; `oturum-kayitlari` kovası istemciye kapalı
-      olduğu için temizlik SUNUCUDA yapılıyor; tezgâh istemcide çıplak
-      `from("cases").delete()` kalmadığını denetliyor
+- [x] P0 · **"Başvuruyu sil" düğmesi bütün belgeleri kovada bırakıyor** ·
+      Kabul: bu yol da dört depo kaynağını satırlar silinmeden önce
+      temizliyor; `oturum-kayitlari` kovası istemciye kapalı olduğu için
+      temizlik SUNUCUDA yapılıyor; tezgâh istemcide çıplak silme kalmadığını
+      denetliyor · **DONE 29.08.2026** · Doğrulama: `npm run test` **417/417**
+      · tsc temiz · `npm run build` temiz · yeni kolda eslint 0 hata
+      · commit `10ccfb2`
+      · **KUSUR:** `deleteCase()` istemciden doğrudan `cases` satırını
+        siliyordu; FK cascade çocuk satırları götürüyor ama DEPOYA HİÇ
+        dokunulmuyordu. Onay penceresi "belgeler de silinecektir" diyor —
+        söz YANLIŞTI. 25.08'de sorumlu olarak `dosya-verilerini-sil`
+        gösterilmişti; asıl üretici bu yoldu.
+      · **ÇÖZÜM:** yeni `supabase/functions/basvuru-sil` kolu. Yetki AYNEN
+        korunur (`cases` RLS silme politikasının aynısını kendisi arar).
+        C3 kapanış silmesiyle karıştırılmaz: kapanış kaydına dokunmaz,
+        C3'ün iki kapısını (paket + "SİL" yazma) taklit etmez.
+        Süpürge TEK YERE taşındı: `_shared/depo-supurge.ts` — iki kol da onu
+        kullanıyor (aynı kural iki yerde yazılırsa biri düzeltilip öteki açık
+        kalıyor; 25.08'de tam bu oldu).
+      · **CANLI ÖLÇÜM (29.08):** `case-documents` kovasında "dosya belgesi"
+        öksüzü **0** · `oturum-kayitlari` kovası **boş** → açık koddaydı ama
+        27.08'den beri yeni zarar üretmemiş. Düzeltme ÖNLEYİCİDİR.
+      · **TEZGÂH ISIRDI:** istemci eski çıplak silmeye döndürülünce 2 denetim
+        kırmızı yandı.
+      · **YAN DÜZELTME (§18-A yanlış alarmı):** `tests/sessiz-yazim.test.ts`
+        tarayıcısı YORUM metnini kod sanıyordu — kaldırılan eski kodu anlatan
+        bir açıklamada `.delete()` geçmesi dosyayı kırmızı yaktı. Tarayıcı
+        artık yorumları boşlukla değiştiriyor (satır numaraları korunuyor).
+      · **YAN DÜZELTME:** `tests/sabit/oksuz-belge-supurgesi.sql` başlığındaki
+        "artık yeni öksüz üretilmiyor" cümlesi YANLIŞTI; düzeltildi ve sesli
+        not kovası için 4. bölüm eklendi.
 
-- [ ] P0 · **KVKK silme kolu depoda üç kaynağı öksüz bırakıyor** · Kabul:
+- [ ] P3 · **Bilgi tabanında 71 öksüz PDF (33,2 MB)** · `case-documents`
+      kovasında `admin/knowledge/` altında hiçbir parçanın göstermediği 71
+      nesne duruyor (en eski 01.07, en yeni 02.08). H-19 yalnız "dosya
+      belgesi" kümesini kapsıyordu, bu küme kapsam dışıydı. Kişisel veri
+      değil (kamuya açık mevzuat PDF'leri) ama constitution m.10 kapsamında.
+      · Kabul: `tests/sabit/oksuz-belge-supurgesi.sql` Bölüm 1'de
+      `bilgi tabani` satırı 0 dönüyor; silme depo API'siyle yapıldı
+
+- [x] P0 · **KVKK silme kolu depoda üç kaynağı öksüz bırakıyor** · Kabul:
       `dosya-verilerini-sil` depoya işaret eden DÖRT kaynağın hepsini
       (`case_documents.file_path` · `agreement_documents.file_path` ·
       `bilirkisi_raporlari.dosya_yolu` · `oturum_kayitlari.ses_dosya_yolu`)
       satırlar silinmeden ÖNCE kovalarından siliyor; yol listesi sınıra
       dayanırsa SESSİZ KIRPMA yok, işlem durup söylüyor;
       `tests/dosya-verilerini-sil.test.ts` yazıldı ve ısırdığı kanıtlandı
+      · **DONE 29.08.2026** · Doğrulama: `npm run test` **412/412** (öncesi
+      401) · tsc temiz · eslint taban değişmedi (9 hatanın hepsi eskiden vardı)
+      · commit `fc40cb1` · **CANLI DAĞITIM:** Lovable
+      `deploy_edge_functions(["dosya-verilerini-sil"])` → başarılı (05:53)
+      · **KUSUR:** 25.08'de bu kola depo temizliği eklenmişti ama YALNIZ
+        `case_documents` için. Dosyaya bağlı DÖRT tablo depoda nesne
+        gösteriyor; öteki üçünün satırları siliniyor, dosyaları kovada
+        kalıyordu. `saklama-imha` ayrımı zaten biliyordu (ses için ayrı kova),
+        silme kolu bilmiyordu. Öksüz süpürgesi SQL'i de biliyordu.
+      · **TEZGÂH ISIRDI:** üç kaynak çıkarılınca 3 denetim, sınır kapısı
+        kaldırılınca 1 denetim kırmızı yandı; ikisi de geri alındı.
+      · Tezgâhta `types.ts`e karşı çalışan bir BEKÇİ var: `case_id` taşıyan bir
+        tabloya yol kolonu eklenip listeye konmazsa kırmızı yanar.
+      · Bu kolun **ilk tezgâhıdır** — HAT H-15/1'in "silme gerçekten silme,
+        tezgâhla kanıtlanacak" şartı 25.08'den beri karşılanmamıştı.
 
 - [x] P0 · **Depodaki öksüz taraf belgeleri silindi (H-19 · seçenek A)** ·
       Kabul: `case-documents` kovasında "dosya belgesi" öksüzü 0 · **DONE

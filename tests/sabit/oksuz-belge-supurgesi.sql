@@ -5,9 +5,23 @@
 -- BÖLÜM 1 ve 2 HİÇBİR ŞEY SİLMEZ — yalnız sayar ve listeler.
 -- BÖLÜM 3 SİLER ve GERİ ALINAMAZ; kurucu kararı gelmeden çalıştırılmaz.
 --
--- NEDEN: 25–26.08'de "önce satır, sonra depo" kusuru kapatıldı ve yeni öksüz
--- üretilmiyor. Bu betik o kusurun GERİDE BIRAKTIĞI birikimi süpürür.
+-- NEDEN: 25–26.08'de "önce satır, sonra depo" kusuru kapatıldı. Bu betik o
+-- kusurun GERİDE BIRAKTIĞI birikimi süpürür.
 -- constitution m.10 (süresiz saklama yasağı) · HAT H-15/1 (sıfır saklama).
+--
+-- ⚠ 29.08.2026 DÜZELTMESİ — BU BAŞLIKTA "artık yeni öksüz üretilmiyor" YAZIYORDU.
+--   YANLIŞTI. 25–26.08'de kapatılan yalnız `dosya-verilerini-sil` koluydu ve o
+--   kolda bile yalnız `case_documents`. Açık üç yerde daha duruyordu:
+--   (a) aynı kolda `agreement_documents` · `bilirkisi_raporlari` ·
+--       `oturum_kayitlari.ses_dosya_yolu` süpürülmüyordu — ilginçtir, aşağıdaki
+--       GÖRÜNÜM bu sahipleri zaten biliyordu, silme kolu bilmiyordu;
+--   (b) `MediationEngine.tsx` "Başvuruyu sil" düğmesi `cases` satırını
+--       İSTEMCİDEN siliyordu ve depoya hiç dokunmuyordu.
+--   İkisi de 29.08'de kapandı (`_shared/depo-supurge.ts` + `basvuru-sil`).
+--   Ölçüm (29.08, canlı): `dosya belgesi` öksüzü 0 · `oturum-kayitlari` kovası
+--   boş → açık koddaydı ama 27.08'den beri yeni zarar üretmemiş.
+--   DERS: "kusur kapandı, artık üretilmiyor" cümlesi, kapatılan yolun TEK yol
+--   olduğu kanıtlanmadan yazılmaz.
 
 -- Bir yol "sahipli" sayılır: dört kaynaktan biri onu gösteriyorsa.
 -- Yeni bir dosya sahibi tablo eklenirse BURAYA DA EKLE; yoksa o tablonun
@@ -62,3 +76,17 @@ order by o.created_at;
 -- `dosya belgesi` satırı 0 dönmelidir.
 --
 -- Kararı ve sonucu `tasks/HAT.md` H-19 maddesine yazın.
+
+
+-- ═══ BÖLÜM 4 · SESLİ NOT KOVASI (hiçbir şey silmez) ════════════════════════
+-- `oturum-kayitlari` kovasının sahibi tek kolondur: `oturum_kayitlari
+-- .ses_dosya_yolu`. Ham ses metne çevrilir çevrilmez silinir (H-14 şart 1);
+-- burada görünen her nesne o silmeden KAÇMIŞ demektir.
+-- 29.08.2026'da ölçülen: kova BOŞ (hiç nesne yok).
+select count(*) as nesne,
+       count(*) filter (
+         where not exists (select 1 from public.oturum_kayitlari k
+                           where k.ses_dosya_yolu = o.name)) as oksuz,
+       round(sum(coalesce((o.metadata->>'size')::numeric, 0)) / 1048576, 1) as toplam_mb
+from storage.objects o
+where o.bucket_id = 'oturum-kayitlari';
