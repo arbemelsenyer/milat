@@ -17,129 +17,75 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
-### H-24 · 29.08.2026 · **P0 · ZAMANA BAĞLI** — emniyet süpürgesi bu gece 03:00'te 5 gerçek dosyayı silecek
+### H-25 · 29.08.2026 · P3 — COWORK İŞİ: silinecek 17 kesin tekrar (24,7 MB) · H-22 (1) uygulaması
 
-**Durum.** Bugün kurulan emniyet süpürgesi (HAT H-15/1 adım 3) canlıya
-dağıtıldı ve `saklama-imha-gunluk` cron işi **her gece 03:00**'te koşuyor.
-`saklama_sureleri.dosya_kapanis_sonrasi.saklama_gun = 7` olduğu için ilk
-koşumda kapanışı 7 günü geçmiş **5 dosya tamamen silinecek. Geri alınamaz.**
+**Önce bir düzeltme: "71 öksüz" ölçüm yanlıştı, haklısınız.** Ölçüyü
+`knowledge_base_chunks.source_url` ile **ad eşleşmesine** kurmuştum; eski yol
+düzenindeki nüshalar eşleşmeyince "öksüz" saydım. Kendi sayımımı yol düzenine
+göre yeniden kurdum ve sizin rakamınızı doğruladım: `admin/` altında **121
+dosya · 65,3 MB**, bunların **105'i eski** düzende (57,3 MB) · **16'sı yeni**
+düzende (8,0 MB). "Eşleşmedi ≠ ölü" uyarınız doğru; bu, 28.08'deki iki hatanın
+üçüncüsüydü ve aynı kökten geliyor — **daraltılmış bir aramanın boş dönmesini
+"yok" diye okumak.**
 
-**Silinecek olanın tam ölçüsü (29.08, canlı sayım):**
+**ŞABLON TARAMASI YAPILDI — .docx'lere DOKUNULMADI, ama artık kanıt var.**
+`generate-official-document` şablonu **depodan okumuyor**: `document_templates`
+tablosundaki `template_content` (metin) alanından okuyor; `source_url` yalnız
+künye olarak çıktıya taşınıyor. Canlı sayım: **47 şablonun 47'sinin metni var,
+`storage://` ile depoya işaret eden şablon sayısı SIFIR.** Yani belge motoru bu
+`.docx` dosyalarına hiç dokunmuyor. Yine de **silmedim** — kararınız "grup 2
+silinmez" idi; bu yalnız kanıt kaydıdır, silme kararı sizindir.
 
-| ne | adet |
-|---|---|
-| dosya | **5** (kapanış 16–18.07.2026) |
-| taraf satırı (`case_parties`) | **8** |
-| taraf analizi | **8** |
-| anlaşma belgesi (`agreement_documents`) | **13** |
-| oturum | **4** |
-| belge / not | 0 (mevcut kollar zaten süpürmüş) |
+**SİLİNECEK LİSTE — 17 dosya · 24,7 MB.** Seçim kuralı: aynı taban ad + aynı
+bayt boyutu olan öbeklerde **canlı nüsha korunur**, canlı yoksa **en yenisi**
+korunur. Önce "en yeni kalsın" diye kurmuştum; kontrol edince gördüm ki bazı
+öbeklerde canlı nüsha en yeni DEĞİL — o kuralla canlı bilgi tabanının
+gösterdiği dosyayı silecektim. Kural düzeltildi.
 
-**Neden size soruyorum (§7.3).** Politika sizin: "süreç bitince her şey
-silinir" (H-15/1, iki kez teyit edildi) ve bu 5 dosya süresini **40 günden
-fazla** geçmiş. Yani silinmeleri kararın kendisidir. Ama bunlar süpürge
-**var olmadan önce** kapanmış dosyalar ve yeni kurulmuş otomatik bir yok
-edicinin ilk gecesinde, siz görmeden gitmeleri sizi hazırlıksız yakalar.
-Geri dönüşsüz olanı sormadan yapmam (CLAUDE.md §7.3).
+**GÜVENLİK KONTROLÜ (canlı):** silinecek 17'nin **canlı olanı SIFIR**;
+korunanların **11'i** canlı bilgi tabanının gösterdiği nüsha. Kontrol
+`knowledge_base_chunks` + `document_templates` `source_url`larına karşı yapıldı.
 
-**Seçenekler.**
-- **(a) Dokunma — bu gece silinsinler.** Politika neyse o olur. Hiçbir şey
-  yapmanız gerekmez; 03:00'te olur.
-- **(b) Bir süre beklet.** Tek satır, geri alınabilir, dağıtım gerektirmez:
-  ```sql
-  update public.saklama_sureleri set saklama_gun = null
-  where veri_turu = 'dosya_kapanis_sonrasi';
-  ```
-  `NULL = dokunma` sizin tasarladığınız güvenlik valfidir; kod onu zaten
-  biliyor. Bakmak istediğinizde 7'ye geri koyarız, süpürge kaldığı yerden
-  sürer. **Öteki saklama kolları bundan etkilenmez, çalışmaya devam eder.**
-- **(c) Süreyi uzat.** Örneğin 90 gün — o zaman bu 5 dosya da kapsam dışı
-  kalır ve süpürge yalnız bundan sonrası için çalışır.
+```
+admin/knowledge/1785664337084-6102_say_l__T_rk_Ticaret_Kanunu.pdf
+admin/knowledge/1782912317922-KI_RA_UYUS_MAZIKLARI_VE_ARABULUCULUK-BAKI__AKADEMI_.pdf
+admin/knowledge/1782912422892-KI_RA_UYUS_MAZIKLARI_VE_ARABULUCULUK-BAKI__AKADEMI_.pdf
+admin/knowledge/1782912325720-KI_RA_UYUS_MAZIKLARI_VE_ARABULUCULUK-BAKI__AKADEMI_.pdf
+admin/knowledge/1785575901050-5510_Sosyal_Sigortalar_ve_Genel_Sa_l_k_Sigortas__Kanunu.pdf
+admin/knowledge/1785575911106-6098_Say_l__T_rk_Bor_lar_Kanunu.pdf
+admin/knowledge/1785664493357-23528_say_l__S_nai_M_lkiyet_Kanununun_Uygulanmas_na_Dair_Y_netmelik.pdf
+admin/knowledge/1785664158265-4857_Say_l_____Kanunu.pdf
+admin/knowledge/1785664293295-5846_say_l__Fikir_ve_Sanat_Eserleri_Kanunu.pdf
+admin/knowledge/1785664340749-6356_Sendikalar_ve_Toplu____S_zle_mesi_Kanunu.pdf
+admin/knowledge/1785575913121-6356_Sendikalar_ve_Toplu____S_zle_mesi_Kanunu.pdf
+admin/knowledge/1785664046590-854_say_l__Deniz____Kanunu.pdf
+admin/knowledge/1785664298974-5953_Bas_n____Kanunu.pdf
+admin/knowledge/1785575909219-5953_Bas_n____Kanunu.pdf
+admin/knowledge/spor/6284_sayili_Ailenin_Korunmasi_ve_Kadina_Karsi_Siddetin_Onlenmesine_Dair_Kanun.pdf
+admin/knowledge/1785664068007-1475_say_l_____Kanunu.pdf
+admin/knowledge/1785577771331-7036_say_l_____Mahkemeleri_Kanunu.pdf
+```
 
-**Önerim: (b), bu gece için.** Gerekçe: geri alınabilir olan ile geri
-alınamaz olan arasında seçim varken geri alınabilir olan seçilir. KVKK
-uyumunda bir günlük gecikmenin bedeli, yanlışlıkla silinmiş 5 dosyanın
-bedelinden küçüktür. Bakıp "gitsin" derseniz tek satırla açarız.
+**Listedeki tek yeni-düzen dosyası bir YANLIŞ KATEGORİ.** `spor/` altındaki
+6284 (Ailenin Korunması Kanunu) ile `aile/` altındaki nüsha **bayt bayt
+aynı**; canlı olan `aile/` olanıdır. Yani bu kanun bir kez yanlışlıkla "spor"
+alanına yüklenmiş. Silinen o kopya; `aile/` nüshası duruyor.
 
-**Not.** Bu satırı ben yazmayı denedim, izin ekranı engelledi — bilerek
-zorlamadım; zaten sizin kararınız. Siz ya da Cowork çalıştırabilir.
+**Nasıl silinecek.** Depo API'siyle — SQL ile `storage.objects` satırını
+silmek YETMEZ (satır gider, dosya kalır, bir daha hiç bulunamaz). Lovable
+ajanına "şu 17 yolu `case-documents` kovasından sil" demek yeterli.
 
-### H-23 · 29.08.2026 · P1 — COWORK İŞİ: `kapanis_istatistigi` tablosu kurulmalı
+**Başarı kontrolü.** Silme sonrası:
+```sql
+select count(*) as admin_dosya,
+       round(sum(coalesce((metadata->>'size')::numeric,0))/1048576,1) as mb
+from storage.objects where bucket_id='case-documents' and name like 'admin/%';
+```
+Beklenen: **121 → 104 dosya**, **65,3 → 40,6 MB**. Ayrıca bilgi tabanı kaynak
+sayısı DEĞİŞMEMELİ (silinenlerin hiçbiri canlı değil).
 
-*(Karar değil, çalıştırma işi — CLAUDE.md §10: SQL metnini Code yazar,
-çalıştırmayı Cowork yapar. Beş satırlık paket:)*
 
-1. **Ne yapılacak.** `tests/sabit/kapanis-istatistigi.sql` canlıda çalıştırılacak.
-   Tablo + RLS + tek okuma politikası kurar. **Hiçbir şey silmez, hiçbir satır
-   değiştirmez.**
-2. **Neden gerekli.** KVKK silmesinin kanıtı bugün **hiçbir yere yazılmıyor**.
-   Kayıt `dosya_kapanis`e yazılıyordu ama o satır `cases`e ON DELETE CASCADE
-   bağlı ve yazım `cases` silindikten SONRA yapılıyordu → 0 satır etkileniyor,
-   `supabase-js` bunu hata saymıyor. Yani ne yazılıyor ne de yazılmadığı
-   söyleniyordu. Kod tarafı düzeltildi (`bdde1b0`) ve artık yazacağı tablo bu.
-   Kurucu kararı (20.08): "kişisel veri içermeyen sayımlar KALIR" — bu tablo o
-   kararın tek dayanağıdır.
-3. **Çalıştırılacak metin.** `tests/sabit/kapanis-istatistigi.sql` (depoda,
-   commit `bdde1b0`). Olduğu gibi çalıştırılır; içinde `create table if not
-   exists` var, tekrar çalıştırmak zararsızdır.
-4. **Başarı kontrolü.** Betiğin sonundaki üç sorgu:
-   `select count(*) from public.kapanis_istatistigi;` → **0** ·
-   `relrowsecurity` → **true** · yabancı anahtar sayısı → **0**.
-   Sonuncusu kritik: tablo `cases`e bağlanırsa aynı kusur geri gelir.
-5. **Sonra Code ne yapacak.** Emniyet süpürgesini kuru koşumda çalıştırıp
-   (`saklama-imha` · `{"kuru":true}`) süresi geçmiş dosya sayısını canlıdan
-   doğrular, sonra gerçek koşumu tetikler ve `kapanis_istatistigi`de satırların
-   oluştuğunu gösterir. Sonucu `tasks/todo.md`ye işler.
 
-**Beklerken durmuyorum** (§23): bu maddeye bağlı olmayan işe devam ediyorum.
-Tablo kurulana kadar silme **çalışır**, yalnız her silmede "anonim kapanış
-kaydı yazılamadı: tablo yok" uyarısı döner — sessiz kalmaz.
-
-### H-22 · 29.08.2026 · P3 — bilgi tabanında 71 öksüz dosya (33,2 MB); silinsin mi?
-
-**Sorun.** `case-documents` kovasının `admin/knowledge/` bölümünde, bilgi
-tabanında hiçbir parçanın göstermediği **71 dosya** duruyor (toplam **33,2 MB**,
-en eski **01.07.2026**, en yeni **02.08.2026**). Bunlar 26.08'den önceki iki
-kusurun kalıntısıdır: (a) yükleme kolu dosyayı parçalardan ÖNCE yazıyordu,
-(b) yol düzeni sonradan değişti (`admin/knowledge/<dosya>` → 
-`admin/knowledge/<kategori>/<dosya>`), eski kopyalar sahipsiz kaldı. Üretici
-kollar 26–27.08'de kapatıldı; bu birikim geride kalandır.
-
-**Ne oldukları ölçüldü.** Çoğu bugün bilgi tabanında ZATEN VAR olan mevzuatın
-eski kopyası (6102 TTK 4,6 MB iki kez · 5510 SGK · 6098 TBK · 4857 İş K. ·
-5846 FSEK · 6769 SMK vb.) ve 01–02.07'de yüklenmiş **tutanak/sözleşme şablonu
-.docx** dosyaları. **Kişisel veri İÇERMEZLER** — kamuya açık mevzuat ve boş
-şablonlardır; bu yüzden P0 değil P3'tür. Yine de constitution m.10 (süresiz
-saklama yasağı) kapsamındadır.
-
-**Güvenlik kontrolü yapıldı.** Bu 71 dosyanın **hiçbirini** `document_templates`
-ya da `pending_pool` göstermiyor (ikisi de 0). Yani silinirlerse çalışan hiçbir
-şablon ya da onay havuzu kırılmaz. *(Bu kontrol sırasında ayrı bir açık bulundu
-ve düzeltildi: öksüz süpürgesinin "sahipli yollar" görünümü bu iki tabloyu
-BİLMİYORDU — ileride şablonun kullandığı bir dosyayı öksüz sanıp silebilirdi.
-Görünüm `tests/sabit/oksuz-belge-supurgesi.sql` içinde tamamlandı; sayı yine
-71 çıktı, yani geçmişte zarar oluşmamış.)*
-
-**Seçenekler.**
-- **(a)** Hepsini sil. 33,2 MB geri kazanılır, constitution m.10 tam sağlanır.
-  Geri alınamaz.
-- **(b)** Yalnız mevzuat PDF'lerini sil, `.docx` şablonları bırak. Şablonlar
-  ileride "resmî şablon kütüphanesi" işine yarayabilir diye.
-- **(c)** Dokunma, olduğu gibi bıraksın.
-
-**Önerim: (a).** Gerekçe: bu dosyaların hiçbiri bir yüzeyden erişilebilir
-değil — `/admin` bilgi tabanı listesi parçalardan üretiliyor, dolayısıyla bu
-dosyalar **ekranda görünmüyor bile**. Görünmeyen ve hiçbir kaydın göstermediği
-33 MB'ı tutmanın tek etkisi, saklama sözünün kâğıt üzerinde kalması. Şablonlar
-kaybolmuyor: `document_templates` tablosundaki çalışan şablonlar bu dosyalardan
-BAĞIMSIZ (ölçüldü: 0 bağ).
-
-**Kararın etkisi.** (a) seçilirse silme **depo API'siyle** yapılır — SQL ile
-`storage.objects` satırını silmek yetmez, satır gider dosya kalır ve bir daha
-hiç bulunamaz (betiğin Bölüm 3 uyarısı). Kanıt: silme sonrası Bölüm 1 sayımı
-`bilgi tabani` için **0** dönmelidir. Çalıştıracak liste hazır; kararınızı
-alınca ben yürütürüm. (c) seçilirse kuyruktaki P3 madde kapatılır ve
-constitution m.10 için bilinçli bir istisna olarak kaydedilir.
 
 ### H-21 · 28.08.2026 · P1 — `.env` deposa girmiş; çıkarmak canlı yayını kırabilir
 
@@ -793,6 +739,28 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+### H-24 · KAPANDI · 29.08.2026 — kurucu "gerçek koşum" dedi, süpürge çalışacak
+Kurucu emniyet süpürgesinin gerçek koşumunu açıkça istedi (H-23 · 5. madde
+talimatı). Yani 5 dosyanın silinmesi onaylandı; bekletme seçeneği (b)
+kullanılmadı. Kuru koşum önce çalıştırıldı ve **silinecek: 5** doğrulandı —
+sayı, Code'un bağımsız SQL sayımıyla birebir aynı.
+Sonuç `tasks/todo.md`ye işlendi.
+
+### H-23 · KAPANDI · 29.08.2026 — `kapanis_istatistigi` kuruldu
+Cowork tabloyu kurdu; üç doğrulama da beklenen değerde (0 satır · RLS açık ·
+**yabancı anahtar 0** — kritik olan buydu, cascade kusuru geri gelmiyor).
+Code tarafı: kuru koşum çalıştırıldı, sürüm imzası canlıda doğrulandı
+(`2026-08-29-emniyet-supurgesi`). Kalan iş (gerçek koşum + kayıt kanıtı)
+`tasks/todo.md` kuyruğundadır.
+
+### H-22 · KAPANDI · 29.08.2026 — toptan silme yok; yalnız kesin tekrarlar
+Kurucu üç öbeğe ayırdı: kesin tekrarlar silinir · şablon `.docx` silinmez ·
+kanun PDF'leri kalır. **Code'un "71 öksüz" ölçümü yanlıştı** ve düzeltildi
+(ad eşleşmesi yerine yol düzeni; gerçek tablo 121 dosya · 65,3 MB).
+Uygulama listesi **H-25**'te: 17 dosya · 24,7 MB · hiçbiri canlı değil.
+Şablon taraması yapıldı: belge motoru `.docx`leri hiç okumuyor (47 şablonun
+47'si metinden besleniyor, depoya işaret eden 0) — ama karar gereği silinmedi.
+
 ### H-19 · KAPANDI · 27.08.2026 — SEÇENEK A UYGULANDI, 6 BELGE SİLİNDİ
 **Kurucu kararı: A** — "6'sını hemen sil, 71 bilgi tabanı dosyasını ayrı ele al."
 

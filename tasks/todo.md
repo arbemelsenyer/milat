@@ -147,6 +147,21 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
+- [ ] P1 · **Emniyet süpürgesinin GERÇEK koşumu + kayıt kanıtı** (H-23 · 5. madde)
+      · Kuru koşum **YAPILDI 29.08**: canlı cevap `surum:
+      "2026-08-29-emniyet-supurgesi"` · `dosya_kapanis_sonrasi` →
+      `{"durum":"kuru","silinecek":5}` — Code'un bağımsız SQL sayımıyla
+      **birebir aynı**. Öteki türler `temiz`/0.
+      · **KALAN:** gerçek koşum. Code tetiklemeyi denedi, **izin ekranı
+      engelledi** (geri dönüşü olmayan üretim silmesi); zorlanmadı. Kurucu
+      ya da Cowork tek satırla çalıştırır — komut aşağıda.
+      · Kabul: koşum sonrası `cases` 10 → **5** · `case_parties` 18 → **10** ·
+      `kapanis_istatistigi` 0 → **5** satır (`sebep = 'sure_doldu'`)
+
+- [ ] P3 · **17 kesin tekrar silinecek (24,7 MB)** · HAT **H-25**'te tam liste;
+      Cowork depo API'siyle çalıştıracak. Kabul: `admin/` altı 121 → **104**
+      dosya · 65,3 → **40,6 MB** · bilgi tabanı kaynak sayısı DEĞİŞMEMELİ
+
 - [x] P1 · **Kapanıştan sonra emniyet süpürgesi YOK — süresi geçmiş dosyalar
       duruyor** · **DONE 29.08.2026** · HAT H-15/1 kurucu kararı: "arabulucu unutursa kapanıştan N
       gün sonra otomatik silinir". Canlı tabloda N **7 gün** olarak girilmiş
@@ -170,8 +185,8 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
         sonradan girilmiş. Yeniden sorulmadı (§7-B.1); değişmesi gerekirse
         tek satırlık tablo düzenlemesidir, dağıtım gerektirmez.
 
-- [!] P1 · **KVKK silme kanıtı sessizce kayboluyor** · **KOD BİTTİ ·
-      COWORK SQL BEKLİYOR** · `dosya-verilerini-sil`
+- [x] P1 · **KVKK silme kanıtı sessizce kayboluyor** · **DONE 29.08.2026 —
+      TABLO CANLIDA** · `dosya-verilerini-sil`
       anonim kapanış kaydını `dosya_kapanis`e YAZIYOR ama o satırın
       `case_id`si `cases`e **ON DELETE CASCADE** bağlı ve yazım `cases`
       silindikten SONRA yapılıyor → satır çoktan gitmiş, güncelleme 0 satır
@@ -186,10 +201,11 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
         ANAHTARSIZDIR — bağlanırsa aynı kusur geri gelir; tezgâh SQL metnini
         de denetliyor. Tablo yoksa (42P01) silme DURMAZ ama sessiz geçilmez,
         uyarı çağırana taşınır.
-      · **KALAN:** `tests/sabit/kapanis-istatistigi.sql` **Cowork tarafından
-        çalıştırılmalı** (§10 — SQL metnini Code yazar, çalıştırmayı Cowork
-        yapar). Çalıştırılana kadar silme çalışır ama kanıt yazılamaz ve her
-        silmede uyarı döner. Doğrulama sorguları betiğin sonundadır.
+      · **COWORK YAPTI (29.08, HAT H-23):** `kapanis_istatistigi` canlıda.
+        Üç doğrulama da beklenen değerde: 0 satır · RLS açık ·
+        **yabancı anahtar 0** (kritik olan buydu — cascade kusuru geri
+        gelmiyor). Yazma politikası konmadı; servis anahtarı RLS'i aşar,
+        istemci sahte kayıt yazamaz.
       · Ayrıca ölü dal kaldırıldı: koldaki "zaten silinmiş" denetimi HİÇ
         çalışamıyordu (aynı cascade yüzünden).
 

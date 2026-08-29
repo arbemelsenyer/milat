@@ -83,6 +83,21 @@ describe("periyodik imha: güvenli tasarım bozulmuyor", () => {
     expect(kolIdx, "silme kapsam kurulmadan yapılıyor").toBeGreaterThan(kapsamIdx);
   });
 
+  it("KALICI tür 'eksik' gibi raporlanmıyor", () => {
+    /* NULL süre iki ayrı şey demekti ve kol ikisini de "süre girilmemiş" diye
+       raporluyordu: biri KARAR BEKLİYOR, öteki KURUCU KARARIYLA KALICI
+       (onay kayıtları · anonim kapanış istatistiği). Aynı cümle birinde
+       "eksik iş", ötekinde "doğru çalışıyor" demek; ayırt edilemeyince kalıcı
+       kayıt sonsuza kadar yapılacak iş sanılır. 29.08 kuru koşumunda görüldü. */
+    expect(G, "kalici kolonu okunmuyor").toContain('baslangic, kalici');
+    expect(G, "kalıcı tür ayrı raporlanmıyor").toContain('durum: "kalıcı"');
+    // İki dal da NULL kapısının İÇİNDE: kalıcı olan da silinmiyor.
+    const bas = G.indexOf("if (s.saklama_gun == null)");
+    const blok = G.slice(bas, bas + 400);
+    expect(blok).toContain("continue;");
+    expect(blok, "kalıcı dalı NULL kapısının dışında").toContain('durum: "kalıcı"');
+  });
+
   it("kuru koşum var (silmeden önce ne silineceği görülebiliyor)", () => {
     expect(G).toContain("kuru");
     expect(G).toMatch(/govde\?\.kuru === true/);

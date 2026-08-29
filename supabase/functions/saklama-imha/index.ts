@@ -61,6 +61,13 @@ type Sure = {
   veri_turu: string;
   saklama_gun: number | null;
   baslangic: string;
+  /* 29.08.2026 · H-15/1: NULL süre iki AYRI şey demekti ve kol ikisini de
+     "süre girilmemiş" diye raporluyordu — biri KARAR BEKLİYOR, öteki KURUCU
+     KARARIYLA KALICI. Aynı cümle, birinde "eksik iş", ötekinde "doğru
+     çalışıyor" demek; ayırt edilemeyince kalıcı kayıt sonsuza kadar
+     yapılacak iş sanılır. Cowork tabloya `kalici` kolonunu tam bu yüzden
+     ekledi; kol da artık ikisini ayırıyor. */
+  kalici: boolean | null;
 };
 
 /** Veri türü → hangi tablo, hangi zaman kolonu. Tablo adları KODDA sabittir;
@@ -115,7 +122,7 @@ Deno.serve(async (req) => {
     const kuru = govde?.kuru === true;   // yalnız say, silme
 
     const { data: sureler, error: sureErr } = await admin
-      .from("saklama_sureleri").select("veri_turu, saklama_gun, baslangic");
+      .from("saklama_sureleri").select("veri_turu, saklama_gun, baslangic, kalici");
     if (sureErr) {
       // Tablo yoksa bunu AÇIKÇA söyle: sessizce "hiçbir şey silinmedi" deme.
       return json({
@@ -130,10 +137,14 @@ Deno.serve(async (req) => {
 
     for (const s of ((sureler ?? []) as Sure[])) {
       const tur = String(s.veri_turu);
-      // SÜRE GİRİLMEMİŞSE DOKUNMA. Bu, tablonun değer olmadan kurulmasının
-      // güvenlik karşılığıdır: karar gelmeden hiçbir şey silinmez.
+      /* SÜRE GİRİLMEMİŞSE DOKUNMA. Bu, tablonun değer olmadan kurulmasının
+         güvenlik karşılığıdır: karar gelmeden hiçbir şey silinmez.
+         Ama SEBEBİ doğru söyle: `kalici` olan tür eksik değil, BİLEREK
+         süresizdir (onay kayıtları · anonim kapanış istatistiği). */
       if (s.saklama_gun == null) {
-        sonuc.push({ tur, durum: "atlandı", sebep: "süre girilmemiş" });
+        sonuc.push(s.kalici === true
+          ? { tur, durum: "kalıcı", sebep: "kurucu kararıyla silinmez" }
+          : { tur, durum: "atlandı", sebep: "süre girilmemiş" });
         continue;
       }
       const hedef = TUR_HARITASI[tur];
