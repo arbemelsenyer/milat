@@ -200,7 +200,11 @@ export default function Verilerim() {
           {
             ad: "Yapay zekâ kullanım bilgilendirmesi onayım",
             sayi: yzOnay,
-            gorebilen: "Belirsiz — bu kaydın erişim politikası bu sayfadan doğrulanamadı.",
+            /* 29.08: "Belirsiz" yazıyordu. Politika okunabilir durumdaydı:
+               `party_own_consent` (kaydın sahibi taraf) + `mediator_reads_consent`
+               (dosyanın arabulucusu / açan hesap / yönetici). Karşı taraf
+               ikisine de girmiyor. Tarafa "bilmiyorum" demek için sebep yoktu. */
+            gorebilen: "Siz, arabulucunuz ve yönetici. Karşı taraf göremez.",
             /* 29.08: burada `dosya_kapanis_sonrasi` yazıyordu, yani tarafa
                "kapanıştan 7 gün sonra silinir" deniyordu. Onay kayıtları
                KURUCU KARARIYLA KALICIDIR (HAT H-15 · 2. madde) — söz yanlıştı. */
@@ -215,14 +219,33 @@ export default function Verilerim() {
           },
           {
             ad: "Randevu tekliflerim ve cevaplarım",
-            sayi: randevu,
-            gorebilen: "Belirsiz — bu kaydın erişim politikası bu sayfadan doğrulanamadı.",
+            /* 29.08 KUSURU: burada `sayi: randevu` yazıyordu ve tarafa
+               **0** gösteriyordu. `randevu_teklifleri` üzerinde tek politika
+               var (`mediator_reads_offers`) ve TARAFI KAPSAMIYOR: tarafın
+               kendi oturumuyla yaptığı sayım RLS tarafından süzülüyor, hata
+               dönmüyor, sıfır dönüyor. Canlıda 11 satır vardı ve hepsi tarafa
+               aitti; sayfa "0" diyordu. Okunamayan bir sayıyı gerçek gibi
+               göstermek, boş bırakmaktan kötüdür. Sayı artık gizlenmiyor,
+               okunamadığı SÖYLENİYOR (aynı desen "analizler" kategorisinde
+               zaten vardı). Tarafın kendi tekliflerini görebilmesi bir RLS
+               kararıdır ve HAT H-26'da kurucuya soruldu. */
+            sayi: null,
+            gorebilen: "Arabulucunuz ve yönetici. Bu sayfadan siz okuyamıyorsunuz.",
+            not: "Bu kayıtların sayısı bu sayfadan okunamaz; erişim politikası izin vermez. "
+              + "Randevu tekliflerini arabulucunuzdan isteyebilirsiniz.",
             sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
           },
           {
             ad: "Bildirdiğim müsait gün ve saatler",
             sayi: musaitlik,
-            gorebilen: "Belirsiz — bu kaydın erişim politikası bu sayfadan doğrulanamadı.",
+            /* 29.08: "Belirsiz" yazıyordu. Politika tek ve açık:
+               `party_manages_own_availability` — yalnız kaydın sahibi taraf.
+               Arabulucunun doğrudan okuma politikası YOK; müsaitliği randevu
+               önerisi üretilirken `ajan-nobetci` servis anahtarıyla okuyor.
+               Tarafa bu ikisi birlikte söylenir, yoksa "yalnız siz" cümlesi
+               eksik kalır. */
+            gorebilen: "Yalnız siz. Arabulucunuz bunu doğrudan görmez; "
+              + "randevu önerisi üretilirken sistem üzerinden kullanılır.",
             sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
           },
           {

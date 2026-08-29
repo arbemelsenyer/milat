@@ -17,6 +17,53 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
+### H-26 · 29.08.2026 · P1 — taraf kendi randevu tekliflerini göremiyor (RLS kararı)
+
+**Sorun.** `randevu_teklifleri` üzerinde **tek** politika var:
+`mediator_reads_offers` — dosyanın arabulucusu / açan hesap / yönetici okur.
+**Tarafın okuma politikası YOK.** Sonuç: taraf kendi oturumuyla bu tabloyu
+sorguladığında RLS satırları süzüyor, **hata dönmüyor, SIFIR dönüyor.**
+Canlıda **11 randevu teklifi** var ve **11'i de tarafa ait**; "Verilerim"
+sayfası tarafa **"0"** diyordu.
+
+**Kod tarafını düzelttim, karar sizde.** Sayfa artık sayıyı uydurmuyor:
+"Bu kayıtların sayısı bu sayfadan okunamaz; erişim politikası izin vermez"
+diyor (aynı desen "analizler" kategorisinde zaten vardı). Yani **yalan
+bitti** — ama taraf hâlâ kendi randevu tekliflerini göremiyor.
+
+**Bu bir RLS kararıdır (§7.4), onun için sormadan yapmadım.**
+
+**Seçenekler.**
+- **(a)** Tarafa kendi tekliflerini okuma politikası ekle:
+  ```sql
+  create policy "Taraf kendi randevu tekliflerini görür"
+    on public.randevu_teklifleri for select
+    using (exists (select 1 from public.case_parties p
+                   where p.id = randevu_teklifleri.party_id
+                     and p.user_id = auth.uid()));
+  ```
+  Yalnız **kendi** satırlarını görür; karşı tarafın teklifleri kapalı kalır.
+  Desen, `taraf_musaitlik` ve `yz_beyan_onaylari`da zaten kullanılan desendir.
+- **(b)** Dokunma. Taraf randevu tekliflerini yalnız arabulucudan öğrenir;
+  "Verilerim" sayfası da bunu açıkça söyler (bugünkü hâli).
+- **(c)** Sayfadan kategoriyi tümüyle kaldır.
+
+**Önerim: (a).** Gerekçe: bu satırlar **tarafın kendi verisidir** ve sayfanın
+sözü "sizinle ilgili tutulan bilgilerin dökümünü görürsünüz". Taraf kendisine
+yapılan randevu teklifini göremiyorsa döküm eksik. Gizlilik açısından risk yok:
+politika `party_id` üzerinden yalnız kendi satırına açılıyor, karşı tarafınkine
+değil. **(c)'yi önermiyorum** — kaydı gizlemek, kaydın var olmadığı anlamına
+gelmez; aydınlatmanın amacı tam tersi.
+
+**Kararın etkisi.** (a) tek `create policy` cümlesi, geri alınabilir, dağıtım
+gerektirmez. Uygulanınca `Verilerim.tsx`teki `sayi: null` geri `sayi: randevu`
+yapılır ve tezgâh o denetimi güncellenir — ikisini de ben yaparım.
+
+**Yan bulgu (karar gerektirmez, kayıt için):** `taraf_musaitlik` üzerinde de
+yalnız tarafın kendi politikası var; arabulucunun doğrudan okuma izni yok.
+Bu bir kusur DEĞİL — müsaitliği `ajan-nobetci` servis anahtarıyla okuyup
+randevu önerisi üretiyor. Sayfada artık bu da açıkça yazıyor.
+
 ### H-25 · 29.08.2026 · P3 — COWORK İŞİ: silinecek 17 kesin tekrar (24,7 MB) · H-22 (1) uygulaması
 
 **Önce ölçüm düzeltmesi — sizin rakamınız doğru, benim ETİKETİM yanlıştı.**

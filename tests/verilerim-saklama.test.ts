@@ -74,12 +74,44 @@ describe("Verilerim: süre sözü doğru", () => {
   it("ONAY KAYITLARI kendi türüne bağlı — dosya süresine değil", () => {
     /* Kusurun kendisi: iki onay kategorisi `dosya_kapanis_sonrasi`ya bağlıydı
        ve tarafa "kapanıştan sonra silinir" deniyordu. */
-    const onayBloklari = [...EKRAN.matchAll(/ad: "([^"]*[Oo]nay[^"]*)",[\s\S]{0,600}?sure: sureMetni\(sureler\.get\("([a-z0-9_]+)"\)/g)];
+    const onayBloklari = [...EKRAN.matchAll(/ad: "([^"]*[Oo]nay[^"]*)",[\s\S]{0,1600}?sure: sureMetni\(sureler\.get\("([a-z0-9_]+)"\)/g)];
     expect(onayBloklari.length, "onay kategorisi bulunamadı").toBeGreaterThanOrEqual(2);
     for (const [, ad, tur] of onayBloklari) {
       expect(tur, `"${ad}" yanlış süreye bağlı — onay kaydı kalıcıdır`)
         .toBe("onay_kayitlari");
     }
+  });
+});
+
+describe("Verilerim: okunamayan sayı gerçek gibi gösterilmiyor", () => {
+  it("SESSİZ SIFIR YOK — RLS süzdüğü kategori sayı göstermiyor", () => {
+    /* 29.08 KUSURU: "Randevu tekliflerim ve cevaplarım" kategorisi tarafa
+       **0** gösteriyordu. `randevu_teklifleri` üzerinde tek politika var
+       (`mediator_reads_offers`) ve tarafı kapsamıyor: tarafın kendi
+       oturumuyla yaptığı sayım RLS tarafından süzülüyor, HATA DÖNMÜYOR,
+       sıfır dönüyor. Canlıda 11 satır vardı, hepsi tarafa aitti, sayfa "0"
+       diyordu. Okunamayan bir sayıyı gerçek gibi göstermek, boş bırakmaktan
+       kötüdür — taraf "hiç teklif almamışım" diye okur. */
+    const bas = EKRAN.indexOf('ad: "Randevu tekliflerim ve cevaplarım"');
+    expect(bas, "randevu kategorisi bulunamadı").toBeGreaterThan(-1);
+    const blok = EKRAN.slice(bas, bas + 1400);
+    expect(blok, "okunamayan sayı yine gösteriliyor").not.toMatch(/sayi:\s*randevu/);
+    expect(blok).toMatch(/sayi:\s*null/);
+    expect(blok, "okunamadığı söylenmiyor").toContain("bu sayfadan okunamaz");
+  });
+
+  it("TARAFA 'Belirsiz' DENMİYOR — politika okunabiliyorsa yazılır", () => {
+    /* H-15/1: "Belirsiz yazan kategori kalmayacak." Üç kategori
+       "bu kaydın erişim politikası bu sayfadan doğrulanamadı" diyordu; oysa
+       üçünün de politikası `pg_policies`ten okunabiliyordu. */
+    expect(EKRAN, "hâlâ 'Belirsiz' diyen kategori var")
+      .not.toContain('gorebilen: "Belirsiz');
+    // Her kategorinin bir `gorebilen` cümlesi olmalı.
+    // Tip bildirimi (`gorebilen: string;`) kategori değildir — tırnak ara.
+    const kategoriSayisi = (EKRAN.match(/^\s*ad: "/gm) ?? []).length;
+    const gorebilenSayisi = (EKRAN.match(/^\s*gorebilen: "/gm) ?? []).length;
+    expect(gorebilenSayisi, "bazı kategoride 'kimin gördüğü' yazmıyor")
+      .toBe(kategoriSayisi);
   });
 });
 

@@ -147,6 +147,27 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
+- [x] P1 · **"Verilerim" tarafa okunamayan sayıyı gerçek gibi gösteriyordu** ·
+      Kabul: RLS'in süzdüğü kategori sayı göstermiyor, okunamadığını söylüyor;
+      hiçbir kategoride "Belirsiz" kalmadı · **DONE 29.08.2026**
+      · Doğrulama: `npm run test` **428/428** (öncesi 426) · tsc temiz
+      · **KUSUR:** "Randevu tekliflerim ve cevaplarım" tarafa **0** diyordu.
+        `randevu_teklifleri` üzerinde tek politika var (`mediator_reads_offers`)
+        ve tarafı kapsamıyor: tarafın sorgusu RLS'te süzülüyor, **hata dönmüyor,
+        sıfır dönüyor.** Canlıda **11 satır** var, **11'i de tarafa ait**.
+        Okunamayan sayıyı gerçek gibi göstermek boş bırakmaktan kötüdür —
+        taraf "hiç teklif almamışım" diye okur.
+      · **ÜÇ "Belirsiz" SATIRI GERÇEĞE ÇEVRİLDİ.** Üçünün de politikası
+        `pg_policies`ten okunabiliyordu; tarafa "bilmiyorum" demek için sebep
+        yoktu. `yz_beyan_onaylari` → "Siz, arabulucunuz ve yönetici; karşı
+        taraf göremez." · `taraf_musaitlik` → "Yalnız siz; arabulucunuz
+        doğrudan görmez, randevu önerisi üretilirken sistem üzerinden
+        kullanılır" (`ajan-nobetci` servis anahtarıyla okuyor — doğrulandı).
+      · **AÇIK KALAN — HAT H-26:** tarafın kendi randevu tekliflerini
+        görebilmesi bir RLS kararıdır (§7.4). Kod yalanı bitirdi; erişimi
+        açmak kurucunun kararı. Önerim (a): `party_id` üzerinden yalnız kendi
+        satırına okuma politikası.
+
 - [x] P1 · **"Verilerim" tarafa onay kayıtları için YANLIŞ süre söylüyordu** ·
       Kabul: kalıcı kayıt "silinir" diye anlatılmıyor; onay kategorileri kendi
       türüne bağlı; ekranın sorduğu her tür göç betiğinde kurulu
