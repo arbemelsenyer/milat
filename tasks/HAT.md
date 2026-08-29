@@ -17,141 +17,6 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
-### H-26 · 29.08.2026 · P1 — taraf kendi randevu tekliflerini göremiyor (RLS kararı)
-
-**Sorun.** `randevu_teklifleri` üzerinde **tek** politika var:
-`mediator_reads_offers` — dosyanın arabulucusu / açan hesap / yönetici okur.
-**Tarafın okuma politikası YOK.** Sonuç: taraf kendi oturumuyla bu tabloyu
-sorguladığında RLS satırları süzüyor, **hata dönmüyor, SIFIR dönüyor.**
-Canlıda **11 randevu teklifi** var ve **11'i de tarafa ait**; "Verilerim"
-sayfası tarafa **"0"** diyordu.
-
-**Kod tarafını düzelttim, karar sizde.** Sayfa artık sayıyı uydurmuyor:
-"Bu kayıtların sayısı bu sayfadan okunamaz; erişim politikası izin vermez"
-diyor (aynı desen "analizler" kategorisinde zaten vardı). Yani **yalan
-bitti** — ama taraf hâlâ kendi randevu tekliflerini göremiyor.
-
-**Bu bir RLS kararıdır (§7.4), onun için sormadan yapmadım.**
-
-**Seçenekler.**
-- **(a)** Tarafa kendi tekliflerini okuma politikası ekle:
-  ```sql
-  create policy "Taraf kendi randevu tekliflerini görür"
-    on public.randevu_teklifleri for select
-    using (exists (select 1 from public.case_parties p
-                   where p.id = randevu_teklifleri.party_id
-                     and p.user_id = auth.uid()));
-  ```
-  Yalnız **kendi** satırlarını görür; karşı tarafın teklifleri kapalı kalır.
-  Desen, `taraf_musaitlik` ve `yz_beyan_onaylari`da zaten kullanılan desendir.
-- **(b)** Dokunma. Taraf randevu tekliflerini yalnız arabulucudan öğrenir;
-  "Verilerim" sayfası da bunu açıkça söyler (bugünkü hâli).
-- **(c)** Sayfadan kategoriyi tümüyle kaldır.
-
-**Önerim: (a).** Gerekçe: bu satırlar **tarafın kendi verisidir** ve sayfanın
-sözü "sizinle ilgili tutulan bilgilerin dökümünü görürsünüz". Taraf kendisine
-yapılan randevu teklifini göremiyorsa döküm eksik. Gizlilik açısından risk yok:
-politika `party_id` üzerinden yalnız kendi satırına açılıyor, karşı tarafınkine
-değil. **(c)'yi önermiyorum** — kaydı gizlemek, kaydın var olmadığı anlamına
-gelmez; aydınlatmanın amacı tam tersi.
-
-**Kararın etkisi.** (a) tek `create policy` cümlesi, geri alınabilir, dağıtım
-gerektirmez. Uygulanınca `Verilerim.tsx`teki `sayi: null` geri `sayi: randevu`
-yapılır ve tezgâh o denetimi güncellenir — ikisini de ben yaparım.
-
-**Yan bulgu (karar gerektirmez, kayıt için):** `taraf_musaitlik` üzerinde de
-yalnız tarafın kendi politikası var; arabulucunun doğrudan okuma izni yok.
-Bu bir kusur DEĞİL — müsaitliği `ajan-nobetci` servis anahtarıyla okuyup
-randevu önerisi üretiyor. Sayfada artık bu da açıkça yazıyor.
-
-### H-25 · 29.08.2026 · P3 — COWORK İŞİ: silinecek 17 kesin tekrar (24,7 MB) · H-22 (1) uygulaması
-
-**Önce ölçüm düzeltmesi — sizin rakamınız doğru, benim ETİKETİM yanlıştı.**
-`admin/` altında **121 dosya · 65,3 MB** var; **105'i eski** düzende
-(57,3 MB) · **16'sı yeni** düzende (8,0 MB). Sizin sayımınızı doğruladım.
-
-Kendi "71" rakamım *sayı olarak* doğruydu ama **"öksüz" demek yanlıştı** ve
-yanlış olan kısım tam da sizin işaret ettiğiniz yerdi. Tam ayrım şu:
-
-| küme | adet | ne demek |
-|---|---|---|
-| bilgi tabanının **gösterdiği** nüsha | **50** | canlı, dokunulmaz |
-| **eskimiş nüsha** (aynı adın canlı bir kardeşi var) | **15** | tekrar — silinebilir |
-| **hiç gösterilmeyen** | **56** | 48 şablon `.docx` (1,3 MB) + 8 PDF (12,0 MB) |
-
-Yani 71'in 15'i gerçekten fazlalık, 56'sı ise "ölü" değil **hiç bağlanmamış**
-— ve büyük çoğunluğu sizin "dokunma" dediğiniz şablonlar. "Öksüz" kelimesi
-üçünü tek torbaya koydu; kaybolmuş içerik izlenimi verdi. **Bu, 27.08'deki
-iki hatanın üçüncüsü:** daraltılmış bir ölçünün sonucunu, ölçünün sorduğundan
-daha geniş bir cümleyle söylemek. Ders `tasks/lessons.md`ye yazıldı — bu kez
-kural olarak değil **mecburi adım** olarak: yokluk iddiası, onu çürütecek
-kontrol sorgusuyla birlikte ve **toplamla oranlanarak** yazılır.
-
-**Not — 8 PDF hakkında:** 6102 TTK'nın iki tam nüshası da bu kümede. Sebebi
-sizin çözümünüz: TTK bilgi tabanına **7 parça hâlinde** girmiş, yani canlı
-olan parçalar, tam nüshalar değil. Aynı durum 7036'da da var. Bunlar
-"kaybolmuş" değil, **kullanılmayan asıl nüshalar**. Kararınız gereği
-dokunulmadı; yalnız kesin tekrar olanlar listeye girdi.
-
-**ŞABLON TARAMASI YAPILDI — .docx'lere DOKUNULMADI, ama artık kanıt var.**
-`generate-official-document` şablonu **depodan okumuyor**: `document_templates`
-tablosundaki `template_content` (metin) alanından okuyor; `source_url` yalnız
-künye olarak çıktıya taşınıyor. Canlı sayım: **47 şablonun 47'sinin metni var,
-`storage://` ile depoya işaret eden şablon sayısı SIFIR.** Yani belge motoru bu
-`.docx` dosyalarına hiç dokunmuyor. Yine de **silmedim** — kararınız "grup 2
-silinmez" idi; bu yalnız kanıt kaydıdır, silme kararı sizindir.
-
-**SİLİNECEK LİSTE — 17 dosya · 24,7 MB.** Seçim kuralı: aynı taban ad + aynı
-bayt boyutu olan öbeklerde **canlı nüsha korunur**, canlı yoksa **en yenisi**
-korunur. Önce "en yeni kalsın" diye kurmuştum; kontrol edince gördüm ki bazı
-öbeklerde canlı nüsha en yeni DEĞİL — o kuralla canlı bilgi tabanının
-gösterdiği dosyayı silecektim. Kural düzeltildi.
-
-**GÜVENLİK KONTROLÜ (canlı):** silinecek 17'nin **canlı olanı SIFIR**;
-korunanların **11'i** canlı bilgi tabanının gösterdiği nüsha. Kontrol
-`knowledge_base_chunks` + `document_templates` `source_url`larına karşı yapıldı.
-
-```
-admin/knowledge/1785664337084-6102_say_l__T_rk_Ticaret_Kanunu.pdf
-admin/knowledge/1782912317922-KI_RA_UYUS_MAZIKLARI_VE_ARABULUCULUK-BAKI__AKADEMI_.pdf
-admin/knowledge/1782912422892-KI_RA_UYUS_MAZIKLARI_VE_ARABULUCULUK-BAKI__AKADEMI_.pdf
-admin/knowledge/1782912325720-KI_RA_UYUS_MAZIKLARI_VE_ARABULUCULUK-BAKI__AKADEMI_.pdf
-admin/knowledge/1785575901050-5510_Sosyal_Sigortalar_ve_Genel_Sa_l_k_Sigortas__Kanunu.pdf
-admin/knowledge/1785575911106-6098_Say_l__T_rk_Bor_lar_Kanunu.pdf
-admin/knowledge/1785664493357-23528_say_l__S_nai_M_lkiyet_Kanununun_Uygulanmas_na_Dair_Y_netmelik.pdf
-admin/knowledge/1785664158265-4857_Say_l_____Kanunu.pdf
-admin/knowledge/1785664293295-5846_say_l__Fikir_ve_Sanat_Eserleri_Kanunu.pdf
-admin/knowledge/1785664340749-6356_Sendikalar_ve_Toplu____S_zle_mesi_Kanunu.pdf
-admin/knowledge/1785575913121-6356_Sendikalar_ve_Toplu____S_zle_mesi_Kanunu.pdf
-admin/knowledge/1785664046590-854_say_l__Deniz____Kanunu.pdf
-admin/knowledge/1785664298974-5953_Bas_n____Kanunu.pdf
-admin/knowledge/1785575909219-5953_Bas_n____Kanunu.pdf
-admin/knowledge/spor/6284_sayili_Ailenin_Korunmasi_ve_Kadina_Karsi_Siddetin_Onlenmesine_Dair_Kanun.pdf
-admin/knowledge/1785664068007-1475_say_l_____Kanunu.pdf
-admin/knowledge/1785577771331-7036_say_l_____Mahkemeleri_Kanunu.pdf
-```
-
-**Listedeki tek yeni-düzen dosyası bir YANLIŞ KATEGORİ.** `spor/` altındaki
-6284 (Ailenin Korunması Kanunu) ile `aile/` altındaki nüsha **bayt bayt
-aynı**; canlı olan `aile/` olanıdır. Yani bu kanun bir kez yanlışlıkla "spor"
-alanına yüklenmiş. Silinen o kopya; `aile/` nüshası duruyor.
-
-**Nasıl silinecek.** Depo API'siyle — SQL ile `storage.objects` satırını
-silmek YETMEZ (satır gider, dosya kalır, bir daha hiç bulunamaz). Lovable
-ajanına "şu 17 yolu `case-documents` kovasından sil" demek yeterli.
-
-**Başarı kontrolü.** Silme sonrası:
-```sql
-select count(*) as admin_dosya,
-       round(sum(coalesce((metadata->>'size')::numeric,0))/1048576,1) as mb
-from storage.objects where bucket_id='case-documents' and name like 'admin/%';
-```
-Beklenen: **121 → 104 dosya**, **65,3 → 40,6 MB**. Ayrıca bilgi tabanı kaynak
-sayısı DEĞİŞMEMELİ (silinenlerin hiçbiri canlı değil).
-
-
-
-
 ### H-21 · 28.08.2026 · P1 — `.env` deposa girmiş; çıkarmak canlı yayını kırabilir
 
 **Sorun.** `.env` dosyası git'te **izleniyor** (`git ls-files .env` onu
@@ -533,47 +398,6 @@ Seçim: A / B / C / (kendi metniniz)
 Not: (varsa)
 ```
 
-### H-25 · CEVAP · 29.08.2026 — ERTELENDİ, PİLOT SONRASI
-Seçim: **hiçbiri şimdi yapılmasın.** Kurucu kararı: **silme ertelendi.**
-
-Gerekçe: 17 dosya · 24,7 MB, tamamı **tekrar eden kamuya açık kanun PDF'i**.
-Kişisel veri yok, KVKK meselesi değil, hiçbir kolu yanıltmıyor, canlı bilgi
-tabanının gösterdiği nüsha aralarında değil. Yani **hiçbir şeyi bozmuyorlar** —
-yalnız yer kaplıyorlar. Buna karşılık silmenin tek yolu depo API'si ve o da
-Lovable ajanına iş vermeyi, yani **kredi harcamayı** gerektiriyor. Kazanç
-(24,7 MB) maliyeti karşılamıyor.
-
-**Ne zaman yapılacak:** başka bir iş için Lovable'a zaten girildiği ilk turda,
-aynı turun içinde. Ya da depo dolmaya başlarsa. **Liste yukarıdaki H-25
-maddesinde duruyor, kaybolmadı.**
-
-**Sana iş yok.** Bu maddeyi kuyruktan düşür, `tasks/todo.md`de "pilot sonrası"
-olarak işaretle, açık blokaj listesinden çıkar. Pilot kapısını bloklamıyor.
-
-### H-26 · CEVAP · 29.08.2026 — (a) SEÇİLDİ ve CANLIDA UYGULANDI
-Seçim: **(a)** — taraf kendi randevu tekliflerini görür.
-
-Gerekçe ayrıca karar değil, **anayasanın kendi kuralıdır** (m.1): *"taraf yalnız
-kendi satırlarını görür (süzgeç SORGUDA)"*. Bu satırlar tarafın kendi verisidir;
-göremiyorsa "Verilerim" sayfasının sözü eksik kalıyordu. Karşı tarafın teklifi
-kapalı — süzgeç `party_id` üzerinden yalnız kendi satırına açılıyor.
-
-**Cowork canlıda çalıştırdı (Lovable MCP):**
-```sql
-create policy "Taraf kendi randevu tekliflerini görür"
-  on public.randevu_teklifleri for select
-  using (exists (select 1 from public.case_parties p
-                 where p.id = randevu_teklifleri.party_id
-                   and p.user_id = auth.uid()));
-```
-**Doğrulama:** `pg_policies` → `randevu_teklifleri` üzerinde artık **iki SELECT
-politikası** var: `mediator_reads_offers` (eskisi, dokunulmadı) ve
-`Taraf kendi randevu tekliflerini görür` (yeni). Yazma politikası KONMADI.
-
-**SIRA SENDE:** `Verilerim.tsx`te `sayi: null`'u geri `sayi: randevu` yap ve o
-kategorinin tezgâh denetimini güncelle (kendi yazdığın madde). Ayrıca
-`tasks/todo.md`deki "H-26 karar bekliyor" satırını kapat.
-
 ### H-15/1 · CEVAP DEĞİŞTİ · 25.08.2026 — SIFIR SAKLAMA
 **Bu blok, aşağıdaki "TEK ÇATI 5 YIL" kararının YERİNE GEÇER. 5 yıl artık geçersizdir.**
 
@@ -845,6 +669,65 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+### H-26 · KAPANDI · 29.08.2026 — taraf kendi randevu tekliflerini görüyor
+**Kurucu (a)'yı seçti.** Gerekçe ayrıca karar değil, anayasanın kendi kuralı
+(m.1): *"taraf yalnız kendi satırlarını görür, süzgeç SORGUDA"*.
+**Cowork canlıda uyguladı:** `Taraf kendi randevu tekliflerini görür` politikası
+(`party_id` üzerinden yalnız kendi satırı; karşı tarafın teklifi kapalı).
+**Code bağımsız doğruladı:** `randevu_teklifleri` üzerinde artık **2 SELECT
+politikası** var (`mediator_reads_offers` dokunulmadı). Yazma politikası yok.
+**Code uyguladı (`e539bb0`):** `Verilerim.tsx` `sayi: null` → `sayi: randevu`;
+`gorebilen` metni gerçeklendi ve karşı tarafın gizliliği açıkça yazıldı.
+**Tezgâh kuralı SİLİNMEDİ, genelleştirildi:** "SESSİZ SIFIR YOK" denetimi
+randevu satırına bağlıydı; kural artık bütün kategorileri geziyor —
+*okunamadığı söylenen kategoride sayı gösterilmez; sayı gizlenen kategoride
+neden gizlendiği yazar.* Kural randevuya bağlı kalsaydı bu maddeyle birlikte
+silinir ve kusur başka bir kategoride sessizce geri gelebilirdi.
+Doğrulama: `npm run test` **429/429** · tsc + build temiz · ısırdığı kanıtlandı.
+
+### H-25 · KAPANDI (ERTELENDİ) · 29.08.2026 — 17 tekrar dosyası pilot sonrasına
+**Kurucu kararı: silme ertelendi.** Gerekçe: 17 dosya · 24,7 MB, tamamı tekrar
+eden kamuya açık kanun PDF'i — kişisel veri yok, hiçbir kolu yanıltmıyor, canlı
+nüsha aralarında değil. Silmenin tek yolu depo API'si ve Lovable kredisi
+harcıyor; 24,7 MB kazanç maliyeti karşılamıyor.
+**Ne zaman:** başka bir iş için Lovable'a zaten girilen ilk turda, ya da depo
+dolmaya başlarsa. **Liste kaybolmadı — aşağıda duruyor.**
+
+Seçim kuralı: aynı taban ad + aynı bayt boyutu öbeğinde **canlı nüsha
+korunur**, canlı yoksa en yenisi korunur. (Önce "en yeni kalsın" kurmuştum;
+kontrol edince bazı öbeklerde canlı nüshanın en yeni OLMADIĞINI gördüm — o
+kuralla canlı bilgi tabanını silecektim.) **Silinecek 17'nin canlı olanı
+SIFIR**; korunanların 11'i canlı. Silme **depo API'siyle** yapılır — SQL ile
+`storage.objects` satırını silmek yetmez.
+
+```
+admin/knowledge/1785664337084-6102_say_l__T_rk_Ticaret_Kanunu.pdf
+admin/knowledge/1782912317922-KI_RA_UYUS_MAZIKLARI_VE_ARABULUCULUK-BAKI__AKADEMI_.pdf
+admin/knowledge/1782912422892-KI_RA_UYUS_MAZIKLARI_VE_ARABULUCULUK-BAKI__AKADEMI_.pdf
+admin/knowledge/1782912325720-KI_RA_UYUS_MAZIKLARI_VE_ARABULUCULUK-BAKI__AKADEMI_.pdf
+admin/knowledge/1785575901050-5510_Sosyal_Sigortalar_ve_Genel_Sa_l_k_Sigortas__Kanunu.pdf
+admin/knowledge/1785575911106-6098_Say_l__T_rk_Bor_lar_Kanunu.pdf
+admin/knowledge/1785664493357-23528_say_l__S_nai_M_lkiyet_Kanununun_Uygulanmas_na_Dair_Y_netmelik.pdf
+admin/knowledge/1785664158265-4857_Say_l_____Kanunu.pdf
+admin/knowledge/1785664293295-5846_say_l__Fikir_ve_Sanat_Eserleri_Kanunu.pdf
+admin/knowledge/1785664340749-6356_Sendikalar_ve_Toplu____S_zle_mesi_Kanunu.pdf
+admin/knowledge/1785575913121-6356_Sendikalar_ve_Toplu____S_zle_mesi_Kanunu.pdf
+admin/knowledge/1785664046590-854_say_l__Deniz____Kanunu.pdf
+admin/knowledge/1785664298974-5953_Bas_n____Kanunu.pdf
+admin/knowledge/1785575909219-5953_Bas_n____Kanunu.pdf
+admin/knowledge/spor/6284_sayili_Ailenin_Korunmasi_ve_Kadina_Karsi_Siddetin_Onlenmesine_Dair_Kanun.pdf
+admin/knowledge/1785664068007-1475_say_l_____Kanunu.pdf
+admin/knowledge/1785577771331-7036_say_l_____Mahkemeleri_Kanunu.pdf
+```
+
+Başarı kontrolü: `admin/` altı **121 → 104** dosya · **65,3 → 40,6 MB**;
+bilgi tabanı kaynak sayısı **değişmemeli**.
+**Pilot kapısını BLOKLAMAZ**, açık blokaj sayılmaz.
+Bu madde kapanırken H-22'nin ölçüm düzeltmesi de kayda geçti: `admin/` altında
+121 dosya — **50 canlı · 15 eskimiş nüsha · 56 hiç bağlanmamış** (48 şablon
+`.docx` + 8 PDF). Şablon taraması: belge motoru `.docx`leri hiç okumuyor
+(47 şablonun 47'si `template_content` metninden besleniyor).
+
 ### H-24 · KAPANDI · 29.08.2026 — kurucu "gerçek koşum" dedi, süpürge çalışacak
 Kurucu emniyet süpürgesinin gerçek koşumunu açıkça istedi (H-23 · 5. madde
 talimatı). Yani 5 dosyanın silinmesi onaylandı; bekletme seçeneği (b)

@@ -5,14 +5,16 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: **yok** (`dur` ile kapatıldı). Bu blokta **yedi iş** bitti;
-  hepsi commit'li, push'lu, canlıya dağıtıldı ve canlı pakette doğrulandı.
-  Son commit bu kayıttır.
+- Aktif görev: **yok** (`dur` ile kapatıldı). Bu blokta **sekiz iş** bitti;
+  hepsi commit'li, push'lu ve canlıya dağıtıldı. Son commit bu kayıttır.
+- **Bekçi notu:** `dur` verildikten sonra Stop kancası H-25/H-26'nın arşive
+  taşınmadığını yakaladı (§23). H-25 kod işi değildi; H-26'nın kalan beş
+  satırlık işi yapıldı, ikisi de ARŞİV'e taşındı. Kanca doğru çalıştı.
 
 ### SIRADAKİ UYGULANABİLİR İŞ (yeni oturum buradan başlar)
-**H-26 uygulaması** — kuyruğun en üstünde, tek P1. Karar geldi, politika
-canlıda, Code doğruladı; kalan yalnız `Verilerim.tsx` + tezgâh düzenlemesi.
-Kimseyi beklemiyor.
+**Kuyrukta karar/önkoşul beklemeyen iş KALMADI.** H-26 de kapandı ve arşive
+taşındı. Yeni oturumun ilk işi aşağıdaki **ölçüm**dür (iş değil, doğrulama);
+sonra §6 gereği kodun gerçek durumundan yeni P0/P1 aday çıkarılır.
 
 ### ⚠ AÇIK VE ZAMANA BAĞLI: EMNİYET SÜPÜRGESİ HENÜZ KOŞMADI
 `cron.job_run_details` son koşumu **29.08 03:00 UTC** gösteriyor — o koşum
@@ -182,22 +184,21 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
-- [ ] P1 · **H-26 uygulaması: taraf kendi randevu tekliflerini görsün** ·
-      **KARAR GELDİ VE CANLIDA UYGULANDI** (H-26 cevabı: seçenek (a); Cowork
-      politikayı çalıştırdı). Code doğruladı: `randevu_teklifleri` üzerinde
-      artık **2 SELECT politikası** var (`mediator_reads_offers` +
-      `Taraf kendi randevu tekliflerini görür`).
-      · **YAPILACAK (bu turda başlanmadı — `medipact dur` verildi):**
-      `src/pages/Verilerim.tsx`te "Randevu tekliflerim ve cevaplarım"
-      kategorisinde `sayi: null` → `sayi: randevu`; `gorebilen` metni
-      "Arabulucunuz ve yönetici. Bu sayfadan siz okuyamıyorsunuz."dan
-      gerçeğe çevrilecek; `not:` satırı kaldırılacak;
-      `tests/verilerim-saklama.test.ts`teki "SESSİZ SIFIR YOK" denetimi
-      randevu yerine **başka bir okunamayan kategoriye** bağlanacak ya da
-      kural "RLS'in süzdüğü kategori sayı göstermez" biçiminde korunacak —
-      denetim SİLİNMEYECEK, yoksa kusur sessizce geri gelebilir.
-      · Kabul: canlıda taraf oturumuyla "Verilerim" açıldığında randevu
-      sayısı **0 değil gerçek sayı** görünüyor; `npm run test` yeşil
+- [x] P1 · **H-26 uygulaması: taraf kendi randevu tekliflerini görüyor** ·
+      **DONE 29.08.2026** · Kabul: kategori gerçek sayıyı gösteriyor,
+      `gorebilen` metni gerçek politikayı anlatıyor, tezgâh kuralı korundu
+      · Doğrulama: `npm run test` **429/429** (öncesi 428) · tsc temiz ·
+      build temiz · commit `e539bb0`
+      · Karar (a); Cowork politikayı canlıda kurdu, Code bağımsız doğruladı:
+        `randevu_teklifleri` üzerinde artık **2 SELECT politikası**.
+      · **TEZGÂH KURALI SİLİNMEDİ, GENELLEŞTİRİLDİ.** "SESSİZ SIFIR YOK"
+        denetimi randevu satırına bağlıydı; bu maddeyle birlikte silinseydi
+        kusur başka bir kategoride sessizce geri gelebilirdi. Kural artık
+        bütün kategorileri geziyor: *okunamadığı söylenen kategoride sayı
+        gösterilmez; sayı gizlenen kategoride neden gizlendiği yazar.*
+      · **CANLI KANIT EKSİK:** taraf oturumuyla ekranın açılıp gerçek sayının
+        görülmesi yapılmadı — Code'un taraf jetonu yok. Kod + politika + tezgâh
+        tarafı tamam; §15.1 şart 4 için kurucunun bir bakışı yeterlidir.
 
 - [x] P1 · **"Verilerim" tarafa okunamayan sayıyı gerçek gibi gösteriyordu** ·
       Kabul: RLS'in süzdüğü kategori sayı göstermiyor, okunamadığını söylüyor;
@@ -260,7 +261,11 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       · **TEZGÂH ISIRDI:** onay kategorisi eski türe bağlanınca 1, kalıcı
         denetimi NULL dalının arkasına alınınca 1 denetim kırmızı yandı.
 
-- [ ] P1 · **Emniyet süpürgesinin GERÇEK koşumu + kayıt kanıtı** (H-23 · 5. madde)
+- [!] P1 · **Emniyet süpürgesinin GERÇEK koşumu + kayıt kanıtı** (H-23 · 5. madde)
+      · **ÖNKOŞUL:** zamanlayıcı. Kol canlıda ve doğru; yeni sürümle ilk
+        koşum **30.08 03:00 UTC**'de. Code tetiklemeyi denedi, izin ekranı
+        engelledi (geri dönüşü olmayan üretim silmesi). Kod işi YOK —
+        yapılacak tek şey koşumdan sonra sayıları ölçmek.
       · Kuru koşum **YAPILDI 29.08**: canlı cevap `surum:
       "2026-08-29-emniyet-supurgesi"` · `dosya_kapanis_sonrasi` →
       `{"durum":"kuru","silinecek":5}` — Code'un bağımsız SQL sayımıyla
