@@ -163,6 +163,20 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
         taraf göremez." · `taraf_musaitlik` → "Yalnız siz; arabulucunuz
         doğrudan görmez, randevu önerisi üretilirken sistem üzerinden
         kullanılır" (`ajan-nobetci` servis anahtarıyla okuyor — doğrulandı).
+      · **KARDEŞ YOLLAR TARANDI — başka sessiz sıfır YOK.** 14 kategorinin
+        beslendiği 12 tablonun `pg_policies` kaydı tek tek okundu: `blind_bids`
+        · `case_discovery_questions` · `teklif_braketleri` · `kayit_onaylari`
+        `is_own_case_party(party_id, auth.uid())` ya da `user_id = auth.uid()`
+        ile tarafa açık; `case_documents` "Party sees own uploads only"
+        (`uploaded_by = auth.uid()`) ve sayfa da tam bu kolonla sayıyor;
+        `case_parties` "Party can view case_parties". **Yalnız
+        `randevu_teklifleri` açıktaydı** ve düzeltilen o.
+        · **Not:** ilk tarama "7 tabloda taraf okuyamıyor" demişti — aramam
+          `qual` içinde `case_parties` metnini arıyordu, oysa politikalar
+          `is_own_case_party()` YARDIMCISINI çağırıyor. Bugünkü dersin
+          (`lessons.md`) gereğini yaparak iddiayı çürütmeye çalıştım ve
+          kendi taramamın dar olduğunu gördüm. Aksi hâlde altı tabloyu
+          yanlışlıkla kusurlu ilan edecektim.
       · **AÇIK KALAN — HAT H-26:** tarafın kendi randevu tekliflerini
         görebilmesi bir RLS kararıdır (§7.4). Kod yalanı bitirdi; erişimi
         açmak kurucunun kararı. Önerim (a): `party_id` üzerinden yalnız kendi
