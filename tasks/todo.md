@@ -1,42 +1,36 @@
 ## Nerede kaldık
 
-- Tarih: **29.08.2026 gece / 30.08 başı** (18. blok) — `medipact dur` ile
-  kapatıldı.
+- Tarih: **29.08.2026 gecesi** (18. blok) — sürüyor.
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: **yok** (`dur` ile kapatıldı). Bu blokta **sekiz iş** bitti;
-  hepsi commit'li, push'lu ve canlıya dağıtıldı. Son commit bu kayıttır.
-- **Bekçi notu:** `dur` verildikten sonra Stop kancası H-25/H-26'nın arşive
-  taşınmadığını yakaladı (§23). H-25 kod işi değildi; H-26'nın kalan beş
-  satırlık işi yapıldı, ikisi de ARŞİV'e taşındı. Kanca doğru çalıştı.
-
-### SIRADAKİ UYGULANABİLİR İŞ (yeni oturum buradan başlar)
-**Kuyrukta karar/önkoşul beklemeyen iş KALMADI.** H-26 de kapandı ve arşive
-taşındı. Yeni oturumun ilk işi aşağıdaki **ölçüm**dür (iş değil, doğrulama);
-sonra §6 gereği kodun gerçek durumundan yeni P0/P1 aday çıkarılır.
+- Aktif görev: yok. Bu blokta **on bir iş** bitti; hepsi commit'li ve push'lu.
 
 ### ⚠ AÇIK VE ZAMANA BAĞLI: EMNİYET SÜPÜRGESİ HENÜZ KOŞMADI
-`cron.job_run_details` son koşumu **29.08 03:00 UTC** gösteriyor — o koşum
-yeni kolun dağıtımından (05:29 UTC) **önceydi**, yani eski kodla koştu.
-Ölçüm (29.08 22:24 UTC): `cases` **10** · süresi geçmiş **5** ·
-`case_parties` **18** · `kapanis_istatistigi` **0**.
-Yeni sürümle ilk koşum **30.08 03:00 UTC**'de. Yeni oturumun ilk işi bu
-sayıları tekrar ölçüp kabul kriterini kapatmaktır:
-`cases` 10→5 · `case_parties` 18→10 · `kapanis_istatistigi` 0→5
-(`sebep='sure_doldu'`). **Koşum yine olmadıysa** kolu değil önce cron'u
-şüphelen (24.08 dersi: cron "succeeded" fonksiyonun çalıştığı anlamına gelmez).
+Son cron koşumu **29.08 03:00 UTC** — yeni kolun dağıtımından (05:29 UTC)
+öncesi, yani eski kodla koştu. Ölçüm (29.08 22:42 UTC): `cases` **10** ·
+süresi geçmiş **5** · `kapanis_istatistigi` **0**. Yeni sürümle ilk koşum
+**30.08 03:00 UTC**'de. Yeni oturumun ilk işi bu sayıları ölçüp kabul
+kriterini kapatmaktır: `cases` 10→5 · `case_parties` 18→10 ·
+`kapanis_istatistigi` 0→5 (`sebep='sure_doldu'`). **Koşum yine olmadıysa**
+kolu değil önce cron'u şüphelen (24.08 dersi).
 
-- Açık blokaj — **ikisi**, ikisi de eski:
-  **H-20** (kurucunun bilgi tabanı yüklemesi) · **H-21** (`.env` kararı).
-  *H-22/23/24 kapandı ve arşivde. H-25 kurucu tarafından **pilot sonrasına
-  ertelendi**, blokaj sayılmaz. H-26 cevaplandı; kalan iş kuyrukta.*
+### SIRADAKİ UYGULANABİLİR İŞ
+Kuyrukta karar/önkoşul beklemeyen iş **kalmadı**. §6 gereği yeni oturum
+kodun gerçek durumundan P0/P1 aday çıkarır. Bu blokta üretken olan yol:
+**"kural bir yerde düzeltildi, kardeş yüzey açık kaldı"** sınıfını kovalamak —
+bu blokta bu sınıftan **yedi** kusur çıktı.
+
+- Açık blokaj — **üç** madde, üçü de kurucu kararı bekliyor:
+  **H-27** (P0 · KVKK imha metni yapılmayan üç şey vaat ediyor + m.11 / dış
+  ürün adı) · **H-20** (bilgi tabanı yüklemesi) · **H-21** (`.env`).
+  *H-22/23/24/25/26 kapandı ve arşivde.*
 - **ÇALIŞMA AĞACINDA YABANCI DEĞİŞİKLİK VAR — DOKUNULMADI (§11).**
   `.agents/skills/medipact-calisma-duzeni/SKILL.md` silinmiş görünüyor;
   ayrıca izlenmeyen `repomix-output.xml`, `devam.sh`, `gs.sh`,
   `Yeni XLSX Worksheet.xlsx`, `.github/.agents/` duruyor.
 
-### 18. BLOKTA BİTENLER (yedi iş — ikisi hariç hepsi TEK KUSUR SINIFI)
+### 18. BLOKTA BİTENLER (on bir iş — çoğu TEK KUSUR SINIFI)
 
 Bu bloğun tamamı şu sınıftan çıktı: **"kural bir yerde yazıldı, kardeş
 yollarda açık kaldı."** 25.08 ve 28.08'de aynı sınıf iki kez görülmüştü;
@@ -80,6 +74,24 @@ tersini söylüyordu. Bu ekranın **ilk tezgâhı** yazıldı.
 var ve hepsi tarafa ait — RLS süzüyor, hata dönmüyor. Üç "Belirsiz" satırı
 da gerçek politikayla değiştirildi. Kardeş yollar tarandı: 12 tablodan
 yalnız biri açıktı.
+
+**8 · P1 · H-26 uygulandı** — `e539bb0`. Taraf kendi randevu tekliflerini
+görüyor; tezgâh kuralı silinmedi, genelleştirildi.
+
+**9 · P1 · "Verilerim" tarafa SABİT "24 saat" gösteriyordu** — `64604f3`.
+Ses/döküm artık kategori, süreleri tablodan geliyor. **Bekçi önce ölü doğdu**
+(`` → backspace baytı); ısırma sınavı yakaladı, bütün depo kontrol baytına
+karşı tarandı.
+
+**10 · P1 · KAYIT ONAY METNİ yanlış saklama sözü veriyordu** — `26b8a34`.
+Onay metni "süreç bitiminden 24 saat sonra silinir" diyordu; ses metne
+çevrildiği an siliniyor. Sürüm v1 → v2 yükseltildi (onay kaydı kalıcı ve
+"hangi metnin hangi sürümü"nü taşıyor). **Parmak izi kilidi** kondu.
+
+**11 · P0 · KVKK imha metni üç yanlış vaat** — `e051130` (HAT **H-27**).
+Hesap silme kolu HİÇ YOK; talep üzerine imha yok; "tüm veriler" yanlış
+(onay kayıtları ve anonim istatistik kalıcı). Hukuki metin olduğu için
+sormadan değiştirilmedi; önerilen metin H-27'de hazır.
 
 ### CANLI ÖLÇÜMLER (29.08, salt okuma)
 | ne | sonuç |
