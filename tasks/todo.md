@@ -184,6 +184,35 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
+- [x] P1 · **KAYIT ONAY METNİ yanlış saklama sözü veriyordu (v1 → v2)** ·
+      Kabul: onay metninde saklama süresi sabiti yok, doğru söz yazılı, sürüm
+      yükseltildi ve metin↔sürüm bağı tezgâhla kilitlendi · **DONE 29.08.2026**
+      · Doğrulama: `npm run test` **432/432** (öncesi 430) · tsc temiz ·
+      build temiz
+      · **KUSUR:** `src/lib/kayitProtokolu.ts` onay metni "Ses kaydı, süreç
+        bitiminden **24 saat sonra** kalıcı olarak silinir" diyordu. Doğrusu:
+        ses **metne çevrildiği AN** silinir (H-14 şart 1; canlı tabloda
+        `oturum_kaydi_ses` **0 gün / oluşturma**). İkinci cümle de yanlıştı:
+        döküm "son tutanakla birlikte" değil, dosya kapanışından sonra saklama
+        süresi dolunca siliniyor. **Aynı ürün aynı kişiye iki çelişik şey
+        söylüyordu** — `kvkk-metinleri.ts` doğrusunu, onay metni yanlışını.
+      · **AĞIRLIĞI:** bu bir ONAY metnidir; taraf kayda ona güvenerek razı
+        oluyor. Ekran etiketinden ağırdır.
+      · **KARDEŞ YÜZEY:** aynı 24 saat sabiti `MediationEngine`in kayıt
+        protokolü kartında da vardı (arabulucuya gösterilen metin) — o da
+        düzeltildi. Üçüncü yüzey `Verilerim.tsx`ti (aynı turda düzeltilmişti).
+        Kaynak: 27.08'de H-18 ile sabit `ajan-nobetci`den kaldırılmış, ama
+        onu ANLATAN üç yüzey eski sözle kalmıştı.
+      · **SÜRÜM YÜKSELTİLDİ (v1 → v2), zorunluydu.** Onay kaydı kalıcıdır ve
+        "hangi metnin hangi sürümü"nü taşır (H-15 · 2. madde); metni sürüm
+        yükseltmeden değiştirmek geçmiş onayı yeni metne verilmiş gibi
+        gösterirdi. Canlıda v1 ile alınmış **1 onay** var (16.08), v1 olarak
+        kalıyor.
+      · **YENİ KİLİT:** dosya başlığı "metin değişirse sürüm de değişmeli"
+        diyordu ama bunu hiçbir şey DENETLEMİYORDU. Tezgâha **parmak izi
+        kilidi** kondu: metin değişince kırmızı yanar ve sürüm yükseltmeye
+        zorlar. Isırdığı iki yönden kanıtlandı.
+
 - [x] P1 · **"Verilerim" tarafa SABİT "24 saat" süresi gösteriyordu** ·
       Kabul: tarafa gösterilen hiçbir metinde elle yazılmış süre yok; ses ve
       döküm de kategori olarak tablodan besleniyor · **DONE 29.08.2026**

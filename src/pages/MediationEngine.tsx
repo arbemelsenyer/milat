@@ -2014,7 +2014,10 @@ function Phase5Sessions({ caseRow, bumpPhase, onAdvance, randevuTetik, isMediato
    · OYBİRLİĞİ: her katılımcı (taraf · vekil · varsa uzman) ayrı ayrı onaylar;
      bir kişi bile onay vermezse kapı açılmaz. Onay ve retler kayda geçer.
    · TEK KAPI: harici araçla kayıt yasağı ekranda yazılı durur.
-   · SİLME: ses 24 saat sonra, döküm süreç sonunda silinir (nöbetçi ajanın işi).
+   · SİLME: ses metne çevrildiği AN silinir; döküm dosya kapanışından sonra
+     saklama süresi dolunca gider. Süreyi TEK belirleyen `saklama_sureleri`
+     tablosudur — 29.08'de buradaki "24 saat" sabiti yanlış çıktı, bkz.
+     `src/lib/kayitProtokolu.ts` başlığı.
    Vekil ve uzmanın uygulamada girişi olmadığı için onayları arabulucu ELLE
    kaydeder; dayanağı (nasıl alındığı) zorunlu alandır — kayıtsız onay yazılmaz.
    Not (constitution m.11): ekran metninde dış ürün adı kullanılmaz; yasak,
@@ -2272,8 +2275,9 @@ function KayitProtokoluKarti({ caseRow }: { caseRow: CaseRow }) {
               : `Kayıt açılamaz — ${engeller.join(" · ")}.`}
           </div>
           <p className="text-xs text-muted-foreground">
-            Kayıt alma ve döküm hattı ayrı iştir; bu ekranda yalnız izin durumu tutulur. Ses kaydı süreç bitiminden
-            24 saat sonra, döküm süreç sonunda nöbetçi ajanın turunda kalıcı olarak silinir.
+            Kayıt alma ve döküm hattı ayrı iştir; bu ekranda yalnız izin durumu tutulur. Ses kaydı metne
+            çevrildiği an silinir; döküm, dosya kapanışından sonra saklama süresi dolunca nöbetçi ajanın
+            turunda kalıcı olarak silinir.
           </p>
         </div>
       )}
