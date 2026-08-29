@@ -37,13 +37,30 @@ function kaynakDosyalari(kok: string): string[] {
   return dosyalar;
 }
 
+/** Yorum gövdelerini boşlukla değiştirir; SATIR SONLARI KORUNUR (satır
+ *  numaraları kaymasın). 29.08.2026: tarayıcı `MediationEngine.tsx`i kırmızı
+ *  yaktı ama bulduğu şey bir AÇIKLAMA satırıydı — kaldırılan eski kodu anlatan
+ *  yorumda `.delete()` geçiyordu. Bir deseni yorumda görüp kusur saymak en
+ *  pahalı yanlış alarmdır: gerçek kusur arayışını durdurur (CLAUDE.md §18-A).
+ *  Yorumları atmak tarayıcıyı ZAYIFLATMAZ — gerçek yazım koddadır. */
+function yorumsuz(g: string): string {
+  const NL = String.fromCharCode(10);
+  /** Metni aynı uzunlukta boşluğa çevirir; satır sonları olduğu gibi kalır. */
+  const bosalt = (m: string) =>
+    m.split(NL).map((p) => " ".repeat(p.length)).join(NL);
+  return g
+    .replace(/\/\*[\s\S]*?\*\//g, bosalt)
+    .replace(new RegExp("(^|[^:])//[^" + NL + "]*", "g"),
+      (m, o) => o + bosalt(m.slice(o.length)));
+}
+
 /** Sonucu hiç kontrol edilmeyen yazımlar — `dosya:satır` kümesi. */
 function kontrolsuzYazimlar(kok: string): string[] {
   const dosyalar = kaynakDosyalari(kok);
 
   const bulgular: string[] = [];
   for (const f of dosyalar) {
-    const g = kaynakOku(f);
+    const g = yorumsuz(kaynakOku(f));
     if (!g.includes("supabase")) continue;
     const satirlar = g.split("\n");
     const YAZIM = /\.\s*(insert|update|delete|upsert)\s*\(/g;

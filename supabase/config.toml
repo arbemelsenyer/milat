@@ -169,3 +169,6 @@ verify_jwt = true
 
 [functions.dosya-verilerini-sil]
 verify_jwt = true
+
+[functions.basvuru-sil]
+verify_jwt = true

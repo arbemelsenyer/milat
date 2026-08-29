@@ -98,6 +98,16 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
+- [ ] P0 · **"Başvuruyu sil" düğmesi bütün belgeleri kovada bırakıyor** ·
+      `src/pages/MediationEngine.tsx` `deleteCase()` istemciden doğrudan
+      `cases` satırını siliyor; FK cascade çocuk satırları götürüyor ama
+      DEPOYA HİÇ DOKUNULMUYOR. Onay penceresi "belgeler de silinecektir"
+      diyor — söz YANLIŞ. 25.08'de canlıda bulunan 6 öksüz belgenin muhtemel
+      üreticisi bu yol. · Kabul: bu yol da dört depo kaynağını satırlar
+      silinmeden önce temizliyor; `oturum-kayitlari` kovası istemciye kapalı
+      olduğu için temizlik SUNUCUDA yapılıyor; tezgâh istemcide çıplak
+      `from("cases").delete()` kalmadığını denetliyor
+
 - [ ] P0 · **KVKK silme kolu depoda üç kaynağı öksüz bırakıyor** · Kabul:
       `dosya-verilerini-sil` depoya işaret eden DÖRT kaynağın hepsini
       (`case_documents.file_path` · `agreement_documents.file_path` ·

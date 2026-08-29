@@ -87,7 +87,7 @@ describe("periyodik imha: güvenli tasarım bozulmuyor", () => {
    bırakıyor" sınıfındandır.
    ──────────────────────────────────────────────────────────────────────────── */
 const NOBETCI = kaynakOku("supabase/functions/ajan-nobetci/index.ts");
-const DOSYA_SIL = kaynakOku("supabase/functions/dosya-verilerini-sil/index.ts");
+const SUPURGE = kaynakOku("supabase/functions/_shared/depo-supurge.ts");
 const SESLI_NOT = kaynakOku("supabase/functions/sesli-not-dokum/index.ts");
 
 /** Yorumlar çıkarılmış gövde: sıra denetimleri yorum metnine takılmasın. */
@@ -191,9 +191,12 @@ describe("kova adları öteki kollarla AYNI (sürüklenme kilidi)", () => {
     expect(burada).toBe(orada);
   });
 
-  it("belge kovası dosya-verilerini-sil ile aynı", () => {
+  it("belge kovası silme kollarıyla aynı", () => {
+    /* 29.08: kova adları `dosya-verilerini-sil`den `_shared/depo-supurge.ts`e
+       taşındı (aynı kural iki silme kolunda geçerli). Eşleşme oradan bakılır;
+       iki yerde ayrı yazılırsa biri değişip öteki yanlış kovayı süpürür. */
     const burada = G.match(/const BELGE_KOVASI = "([^"]+)"/)?.[1];
-    const orada = DOSYA_SIL.match(/const BELGE_KOVASI = "([^"]+)"/)?.[1];
+    const orada = SUPURGE.match(/const BELGE_KOVASI = "([^"]+)"/)?.[1];
     expect(burada).toBeTruthy();
     expect(burada).toBe(orada);
   });

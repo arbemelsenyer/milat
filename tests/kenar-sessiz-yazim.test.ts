@@ -454,25 +454,23 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
        belgeleri kovada KALIYORDU. Satir gittikten sonra o dosyayi gosteren
        hicbir kayit kalmadigi icin hicbir silme kolu onlari bir daha bulamaz
        (constitution m.10). Canlida bu yolla uretilmis 6 oksuz dosya bulundu. */
-    /* 29.08 GENİŞLEMESİ: kol artık tek tabloya değil, depoya yol yazan DÖRT
-       kaynağa birden bakıyor (`DEPO_KAYNAKLARI`) ve kovayı değişkenden alıyor.
-       Bu tezgâh o yüzden `BELGE_KOVASI` harfine değil, KOVA DEĞİŞKENİNE bakar;
-       kaynak listesinin eksiksizliğini `tests/dosya-verilerini-sil.test.ts`
-       şemaya karşı denetler. */
+    /* 29.08 GENİŞLEMESİ: kol artık depoya kendisi dokunmuyor — dosyaya bağlı
+       DÖRT kaynağı süpüren kural `_shared/depo-supurge.ts`e taşındı, çünkü
+       aynı kural `basvuru-sil` kolunda da geçerli ve iki yerde yazılırsa biri
+       düzeltilip öteki açık kalıyor (25.08'in kusuru tam buydu). Süpürgenin
+       kendisi `tests/dosya-verilerini-sil.test.ts`te denetleniyor; burada
+       yalnız BU KOLUN sözü denetlenir: süpürge düşerse satıra dokunulmuyor mu.
+       Eski hâlde burada `storage.from(BELGE_KOVASI).remove(` aranıyordu. */
     const g = oku("dosya-verilerini-sil");
-    expect(g, "depo kovasi tanimli degil").toContain("BELGE_KOVASI");
-    expect(g, "depo silmesi yok").toMatch(/storage\.from\(kova\)\.remove\(/);
-    for (const im of ["yolErr", "depoErr"]) expect(g, `${im} okunmuyor`).toContain(im);
-    // SIRA: yollar okunur -> depo silinir -> ANCAK SONRA satirlar silinir.
-    const yolIdx = g.indexOf('.select(kaynak.kolon).eq("case_id", case_id)');
-    const depoIdx = g.indexOf("storage.from(kova).remove(");
+    expect(g, "ortak süpürge kullanılmıyor").toContain("depoyuSupur");
+    // SIRA: supurge -> ANCAK SONRA satirlar silinir.
+    const supurgeIdx = g.indexOf("const supurge = await depoyuSupur(admin, case_id);");
     // Satır silme döngüsü: sayım döngüsü değil, `delete()` çağıran olan.
     const satirIdx = g.indexOf('await admin.from(t.tablo).delete()');
-    expect(yolIdx, "yollar okunmuyor").toBeGreaterThan(-1);
-    expect(depoIdx, "depo silmesi yok").toBeGreaterThan(yolIdx);
-    expect(satirIdx, "satır silmesi depo silmesinden ÖNCE").toBeGreaterThan(depoIdx);
-    // Depo silinemezse SATIRLARA DOKUNULMAZ.
-    expect(g).toContain("hiçbir kayıt silinmedi");
+    expect(supurgeIdx, "süpürge çağrılmıyor").toBeGreaterThan(-1);
+    expect(satirIdx, "satır silmesi süpürgeden ÖNCE").toBeGreaterThan(supurgeIdx);
+    // Supurge duserse SATIRLARA DOKUNULMAZ.
+    expect(g.slice(supurgeIdx, satirIdx)).toMatch(/if \(!supurge\.ok\) return json/);
     // Soz kanitlanabilir: silinen belge sayisi cagirana bildirilir.
     expect(g).toMatch(/belge:\s*toplamYol/);
   });

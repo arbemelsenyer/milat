@@ -407,13 +407,23 @@ export default function MediationEngine() {
     }
   }, [activeCase, isMediator, isAdmin, params]);
 
+  /* 29.08.2026 KUSURU: burada doğrudan `from("cases").delete()` çağrılıyordu.
+     Cascade çocuk satırları götürüyor ama DEPOYA hiç dokunulmuyordu; oysa
+     onay penceresi "belgeler de silinecektir" diyor. Her silinen başvurunun
+     dosyaları kovada süresiz kalıyordu (constitution m.10). 25.08'de canlıda
+     bulunan 6 öksüz belgenin muhtemel üreticisi bu yol.
+     İstemci bunu kendi düzeltemez: sesli notun kovası istemciye kapalıdır.
+     Silme artık `basvuru-sil` kolundan geçiyor — önce depo, sonra satır.
+     Yetki AYNI kalır: kol, `cases` RLS silme politikasının aynısını arar. */
   async function deleteCase(c: CaseRow) {
     setDeleting(true);
     try {
-      const { error, count } = await supabase
-        .from("cases").delete({ count: "exact" }).eq("id", c.id);
-      if (error) throw error;
-      if (!count) {
+      const { data, error } = await supabase.functions.invoke("basvuru-sil", {
+        body: { case_id: c.id },
+      });
+      const hata = error ? String(error.message ?? "") : String((data as any)?.error ?? "");
+      if (hata) throw new Error(hata);
+      if (!(data as any)?.silindi) {
         throw new Error(
           "Silme işlemi başarısız. Bu başvuruyu silme yetkiniz yok veya başvuru zaten silinmiş olabilir."
         );

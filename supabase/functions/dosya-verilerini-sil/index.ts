@@ -20,6 +20,7 @@
 // SİLİNEN İÇERİK HİÇBİR LOGA YAZILMAZ; anahtarlar loglanmaz.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { sinirdanGecir } from "../_shared/anlatim.ts";
+import { depoyuSupur } from "../_shared/depo-supurge.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,37 +41,10 @@ function temiz(v: unknown): string {
 }
 
 /* SİLME SIRASI — yabancı anahtarlara uygun: önce çocuk kayıtlar, sonra
-   taraflar, en sonda dosyanın kendisi. Her tablo case_id ile silinir. */
-// Tarafların belgelerinin durduğu kova. Silme kolu satırlarla birlikte
-// dosyaları da kaldırmalıdır; yoksa dosyalar öksüz kalır (constitution m.10).
-const BELGE_KOVASI = "case-documents";
-// Sesli notun ham kaydının durduğu kova. `saklama-imha` ile AYNI ad.
-const KAYIT_KOVASI = "oturum-kayitlari";
-
-/* DEPOYA İŞARET EDEN BÜTÜN KAYNAKLAR — 29.08.2026 kusuru.
-   25.08'de bu kol yalnız `case_documents` için depo temizliği kazanmıştı.
-   Oysa dosyaya bağlı DÖRT tablo depoda nesne gösteriyor; öteki üçünün
-   satırları siliniyor ama dosyaları kovada kalıyordu. Satır gidince o nesneyi
-   gösteren hiçbir kayıt kalmaz — hiçbir silme kolu onu bir daha bulamaz
-   (constitution m.10 · HAT H-12 ile aynı kusur, üç kardeş yolda).
-   · `agreement_documents.file_path`  → imzalı anlaşmanın TARAMASI
-   · `bilirkisi_raporlari.dosya_yolu` → bilirkişinin yüklediği rapor
-   · `oturum_kayitlari.ses_dosya_yolu`→ dökümden sonra silinemeyip KAÇAN ses
-     (`sesli-not-dokum` silme düşerse yolu bilerek NULL'lamaz)
-   Yeni bir tablo depoya yol yazacaksa buraya eklenir; eklenmezse bu koldan
-   kaçar. Tezgâh listeyi `types.ts`e karşı denetler. */
-const DEPO_KAYNAKLARI: { tablo: string; kolon: string; kova: string }[] = [
-  { tablo: "case_documents", kolon: "file_path", kova: BELGE_KOVASI },
-  { tablo: "agreement_documents", kolon: "file_path", kova: BELGE_KOVASI },
-  { tablo: "bilirkisi_raporlari", kolon: "dosya_yolu", kova: BELGE_KOVASI },
-  { tablo: "oturum_kayitlari", kolon: "ses_dosya_yolu", kova: KAYIT_KOVASI },
-];
-
-/* Tek kaynaktan okunacak en çok yol sayısı. SESSİZ KIRPMA YOK: sınıra
-   dayanılırsa işlem DURUR (bkz. okuma döngüsü). Sessizce kırpmak, silindiği
-   söylenen bir dosyayı kovada bırakmak demektir. */
-const YOL_SINIRI = 1000;
-
+   taraflar, en sonda dosyanın kendisi. Her tablo case_id ile silinir.
+   DEPO tarafı burada değil `_shared/depo-supurge.ts`tedir: aynı kural
+   `basvuru-sil` kolunda da geçerli ve iki yerde yazılırsa biri düzeltilip
+   öteki açık kalıyor (25.08'in kusuru tam buydu). */
 const SILME_SIRASI: { tablo: string; alan?: string }[] = [
   { tablo: "belge_ozetleri", alan: "case_id" },
   { tablo: "case_documents" },
@@ -159,67 +133,12 @@ Deno.serve(async (req) => {
       } catch { /* tablo yoksa sayıma girmez */ }
     }
 
-    /* DEPO TEMİZLİĞİ — SATIRLARDAN ÖNCE (25.08.2026 canlı bulgusu,
-       29.08.2026'da ÜÇ KARDEŞ YOLA genişletildi).
-       Bu kol KVKK silme koludur ama depoya HİÇ dokunmuyordu: `case_documents`
-       satırları siliniyor, tarafların belgeleri `case-documents` kovasında
-       KALIYORDU. Satır gittikten sonra o dosyayı gösteren hiçbir kayıt kalmadığı
-       için hiçbir silme kolu onları bir daha bulamaz — constitution m.10
-       (süresiz saklama yasağı) ihlali. Canlıda bu yolla üretilmiş 6 öksüz dosya
-       bulundu (30.06–01.07, dosyaları artık var olmayan davalara ait).
-       25.08 düzeltmesi YALNIZ `case_documents`i kapattı; imzalı anlaşma
-       taraması, bilirkişi raporu ve kaçan ses kaydı aynı açıkta kaldı.
-       Artık kaynak listesi `DEPO_KAYNAKLARI`dır — tek yer.
-
-       SIRA KRİTİK: önce dosya (asıl kişisel veri), sonra satır. Ters sırada
-       depo silmesi düşerse indeks yok olur ve veri erişilemez biçimde KALIR.
-       Yollar satırlar silinmeden ÖNCE okunur; sonra okunamaz. */
-    const kovaYollari = new Map<string, string[]>();
-    let toplamYol = 0;
-    for (const kaynak of DEPO_KAYNAKLARI) {
-      const { data: satirlar, error: yolErr } = await admin.from(kaynak.tablo)
-        .select(kaynak.kolon).eq("case_id", case_id).limit(YOL_SINIRI);
-      if (yolErr) {
-        /* Tablo yoksa (eski şema) bu bir eksiklik değildir; ama başka her hata
-           "okuyamadım" demektir ve okuyamadığımız yolu silemeyiz. */
-        if (String(yolErr.code ?? "") === "42P01") continue;
-        return json({
-          silindi: false,
-          error: `Belge yolları okunamadı; hiçbir kayıt silinmedi: ${yolErr.message}`,
-        }, 500);
-      }
-      const ham = (satirlar ?? []) as Record<string, unknown>[];
-      /* SESSİZ KIRPMA YOK: sınıra dayandıysak geri kalan yolları hiç görmedik.
-         Devam edersek satırları siler, görmediğimiz dosyaları kovada öksüz
-         bırakırdık — düzeltmeye çalıştığımız kusurun ta kendisi. */
-      if (ham.length === YOL_SINIRI) {
-        return json({
-          silindi: false,
-          error: "Bu dosyada silinecek belge sayısı tek seferde işlenemeyecek kadar çok; "
-            + "hiçbir kayıt silinmedi. Lütfen bildirin.",
-        }, 500);
-      }
-      const yollar = ham
-        .map((r) => String(r?.[kaynak.kolon] ?? "").trim())
-        .filter((y) => y.length > 0);
-      if (yollar.length === 0) continue;
-      const birikmis = kovaYollari.get(kaynak.kova) ?? [];
-      birikmis.push(...yollar);
-      kovaYollari.set(kaynak.kova, birikmis);
-      toplamYol += yollar.length;
-    }
-
-    for (const [kova, yollar] of kovaYollari) {
-      const { error: depoErr } = await admin.storage.from(kova).remove(yollar);
-      if (depoErr) {
-        // Depo temizlenemediyse SATIRLARA DOKUNULMAZ: dosyalar bulunabilir kalsın.
-        console.error(`[dosya-verilerini-sil] depo temizlenemedi (${case_id} · ${kova}): ${depoErr.message}`);
-        return json({
-          silindi: false,
-          error: "Belgeler depodan silinemedi; hiçbir kayıt silinmedi. Lütfen tekrar deneyin.",
-        }, 500);
-      }
-    }
+    /* DEPO TEMİZLİĞİ — SATIRLARDAN ÖNCE (25.08.2026 canlı bulgusu;
+       29.08.2026'da dört kaynağa genişletildi ve ortak modüle taşındı).
+       Gerekçenin tamamı `_shared/depo-supurge.ts` başlığındadır. */
+    const supurge = await depoyuSupur(admin, case_id);
+    if (!supurge.ok) return json({ silindi: false, error: supurge.hata }, 500);
+    const toplamYol = supurge.toplamYol;
 
     // SİLME — sırayla. Hata olursa DURUR; yarım silme bırakılmaz.
     for (const t of SILME_SIRASI) {
