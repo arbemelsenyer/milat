@@ -1,6 +1,57 @@
 # tasks/lessons.md — Öğrenilen Dersler
 Her kurucu düzeltmesinden sonra buraya kural ekle. Oturum başında oku.
 
+- DERS (29.08.2026) — **AYNI HATANIN ÜÇÜNCÜSÜ: BU KEZ "ÖKSÜZ" DEDİM.**
+  Kurucuya "bilgi tabanında 71 öksüz dosya var" dedim. Yanlıştı. Ölçüyü yine
+  **ada göre eşleştirmeye** kurmuştum; eski yol düzenindeki nüshalar
+  eşleşmeyince onları "sahipsiz" saydım. Oysa gerçek tablo şuydu: `admin/`
+  altında **121 dosya**, **105'i eski düzende** ve çoğu **bugün canlı olan**
+  bilgi tabanının aslı. Örnek: 6102 TTK listede 9 kez geçiyor ve TTK canlı.
+  27.08'de iki kez aynı hatayı yapmış, dersini de yazmıştım — üçüncüsünde
+  yine yaptım. Demek ki kuralı **yazmak yetmemiş**.
+
+  **KURAL (öncekini değiştirmez, ONU ÖLÇÜLEBİLİR YAPAR):** "yok / öksüz /
+  kullanılmıyor" diyen her ölçüm, **iddiayı çürütecek bir kontrol sorgusuyla
+  birlikte** yazılır ve ikisi AYNI turda koşulur:
+  1. Sorgunun bulduğu kümeden **bir örnek seç** ve onun gerçekten ölü
+     olduğunu **başka bir yoldan** doğrula (burada: 6102'nin canlı olduğunu
+     görmek ölçüyü çürütürdü).
+  2. Ölçüyü **taşıyıcıya göre değil** (yol, ad, kaynak türü), **kimliğe göre**
+     kur; taşıyıcı değişmiştir, kimlik değişmez.
+  3. Toplamı da yaz: "71 öksüz" cümlesi yanında "toplam kaç var" olmadan
+     anlamsızdır. 71/121 ile 71/10.000 aynı şey değildir ve oranı yazmak
+     insanı ölçüye bakmaya zorlar.
+  **Neden bu kadar tekrarlıyor:** eksik sorgu her seferinde *daha temiz* bir
+  cevap üretiyor — boş küme, düzenli liste, yuvarlak sayı. Yanlış ölçüm
+  bozuk görünmez, **düzgün görünür.** Bu yüzden şüphe kendiliğinden gelmiyor;
+  kontrol sorgusu **mecburi adım** olmalı.
+
+- DERS (29.08.2026) — **"KURAL DÜZELTİLDİ" DEMEDEN ÖNCE, DÜZELTİLEN YOLUN
+  TEK YOL OLDUĞUNU KANITLA.** 25.08'de depo temizliği `dosya-verilerini-sil`e
+  eklendi ve `tests/sabit/oksuz-belge-supurgesi.sql` başlığına "artık yeni
+  öksüz üretilmiyor" yazıldı. Yanlıştı: aynı kolda üç kardeş kaynak
+  (`agreement_documents` · `bilirkisi_raporlari` · `oturum_kayitlari`) hâlâ
+  açıktı ve üstelik "Başvuruyu sil" düğmesi `cases` satırını İSTEMCİDEN
+  siliyor, depoya hiç dokunmuyordu. Yani asıl üretici hiç kapanmamıştı.
+  O cümle dört gün boyunca kusuru **görünmez** yaptı — çünkü kimse kapalı
+  sanılan bir kapıya bakmaz.
+  **KURAL:** bir kusuru kapattığında sor: *bu sonucu üretebilecek KAÇ yol
+  var?* Listeyi çıkar, hepsini tek tek gör, ve kuralı **tek yere taşı**
+  (ortak modül) ki kardeş yollar ayrışamasın. Ayrıca: kapatma iddiasını
+  belgeye yazarken **hangi yolları taradığını da yaz**; taranmamış yol
+  varsa cümle "şu yolda kapandı" olur, "artık üretilmiyor" olmaz.
+
+- DERS (29.08.2026) — **"EN YENİSİ KALSIN" MASUM GÖRÜNEN BİR VERİ KAYBI
+  KURALIDIR.** 17 kesin tekrarı silmek için "aynı ad + aynı boyut öbeğinde
+  en yenisi kalsın" kuralını kurmuştum. Silmeden önce kontrol edince gördüm:
+  bazı öbeklerde **canlı bilgi tabanının gösterdiği nüsha en yeni DEĞİL** —
+  o kuralla çalışan kaynağı silip yedeğini bırakacaktım. Kural
+  "**önce canlı olan korunur**, canlı yoksa en yeni"ye çevrildi.
+  **KURAL:** tekrar temizlerken sıralama ölçütü **tarih değil KULLANIMDIR**.
+  Hangi nüshanın gerçekten kullanıldığını sorgula; tarih yalnız beraberlik
+  bozar. Ve silme listesini üretir üretmez şunu koş: *silinecekler arasında
+  kullanılan var mı?* Sıfır çıkmadan liste teslim edilmez.
+
 - DERS (27.08.2026) — **"YOK" DEMEDEN ÖNCE, ARADIĞIN ADIN TEK BİÇİMİ OLDUĞUNU
   VARSAYMA.** Kurucuya "Türk Ticaret Kanunu, FSEK ve Sınai Mülkiyet mevzuatı
   bilgi tabanında yok" dedim. Üçü de vardı. Öksüz depo dosyalarının adlarını

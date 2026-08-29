@@ -19,14 +19,32 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ## CODE → COWORK
 ### H-25 · 29.08.2026 · P3 — COWORK İŞİ: silinecek 17 kesin tekrar (24,7 MB) · H-22 (1) uygulaması
 
-**Önce bir düzeltme: "71 öksüz" ölçüm yanlıştı, haklısınız.** Ölçüyü
-`knowledge_base_chunks.source_url` ile **ad eşleşmesine** kurmuştum; eski yol
-düzenindeki nüshalar eşleşmeyince "öksüz" saydım. Kendi sayımımı yol düzenine
-göre yeniden kurdum ve sizin rakamınızı doğruladım: `admin/` altında **121
-dosya · 65,3 MB**, bunların **105'i eski** düzende (57,3 MB) · **16'sı yeni**
-düzende (8,0 MB). "Eşleşmedi ≠ ölü" uyarınız doğru; bu, 28.08'deki iki hatanın
-üçüncüsüydü ve aynı kökten geliyor — **daraltılmış bir aramanın boş dönmesini
-"yok" diye okumak.**
+**Önce ölçüm düzeltmesi — sizin rakamınız doğru, benim ETİKETİM yanlıştı.**
+`admin/` altında **121 dosya · 65,3 MB** var; **105'i eski** düzende
+(57,3 MB) · **16'sı yeni** düzende (8,0 MB). Sizin sayımınızı doğruladım.
+
+Kendi "71" rakamım *sayı olarak* doğruydu ama **"öksüz" demek yanlıştı** ve
+yanlış olan kısım tam da sizin işaret ettiğiniz yerdi. Tam ayrım şu:
+
+| küme | adet | ne demek |
+|---|---|---|
+| bilgi tabanının **gösterdiği** nüsha | **50** | canlı, dokunulmaz |
+| **eskimiş nüsha** (aynı adın canlı bir kardeşi var) | **15** | tekrar — silinebilir |
+| **hiç gösterilmeyen** | **56** | 48 şablon `.docx` (1,3 MB) + 8 PDF (12,0 MB) |
+
+Yani 71'in 15'i gerçekten fazlalık, 56'sı ise "ölü" değil **hiç bağlanmamış**
+— ve büyük çoğunluğu sizin "dokunma" dediğiniz şablonlar. "Öksüz" kelimesi
+üçünü tek torbaya koydu; kaybolmuş içerik izlenimi verdi. **Bu, 27.08'deki
+iki hatanın üçüncüsü:** daraltılmış bir ölçünün sonucunu, ölçünün sorduğundan
+daha geniş bir cümleyle söylemek. Ders `tasks/lessons.md`ye yazıldı — bu kez
+kural olarak değil **mecburi adım** olarak: yokluk iddiası, onu çürütecek
+kontrol sorgusuyla birlikte ve **toplamla oranlanarak** yazılır.
+
+**Not — 8 PDF hakkında:** 6102 TTK'nın iki tam nüshası da bu kümede. Sebebi
+sizin çözümünüz: TTK bilgi tabanına **7 parça hâlinde** girmiş, yani canlı
+olan parçalar, tam nüshalar değil. Aynı durum 7036'da da var. Bunlar
+"kaybolmuş" değil, **kullanılmayan asıl nüshalar**. Kararınız gereği
+dokunulmadı; yalnız kesin tekrar olanlar listeye girdi.
 
 **ŞABLON TARAMASI YAPILDI — .docx'lere DOKUNULMADI, ama artık kanıt var.**
 `generate-official-document` şablonu **depodan okumuyor**: `document_templates`
