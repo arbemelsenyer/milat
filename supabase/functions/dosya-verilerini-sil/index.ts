@@ -12,15 +12,13 @@
 // YARIM SİLME YOK: silme sırası yabancı anahtarlara uygundur; bir adım hata
 // verirse işlem DURUR ve arabulucuya sade cümleyle bildirilir.
 //
-// DEPO DA SİLİNİR: dosyaya bağlı DÖRT tablo depoda nesne gösterir
-// (`DEPO_KAYNAKLARI`). Yolları satırlar silinmeden ÖNCE okunur, kovalarından
-// silinir, ancak sonra satırlara dokunulur. Yol listesi sınıra dayanırsa
-// SESSİZ KIRPMA YOK — işlem durur (görmediğimiz dosyayı silemeyiz).
+// DEPO DA SİLİNİR ve ANONİM KAYIT BIRAKILIR: ikisinin de kuralı
+// `_shared/dosya-silme.ts`tedir. Bu dosya yalnız KAPILARI tutar.
 //
 // SİLİNEN İÇERİK HİÇBİR LOGA YAZILMAZ; anahtarlar loglanmaz.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { sinirdanGecir } from "../_shared/anlatim.ts";
-import { depoyuSupur } from "../_shared/depo-supurge.ts";
+import { dosyayiTemizle } from "../_shared/dosya-silme.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,42 +38,10 @@ function temiz(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
-/* SİLME SIRASI — yabancı anahtarlara uygun: önce çocuk kayıtlar, sonra
-   taraflar, en sonda dosyanın kendisi. Her tablo case_id ile silinir.
-   DEPO tarafı burada değil `_shared/depo-supurge.ts`tedir: aynı kural
-   `basvuru-sil` kolunda da geçerli ve iki yerde yazılırsa biri düzeltilip
-   öteki açık kalıyor (25.08'in kusuru tam buydu). */
-const SILME_SIRASI: { tablo: string; alan?: string }[] = [
-  { tablo: "belge_ozetleri", alan: "case_id" },
-  { tablo: "case_documents" },
-  { tablo: "party_analyses" },
-  { tablo: "party_root_cause_analysis" },
-  { tablo: "taraf_kalemleri" },
-  { tablo: "case_notes" },
-  { tablo: "oturum_hazirlik_foyleri" },
-  { tablo: "foy_gonderim_kayitlari" },
-  { tablo: "case_discovery_questions" },
-  { tablo: "ajan_gorevleri" },
-  { tablo: "ajan_bellek" },
-  { tablo: "akis_olaylari" },
-  { tablo: "agent_states" },
-  { tablo: "arabulucu_talimatlari" },
-  { tablo: "ajan_onerileri" },
-  { tablo: "akis_duraklatma" },
-  { tablo: "arabulucu_kontrol_tercihleri" },
-  { tablo: "iletisim_tercihleri" },
-  { tablo: "taraf_musaitlik", alan: "case_id" },
-  { tablo: "randevu_teklifleri" },
-  { tablo: "teklif_braketleri" },
-  { tablo: "olay_cizelgesi" },
-  { tablo: "common_ground_reports" },
-  { tablo: "bilirkisi_raporlari" },
-  { tablo: "agreement_documents" },
-  { tablo: "oturum_kayitlari" },
-  { tablo: "case_sessions" },
-  { tablo: "case_party_invites", alan: "case_id" },
-  { tablo: "case_parties" },
-];
+/* SİLME SIRASI ve DEPO SÜPÜRGESİ burada değil `_shared/dosya-silme.ts`tedir:
+   aynı kural `basvuru-sil` ve `saklama-imha` (emniyet süpürgesi) kollarında da
+   geçerli. Üç yerde yazılırsa biri düzeltilip ötekiler açık kalıyor — 25.08 ve
+   29.08'de tam bu oldu. Bu dosyada kalan şey KAPILARDIR (insan kapısı). */
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -115,87 +81,25 @@ Deno.serve(async (req) => {
 
     // Paket alınmadan silme açılmaz (C3 sırası).
     const { data: kapanis } = await admin.from("dosya_kapanis")
-      .select("paket_alindi, silme_zamani").eq("case_id", case_id).maybeSingle();
+      .select("paket_alindi").eq("case_id", case_id).maybeSingle();
     if (!(kapanis as any)?.paket_alindi) {
       return json({ error: "Önce kapanış paketini almalısınız." }, 400);
     }
-    if ((kapanis as any)?.silme_zamani) {
-      return json({ silindi: false, sebep: "Bu dosyanın verileri zaten silinmiş." });
-    }
+    /* Burada eskiden bir "zaten silinmiş" dalı vardı ve HİÇ ÇALIŞAMAZDI:
+       `dosya_kapanis.case_id` `cases`e ON DELETE CASCADE bağlıdır, yani dosya
+       silinince bu satır da gider. İkinci çağrı zaten yukarıdaki
+       "Dosya bulunamadı" dalına düşer. Ölü dal bırakılmadı (§15.1 şart 5). */
 
-    // SİLMEDEN ÖNCE SAYIM (yalnız sayı; içerik okunmaz).
-    let oncekiToplam = 0;
-    for (const t of SILME_SIRASI) {
-      try {
-        const { count } = await admin.from(t.tablo)
-          .select("id", { count: "exact", head: true }).eq(t.alan ?? "case_id", case_id);
-        oncekiToplam += count ?? 0;
-      } catch { /* tablo yoksa sayıma girmez */ }
-    }
+    /* SİLME — kural ortak modüldedir. Buradaki kolun işi KAPILARDI ve
+       hepsi yukarıda geçildi: oturum · yetki · paket · elle "SİL" yazımı. */
+    const sonuc = await dosyayiTemizle(admin, case_id, "arabulucu");
+    if (!sonuc.ok) return json({ silindi: false, error: sonuc.hata }, 500);
+    const uyarilar = [...sonuc.uyarilar];
 
-    /* DEPO TEMİZLİĞİ — SATIRLARDAN ÖNCE (25.08.2026 canlı bulgusu;
-       29.08.2026'da dört kaynağa genişletildi ve ortak modüle taşındı).
-       Gerekçenin tamamı `_shared/depo-supurge.ts` başlığındadır. */
-    const supurge = await depoyuSupur(admin, case_id);
-    if (!supurge.ok) return json({ silindi: false, error: supurge.hata }, 500);
-    const toplamYol = supurge.toplamYol;
-
-    // SİLME — sırayla. Hata olursa DURUR; yarım silme bırakılmaz.
-    for (const t of SILME_SIRASI) {
-      const { error } = await admin.from(t.tablo).delete().eq(t.alan ?? "case_id", case_id);
-      if (error) {
-        console.error("[dosya-verilerini-sil] silme durdu", { tablo: t.tablo, kod: error.code ?? "" });
-        return json({
-          silindi: false,
-          error: "Silme tamamlanamadı; hiçbir kayıt yarım bırakılmadı. Lütfen tekrar deneyin.",
-        }, 500);
-      }
-    }
-
-    /* KALANLAR (kurucu kararı — kişisel veri İÇERMEZ): sayımlar ve kural
-       kütüphanesi kalır, dosya bağlantısı KOPARILIR (case_id NULL). */
-    // 25.08.2026 — bu uc yazimin sonucu OKUNMUYORDU ve ardindan kosulsuz
-    // "dosyada kisisel veri kalmadi" deniyordu. Silmenin kendisi zaten dogru
-    // denetleniyor (yukaridaki dongu + `cases`); eksik olan, silme SONRASI
-    // baglantiyi koparan ve silmeyi KAYDA GECIREN yazimlardi. Bir KVKK silme
-    // isleminin kaniti sessizce kaybolamaz.
-    const uyarilar: string[] = [];
-    const { error: deneyimErr } = await admin.from("ajan_deneyim")
-      .update({ case_id: null }).eq("case_id", case_id);
-    if (deneyimErr) uyarilar.push(`ajan_deneyim dosya bağlantısı koparılamadı: ${deneyimErr.message}`);
-    const { error: duzeltmeErr } = await admin.from("duzeltme_kayitlari")
-      .update({ case_id: null }).eq("case_id", case_id);
-    if (duzeltmeErr) uyarilar.push(`duzeltme_kayitlari dosya bağlantısı koparılamadı: ${duzeltmeErr.message}`);
-
-    // Bir satırlık ANONİM kapanış kaydı: tarih, sonuç türü, süreç gün sayısı.
-    const acilis = new Date(String((dosya as any).created_at ?? "")).getTime();
-    const kapanisZamani = new Date(String((dosya as any).closed_at ?? new Date().toISOString())).getTime();
-    const gun = Number.isFinite(acilis) && Number.isFinite(kapanisZamani)
-      ? Math.max(0, Math.round((kapanisZamani - acilis) / 86_400_000)) : null;
-
-    const { error: dErr } = await admin.from("cases").delete().eq("id", case_id);
-    if (dErr) {
-      return json({
-        silindi: false,
-        error: "Dosya kaydı silinemedi; içerik silindi ama dosya satırı kaldı. Lütfen tekrar deneyin.",
-      }, 500);
-    }
-
-    const { error: kapanisErr } = await admin.from("dosya_kapanis").update({
-      silme_zamani: new Date().toISOString(), silen: userId,
-      eksik_notu: `anonim kapanış: sonuç ${temiz((dosya as any).outcome) || "belirtilmedi"} · süreç ${gun ?? "?"} gün`,
-    }).eq("case_id", case_id);
-    if (kapanisErr) uyarilar.push(`silme kaydı (dosya_kapanis) yazılamadı: ${kapanisErr.message}`);
-
-    if (uyarilar.length > 0) {
-      console.error("[dosya-verilerini-sil] silme sonrası eksikler", { case_id, uyarilar });
-    }
-    /* "Kişisel veri kalmadı" sözü artık depoyu da kapsıyor: silinen dosya
-       sayısı çağırana bildirilir, yani söz KANITLANABİLİR. */
     return json({
-      silindi: true, kayit: oncekiToplam, belge: toplamYol, uyarilar,
+      silindi: true, kayit: sonuc.kayit, belge: sonuc.belge, uyarilar,
       mesaj: sinirdanGecir(
-        `${oncekiToplam} kayıt${toplamYol > 0 ? ` ve ${toplamYol} belge` : ""} silindi, `
+        `${sonuc.kayit} kayıt${sonuc.belge > 0 ? ` ve ${sonuc.belge} belge` : ""} silindi, `
         + "dosyada kişisel veri kalmadı.", "silme"),
     });
   } catch (e: any) {

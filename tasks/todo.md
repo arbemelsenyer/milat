@@ -98,6 +98,52 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
+- [x] P1 · **Kapanıştan sonra emniyet süpürgesi YOK — süresi geçmiş dosyalar
+      duruyor** · **DONE 29.08.2026** · HAT H-15/1 kurucu kararı: "arabulucu unutursa kapanıştan N
+      gün sonra otomatik silinir". Canlı tabloda N **7 gün** olarak girilmiş
+      ama `saklama-imha` `dosya_kapanis_sonrasi` türünü "başka kolun işi" diye
+      ATLIYOR ve `dosya-verilerini-sil` kendiliğinden hiç çalışmıyor.
+      **CANLI KANIT (29.08):** 6 kapalı dosyanın **5'i** 7 günü geçmiş ve
+      hâlâ **8 `case_parties` satırı** (taraf kimlikleri) duruyor.
+      · Kabul: `saklama-imha` kuru koşumu `dosya_kapanis_sonrasi` için
+      süresi geçmiş dosya sayısını bildiriyor; gerçek koşumda dosya depo +
+      satır + `cases` olarak tam siliniyor; NULL süre = dokunma korunuyor
+      · Doğrulama: `npm run test` **420/420** (öncesi 417) · tsc temiz ·
+      eslint: `dosya-verilerini-sil` 9 → **5** hataya indi (taban iyileşti)
+      · **ÇÖZÜM:** `saklama-imha`ya ÖZEL KOL 0 eklendi. Silme kuralı
+        `_shared/dosya-silme.ts`e taşındı; artık elle silme kolu ile emniyet
+        süpürgesi ASLA ayrışamaz (üçüncü kez aynı kusuru yaşamamak için).
+        Bir dosya düşerse ötekilere devam edilir, düşen `uyarilar`a yazılır.
+        Sürüm imzası: `2026-08-29-emniyet-supurgesi`.
+      · **TEZGÂH ISIRDI:** kol geri çekilince 2 denetim kırmızı yandı.
+      · **NOT:** N değeri canlı tabloda **7 gün** (`dosya_kapanis_sonrasi`).
+        HAT H-15/1'de "kurucu onayı bekliyor, öneri 30" yazıyordu; değer
+        sonradan girilmiş. Yeniden sorulmadı (§7-B.1); değişmesi gerekirse
+        tek satırlık tablo düzenlemesidir, dağıtım gerektirmez.
+
+- [!] P1 · **KVKK silme kanıtı sessizce kayboluyor** · **KOD BİTTİ ·
+      COWORK SQL BEKLİYOR** · `dosya-verilerini-sil`
+      anonim kapanış kaydını `dosya_kapanis`e YAZIYOR ama o satırın
+      `case_id`si `cases`e **ON DELETE CASCADE** bağlı ve yazım `cases`
+      silindikten SONRA yapılıyor → satır çoktan gitmiş, güncelleme 0 satır
+      etkiliyor, hata da dönmüyor. Kolun kendi yorumu "bir KVKK silme
+      işleminin kanıtı sessizce kaybolamaz" diyor; tam bu oluyor.
+      `case_outcome_analytics` de kurtarmıyor — o bir GÖRÜNÜM, `cases`
+      silinince o da yok oluyor. · Kabul: silme sonrası, dosyaya bağlı
+      olmayan bir tabloda anonim kapanış kaydı DURUYOR ve tezgâh kaydın
+      `cases` silmesinden ÖNCE yazıldığını denetliyor
+      · **KOD TARAF DONE 29.08.2026:** kayıt artık `kapanis_istatistigi`
+        tablosuna, `cases` silinmeden ÖNCE yazılıyor. Tablo YABANCI
+        ANAHTARSIZDIR — bağlanırsa aynı kusur geri gelir; tezgâh SQL metnini
+        de denetliyor. Tablo yoksa (42P01) silme DURMAZ ama sessiz geçilmez,
+        uyarı çağırana taşınır.
+      · **KALAN:** `tests/sabit/kapanis-istatistigi.sql` **Cowork tarafından
+        çalıştırılmalı** (§10 — SQL metnini Code yazar, çalıştırmayı Cowork
+        yapar). Çalıştırılana kadar silme çalışır ama kanıt yazılamaz ve her
+        silmede uyarı döner. Doğrulama sorguları betiğin sonundadır.
+      · Ayrıca ölü dal kaldırıldı: koldaki "zaten silinmiş" denetimi HİÇ
+        çalışamıyordu (aynı cascade yüzünden).
+
 - [x] P0 · **"Başvuruyu sil" düğmesi bütün belgeleri kovada bırakıyor** ·
       Kabul: bu yol da dört depo kaynağını satırlar silinmeden önce
       temizliyor; `oturum-kayitlari` kovası istemciye kapalı olduğu için

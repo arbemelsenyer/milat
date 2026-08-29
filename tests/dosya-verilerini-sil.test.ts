@@ -28,6 +28,8 @@ import { kaynakOku } from "./kaynak";
  * dosya çalışma ağacına CRLF ile inerse ham okuma sessizce eşleşmez.
  */
 const SUPURGE = kaynakOku("supabase/functions/_shared/depo-supurge.ts");
+const SILME = kaynakOku("supabase/functions/_shared/dosya-silme.ts");
+const IMHA = kaynakOku("supabase/functions/saklama-imha/index.ts");
 const C3 = kaynakOku("supabase/functions/dosya-verilerini-sil/index.ts");
 const BASVURU = kaynakOku("supabase/functions/basvuru-sil/index.ts");
 const EKRAN = kaynakOku("src/pages/MediationEngine.tsx");
@@ -122,32 +124,65 @@ describe("depo süpürgesi: silme gerçekten silme", () => {
     expect(kalan, "sınıra dayanınca yine de siliyor").toContain("ok: false");
   });
 
-  it("SÜPÜRGE TEK YERDE — iki kol da kendi listesini tutmuyor", () => {
+  it("SÜPÜRGE TEK YERDE — hiçbir kol kendi listesini tutmuyor", () => {
     const kollar: [string, string][] = [
       ["dosya-verilerini-sil", C3],
       ["basvuru-sil", BASVURU],
+      ["saklama-imha", IMHA],
+      ["_shared/dosya-silme", SILME],
     ];
     for (const [ad, g] of kollar) {
-      expect(g, `${ad} ortak süpürgeyi kullanmıyor`)
-        .toContain('import { depoyuSupur } from "../_shared/depo-supurge.ts";');
       expect(g, `${ad} kendi kaynak listesini tutuyor — ikinci kural doğar`)
         .not.toContain("const DEPO_KAYNAKLARI");
-      expect(g, `${ad} kendi kova adını tutuyor`)
-        .not.toMatch(/storage\.from\("[a-z-]+"\)/);
+      if (ad === "_shared/dosya-silme") {
+        expect(g, "ortak modül süpürgeyi çağırmıyor")
+          .toContain('import { depoyuSupur } from "./depo-supurge.ts";');
+      }
     }
+    // Depoya dokunan tek yer süpürgedir; kova adı başka yerde geçmez.
+    expect(govdesi(C3), "C3 depoya kendi dokunuyor").not.toMatch(/storage\.from\(/);
+    expect(govdesi(SILME), "ortak silme modülü depoya kendi dokunuyor")
+      .not.toMatch(/storage\.from\(/);
+  });
+
+  it("SİLME SIRASI TEK YERDE — üç kol da ortak modülü kullanıyor", () => {
+    expect(SILME, "silme sırası ortak modülde değil").toContain("export const SILME_SIRASI");
+    expect(C3, "C3 kendi sırasını tutuyor").not.toContain("const SILME_SIRASI");
+    expect(C3).toContain('import { dosyayiTemizle } from "../_shared/dosya-silme.ts";');
+    expect(IMHA).toContain('import { dosyayiTemizle } from "../_shared/dosya-silme.ts";');
   });
 });
 
 describe("iki silme kolu: önce depo, sonra satır", () => {
-  it("C3 kapanış silmesi: süpürge satır silmesinden ÖNCE", () => {
-    const supurgeIdx = C3.indexOf("const supurge = await depoyuSupur(admin, case_id);");
-    const satirIdx = C3.indexOf("await admin.from(t.tablo).delete()");
-    const dosyaIdx = C3.indexOf('await admin.from("cases").delete()');
-    expect(supurgeIdx, "süpürge çağrılmıyor").toBeGreaterThan(-1);
-    expect(satirIdx, "satır silmesi süpürgeden ÖNCE").toBeGreaterThan(supurgeIdx);
-    expect(dosyaIdx, "dosya silmesi süpürgeden ÖNCE").toBeGreaterThan(supurgeIdx);
+  it("ORTAK MODÜL: depo → anonim kayıt → satırlar → cases", () => {
+    const depoIdx = SILME.indexOf("const supurge = await depoyuSupur(admin, case_id);");
+    const kayitIdx = SILME.indexOf('from("kapanis_istatistigi").insert(');
+    const satirIdx = SILME.indexOf("await admin.from(t.tablo).delete()");
+    const dosyaIdx = SILME.indexOf('await admin.from("cases").delete()');
+    expect(depoIdx, "süpürge çağrılmıyor").toBeGreaterThan(-1);
+    expect(kayitIdx, "anonim kayıt yazılmıyor").toBeGreaterThan(depoIdx);
+    expect(satirIdx, "satır silmesi süpürgeden ÖNCE").toBeGreaterThan(depoIdx);
+    expect(dosyaIdx, "dosya silmesi satırlardan ÖNCE").toBeGreaterThan(satirIdx);
     // Süpürge düşerse HİÇBİR satıra dokunulmaz.
-    expect(C3.slice(supurgeIdx, satirIdx)).toMatch(/if \(!supurge\.ok\) return json/);
+    expect(SILME.slice(depoIdx, satirIdx)).toMatch(/if \(!supurge\.ok\) return/);
+  });
+
+  it("ANONİM KAYIT `cases` SİLİNMEDEN ÖNCE yazılıyor", () => {
+    /* 29.08.2026 kusuru: kayıt `dosya_kapanis`e, üstelik `cases` silindikten
+       SONRA yazılıyordu. O tablo `cases`e ON DELETE CASCADE bağlıdır — satır
+       çoktan gitmiş oluyor, güncelleme 0 satır etkiliyor ve supabase-js bunu
+       hata SAYMIYOR. Yani KVKK silmesinin kanıtı ne yazılıyor ne de
+       yazılmadığı söyleniyordu. */
+    const kayitIdx = SILME.indexOf('from("kapanis_istatistigi").insert(');
+    const dosyaIdx = SILME.indexOf('await admin.from("cases").delete()');
+    expect(kayitIdx, "anonim kayıt yok").toBeGreaterThan(-1);
+    expect(dosyaIdx, "kayıt `cases` silindikten SONRA yazılıyor").toBeGreaterThan(kayitIdx);
+    // Kayıt tablosu `cases`e BAĞLANMAMALI; yoksa aynı kusur geri gelir.
+    const SQL = kaynakOku("tests/sabit/kapanis-istatistigi.sql");
+    expect(SQL, "anonim kayıt tablosu `cases`e bağlanmış").not.toMatch(/references\s+public\.cases/i);
+    expect(SQL).toContain("enable row level security");
+    // Tablo yoksa silme DURMAZ ama sessiz de geçilmez.
+    expect(SILME).toContain("kapanis_istatistigi` tablosu yok");
   });
 
   it("başvuru silmesi: süpürge satır silmesinden ÖNCE", () => {
@@ -159,10 +194,10 @@ describe("iki silme kolu: önce depo, sonra satır", () => {
     expect(BASVURU.slice(supurgeIdx, satirIdx)).toMatch(/if \(!supurge\.ok\) return json/);
   });
 
-  it("bilirkisi_raporlari C3'ün satır silme sırasında da var", () => {
-    const bas = C3.indexOf("const SILME_SIRASI");
-    const son = C3.indexOf("];", bas);
-    expect(C3.slice(bas, son)).toContain('{ tablo: "bilirkisi_raporlari" }');
+  it("bilirkisi_raporlari satır silme sırasında da var", () => {
+    const bas = SILME.indexOf("export const SILME_SIRASI");
+    const son = SILME.indexOf("];", bas);
+    expect(SILME.slice(bas, son)).toContain('{ tablo: "bilirkisi_raporlari" }');
   });
 });
 
@@ -218,9 +253,10 @@ describe("insan kapısı bozulmuyor", () => {
   it("C3: 'SİL' yazılmadan ve paket alınmadan hiçbir silme başlamıyor", () => {
     const onayIdx = C3.indexOf('onay.toLocaleUpperCase("tr-TR") !== "SİL"');
     const paketIdx = C3.indexOf("paket_alindi");
-    const supurgeIdx = C3.indexOf("const supurge = await depoyuSupur");
+    const supurgeIdx = C3.indexOf('dosyayiTemizle(admin, case_id, "arabulucu")');
     expect(onayIdx, "elle onay kapısı yok").toBeGreaterThan(-1);
     expect(paketIdx, "paket kapısı yok").toBeGreaterThan(-1);
+    expect(supurgeIdx, "silme çağrısı bulunamadı").toBeGreaterThan(-1);
     expect(onayIdx, "onay kapısı silmeden sonra").toBeLessThan(supurgeIdx);
     expect(paketIdx, "paket kapısı silmeden sonra").toBeLessThan(supurgeIdx);
     expect(C3).toContain("Önce kapanış paketini almalısınız.");

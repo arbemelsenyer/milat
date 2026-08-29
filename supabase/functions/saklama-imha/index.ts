@@ -37,6 +37,7 @@
 //
 // Ortak kural: bir silme kolu, sildiği şeyin İZİNİ de doğru bırakmalıdır.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { dosyayiTemizle } from "../_shared/dosya-silme.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,10 +78,17 @@ const TUR_HARITASI: Record<string, { tablo: string; zaman: string } | null> = {
   case_notes: { tablo: "case_notes", zaman: "created_at" },
   // Canlı tabloda 25.08'de eklendi (kurucu kararı: mali kayıt 10 yıl).
   odeme_kayitlari: { tablo: "case_payments", zaman: "created_at" },
-  // Dosyanın kendisinin silinmesi `dosya-verilerini-sil` kolunun işidir
-  // (kapanış paketi + anonim kayıt + depo temizliği zinciriyle). Bu kol
-  // oraya DOKUNMAZ; tür tanımlı ama eşlemesi bilerek yoktur.
-  dosya_kapanis_sonrasi: null,
+  /* EMNİYET SÜPÜRGESİ (29.08.2026 · HAT H-15/1 adım 3).
+     Bu tür 28.08'e kadar `null` idi: "başka kolun işi (dosya-verilerini-sil)".
+     Ama o kol KENDİLİĞİNDEN HİÇ ÇALIŞMAZ — bilerek öyle yazıldı (insan
+     kapısı). Yani arabulucu "Verileri sil" düğmesine basmayı unutursa dosya
+     SONSUZA KADAR duruyordu. Kurucu kararı bunu açıkça istiyordu:
+     "arabulucu unutursa kapanıştan N gün sonra otomatik silinir."
+     CANLI KANIT (29.08): 6 kapalı dosyanın 5'i süresini geçmişti ve
+     8 `case_parties` satırı (taraf kimlikleri) hâlâ duruyordu.
+     Bu tür ÖZEL KOLDA işlenir (aşağıda); eşlemesi yalnız "tanınan tür"
+     sayılması için burada durur — tablo adı kullanılmaz. */
+  dosya_kapanis_sonrasi: { tablo: "cases", zaman: "closed_at" },
 };
 
 Deno.serve(async (req) => {
@@ -170,6 +178,41 @@ Deno.serve(async (req) => {
       // deno-lint-ignore no-explicit-any
       const kapsamla = (q: any) =>
         kapsamIdler ? q.in("case_id", kapsamIdler) : q.lt(hedef.zaman, sinir);
+
+      /* ── ÖZEL KOL 0 · EMNİYET SÜPÜRGESİ — DOSYANIN TAMAMI ────────────────
+         HAT H-15/1 adım 3: arabulucu "Verileri sil" düğmesine basmayı
+         unutursa, kapanıştan N gün sonra dosya kendiliğinden silinir. N
+         `saklama_sureleri.dosya_kapanis_sonrasi` satırındadır; NULL ise bu
+         kol HİÇ ÇALIŞMAZ (karar gelmeden hiçbir şey silinmez kuralı).
+
+         Öteki türler dosyanın BİR PARÇASINI siler; bu kol dosyanın KENDİSİNİ
+         siler — depo + bütün satırlar + `cases` + anonim kayıt. Kural ortak
+         modüldedir (`_shared/dosya-silme.ts`), böylece elle silme kolu
+         (`dosya-verilerini-sil`) ile bu kol ASLA ayrışamaz.
+
+         BİR DOSYA DÜŞERSE ÖTEKİLERE DEVAM EDİLİR: tek bir bozuk dosya bütün
+         gecelik koşumu durduramaz. Düşen dosya `uyarilar`a yazılır. */
+      if (tur === "dosya_kapanis_sonrasi") {
+        const idler = kapsamIdler ?? [];
+        if (idler.length === 0) { sonuc.push({ tur, durum: "temiz", silinen: 0 }); continue; }
+        if (kuru) { sonuc.push({ tur, durum: "kuru", silinecek: idler.length }); continue; }
+
+        let silinenDosya = 0;
+        for (const id of idler) {
+          const t = await dosyayiTemizle(admin, id, "sure_doldu");
+          if (!t.ok) { uyarilar.push(`${tur}: bir dosya silinemedi — ${t.hata}`); continue; }
+          silinenDosya += 1;
+          for (const u of t.uyarilar) uyarilar.push(`${tur}: ${u}`);
+        }
+        toplamSilinen += silinenDosya;
+        sonuc.push({
+          tur, durum: "silindi", silinen: silinenDosya,
+          ne: "dosyanın tamamı (depo + satırlar + cases)",
+          ...(silinenDosya < idler.length
+            ? { silinemeyen: idler.length - silinenDosya } : {}),
+        });
+        continue;
+      }
 
       /* ── ÖZEL KOL 1 · OTURUM KAYDI — SATIR SİLİNMEZ, KOLON BOŞALTILIR ─────
          Ses ve döküm AYNI satırda ayrı kolonlardadır. Satırı silmek ötekini de
@@ -274,7 +317,7 @@ Deno.serve(async (req) => {
     }
     return json({
       ok: true,
-      surum: "2026-08-26-kolon-depo",
+      surum: "2026-08-29-emniyet-supurgesi",
       kuru,
       toplam_silinen: toplamSilinen,
       sonuc,

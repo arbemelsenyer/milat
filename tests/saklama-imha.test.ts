@@ -52,10 +52,35 @@ describe("periyodik imha: güvenli tasarım bozulmuyor", () => {
     expect(G).toMatch(/\.lt\("closed_at", sinir\)/);
   });
 
-  it("dosyanın kendisini silmiyor (o başka kolun işi)", () => {
-    // `dosya_kapanis_sonrasi` bilerek eslenmemis olmali.
-    expect(G).toMatch(/dosya_kapanis_sonrasi:\s*null/);
-    expect(G).toContain("dosya-verilerini-sil");
+  it("EMNİYET SÜPÜRGESİ: arabulucu unutursa dosya kendiliğinden siliniyor", () => {
+    /* 29.08.2026'ya kadar burada "dosyanın kendisini SİLMİYOR (o başka kolun
+       işi)" yazıyordu ve `dosya_kapanis_sonrasi: null` aranıyordu. O tasarım
+       KUSURLUYDU: işaret edilen kol (`dosya-verilerini-sil`) kendiliğinden HİÇ
+       çalışmaz — bilerek öyle yazılmıştır (insan kapısı). Yani arabulucu
+       düğmeye basmayı unutursa dosya SONSUZA KADAR duruyordu; oysa kurucu
+       kararı (HAT H-15/1 adım 3) açıkça "kapanıştan N gün sonra otomatik
+       silinir" diyor. Canlıda 6 kapalı dosyanın 5'i süresini geçmiş, 8 taraf
+       satırı hâlâ duruyordu. */
+    expect(G, "emniyet süpürgesi kolu yok").toContain('if (tur === "dosya_kapanis_sonrasi")');
+    expect(G, "silme kuralı ortak modülden gelmiyor").toContain("dosyayiTemizle(admin, id");
+    // Bir dosya düşerse ötekilere devam edilir; sessiz geçilmez.
+    const bas = G.indexOf('if (tur === "dosya_kapanis_sonrasi")');
+    const blok = G.slice(bas, bas + 900);
+    expect(blok, "düşen dosya bildirilmiyor").toContain("uyarilar.push");
+    expect(blok, "kuru koşum bu kolda yok").toContain("if (kuru)");
+  });
+
+  it("EMNİYET SÜPÜRGESİ süre girilmemişse hiç çalışmıyor", () => {
+    /* NULL süre = dokunma kuralı bu kol için de geçerli olmalı: kapı,
+       türe özel koldan ÖNCEKİ genel `saklama_gun == null` denetimidir. */
+    const nullIdx = G.indexOf("if (s.saklama_gun == null)");
+    const kolIdx = G.indexOf('if (tur === "dosya_kapanis_sonrasi")');
+    expect(nullIdx, "NULL kapısı yok").toBeGreaterThan(-1);
+    expect(kolIdx, "emniyet süpürgesi NULL kapısından ÖNCE").toBeGreaterThan(nullIdx);
+    // Kapsam kapanmış dosyalarla sınırlı: kapanmamış dosya asla silinmez.
+    const kapsamIdx = G.indexOf('.not("closed_at", "is", null)');
+    expect(kapsamIdx, "kapsam kapanmış dosyalarla sınırlanmıyor").toBeGreaterThan(-1);
+    expect(kolIdx, "silme kapsam kurulmadan yapılıyor").toBeGreaterThan(kapsamIdx);
   });
 
   it("kuru koşum var (silmeden önce ne silineceği görülebiliyor)", () => {

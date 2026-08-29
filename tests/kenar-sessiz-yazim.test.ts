@@ -64,13 +64,18 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
   it("silme: silme sonrası eksikler gizlenmiyor", () => {
     // Silmenin KENDISI zaten dogru denetleniyordu; eksik olan, baglantiyi koparan
     // ve silmeyi KAYDA GECIREN yazimlardi. KVKK silmesinin kaniti kaybolamaz.
-    const g = oku("dosya-verilerini-sil");
-    for (const im of ["deneyimErr", "duzeltmeErr", "kapanisErr"]) {
+    /* 29.08: silmenin kendisi `_shared/dosya-silme.ts`e taşındı (aynı kural
+       üç kolda geçerli). Denetim oraya bakar; kolun kendisinde kalan şey
+       KAPILARDIR. Ayrıca `kapanisErr` KALDIRILDI çünkü yazımın hedefi
+       `dosya_kapanis`ti ve o satır `cases`e cascade bağlı olduğu için silme
+       ANINDA yok oluyordu — yazım sessiz bir hiçlikti (bkz.
+       `tests/dosya-verilerini-sil.test.ts`). Yerine `kapanis_istatistigi`. */
+    const g = kaynakOku(y("supabase/functions/_shared/dosya-silme.ts"));
+    for (const im of ["deneyimErr", "duzeltmeErr", "istErr"]) {
       expect(g, `${im} okunmuyor`).toContain(im);
     }
-    // `belge: yollar.length` 25.08'de eklendi (depo temizliği); amaç aynı:
-    // eksikler `uyarilar` ile çağırana taşınıyor mu.
-    expect(g, "eksikler çağırana bildirilmiyor").toMatch(/silindi:\s*true,\s*kayit:\s*oncekiToplam,[\s\S]{0,40}uyarilar/);
+    // Eksikler `uyarilar` ile çağırana taşınıyor mu.
+    expect(g, "eksikler çağırana bildirilmiyor").toMatch(/ok:\s*true,\s*kayit,\s*belge:[\s\S]{0,40}uyarilar/);
     // Silme dongusu ve `cases` silmesi eskiden beri denetli — bozulmamali.
     expect(g).toContain("Silme tamamlanamadı; hiçbir kayıt yarım bırakılmadı");
     expect(g).toMatch(/const\s*\{\s*error:\s*dErr\s*\}\s*=\s*await\s+admin\.from\("cases"\)\.delete/);
@@ -461,7 +466,7 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
        kendisi `tests/dosya-verilerini-sil.test.ts`te denetleniyor; burada
        yalnız BU KOLUN sözü denetlenir: süpürge düşerse satıra dokunulmuyor mu.
        Eski hâlde burada `storage.from(BELGE_KOVASI).remove(` aranıyordu. */
-    const g = oku("dosya-verilerini-sil");
+    const g = kaynakOku(y("supabase/functions/_shared/dosya-silme.ts"));
     expect(g, "ortak süpürge kullanılmıyor").toContain("depoyuSupur");
     // SIRA: supurge -> ANCAK SONRA satirlar silinir.
     const supurgeIdx = g.indexOf("const supurge = await depoyuSupur(admin, case_id);");
@@ -470,8 +475,9 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     expect(supurgeIdx, "süpürge çağrılmıyor").toBeGreaterThan(-1);
     expect(satirIdx, "satır silmesi süpürgeden ÖNCE").toBeGreaterThan(supurgeIdx);
     // Supurge duserse SATIRLARA DOKUNULMAZ.
-    expect(g.slice(supurgeIdx, satirIdx)).toMatch(/if \(!supurge\.ok\) return json/);
+    expect(g.slice(supurgeIdx, satirIdx)).toMatch(/if \(!supurge\.ok\) return/);
     // Soz kanitlanabilir: silinen belge sayisi cagirana bildirilir.
-    expect(g).toMatch(/belge:\s*toplamYol/);
+    expect(kaynakOku(y("supabase/functions/dosya-verilerini-sil/index.ts")))
+      .toMatch(/belge:\s*sonuc\.belge/);
   });
 });
