@@ -31,7 +31,17 @@ type Kategori = {
    güncellenir. Sabit metin BIRAKILMADI: "Belirsiz" yalnızca tablo gerçekten
    okunamadığında görünür ve o zaman da sebebi açıkça yazılır (§15.1: veri
    yoksa uydurma yok). */
-type SaklamaSuresi = { veri_turu: string; saklama_gun: number | null; baslangic: string };
+type SaklamaSuresi = {
+  veri_turu: string;
+  saklama_gun: number | null;
+  baslangic: string;
+  /* 29.08.2026: NULL süre İKİ AYRI şey demekti ve bu sayfa ikisini de
+     "işlenir işlenmez silinir" diye okuyordu. Biri gerçekten öyle; öteki
+     KURUCU KARARIYLA KALICI (onay kayıtları · anonim kapanış istatistiği).
+     Yani sayfa, tarafa kendi verisi hakkında GERÇEĞİN TERSİNİ söyleyebilirdi.
+     Cowork tabloya `kalici` kolonunu bu ayrımı yapabilmek için ekledi. */
+  kalici: boolean | null;
+};
 
 /** Gün sayısını insan diline çevirir. Tablo tek doğruluk kaynağıdır. */
 function sureMetni(kayit: SaklamaSuresi | undefined, okunabildiMi: boolean): string {
@@ -40,6 +50,14 @@ function sureMetni(kayit: SaklamaSuresi | undefined, okunabildiMi: boolean): str
   }
   if (!kayit) {
     return "Bu kayıt tipi için saklama süresi henüz tanımlanmadı.";
+  }
+  if (kayit.kalici === true) {
+    /* KALICI kayıt tarafa AÇIKÇA söylenir — bu sayfanın varlık sebebi budur.
+       Neden saklandığı da söylenir ki söz denetlenebilir olsun: kayıt içerik
+       taşımaz (kurucu kararı, HAT H-15 · 2. madde). */
+    return "Kalıcı olarak saklanır, silinmez. Yalnız onay/ret kaydı tutulur: "
+      + "kim, ne zaman, hangi metnin hangi sürümü. Beyanınız, belgeniz ya da "
+      + "tutar bu kayda girmez.";
   }
   if (kayit.saklama_gun == null) {
     return "İşlenir işlenmez silinir; saklanmaz.";
@@ -72,7 +90,7 @@ export default function Verilerim() {
         {
           const { data: sureSatirlari, error: sErr } = await supabase
             .from("saklama_sureleri" as never)
-            .select("veri_turu, saklama_gun, baslangic");
+            .select("veri_turu, saklama_gun, baslangic, kalici");
           if (sErr) {
             sureTablosuOkundu = false;
             console.error("[Verilerim] saklama süreleri okunamadı:", sErr.message);
@@ -183,13 +201,17 @@ export default function Verilerim() {
             ad: "Yapay zekâ kullanım bilgilendirmesi onayım",
             sayi: yzOnay,
             gorebilen: "Belirsiz — bu kaydın erişim politikası bu sayfadan doğrulanamadı.",
-            sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
+            /* 29.08: burada `dosya_kapanis_sonrasi` yazıyordu, yani tarafa
+               "kapanıştan 7 gün sonra silinir" deniyordu. Onay kayıtları
+               KURUCU KARARIYLA KALICIDIR (HAT H-15 · 2. madde) — söz yanlıştı. */
+            sure: sureMetni(sureler.get("onay_kayitlari"), sureTablosuOkundu),
           },
           {
             ad: "Oturum kaydı onayım / reddim",
             sayi: kayitOnay,
             gorebilen: "Siz (yalnız kendi kararınız) ve arabulucunuz.",
-            sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
+            // Onay kaydı: kalıcı (yukarıdaki gerekçenin aynısı).
+            sure: sureMetni(sureler.get("onay_kayitlari"), sureTablosuOkundu),
           },
           {
             ad: "Randevu tekliflerim ve cevaplarım",

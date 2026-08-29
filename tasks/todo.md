@@ -147,6 +147,32 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
+- [x] P1 · **"Verilerim" tarafa onay kayıtları için YANLIŞ süre söylüyordu** ·
+      Kabul: kalıcı kayıt "silinir" diye anlatılmıyor; onay kategorileri kendi
+      türüne bağlı; ekranın sorduğu her tür göç betiğinde kurulu
+      · **DONE 29.08.2026** · Doğrulama: `npm run test` **426/426** (öncesi
+      421) · tsc temiz · build temiz
+      · **KUSUR:** iki onay kategorisi ("Yapay zekâ kullanım bilgilendirmesi
+        onayım" · "Oturum kaydı onayım / reddim") `dosya_kapanis_sonrasi`
+        süresine bağlıydı — tarafa **"dosya kapanışından sonra 7 gün"**
+        deniyordu. Oysa kurucu kararı (H-15 · 2. madde) "onay kayıtları
+        KALICI, silinmez" ve canlı tabloda `onay_kayitlari.kalici = true`.
+        **Sayfa tarafa kendi verisi hakkında gerçeğin TERSİNİ söylüyordu.**
+      · **İKİNCİ YÜZ:** `saklama_gun == null` dalı "işlenir işlenmez silinir;
+        saklanmaz" diyordu. NULL süre iki ayrı şey demek; kalıcı kayıt bu dala
+        düşerse "hiç saklanmaz" denir. Kalıcı denetimi NULL dalından ÖNCE
+        kondu ve tezgâh SIRAYI kilitliyor.
+      · **BU EKRANIN İLK TEZGÂHI:** `tests/verilerim-saklama.test.ts`.
+        Tarafa verilen sözü denetleyen yüzeyin hiç tezgâhı yoktu.
+      · **YAN DÜZELTME:** `tests/sabit/saklama-suresi-politika.sql` 5 tür
+        kuruyordu, canlıda 8 var (üçü sonradan Cowork tarafından eklenmiş,
+        betiğe hiç yazılmamış) ve `kalici` kolonu betikte yoktu. Temiz bir
+        kurulumda ekran o türleri soramaz, tarafa "süre tanımlanmadı" derdi.
+        Betik canlıyla hizalandı; tezgâh ekranın sorduğu her türün betikte
+        kurulu olmasını denetliyor.
+      · **TEZGÂH ISIRDI:** onay kategorisi eski türe bağlanınca 1, kalıcı
+        denetimi NULL dalının arkasına alınınca 1 denetim kırmızı yandı.
+
 - [ ] P1 · **Emniyet süpürgesinin GERÇEK koşumu + kayıt kanıtı** (H-23 · 5. madde)
       · Kuru koşum **YAPILDI 29.08**: canlı cevap `surum:
       "2026-08-29-emniyet-supurgesi"` · `dosya_kapanis_sonrasi` →
@@ -157,6 +183,15 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
       ya da Cowork tek satırla çalıştırır — komut aşağıda.
       · Kabul: koşum sonrası `cases` 10 → **5** · `case_parties` 18 → **10** ·
       `kapanis_istatistigi` 0 → **5** satır (`sebep = 'sure_doldu'`)
+      · **İKİNCİ KURU KOŞUM (yeni sürümle, canlı):** kalıcı türler artık doğru
+        raporlanıyor — `onay_kayitlari` ve `anonim_kapanis_istatistigi` →
+        `{"durum":"kalıcı","sebep":"kurucu kararıyla silinmez"}`. Öncesinde
+        ikisi de "atlandı · süre girilmemiş" diyordu, yani bilerek kalıcı olan
+        kayıt **yapılacak iş** gibi görünüyordu.
+      · **NOT:** cron (`saklama-imha-gunluk`, her gece 03:00) bu koşumu zaten
+        yapacak. Kurucu gerçek koşumu onayladı (H-24 arşivde), yani el ile
+        tetiklenmese de bu gece gerçekleşir. Manuel komut yukarıdaki kuru
+        koşumun aynısıdır, `body` yalnız `'{}'` olur.
 
 - [ ] P3 · **17 kesin tekrar silinecek (24,7 MB)** · HAT **H-25**'te tam liste;
       Cowork depo API'siyle çalıştıracak. Kabul: `admin/` altı 121 → **104**
