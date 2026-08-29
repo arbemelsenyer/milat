@@ -2957,6 +2957,36 @@ export type Database = {
           },
         ]
       }
+      kapanis_istatistigi: {
+        Row: {
+          id: string
+          sebep: string
+          silindi_at: string
+          silinen_belge: number | null
+          silinen_kayit: number | null
+          sonuc: string | null
+          surec_gun: number | null
+        }
+        Insert: {
+          id?: string
+          sebep: string
+          silindi_at?: string
+          silinen_belge?: number | null
+          silinen_kayit?: number | null
+          sonuc?: string | null
+          surec_gun?: number | null
+        }
+        Update: {
+          id?: string
+          sebep?: string
+          silindi_at?: string
+          silinen_belge?: number | null
+          silinen_kayit?: number | null
+          sonuc?: string | null
+          surec_gun?: number | null
+        }
+        Relationships: []
+      }
       kayit_onay_talepleri: {
         Row: {
           case_id: string
