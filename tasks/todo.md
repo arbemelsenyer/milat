@@ -4,21 +4,22 @@
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: yok — bu bloktaki dört iş bitti, hepsi commit'li ve push'lu.
-  Son commit `bdde1b0`.
-- **⏰ ZAMANA BAĞLI · HAT H-24:** emniyet süpürgesi canlıda ve
-  `saklama-imha-gunluk` cron'u **her gece 03:00**'te koşuyor. İlk koşumda
-  kapanışı 7 günü geçmiş **5 gerçek dosya tamamen silinecek** (8 taraf,
-  8 analiz, 13 anlaşma belgesi, 4 oturum). Geri alınamaz. Kurucu kararı
-  bekleniyor; önerim H-24 (b) — `saklama_gun`u geçici NULL yap.
-- Açık blokaj: **HAT H-23** (Cowork: `kapanis_istatistigi` tablosu
-  çalıştırılmalı) · **HAT H-24** (yukarıdaki) · H-20 · H-21 · H-22.
+- Aktif görev: yok. Bu blokta **yedi iş** bitti; hepsi commit'li, push'lu,
+  canlıya dağıtıldı ve canlı pakette doğrulandı.
+- Açık blokaj — üçü de dış eylem bekliyor, hiçbiri Code'un yapabileceği iş
+  değil:
+  1. **Emniyet süpürgesi gerçek koşumu** — kuru koşum doğrulandı (silinecek 5).
+     Gerçek koşumu Code tetiklemeyi denedi, izin ekranı engelledi. **Cron
+     bunu bu gece 03:00'te zaten yapacak** (kurucu onayladı, H-24 arşivde).
+  2. **HAT H-25** — 17 kesin tekrar (24,7 MB) Cowork depo API'siyle silecek.
+  3. **HAT H-26** — tarafın kendi randevu tekliflerini görmesi (RLS kararı).
+  Ayrıca eski açıklar: H-20 · H-21.
 - **ÇALIŞMA AĞACINDA YABANCI DEĞİŞİKLİK VAR — DOKUNULMADI (§11).**
   `.agents/skills/medipact-calisma-duzeni/SKILL.md` silinmiş görünüyor;
   ayrıca izlenmeyen `repomix-output.xml`, `devam.sh`, `gs.sh`,
   `Yeni XLSX Worksheet.xlsx`, `.github/.agents/` duruyor.
 
-### 18. BLOKTA BİTENLER (dört iş — hepsi TEK KUSUR SINIFI)
+### 18. BLOKTA BİTENLER (yedi iş — ikisi hariç hepsi TEK KUSUR SINIFI)
 
 Bu bloğun tamamı şu sınıftan çıktı: **"kural bir yerde yazıldı, kardeş
 yollarda açık kaldı."** 25.08 ve 28.08'de aynı sınıf iki kez görülmüştü;
@@ -47,6 +48,22 @@ geçmiş, 8 taraf satırı duruyor). Ve silme kanıtı `dosya_kapanis`e, üsteli
 `cases` silindikten SONRA yazılıyordu — o satır cascade ile gittiği için
 yazım sessiz bir hiçlikti.
 
+**5 · P1 · Emniyet süpürgesi canlıda doğrulandı + kalıcı türler artık
+"eksik" görünmüyor** — `482d17f`. Kuru koşum: `silinecek: 5`, Code'un bağımsız
+SQL sayımıyla birebir. NULL süre iki ayrı şey demekti ve kol ikisini de "süre
+girilmemiş" diyordu; `kalici` okunuyor, artık `durum: "kalıcı"` dönüyor.
+
+**6 · P1 · "Verilerim" tarafa onay kayıtları için YANLIŞ süre söylüyordu** —
+`ff5cafa`. İki onay kategorisi "kapanıştan 7 gün sonra silinir" diyordu; oysa
+kurucu kararıyla **kalıcı**. Sayfa tarafa kendi verisi hakkında gerçeğin
+tersini söylüyordu. Bu ekranın **ilk tezgâhı** yazıldı.
+
+**7 · P1 · "Verilerim" okunamayan sayıyı gerçek gibi gösteriyordu** —
+`8710dcd`. "Randevu tekliflerim" tarafa **0** diyordu; canlıda **11 satır**
+var ve hepsi tarafa ait — RLS süzüyor, hata dönmüyor. Üç "Belirsiz" satırı
+da gerçek politikayla değiştirildi. Kardeş yollar tarandı: 12 tablodan
+yalnız biri açıktı.
+
 ### CANLI ÖLÇÜMLER (29.08, salt okuma)
 | ne | sonuç |
 |---|---|
@@ -55,6 +72,9 @@ yazım sessiz bir hiçlikti.
 | `case-documents` · "bilgi tabanı" öksüz | **71** (33,2 MB) → HAT H-22 |
 | kapalı dosya / 7 günü geçmiş | **6 / 5** → HAT H-24 |
 | yayınlanan pakette `basvuru-sil` | **var** · çıplak silme **yok** |
+| `admin/` altı (H-22 düzeltmesi) | 121 dosya · 50 canlı · 15 eskimiş · 56 bağlanmamış |
+| kuru koşum `dosya_kapanis_sonrasi` | **silinecek 5** |
+| yayınlanan pakette "Kalıcı olarak saklanır" | **var** · eski "Belirsiz" ifadesi **yok** |
 
 ### CANLI DAĞITIM (§11-B)
 `dosya-verilerini-sil` (iki kez) · `basvuru-sil` (ilk dağıtım) ·
