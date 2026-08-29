@@ -219,20 +219,21 @@ export default function Verilerim() {
           },
           {
             ad: "Randevu tekliflerim ve cevaplarım",
-            /* 29.08 KUSURU: burada `sayi: randevu` yazıyordu ve tarafa
-               **0** gösteriyordu. `randevu_teklifleri` üzerinde tek politika
-               var (`mediator_reads_offers`) ve TARAFI KAPSAMIYOR: tarafın
-               kendi oturumuyla yaptığı sayım RLS tarafından süzülüyor, hata
-               dönmüyor, sıfır dönüyor. Canlıda 11 satır vardı ve hepsi tarafa
-               aitti; sayfa "0" diyordu. Okunamayan bir sayıyı gerçek gibi
-               göstermek, boş bırakmaktan kötüdür. Sayı artık gizlenmiyor,
-               okunamadığı SÖYLENİYOR (aynı desen "analizler" kategorisinde
-               zaten vardı). Tarafın kendi tekliflerini görebilmesi bir RLS
-               kararıdır ve HAT H-26'da kurucuya soruldu. */
-            sayi: null,
-            gorebilen: "Arabulucunuz ve yönetici. Bu sayfadan siz okuyamıyorsunuz.",
-            not: "Bu kayıtların sayısı bu sayfadan okunamaz; erişim politikası izin vermez. "
-              + "Randevu tekliflerini arabulucunuzdan isteyebilirsiniz.",
+            /* 29.08 KUSURU ve ÇÖZÜMÜ. Burada `sayi: randevu` yazıyordu ve
+               tarafa **0** gösteriyordu: `randevu_teklifleri` üzerinde tek
+               politika vardı (`mediator_reads_offers`) ve tarafı kapsamıyordu,
+               yani tarafın sorgusu RLS'te süzülüyor, hata DÖNMÜYOR, sıfır
+               dönüyordu. Canlıda 11 satır vardı ve hepsi tarafa aitti.
+               Önce sayıyı gizleyip "okunamıyor" dedim (yalanı bitirmek için),
+               sonra erişimi açmak RLS kararı olduğu için HAT H-26'da sordum.
+               Kurucu (a)'yı seçti — gerekçesi anayasanın kendi kuralı (m.1):
+               "taraf yalnız kendi satırlarını görür, süzgeç SORGUDA". Cowork
+               `Taraf kendi randevu tekliflerini görür` politikasını canlıda
+               kurdu (`party_id` üzerinden yalnız kendi satırı; karşı tarafın
+               teklifi kapalı). Artık sayı gerçek. */
+            sayi: randevu,
+            gorebilen: "Siz (yalnız kendi teklifleriniz), arabulucunuz ve yönetici. "
+              + "Karşı tarafa yapılan teklifleri göremezsiniz.",
             sure: sureMetni(sureler.get("dosya_kapanis_sonrasi"), sureTablosuOkundu),
           },
           {

@@ -84,20 +84,54 @@ describe("Verilerim: süre sözü doğru", () => {
 });
 
 describe("Verilerim: okunamayan sayı gerçek gibi gösterilmiyor", () => {
-  it("SESSİZ SIFIR YOK — RLS süzdüğü kategori sayı göstermiyor", () => {
-    /* 29.08 KUSURU: "Randevu tekliflerim ve cevaplarım" kategorisi tarafa
-       **0** gösteriyordu. `randevu_teklifleri` üzerinde tek politika var
-       (`mediator_reads_offers`) ve tarafı kapsamıyor: tarafın kendi
-       oturumuyla yaptığı sayım RLS tarafından süzülüyor, HATA DÖNMÜYOR,
+  it("SESSİZ SIFIR YOK — 'okuyamıyorsunuz' diyen kategori sayı GÖSTERMEZ", () => {
+    /* 29.08 KUSURU: "Randevu tekliflerim" kategorisi tarafa **0** gösteriyordu.
+       `randevu_teklifleri` üzerinde tek politika vardı (`mediator_reads_offers`)
+       ve tarafı kapsamıyordu: tarafın sorgusu RLS'te süzülüyor, HATA DÖNMÜYOR,
        sıfır dönüyor. Canlıda 11 satır vardı, hepsi tarafa aitti, sayfa "0"
-       diyordu. Okunamayan bir sayıyı gerçek gibi göstermek, boş bırakmaktan
-       kötüdür — taraf "hiç teklif almamışım" diye okur. */
+       diyordu. Taraf bunu "hiç teklif almamışım" diye okur.
+
+       ÇÖZÜLDÜ (H-26): kurucu erişimi açtı, Cowork politikayı canlıda kurdu ve
+       sayı artık gerçek. Ama KURAL KALDI ve genelleştirildi — asıl invaryant
+       kategori adı değil şudur: **tarafa "bu sayfadan okuyamıyorsunuz" denen
+       bir kategoride sayı gösterilmez**, ve sayı gizlenen her kategoride
+       NEDEN gizlendiği yazar. Kural randevu satırına bağlı kalsaydı, H-26
+       ile birlikte silinir ve kusur başka bir kategoride sessizce geri
+       gelebilirdi. */
+    /* Kategori blokları: `ad: "..."`den bir sonraki `ad:`e (ya da dosya
+       sonuna) kadar. Blok sınırını süslü parantezle aramak kırılgan —
+       yorumların içindeki parantezlere takılıyor. */
+    const adlar = [...EKRAN.matchAll(/^\s*ad: "([^"]+)",$/gm)];
+    expect(adlar.length, "kategori bulunamadı").toBeGreaterThan(10);
+    for (let i = 0; i < adlar.length; i++) {
+      const ad = adlar[i][1];
+      const bas = adlar[i].index ?? 0;
+      const son = i + 1 < adlar.length ? (adlar[i + 1].index ?? EKRAN.length) : EKRAN.length;
+      const govde = EKRAN.slice(bas, son);
+      const okunamiyor = /okuyamıyorsunuz|bu sayfadan okunamaz/.test(govde);
+      const sayiGizli = /sayi:\s*null/.test(govde);
+      if (okunamiyor) {
+        expect(sayiGizli, `"${ad}": okunamadığı söyleniyor ama sayı gösteriliyor`)
+          .toBe(true);
+      }
+      if (sayiGizli) {
+        expect(govde, `"${ad}": sayı gizli ama NEDEN gizlendiği yazmıyor`)
+          .toMatch(/^\s*not: /m);
+      }
+    }
+  });
+
+  it("H-26 UYGULANDI — randevu sayısı gerçek, kaynağı yazılı", () => {
     const bas = EKRAN.indexOf('ad: "Randevu tekliflerim ve cevaplarım"');
     expect(bas, "randevu kategorisi bulunamadı").toBeGreaterThan(-1);
-    const blok = EKRAN.slice(bas, bas + 1400);
-    expect(blok, "okunamayan sayı yine gösteriliyor").not.toMatch(/sayi:\s*randevu/);
-    expect(blok).toMatch(/sayi:\s*null/);
-    expect(blok, "okunamadığı söylenmiyor").toContain("bu sayfadan okunamaz");
+    const blok = EKRAN.slice(bas, bas + 1800);
+    expect(blok, "sayı hâlâ gizli — H-26 uygulanmamış").toMatch(/sayi:\s*randevu/);
+    /* Sayının gerçek olması CANLI politikaya bağlı. O politika kaldırılırsa
+       sayfa yine sessizce 0 der; bu tezgâh onu göremez. Bu yüzden dayanağın
+       kodda YAZILI olması şart: bir sonraki okuyan neye güvendiğini bilsin. */
+    expect(blok, "hangi politikaya dayanıldığı yazılmamış")
+      .toContain("Taraf kendi randevu tekliflerini görür");
+    expect(blok, "karşı tarafın gizliliği anlatılmamış").toContain("Karşı tarafa");
   });
 
   it("TARAFA 'Belirsiz' DENMİYOR — politika okunabiliyorsa yazılır", () => {
