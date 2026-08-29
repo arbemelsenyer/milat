@@ -17,6 +17,69 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
+### H-27 · 29.08.2026 · **P0** — KVKK imha metni yapılmayan üç şey vaat ediyor
+
+**Sorun.** `src/lib/kvkk-metinleri.ts` → `KVKK_IMHA` metni aynen şöyle:
+
+> *"Toplanan veriler yalnızca Medipact AI sisteminin çalışması için gerekli olan
+> güvenli altyapıda (Supabase) şifrelenmiş olarak saklanır. **Kullanıcı hesabını
+> sildiği veya talep ettiği an tüm veriler kalıcı olarak imha edilir.**"*
+
+Bu metin **`/auth` (kayıt ekranı)** ve **`KatilimCevap` (tarafın davete cevap
+ekranı)** yüzeylerinde gösteriliyor — yani kişi **buna bakarak** sisteme
+giriyor ve verisini veriyor. Üç iddiası da gerçekle uyuşmuyor:
+
+| iddia | gerçek |
+|---|---|
+| "hesabını sildiği an" | **Hesap silme diye bir yol YOK.** Depoda hiçbir hesap silme kolu bulunmuyor (arama: `deleteUser` · `auth.admin.delete` — sıfır sonuç). |
+| "talep ettiği an" | Talep üzerine imha kolu da yok. Silme ya arabulucunun "Verileri sil" eylemidir ya da kapanıştan **7 gün** sonra emniyet süpürgesi. |
+| "**tüm** veriler" | Yanlış. Kurucu kararıyla **onay kayıtları** ve **anonim kapanış istatistiği KALICI** (H-15 · 2 ve 3. maddeler) — bunlar bilerek silinmez. |
+
+Ayrıca aynı sayfada **"Verilerim"** ekranı artık doğruyu söylüyor (bugün
+düzeltildi). Yani ürün aynı kişiye iki farklı şey anlatıyor.
+
+**Neden sormadan düzeltmedim.** Bu bir KVKK **aydınlatma/imha politikası
+metnidir**; doğru cümleyi yazmak hukuki sonuç doğurur (§7.2). Yanlışı
+göstermek benim işim, yerine ne yazılacağı sizin kararınız.
+
+**Önerdiğim metin (onaylarsanız uygularım):**
+
+> "Toplanan veriler, yalnızca Medipact AI'ın çalışması için gerekli olan
+> güvenli altyapıda şifrelenmiş olarak saklanır. Dosyanız kapandığında
+> arabulucunuz verileri siler; silmezse kapanıştan sonra saklama süresi
+> dolduğunda sistem kendiliğinden siler. Silme gerçek silmedir: hem kayıt hem
+> yüklediğiniz dosya gider. İki şey saklı kalır ve bunlar kişisel veri
+> içermez: onay/ret kaydınız (kim, ne zaman, hangi metnin hangi sürümü) ve
+> dosya kapandığında tutulan anonim istatistik. Hangi verinin ne kadar
+> saklandığını 'Verilerim' sayfasında görebilirsiniz."
+
+Gerekçe: süre **sayısı yazılmadı** — tek doğruluk kaynağı `saklama_sureleri`
+tablosu ve taraf onu "Verilerim"de görüyor. Bugün üç yüzeyde tam bu sabitler
+yüzünden yanlış söz verdiğimizi bulduk.
+
+**İKİNCİ SORU — constitution m.11 (aynı dosya, ayrı karar).**
+Aynı metinlerde **"Supabase"** ve **"Google Gemini API"** adları geçiyor
+(`KVKK_IMHA` · `KVKK_ACIK_RIZA` · `KVKK_SESLI_NOT`). m.11: *"ürün
+yüzeylerinde dış ürün/marka adları kullanılmaz... hiçbir MediPact özelliği bir
+dış ürünün adıyla tarif edilemez."* İstisna olarak yalnız yığın envanteri
+(mimari §4.2) ve m.12 sayılmış — bu metinler o istisnaya girmiyor.
+
+**Ama karşı bir gerekçe var ve bu yüzden karar sizin:** KVKK aydınlatmasında
+**veri işleyeni adıyla bildirmek** hukuken gerekli olabilir. m.11 bir ürün
+dili kuralı, aydınlatma ise hukuki bir yükümlülük.
+
+**Seçenekler.** (a) Adlar kalsın, m.11'e "KVKK aydınlatması istisnadır"
+açıklaması eklensin. · (b) Adlar çıkarılsın, "yurt dışında yerleşik bir yapay
+zekâ altyapısı" gibi tarif edilsin. · (c) Adlar yalnız aydınlatmada kalsın,
+öteki yüzeylerden çıkarılsın.
+**Önerim (a):** yasağın amacı ürün yeteneğini başkasının markasıyla
+adlandırmamak; aydınlatmada işleyeni saymak bu amaca aykırı değil, tersine
+şeffaflık. Ama bu bir hukuk kararıdır, sizindir.
+
+**Kararın etkisi.** (1) için: metin tek dosyada (`kvkk-metinleri.ts`), iki
+yüzey oradan okuyor, değişiklik tek yerde olur ve tezgâhla kilitlenir.
+(2) için: (a) seçilirse constitution'a tek cümle eklenir ve kod değişmez.
+
 ### H-21 · 28.08.2026 · P1 — `.env` deposa girmiş; çıkarmak canlı yayını kırabilir
 
 **Sorun.** `.env` dosyası git'te **izleniyor** (`git ls-files .env` onu

@@ -184,6 +184,18 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
+- [!] P0 · **KVKK imha metni yapılmayan üç şey vaat ediyor** · HAT **H-27**'de
+      kurucu kararı bekliyor (§7.2 — hukuki metin, yerine ne yazılacağı Code'un
+      kararı değil). `KVKK_IMHA` metni `/auth` ve `KatilimCevap` yüzeylerinde
+      gösteriliyor ve üç iddiası da gerçek değil: (1) "hesabını sildiği an" —
+      **hesap silme kolu hiç YOK** (`deleteUser` · `auth.admin.delete` araması
+      sıfır sonuç), (2) "talep ettiği an" — talep üzerine imha kolu yok,
+      (3) "**tüm** veriler" — onay kayıtları ve anonim istatistik kurucu
+      kararıyla KALICI. Önerilen metin H-27'de hazır; onay gelince tek dosyada
+      uygulanır ve tezgâhla kilitlenir.
+      · Kabul: metin gerçekle uyuşuyor, süre SAYISI içermiyor (tek kaynak
+      `saklama_sureleri`), tezgâh sabit süre ve yanlış vaat girmesini engelliyor
+
 - [x] P1 · **KAYIT ONAY METNİ yanlış saklama sözü veriyordu (v1 → v2)** ·
       Kabul: onay metninde saklama süresi sabiti yok, doğru söz yazılı, sürüm
       yükseltildi ve metin↔sürüm bağı tezgâhla kilitlendi · **DONE 29.08.2026**
