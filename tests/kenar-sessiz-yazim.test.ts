@@ -454,13 +454,18 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
        belgeleri kovada KALIYORDU. Satir gittikten sonra o dosyayi gosteren
        hicbir kayit kalmadigi icin hicbir silme kolu onlari bir daha bulamaz
        (constitution m.10). Canlida bu yolla uretilmis 6 oksuz dosya bulundu. */
+    /* 29.08 GENİŞLEMESİ: kol artık tek tabloya değil, depoya yol yazan DÖRT
+       kaynağa birden bakıyor (`DEPO_KAYNAKLARI`) ve kovayı değişkenden alıyor.
+       Bu tezgâh o yüzden `BELGE_KOVASI` harfine değil, KOVA DEĞİŞKENİNE bakar;
+       kaynak listesinin eksiksizliğini `tests/dosya-verilerini-sil.test.ts`
+       şemaya karşı denetler. */
     const g = oku("dosya-verilerini-sil");
     expect(g, "depo kovasi tanimli degil").toContain("BELGE_KOVASI");
-    expect(g, "depo silmesi yok").toMatch(/storage\.from\(BELGE_KOVASI\)\.remove\(/);
+    expect(g, "depo silmesi yok").toMatch(/storage\.from\(kova\)\.remove\(/);
     for (const im of ["yolErr", "depoErr"]) expect(g, `${im} okunmuyor`).toContain(im);
     // SIRA: yollar okunur -> depo silinir -> ANCAK SONRA satirlar silinir.
-    const yolIdx = g.indexOf('.select("file_path").eq("case_id", case_id)');
-    const depoIdx = g.indexOf("storage.from(BELGE_KOVASI).remove(");
+    const yolIdx = g.indexOf('.select(kaynak.kolon).eq("case_id", case_id)');
+    const depoIdx = g.indexOf("storage.from(kova).remove(");
     // Satır silme döngüsü: sayım döngüsü değil, `delete()` çağıran olan.
     const satirIdx = g.indexOf('await admin.from(t.tablo).delete()');
     expect(yolIdx, "yollar okunmuyor").toBeGreaterThan(-1);
@@ -469,6 +474,6 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     // Depo silinemezse SATIRLARA DOKUNULMAZ.
     expect(g).toContain("hiçbir kayıt silinmedi");
     // Soz kanitlanabilir: silinen belge sayisi cagirana bildirilir.
-    expect(g).toMatch(/belge:\s*yollar\.length/);
+    expect(g).toMatch(/belge:\s*toplamYol/);
   });
 });

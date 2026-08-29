@@ -12,6 +12,11 @@
 // YARIM SİLME YOK: silme sırası yabancı anahtarlara uygundur; bir adım hata
 // verirse işlem DURUR ve arabulucuya sade cümleyle bildirilir.
 //
+// DEPO DA SİLİNİR: dosyaya bağlı DÖRT tablo depoda nesne gösterir
+// (`DEPO_KAYNAKLARI`). Yolları satırlar silinmeden ÖNCE okunur, kovalarından
+// silinir, ancak sonra satırlara dokunulur. Yol listesi sınıra dayanırsa
+// SESSİZ KIRPMA YOK — işlem durur (görmediğimiz dosyayı silemeyiz).
+//
 // SİLİNEN İÇERİK HİÇBİR LOGA YAZILMAZ; anahtarlar loglanmaz.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { sinirdanGecir } from "../_shared/anlatim.ts";
@@ -39,6 +44,32 @@ function temiz(v: unknown): string {
 // Tarafların belgelerinin durduğu kova. Silme kolu satırlarla birlikte
 // dosyaları da kaldırmalıdır; yoksa dosyalar öksüz kalır (constitution m.10).
 const BELGE_KOVASI = "case-documents";
+// Sesli notun ham kaydının durduğu kova. `saklama-imha` ile AYNI ad.
+const KAYIT_KOVASI = "oturum-kayitlari";
+
+/* DEPOYA İŞARET EDEN BÜTÜN KAYNAKLAR — 29.08.2026 kusuru.
+   25.08'de bu kol yalnız `case_documents` için depo temizliği kazanmıştı.
+   Oysa dosyaya bağlı DÖRT tablo depoda nesne gösteriyor; öteki üçünün
+   satırları siliniyor ama dosyaları kovada kalıyordu. Satır gidince o nesneyi
+   gösteren hiçbir kayıt kalmaz — hiçbir silme kolu onu bir daha bulamaz
+   (constitution m.10 · HAT H-12 ile aynı kusur, üç kardeş yolda).
+   · `agreement_documents.file_path`  → imzalı anlaşmanın TARAMASI
+   · `bilirkisi_raporlari.dosya_yolu` → bilirkişinin yüklediği rapor
+   · `oturum_kayitlari.ses_dosya_yolu`→ dökümden sonra silinemeyip KAÇAN ses
+     (`sesli-not-dokum` silme düşerse yolu bilerek NULL'lamaz)
+   Yeni bir tablo depoya yol yazacaksa buraya eklenir; eklenmezse bu koldan
+   kaçar. Tezgâh listeyi `types.ts`e karşı denetler. */
+const DEPO_KAYNAKLARI: { tablo: string; kolon: string; kova: string }[] = [
+  { tablo: "case_documents", kolon: "file_path", kova: BELGE_KOVASI },
+  { tablo: "agreement_documents", kolon: "file_path", kova: BELGE_KOVASI },
+  { tablo: "bilirkisi_raporlari", kolon: "dosya_yolu", kova: BELGE_KOVASI },
+  { tablo: "oturum_kayitlari", kolon: "ses_dosya_yolu", kova: KAYIT_KOVASI },
+];
+
+/* Tek kaynaktan okunacak en çok yol sayısı. SESSİZ KIRPMA YOK: sınıra
+   dayanılırsa işlem DURUR (bkz. okuma döngüsü). Sessizce kırpmak, silindiği
+   söylenen bir dosyayı kovada bırakmak demektir. */
+const YOL_SINIRI = 1000;
 
 const SILME_SIRASI: { tablo: string; alan?: string }[] = [
   { tablo: "belge_ozetleri", alan: "case_id" },
@@ -64,6 +95,7 @@ const SILME_SIRASI: { tablo: string; alan?: string }[] = [
   { tablo: "teklif_braketleri" },
   { tablo: "olay_cizelgesi" },
   { tablo: "common_ground_reports" },
+  { tablo: "bilirkisi_raporlari" },
   { tablo: "agreement_documents" },
   { tablo: "oturum_kayitlari" },
   { tablo: "case_sessions" },
@@ -127,34 +159,61 @@ Deno.serve(async (req) => {
       } catch { /* tablo yoksa sayıma girmez */ }
     }
 
-    /* DEPO TEMİZLİĞİ — SATIRLARDAN ÖNCE (25.08.2026 canlı bulgusu).
+    /* DEPO TEMİZLİĞİ — SATIRLARDAN ÖNCE (25.08.2026 canlı bulgusu,
+       29.08.2026'da ÜÇ KARDEŞ YOLA genişletildi).
        Bu kol KVKK silme koludur ama depoya HİÇ dokunmuyordu: `case_documents`
        satırları siliniyor, tarafların belgeleri `case-documents` kovasında
        KALIYORDU. Satır gittikten sonra o dosyayı gösteren hiçbir kayıt kalmadığı
        için hiçbir silme kolu onları bir daha bulamaz — constitution m.10
        (süresiz saklama yasağı) ihlali. Canlıda bu yolla üretilmiş 6 öksüz dosya
        bulundu (30.06–01.07, dosyaları artık var olmayan davalara ait).
+       25.08 düzeltmesi YALNIZ `case_documents`i kapattı; imzalı anlaşma
+       taraması, bilirkişi raporu ve kaçan ses kaydı aynı açıkta kaldı.
+       Artık kaynak listesi `DEPO_KAYNAKLARI`dır — tek yer.
 
        SIRA KRİTİK: önce dosya (asıl kişisel veri), sonra satır. Ters sırada
        depo silmesi düşerse indeks yok olur ve veri erişilemez biçimde KALIR.
        Yollar satırlar silinmeden ÖNCE okunur; sonra okunamaz. */
-    const { data: belgeYollari, error: yolErr } = await admin.from("case_documents")
-      .select("file_path").eq("case_id", case_id).limit(1000);
-    if (yolErr) {
-      return json({
-        silindi: false,
-        error: `Belge yolları okunamadı; hiçbir kayıt silinmedi: ${yolErr.message}`,
-      }, 500);
+    const kovaYollari = new Map<string, string[]>();
+    let toplamYol = 0;
+    for (const kaynak of DEPO_KAYNAKLARI) {
+      const { data: satirlar, error: yolErr } = await admin.from(kaynak.tablo)
+        .select(kaynak.kolon).eq("case_id", case_id).limit(YOL_SINIRI);
+      if (yolErr) {
+        /* Tablo yoksa (eski şema) bu bir eksiklik değildir; ama başka her hata
+           "okuyamadım" demektir ve okuyamadığımız yolu silemeyiz. */
+        if (String(yolErr.code ?? "") === "42P01") continue;
+        return json({
+          silindi: false,
+          error: `Belge yolları okunamadı; hiçbir kayıt silinmedi: ${yolErr.message}`,
+        }, 500);
+      }
+      const ham = (satirlar ?? []) as Record<string, unknown>[];
+      /* SESSİZ KIRPMA YOK: sınıra dayandıysak geri kalan yolları hiç görmedik.
+         Devam edersek satırları siler, görmediğimiz dosyaları kovada öksüz
+         bırakırdık — düzeltmeye çalıştığımız kusurun ta kendisi. */
+      if (ham.length === YOL_SINIRI) {
+        return json({
+          silindi: false,
+          error: "Bu dosyada silinecek belge sayısı tek seferde işlenemeyecek kadar çok; "
+            + "hiçbir kayıt silinmedi. Lütfen bildirin.",
+        }, 500);
+      }
+      const yollar = ham
+        .map((r) => String(r?.[kaynak.kolon] ?? "").trim())
+        .filter((y) => y.length > 0);
+      if (yollar.length === 0) continue;
+      const birikmis = kovaYollari.get(kaynak.kova) ?? [];
+      birikmis.push(...yollar);
+      kovaYollari.set(kaynak.kova, birikmis);
+      toplamYol += yollar.length;
     }
-    const yollar = ((belgeYollari ?? []) as { file_path?: string }[])
-      .map((b) => String(b?.file_path ?? "").trim())
-      .filter((y) => y.length > 0);
 
-    if (yollar.length > 0) {
-      const { error: depoErr } = await admin.storage.from(BELGE_KOVASI).remove(yollar);
+    for (const [kova, yollar] of kovaYollari) {
+      const { error: depoErr } = await admin.storage.from(kova).remove(yollar);
       if (depoErr) {
         // Depo temizlenemediyse SATIRLARA DOKUNULMAZ: dosyalar bulunabilir kalsın.
-        console.error(`[dosya-verilerini-sil] depo temizlenemedi (${case_id}): ${depoErr.message}`);
+        console.error(`[dosya-verilerini-sil] depo temizlenemedi (${case_id} · ${kova}): ${depoErr.message}`);
         return json({
           silindi: false,
           error: "Belgeler depodan silinemedi; hiçbir kayıt silinmedi. Lütfen tekrar deneyin.",
@@ -215,9 +274,9 @@ Deno.serve(async (req) => {
     /* "Kişisel veri kalmadı" sözü artık depoyu da kapsıyor: silinen dosya
        sayısı çağırana bildirilir, yani söz KANITLANABİLİR. */
     return json({
-      silindi: true, kayit: oncekiToplam, belge: yollar.length, uyarilar,
+      silindi: true, kayit: oncekiToplam, belge: toplamYol, uyarilar,
       mesaj: sinirdanGecir(
-        `${oncekiToplam} kayıt${yollar.length > 0 ? ` ve ${yollar.length} belge` : ""} silindi, `
+        `${oncekiToplam} kayıt${toplamYol > 0 ? ` ve ${toplamYol} belge` : ""} silindi, `
         + "dosyada kişisel veri kalmadı.", "silme"),
     });
   } catch (e: any) {

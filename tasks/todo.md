@@ -98,6 +98,14 @@ dikeyler), §15.4 (Aşama 3 kurumsal), §15.4a (Aşama 4 şahıslar) **alınmad�
 | Çapraz-arabulucu gizlilik açığı (§15.5-1) | 22.07 kapandı, doğrulandı |
 
 ### Kuyruk
+- [ ] P0 · **KVKK silme kolu depoda üç kaynağı öksüz bırakıyor** · Kabul:
+      `dosya-verilerini-sil` depoya işaret eden DÖRT kaynağın hepsini
+      (`case_documents.file_path` · `agreement_documents.file_path` ·
+      `bilirkisi_raporlari.dosya_yolu` · `oturum_kayitlari.ses_dosya_yolu`)
+      satırlar silinmeden ÖNCE kovalarından siliyor; yol listesi sınıra
+      dayanırsa SESSİZ KIRPMA yok, işlem durup söylüyor;
+      `tests/dosya-verilerini-sil.test.ts` yazıldı ve ısırdığı kanıtlandı
+
 - [x] P0 · **Depodaki öksüz taraf belgeleri silindi (H-19 · seçenek A)** ·
       Kabul: `case-documents` kovasında "dosya belgesi" öksüzü 0 · **DONE
       27.08.2026 — CANLI KANITLI** · Doğrulama: kovadaki nesne 149 → **143**
