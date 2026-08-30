@@ -19,6 +19,75 @@ import { kaynakOku } from "./kaynak";
 const G = kaynakOku("supabase/functions/saklama-imha/index.ts");
 const SQL = kaynakOku("tests/sabit/saklama-suresi-politika.sql");
 
+/** `types.ts` Row bloklarından tablo → kolon adları. */
+function semaKolonlari(): Record<string, string[]> {
+  const TIPLER = kaynakOku("src/integrations/supabase/types.ts");
+  const harita: Record<string, string[]> = {};
+  let tablo: string | null = null;
+  let rowIcinde = false;
+  for (const l of TIPLER.split(/\r?\n/)) {
+    const t = l.match(/^ {6}([a-z0-9_]+): \{$/);
+    if (t) { tablo = t[1]; harita[tablo] ??= []; rowIcinde = false; }
+    if (tablo && /^ {8}Row: \{$/.test(l)) { rowIcinde = true; continue; }
+    if (rowIcinde) {
+      if (/^ {8}\}$/.test(l)) { rowIcinde = false; continue; }
+      const k = l.match(/^ {10}([a-zA-Z0-9_]+)\??:/);
+      if (k) harita[tablo!].push(k[1]);
+    }
+  }
+  return harita;
+}
+
+describe("liste şemayla uyuşuyor mu (30.08.2026 dersi)", () => {
+  /* O gün `_shared/dosya-silme.ts`teki `SILME_SIRASI` iki satırında var olmayan
+     bir kolonu gösteriyordu ve emniyet süpürgesi ilk gerçek koşumunda tam
+     orada durdu — yarım silme bırakarak. Kusurun kaynağı tek bir satır değil,
+     ŞUYDU: elle yazılmış tablo/kolon listeleri şemaya karşı hiç denetlenmiyordu.
+     Bu kolda da iki böyle liste var; ikisi de artık denetleniyor. */
+
+  it("TUR_HARITASI'ndaki her tablo.zaman çifti şemada VAR", () => {
+    const sema = semaKolonlari();
+    const bas = G.indexOf("const TUR_HARITASI");
+    expect(bas, "TUR_HARITASI yok").toBeGreaterThan(-1);
+    const son = G.indexOf("\n};", bas);
+    const eslemeler = [...G.slice(bas, son).matchAll(
+      /([a-z0-9_]+):\s*\{\s*tablo:\s*"([a-z0-9_]+)",\s*zaman:\s*"([a-z0-9_]+)"\s*\}/g,
+    )].map((m) => ({ tur: m[1], tablo: m[2], zaman: m[3] }));
+    expect(eslemeler.length, "eşleme okunamadı — denetim boşa dönüyor").toBeGreaterThan(3);
+    const kacanlar: string[] = [];
+    for (const e of eslemeler) {
+      const k = sema[e.tablo];
+      if (!k) { kacanlar.push(`${e.tablo} (tablo şemada yok)`); continue; }
+      if (!k.includes(e.zaman)) kacanlar.push(`${e.tablo}.${e.zaman}`);
+    }
+    expect(kacanlar, `TUR_HARITASI şemayla uyuşmuyor: ${kacanlar.join(", ")}`).toEqual([]);
+  });
+
+  it("ÖZEL KOLLARIN dokunduğu kolonlar şemada VAR", () => {
+    /* Ses/döküm kolu satır silmez, KOLON boşaltır ve silme damgası yazar.
+       Damga kolonlarından biri şemadan düşerse yazım sessizce hata döner ve
+       KVKK silmesinin kanıtı kaybolur — kolun varlık sebebi budur. */
+    const sema = semaKolonlari();
+    const beklenen: [string, string[]][] = [
+      ["oturum_kayitlari", ["ses_dosya_yolu", "ses_silindi_at", "ses_silme_notu",
+        "dokum_metni", "dokum_silindi_at", "dokum_silme_notu"]],
+      ["case_documents", ["file_path"]],
+      ["cases", ["closed_at"]],
+      ["saklama_sureleri", ["veri_turu", "saklama_gun", "baslangic", "kalici"]],
+    ];
+    const kacanlar: string[] = [];
+    for (const [tab, kolonlar] of beklenen) {
+      const k = sema[tab] ?? [];
+      for (const c of kolonlar) {
+        // Kod gerçekten bu kolona dokunuyor mu? Dokunmuyorsa denetim yanıltıcı olur.
+        if (!G.includes(c)) { kacanlar.push(`${tab}.${c} (kod artık kullanmıyor)`); continue; }
+        if (!k.includes(c)) kacanlar.push(`${tab}.${c}`);
+      }
+    }
+    expect(kacanlar, `kolun dokunduğu kolon şemada yok: ${kacanlar.join(", ")}`).toEqual([]);
+  });
+});
+
 describe("periyodik imha: güvenli tasarım bozulmuyor", () => {
   it("süre PARAMETRE TABLOSUNDAN okunuyor, kodda sabit değil", () => {
     expect(G).toContain('from("saklama_sureleri")');
