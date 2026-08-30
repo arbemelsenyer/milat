@@ -1,30 +1,45 @@
 ## Nerede kaldık
 
-- Tarih: **29.08.2026 gecesi** (18. blok) — sürüyor.
+- Tarih: **30.08.2026 00:23 UTC** (18. blok) — `medipact dur` ile kapatıldı.
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: yok. Bu blokta **on bir iş** bitti; hepsi commit'li ve push'lu.
+- Aktif görev: **yok** (`dur` ile kapatıldı). Bu blokta **on bir iş** bitti;
+  hepsi commit'li, push'lu ve canlıya dağıtıldı. Yerel ile uzak aynı hizada,
+  çalışma ağacında yalnız dokunulmayan yabancı değişiklikler var.
+- Doğrulama (kapanışta): `npm run test` **432/432** · `tsc --noEmit` temiz ·
+  `npm run build` temiz · canlı paket `index-uuPFTSxM.js` doğrulandı.
 
-### ⚠ AÇIK VE ZAMANA BAĞLI: EMNİYET SÜPÜRGESİ HENÜZ KOŞMADI
-Son cron koşumu **29.08 03:00 UTC** — yeni kolun dağıtımından (05:29 UTC)
-öncesi, yani eski kodla koştu. Ölçüm (29.08 22:42 UTC): `cases` **10** ·
-süresi geçmiş **5** · `kapanis_istatistigi` **0**. Yeni sürümle ilk koşum
-**30.08 03:00 UTC**'de. Yeni oturumun ilk işi bu sayıları ölçüp kabul
-kriterini kapatmaktır: `cases` 10→5 · `case_parties` 18→10 ·
-`kapanis_istatistigi` 0→5 (`sebep='sure_doldu'`). **Koşum yine olmadıysa**
-kolu değil önce cron'u şüphelen (24.08 dersi).
+### ⚠ YENİ OTURUMUN İLK İŞİ — SÜPÜRGE ÖLÇÜMÜ (iş değil, doğrulama)
+Emniyet süpürgesi **hâlâ koşmadı**. Ölçüm **30.08 00:23 UTC**:
+son cron koşumu **29.08 03:00 UTC** (yeni kolun dağıtımından öncesi, eski
+kodla koştu) · `cases` **10** · süresi geçmiş **5** · `case_parties` **18** ·
+`kapanis_istatistigi` **0**.
+İlk gerçek koşum **30.08 03:00 UTC** — bu kaydın yazıldığı andan ~2,5 saat
+sonra. Yeni oturum önce şunu ölçer:
+`cases` 10→**5** · `case_parties` 18→**10** · `kapanis_istatistigi` 0→**5**
+(`sebep='sure_doldu'`).
+**Koşum yine olmadıysa** kolu değil önce cron'u şüphelen — cron "succeeded"
+fonksiyonun çalıştığı anlamına gelmez (24.08 dersi). Kolun kendisi kuru
+koşumda canlıda doğrulandı (`silinecek: 5`, sürüm
+`2026-08-29-emniyet-supurgesi`).
 
-### SIRADAKİ UYGULANABİLİR İŞ
-Kuyrukta karar/önkoşul beklemeyen iş **kalmadı**. §6 gereği yeni oturum
-kodun gerçek durumundan P0/P1 aday çıkarır. Bu blokta üretken olan yol:
-**"kural bir yerde düzeltildi, kardeş yüzey açık kaldı"** sınıfını kovalamak —
-bu blokta bu sınıftan **yedi** kusur çıktı.
+### SONRA NE YAPILIR
+Kuyrukta karar/önkoşul beklemeyen iş **kalmadı**. §6 gereği kodun gerçek
+durumundan yeni P0/P1 aday çıkarılır. Bu blokta en üretken yol şuydu ve
+tükenmedi: **"kural bir yerde düzeltildi, kardeş yüzey açık kaldı"** sınıfını
+kovalamak — bu blokta bu sınıftan yedi kusur çıktı (üçü aynı "24 saat"
+sabitinden).
 
 - Açık blokaj — **üç** madde, üçü de kurucu kararı bekliyor:
   **H-27** (P0 · KVKK imha metni yapılmayan üç şey vaat ediyor + m.11 / dış
   ürün adı) · **H-20** (bilgi tabanı yüklemesi) · **H-21** (`.env`).
-  *H-22/23/24/25/26 kapandı ve arşivde.*
+  *H-22/23/24/25/26 kapandı ve arşivde (26 arşiv maddesi).*
+- **Küçük ev işi (acele değil):** `HAT.md` → `COWORK → CODE` bölümünde
+  H-15/1 · H-15 · H-14 · H-11 · H-1…H-6 cevapları duruyor. Hepsi günler önce
+  uygulandı (H-15/1'in son parçası — emniyet süpürgesi — bu blokta bitti),
+  ama arşive taşınmadı. Taşımadan önce her birinin gerçekten uygulandığı
+  **tek tek doğrulanmalı**; "herhalde yapılmıştır" diye arşivlenmez.
 - **ÇALIŞMA AĞACINDA YABANCI DEĞİŞİKLİK VAR — DOKUNULMADI (§11).**
   `.agents/skills/medipact-calisma-duzeni/SKILL.md` silinmiş görünüyor;
   ayrıca izlenmeyen `repomix-output.xml`, `devam.sh`, `gs.sh`,
