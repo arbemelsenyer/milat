@@ -470,8 +470,11 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     expect(g, "ortak süpürge kullanılmıyor").toContain("depoyuSupur");
     // SIRA: supurge -> ANCAK SONRA satirlar silinir.
     const supurgeIdx = g.indexOf("const supurge = await depoyuSupur(admin, case_id);");
-    // Satır silme döngüsü: sayım döngüsü değil, `delete()` çağıran olan.
-    const satirIdx = g.indexOf('await admin.from(t.tablo).delete()');
+    /* Satır silme döngüsü: sayım döngüsü değil, `delete()` çağıran olan.
+       30.08.2026: döngü artık kapsamı `kapsamla()` ile kuruyor (taraf üzerinden
+       bağlı tablolar `case_id` ile bulunamıyordu), bu yüzden aranan metin
+       değişti. */
+    const satirIdx = g.indexOf('const q = kapsamla(t, admin.from(t.tablo).delete());');
     expect(supurgeIdx, "süpürge çağrılmıyor").toBeGreaterThan(-1);
     expect(satirIdx, "satır silmesi süpürgeden ÖNCE").toBeGreaterThan(supurgeIdx);
     // Supurge duserse SATIRLARA DOKUNULMAZ.

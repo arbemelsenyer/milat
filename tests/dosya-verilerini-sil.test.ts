@@ -51,6 +51,20 @@ function depoKaynaklari(): { tablo: string; kolon: string; kova: string }[] {
 const govdesi = (g: string) =>
   g.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
+/** `SILME_SIRASI` dizisindeki satırlar: tablo · gerçek bağ alanı · `uzeri`. */
+function silmeSirasi(): { tablo: string; alan: string; uzeri: boolean }[] {
+  const bas = SILME.indexOf("export const SILME_SIRASI");
+  expect(bas, "SILME_SIRASI listesi yok").toBeGreaterThan(-1);
+  const son = SILME.indexOf("];", bas);
+  return [...SILME.slice(bas, son).matchAll(
+    /\{\s*tablo:\s*"([a-z0-9_]+)"(?:,\s*alan:\s*"([a-z0-9_]+)")?(?:,\s*uzeri:\s*"([a-z0-9_]+)")?\s*\}/g,
+  )].map((m) => ({
+    tablo: m[1],
+    alan: m[2] ?? (m[3] ? "party_id" : "case_id"),
+    uzeri: !!m[3],
+  }));
+}
+
 /** `types.ts` Row bloklarından tablo → kolon adları. */
 function semaKolonlari(): Record<string, string[]> {
   const harita: Record<string, string[]> = {};
@@ -154,17 +168,65 @@ describe("depo süpürgesi: silme gerçekten silme", () => {
 });
 
 describe("iki silme kolu: önce depo, sonra satır", () => {
-  it("ORTAK MODÜL: depo → anonim kayıt → satırlar → cases", () => {
+  it("ORTAK MODÜL: depo → satırlar → anonim kayıt → cases", () => {
+    /* 30.08.2026'da sıra DEĞİŞTİ. Eskiden anonim kayıt satırlardan ÖNCE
+       yazılıyordu; silme yarıda kalınca geriye "silindi" diyen bir kanıt
+       kalıyordu ve canlıda tam bu oldu (5 dosya için 5 yalancı satır).
+       Kanıt, kanıtladığı işten SONRA yazılır — ama `cases` hâlâ dururken,
+       çünkü kayıt tablosunun `cases`e bağlanmaması gerekçesi sürüyor. */
     const depoIdx = SILME.indexOf("const supurge = await depoyuSupur(admin, case_id);");
     const kayitIdx = SILME.indexOf('from("kapanis_istatistigi").insert(');
-    const satirIdx = SILME.indexOf("await admin.from(t.tablo).delete()");
+    const satirIdx = SILME.indexOf("const q = kapsamla(t, admin.from(t.tablo).delete());");
     const dosyaIdx = SILME.indexOf('await admin.from("cases").delete()');
     expect(depoIdx, "süpürge çağrılmıyor").toBeGreaterThan(-1);
-    expect(kayitIdx, "anonim kayıt yazılmıyor").toBeGreaterThan(depoIdx);
     expect(satirIdx, "satır silmesi süpürgeden ÖNCE").toBeGreaterThan(depoIdx);
-    expect(dosyaIdx, "dosya silmesi satırlardan ÖNCE").toBeGreaterThan(satirIdx);
+    expect(kayitIdx, "anonim kayıt satırlar SİLİNMEDEN yazılıyor — olmamış işin kanıtı")
+      .toBeGreaterThan(satirIdx);
+    expect(dosyaIdx, "dosya silmesi kayıttan ÖNCE").toBeGreaterThan(kayitIdx);
     // Süpürge düşerse HİÇBİR satıra dokunulmaz.
     expect(SILME.slice(depoIdx, satirIdx)).toMatch(/if \(!supurge\.ok\) return/);
+  });
+
+  it("BEKÇİ: silme sırasındaki her `tablo.alan` çifti ŞEMADA VAR", () => {
+    /* 30.08.2026 · P0'ın kendisi. İki satır `alan: "case_id"` diyordu ama o
+       tablolarda `case_id` kolonu YOK (`taraf_musaitlik.party_id` ·
+       `case_party_invites.case_party_id`). PostgREST olmayan kolona silme
+       isteğini 42703 ile reddediyor — TABLO BOŞ OLSA BİLE — ve döngü ilk
+       hatada `return` ettiği için silme tam orada duruyordu. Canlıda süresi
+       dolan 5 dosyanın ilk 18 tablosu silindi, gerisi ve `cases` kaldı.
+       `DEPO_KAYNAKLARI` için aynı bekçi vardı; silme sırası denetimsizdi. */
+    const sema = semaKolonlari();
+    const kacanlar: string[] = [];
+    for (const s of silmeSirasi()) {
+      const kolonlar = sema[s.tablo];
+      if (!kolonlar) { kacanlar.push(`${s.tablo} (tablo şemada yok)`); continue; }
+      if (!kolonlar.includes(s.alan)) kacanlar.push(`${s.tablo}.${s.alan}`);
+    }
+    expect(kacanlar, `silme sırası şemayla uyuşmuyor: ${kacanlar.join(", ")}`).toEqual([]);
+  });
+
+  it("BEKÇİ: taraf üzerinden bağlı tablo `case_parties`ten ÖNCE siliniyor", () => {
+    /* `uzeri` satırları taraf kimliklerini kullanır; taraflar önce silinirse
+       kimlik listesi boşalır ve o satırlar sessizce ayakta kalır. */
+    const liste = silmeSirasi();
+    const tarafIdx = liste.findIndex((s) => s.tablo === "case_parties");
+    expect(tarafIdx, "`case_parties` silme sırasında yok").toBeGreaterThan(-1);
+    for (const [i, s] of liste.entries()) {
+      if (!s.uzeri) continue;
+      expect(i, `${s.tablo} taraflardan SONRA siliniyor — hiç silinmez`).toBeLessThan(tarafIdx);
+    }
+    // En az bir `uzeri` satırı olmalı; yoksa denetim sessizce boşa döner.
+    expect(liste.filter((s) => s.uzeri).length,
+      "taraf üzerinden bağlı tablo kalmadı mı? denetim boşa dönüyor").toBeGreaterThan(0);
+  });
+
+  it("SAYIM SESSİZ SIFIRLAMIYOR — okunamayan tablo uyarı üretiyor", () => {
+    /* Sayım try/catch içindeydi; supabase-js hatayı FIRLATMADIĞI için
+       okunamayan tablo sessizce 0 sayılıyordu. Şemayla uyuşmayan iki satır
+       tam bu yüzden sayımda da görünmedi. */
+    expect(govdesi(SILME), "sayım hatayı yine yutuyor")
+      .not.toMatch(/catch \{ \/\* tablo yoksa/);
+    expect(SILME).toContain("sayılamadı —");
   });
 
   it("ANONİM KAYIT `cases` SİLİNMEDEN ÖNCE yazılıyor", () => {
