@@ -1,45 +1,98 @@
 ## Nerede kaldık
 
-- Tarih: **30.08.2026 00:23 UTC** (18. blok) — `medipact dur` ile kapatıldı.
+- Tarih: **30.08.2026 ~09:35 UTC** (19. blok, sürüyor)
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: **yok** (`dur` ile kapatıldı). Bu blokta **on bir iş** bitti;
-  hepsi commit'li, push'lu ve canlıya dağıtıldı. Yerel ile uzak aynı hizada,
-  çalışma ağacında yalnız dokunulmayan yabancı değişiklikler var.
-- Doğrulama (kapanışta): `npm run test` **432/432** · `tsc --noEmit` temiz ·
-  `npm run build` temiz · canlı paket `index-uuPFTSxM.js` doğrulandı.
+- Aktif görev: §6 gereği kodun gerçek durumundan yeni P0/P1 aday çıkarma.
+- Doğrulama (son koşum): `npm run test` **445/445** · `tsc --noEmit` temiz ·
+  `npm run build` temiz.
 
-### ⚠ YENİ OTURUMUN İLK İŞİ — SÜPÜRGE ÖLÇÜMÜ (iş değil, doğrulama)
-Emniyet süpürgesi **hâlâ koşmadı**. Ölçüm **30.08 00:23 UTC**:
-son cron koşumu **29.08 03:00 UTC** (yeni kolun dağıtımından öncesi, eski
-kodla koştu) · `cases` **10** · süresi geçmiş **5** · `case_parties` **18** ·
-`kapanis_istatistigi` **0**.
-İlk gerçek koşum **30.08 03:00 UTC** — bu kaydın yazıldığı andan ~2,5 saat
-sonra. Yeni oturum önce şunu ölçer:
-`cases` 10→**5** · `case_parties` 18→**10** · `kapanis_istatistigi` 0→**5**
-(`sebep='sure_doldu'`).
-**Koşum yine olmadıysa** kolu değil önce cron'u şüphelen — cron "succeeded"
-fonksiyonun çalıştığı anlamına gelmez (24.08 dersi). Kolun kendisi kuru
-koşumda canlıda doğrulandı (`silinecek: 5`, sürüm
-`2026-08-29-emniyet-supurgesi`).
+### ⚠ YENİ OTURUMUN İLK İŞİ — SÜPÜRGENİN GERÇEK KOŞUMUNU ÖLÇ
+Düzeltme canlıya dağıtıldı ama **gerçek koşumla henüz kanıtlanmadı**: gerçek
+koşumu elle tetiklemek üretim verisi silmek olduğu için izin katmanı
+tarafından ENGELLENDİ; etrafından dolaşılmadı. Kanıt **31.08 03:00 UTC**'deki
+cron koşumundan (ya da kurucunun "Verileri sil" düğmesinden) gelecek.
 
-### SONRA NE YAPILIR
-Kuyrukta karar/önkoşul beklemeyen iş **kalmadı**. §6 gereği kodun gerçek
-durumundan yeni P0/P1 aday çıkarılır. Bu blokta en üretken yol şuydu ve
-tükenmedi: **"kural bir yerde düzeltildi, kardeş yüzey açık kaldı"** sınıfını
-kovalamak — bu blokta bu sınıftan yedi kusur çıktı (üçü aynı "24 saat"
-sabitinden).
+Beklenen (30.08 09:35 ölçümüne göre):
+`cases` 10→**5** · `case_parties` 18→**10** · `case_sessions` (süresi
+dolanlarda) 4→**0** · `kapanis_istatistigi` 5→**10**.
+> 10 satırın **5'i yalancıdır** — 30.08 03:00'te yarıda kalan koşumun bıraktığı
+> kayıt (HAT **H-29**). Sayaç bu yüzden 5 fazla sayar.
 
-- Açık blokaj — **üç** madde, üçü de kurucu kararı bekliyor:
-  **H-27** (P0 · KVKK imha metni yapılmayan üç şey vaat ediyor + m.11 / dış
-  ürün adı) · **H-20** (bilgi tabanı yüklemesi) · **H-21** (`.env`).
-  *H-22/23/24/25/26 kapandı ve arşivde (26 arşiv maddesi).*
-- **Küçük ev işi (acele değil):** `HAT.md` → `COWORK → CODE` bölümünde
-  H-15/1 · H-15 · H-14 · H-11 · H-1…H-6 cevapları duruyor. Hepsi günler önce
-  uygulandı (H-15/1'in son parçası — emniyet süpürgesi — bu blokta bitti),
-  ama arşive taşınmadı. Taşımadan önce her birinin gerçekten uygulandığı
-  **tek tek doğrulanmalı**; "herhalde yapılmıştır" diye arşivlenmez.
+Kuru koşum bugün 200 döndü ve `dosya_kapanis_sonrasi → silinecek: 5` dedi;
+yani kapsam doğru. Kanıtlanmamış olan **silmenin sonuna kadar gitmesi**.
+
+### 19. BLOKTA BİTENLER (üç iş — hepsi TEK KUSUR SINIFI)
+
+Bu bloğun tamamı 18. bloğun tükenmediği damardan çıktı: **"kural bir yerde
+yazıldı, kardeş yolda açık kaldı."** Bu kez sınıfın kaynağı ortaya çıktı:
+**listeler şemaya karşı denetlenmiyordu.** Üç iş de aynı sabahki tek bir
+ölçümden doğdu — `SILME_SIRASI` ile canlı şemanın karşılaştırılması.
+
+**1 · P0 · Emniyet süpürgesi yarım silip duruyordu** — `78ccccd`.
+30.08 03:00 UTC'deki **ilk gerçek koşum** yarıda durdu. `SILME_SIRASI`nın iki
+satırı `alan: "case_id"` diyordu ama o tablolarda o kolon YOK; ikisi de dosyaya
+`case_parties` üzerinden bağlı (`taraf_musaitlik.party_id` ·
+`case_party_invites.case_party_id`). PostgREST olmayan kolona silme isteğini
+42703 ile reddediyor — **tablo boş olsa bile** — ve döngü ilk hatada `return`
+ediyordu. Süresi dolan 5 dosyanın ilk 18 tablosu silindi, gerisi kaldı.
+Üstelik anonim kapanış kaydı silmeden ÖNCE yazıldığı için
+`kapanis_istatistigi`ye **olmamış bir işin 5 kanıtı** girdi.
+Düzeltme: `uzeri: "case_parties"` alanı · kanıt artık silmeden SONRA yazılıyor ·
+sayımdaki try/catch kaldırıldı (supabase-js hatayı fırlatmadığı için okunamayan
+tablo sessizce 0 sayılıyordu — kusurun görünmemesinin ikinci sebebi buydu).
+**Üç yeni bekçi, üçü de ısırma sınavından geçti.**
+
+**2 · P0 · "Kalıcı" denen onay kayıtları — biri siliniyordu, öteki silmeyi
+bloke ediyordu** — `3e6755f` (HAT **H-28**).
+`Verilerim.tsx` tarafa iki kaydı kalıcı diye gösteriyor (kurucu kararı H-15/2).
+Canlı şema ölçüldü; ikisi de sözü tutmuyor, **ters yönde**:
+`kayit_onaylari` CASCADE → dosyayla **siliniyor** (söz sessizce bozuluyor) ·
+`yz_beyan_onaylari` NO ACTION → dosyayı **sildirmiyor** (KVKK silme hakkı
+bloke). Kod tarafı yazıldı: `KALICI_BAGLAR` listesi (satır kalır, bağ kopar) +
+bağ koparmadan önce **en dar kimlik damgası** (`dosya_no` · `katilimci_adi`;
+TCKN/adres/iletişim/beyan GİRMEZ) + `cases` silmesi 23503 ile düşerse artık
+sebebi söyleniyor. **Şema tarafı Cowork'te:**
+`tests/sabit/onay-kayitlari-kalici.sql` · HAT H-28.
+
+**3 · P0 · "Başvuruyu sil" cascade'e güveniyordu; cascade yetmiyor** —
+`48dff4b`. Kol 29.08'de depo süpürgesini ortak modülden aldı ama satır
+silmesini cascade'e bıraktı. Canlı şema: **üç** yabancı anahtar NO ACTION ve
+`cases` silmesini düşürüyor. CANLI KANIT: **açık dört başvurunun dördünde de**
+`ajan_gorevleri` satırı var (36 · 23 · 501 · 1328). Yani bugün düğmeye basan
+arabulucu şunu yaşardı: depo süpürgesi ÖNCE koştuğu için **bütün belgeler geri
+alınamaz biçimde silinir**, sonra `cases` silmesi düşer, ekranda "Lütfen tekrar
+deneyin" yazar — ve tekrar denemek **asla** çözmez. Emniyet süpürgesi bu tuzağa
+düşmüyordu çünkü ortak modülü kullanıyor. Kural üçüncü kez iki yerde ayrı
+yazılmıştı. Artık bu kol da `dosyayiTemizle`den geçiyor; yeni sebep
+`basvuru_silindi` (hiç yürümemiş başvurunun kapanışı yoktur → istatistik
+yazılmaz).
+
+**Dağıtım:** `_shared/dosya-silme.ts` üç kez değişti → fan-out her seferinde
+yapıldı. `saklama-imha` + `dosya-verilerini-sil` `78ccccd` ve `3e6755f` ile
+deploy edildi (Lovable "başarılı" dedi); `48dff4b` için üçü birden
+(`+ basvuru-sil`) istendi. Ön yüz değişmedi → **publish gerekmedi**.
+
+### AÇIK BLOKAJLAR — beş madde, hepsi kurucu/Cowork'te
+- **H-28** (P0 · onay kayıtları şema düzeltmesi — SQL Cowork'te, metin depoda)
+- **H-29** (P1 · yarım koşumun bıraktığı 5 yalancı istatistik satırı)
+- **H-27** (P0 · KVKK imha metni + m.11 / dış ürün adı)
+- **H-20** (bilgi tabanı yüklemesi) · **H-21** (`.env`)
+
+### KUYRUK — karar beklemeyen işler
+- [ ] P2 · Taraf silme (`MediationEngine.tsx` → `remove()`) aynı NO ACTION
+  duvarına çarpıyor: `taraf_musaitlik.party_id` ve `yz_beyan_onaylari.party_id`
+  satırı olan bir taraf silinemez, ekranda ham hata görünür. H-28 SQL'i
+  koşarsa `yz_beyan_onaylari` tarafı kendiliğinden çözülür.
+  Kabul: müsaitlik satırı olan bir taraf silinebiliyor ya da kullanıcıya
+  **sebebi anlaşılır** biçimde söyleniyor; tezgâhla kilitli.
+- [ ] P2 · `ajan_gorevleri.case_id` ve `taraf_musaitlik.party_id` yabancı
+  anahtarları NO ACTION. Üç silme yolu artık bunları AÇIKÇA siliyor, yani
+  kırık bir yol yok; ama cascade bir emniyet ağı olarak çalışmıyor ve dördüncü
+  bir yol yazılırsa aynı tuzak yeniden kurulur. Kabul: iki anahtar CASCADE
+  yapılır (SQL Cowork'te), doğrulama sorgusu yeşil.
+
 - **ÇALIŞMA AĞACINDA YABANCI DEĞİŞİKLİK VAR — DOKUNULMADI (§11).**
   `.agents/skills/medipact-calisma-duzeni/SKILL.md` silinmiş görünüyor;
   ayrıca izlenmeyen `repomix-output.xml`, `devam.sh`, `gs.sh`,
