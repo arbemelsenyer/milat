@@ -7,12 +7,29 @@
 - Aktif görev: §6 gereği kodun gerçek durumundan yeni P0/P1 aday çıkarma.
 - Doğrulama (son koşum): `npm run test` **451/451** · `tsc --noEmit` temiz ·
   `npm run build` temiz.
-- **DAĞITIM YARIM:** `8aba9be`/`367ba4c` sürümü canlıya İNMEDİ. Lovable'a üç
-  kez deploy isteği gönderildi; biri BOŞ cevapla "completed" döndü ve hiçbir şey
-  yapmadı. Canlı `saklama-imha` hâlâ `surum: 2026-08-29-…` diyor ve
-  `silme_surumu` alanı YOK. **Canlıdaki en son sürüm `48dff4b`** — yani üç P0
-  düzeltmesi de canlıda; inmeyen tek şey sürüm-damgası (`8aba9be`).
-  Ön yüz publish'i (`d6fbcf7`) başlatıldı: deployment `b8e28b05`, "pending".
+### ⛔ KURUCUNUN TEK TIKLIK İŞİ — LOVABLE KUYRUĞU DURMUŞ
+Lovable ajan kuyruğu **duraklatılmış** durumda. Aracın kendi sözleri:
+> *"Message is queued (position 2) but the queue is paused (reason:
+> server_error). Unpause the queue in the Lovable editor."*
+
+**Yapılacak:** Lovable editöründe (`lovable.dev/projects/5ffedb1b-…`) kuyruğu
+devam ettir. Sonrasında Code kalan deploy'u kendisi yapar; başka bir şey
+gerekmiyor.
+
+Belirtisi şuydu ve **teşhisi geciktirdi**: bir deploy isteği BOŞ içerikle
+`completed` döndü — yani "başarılı" göründü ama hiçbir şey deploy etmedi. Bunu
+yakalayan şey aynı gün konan sürüm damgası oldu (aşağıda 4. iş).
+
+**Ne inmedi, ne indi:**
+- Canlıdaki en son edge sürümü **`48dff4b`** → **üç P0 düzeltmesinin ÜÇÜ DE
+  CANLIDA.** Emniyet süpürgesi, kalıcı onay bağları ve "Başvuruyu sil"in ortak
+  modüle geçmesi çalışıyor.
+- İnmeyen tek şey **`8aba9be`**: sürüm damgası (`silme_surumu`). Davranışı
+  değiştirmez; yalnız "hangi kural canlıda" sorusunu yanıttan okunur kılar.
+  Canlı yanıt hâlâ `surum: 2026-08-29-…` diyor ve `silme_surumu` taşımıyor.
+- Ön yüz publish'i (`d6fbcf7` — yalnız bir hata metni) başlatıldı:
+  deployment `b8e28b05`, dönüş **"pending"**; kuyruk durduğu için tamamlandığı
+  **doğrulanamadı**.
 
 ### ⚠ YENİ OTURUMUN İLK İŞİ — SÜPÜRGENİN GERÇEK KOŞUMUNU ÖLÇ
 Düzeltme canlıya dağıtıldı ama **gerçek koşumla henüz kanıtlanmadı**: gerçek
