@@ -17,6 +17,46 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
+### H-29 · 30.08.2026 · P1 — Yarım kalan koşumun bıraktığı 5 YALANCI istatistik satırı silinsin mi?
+
+**Sorun.** 30.08 03:00 UTC'deki ilk emniyet süpürgesi koşumu yarıda durdu
+(kök neden ve düzeltmesi: commit `78ccccd`). Ama anonim kapanış kaydı o
+sürümde silmeden **ÖNCE** yazıldığı için `kapanis_istatistigi` tablosuna
+**5 satır** girdi — hiçbiri gerçekleşmemiş bir silmenin kaydı. Beş dosya da
+hâlâ yerinde duruyor.
+
+Düzeltme sonrası kayıt artık satırlar gerçekten silindikten sonra yazılıyor,
+yani **yeni yalancı satır oluşmayacak**. Ama bu beşi duruyor: gerçek silme
+koştuğunda aynı 5 dosya için 5 satır daha yazılacak ve tablo **5 dosyayı 10
+kez** saymış olacak. Bu tablo kazanım sayacının kaynağıdır (mimari §5.9).
+
+**Satırlar tartışmasız ayırt edilebilir** — koşum 4 saniye sürdü ve o pencerede
+başka hiçbir silme olmadı:
+```sql
+select * from kapanis_istatistigi
+where sebep = 'sure_doldu'
+  and silindi_at between '2026-08-30 03:00:00+00' and '2026-08-30 03:00:15+00';
+-- beklenen: tam 5 satır (id'ler: 7090cfbe · 2c42e9f4 · ca268514 · e0e75217 · f2f6c867)
+```
+
+**Seçenekler.**
+- **(a) Silinsin.** Sayaç doğru olur. Satırlar anonimdir (kişisel veri yok),
+  yani silmenin KVKK riski yoktur; risk yalnız "geri alınamaz" olmasıdır.
+- **(b) Kalsın, işaretlensin.** Tabloya `gecersiz boolean` kolonu eklenir,
+  bu beşi `true` yapılır, sayaç `where not gecersiz` ile okur. Hiçbir şey
+  kaybolmaz ama şema + okuyan her yer değişir.
+- **(c) Dokunulmaz.** Sayaç 5 fazla sayar; pilot verisi bu yüzden hatalı olur.
+
+**Önerim: (a).** Gerekçe: bu satırlar bir olayın kaydı değil, **olmamış bir
+olayın kaydı** — yani baştan geçersiz. (b) yanlış veriyi kalıcılaştırmak için
+şemayı büyütür; sakladığı tek şey benim hatamın izidir ve o iz zaten burada,
+commit mesajında ve `dosya-silme.ts` başlığında duruyor.
+
+**Kararın etkisi.** (a) seçilirse tek `delete` cümlesi, yukarıdaki pencereyle
+sınırlı; kişisel veriye dokunmaz. Silme **Cowork/kurucu** tarafından koşulur
+(CLAUDE.md §10) — Code çalıştırmaz. (c) seçilirse pilotun kazanım sayacı
+5 fazla başlar ve bu bir daha ayırt edilemez hâle gelir.
+
 ### H-28 · 30.08.2026 · **P0** — Onay kayıtları "kalıcı" deniyor; şema iki ayrı şey yapıyor (SQL Cowork'te)
 
 **Bu bir karar sorusu değil, ÇALIŞTIRMA isteğidir.** Kararı kurucu 25.08'de
