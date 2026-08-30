@@ -3034,9 +3034,10 @@ export type Database = {
       }
       kayit_onaylari: {
         Row: {
-          case_id: string
+          case_id: string | null
           created_at: string
           dayanak: string | null
+          dosya_no: string | null
           durum: string
           id: string
           karar_zamani: string
@@ -3046,12 +3047,13 @@ export type Database = {
           kaydeden_user_id: string | null
           metin_surumu: string
           party_id: string | null
-          talep_id: string
+          talep_id: string | null
         }
         Insert: {
-          case_id: string
+          case_id?: string | null
           created_at?: string
           dayanak?: string | null
+          dosya_no?: string | null
           durum: string
           id?: string
           karar_zamani?: string
@@ -3061,12 +3063,13 @@ export type Database = {
           kaydeden_user_id?: string | null
           metin_surumu?: string
           party_id?: string | null
-          talep_id: string
+          talep_id?: string | null
         }
         Update: {
-          case_id?: string
+          case_id?: string | null
           created_at?: string
           dayanak?: string | null
+          dosya_no?: string | null
           durum?: string
           id?: string
           karar_zamani?: string
@@ -3076,7 +3079,7 @@ export type Database = {
           kaydeden_user_id?: string | null
           metin_surumu?: string
           party_id?: string | null
-          talep_id?: string
+          talep_id?: string | null
         }
         Relationships: [
           {
@@ -4933,25 +4936,31 @@ export type Database = {
       }
       yz_beyan_onaylari: {
         Row: {
-          case_id: string
+          case_id: string | null
+          dosya_no: string | null
           id: string
+          katilimci_adi: string | null
           metin_surumu: string
           onay_zamani: string
-          party_id: string
+          party_id: string | null
         }
         Insert: {
-          case_id: string
+          case_id?: string | null
+          dosya_no?: string | null
           id?: string
+          katilimci_adi?: string | null
           metin_surumu?: string
           onay_zamani?: string
-          party_id: string
+          party_id?: string | null
         }
         Update: {
-          case_id?: string
+          case_id?: string | null
+          dosya_no?: string | null
           id?: string
+          katilimci_adi?: string | null
           metin_surumu?: string
           onay_zamani?: string
-          party_id?: string
+          party_id?: string | null
         }
         Relationships: [
           {
