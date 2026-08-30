@@ -71,9 +71,16 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
        ANINDA yok oluyordu — yazım sessiz bir hiçlikti (bkz.
        `tests/dosya-verilerini-sil.test.ts`). Yerine `kapanis_istatistigi`. */
     const g = kaynakOku(y("supabase/functions/_shared/dosya-silme.ts"));
-    for (const im of ["deneyimErr", "duzeltmeErr", "istErr"]) {
-      expect(g, `${im} okunmuyor`).toContain(im);
-    }
+    /* 30.08: `deneyimErr` / `duzeltmeErr` KALDIRILDI — bağ koparma artık
+       ad-hoc iki çağrı değil, `KALICI_BAGLAR` listesinden yürüyen tek döngü
+       (tarafa "kalıcı" denen iki onay tablosu da o listeye girdi). Denetlenen
+       şey aynı kaldı: yazımın sonucu OKUNUYOR ve eksik SESSİZ GEÇİLMİYOR. */
+    expect(g, "istErr okunmuyor").toContain("istErr");
+    expect(g, "bağ koparma listeden yürümüyor").toContain("for (const b of KALICI_BAGLAR)");
+    const kopIdx = g.indexOf("update({ [alan]: null })");
+    expect(kopIdx, "bağ koparma yok").toBeGreaterThan(-1);
+    expect(g.slice(kopIdx, kopIdx + 400), "koparma hatası yutuluyor")
+      .toMatch(/if \(error\)[\s\S]{0,120}uyarilar\.push/);
     // Eksikler `uyarilar` ile çağırana taşınıyor mu.
     expect(g, "eksikler çağırana bildirilmiyor").toMatch(/ok:\s*true,\s*kayit,\s*belge:[\s\S]{0,40}uyarilar/);
     // Silme dongusu ve `cases` silmesi eskiden beri denetli — bozulmamali.

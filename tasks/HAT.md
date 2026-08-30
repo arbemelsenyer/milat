@@ -17,6 +17,58 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
+### H-28 · 30.08.2026 · **P0** — Onay kayıtları "kalıcı" deniyor; şema iki ayrı şey yapıyor (SQL Cowork'te)
+
+**Bu bir karar sorusu değil, ÇALIŞTIRMA isteğidir.** Kararı kurucu 25.08'de
+verdi (H-15 · CEVAP · madde 2: *"Onay kayıtları → KALICI. Silinmez."*). Kod
+tarafı bugün yazıldı ve yeşil; eksik olan tek şey **SQL'in canlıda koşması**
+— onu Code çalıştıramaz (CLAUDE.md §10).
+
+**Sorun.** `src/pages/Verilerim.tsx` tarafa iki kaydı **kalıcı** diye
+gösteriyor. 30.08'de canlı şema ölçüldü; ikisi de sözü tutmuyor, üstelik
+**ters yönde** bozuk:
+
+| tablo | case_id | party_id | talep_id | gerçekte olan |
+|---|---|---|---|---|
+| `kayit_onaylari` ("Oturum kaydı onayım / reddim") | CASCADE | CASCADE | CASCADE | dosyayla birlikte **SİLİNİYOR** — "kalıcı" sözü sessizce bozuluyor |
+| `yz_beyan_onaylari` ("YZ kullanım bilgilendirmesi onayım") | NO ACTION | NO ACTION | — | dosyanın silinmesini **BLOKE EDİYOR** — KVKK silme hakkı bloke |
+
+`yz_beyan_onaylari` satırı olan bir dosya ne arabulucunun "Verileri sil"
+düğmesiyle ne emniyet süpürgesiyle silinebilir: `cases` silmesi 23503 (yabancı
+anahtar ihlali) ile düşer ve geriye "içerik silindi ama dosya satırı kaldı"
+kalır — yani **yarım silme**.
+
+**Canlı ölçüm (30.08).** `yz_beyan_onaylari` 1 satır · `kayit_onaylari` 1
+satır; ikisi de **açık** dosya `5186ee1d`de. Blokaj bugün görünmüyor; o dosya
+kapanıp süresi dolduğu gün görünür olacaktı.
+
+**Çalıştırılacak metin.** `tests/sabit/onay-kayitlari-kalici.sql`
+(depoda, `78ccccd` sonrası commit). Yaptığı üç şey:
+1. Kimlik anlık görüntüsü kolonları: `dosya_no` (iki tabloya) ve
+   `katilimci_adi` (`yz_beyan_onaylari`a; `kayit_onaylari`da zaten var).
+2. `case_id` · `party_id` · `talep_id` → **NULL alabilir** ("bağı kopmuş
+   kalıcı kayıt" ancak böyle ifade edilebilir).
+3. Beş yabancı anahtar → **ON DELETE SET NULL**.
+
+> Kısıt adları varsayılan kalıpta (`<tablo>_<kolon>_fkey`) yazıldı. Farklıysa
+> SQL'in içindeki `pg_constraint` sorgusu önce koşturulup adlar düzeltilmeli.
+
+**Başarı kontrolü (SQL'in sonundaki iki doğrulama sorgusu).** Beş satır döner
+ve **hepsi `SET NULL`** der; `case_id`/`party_id`/`talep_id` `is_nullable=YES`
+olur; `dosya_no` ve `katilimci_adi` kolonları görünür.
+
+**Sonuç geldiğinde Code'un atacağı adım.** Süresi dolmuş bir dosya üzerinde
+`saklama-imha` kuru koşumu + gerçek koşum yapılır; `yz_beyan_onaylari` ve
+`kayit_onaylari` satırlarının **kaldığı**, `case_id`lerinin **NULL olduğu** ve
+`dosya_no`/`katilimci_adi` alanlarının **dolduğu** canlıdan doğrulanır; sonuç
+`tasks/todo.md`ye yazılır.
+
+**Kararın etkisi.** SQL koşmadan kod tarafı bağı koparamaz (kolonlar NOT NULL)
+— bu durumda silme **durmaz**, `uyarilar`a "şema düzeltmesi bekliyor (HAT
+H-28)" yazılır; ama `yz_beyan_onaylari` olan dosyanın `cases` satırı silinemez
+hâlde kalmaya devam eder. Yani bu SQL koşana kadar KVKK silme hakkı o dosyalar
+için bloke.
+
 ### H-27 · 29.08.2026 · **P0** — KVKK imha metni yapılmayan üç şey vaat ediyor
 
 **Sorun.** `src/lib/kvkk-metinleri.ts` → `KVKK_IMHA` metni aynen şöyle:

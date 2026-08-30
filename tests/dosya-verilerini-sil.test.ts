@@ -65,6 +65,21 @@ function silmeSirasi(): { tablo: string; alan: string; uzeri: boolean }[] {
   }));
 }
 
+/** `KALICI_BAGLAR` dizisi: silinmeyen, yalnız bağı koparılan kayıtlar. */
+function kaliciBaglar(): { tablo: string; alan: string; uzeri: boolean; onay: boolean }[] {
+  const bas = SILME.indexOf("export const KALICI_BAGLAR");
+  expect(bas, "KALICI_BAGLAR listesi yok").toBeGreaterThan(-1);
+  const son = SILME.indexOf("];", bas);
+  return [...SILME.slice(bas, son).matchAll(
+    /\{\s*tablo:\s*"([a-z0-9_]+)"(?:,\s*alan:\s*"([a-z0-9_]+)")?(?:,\s*uzeri:\s*"([a-z0-9_]+)")?(?:,\s*onay:\s*true)?\s*\}/g,
+  )].map((m) => ({
+    tablo: m[1],
+    alan: m[2] ?? (m[3] ? "party_id" : "case_id"),
+    uzeri: !!m[3],
+    onay: m[0].includes("onay: true"),
+  }));
+}
+
 /** `types.ts` Row bloklarından tablo → kolon adları. */
 function semaKolonlari(): Record<string, string[]> {
   const harita: Record<string, string[]> = {};
@@ -333,5 +348,113 @@ describe("insan kapısı bozulmuyor", () => {
       .not.toContain("dosya_kapanis");
     expect(govdesi(BASVURU), "başvuru kolu C3'ün onay kapısını taklit ediyor")
       .not.toContain('"SİL"');
+  });
+});
+
+describe("kalıcı onay kayıtları: ürünün sözü şemayla aynı şeyi söylüyor mu", () => {
+  /* 30.08.2026 · P0. `Verilerim.tsx` tarafa iki kaydı KALICI diye gösteriyor
+     (kurucu kararı HAT H-15 · 2). Canlı şema ölçüldü ve İKİSİ DE yanlıştı,
+     üstelik ters yönde:
+       `kayit_onaylari`    → case_id/party_id CASCADE  → dosyayla SİLİNİYOR
+       `yz_beyan_onaylari` → case_id/party_id NO ACTION → dosya SİLİNEMİYOR
+     Biri tarafa verilen sözü sessizce bozuyor, öteki KVKK silme hakkını
+     sessizce bloke ediyor. Şema düzeltmesi HAT H-28 · SQL
+     `tests/sabit/onay-kayitlari-kalici.sql`. Buradaki bekçiler kod tarafının
+     bir daha ayrışmamasını sağlar. */
+  const ONAY_TABLOLARI = ["yz_beyan_onaylari", "kayit_onaylari"];
+  const VERILERIM = kaynakOku("src/pages/Verilerim.tsx");
+
+  it("kalıcı denen onay tabloları SİLME listesinde DEĞİL", () => {
+    const silinenler = new Set(silmeSirasi().map((s) => s.tablo));
+    for (const t of ONAY_TABLOLARI) {
+      expect(silinenler.has(t), `${t} hem "kalıcı" deniyor hem siliniyor`).toBe(false);
+    }
+  });
+
+  it("kalıcı denen onay tabloları BAĞ KOPARMA listesinde VAR (hem dosya hem taraf bağı)", () => {
+    const baglar = kaliciBaglar();
+    for (const t of ONAY_TABLOLARI) {
+      const satirlar = baglar.filter((b) => b.tablo === t);
+      expect(satirlar.length, `${t} KALICI_BAGLAR listesinde yok`).toBeGreaterThan(0);
+      expect(satirlar.map((b) => b.alan).sort(), `${t}: iki bağ da koparılmalı`)
+        .toEqual(["case_id", "party_id"]);
+      expect(satirlar.every((b) => b.onay), `${t} onay kaydı olarak işaretlenmemiş`).toBe(true);
+    }
+  });
+
+  it("BEKÇİ: ürün kaç kaydı 'kalıcı' diyorsa kod o kadarını koruyor", () => {
+    /* `Verilerim.tsx`te bir kategori `onay_kayitlari` süresini gösteriyorsa
+       tarafa "bu kalıcıdır" denmiş olur. Üçüncü bir kategori eklenip tablosu
+       KALICI_BAGLAR'a konmazsa burası kırmızı yanar — söz yine sessizce
+       bozulmasın diye. */
+    const sozSayisi = [...VERILERIM.matchAll(/sureler\.get\("onay_kayitlari"\)/g)].length;
+    expect(sozSayisi, "Verilerim artık hiçbir kaydı kalıcı göstermiyor mu?").toBeGreaterThan(0);
+    const korunan = new Set(kaliciBaglar().filter((b) => b.onay).map((b) => b.tablo));
+    expect(korunan.size, `ürün ${sozSayisi} kaydı kalıcı diyor, kod ${korunan.size} tablo koruyor`)
+      .toBe(sozSayisi);
+    for (const t of korunan) {
+      expect(VERILERIM, `${t} kodda korunuyor ama Verilerim'de görünmüyor`).toContain(t);
+    }
+  });
+
+  it("BEKÇİ: KALICI_BAGLAR ile SILME_SIRASI kesişmiyor", () => {
+    const silinen = new Set(silmeSirasi().map((s) => s.tablo));
+    const kesisim = [...new Set(kaliciBaglar().map((b) => b.tablo))].filter((t) => silinen.has(t));
+    expect(kesisim, `aynı tablo hem siliniyor hem korunuyor: ${kesisim.join(", ")}`).toEqual([]);
+  });
+
+  it("BEKÇİ: KALICI_BAGLAR'daki her `tablo.alan` çifti ŞEMADA VAR", () => {
+    const sema = semaKolonlari();
+    const kacanlar: string[] = [];
+    for (const b of kaliciBaglar()) {
+      const kolonlar = sema[b.tablo];
+      if (!kolonlar) { kacanlar.push(`${b.tablo} (tablo şemada yok)`); continue; }
+      if (!kolonlar.includes(b.alan)) kacanlar.push(`${b.tablo}.${b.alan}`);
+    }
+    expect(kacanlar, `bağ koparma listesi şemayla uyuşmuyor: ${kacanlar.join(", ")}`).toEqual([]);
+  });
+
+  it("bağ koparma AD-HOC değil, listeden yürüyor ve sonucu OKUNUYOR", () => {
+    expect(SILME).toContain("for (const b of KALICI_BAGLAR)");
+    expect(govdesi(SILME), "ajan_deneyim hâlâ elle koparılıyor")
+      .not.toMatch(/from\("ajan_deneyim"\)[\s\S]{0,40}\.update/);
+    expect(SILME, "koparma hatası yutuluyor").toContain("bağlantısı koparılamadı");
+  });
+
+  it("KİMLİK DAMGASI bağ koparmadan ÖNCE yazılıyor", () => {
+    /* Bağ koptuktan sonra yazılamaz (satır artık dosyayla bulunamaz) ve
+       yazılmazsa kalıcı kayıt "kimin, hangi dosyanın onayı" olduğunu
+       söyleyemez — kalıcı tutmanın amacı kalmaz. */
+    const damgaIdx = SILME.indexOf("update({ dosya_no: dosyaNo })");
+    const kopIdx = SILME.indexOf("update({ [alan]: null })");
+    expect(damgaIdx, "dosya numarası damgası yok").toBeGreaterThan(-1);
+    expect(kopIdx, "bağ koparma yok").toBeGreaterThan(-1);
+    expect(kopIdx, "damga bağ koparmadan SONRA — hiç yazılamaz").toBeGreaterThan(damgaIdx);
+    // Ad yalnız BOŞSA yazılır: kaydın kendi yazdığı adın üstüne geçilmez.
+    expect(SILME).toContain('.is("katilimci_adi", null)');
+    // KURUCU SINIRI: en dar kimlik. Bu üçü onay kaydına GİRMEZ.
+    const damgaBlok = SILME.slice(damgaIdx - 1200, kopIdx);
+    for (const yasak of ["tc_kimlik", "address", "email"]) {
+      expect(damgaBlok, `onay kaydına ${yasak} yazılıyor — kurucu sınırı ihlali`)
+        .not.toContain(yasak);
+    }
+  });
+
+  it("ŞEMA DÜZELTMESİNİN METNİ DEPODA ve doğru şeyi söylüyor", () => {
+    /* Kod tarafı bu SQL'e bağlıdır; metin kaybolursa neyin uygulanması
+       gerektiğinin kaydı da kaybolur (tests/sabit/BENIOKU.md). */
+    const SQL = kaynakOku("tests/sabit/onay-kayitlari-kalici.sql");
+    for (const t of ONAY_TABLOLARI) expect(SQL, `${t} SQL'de yok`).toContain(t);
+    expect(SQL, "bağ kolonları NULL alamıyor").toContain("drop not null");
+    expect(SQL, "yabancı anahtarlar SET NULL yapılmıyor").toContain("on delete set null");
+    expect(SQL, "kimlik anlık görüntüsü kolonları eklenmiyor").toContain("dosya_no");
+    expect(SQL).toContain("katilimci_adi");
+  });
+
+  it("`cases` silmesi yabancı anahtardan düşerse SEBEBİ söyleniyor", () => {
+    /* "Tekrar deneyin" burada yanlış yönlendirmedir: tekrar denemek çözmez,
+       şema düzeltmesi çözer. */
+    expect(SILME).toContain('=== "23503"');
+    expect(SILME).toContain("bu dosyaya bağlı kalıcı bir kayıt var");
   });
 });

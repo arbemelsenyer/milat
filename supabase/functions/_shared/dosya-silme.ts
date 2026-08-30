@@ -84,6 +84,47 @@ export const SILME_SIRASI: {
   { tablo: "case_parties" },
 ];
 
+/* KALICI KAYITLAR — SİLİNMEZ, BAĞI KOPARILIR.
+   Kurucu kararı (HAT H-15 · 2 ve 3): onay kayıtları KALICIDIR. İçerik
+   taşımazlar; yalnız "kim · ne zaman · hangi metnin hangi sürümü · onay/ret".
+   Öğrenme kayıtları da kalır ama dosyaya bağlı kalmaz.
+
+   ── 30.08.2026 · P0: ÜRÜN "KALICI" DİYOR, ŞEMA İKİ AYRI ŞEY YAPIYOR ────────
+   `src/pages/Verilerim.tsx` tarafa iki kaydı KALICI diye gösteriyor:
+   "Yapay zekâ kullanım bilgilendirmesi onayım" (`yz_beyan_onaylari`) ve
+   "Oturum kaydı onayım / reddim" (`kayit_onaylari`). Canlı şema ölçüldü:
+
+   | tablo               | case_id   | party_id  | gerçekte olan               |
+   |---------------------|-----------|-----------|-----------------------------|
+   | `kayit_onaylari`    | CASCADE   | CASCADE   | dosyayla birlikte SİLİNİYOR |
+   | `yz_beyan_onaylari` | NO ACTION | NO ACTION | dosyanın silinmesini BLOKE  |
+
+   İkisi de yanlış ve ters yönde: biri tarafa verilen "kalıcı" sözünü sessizce
+   bozuyor, öteki KVKK silme hakkını sessizce bloke ediyor. `yz_beyan_onaylari`
+   satırı olan bir dosya ne arabulucunun düğmesiyle ne emniyet süpürgesiyle
+   silinebilir — `cases` silmesi yabancı anahtar ihlaliyle düşer ve geriye
+   "içerik silindi ama dosya satırı kaldı" kalır.
+   CANLI (30.08): iki satır da AÇIK dosya `5186ee1d`de; kapandığı gün bu dosya
+   silinemez hâle gelecekti.
+
+   ŞEMA DÜZELTMESİ AYRI BİR İŞTİR (SQL · Cowork): metni
+   `tests/sabit/onay-kayitlari-kalici.sql`de, gerekçesi HAT H-28'de.
+   Kod tarafı buraya bağlıdır: bağ koparma DENENİR, düşerse SESSİZ GEÇİLMEZ. */
+export const KALICI_BAGLAR: {
+  tablo: string;
+  alan?: string;
+  uzeri?: "case_parties";
+  /** Tarafa "kalıcı" diye gösterilen bir onay kaydı mı? (Verilerim.tsx) */
+  onay?: true;
+}[] = [
+  { tablo: "ajan_deneyim" },
+  { tablo: "duzeltme_kayitlari" },
+  { tablo: "yz_beyan_onaylari", onay: true },
+  { tablo: "yz_beyan_onaylari", alan: "party_id", uzeri: "case_parties", onay: true },
+  { tablo: "kayit_onaylari", onay: true },
+  { tablo: "kayit_onaylari", alan: "party_id", uzeri: "case_parties", onay: true },
+];
+
 /** Silmeyi kimin tetiklediği. Anonim kayda yazılır. */
 export type Sebep = "arabulucu" | "sure_doldu";
 
@@ -108,7 +149,7 @@ export async function dosyayiTemizle(
   const uyarilar: string[] = [];
 
   const { data: dosya } = await admin.from("cases")
-    .select("id, outcome, closed_at, created_at").eq("id", case_id).maybeSingle();
+    .select("id, outcome, closed_at, created_at, uyap_no, application_no").eq("id", case_id).maybeSingle();
   if (!dosya) return { ok: false, hata: "Dosya bulunamadı" };
 
   /* TARAF KİMLİKLERİ — `uzeri: "case_parties"` diyen tablolar dosyaya taraf
@@ -117,17 +158,19 @@ export async function dosyayiTemizle(
      kullanır ki iki yer ayrışamasın. Okuma düşerse silmeye BAŞLANMAZ:
      eksik kimlik listesiyle silmek "yarım silme"nin ta kendisidir. */
   const { data: tarafSatirlari, error: tarafErr } = await admin
-    .from("case_parties").select("id").eq("case_id", case_id);
+    .from("case_parties").select("id, full_name").eq("case_id", case_id);
   if (tarafErr) {
     return { ok: false, hata: "Dosyanın tarafları okunamadı; hiçbir kayıt silinmedi. Lütfen tekrar deneyin." };
   }
-  const tarafIdler = ((tarafSatirlari ?? []) as { id: string }[]).map((t) => t.id);
+  const taraflar = (tarafSatirlari ?? []) as { id: string; full_name: string | null }[];
+  const tarafIdler = taraflar.map((t) => t.id);
 
-  /** Bir liste satırının kapsamını kurar. `uzeri` doluysa taraf kimlikleriyle,
-   *  değilse dosya kimliğiyle daraltılır. Taraf yoksa `null` döner — o tabloda
-   *  bu dosyaya ait satır OLAMAZ, sorgu hiç kurulmaz. */
+  /** Bir liste satırının kapsamını kurar — `SILME_SIRASI` ve `KALICI_BAGLAR`
+   *  aynı kuralı kullanır ki ikisi ayrışamasın. `uzeri` doluysa taraf
+   *  kimlikleriyle, değilse dosya kimliğiyle daraltılır. Taraf yoksa `null`
+   *  döner — o tabloda bu dosyaya ait satır OLAMAZ, sorgu hiç kurulmaz. */
   // deno-lint-ignore no-explicit-any
-  const kapsamla = (t: (typeof SILME_SIRASI)[number], q: any) =>
+  const kapsamla = (t: { alan?: string; uzeri?: "case_parties" }, q: any) =>
     t.uzeri
       ? (tarafIdler.length === 0 ? null : q.in(t.alan ?? "party_id", tarafIdler))
       : q.eq(t.alan ?? "case_id", case_id);
@@ -194,20 +237,62 @@ export async function dosyayiTemizle(
     }
   }
 
-  /* KALANLAR (kurucu kararı — kişisel veri İÇERMEZ): öğrenme kayıtları kalır,
-     dosya bağlantısı KOPARILIR. Yabancı anahtar zaten SET NULL; yazımı yine de
-     açıkça yapıp sonucunu OKUYORUZ — sessiz geçilmez. */
-  const { error: deneyimErr } = await admin.from("ajan_deneyim")
-    .update({ case_id: null }).eq("case_id", case_id);
-  if (deneyimErr) uyarilar.push(`ajan_deneyim dosya bağlantısı koparılamadı: ${deneyimErr.message}`);
-  const { error: duzeltmeErr } = await admin.from("duzeltme_kayitlari")
-    .update({ case_id: null }).eq("case_id", case_id);
-  if (duzeltmeErr) uyarilar.push(`duzeltme_kayitlari dosya bağlantısı koparılamadı: ${duzeltmeErr.message}`);
+  /* KALANLAR — satır KALIR, dosya/taraf bağı KOPARILIR. Liste `KALICI_BAGLAR`
+     içindedir; ad-hoc yazılmaz ki tarafa "kalıcı" denen bir kayıt listeden
+     düşerse bekçi yakalasın. Yazım açıkça yapılır ve sonucu OKUNUR — sessiz
+     geçilmez; bir onay kaydının bağı koparılamazsa `cases` silmesi de düşer
+     (yabancı anahtar NO ACTION ise) ve sebebini burada söylemiş oluruz. */
+  /* KİMLİK ANLIK GÖRÜNTÜSÜ — bağ KOPARILMADAN ÖNCE.
+     Kurucu (HAT H-15 · cevabın son paragrafı): "kalıcı onay kaydı 'kimin
+     onayı' bilgisini taşıyacaksa taraf kimliği de kalıcı olur. Bu yüzden
+     kimlik alanı EN DAR tutulacak: ad-soyad + dosya numarası. TCKN, adres,
+     iletişim, beyan bu kayda GİRMEZ."
+     Bağ koptuktan sonra kayıt kime ve hangi dosyaya ait olduğunu söyleyemez;
+     onu kalıcı tutmanın amacı da kalmaz. Kolonlar henüz yoksa (HAT H-28 SQL'i
+     koşmadıysa) yazım düşer, UYARIYA yazılır, silme DURMAZ. Ad yalnız BOŞSA
+     yazılır: dolu bir kaydın kendi yazdığı adın üstüne geçilmez. */
+  const dosyaNo = String(dosya.uyap_no ?? dosya.application_no ?? "").trim() || null;
+  for (const b of KALICI_BAGLAR) {
+    if (!b.onay) continue;
+    if (!b.uzeri) {
+      const { error } = await admin.from(b.tablo)
+        .update({ dosya_no: dosyaNo }).eq("case_id", case_id);
+      if (error) uyarilar.push(`${b.tablo}.dosya_no yazılamadı: ${error.message} (HAT H-28)`);
+      continue;
+    }
+    for (const t of taraflar) {
+      const ad = String(t.full_name ?? "").trim();
+      if (!ad) continue;
+      const { error } = await admin.from(b.tablo)
+        .update({ katilimci_adi: ad }).eq("party_id", t.id).is("katilimci_adi", null);
+      if (error) uyarilar.push(`${b.tablo}.katilimci_adi yazılamadı: ${error.message} (HAT H-28)`);
+    }
+  }
+
+  for (const b of KALICI_BAGLAR) {
+    const alan = b.alan ?? "case_id";
+    const q = kapsamla(b, admin.from(b.tablo).update({ [alan]: null }));
+    if (!q) continue;
+    const { error } = await q;
+    if (error) {
+      uyarilar.push(
+        `${b.tablo}.${alan} bağlantısı koparılamadı: ${error.message}`
+        + (b.onay ? " — kalıcı onay kaydı; şema düzeltmesi bekliyor (HAT H-28)" : ""),
+      );
+    }
+  }
 
   // 4) DOSYANIN KENDİSİ — en son. `dosya_kapanis` buna cascade bağlıdır.
   const { error: dErr } = await admin.from("cases").delete().eq("id", case_id);
   if (dErr) {
-    return { ok: false, hata: "Dosya kaydı silinemedi; içerik silindi ama dosya satırı kaldı. Lütfen tekrar deneyin." };
+    /* SEBEBİ SÖYLE. 23503 = yabancı anahtar ihlali: geride `cases`e NO ACTION
+       ile bağlı bir satır kalmış demektir (30.08'de `yz_beyan_onaylari` tam
+       bunu yapıyordu). "Tekrar deneyin" demek burada yanlış yönlendirmedir —
+       tekrar denemek çözmez, şema düzeltmesi çözer. */
+    console.error("[dosya-silme] cases silinemedi", { case_id, kod: dErr.code ?? "" });
+    return String(dErr.code ?? "") === "23503"
+      ? { ok: false, hata: "Dosya kaydı silinemedi: geride bu dosyaya bağlı kalıcı bir kayıt var (şema düzeltmesi gerekiyor). İçerik silindi, dosya satırı kaldı." }
+      : { ok: false, hata: "Dosya kaydı silinemedi; içerik silindi ama dosya satırı kaldı. Lütfen tekrar deneyin." };
   }
 
   if (uyarilar.length > 0) {
