@@ -5,8 +5,14 @@
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
 - Aktif görev: §6 gereği kodun gerçek durumundan yeni P0/P1 aday çıkarma.
-- Doğrulama (son koşum): `npm run test` **445/445** · `tsc --noEmit` temiz ·
+- Doğrulama (son koşum): `npm run test` **451/451** · `tsc --noEmit` temiz ·
   `npm run build` temiz.
+- **DAĞITIM YARIM:** `8aba9be`/`367ba4c` sürümü canlıya İNMEDİ. Lovable'a üç
+  kez deploy isteği gönderildi; biri BOŞ cevapla "completed" döndü ve hiçbir şey
+  yapmadı. Canlı `saklama-imha` hâlâ `surum: 2026-08-29-…` diyor ve
+  `silme_surumu` alanı YOK. **Canlıdaki en son sürüm `48dff4b`** — yani üç P0
+  düzeltmesi de canlıda; inmeyen tek şey sürüm-damgası (`8aba9be`).
+  Ön yüz publish'i (`d6fbcf7`) başlatıldı: deployment `b8e28b05`, "pending".
 
 ### ⚠ YENİ OTURUMUN İLK İŞİ — SÜPÜRGENİN GERÇEK KOŞUMUNU ÖLÇ
 Düzeltme canlıya dağıtıldı ama **gerçek koşumla henüz kanıtlanmadı**: gerçek
@@ -23,7 +29,7 @@ dolanlarda) 4→**0** · `kapanis_istatistigi` 5→**10**.
 Kuru koşum bugün 200 döndü ve `dosya_kapanis_sonrasi → silinecek: 5` dedi;
 yani kapsam doğru. Kanıtlanmamış olan **silmenin sonuna kadar gitmesi**.
 
-### 19. BLOKTA BİTENLER (üç iş — hepsi TEK KUSUR SINIFI)
+### 19. BLOKTA BİTENLER (altı iş — hepsi TEK KUSUR SINIFI)
 
 Bu bloğun tamamı 18. bloğun tükenmediği damardan çıktı: **"kural bir yerde
 yazıldı, kardeş yolda açık kaldı."** Bu kez sınıfın kaynağı ortaya çıktı:
@@ -74,24 +80,51 @@ yapıldı. `saklama-imha` + `dosya-verilerini-sil` `78ccccd` ve `3e6755f` ile
 deploy edildi (Lovable "başarılı" dedi); `48dff4b` için üçü birden
 (`+ basvuru-sil`) istendi. Ön yüz değişmedi → **publish gerekmedi**.
 
-### AÇIK BLOKAJLAR — beş madde, hepsi kurucu/Cowork'te
+**4 · P1 · Canlı yanıt ortak kuralın sürümünü söylemiyordu** — `8aba9be`.
+Kusur da düzeltme de `_shared/dosya-silme.ts`teydi; `saklama-imha` kol dosyası
+değişmediği için canlı yanıt düzeltmeden ÖNCE ve SONRA birebir aynı çıkıyordu
+(`surum: 2026-08-29-…`). Yani dağıtımın gerçekten yeni kuralı taşıyıp
+taşımadığı yanıttan OKUNAMIYORDU. `SILME_SURUMU` ortak modülden export edilip
+yanıta `silme_surumu` olarak kondu. **Bu düzeltme daha kondugu gün işe yaradı:**
+bir Lovable deploy isteği BOŞ cevapla "completed" döndü ve hiçbir şey deploy
+etmedi; sürüm dizesi olmasa "deploy edildi" sözüne inanılacaktı.
+
+**5 · P2 · Yabancı anahtar ihlali ham Postgres cümlesiyle ekrana basılıyordu** —
+`d6fbcf7`. `trErr` tanımadığı hatayı olduğu gibi gösteriyordu; taraf silmede
+kullanıcı `violates foreign key constraint "taraf_musaitlik_party_id_fkey"`
+cümlesini görüyordu — hem anlaşılmaz hem şema iç yapısını sızdırıyor. Artık
+23503 tanınıyor. **İşlemin kendisi hâlâ düşer**; çözümü şemada: HAT **H-30** ·
+`tests/sabit/yabanci-anahtar-emniyeti.sql`.
+
+**6 · P2 · `saklama-imha`nın iki elle yazılmış listesi şemaya bağlandı** —
+`367ba4c`. Bugünün kök nedeni tek bir satır değil, **elle yazılmış tablo/kolon
+listelerinin şemaya karşı hiç denetlenmemesiydi.** Aynı kolda iki liste daha
+vardı (`TUR_HARITASI` · özel kolların dokunduğu damga kolonları); ölçüldü,
+bugün temizler, ama denetimsizdiler. Artık `types.ts`e karşı aranıyorlar.
+
+**KAPSAM TARAMASI (sonuç: temiz).** Aynı kusur sınıfı depo çapında arandı:
+(a) `from("X")` çağrılan ama şemada olmayan tablo → **yok**;
+(b) süzgeçte kullanılan ama şemada olmayan kolon → **yok** (ilk sonda 106 bulgu
+verdi, hepsi pencere taşmasıydı; pencere bir sonraki `.from(`ta kesilince sıfıra
+indi); (c) depoya yol yazan ama süpürgede olmayan tablo → **yok**.
+
+### AÇIK BLOKAJLAR — altı madde, hepsi kurucu/Cowork'te
 - **H-28** (P0 · onay kayıtları şema düzeltmesi — SQL Cowork'te, metin depoda)
+- **H-30** (P2 · iki yabancı anahtar CASCADE — SQL Cowork'te, metin depoda)
 - **H-29** (P1 · yarım koşumun bıraktığı 5 yalancı istatistik satırı)
 - **H-27** (P0 · KVKK imha metni + m.11 / dış ürün adı)
 - **H-20** (bilgi tabanı yüklemesi) · **H-21** (`.env`)
 
 ### KUYRUK — karar beklemeyen işler
-- [ ] P2 · Taraf silme (`MediationEngine.tsx` → `remove()`) aynı NO ACTION
-  duvarına çarpıyor: `taraf_musaitlik.party_id` ve `yz_beyan_onaylari.party_id`
-  satırı olan bir taraf silinemez, ekranda ham hata görünür. H-28 SQL'i
-  koşarsa `yz_beyan_onaylari` tarafı kendiliğinden çözülür.
-  Kabul: müsaitlik satırı olan bir taraf silinebiliyor ya da kullanıcıya
-  **sebebi anlaşılır** biçimde söyleniyor; tezgâhla kilitli.
-- [ ] P2 · `ajan_gorevleri.case_id` ve `taraf_musaitlik.party_id` yabancı
-  anahtarları NO ACTION. Üç silme yolu artık bunları AÇIKÇA siliyor, yani
-  kırık bir yol yok; ama cascade bir emniyet ağı olarak çalışmıyor ve dördüncü
-  bir yol yazılırsa aynı tuzak yeniden kurulur. Kabul: iki anahtar CASCADE
-  yapılır (SQL Cowork'te), doğrulama sorgusu yeşil.
+- [x] P2 · Taraf silmede ham hata metni — **DONE 30.08** (`d6fbcf7`).
+  Kullanıcıya anlaşılır cümle dönüyor, şema adları sızmıyor; tezgâhla kilitli.
+  Kalan yarısı (işlemin kendisinin düşmesi) şema tarafında → **H-30**.
+- [!] P2 · `ajan_gorevleri.case_id` ve `taraf_musaitlik.party_id` yabancı
+  anahtarları NO ACTION → **HAT H-30**'a taşındı, SQL metni depoda
+  (`tests/sabit/yabanci-anahtar-emniyeti.sql`). Cowork koşacak.
+- [ ] P2 · `basvuru-sil` ve `dosya-verilerini-sil` canlıda uçtan uca
+  denenmedi (yalnız tezgâh + dağıtım). Kabul: bir başvuru canlıda silinip
+  `cases` satırının GİTTİĞİ ve depoda öksüz kalmadığı SQL ile doğrulanır.
 
 - **ÇALIŞMA AĞACINDA YABANCI DEĞİŞİKLİK VAR — DOKUNULMADI (§11).**
   `.agents/skills/medipact-calisma-duzeni/SKILL.md` silinmiş görünüyor;
