@@ -125,8 +125,11 @@ export const KALICI_BAGLAR: {
   { tablo: "kayit_onaylari", alan: "party_id", uzeri: "case_parties", onay: true },
 ];
 
-/** Silmeyi kimin tetiklediği. Anonim kayda yazılır. */
-export type Sebep = "arabulucu" | "sure_doldu";
+/** Silmeyi kimin tetiklediği. Anonim kayda yazılır.
+ *  `basvuru_silindi` AYRIDIR: hiç yürümemiş bir başvuru listeden kaldırılıyor
+ *  demektir. Bunun bir "kapanışı" yoktur — anonim kapanış istatistiği
+ *  YAZILMAZ, yoksa kazanım sayacı hiç yaşanmamış bir süreci sayar. */
+export type Sebep = "arabulucu" | "sure_doldu" | "basvuru_silindi";
 
 export type TemizlikSonucu =
   | { ok: true; kayit: number; belge: number; uyarilar: string[] }
@@ -220,20 +223,24 @@ export async function dosyayiTemizle(
   const surec_gun = Number.isFinite(acilis) && Number.isFinite(kapanis)
     ? Math.max(0, Math.round((kapanis - acilis) / 86_400_000)) : null;
 
-  const { error: istErr } = await admin.from("kapanis_istatistigi").insert({
-    sebep,
-    sonuc: (typeof dosya.outcome === "string" ? dosya.outcome.trim() : "") || null,
-    surec_gun,
-    silinen_kayit: kayit,
-    silinen_belge: supurge.toplamYol,
-  });
-  if (istErr) {
-    /* Tablo henüz kurulmamışsa (42P01) silmeyi DURDURMA — silme kişinin
-       hakkıdır, istatistik yalnız kayıttır. Ama SESSİZ GEÇME. */
-    if (String(istErr.code ?? "") === "42P01") {
-      uyarilar.push("anonim kapanış kaydı yazılamadı: `kapanis_istatistigi` tablosu yok (tests/sabit/kapanis-istatistigi.sql çalıştırılmalı)");
-    } else {
-      uyarilar.push(`anonim kapanış kaydı yazılamadı: ${istErr.message}`);
+  /* Hiç yürümemiş bir BAŞVURUNUN kapanışı yoktur: istatistik yazılmaz.
+     Yazılsaydı kazanım sayacı hiç yaşanmamış bir süreci sayardı. */
+  if (sebep !== "basvuru_silindi") {
+    const { error: istErr } = await admin.from("kapanis_istatistigi").insert({
+      sebep,
+      sonuc: (typeof dosya.outcome === "string" ? dosya.outcome.trim() : "") || null,
+      surec_gun,
+      silinen_kayit: kayit,
+      silinen_belge: supurge.toplamYol,
+    });
+    if (istErr) {
+      /* Tablo henüz kurulmamışsa (42P01) silmeyi DURDURMA — silme kişinin
+         hakkıdır, istatistik yalnız kayıttır. Ama SESSİZ GEÇME. */
+      if (String(istErr.code ?? "") === "42P01") {
+        uyarilar.push("anonim kapanış kaydı yazılamadı: `kapanis_istatistigi` tablosu yok (tests/sabit/kapanis-istatistigi.sql çalıştırılmalı)");
+      } else {
+        uyarilar.push(`anonim kapanış kaydı yazılamadı: ${istErr.message}`);
+      }
     }
   }
 

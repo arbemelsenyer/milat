@@ -21,9 +21,26 @@
 // silmek `dosya-verilerini-sil` kolunun işidir (kapanış paketi + "SİL" yazma
 // kapısı oradadır). Bu kol, henüz yürümemiş bir BAŞVURUYU listeden kaldırır.
 //
+// ── 30.08.2026 · P0: BU KOL CASCADE'E GÜVENİYORDU VE CASCADE YETMİYOR ───────
+// Kol 29.08'de kurulurken depo süpürgesini ortak modülden aldı ama SATIR
+// silmesini cascade'e bıraktı: "`cases` silinince çocuk tablolar kendiliğinden
+// gider." Canlı şema ölçüldü — GİTMİYOR. Üç yabancı anahtar ON DELETE NO
+// ACTION'dır ve `cases` silmesini 23503 ile DÜŞÜRÜR:
+//     `ajan_gorevleri.case_id` · `yz_beyan_onaylari.case_id/party_id`
+//     `taraf_musaitlik.party_id` (→ `case_parties` silmesini düşürür)
+// CANLI KANIT (30.08): AÇIK dört başvurunun DÖRDÜNDE de `ajan_gorevleri`
+// satırı var (36 · 23 · 501 · 1328). Yani bugün "Başvuruyu sil" düğmesine
+// basan arabulucu şunu yaşardı: depo süpürgesi ÖNCE koştuğu için BÜTÜN
+// BELGELER GERİ ALINAMAZ BİÇİMDE SİLİNİR, sonra `cases` silmesi düşer, ekranda
+// "Lütfen tekrar deneyin" yazar — ve tekrar denemek ASLA çözmez.
+// Emniyet süpürgesi bu tuzağa düşmüyordu, çünkü o ortak modülü kullanıyor ve
+// `ajan_gorevleri`yi AÇIKÇA siliyor. Kural iki yerde ayrı yazıldığı için biri
+// düzeltilip öteki açık kaldı — 25.08 ve 29.08'in aynısı, üçüncü kez.
+// ÇÖZÜM: bu kol da `dosyayiTemizle`yi kullanır. Kendi sırasını TUTMAZ.
+//
 // SİLİNEN İÇERİK HİÇBİR LOGA YAZILMAZ; anahtarlar loglanmaz.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { depoyuSupur } from "../_shared/depo-supurge.ts";
+import { dosyayiTemizle } from "../_shared/dosya-silme.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -75,30 +92,19 @@ Deno.serve(async (req) => {
       }, 403);
     }
 
-    /* ÖNCE DEPO, SONRA SATIR. Süpürge düşerse satıra DOKUNULMAZ: dosyalar
-       bulunabilir kalsın ki bir sonraki deneme onları yine görebilsin. */
-    const supurge = await depoyuSupur(admin, case_id);
-    if (!supurge.ok) return json({ silindi: false, error: supurge.hata }, 500);
-
-    /* Satırlar: `cases` silinince çocuk tablolar yabancı anahtar cascade'iyle
-       gider. Cascade'in gerçekten koştuğunu çağıran ayrıca doğrular. */
-    const { error: dErr, count } = await admin.from("cases")
-      .delete({ count: "exact" }).eq("id", case_id);
-    if (dErr) {
-      console.error("[basvuru-sil] dosya satırı silinemedi", { case_id, kod: dErr.code ?? "" });
-      return json({
-        silindi: false,
-        error: "Başvuru silinemedi; belgeleri kaldırıldı ama kaydı duruyor. Lütfen tekrar deneyin.",
-      }, 500);
+    /* SİLME KURALI ORTAK MODÜLDEDİR — bu kol kendi sırasını TUTMAZ.
+       Sebep `basvuru_silindi`: hiç yürümemiş bir başvurunun kapanışı yoktur,
+       anonim kapanış istatistiği yazılmaz (bkz. `Sebep` tanımı). */
+    const sonuc = await dosyayiTemizle(admin, case_id, "basvuru_silindi");
+    if (!sonuc.ok) {
+      console.error("[basvuru-sil] silme tamamlanamadı", { case_id });
+      return json({ silindi: false, error: sonuc.hata }, 500);
     }
-    if (!count) {
-      return json({
-        silindi: false,
-        error: "Silme işlemi başarısız. Başvuru zaten silinmiş olabilir.",
-      }, 404);
+    if (sonuc.uyarilar.length > 0) {
+      console.error("[basvuru-sil] silme sonrası eksikler", { case_id, uyarilar: sonuc.uyarilar });
     }
 
-    return json({ silindi: true, belge: supurge.toplamYol });
+    return json({ silindi: true, belge: sonuc.belge, kayit: sonuc.kayit });
   } catch (e) {
     const mesaj = e instanceof Error ? e.message : String(e);
     console.error("[basvuru-sil] Genel hata:", mesaj.slice(0, 200));

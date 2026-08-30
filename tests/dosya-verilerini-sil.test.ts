@@ -262,13 +262,28 @@ describe("iki silme kolu: önce depo, sonra satır", () => {
     expect(SILME).toContain("kapanis_istatistigi` tablosu yok");
   });
 
-  it("başvuru silmesi: süpürge satır silmesinden ÖNCE", () => {
-    const supurgeIdx = BASVURU.indexOf("const supurge = await depoyuSupur(admin, case_id);");
-    const satirIdx = BASVURU.indexOf('.delete({ count: "exact" }).eq("id", case_id)');
-    expect(supurgeIdx, "süpürge çağrılmıyor").toBeGreaterThan(-1);
-    expect(satirIdx, "satır silmesi bulunamadı").toBeGreaterThan(-1);
-    expect(satirIdx, "satır silmesi süpürgeden ÖNCE").toBeGreaterThan(supurgeIdx);
-    expect(BASVURU.slice(supurgeIdx, satirIdx)).toMatch(/if \(!supurge\.ok\) return json/);
+  it("BAŞVURU SİLME DE ORTAK MODÜLDEN GEÇİYOR — kendi sırasını tutmuyor", () => {
+    /* 30.08.2026 · P0. Bu kol 29.08'de depo süpürgesini ortak modülden aldı
+       ama SATIR silmesini cascade'e bıraktı. Canlı şema ölçüldü: cascade
+       YETMİYOR — `ajan_gorevleri.case_id`, `yz_beyan_onaylari.case_id/party_id`
+       ve `taraf_musaitlik.party_id` ON DELETE NO ACTION'dır ve `cases`
+       silmesini 23503 ile düşürür. Depo süpürgesi ÖNCE koştuğu için belgeler
+       geri alınamaz biçimde gitmiş, dosya satırı kalmış olurdu.
+       CANLI (30.08): açık dört başvurunun DÖRDÜNDE de `ajan_gorevleri` var. */
+    expect(BASVURU).toContain('import { dosyayiTemizle } from "../_shared/dosya-silme.ts";');
+    expect(BASVURU).toContain('await dosyayiTemizle(admin, case_id, "basvuru_silindi")');
+    expect(govdesi(BASVURU), "kol yine kendi süpürgesini çağırıyor")
+      .not.toContain("depoyuSupur(");
+    expect(govdesi(BASVURU), "kol yine `cases` satırını kendisi siliyor — cascade yetmiyor")
+      .not.toMatch(/from\("cases"\)[\s\S]{0,40}\.delete\(/);
+  });
+
+  it("BAŞVURU SİLME kapanış istatistiği YAZMIYOR", () => {
+    /* Hiç yürümemiş bir başvurunun kapanışı yoktur; yazılsaydı kazanım sayacı
+       hiç yaşanmamış bir süreci sayardı. */
+    expect(SILME).toContain('if (sebep !== "basvuru_silindi")');
+    const sebepIdx = SILME.indexOf('export type Sebep');
+    expect(SILME.slice(sebepIdx, sebepIdx + 200)).toContain('"basvuru_silindi"');
   });
 
   it("bilirkisi_raporlari satır silme sırasında da var", () => {
@@ -308,9 +323,10 @@ describe("başvuru silme: istemci artık çıplak silmiyor", () => {
     expect(BASVURU).toMatch(/assigned_mediator_id[\s\S]{0,40}=== userId/);
     expect(BASVURU).toMatch(/from\("user_roles"\)[\s\S]{0,120}eq\("role", "admin"\)/);
     const yetkiIdx = BASVURU.indexOf("if (!yetkili)");
-    const supurgeIdx = BASVURU.indexOf("const supurge = await depoyuSupur");
+    const silmeIdx = BASVURU.indexOf("await dosyayiTemizle(admin, case_id");
     expect(yetkiIdx, "yetki kapısı yok").toBeGreaterThan(-1);
-    expect(supurgeIdx, "yetki kapısı silmeden SONRA").toBeGreaterThan(yetkiIdx);
+    expect(silmeIdx, "silme çağrısı yok").toBeGreaterThan(-1);
+    expect(silmeIdx, "yetki kapısı silmeden SONRA").toBeGreaterThan(yetkiIdx);
   });
 });
 
