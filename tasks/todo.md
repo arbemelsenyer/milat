@@ -1,52 +1,83 @@
 ## Nerede kaldık
 
-- Tarih: **30.08.2026 ~09:35 UTC** (19. blok, sürüyor)
+- Tarih: **30.08.2026 ~12:40 UTC** (19. blok) — `medipact dur` ile kapatıldı.
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
-- Aktif görev: §6 gereği kodun gerçek durumundan yeni P0/P1 aday çıkarma.
-- Doğrulama (son koşum): `npm run test` **452/452** · `tsc --noEmit` temiz ·
+- Aktif görev: **yok** (`dur` ile kapatıldı). Bu blokta **sekiz iş** bitti;
+  hepsi commit'li, push'lu. Kuyrukta açık `P0–P3` maddesi **yok**.
+- Doğrulama (kapanışta): `npm run test` **452/452** · `tsc --noEmit` temiz ·
   `npm run build` temiz.
-### ⛔ KURUCUNUN TEK TIKLIK İŞİ — LOVABLE KUYRUĞU DURMUŞ
-Lovable ajan kuyruğu **duraklatılmış** durumda. Aracın kendi sözleri:
-> *"Message is queued (position 2) but the queue is paused (reason:
-> server_error). Unpause the queue in the Lovable editor."*
+- Çalışma ağacı: yalnız dokunulmayan yabancı değişiklikler (aşağıda).
 
-**Yapılacak:** Lovable editöründe (`lovable.dev/projects/5ffedb1b-…`) kuyruğu
-devam ettir. Sonrasında Code kalan deploy'u kendisi yapar; başka bir şey
-gerekmiyor.
+### ✅ KAPANIŞTA GELEN İYİ HABER — H-28 ve H-30 KOŞULDU, DAĞITIM TAMAM
+Cowork iki SQL'i de canlıda koşturdu ve Lovable kuyruğunun duraklaması kalktı.
+**Code hepsini canlıdan doğruladı (30.08 ~12:32 UTC, salt okuma):**
 
-Belirtisi şuydu ve **teşhisi geciktirdi**: bir deploy isteği BOŞ içerikle
-`completed` döndü — yani "başarılı" göründü ama hiçbir şey deploy etmedi. Bunu
-yakalayan şey aynı gün konan sürüm damgası oldu (aşağıda 4. iş).
+| ne | sonuç |
+|---|---|
+| `cases`/`case_parties`e bağlı **NO ACTION** anahtar | **0** (sabah 4 idi; üç P0'ın da sebebiydi) |
+| kalan CASCADE olmayan anahtar | 10, hepsi SET NULL — hiçbiri silmeyi düşürmez |
+| `yz_beyan_onaylari` · `kayit_onaylari` bağ kolonları | `is_nullable = YES` |
+| `dosya_no` · `katilimci_adi` kolonları | iki tabloda da **var** |
+| `ajan_gorevleri.case_id` · `taraf_musaitlik.party_id` | **CASCADE** |
+| canlı `saklama-imha` sürümü | `2026-08-30-emniyet-supurgesi` + `silme_surumu: 2026-08-30-uzeri-baglar-kalici-onaylar` |
 
-**Ne inmedi, ne indi:**
-- Canlıdaki en son edge sürümü **`48dff4b`** → **üç P0 düzeltmesinin ÜÇÜ DE
-  CANLIDA.** Emniyet süpürgesi, kalıcı onay bağları ve "Başvuruyu sil"in ortak
-  modüle geçmesi çalışıyor.
-- İnmeyen tek şey **`8aba9be`**: sürüm damgası (`silme_surumu`). Davranışı
-  değiştirmez; yalnız "hangi kural canlıda" sorusunu yanıttan okunur kılar.
-  Canlı yanıt hâlâ `surum: 2026-08-29-…` diyor ve `silme_surumu` taşımıyor.
-- Ön yüz publish'i (`d6fbcf7` — yalnız bir hata metni) başlatıldı:
-  deployment `b8e28b05`, dönüş **"pending"**; kuyruk durduğu için tamamlandığı
-  **doğrulanamadı**.
+Yani **kod, şema ve dağıtım artık aynı şeyi söylüyor.** H-28 ve H-30 arşive
+alındı ve **KAPANDI** yazıldı.
 
 ### ⚠ YENİ OTURUMUN İLK İŞİ — SÜPÜRGENİN GERÇEK KOŞUMUNU ÖLÇ
-Düzeltme canlıya dağıtıldı ama **gerçek koşumla henüz kanıtlanmadı**: gerçek
-koşumu elle tetiklemek üretim verisi silmek olduğu için izin katmanı
-tarafından ENGELLENDİ; etrafından dolaşılmadı. Kanıt **31.08 03:00 UTC**'deki
-cron koşumundan (ya da kurucunun "Verileri sil" düğmesinden) gelecek.
+Geriye tek kanıt kaldı ve o da 31.08 03:00 UTC cron'undan gelecek. Gerçek
+koşumu elle tetiklemek üretim verisi silmek olduğu için izin katmanı engelledi;
+etrafından dolaşılmadı.
 
-Beklenen (30.08 09:35 ölçümüne göre):
-`cases` 10→**5** · `case_parties` 18→**10** · `case_sessions` (süresi
-dolanlarda) 4→**0** · `kapanis_istatistigi` 5→**10**.
-> 10 satırın **5'i yalancıdır** — 30.08 03:00'te yarıda kalan koşumun bıraktığı
-> kayıt (HAT **H-29**). Sayaç bu yüzden 5 fazla sayar.
+**Beklenen (30.08 12:40 ölçümüne göre):**
+`cases` 10→**5** · `case_parties` 18→**10** · süresi dolanlarda `case_sessions`
+4→**0** · `kapanis_istatistigi` 5→**10**.
 
-Kuru koşum bugün 200 döndü ve `dosya_kapanis_sonrasi → silinecek: 5` dedi;
-yani kapsam doğru. Kanıtlanmamış olan **silmenin sonuna kadar gitmesi**.
+**Ayrıca kontrol edilecek (H-28'in asıl kanıtı):** silinen dosyalara ait
+`yz_beyan_onaylari` / `kayit_onaylari` satırları **KALMALI**, `case_id` ve
+`party_id` alanları **NULL** olmalı, `dosya_no` ve `katilimci_adi` **dolmuş**
+olmalı. Bu, "onay kayıtları kalıcıdır" sözünün ilk gerçek kanıtı olacak.
 
-### 19. BLOKTA BİTENLER (yedi iş — hepsi TEK KUSUR SINIFI)
+> `kapanis_istatistigi`nin 10 satırının **5'i yalancıdır** — 30.08 03:00'te
+> yarıda kalan koşumun bıraktığı kayıt (HAT **H-29**, hâlâ açık). Sayaç bu
+> yüzden 5 fazla sayar.
+
+**Koşum yine olmadıysa** kolu değil önce cron'u şüphelen — cron "succeeded"
+fonksiyonun çalıştığı anlamına gelmez (24.08 dersi).
+
+### AÇIK BLOKAJLAR — dört madde, hepsi kurucuda
+- **H-27** (P0 · KVKK imha metni + m.11 / dış ürün adı)
+- **H-29** (P1 · yarım koşumun bıraktığı 5 yalancı istatistik satırı)
+- **H-20** (bilgi tabanı yüklemesi) · **H-21** (`.env`)
+
+*H-28 ve H-30 bugün açıldı, bugün koşuldu, bugün doğrulandı ve arşivde.*
+
+### KUYRUK — açık `P0–P3` maddesi YOK
+Tek bekleyen iş yukarıdaki ölçüm (iş değil, doğrulama). Sıradaki uygulanabilir
+iş §6 gereği kodun gerçek durumundan çıkarılacak. Bu blokta en üretken damar
+şuydu ve **tükendi**: "elle yazılmış liste şemaya karşı denetlenmiyor" —
+depodaki dört listenin dördü de artık bekçili, depo çapı tarandı, başka bulgu
+yok. Yeni damar aranmalı.
+
+- [!] P2 · **BLOCKED — kolların canlıda uçtan uca ÇAĞRILMASI.**
+  · *Denenenler:* `saklama-imha` kuru koşumu beş kez (200; kapsam `silinecek: 5`
+    — doğru; son koşumda yeni sürüm damgası da göründü). Gerçek koşum denendi →
+    **izin katmanı engelledi**; etrafından dolaşılmadı.
+  · *Kanıt:* kuru koşum 200 · tezgâh 452/452 · şema ölçümü yenilendi.
+  · *Muhtemel kök neden:* yok — kusur değil, yetki sınırı.
+  · *Kalan engel:* gerçek koşum 31.08 03:00 UTC cron'undan gelecek;
+    `basvuru-sil` ve `dosya-verilerini-sil` bilerek **kullanıcı JWT'si** ister
+    (cron sırrını kabul etmezler — insan kapısı, §13), onları ancak oturum açmış
+    kurucu tetikleyebilir.
+
+- **ÇALIŞMA AĞACINDA YABANCI DEĞİŞİKLİK VAR — DOKUNULMADI (§11).**
+  `.agents/skills/medipact-calisma-duzeni/SKILL.md` silinmiş görünüyor;
+  ayrıca izlenmeyen `repomix-output.xml`, `devam.sh`, `gs.sh`,
+  `Yeni XLSX Worksheet.xlsx`, `.github/.agents/` duruyor.
+
+### 19. BLOKTA BİTENLER (sekiz iş — hepsi TEK KUSUR SINIFI)
 
 Bu bloğun tamamı 18. bloğun tükenmediği damardan çıktı: **"kural bir yerde
 yazıldı, kardeş yolda açık kaldı."** Bu kez sınıfın kaynağı ortaya çıktı:
@@ -125,6 +156,14 @@ okuma ile ölçülüp `tests/sabit/yabanci-anahtar-olcumu.md`ye yazıldı. Bugü
 P0'ın ortak kökü buydu: **cascade bir emniyet ağı sanılıyordu.** Artık ölçüm
 kayıtlı ve bekçi şunu soruyor: ölçülen her NO ACTION engeli kodun iki
 listesinden birinde ele alınıyor mu? Dördü de alınıyor.
+
+**8 · Kapanışta · H-28 ve H-30 koşuldu, canlıdan doğrulandı, arşive alındı.**
+Şema artık kodun söylediğini yapıyor: NO ACTION anahtar kalmadı, onay kayıtları
+gerçekten kalıcı, `8aba9be` sürüm damgası canlıda görünüyor. Ölçüm dosyası
+yenilendi ve **kapsam bekçisi ilk koşumunda kendi ölçüm dosyamdaki bir hatayı
+yakaladı**: `case_documents.party_id` için "SILME_SIRASI" yazmıştım, oysa
+listede duran çift `case_documents.case_id` — silinen o kolon değil, satırın
+kendisi. `satir_gider` etiketi bu yüzden eklendi.
 
 **KAPSAM TARAMASI (sonuç: temiz).** Aynı kusur sınıfı depo çapında arandı:
 (a) `from("X")` çağrılan ama şemada olmayan tablo → **yok**;

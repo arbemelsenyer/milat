@@ -1,11 +1,15 @@
 # Canlı yabancı anahtar ölçümü — `cases` ve `case_parties`
 
-**Ölçüm tarihi: 30.08.2026 ~10:05 UTC.** Salt okuma; hiçbir şey değiştirilmedi.
+**Ölçüm tarihi: 30.08.2026 ~12:32 UTC** (HAT **H-28** ve **H-30** SQL'leri
+Cowork tarafından koşulduktan SONRA). Salt okuma; hiçbir şey değiştirilmedi.
+
+> Önceki ölçüm (aynı gün ~10:05 UTC, SQL'lerden önce) **4 NO ACTION** anahtar
+> gösteriyordu. O dört anahtarın ikisi CASCADE (H-30), ikisi SET NULL (H-28)
+> oldu. **Şimdi NO ACTION anahtar YOK.**
 
 Bu dosya bir **kayıt**tır, otorite değildir. Otorite canlı şemadır. Buradaki
 liste, `tests/dosya-verilerini-sil.test.ts` içindeki *kapsam bekçisinin*
-dayanağıdır: kodun silme listeleri, en son ölçülen şemadaki **her engeli**
-karşılamak zorundadır.
+dayanağıdır: ölçülen her anahtarın **kodda bir karşılığı** olmak zorundadır.
 
 ## Niye var
 
@@ -42,43 +46,58 @@ kendiliğinden gider ve hiçbir şeyi bloke etmez.
 
 ## SONUÇ — CASCADE OLMAYAN 10 ANAHTAR
 
-### NO ACTION (4) — silmeyi 23503 ile DÜŞÜRÜR, mutlaka ele alınmalı
+`kod` sütunu bekçinin okuduğu alandır. Üç değerden biri olabilir:
 
-| tablo.kolon | hedef | kod nerede ele alıyor |
+| değer | anlamı | bekçi ne arar |
 |---|---|---|
-| `ajan_gorevleri.case_id` | `cases` | `SILME_SIRASI` — açıkça siliniyor |
-| `taraf_musaitlik.party_id` | `case_parties` | `SILME_SIRASI` (`uzeri`) — taraf kimlikleriyle siliniyor |
-| `yz_beyan_onaylari.case_id` | `cases` | `KALICI_BAGLAR` — bağ koparılıyor |
-| `yz_beyan_onaylari.party_id` | `case_parties` | `KALICI_BAGLAR` — bağ koparılıyor |
+| `SILME_SIRASI` | satır açıkça siliniyor | çift `SILME_SIRASI`'nda olmalı |
+| `KALICI_BAGLAR` | satır kalıyor, bağı koparılıyor | çift `KALICI_BAGLAR`'da olmalı |
+| `satir_gider` | bu KOLON değil, SATIRIN kendisi gidiyor (kendi `case_id`'siyle: ya `SILME_SIRASI`'nda ya CASCADE) | kodda bu çift için karşılık aranmaz |
 
-> ⚠ Son ikisi **HAT H-28 SQL'i koşana kadar fiilen çalışmaz**: kolonlar NOT NULL
-> olduğu için bağ koparılamıyor. Kod bunu sessiz geçmiyor (`uyarilar`a "şema
-> düzeltmesi bekliyor (HAT H-28)" yazıyor), ama o dosyanın `cases` satırı
-> silinemez halde kalıyor. İlk ikisi için ayrıca **H-30** CASCADE öneriyor —
-> zorunlu değil, landmin temizliği.
+### NO ACTION (0) — silmeyi 23503 ile DÜŞÜRÜR
 
-### SET NULL (6) — satır KALIR, bağı kopar
+**Bu bölüm BOŞ ve boş kalmalı.** 30.08'de dört tane vardı ve üç P0'ın da
+sebebiydi; H-28 ve H-30 ile kaldırıldılar. Buraya yeni bir satır girerse o
+anahtar `SILME_SIRASI` ya da `KALICI_BAGLAR`'da ele alınmak zorundadır —
+bekçi bunu denetler.
 
-| tablo.kolon | hedef | satır ne oluyor |
+| tablo.kolon | hedef | kod |
 |---|---|---|
-| `ajan_deneyim.case_id` | `cases` | **kalır** — `KALICI_BAGLAR`, kurucu kararı (kişisel veri yok) |
-| `duzeltme_kayitlari.case_id` | `cases` | **kalır** — `KALICI_BAGLAR`, aynı gerekçe |
-| `case_documents.party_id` | `case_parties` | satır zaten `SILME_SIRASI`'nda siliniyor |
-| `case_payments.party_id` | `case_parties` | satır `case_id` CASCADE ile gidiyor |
-| `case_payments.payer_party_id` | `case_parties` | aynı |
-| `braket_denetim_izi.party_id` | `case_parties` | satır `case_id` CASCADE ile gidiyor |
 
-**Yani geride kişisel veri taşıyan öksüz satır kalmıyor.** Kalan üç şey bilerek
-kalıyor ve üçü de kişisel veri içermiyor: anonim kapanış istatistiği · öğrenme
-kayıtları · (H-28 sonrası) içeriksiz onay kayıtları.
+### SET NULL (10) — satır KALIR, bağı kopar
+
+| tablo.kolon | hedef | kod |
+|---|---|---|
+| `ajan_deneyim.case_id` | `cases` | `KALICI_BAGLAR` |
+| `duzeltme_kayitlari.case_id` | `cases` | `KALICI_BAGLAR` |
+| `yz_beyan_onaylari.case_id` | `cases` | `KALICI_BAGLAR` |
+| `yz_beyan_onaylari.party_id` | `case_parties` | `KALICI_BAGLAR` |
+| `kayit_onaylari.case_id` | `cases` | `KALICI_BAGLAR` |
+| `kayit_onaylari.party_id` | `case_parties` | `KALICI_BAGLAR` |
+| `case_documents.party_id` | `case_parties` | `satir_gider` |
+| `case_payments.party_id` | `case_parties` | `satir_gider` |
+| `case_payments.payer_party_id` | `case_parties` | `satir_gider` |
+| `braket_denetim_izi.party_id` | `case_parties` | `satir_gider` |
+
+**Geride kişisel veri taşıyan öksüz satır kalmıyor.** Kalan şeyler bilerek
+kalıyor ve kişisel veri içermiyor: anonim kapanış istatistiği · öğrenme
+kayıtları · içeriksiz onay kayıtları (kurucu kararı HAT H-15/2).
+
+> `kayit_onaylari.talep_id` bu tabloda yok çünkü hedefi `cases`/`case_parties`
+> değil, `kayit_onay_talepleri`. O da H-28 ile SET NULL yapıldı; yoksa talep
+> satırı cascade ile gidince kalıcı onay kaydı da onunla giderdi.
+
+> **`satir_gider` neden ayrı bir etiket.** İlk yazımda `case_documents.party_id`
+> için `SILME_SIRASI` yazmıştım ve bekçi **ilk koşumunda** yakaladı: listede
+> duran çift `case_documents.case_id`, `party_id` değil. Silinen şey o kolon
+> değil, satırın kendisi. Etiket bunu tam söylemezse denetim ya yanlış yere
+> kırmızı yanar ya da yanlış bir güven verir.
 
 ## Bu ölçüm ne zaman yenilenir
 
-- **HAT H-28** SQL'i koştuğunda (dört satır değişir: iki NO ACTION → SET NULL).
-- **HAT H-30** SQL'i koştuğunda (iki NO ACTION → CASCADE, tablodan düşerler).
 - `cases`/`case_parties`e yeni bir yabancı anahtar eklendiğinde.
+- Var olan bir anahtarın `delete_rule`'u değiştiğinde.
 
-Yenilendiğinde bu dosya güncellenir; bekçi buradaki listeyi okuduğu için
-güncellenmezse **eski hâli denetlenir**. Bekçinin koruduğu şey KODUN
-listeleridir (biri listeden düşerse yakalar); şema kaymasını yakalayan şey
-yukarıdaki sorgunun tekrar koşturulmasıdır.
+Yenilenmezse bekçi **eski hâli** denetler. Bekçinin koruduğu şey KODUN
+listeleridir (bir çift listeden düşerse yakalar); şema kaymasını yakalayan
+şey yukarıdaki sorgunun tekrar koşturulmasıdır.

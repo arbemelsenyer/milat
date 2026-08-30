@@ -414,40 +414,62 @@ describe("kalıcı onay kayıtları: ürünün sözü şemayla aynı şeyi söyl
     }
   });
 
-  it("KAPSAM: ölçülen HER NO ACTION anahtarını kod ele alıyor", () => {
+  it("KAPSAM: ölçülen HER anahtarın kodda bir karşılığı var", () => {
     /* 30.08.2026'nin uc P0'inin ORTAK koku: cascade bir emniyet agi sanildi.
-       `cases`/`case_parties`e bagli anahtarlarin hepsi CASCADE degil; NO ACTION
-       olanlar silmeyi 23503 ile DUSURUR. Canli olcum
-       `tests/sabit/yabanci-anahtar-olcumu.md`de kayitli. Bu denetim sunu
-       sorar: o olcumdeki her engel, kodun IKI listesinden birinde ele
-       aliniyor mu? Alinmiyorsa silme yolu bir yerde duruyor demektir.
+       `cases`/`case_parties`e bagli anahtarlarin hepsi CASCADE degil. Canli
+       olcum `tests/sabit/yabanci-anahtar-olcumu.md`de kayitli ve her satir
+       `kod` sutununda dispozisyonunu tasiyor. Bu denetim o dispozisyonun
+       KODDA gercekten karsilandigini arar.
 
-       NE KORUR, NE KORUMAZ: bu bekci KODUN listelerini korur — biri listeden
-       duserse yakalar. Semanin kaymasini yakalayan sey olcumun tekrar
-       kosturulmasidir; sorgu o dosyanin icindedir ve ne zaman yenilenecegi
-       orada yazilidir. */
+       NE KORUR, NE KORUMAZ: bu bekci KODUN listelerini korur — bir cift
+       listeden duserse yakalar. Semanin kaymasini yakalayan sey olcumun
+       tekrar kosturulmasidir; sorgu o dosyanin icinde, yenileme kosulu da. */
     const OLCUM = kaynakOku("tests/sabit/yabanci-anahtar-olcumu.md");
-    const bas = OLCUM.indexOf("### NO ACTION");
-    const son = OLCUM.indexOf("### SET NULL");
-    expect(bas, "olcumde NO ACTION bolumu yok").toBeGreaterThan(-1);
-    expect(son, "olcumde SET NULL bolumu yok").toBeGreaterThan(bas);
-    const engeller = [...OLCUM.slice(bas, son).matchAll(
-      /^\| `([a-z0-9_]+)\.([a-z0-9_]+)` \|/gm,
-    )].map((m) => ({ tablo: m[1], alan: m[2] }));
-    expect(engeller.length, "olcum tablosu okunamadi — denetim bosa donuyor")
-      .toBeGreaterThan(2);
+    const bolum = (ad: string, bitis: string) => {
+      const b = OLCUM.indexOf(ad);
+      expect(b, `olcumde ${ad} bolumu yok`).toBeGreaterThan(-1);
+      const e = OLCUM.indexOf(bitis, b);
+      return OLCUM.slice(b, e === -1 ? OLCUM.length : e);
+    };
+    const ayikla = (metin: string) =>
+      [...metin.matchAll(
+        /^\| `([a-z0-9_]+)\.([a-z0-9_]+)` \| `[a-z_]+` \| `([A-Za-z_]+)` \|$/gm,
+      )].map((m) => ({ tablo: m[1], alan: m[2], kod: m[3] }));
+
+    const engeller = ayikla(bolum("### NO ACTION", "### SET NULL"));
+    const bagsizlar = ayikla(bolum("### SET NULL", "## Bu ölçüm"));
+    // Ayiklayicinin CALISTIGI kanitlanmali; yoksa denetim sessizce bosa doner.
+    expect(bagsizlar.length, "olcum tablosu okunamadi — denetim bosa donuyor")
+      .toBeGreaterThan(5);
 
     const silinen = silmeSirasi();
     const korunan = kaliciBaglar();
-    const acikta: string[] = [];
-    for (const e of engeller) {
-      const varMi = (l: { tablo: string; alan: string }[]) =>
-        l.some((x) => x.tablo === e.tablo && x.alan === e.alan);
-      if (!varMi(silinen) && !varMi(korunan)) acikta.push(`${e.tablo}.${e.alan}`);
-    }
+    const varMi = (l: { tablo: string; alan: string }[], e: { tablo: string; alan: string }) =>
+      l.some((x) => x.tablo === e.tablo && x.alan === e.alan);
+
+    /* NO ACTION silmeyi 23503 ile DUSURUR: dispozisyonu ne yazarsa yazsin
+       kodun IKI listesinden birinde ele alinmis olmak ZORUNDA. Bolum su an
+       bos ve bos kalmali; yeni bir satir girerse burasi konusur. */
+    const acikta = engeller
+      .filter((e) => !varMi(silinen, e) && !varMi(korunan, e))
+      .map((e) => `${e.tablo}.${e.alan}`);
     expect(acikta,
       `bu anahtarlar silmeyi dusurur ama kod onlari ele almiyor: ${acikta.join(", ")}`)
       .toEqual([]);
+
+    /* SET NULL satiri KALIR. Kalmasi bilerek mi? `kod` sutunu soyluyor ve
+       kodda karsiligi araniyor. `satir_gider` diyenlerde aranacak bir sey
+       yok: o KOLON degil, SATIRIN kendisi gidiyor (kendi `case_id`'siyle). */
+    const uyusmayan: string[] = [];
+    for (const e of bagsizlar) {
+      if (e.kod === "SILME_SIRASI" && !varMi(silinen, e)) uyusmayan.push(`${e.tablo}.${e.alan} (SILME_SIRASI diyor, listede yok)`);
+      if (e.kod === "KALICI_BAGLAR" && !varMi(korunan, e)) uyusmayan.push(`${e.tablo}.${e.alan} (KALICI_BAGLAR diyor, listede yok)`);
+      if (!["SILME_SIRASI", "KALICI_BAGLAR", "satir_gider"].includes(String(e.kod))) {
+        uyusmayan.push(`${e.tablo}.${e.alan} (taninmayan dispozisyon: ${e.kod})`);
+      }
+    }
+    expect(uyusmayan,
+      `olcum ile kod uyusmuyor: ${uyusmayan.join(", ")}`).toEqual([]);
   });
 
   it("BEKÇİ: KALICI_BAGLAR ile SILME_SIRASI kesişmiyor", () => {

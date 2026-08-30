@@ -17,44 +17,6 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
-### H-30 · 30.08.2026 · P2 — İki yabancı anahtar CASCADE yapılsın (landmin temizliği + taraf silme)
-
-**Bu da bir karar sorusu değil, çalıştırma isteğidir.** Metin depoda:
-`tests/sabit/yabanci-anahtar-emniyeti.sql`. H-28 ile aynı oturumda koşulabilir.
-
-**Sorun.** `cases`/`case_parties`e bağlı yabancı anahtarlardan **dördü**
-ON DELETE NO ACTION ve silmeyi 23503 ile düşürüyor. İkisi H-28'in konusu
-(kalıcı onay kayıtları → SET NULL). Kalan ikisi bu maddenin konusu:
-`ajan_gorevleri.case_id` · `taraf_musaitlik.party_id`.
-
-**Bugün kırık bir silme yolu YOK** — üç kol da ortak modülden geçiyor ve bu iki
-tabloyu açıkça siliyor (`48dff4b`). Ama iki gerçek zarar var:
-1. **Landmin.** Dördüncü bir silme yolu yazan biri "cascade halleder" diye
-   düşünür ve aynı tuzağa düşer. 30.08'de `basvuru-sil` tam bunu yaptı ve
-   canlıda belgeleri geri alınamaz biçimde silip dosya satırını bırakacaktı.
-2. **Taraf silme fiilen kırık.** `MediationEngine.tsx` → `remove()` doğrudan
-   `case_parties` satırını siliyor; müsaitlik satırı olan bir taraf silinemez.
-   (Ham Postgres hata metninin ekrana basılması bugün düzeltildi — artık
-   anlaşılır bir cümle çıkıyor — ama işlemin kendisi hâlâ düşüyor.)
-
-**Neden CASCADE doğru seçim.** İkisi de dosyanın/tarafın kendi verisidir:
-ajan iş kuyruğu ve tarafın girdiği randevu müsaitliği. İkincisi **kişisel
-veridir**; taraf silindikten sonra kalması constitution m.10'a aykırı olurdu.
-Yani "sessizce silinmesinler" diye bir gerekçe yok; tersine, silinmemeleri
-kusur. Açık silme listesi yine de kalır (silinen satır sayısı çağırana
-bildirilen sözün kanıtıdır).
-
-**Başarı kontrolü.** SQL'in sonundaki iki sorgu: ilki 2 satır ve ikisi de
-`CASCADE` demeli. H-28 de koştuysa ikinci sorgu — `cases`/`case_parties`e
-bağlı NO ACTION kalan var mı — **0 satır** dönmeli.
-
-**Sonuç geldiğinde Code'un adımı.** Taraf silme canlıda denenir (müsaitlik
-satırı olan bir tarafla), sonuç `tasks/todo.md`ye yazılır.
-
-**Kararın etkisi.** Koşmazsa: bugünkü üç yol çalışmaya devam eder, taraf silme
-kırık kalır, landmin durur. Koşarsa: davranış bugünkü üç yol için **değişmez**
-(zaten açıkça siliniyorlar), yalnız emniyet ağı gerçekten kurulmuş olur.
-
 ### H-29 · 30.08.2026 · P1 — Yarım kalan koşumun bıraktığı 5 YALANCI istatistik satırı silinsin mi?
 
 **Sorun.** 30.08 03:00 UTC'deki ilk emniyet süpürgesi koşumu yarıda durdu
@@ -94,58 +56,6 @@ commit mesajında ve `dosya-silme.ts` başlığında duruyor.
 sınırlı; kişisel veriye dokunmaz. Silme **Cowork/kurucu** tarafından koşulur
 (CLAUDE.md §10) — Code çalıştırmaz. (c) seçilirse pilotun kazanım sayacı
 5 fazla başlar ve bu bir daha ayırt edilemez hâle gelir.
-
-### H-28 · 30.08.2026 · **P0** — Onay kayıtları "kalıcı" deniyor; şema iki ayrı şey yapıyor (SQL Cowork'te)
-
-**Bu bir karar sorusu değil, ÇALIŞTIRMA isteğidir.** Kararı kurucu 25.08'de
-verdi (H-15 · CEVAP · madde 2: *"Onay kayıtları → KALICI. Silinmez."*). Kod
-tarafı bugün yazıldı ve yeşil; eksik olan tek şey **SQL'in canlıda koşması**
-— onu Code çalıştıramaz (CLAUDE.md §10).
-
-**Sorun.** `src/pages/Verilerim.tsx` tarafa iki kaydı **kalıcı** diye
-gösteriyor. 30.08'de canlı şema ölçüldü; ikisi de sözü tutmuyor, üstelik
-**ters yönde** bozuk:
-
-| tablo | case_id | party_id | talep_id | gerçekte olan |
-|---|---|---|---|---|
-| `kayit_onaylari` ("Oturum kaydı onayım / reddim") | CASCADE | CASCADE | CASCADE | dosyayla birlikte **SİLİNİYOR** — "kalıcı" sözü sessizce bozuluyor |
-| `yz_beyan_onaylari` ("YZ kullanım bilgilendirmesi onayım") | NO ACTION | NO ACTION | — | dosyanın silinmesini **BLOKE EDİYOR** — KVKK silme hakkı bloke |
-
-`yz_beyan_onaylari` satırı olan bir dosya ne arabulucunun "Verileri sil"
-düğmesiyle ne emniyet süpürgesiyle silinebilir: `cases` silmesi 23503 (yabancı
-anahtar ihlali) ile düşer ve geriye "içerik silindi ama dosya satırı kaldı"
-kalır — yani **yarım silme**.
-
-**Canlı ölçüm (30.08).** `yz_beyan_onaylari` 1 satır · `kayit_onaylari` 1
-satır; ikisi de **açık** dosya `5186ee1d`de. Blokaj bugün görünmüyor; o dosya
-kapanıp süresi dolduğu gün görünür olacaktı.
-
-**Çalıştırılacak metin.** `tests/sabit/onay-kayitlari-kalici.sql`
-(depoda, `78ccccd` sonrası commit). Yaptığı üç şey:
-1. Kimlik anlık görüntüsü kolonları: `dosya_no` (iki tabloya) ve
-   `katilimci_adi` (`yz_beyan_onaylari`a; `kayit_onaylari`da zaten var).
-2. `case_id` · `party_id` · `talep_id` → **NULL alabilir** ("bağı kopmuş
-   kalıcı kayıt" ancak böyle ifade edilebilir).
-3. Beş yabancı anahtar → **ON DELETE SET NULL**.
-
-> Kısıt adları varsayılan kalıpta (`<tablo>_<kolon>_fkey`) yazıldı. Farklıysa
-> SQL'in içindeki `pg_constraint` sorgusu önce koşturulup adlar düzeltilmeli.
-
-**Başarı kontrolü (SQL'in sonundaki iki doğrulama sorgusu).** Beş satır döner
-ve **hepsi `SET NULL`** der; `case_id`/`party_id`/`talep_id` `is_nullable=YES`
-olur; `dosya_no` ve `katilimci_adi` kolonları görünür.
-
-**Sonuç geldiğinde Code'un atacağı adım.** Süresi dolmuş bir dosya üzerinde
-`saklama-imha` kuru koşumu + gerçek koşum yapılır; `yz_beyan_onaylari` ve
-`kayit_onaylari` satırlarının **kaldığı**, `case_id`lerinin **NULL olduğu** ve
-`dosya_no`/`katilimci_adi` alanlarının **dolduğu** canlıdan doğrulanır; sonuç
-`tasks/todo.md`ye yazılır.
-
-**Kararın etkisi.** SQL koşmadan kod tarafı bağı koparamaz (kolonlar NOT NULL)
-— bu durumda silme **durmaz**, `uyarilar`a "şema düzeltmesi bekliyor (HAT
-H-28)" yazılır; ama `yz_beyan_onaylari` olan dosyanın `cases` satırı silinemez
-hâlde kalmaya devam eder. Yani bu SQL koşana kadar KVKK silme hakkı o dosyalar
-için bloke.
 
 ### H-27 · 29.08.2026 · **P0** — KVKK imha metni yapılmayan üç şey vaat ediyor
 
@@ -862,6 +772,160 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+
+### H-28 · **KAPANDI** · 30.08.2026 — onay kayıtları gerçekten kalıcı
+### H-30 · **KAPANDI** · 30.08.2026 — `cases`/`case_parties`e bağlı NO ACTION kalmadı
+
+İkisi de aynı gün açıldı, aynı gün Cowork tarafından koşuldu ve **Code
+tarafından canlıdan doğrulandı**. Sonuç `tasks/todo.md`ye işlendi; ölçüm
+`tests/sabit/yabanci-anahtar-olcumu.md`de yenilendi.
+
+**CODE'UN CANLI DOĞRULAMASI (30.08 ~12:32 UTC, salt okuma):**
+- `cases`/`case_parties`e bağlı **NO ACTION anahtar YOK** (önceki ölçümde 4
+  vardı ve üç P0'ın da sebebiydi). Kalan 10 anahtarın hepsi SET NULL.
+- `yz_beyan_onaylari` ve `kayit_onaylari`: `case_id` · `party_id` · `talep_id`
+  → `is_nullable = YES`; `dosya_no` iki tabloda, `katilimci_adi` ikisinde de
+  görünüyor. Yani kodun bağ koparma ve kimlik damgası kolu artık çalışabilir.
+- `ajan_gorevleri.case_id` ve `taraf_musaitlik.party_id` → `CASCADE`.
+- Dağıtım da doğrulandı: `saklama-imha` kuru koşumu 200 döndü ve yanıtta
+  `surum: 2026-08-30-emniyet-supurgesi` · `silme_surumu:
+  2026-08-30-uzeri-baglar-kalici-onaylar` **görüldü** — yani `8aba9be` canlıda.
+
+**Kalan tek kanıt** (bu iki maddeye ait değil, süpürgeye ait): gerçek koşumda
+onay satırlarının KALDIĞI ve `case_id`lerinin NULL'landığı. 31.08 03:00 UTC
+cron'undan gelecek; `tasks/todo.md` üstünde bekliyor.
+
+---
+
+<details><summary>H-28 · açılış maddesi (30.08.2026)</summary>
+
+### H-28 · 30.08.2026 · **P0** — Onay kayıtları "kalıcı" deniyor; şema iki ayrı şey yapıyor (SQL Cowork'te)
+
+**Bu bir karar sorusu değil, ÇALIŞTIRMA isteğidir.** Kararı kurucu 25.08'de
+verdi (H-15 · CEVAP · madde 2: *"Onay kayıtları → KALICI. Silinmez."*). Kod
+tarafı bugün yazıldı ve yeşil; eksik olan tek şey **SQL'in canlıda koşması**
+— onu Code çalıştıramaz (CLAUDE.md §10).
+
+**Sorun.** `src/pages/Verilerim.tsx` tarafa iki kaydı **kalıcı** diye
+gösteriyor. 30.08'de canlı şema ölçüldü; ikisi de sözü tutmuyor, üstelik
+**ters yönde** bozuk:
+
+| tablo | case_id | party_id | talep_id | gerçekte olan |
+|---|---|---|---|---|
+| `kayit_onaylari` ("Oturum kaydı onayım / reddim") | CASCADE | CASCADE | CASCADE | dosyayla birlikte **SİLİNİYOR** — "kalıcı" sözü sessizce bozuluyor |
+| `yz_beyan_onaylari` ("YZ kullanım bilgilendirmesi onayım") | NO ACTION | NO ACTION | — | dosyanın silinmesini **BLOKE EDİYOR** — KVKK silme hakkı bloke |
+
+`yz_beyan_onaylari` satırı olan bir dosya ne arabulucunun "Verileri sil"
+düğmesiyle ne emniyet süpürgesiyle silinebilir: `cases` silmesi 23503 (yabancı
+anahtar ihlali) ile düşer ve geriye "içerik silindi ama dosya satırı kaldı"
+kalır — yani **yarım silme**.
+
+**Canlı ölçüm (30.08).** `yz_beyan_onaylari` 1 satır · `kayit_onaylari` 1
+satır; ikisi de **açık** dosya `5186ee1d`de. Blokaj bugün görünmüyor; o dosya
+kapanıp süresi dolduğu gün görünür olacaktı.
+
+**Çalıştırılacak metin.** `tests/sabit/onay-kayitlari-kalici.sql`
+(depoda, `78ccccd` sonrası commit). Yaptığı üç şey:
+1. Kimlik anlık görüntüsü kolonları: `dosya_no` (iki tabloya) ve
+   `katilimci_adi` (`yz_beyan_onaylari`a; `kayit_onaylari`da zaten var).
+2. `case_id` · `party_id` · `talep_id` → **NULL alabilir** ("bağı kopmuş
+   kalıcı kayıt" ancak böyle ifade edilebilir).
+3. Beş yabancı anahtar → **ON DELETE SET NULL**.
+
+> Kısıt adları varsayılan kalıpta (`<tablo>_<kolon>_fkey`) yazıldı. Farklıysa
+> SQL'in içindeki `pg_constraint` sorgusu önce koşturulup adlar düzeltilmeli.
+
+**Başarı kontrolü (SQL'in sonundaki iki doğrulama sorgusu).** Beş satır döner
+ve **hepsi `SET NULL`** der; `case_id`/`party_id`/`talep_id` `is_nullable=YES`
+olur; `dosya_no` ve `katilimci_adi` kolonları görünür.
+
+**Sonuç geldiğinde Code'un atacağı adım.** Süresi dolmuş bir dosya üzerinde
+`saklama-imha` kuru koşumu + gerçek koşum yapılır; `yz_beyan_onaylari` ve
+`kayit_onaylari` satırlarının **kaldığı**, `case_id`lerinin **NULL olduğu** ve
+`dosya_no`/`katilimci_adi` alanlarının **dolduğu** canlıdan doğrulanır; sonuç
+`tasks/todo.md`ye yazılır.
+
+**Kararın etkisi.** SQL koşmadan kod tarafı bağı koparamaz (kolonlar NOT NULL)
+— bu durumda silme **durmaz**, `uyarilar`a "şema düzeltmesi bekliyor (HAT
+H-28)" yazılır; ama `yz_beyan_onaylari` olan dosyanın `cases` satırı silinemez
+hâlde kalmaya devam eder. Yani bu SQL koşana kadar KVKK silme hakkı o dosyalar
+için bloke.
+
+</details>
+
+<details><summary>H-30 · açılış maddesi (30.08.2026)</summary>
+
+### H-30 · 30.08.2026 · P2 — İki yabancı anahtar CASCADE yapılsın (landmin temizliği + taraf silme)
+
+**Bu da bir karar sorusu değil, çalıştırma isteğidir.** Metin depoda:
+`tests/sabit/yabanci-anahtar-emniyeti.sql`. H-28 ile aynı oturumda koşulabilir.
+
+**Sorun.** `cases`/`case_parties`e bağlı yabancı anahtarlardan **dördü**
+ON DELETE NO ACTION ve silmeyi 23503 ile düşürüyor. İkisi H-28'in konusu
+(kalıcı onay kayıtları → SET NULL). Kalan ikisi bu maddenin konusu:
+`ajan_gorevleri.case_id` · `taraf_musaitlik.party_id`.
+
+**Bugün kırık bir silme yolu YOK** — üç kol da ortak modülden geçiyor ve bu iki
+tabloyu açıkça siliyor (`48dff4b`). Ama iki gerçek zarar var:
+1. **Landmin.** Dördüncü bir silme yolu yazan biri "cascade halleder" diye
+   düşünür ve aynı tuzağa düşer. 30.08'de `basvuru-sil` tam bunu yaptı ve
+   canlıda belgeleri geri alınamaz biçimde silip dosya satırını bırakacaktı.
+2. **Taraf silme fiilen kırık.** `MediationEngine.tsx` → `remove()` doğrudan
+   `case_parties` satırını siliyor; müsaitlik satırı olan bir taraf silinemez.
+   (Ham Postgres hata metninin ekrana basılması bugün düzeltildi — artık
+   anlaşılır bir cümle çıkıyor — ama işlemin kendisi hâlâ düşüyor.)
+
+**Neden CASCADE doğru seçim.** İkisi de dosyanın/tarafın kendi verisidir:
+ajan iş kuyruğu ve tarafın girdiği randevu müsaitliği. İkincisi **kişisel
+veridir**; taraf silindikten sonra kalması constitution m.10'a aykırı olurdu.
+Yani "sessizce silinmesinler" diye bir gerekçe yok; tersine, silinmemeleri
+kusur. Açık silme listesi yine de kalır (silinen satır sayısı çağırana
+bildirilen sözün kanıtıdır).
+
+**Başarı kontrolü.** SQL'in sonundaki iki sorgu: ilki 2 satır ve ikisi de
+`CASCADE` demeli. H-28 de koştuysa ikinci sorgu — `cases`/`case_parties`e
+bağlı NO ACTION kalan var mı — **0 satır** dönmeli.
+
+**Sonuç geldiğinde Code'un adımı.** Taraf silme canlıda denenir (müsaitlik
+satırı olan bir tarafla), sonuç `tasks/todo.md`ye yazılır.
+
+**Kararın etkisi.** Koşmazsa: bugünkü üç yol çalışmaya devam eder, taraf silme
+kırık kalır, landmin durur. Koşarsa: davranış bugünkü üç yol için **değişmez**
+(zaten açıkça siliniyorlar), yalnız emniyet ağı gerçekten kurulmuş olur.
+
+</details>
+
+<details><summary>Cowork'ün cevapları (30.08.2026)</summary>
+
+### H-28 · CEVAP · 30.08.2026 — KOŞULDU (Cowork)
+`tests/sabit/onay-kayitlari-kalici.sql` canlıda koşuldu. Kısıt adları önce
+`pg_constraint`tan okundu — hepsi varsayılan kalıptaydı, düzeltme gerekmedi.
+**Doğrulama (canlıdan):** 5 yabancı anahtar da `SET NULL`
+(`yz_beyan_onaylari.case_id/party_id` · `kayit_onaylari.case_id/party_id/talep_id`);
+`case_id`·`party_id`·`talep_id` → `is_nullable=YES`; `dosya_no` iki tabloda,
+`katilimci_adi` `yz_beyan_onaylari`nda görünür. Code'un adımı (süresi dolmuş
+dosyada kuru + gerçek koşum, satırların kalıp bağın NULL'landığının kanıtı) sırada.
+
+### H-30 · CEVAP · 30.08.2026 — KOŞULDU (Cowork)
+`tests/sabit/yabanci-anahtar-emniyeti.sql` canlıda koşuldu (H-28 ile aynı oturum).
+**Doğrulama (canlıdan):** `ajan_gorevleri.case_id` ve `taraf_musaitlik.party_id`
+→ `CASCADE`. İkinci kontrol: `cases`/`case_parties`e bağlı **NO ACTION kalmadı
+(0 satır)**. Code'un adımı: müsaitlik satırı olan bir tarafla taraf silmeyi
+canlıda dene, sonucu `tasks/todo.md`ye yaz.
+
+### DEPLOY NOTU · 30.08.2026 (Cowork)
+Lovable kuyruğu artık ÇALIŞIYOR (duraklama kalkmış). İki iş yapıldı:
+1. `8aba9be` (silme_surumu damgası) için üç kol (`saklama-imha` ·
+   `dosya-verilerini-sil` · `basvuru-sil`) yeniden deploy edildi — Lovable bu kez
+   DOLU cevapla "8aba9be ile deploy edildi" dedi. Yine de kanıt sayılmaz:
+   Code kuru koşumda yanıtta `silme_surumu` alanını GÖRENE kadar doğrulanmış sayma.
+2. Ön yüz publish'i yeniden başlatıldı: deployment `27db505e`, dönüş "pending".
+   (Eski `b8e28b05` kuyruk durunca askıda kalmıştı.)
+
+</details>
+
+---
+
 ### H-26 · KAPANDI · 29.08.2026 — taraf kendi randevu tekliflerini görüyor
 **Kurucu (a)'yı seçti.** Gerekçe ayrıca karar değil, anayasanın kendi kuralı
 (m.1): *"taraf yalnız kendi satırlarını görür, süzgeç SORGUDA"*.
