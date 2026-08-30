@@ -414,6 +414,42 @@ describe("kalıcı onay kayıtları: ürünün sözü şemayla aynı şeyi söyl
     }
   });
 
+  it("KAPSAM: ölçülen HER NO ACTION anahtarını kod ele alıyor", () => {
+    /* 30.08.2026'nin uc P0'inin ORTAK koku: cascade bir emniyet agi sanildi.
+       `cases`/`case_parties`e bagli anahtarlarin hepsi CASCADE degil; NO ACTION
+       olanlar silmeyi 23503 ile DUSURUR. Canli olcum
+       `tests/sabit/yabanci-anahtar-olcumu.md`de kayitli. Bu denetim sunu
+       sorar: o olcumdeki her engel, kodun IKI listesinden birinde ele
+       aliniyor mu? Alinmiyorsa silme yolu bir yerde duruyor demektir.
+
+       NE KORUR, NE KORUMAZ: bu bekci KODUN listelerini korur — biri listeden
+       duserse yakalar. Semanin kaymasini yakalayan sey olcumun tekrar
+       kosturulmasidir; sorgu o dosyanin icindedir ve ne zaman yenilenecegi
+       orada yazilidir. */
+    const OLCUM = kaynakOku("tests/sabit/yabanci-anahtar-olcumu.md");
+    const bas = OLCUM.indexOf("### NO ACTION");
+    const son = OLCUM.indexOf("### SET NULL");
+    expect(bas, "olcumde NO ACTION bolumu yok").toBeGreaterThan(-1);
+    expect(son, "olcumde SET NULL bolumu yok").toBeGreaterThan(bas);
+    const engeller = [...OLCUM.slice(bas, son).matchAll(
+      /^\| `([a-z0-9_]+)\.([a-z0-9_]+)` \|/gm,
+    )].map((m) => ({ tablo: m[1], alan: m[2] }));
+    expect(engeller.length, "olcum tablosu okunamadi — denetim bosa donuyor")
+      .toBeGreaterThan(2);
+
+    const silinen = silmeSirasi();
+    const korunan = kaliciBaglar();
+    const acikta: string[] = [];
+    for (const e of engeller) {
+      const varMi = (l: { tablo: string; alan: string }[]) =>
+        l.some((x) => x.tablo === e.tablo && x.alan === e.alan);
+      if (!varMi(silinen) && !varMi(korunan)) acikta.push(`${e.tablo}.${e.alan}`);
+    }
+    expect(acikta,
+      `bu anahtarlar silmeyi dusurur ama kod onlari ele almiyor: ${acikta.join(", ")}`)
+      .toEqual([]);
+  });
+
   it("BEKÇİ: KALICI_BAGLAR ile SILME_SIRASI kesişmiyor", () => {
     const silinen = new Set(silmeSirasi().map((s) => s.tablo));
     const kesisim = [...new Set(kaliciBaglar().map((b) => b.tablo))].filter((t) => silinen.has(t));

@@ -5,7 +5,7 @@
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
   durulmaz, `tasks/HAT.md`ye yazılır, devam edilir (§23).
 - Aktif görev: §6 gereği kodun gerçek durumundan yeni P0/P1 aday çıkarma.
-- Doğrulama (son koşum): `npm run test` **451/451** · `tsc --noEmit` temiz ·
+- Doğrulama (son koşum): `npm run test` **452/452** · `tsc --noEmit` temiz ·
   `npm run build` temiz.
 ### ⛔ KURUCUNUN TEK TIKLIK İŞİ — LOVABLE KUYRUĞU DURMUŞ
 Lovable ajan kuyruğu **duraklatılmış** durumda. Aracın kendi sözleri:
@@ -46,7 +46,7 @@ dolanlarda) 4→**0** · `kapanis_istatistigi` 5→**10**.
 Kuru koşum bugün 200 döndü ve `dosya_kapanis_sonrasi → silinecek: 5` dedi;
 yani kapsam doğru. Kanıtlanmamış olan **silmenin sonuna kadar gitmesi**.
 
-### 19. BLOKTA BİTENLER (altı iş — hepsi TEK KUSUR SINIFI)
+### 19. BLOKTA BİTENLER (yedi iş — hepsi TEK KUSUR SINIFI)
 
 Bu bloğun tamamı 18. bloğun tükenmediği damardan çıktı: **"kural bir yerde
 yazıldı, kardeş yolda açık kaldı."** Bu kez sınıfın kaynağı ortaya çıktı:
@@ -119,6 +119,13 @@ listelerinin şemaya karşı hiç denetlenmemesiydi.** Aynı kolda iki liste dah
 vardı (`TUR_HARITASI` · özel kolların dokunduğu damga kolonları); ölçüldü,
 bugün temizler, ama denetimsizdiler. Artık `types.ts`e karşı aranıyorlar.
 
+**7 · P2 · Silme kuralının kapsamı canlı şemaya karşı kanıtlandı ve bekçiye
+bağlandı** — `cases`/`case_parties`e bağlı CASCADE **olmayan** 10 anahtar salt
+okuma ile ölçülüp `tests/sabit/yabanci-anahtar-olcumu.md`ye yazıldı. Bugünkü üç
+P0'ın ortak kökü buydu: **cascade bir emniyet ağı sanılıyordu.** Artık ölçüm
+kayıtlı ve bekçi şunu soruyor: ölçülen her NO ACTION engeli kodun iki
+listesinden birinde ele alınıyor mu? Dördü de alınıyor.
+
 **KAPSAM TARAMASI (sonuç: temiz).** Aynı kusur sınıfı depo çapında arandı:
 (a) `from("X")` çağrılan ama şemada olmayan tablo → **yok**;
 (b) süzgeçte kullanılan ama şemada olmayan kolon → **yok** (ilk sonda 106 bulgu
@@ -139,9 +146,27 @@ indi); (c) depoya yol yazan ama süpürgede olmayan tablo → **yok**.
 - [!] P2 · `ajan_gorevleri.case_id` ve `taraf_musaitlik.party_id` yabancı
   anahtarları NO ACTION → **HAT H-30**'a taşındı, SQL metni depoda
   (`tests/sabit/yabanci-anahtar-emniyeti.sql`). Cowork koşacak.
-- [ ] P2 · `basvuru-sil` ve `dosya-verilerini-sil` canlıda uçtan uca
-  denenmedi (yalnız tezgâh + dağıtım). Kabul: bir başvuru canlıda silinip
-  `cases` satırının GİTTİĞİ ve depoda öksüz kalmadığı SQL ile doğrulanır.
+- [x] P2 · **Silme kuralının KAPSAMI canlı şemaya karşı kanıtlandı** —
+  DONE 30.08. Uçtan uca çağrı yapılamadı (aşağıya bakınız) ama asıl soru
+  cevaplandı: *kural her engeli karşılıyor mu?* `cases`/`case_parties`e bağlı
+  CASCADE olmayan **10** anahtar salt okuma ile ölçüldü
+  (`tests/sabit/yabanci-anahtar-olcumu.md`). Silmeyi düşürebilecek **4 NO
+  ACTION** anahtarın **dördü de** kodun iki listesinden birinde ele alınıyor;
+  **6 SET NULL** anahtarın hiçbiri geride kişisel veri taşıyan öksüz satır
+  bırakmıyor. Kapsam bekçisi eklendi ve ısırma sınavından geçti: bir tablo
+  listeden düşerse kırmızı yanıyor.
+- [!] P2 · **BLOCKED — kolların canlıda uçtan uca ÇAĞRILMASI.**
+  · *Denenenler:* `saklama-imha` kuru koşumu üç kez yapıldı (200, kapsam
+    `silinecek: 5` — doğru). Gerçek koşum denendi → **izin katmanı engelledi**
+    (üretim verisi silme); etrafından dolaşılmadı. `basvuru-sil` ve
+    `dosya-verilerini-sil` çağrılamadı: ikisi de **kullanıcı JWT'si** ister
+    (cron sırrını bilerek kabul etmiyorlar — insan kapısı, §13).
+  · *Kanıt:* kuru koşum yanıtı 200 · tezgâh 452/452 · kapsam ölçümü yukarıda.
+  · *Muhtemel kök neden:* yok — kusur değil, yetki sınırı.
+  · *Kalan engel:* (1) gerçek koşum **31.08 03:00 UTC** cron'undan gelecek;
+    (2) arabulucu kollarını ancak oturum açmış kurucu tetikleyebilir;
+    (3) `yz_beyan_onaylari` satırı olan dosya **H-28 SQL'i koşana kadar**
+    zaten silinemez — o dosyayla yapılacak test şimdi anlamsız.
 
 - **ÇALIŞMA AĞACINDA YABANCI DEĞİŞİKLİK VAR — DOKUNULMADI (§11).**
   `.agents/skills/medipact-calisma-duzeni/SKILL.md` silinmiş görünüyor;

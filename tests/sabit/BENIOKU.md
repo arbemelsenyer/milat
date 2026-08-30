@@ -22,11 +22,18 @@ Buradaki dosyalar ise **kalıcıdır ve izlenir**; iki sebeple:
 | `baz-cizgi.sql` | arabulucu baz çizgisi tablosu + RLS (H-15/4) | **evet** (26.08.2026) |
 | `kota-tablosu.sql` | üyelik/paket/kota parametre tabloları (H-15/3) | **hayır** — madde pilot kapısından düştü, zararsızdır |
 | `oksuz-belge-supurgesi.sql` | depodaki öksüz belgelerin kuru dökümü ve süpürme yordamı (HAT H-19) | Bölüm 1–2 okundu; **Bölüm 3 koşmadı** (kurucu kararı bekliyor) |
+| `onay-kayitlari-kalici.sql` | "kalıcı" denen onay kayıtları gerçekten kalıcı olsun: bağ kolonları NULL alabilir + FK'ler SET NULL + en dar kimlik damgası (HAT **H-28**) | **hayır** — Cowork koşacak; koşana kadar `yz_beyan_onaylari` satırı olan dosya silinemiyor |
+| `yabanci-anahtar-emniyeti.sql` | `ajan_gorevleri.case_id` ve `taraf_musaitlik.party_id` → CASCADE; landmin temizliği + taraf silmenin düzelmesi (HAT **H-30**) | **hayır** — zorunlu değil; bugün kırık bir silme yolu yok |
+| `yabanci-anahtar-olcumu.md` | `cases`/`case_parties`e bağlı CASCADE **olmayan** 10 anahtarın canlı ölçümü (30.08.2026) + ölçüm sorgusu | salt okuma — `tests/dosya-verilerini-sil.test.ts` kapsam bekçisi bunu okur |
 
 ## Kural
 
 - Bu klasördeki bir SQL'i **Code çalıştırmaz** (CLAUDE.md §10); yazar, Cowork
   ya da kurucu koşar.
 - Bir tezgâh bir dosyayı okuyacaksa o dosya **buraya** konur, `gecici`ye değil.
+- `yabanci-anahtar-olcumu.md` bir **kayıttır, otorite değildir**. Otorite canlı
+  şemadır. Bekçi kodun listelerini korur (biri listeden düşerse yakalar); şema
+  kaymasını yakalayan şey, o dosyadaki sorgunun tekrar koşturulmasıdır. H-28 ya
+  da H-30 koştuğunda dosya güncellenmelidir.
 - Silme yapan bir bölüm varsa dosyanın içinde **açıkça işaretlenir** ve kuru
   döküm bölümü ondan önce gelir.
