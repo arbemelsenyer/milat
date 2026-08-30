@@ -18,6 +18,17 @@
 //   4) `cases`        — en son
 import { depoyuSupur } from "./depo-supurge.ts";
 
+/* MODÜL SÜRÜMÜ — canlıda HANGİ kuralın koştuğunu söyler.
+   30.08.2026 dersi: `saklama-imha` yanıtı yalnız KENDİ sürümünü basıyordu
+   (`2026-08-29-emniyet-supurgesi`). Kusur bu dosyadaydı, düzeltme de burada
+   yapıldı — ama kol dosyası değişmediği için canlı yanıt DÜZELTMEDEN ÖNCE VE
+   SONRA birebir aynı çıktı. Yani dağıtımın gerçekten yeni kuralı taşıyıp
+   taşımadığı yanıttan OKUNAMIYORDU; "deploy edildi" sözüne güvenmek zorunda
+   kalındı. Kuralın sürümü kuralın yanında durur.
+   Bu dizeyi `SILME_SIRASI` / `KALICI_BAGLAR` / silme sırası değiştiğinde
+   GÜNCELLE. */
+export const SILME_SURUMU = "2026-08-30-uzeri-baglar-kalici-onaylar";
+
 /* SİLME SIRASI — yabancı anahtarlara uygun: önce çocuk kayıtlar, sonra
    taraflar. `cases` en sonda ayrıca silinir. Buradaki tabloların çoğu
    `cases`e cascade bağlıdır ve teknik olarak `cases` silinince kendiliğinden

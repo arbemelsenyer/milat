@@ -37,7 +37,7 @@
 //
 // Ortak kural: bir silme kolu, sildiği şeyin İZİNİ de doğru bırakmalıdır.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { dosyayiTemizle } from "../_shared/dosya-silme.ts";
+import { dosyayiTemizle, SILME_SURUMU } from "../_shared/dosya-silme.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -328,7 +328,12 @@ Deno.serve(async (req) => {
     }
     return json({
       ok: true,
-      surum: "2026-08-29-emniyet-supurgesi",
+      surum: "2026-08-30-emniyet-supurgesi",
+      /* ORTAK KURALIN SÜRÜMÜ. Kusur da düzeltme de `_shared/dosya-silme.ts`te
+         olabiliyor; kol dosyası hiç değişmeden canlı davranış değişir. Kolun
+         kendi sürümü bunu göstermez — 30.08'de tam bu yüzden dağıtımın yeni
+         kuralı taşıyıp taşımadığı yanıttan okunamadı. */
+      silme_surumu: SILME_SURUMU,
       kuru,
       toplam_silinen: toplamSilinen,
       sonuc,

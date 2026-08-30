@@ -178,7 +178,8 @@ describe("depo süpürgesi: silme gerçekten silme", () => {
     expect(SILME, "silme sırası ortak modülde değil").toContain("export const SILME_SIRASI");
     expect(C3, "C3 kendi sırasını tutuyor").not.toContain("const SILME_SIRASI");
     expect(C3).toContain('import { dosyayiTemizle } from "../_shared/dosya-silme.ts";');
-    expect(IMHA).toContain('import { dosyayiTemizle } from "../_shared/dosya-silme.ts";');
+    expect(IMHA).toContain('from "../_shared/dosya-silme.ts";');
+    expect(IMHA).toMatch(/import \{[^}]*dosyayiTemizle[^}]*\} from "\.\.\/_shared\/dosya-silme\.ts";/);
   });
 });
 
@@ -465,6 +466,17 @@ describe("kalıcı onay kayıtları: ürünün sözü şemayla aynı şeyi söyl
     expect(SQL, "yabancı anahtarlar SET NULL yapılmıyor").toContain("on delete set null");
     expect(SQL, "kimlik anlık görüntüsü kolonları eklenmiyor").toContain("dosya_no");
     expect(SQL).toContain("katilimci_adi");
+  });
+
+  it("CANLI YANIT ORTAK KURALIN SÜRÜMÜNÜ SÖYLÜYOR", () => {
+    /* 30.08.2026 dersi: kusur da düzeltme de `_shared/dosya-silme.ts`teydi;
+       kol dosyası değişmediği için canlı yanıt düzeltmeden önce ve sonra
+       BİREBİR aynı çıktı. Dağıtımın yeni kuralı taşıyıp taşımadığı yanıttan
+       okunamıyordu — "deploy edildi" sözüne güvenmek zorunda kalındı.
+       Kuralın sürümü kuralın yanında durur ve yanıtta görünür. */
+    expect(SILME, "ortak modülün sürümü yok").toContain("export const SILME_SURUMU");
+    expect(IMHA, "kol ortak sürümü okumuyor").toContain("SILME_SURUMU");
+    expect(IMHA, "kol ortak sürümü yanıta koymuyor").toContain("silme_surumu: SILME_SURUMU");
   });
 
   it("`cases` silmesi yabancı anahtardan düşerse SEBEBİ söyleniyor", () => {
