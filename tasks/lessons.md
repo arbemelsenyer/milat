@@ -1237,3 +1237,45 @@ Kurucuya kalan iş "dosya bul ve yükle"den "düğmeye bas"a indi.
 insan gerektirdiğini ayır. Çoğu zaman insan gereken kısım karardır; malzemeyi
 bulmak değildir.
 
+
+## 30.08.2026 — Elle yazilan tablo/kolon listeleri semaya karsi denetlenmezse sessizce curur
+
+Emniyet supurgesi **ilk gercek kosumunda** yarida durdu. `SILME_SIRASI`'nin iki
+satiri `alan: "case_id"` diyordu; o iki tabloda o kolon **yok** — ikisi de
+dosyaya `case_parties` uzerinden bagli. PostgREST olmayan kolona silme istegini
+42703 ile reddediyor **tablo bos olsa bile**, dongu de ilk hatada donuyordu.
+Sonuc: 5 dosyanin 18 tablosu silindi, gerisi ve `cases` kaldi.
+
+**Birinci ders — liste semanin kopyasidir; kopyalar catallanir.** Depoda ayni
+sinifta uc liste daha vardi (`DEPO_KAYNAKLARI` denetliydi, `TUR_HARITASI` ve
+ozel kollarin damga kolonlari degildi). Hepsi artik `types.ts`e karsi araniyor.
+Depo capinda tarandi: `from("X")` cagrilan ama semada olmayan tablo yok;
+suzgecte kullanilan ama semada olmayan kolon yok.
+
+**Ikinci ders — KANIT, KANITLADIGI ISTEN SONRA YAZILIR.** Anonim kapanis kaydi
+silmeden ONCE yaziliyordu. Silme yarida kalinca geriye "5 dosya silindi" diyen
+5 satir kaldi: olmamis bir isin kaniti. Bir islemin kanitini once yazmak, o
+islemi yapmaktan daha kolaydir — bu yuzden cekicidir ve bu yuzden yaniltir.
+
+**Ucuncu ders — CASCADE BIR EMNIYET AGI DEGILDIR.** `basvuru-sil` "cases
+silinince cocuklar kendiliginden gider" varsayimiyla yazilmisti. Canli semada
+`cases`/`case_parties`e bagli anahtarlardan dordu ON DELETE NO ACTION'dir ve
+silmeyi 23503 ile dusurur. Depo supurgesi ONCE kostugu icin sonuc su olurdu:
+butun belgeler geri alinamaz bicimde silinir, dosya satiri kalir, ekranda
+"tekrar deneyin" yazar ve tekrar denemek asla cozmez. Acik liste, cascade'in
+yerine gecmez — cascade'in KENDISI dogrulanmadikca ona guvenilmez.
+
+**Dorduncu ders — ORTAK KURALIN SURUMU CANLI YANITTA GORUNMELI.** Kusur da
+duzeltme de `_shared/dosya-silme.ts`teydi; `saklama-imha` kol dosyasi
+degismedigi icin canli yanit duzeltmeden once ve sonra **birebir ayni** cikti.
+Yani dagitimin gercekten yeni kurali tasiyip tasimadigi yanittan okunamiyordu.
+`SILME_SURUMU` konuldu ve **kondugu gun ise yaradi**: bir Lovable deploy istegi
+BOS icerikle `completed` dondu ve hicbir sey deploy etmedi. Surum damgasi
+olmasaydi "deploy edildi" sozune inanilacakti. (Kok neden sonradan cikti:
+Lovable ajan kuyrugu `server_error` ile duraklatilmisti.)
+
+**Besinci ders — "tekrar deneyin" bir teshis degildir.** Yabanci anahtar
+ihlalinde tekrar denemek asla cozmez; kullaniciya boyle demek onu bos yere
+dondurur. Hata kodu (23503) taniniyorsa sebep soylenir. Ayni sey ham Postgres
+cumlesini ekrana basmak icin de gecerli: kullanici anlamaz, uzerine sema ic
+yapisi (tablo ve kisit adlari) urun yuzeyine sizar.
