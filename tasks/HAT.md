@@ -17,6 +17,44 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
+### H-30 · 30.08.2026 · P2 — İki yabancı anahtar CASCADE yapılsın (landmin temizliği + taraf silme)
+
+**Bu da bir karar sorusu değil, çalıştırma isteğidir.** Metin depoda:
+`tests/sabit/yabanci-anahtar-emniyeti.sql`. H-28 ile aynı oturumda koşulabilir.
+
+**Sorun.** `cases`/`case_parties`e bağlı yabancı anahtarlardan **dördü**
+ON DELETE NO ACTION ve silmeyi 23503 ile düşürüyor. İkisi H-28'in konusu
+(kalıcı onay kayıtları → SET NULL). Kalan ikisi bu maddenin konusu:
+`ajan_gorevleri.case_id` · `taraf_musaitlik.party_id`.
+
+**Bugün kırık bir silme yolu YOK** — üç kol da ortak modülden geçiyor ve bu iki
+tabloyu açıkça siliyor (`48dff4b`). Ama iki gerçek zarar var:
+1. **Landmin.** Dördüncü bir silme yolu yazan biri "cascade halleder" diye
+   düşünür ve aynı tuzağa düşer. 30.08'de `basvuru-sil` tam bunu yaptı ve
+   canlıda belgeleri geri alınamaz biçimde silip dosya satırını bırakacaktı.
+2. **Taraf silme fiilen kırık.** `MediationEngine.tsx` → `remove()` doğrudan
+   `case_parties` satırını siliyor; müsaitlik satırı olan bir taraf silinemez.
+   (Ham Postgres hata metninin ekrana basılması bugün düzeltildi — artık
+   anlaşılır bir cümle çıkıyor — ama işlemin kendisi hâlâ düşüyor.)
+
+**Neden CASCADE doğru seçim.** İkisi de dosyanın/tarafın kendi verisidir:
+ajan iş kuyruğu ve tarafın girdiği randevu müsaitliği. İkincisi **kişisel
+veridir**; taraf silindikten sonra kalması constitution m.10'a aykırı olurdu.
+Yani "sessizce silinmesinler" diye bir gerekçe yok; tersine, silinmemeleri
+kusur. Açık silme listesi yine de kalır (silinen satır sayısı çağırana
+bildirilen sözün kanıtıdır).
+
+**Başarı kontrolü.** SQL'in sonundaki iki sorgu: ilki 2 satır ve ikisi de
+`CASCADE` demeli. H-28 de koştuysa ikinci sorgu — `cases`/`case_parties`e
+bağlı NO ACTION kalan var mı — **0 satır** dönmeli.
+
+**Sonuç geldiğinde Code'un adımı.** Taraf silme canlıda denenir (müsaitlik
+satırı olan bir tarafla), sonuç `tasks/todo.md`ye yazılır.
+
+**Kararın etkisi.** Koşmazsa: bugünkü üç yol çalışmaya devam eder, taraf silme
+kırık kalır, landmin durur. Koşarsa: davranış bugünkü üç yol için **değişmez**
+(zaten açıkça siliniyorlar), yalnız emniyet ağı gerçekten kurulmuş olur.
+
 ### H-29 · 30.08.2026 · P1 — Yarım kalan koşumun bıraktığı 5 YALANCI istatistik satırı silinsin mi?
 
 **Sorun.** 30.08 03:00 UTC'deki ilk emniyet süpürgesi koşumu yarıda durdu

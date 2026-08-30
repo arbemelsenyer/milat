@@ -336,6 +336,17 @@ function trErr(msg: string) {
   if (m.includes("failed to fetch") || m.includes("networkerror") || m.includes("network request")) {
     return "Bağlantı hatası. İnternet bağlantınızı kontrol edip tekrar deneyin.";
   }
+  /* 30.08.2026 · YABANCI ANAHTAR İHLALİ ARTIK HAM GÖRÜNMÜYOR.
+     Buraya düşen mesaj olduğu gibi ekrana basılıyordu; taraf silmede bu şu
+     demekti: kullanıcı `update or delete on table "case_parties" violates
+     foreign key constraint "taraf_musaitlik_party_id_fkey" on table
+     "taraf_musaitlik"` görüyordu. İki ayrı kusur: (1) kullanıcı ne yapacağını
+     anlamıyor, (2) tablo ve kısıt adları — yani şema iç yapısı — ürün
+     yüzeyine sızıyor. Sebep gerçek: `taraf_musaitlik.party_id` ve
+     `yz_beyan_onaylari.party_id` ON DELETE NO ACTION'dır (canlı ölçüm). */
+  if (m.includes("23503") || m.includes("foreign key constraint")) {
+    return "Bu kayıt silinemedi: kendisine bağlı başka kayıtlar var (ör. verilmiş bir onay ya da girilmiş müsaitlik). Önce onlar kaldırılmalı; çözülmezse yöneticinize bildirin.";
+  }
   return msg;
 }
 
