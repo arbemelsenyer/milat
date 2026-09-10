@@ -1,0 +1,50 @@
+-- BELGE LİSTESİ AÇILSIN: `experts` SÜTUN İZNİ (HAT H-34, 10.09.2026)
+-- Çalıştıran: COWORK (CLAUDE.md §10 — Code SQL metnini yazar, çalıştırmaz).
+--
+-- BULGU (canlı ön izlemede ölçüldü, kurucunun kendi oturumuyla, salt okuma):
+--   experts?select=id   → 200  (okunuyor)
+--   experts?select=*    → 403  {"code":"42501","message":"permission denied for table experts"}
+--   case_documents?select=... → AYNI 403, aynı mesaj
+--
+-- OKUMA: `public.experts` üzerinde `authenticated` rolüne **sütun bazlı**
+-- SELECT verilmiş; `id` gibi bazı sütunlar açık, ötekiler kapalı. Postgres,
+-- izinsiz bir sütuna dokunulduğunda "permission denied for table <ad>" der.
+-- `case_documents`in RLS politikalarından biri (bilirkişi kolu) `experts`
+-- tablosundan izinsiz bir sütun okuyor; bu yüzden dosyaya ait BÜTÜN belge
+-- okumaları düşüyor — dosya sahibi ve yönetici olsanız bile.
+--
+-- Yani kusur `case_documents` kapısında DEĞİL; kapı doğru. Kusur, kapının
+-- okuduğu yardımcı tablodaki eksik sütun izninde.
+--
+-- İKİ SEÇENEK VAR. (A) daha basit, (B) daha dar.
+--
+-- ── (A) TABLO BAZLI İZİN — ÖNERİLEN ────────────────────────────────────────
+-- `experts` üzerinde RLS açıksa satır süzgeci yine çalışır; izin vermek
+-- "herkes her bilirkişiyi görür" demek DEĞİLDİR, yalnız sütun engelini kaldırır.
+-- ÖNCE ŞUNU DOĞRULA (RLS açık mı):
+--   select relrowsecurity from pg_class where oid = 'public.experts'::regclass;
+--   -- beklenen: t   (f dönerse (A)'yı KOŞMA, (B)'ye geç)
+grant select on public.experts to authenticated;
+
+-- ── (B) YALNIZ POLİTİKANIN OKUDUĞU SÜTUN ───────────────────────────────────
+-- (A) uygun değilse: politikanın hangi sütunu okuduğunu bul ve yalnız onu ver.
+--   select polname, pg_get_expr(polqual, polrelid) as ifade
+--     from pg_policy where polrelid = 'public.case_documents'::regclass;
+-- İfadede `experts` hangi sütunla geçiyorsa (büyük olasılıkla `user_id`):
+--   grant select (id, user_id) on public.experts to authenticated;
+--
+-- ── KALICI ÇÖZÜM (bu turda İSTENMİYOR, kurucu kararı gerekir) ───────────────
+-- Bu ürün `has_role` ve `is_case_mediator` için SECURITY DEFINER yardımcıları
+-- kullanıyor; bilirkişi kolu da aynı kalıba alınsaydı politika hiçbir tabloya
+-- doğrudan dokunmaz ve bu sınıf kusur bir daha doğmazdı. Öneri olarak
+-- `tasks/HAT.md` H-34'e yazıldı; kod/şema değişikliği kurucu onayına bağlıdır.
+--
+-- BAŞARI KONTROLÜ (koşumdan sonra, kurucunun oturumuyla ekrandan):
+--   Aşama 1 > 1.1'de kırmızı "Belgeler okunamadı" satırı KAYBOLMALI ve
+--   "Dosyadaki belgeler · N belge" satırı görünmeli.
+-- Ya da REST'ten:
+--   experts?select=*&limit=1        → 200 beklenir
+--   case_documents?select=id&limit=1 → 200 beklenir
+--
+-- RLS NOTU: hiçbir POLİTİKA değişmiyor, gevşetilmiyor, silinmiyor. Değişen tek
+-- şey tablo/sütun düzeyindeki GRANT'tir; satır süzgeci aynen yerinde kalır.

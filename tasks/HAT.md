@@ -17,41 +17,43 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
-### H-33 · 10.09.2026 · P1 — BELGE LİSTESİ YÖNETİCİYE DE KAPALI GÖRÜNÜYOR (canlı ön izleme bulgusu)
+### H-34 · 10.09.2026 · P1 — `experts` SÜTUN İZNİ BELGE OKUMASINI KESİYOR (Cowork koşacak)
 
-**Ne oldu.** Aşama 1 ön izlemesinde 1.1'de kırmızı satır çıktı:
-"Belgeler okunamadı: Bu işlem için yetkiniz yok…". Oturum **kurucunun kendi
-hesabı** ve ekranda sağ üstte **Admin** rozeti duruyor; dosya `MP-2026-1020`.
-İstek: `case_documents` SELECT. Aynı sayfada `cases` ve `case_parties`
-okumaları sorunsuz döndü, yani oturum ve jeton sağlam.
+**H-33'ün ölçülmüş kökü budur.** Cevapta öne sürülen iki aday (jeton yok ·
+gömülü sorgu) ölçümle **elendi**: jeton geçerli ve kullanıcı doğru
+(`f7f696f2-…`, `assigned_mediator_id` ile aynı), sorgu düz — gömme yok.
 
-**Kesin olmayan nokta:** hata ilk yüklemede çıkmadı, sonrakilerde çıktı — yani
-ya `case_documents` SELECT politikası yöneticiyi kapsamıyor ya da politikanın
-dayandığı bir alt sorgu (görevli arabulucu / taraf eşleşmesi) zamanlamaya
-bağlı. Code canlı politikayı okuyamıyor (Supabase CLI yalnız okuma değil,
-politika metnine erişimi yok).
+**CANLI ÖLÇÜM (kurucunun oturumu, salt okuma, ön izleme):**
+| istek | sonuç |
+|---|---|
+| `experts?select=id` | **200** |
+| `experts?select=*` | **403** `42501 permission denied for table experts` |
+| `case_documents?select=id,...` | **403** AYNI mesaj |
+| `cases` · `case_parties` · `case_sessions` · `belge_ozetleri` | 200 |
 
-**Ekranda ne değişti (Code'un yaptığı):** hata metni artık yaptığı işi
-anlatıyor. Eskiden her RLS hatasında "…yalnız … **silebilir**" yazıyordu;
-belge LİSTESİ okunamadığında da bu çıkıyordu. Cümle düzeltildi (commit
-`bc7859c`). Bu yalnız METNİ düzeltir, KAPIYI değil.
+**Okuma:** `public.experts` üzerinde `authenticated` rolüne **sütun bazlı**
+SELECT verilmiş; `id` açık, en az bir sütun kapalı. `case_documents`in bilirkişi
+politikası `experts`ten izinsiz bir sütun okuyor → Postgres 42501 veriyor ve
+dosyanın BÜTÜN belge okuması düşüyor. Kapı doğru; kusur kapının okuduğu
+yardımcı tablodaki eksik izinde.
 
-**Seçenekler.**
-- **(a)** Cowork `case_documents` SELECT politikasını okur; yönetici kapsam
-  dışındaysa `has_role(auth.uid(),'admin')` koşulu eklenir.
-- **(b)** Politika doğruysa, dosyanın `assigned_mediator_id` alanı boş olabilir;
-  o zaman kurucu bu dosyada "görevli arabulucu" değildir ve kapı doğru çalışıyor
-  demektir — bu hâlde ekrandaki cümle yeterlidir, kod değişmez.
-- **(c)** Dokunulmaz; belge yükleme akışı pilotta kırık kalır.
+**COWORK PAKETİ (beş satır):**
+1. **Ne yapılacak:** `tests/sabit/experts-sutun-izni.sql` koşulacak.
+2. **Neden:** belge listesi yöneticiye ve görevli arabulucuya açılsın.
+3. **Komut:** önce `relrowsecurity` kontrolü; `t` ise (A) `grant select on
+   public.experts to authenticated;`. `f` ise (A)'yı KOŞMA, dosyadaki (B)
+   dar seçeneğini uygula.
+4. **Başarı kontrolü:** `experts?select=*&limit=1` → 200 ve
+   `case_documents?select=id&limit=1` → 200; ekranda kırmızı satır kaybolur.
+5. **Sonra Code:** ön izlemede 1.1'i açıp belge listesini doğrular, H-34'ü kapatır.
 
-**Önerim: (a) için önce ÖLÇÜM.** Cowork tek sorguyla iki şeyi söylesin:
-`select assigned_mediator_id, user_id from cases where application_no='MP-2026-1020';`
-ve `case_documents` SELECT politikasının metni. Ölçüm gelmeden politika
-değiştirmek, çalışan bir kapıyı gevşetme riski taşır.
+**Önerim:** (A), RLS açıksa. **Hiçbir politika değişmiyor**; değişen yalnız
+GRANT. Satır süzgeci yerinde kalır.
 
-**Kararın etkisi:** (a) doğruysa yönetici bütün dosyalarda belgeleri görür;
-(b) doğruysa hiçbir şey değişmez ve pilotta dosyaya arabulucu ataması
-hatırlanır.
+**AYRICA — ÖNERİ (uygulanmadı, kurucu kararı gerekir):** bu üründe `has_role`
+ve `is_case_mediator` SECURITY DEFINER yardımcılarıdır; bilirkişi kolu da aynı
+kalıba alınsa politika hiçbir tabloya doğrudan dokunmaz ve bu sınıf kusur bir
+daha doğmaz. Kod/şema değişikliği olduğu için **beklemede**.
 
 ### H-27 · 29.08.2026 · **P0** — KVKK imha metni yapılmayan üç şey vaat ediyor
 
@@ -338,6 +340,21 @@ _Cevaplar buraya yazılır. Biçim:_
 Seçim: A / B / C / (kendi metniniz)
 Not: (varsa)
 ```
+
+### H-33 · CEVAP · 10.09.2026 — ÖLÇÜLDÜ: KAPI DOĞRU, SEBEP EKRAN TARAFINDA (b)
+Canlıdan okundu (salt okuma):
+- `MP-2026-1020` → `assigned_mediator_id` = `user_id` = `f7f696f2-…` (kurucunun hesabı). Boş DEĞİL.
+- `user_roles`: bu hesapta **admin** ve user rolleri var.
+- `case_documents` SELECT politikaları: "Admins can view all documents" (`has_role admin`) **var**;
+  "Mediator sees all case documents" (`is_case_mediator`) **var**; ayrıca owner/party/bilirkişi.
+- `is_case_mediator` = `cases.assigned_mediator_id = uid` → bu dosyada **doğru döner**.
+- Depo (`storage.objects`, `case-documents` kovası) SELECT: admin için açık.
+**Sonuç:** Bu kullanıcı için `case_documents` okuması **iki ayrı yoldan açık**; veritabanı kapısı
+"yetkiniz yok" üretmez. Hata aralıklı çıktığına göre sebep ekran tarafında — en olası iki aday:
+(1) istek oturum jetonu yüklenmeden atılıyor (`auth.uid()` boş → RLS reddi), (2) istek
+`case_documents`i başka bir tabloyla **gömülü** çekiyor ve o tablonun politikası yöneticiyi
+kapsamıyor. Code: hatayı veren isteğin **tam gövdesini** (hangi tablo/gömme, jeton var mı) ölçüp
+düzeltir. Politika değiştirilmedi, gevşetilmedi. H-33 kod tarafında kalır.
 
 ### H-32 · CEVAP · 10.09.2026 — ZATEN KOŞULDU (aşağıdaki kayıt). Code: ön izlemede iki seçimi kaydedip doğrula, H-32'yi kapat.
 ### AŞAMA 1 ŞEMASI · KOŞULDU · 10.09.2026 (Cowork)
@@ -658,6 +675,23 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+
+### H-33 · KAPANDI · 10.09.2026 — ÖLÇÜLDÜ; KÖK NEDEN BULUNDU, İŞ H-34'E DEVREDİLDİ
+Cevaptaki iki aday da ölçümle elendi (jeton geçerli, sorgu düz). Gerçek sebep:
+`experts` tablosundaki **sütun bazlı** SELECT izni — `case_documents` politikası
+oradan izinsiz bir sütun okuyunca bütün belge okuması 42501 ile düşüyor.
+Kanıt: `experts?select=id` **200**, `experts?select=*` **403**, `case_documents`
+**aynı 403 ve aynı mesaj**.
+
+**Code tarafında yapılan (commit sonrası):** ekran artık gerçek sebebi
+YUTMUYOR. `trErr` bir izin hatasında sunucu BAŞKA bir tablonun adını veriyorsa
+o cümleyi ekranda bırakıyor ("…(sunucunun verdiği sebep: permission denied for
+table experts)"). Bu satır olmasaydı doğru yere bakmak saatler alırdı — nitekim
+aldı.
+
+**Kalan iş veritabanındadır ve Cowork'ündür:** `tests/sabit/experts-sutun-izni.sql`
+→ **H-34**.
+
 
 ### H-32 · KAPANDI · 10.09.2026 — SQL KOŞULDU, İKİ SEÇİM DE ÖN İZLEMEDE DOĞRULANDI
 Cowork `tests/sabit/asama1-basvuru-alanlari.sql`i canlıda koştu; dört kolon da

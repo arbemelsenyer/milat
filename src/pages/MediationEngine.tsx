@@ -339,7 +339,18 @@ function trErr(msg: string) {
        Ön izlemede belge LİSTESİ okunamadığında ekranda "…silebilir" yazdı;
        arabulucu silmeye çalışmamıştı. Cümle artık yaptığı işi anlatıyor:
        kapı okumada da yazmada da aynı kapıdır. */
-    return "Bu işlem için yetkiniz yok. Bu dosyada yalnız başvuru sahibi, atanmış arabulucu veya yönetici işlem yapabilir.";
+    const dostane = "Bu işlem için yetkiniz yok. Bu dosyada yalnız başvuru sahibi, atanmış arabulucu veya yönetici işlem yapabilir.";
+    /* GERÇEK SEBEP YUTULMAZ (10.09.2026 akşamı, HAT H-33'ün kökü).
+       "Belgeler okunamadı: yetkiniz yok" satırı üç saat boyunca yanlış yere
+       baktırdı: yetki gerçekten vardı. Sunucunun söylediği asıl cümle
+       "permission denied for table experts" idi — yani sorgulanan tabloya
+       değil, POLİTİKANIN OKUDUĞU BAŞKA bir tabloya izin yoktu. Dostane cümle
+       o bilgiyi siliyordu.
+       Kural: sunucu BAŞKA bir tablonun adını veriyorsa o ad ekranda kalır.
+       Metin kısa tutulur ve kişisel veri taşımaz — yalnız tablo adı geçer. */
+    const baskaTablo = /permission denied for (table|relation|view|sequence) ([a-z0-9_."]+)/i.exec(msg || "");
+    if (baskaTablo) return `${dostane} (sunucunun verdiği sebep: ${baskaTablo[0]})`;
+    return dostane;
   }
   if (m.includes("jwt") || m.includes("not authenticated") || m.includes("invalid token")) {
     return "Oturumunuz sona ermiş olabilir. Lütfen tekrar giriş yapın.";

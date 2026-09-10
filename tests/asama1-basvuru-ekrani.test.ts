@@ -484,3 +484,22 @@ describe("ölçüt 14 — 1.10 her iki yandaki HER tarafı gösterir", () => {
     expect(govde).toContain('bolum !== "taraflar" && p.email');
   });
 });
+
+/* ── İZİN HATASINDA GERÇEK SEBEP YUTULMAZ (HAT H-33 → H-34) ─────────────────
+   Canlıda "Belgeler okunamadı: yetkiniz yok" satırı yanlış yere baktırdı:
+   yetki vardı. Sunucunun asıl cümlesi "permission denied for table experts"
+   idi — sorgulanan tabloya değil, POLİTİKANIN OKUDUĞU başka bir tabloya izin
+   yoktu. Dostane cümle o bilgiyi siliyordu. */
+describe("izin hatası — sunucunun verdiği tablo adı ekranda kalır", () => {
+  it("başka bir tablo adı geçiyorsa sebep cümlesi korunur", () => {
+    const bas = MOTOR.indexOf("function trErr(");
+    expect(bas).toBeGreaterThan(-1);
+    const govde = MOTOR.slice(bas, bas + 3000);
+    expect(govde).toContain("permission denied for");
+    expect(govde).toContain("sunucunun verdiği sebep");
+  });
+
+  it("dostane cümle yine de var — ham hata tek başına bırakılmıyor", () => {
+    expect(MOTOR).toContain("Bu işlem için yetkiniz yok. Bu dosyada yalnız başvuru sahibi");
+  });
+});

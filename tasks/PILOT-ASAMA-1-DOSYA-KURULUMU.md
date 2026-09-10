@@ -103,6 +103,33 @@ Her adım aynı kalıpla dizilir (bkz. §2). Sıra:
   WhatsApp gönderimi bugün üründe yoksa Code bunu **raporda yazar** (kurucu kararı için), sessizce
   e-postaya düşürmez.
 
+### EK — 10.09.2026 akşam (kurucu, ilk rapordan sonra; Aşama 1 kapsamında, "tamam"dan ÖNCE yapılır)
+
+**1.8-a Birden çok taraf.** Başvurucu tarafında da karşı tarafta da **birden çok kişi/firma**
+girilebilir: her iki tarafta **"+ Taraf ekle"** düğmesi; sınır yok. Bugün varsa aynen kalır,
+Code raporda "vardı/eklendi" der.
+
+**1.8-b Vekil.** Her tarafın yanında **"+ Vekil ekle"** — elle. Her tarafın vekili olmayabilir,
+zorunlu değil. 1.1'de vekâletname/yetki belgesi yüklendiyse vekil o belgeden **otomatik dolar**
+(alan elle düzenlenebilir kalır); yüklenmediyse elle girilir.
+
+**1.9 → 1.10 sırası.** Taraflara **davet gönderilmeden ÖNCE süreç bilgilendirmesi** gider
+(dava şartında). Bu yüzden mevcut **"Davet gönder"** adımı 1.9'un ALTINA iner ve **1.10** olur:
+  1.9 Süreç bilgilendirmesi (dava şartında) → 1.10 Davet gönder.
+İhtiyaride 1.9 görünmez, 1.10 doğrudan gelir.
+
+**OLMADI — 10.09.2026 gece (kurucu ekranlara baktı):** Vekil ekleme · iletişim kanalı seçimi ·
+süreç bilgilendirmesi gönderme · davet gönderme **yalnız başvurucu için** yapılmış; **karşı taraf
+için hiçbiri yok.** Kural açık: 1.8, 1.8-a, 1.8-b, 1.9 ve 1.10'daki HER unsur **her iki yandaki HER
+taraf için ayrı ayrı** vardır — başvurucu 1, başvurucu 2, karşı taraf 1, karşı taraf 2… hepsinde
+aynı: vekil ekle · kanal kutuları · bilgilendirme gönder · davet gönder. İki yan **birbirinin
+aynası**dır; birinde olan ötekinde de aynı yerde durur (§2 kuralı). Kabul ölçütü 13.
+
+**Cowork'ün koyduğu tek madde (kurucu ekranda görür, itiraz ederse değişir):** 1.10 "Davet gönder"
+düğmesi dava şartında bilgilendirme gönderilmemişse **kapanmaz**, yalnız altında küçük italik
+"Süreç bilgilendirmesi henüz gönderilmedi." yazar — ürünün genel kuralı: sistem uyarır, arabulucu
+karar verir, düğme kilitlenmez.
+
 ---
 
 ## 2. HER ADIMIN ORTAK KALIBI (bütün ürün için kural; bu turda Aşama 1 ekranında uygulanır)
@@ -193,3 +220,7 @@ Cowork bunun dışında ürün davranışı eklemedi. Code de eklemez; eklemek i
 | 8 | Belge yüklenince alanlar doluyor ve elle düzenlenebiliyor |
 | 9 | H-31: kapanmış dosyadan e-posta çıkmıyor (tezgâh + canlı ölçüm) |
 | 10 | Ekran görüntüleri (masaüstü + telefon) klasörde; ön izleme bağlantısı raporda |
+| 11 | (EK) İki tarafta da "+ Taraf ekle" var, sınırsız; her tarafta "+ Vekil ekle" var, elle; vekâletname yüklendiyse vekil otomatik dolmuş |
+| 12 | (EK) Sıra: 1.9 süreç bilgilendirmesi → 1.10 Davet gönder; ihtiyaride 1.9 yok; bilgilendirme gitmemişse 1.10 kilitlenmiyor, italik uyarı var |
+| 13 | (OLMADI-1) Vekil ekle · kanal kutuları · bilgilendirme gönder · davet gönder — **karşı taraftaki her taraf için de** var, başvurucu tarafıyla birebir aynı yerde ve biçimde; ekran görüntüsünde iki yan yan yana görünür |
+| 14 | (OLMADI-2, kurucu 10.09 gece ikinci bakış) Karşı taraf 1.8/1.9'a girdi ama **1.10 Davet gönder'de yok** — 1.10 listesi de her iki yandaki HER tarafı gösterir, her tarafa ayrı davet düğmesi; ekran görüntüsünde 1.10'da iki yan görünür |

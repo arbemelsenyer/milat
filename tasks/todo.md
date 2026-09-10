@@ -1,4 +1,30 @@
 ## Nerede kaldık
+### ▶ H-33 ÖLÇÜLDÜ VE KAPANDI — KÖK NEDEN `experts` SÜTUN İZNİ (10.09.2026 gece)
+"Belgeler okunamadı: yetkiniz yok" satırının sebebi yetki eksikliği DEĞİLDİ.
+
+**Ölçüm (canlı ön izleme, kurucunun oturumu, salt okuma):**
+| istek | sonuç |
+|---|---|
+| `experts?select=id` | 200 |
+| `experts?select=*` | **403** `42501 permission denied for table experts` |
+| `case_documents?select=…` | **403** aynı mesaj |
+| `cases` · `case_parties` · `case_sessions` · `belge_ozetleri` | 200 |
+
+`public.experts` üzerinde `authenticated` rolüne **sütun bazlı** SELECT
+verilmiş; `case_documents`in bilirkişi politikası oradan izinsiz bir sütun
+okuyunca dosyanın BÜTÜN belge okuması düşüyor. Kapı doğru, kusur kapının
+okuduğu yardımcı tabloda.
+
+**Code tarafında yapıldı:** ekran gerçek sebebi artık yutmuyor. İzin hatasında
+sunucu başka bir tablonun adını veriyorsa o cümle ekranda kalıyor. Bu satır
+olmasaydı doğru yere bakmak yine saatler alırdı.
+
+**Kalan iş Cowork'te: HAT H-34** → `tests/sabit/experts-sutun-izni.sql`
+(önce `relrowsecurity` kontrolü, sonra `grant select on public.experts to
+authenticated`; RLS kapalıysa dar seçenek). Hiçbir politika değişmiyor.
+
+---
+
 
 ### ▶ OLMADI-2 DÜZELTİLDİ — ÖLÇÜT 14 (10.09.2026 gece)
 Kurucu: "karşı taraf 1.8 ve 1.9'da görünüyor ama 1.10 Davet gönder'de yok."
