@@ -17,6 +17,32 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
+### H-32 · 10.09.2026 · P1 — AŞAMA 1'İN İKİ ALANI İÇİN SQL KOŞULACAK (Cowork)
+
+**Sorun.** Aşama 1 ekranı (kurucu kararı, `tasks/PILOT-ASAMA-1-DOSYA-KURULUMU.md`)
+iki yeni alan istiyor ve bu iki alanın kolonu canlıda YOK:
+· §1.3 arabulucunun elle verdiği uygunluk kararı (`cases.arabuluculuga_uygunluk`
+  + gerekçe + kaynak),
+· §1.8 tarafa gönderimde kullanılacak kanal (`case_parties.gonderim_kanallari`).
+Kolonlar gelmeden ekran ÇALIŞIR; yalnız bu iki seçim kaydedilmez ve ekranda tek
+satırla "veritabanı güncellemesi bekleniyor" yazar (sessiz düşme yok).
+
+**Code SQL yazamaz mı?** Yazdı. Çalıştırmak §10 gereği Cowork'ün işidir.
+
+**COWORK PAKETİ (beş satır):**
+1. **Ne yapılacak:** `tests/sabit/asama1-basvuru-alanlari.sql` canlıda koşulacak.
+2. **Neden:** Aşama 1'in §1.3 ve §1.8 seçimleri kaydedilebilsin.
+3. **Komut:** dosyanın tamamı, olduğu gibi (yalnız `add column if not exists` ve
+   iki `check` kısıtı; hiçbir şey değiştirmez, silmez, taşımaz).
+4. **Başarı kontrolü:** dosyanın başındaki iki `information_schema` sorgusu —
+   `cases`te **3**, `case_parties`te **1** satır dönmeli.
+5. **Sonra Code ne yapacak:** ön izlemede iki seçimi de kaydedip doğrular,
+   sonucu `tasks/todo.md`ye yazar.
+
+**Önerim:** koşulsun. Alanlar NULL/boş kabul ediyor, RLS değişmiyor, geri dönüşü
+olan bir işlem. **Kararın etkisi:** koşulmazsa Aşama 1 kapanabilir ama iki alan
+pilotta boş kalır.
+
 ### H-29 · 30.08.2026 · P1 — Yarım kalan koşumun bıraktığı 5 YALANCI istatistik satırı silinsin mi?
 
 **Sorun.** 30.08 03:00 UTC'deki ilk emniyet süpürgesi koşumu yarıda durdu
@@ -501,6 +527,53 @@ Seçim: A / B / C / (kendi metniniz)
 Not: (varsa)
 ```
 
+### AŞAMA 1 ŞEMASI · KOŞULDU · 10.09.2026 (Cowork)
+`tests/sabit/asama1-basvuru-alanlari.sql` canlıda koşuldu — yalnız ekleme, mevcut
+satır ve sorgu etkilenmedi. **Doğrulama (canlıdan):** `cases.arabuluculuga_uygunluk` ·
+`cases.uygunluk_gerekcesi` · `cases.uygunluk_kaynaklari` · `case_parties.gonderim_kanallari`
+**4/4 var**; iki check kısıtı kuruldu. Ekrandaki "kayıt düşmez" amber satırı artık
+görünmemeli — Code ön izlemede doğrular. Aşama kapısına aykırılık yok: kolonlar
+kullanıcıya görünmez, yalnız ön izleme testinin temiz olması için önceden açıldı.
+
+### KURUCU KARAR PAKETİ · CEVAP · 07.09.2026 (Cowork, kurucu yetkisiyle)
+> Kurucu 07.09'da beş maddelik paketi "yazılımcı değilim, cevabını bilmiyorum"
+> diyerek Cowork'e devretti. Aşağıdaki seçimler Code'un önerileriyle aynıdır;
+> **hukuki iki madde (H-27/1 ve H-27/2) duman testinde kurucunun ekranda göreceği
+> hâle getirilir, itiraz ederse o gün döner.** Bu paket kapalıdır — Code yeniden sormaz.
+
+### H-29 · CEVAP · 07.09.2026 — (a) SİLİNDİ (Cowork koştu)
+5 yalancı satır canlıdan silindi (id listesi ve zaman penceresiyle sınırlı).
+Doğrulama: pencerede kalan **0** · tabloda toplam **6** satır (31.08 gerçek
+koşumunun kayıtları). Code'a iş yok; arşive taşı.
+
+### H-27/1 · CEVAP · 07.09.2026 — ÖNERİLEN METİN ONAYLANDI
+Code'un H-27'de önerdiği KVKK imha metni aynen uygulanır (`kvkk-metinleri.ts`,
+tek yerde; iki yüzey oradan okur; tezgâhla kilitle). Kurucu duman testinde kayıt
+ekranında metni görecek; değiştirmek isterse o gün söyler.
+
+### H-27/2 · CEVAP · 07.09.2026 — (a) ADLAR KALSIN
+constitution m.11'e tek cümle: "KVKK aydınlatma metinleri istisnadır — veri
+işleyen açıkça adlandırılır." Kod değişmez.
+
+### H-21 · CEVAP · 07.09.2026 — (b)
+`.env` olduğu gibi kalır; `.gitignore`a `.env.*` (`!.env.example` hariç)
+eklenir. Canlıya dokunulmaz. Code yapar.
+
+### H-20 · CEVAP · 07.09.2026
+- 7251 kaynağı → **(b)** yerine 6502 Tüketicinin Korunması Hakkında Kanun
+  (mevzuat.gov.tr, metin katmanlı). Code kitap listesini günceller.
+- "Atlananları yeniden işle" düğmesi: Code'un elinde admin yolu varsa
+  (iç çağrı / servis anahtarı) kendisi tetikler ve parça sayısını canlıdan
+  doğrular; yoksa duman testi günü kurucuyla birlikte ekrandan basılır. Eski boş
+  İİK nüshasının silinmesi de o gün.
+- Kira eğitim dokümanı: kurucuda metin katmanlı sürüm yoksa BIRAKILDI; ısrar yok.
+
+### H-31 · CEVAP · 07.09.2026 — ÜST SINIR: **3 hatırlatma** (geçici)
+Cevapsız soruya en fazla **3** hatırlatma; sonra susar, arabulucunun dosya
+ekranında "cevapsız kaldı" görünür. **Bu sayı pilotta ölçülene kadar geçicidir**
+— kurucu duman testinde davranışı görüp değiştirebilir. Sayıyı tek yerden
+okunur yap ki değişim tek satır olsun.
+
 ### H-15/1 · CEVAP DEĞİŞTİ · 25.08.2026 — SIFIR SAKLAMA
 **Bu blok, aşağıdaki "TEK ÇATI 5 YIL" kararının YERİNE GEÇER. 5 yıl artık geçersizdir.**
 
@@ -772,6 +845,29 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+
+### H-31 · KAPANDI · 10.09.2026 — KOD DÜZELTMESİ YAPILDI, CANLI DOĞRULAMA AŞAMA KAPISINDA
+
+Kalıcı düzeltme koda girdi (commit `3502284`), `npm run test` 474/474 yeşil:
+· Kapanış tanımı TEK YERDE: `supabase/functions/_shared/dosya-kapanis-kapisi.ts`
+  (`dosyaKapali` · `KAPALI_STATUSLER` · `acikDosyalar`). Nöbetçideki dört ayrı
+  elle yazılmış tanım tek çağrıya indi.
+· Nöbetçi tur döngüsüne kapanış kapısı: kapanmış dosyada kolların HİÇBİRİ
+  koşmuyor. Tek bilinçli istisna C4 kapanış hatırlatmasıdır (arabulucuya yazar,
+  tarafa e-posta göndermez); kapı onu da kesseydi kapanış adımları sessizce
+  hatırlatılmaz olurdu.
+· Görevi AÇAN yol da kapıya bakıyor: `anaAjanaBildir` (görev yazımının tek
+  geçidi) yazmadan önce dosyanın kapanışına bakıyor → 4.841 satırlık boşa dönen
+  çark kaynağından kapandı. FAIL-OPEN: sorgu arızası görev yazımını susturmaz.
+· Hatırlatma üst sınırı **3** (Cowork'ün 07.09 cevabı) tek yerden okunuyor;
+  sınıra dayanan soru silinmiyor, "cevapsız kaldı" damgası alıyor.
+· Isırma sınavı: `tests/kapanmis-dosya-eposta.test.ts` (22 sınav) — kapanmış
+  dosyaya tek satır bile yazılmadığını sahte istemciyle koşturarak gösteriyor.
+
+**Kalan:** edge function deploy'u aşama kapısına bağlı (CLAUDE.md §11-C) —
+kurucu "tamam" dedikten sonra. `_shared/anlatim.ts` değiştiği için fan-out
+36 fonksiyonu kapsar; liste `tasks/todo.md`dedir.
+
 
 ### H-28 · **KAPANDI** · 30.08.2026 — onay kayıtları gerçekten kalıcı
 ### H-30 · **KAPANDI** · 30.08.2026 — `cases`/`case_parties`e bağlı NO ACTION kalmadı

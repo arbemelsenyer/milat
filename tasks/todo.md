@@ -1,5 +1,119 @@
 ## Nerede kaldık
 
+### ▶ AŞAMA 1 BİTTİ — KURUCU "TAMAM" BEKLENİYOR (10.09.2026)
+**Aşama kapısı açık (CLAUDE.md §11-C).** Yayın YAPILMADI, edge function deploy
+YAPILMADI. `main`'e push edildi, Lovable ön izlemesi bu commit'le kuruldu.
+
+- Tarih: **10.09.2026**
+- Aşama: Pilot geri bildirimi · **Aşama 1 — Dosya kurulumu**
+- Aktif görev: **yok** — aşama kapısında bekleniyor.
+- Son tamamlanan iş: (1) HAT **H-31** kalıcı düzeltmesi · (2) Aşama 1'in
+  tamamı (1.1–1.9 + §2 ortak kalıbı) · (3) CLAUDE.md **§11-C**.
+- Doğrulama: `npm run test` **517/517** · `npx tsc --noEmit -p tsconfig.app.json`
+  temiz · `npm run build` temiz.
+- Commit'ler: `3502284` (H-31) · `5a6db53` (Aşama 1). İkisi de `main`'de.
+- Ön izleme: https://id-preview--5ffedb1b-4087-4fe1-a1ef-873c9754f71d.lovable.app
+  (Lovable `latest_commit_sha` = `5a6db533` — ön izleme bu işi taşıyor)
+- Ekran görüntüleri klasörü: Masaüstü\medipact claude\ASAMA-1-EKRANLAR
+- Açık blokaj: **iki tane, ikisi de kurucuya bağlı.**
+  1. **§1.9 metni gelmedi** → ekranda yer tutucu duruyor, gönderim düğmesi kapalı.
+  2. **HAT H-32** → `tests/sabit/asama1-basvuru-alanlari.sql` Cowork tarafından
+     koşulacak. Koşana kadar §1.3 uygunluk seçimi ve §1.8 kanal seçimi ekranda
+     görünür ama KAYDEDİLMEZ (ekran bunu tek satırla söyler, sessiz düşmez).
+- Sıradaki uygulanabilir iş: kurucu **"tamam"** derse → publish + edge deploy
+  (aşağıdaki liste) → canlı doğrulama → Aşama 1 kapanır, Aşama 2'ye geçilir.
+  Kurucu "olmadı" derse → düzelt, tekrar push, tekrar rapor.
+
+**"TAMAM" GELİNCE DEPLOY EDİLECEKLER (CLAUDE.md §11-B fan-out kuralı):**
+· **Publish** (ön yüz): `src/**` değişti.
+· **Yeni fonksiyonlar:** `basvuru-belgelerinden-doldur` · `taraf-iletisim-arastir`
+· **Değişen fonksiyon:** `classify-dispute`
+· **`_shared/anlatim.ts` DEĞİŞTİ → fan-out 36 fonksiyon:** ajan-nobetci ·
+  akis-yurut · analyze-meeting-notes · belge-ozeti · bilirkisi-secim ·
+  bilirkisi-sorulari · case-qa · classify-dispute · common-ground-report ·
+  detect-legal-deadlines · dosya-ozeti-oner · dosya-verilerini-sil ·
+  elverislilik · generate-options · guc-dengesi · hazirlik-foyu ·
+  hazirlik-foyu-gonder · iletisim-degisim · intake-chat ·
+  legal-reasoning-gemini · masa-kalem-karsilastir · mediation-ai ·
+  multi-agent-negotiation · olay-cizelgesi · orchestrator-run ·
+  party-communication-analysis · party-confidential-analysis ·
+  party-consistency-check · send-meeting-invite · taraf-asistan · taraf-cevap ·
+  taraf-kalem-cikar · taslak-denetim · usul-engeli · usul-onerisi
+  (yeni `_shared/dosya-kapanis-kapisi.ts` bu 36'nın içinde taşınır)
+· **Yeni secret gerekmiyor:** `taraf-iletisim-arastir` mevcut `GEMINI_API_KEY`i
+  kullanır. Anahtar yoksa "arama yapılamadı" der — sessizce kaynaksız cevap üretmez.
+
+**H-31 — NE DÜZELDİ (kod tarafı DONE, canlı doğrulama kapıda):**
+· Kapanış tanımı tek yerde: `_shared/dosya-kapanis-kapisi.ts`.
+· Kapanmış dosyada nöbetçi kolları koşmuyor → taraflara e-posta çıkmıyor.
+  Tek bilinçli istisna C4 kapanış hatırlatması (arabulucuya yazar, e-postasız).
+· Görevi AÇAN tek geçit (`anaAjanaBildir`) de kapanışa bakıyor → boşa dönen
+  görev çarkı kaynağından kapandı. FAIL-OPEN korundu.
+· Hatırlatma üst sınırı **3**; sınıra dayanan soru "cevapsız kaldı" damgası alır.
+· Isırma sınavı: `tests/kapanmis-dosya-eposta.test.ts` (22 sınav).
+
+**AŞAMA 1 — NE DEĞİŞTİ (kabul ölçütleri `tests/asama1-basvuru-ekrani.test.ts`
+içinde 43 sınavla kilitli):**
+· Ekran katlanır katmanlardan çıktı, **1.1–1.9 sıralı adımlara** çevrildi.
+· Uyuşmazlık konusu **tek alan**; üç yerde tekrar eden alanlar kaldırıldı.
+· Ortak kalıp: `src/components/basvuru/AdimKalibi.tsx` — AI düğmesi hep alanın
+  sağında, cevap hep alanın altında küçük italik, kaynak tıklanabilir, kaynak
+  yoksa "Kaynaklarda bulamadım." Yanıp sönen ışık yok, ayrı pencere yok.
+· 1.4'te AI düğmesi yok (kurucu kararı), boşluk korunuyor.
+· 1.5 → 1.6 sırası: AI **önce ana alanı** söylüyor, alt uzmanlık ana alana bağlı.
+  Firma/tüketici kuralı `classify-dispute` istemine yazıldı.
+· 1.8'de "AI araştırsın" kaynağı modelin beyanı değil, aramanın gerçekten
+  getirdiği sayfalardır; kaynak yoksa değer ekrana çıkmaz.
+· 1.9 yalnız dava şartında görünüyor; metin kurucudan bekleniyor.
+· **WhatsApp gönderimi üründe YOK** — 1.8'de telefon kanalı seçilirse ekran
+  bunu söyler, sessizce e-postaya düşürmez (kurucu kararı bekliyor).
+
+---
+
+
+### ▶ DEVAM — 10.09.2026 · PİLOT GERİ BİLDİRİMİ, AŞAMA 1 (kurucu kararı, Cowork yazdı)
+Kurucu kendi dosyasıyla canlı pilot denedi; **Yeni başvuru ekranı** baştan sona
+kusurlu çıktı. Bulgular ve kararlar tek dosyada:
+**`tasks/PILOT-ASAMA-1-DOSYA-KURULUMU.md`** — Code önce onu okur.
+
+**YENİ ÇALIŞMA USULÜ — AŞAMA KAPISI (§11-C, o dosyanın 0. bölümü):**
+aşama yapılır → test → main'e push (ön izleme) → kurucuya 10 satırlık düz
+Türkçe rapor + ekran görüntüleri → kurucu **"tamam"** der → ancak o zaman
+publish/deploy. **Kurucu onayı olmadan canlı değişmez, öneri uygulanmaz.**
+Aşama aşama gidilir; bir aşama kapanmadan ötekine geçilmez.
+
+**Bu turun kapsamı:** HAT **H-31** (kapanmış dosya mail atamasın) + Aşama 1.
+Başka iş yok. Kararlar HAT → COWORK→CODE'da hazır (H-29 · H-27 · H-21 · H-20 · H-31).
+
+**Canlı durum:** 4 dosya kapalı, `otomatik_akis` hepsinde kapalı, mail çıkmıyor.
+
+---
+
+### ⏸ (ESKİ) PROJE BEKLEMEDE — 07.09.2026 → 10.09'da kalktı
+Kurucu önce diğer SaaS'ı (çalışan şikâyet platformu) bitirecek; MediPact
+**buradan** devam edecek. Code bu tarihten sonra **açılmadı**; kurucu açıp
+komut vermeden hiçbir şey çalışmaz.
+
+**Canlı durum (07.09):** dört dosyanın dördü kapalı, `otomatik_akis` hepsinde
+**kapalı** → nöbetçi ajan boş dönüyor, e-posta çıkmıyor. Lovable kuyruğu boş.
+
+**Dönüşte ilk üç iş (sırayla):**
+1. Code'a **H-31** komutu (kapanmış dosya mail atamasın — metin
+   `tasks/HAT.md` H-31 + COWORK→CODE "H-31 · CEVAP"). Cevap paketi HAT'ta
+   hazır: H-29 silindi · H-27 metin onaylı, adlar kalıyor · H-21 (b) ·
+   H-20 6502 · H-31 üst sınır 3.
+2. **Duman testi:** kurucu 2 dosya girer (basit kira · karmaşık sağlık/
+   bilirkişili), Cowork tarafları oynar (+test1/+test2), düzeltme yok, takılmalar
+   tek listeye.
+3. **Eksiltme:** kurucu pilotta kalan ekranları seçer; seçilmeyen gizlenir,
+   silinmez. Sonra Code listeyi tek akışta kapatır → telefondan ikinci test →
+   büroda 1 gerçek dosya.
+
+**Dönüş komutu:** Cowork'te `medipact devam` — bu blok okunur, 1'den başlanır.
+Code için de aynı: `medipact devam` bu bloğu okur, kuyruk H-31'dir.
+
+---
+
 - Tarih: **30.08.2026 ~12:40 UTC** (19. blok) — `medipact dur` ile kapatıldı.
 - Aşama: DAOS · canlı doğrulama döngüsü (§11-B) · **pilot hazırlığı**
 - **DAİMÎ TALİMAT (24.08, kurucu):** pilot hazır olana kadar **soru yok** —
