@@ -39,7 +39,7 @@ async function upsertAgentActivityState(
 const ALLOWED = [
   "işçi_işveren", "ticari", "tüketici", "sağlık", "fikri_mülkiyet",
   "inşaat", "sigorta", "bankacılık", "aile", "spor", "enerji_maden",
-  "kira", "gayrimenkul", "genel",
+  "kira", "gayrimenkul", "genel", "ortaklık",
 ];
 
 // Frontend ALT_UZMANLIK_ALANLARI (MediationEngine.tsx:749-757) ile birebir aynı slug'lar.
@@ -137,11 +137,22 @@ Deno.serve(async (req) => {
     const systemPrompt = `Sen bir Türk hukuku sınıflandırma asistanısın.
 Verilen uyuşmazlık metnini knowledge_base_chunks tablosundaki kaynaklara ve Türk hukuku bilgine dayanarak analiz et.
 SADECE şu kategorilerden birini seç:
-işçi_işveren | ticari | tüketici | sağlık | fikri_mülkiyet | inşaat | sigorta | bankacılık | aile | spor | enerji_maden | kira | gayrimenkul | genel
+işçi_işveren | ticari | tüketici | sağlık | fikri_mülkiyet | inşaat | sigorta | bankacılık | aile | spor | enerji_maden | kira | gayrimenkul | ortaklık | genel
 
 Ayrıca, ana kategorinin yanında metin belirgin şekilde şu alt uzmanlık alanlarından birine işaret
 ediyorsa onu da belirt: sağlık | sigorta | fikri_sınai_haklar | inşaat | bankacılık | spor | enerji_maden.
 Emin değilsen veya metin bu alanlardan hiçbirine açıkça girmiyorsa "yok" de — tahmin zorlaması yapma.
+
+SIRA ÖNEMLİ: ÖNCE ANA ALAN, SONRA ALT UZMANLIK. Alt uzmanlığı ana alandan bağımsız seçme;
+alt uzmanlık her zaman seçtiğin ana alana bağlıdır.
+
+ANA ALANI TARAFLARIN NİTELİĞİ BELİRLER (kurucu kuralı, 10.09.2026 — bağlayıcı örnek):
+  · İki ya da daha çok FİRMA arasında eser sözleşmesi / bina yapımı → ana: ticari, alt: inşaat
+  · Firma(lar) ile TÜKETİCİ konumundaki taraf(lar) arasında inşaat → ana: tüketici, alt: inşaat
+Yani AYNI alt uzmanlık farklı ana alanlara düşebilir; belirleyici olan tarafların şahıs mı firma mı
+olduğudur. Aynı mantık öteki alanlarda da geçerlidir (ör. sigorta, bankacılık, sağlık).
+Metinde tarafların niteliği (şahıs / firma / tüketici) yazmıyorsa: guven_skoru'nu 60'ın ALTINA indir
+ve gerekçede "tarafların şahıs mı firma mı olduğu belirtilmemiş" diye açıkça söyle — tahmin etme.
 
 JSON formatında döndür:
 {

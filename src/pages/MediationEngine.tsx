@@ -54,6 +54,12 @@ import { CaseQaPanel } from "@/components/mediation/CaseQaPanel";
 // Ücretli model çağrısı işareti — TEK tanım (bkz. UcretliIsaret.tsx).
 import { UcretliIsaret } from "@/components/mediation/UcretliIsaret";
 import { BazCizgiSorulari } from "@/components/mediation/BazCizgiSorulari";
+/* AŞAMA 1'in ORTAK ADIM KALIBI (§2 · §2-A). Düğmenin yeri, cevabın biçimi ve
+   kaynak sırası orada TEK KOPYA hâlinde durur; adımlar kendi düzenini kurmaz. */
+import {
+  Adim, AiCevap, AiDugmesi, KAYNAK_YOK_METNI,
+  type AiCevapDurumu, type AiKaynak,
+} from "@/components/basvuru/AdimKalibi";
 
 // Paylaşılan giriş animasyonu deseni — Dashboard.tsx'teki containerVariants/itemVariants ile aynı.
 const containerVariants = {
@@ -2303,45 +2309,572 @@ function KayitProtokoluKarti({ caseRow }: { caseRow: CaseRow }) {
 // aynen) ve BELGELER (dosya bazında yükleme). Sayfa düzeni Aşama 4'ü örnek alır:
 // solda ve sağda ANA KATMANLAR (büyük harf), altlarında alt katmanlar (normal
 // yazım). Mobilde tek sütuna iner; kart ve düğme stilleri değişmedi.
+/* ═══════════════════════════════════════════════════════════════════════════
+   AŞAMA 1 — YENİ BAŞVURU EKRANI (kurucu kararı, 10.09.2026)
+   Kaynak: tasks/PILOT-ASAMA-1-DOSYA-KURULUMU.md §1 ve §2
+
+   NE DEĞİŞTİ VE NİÇİN. Kurucu kendi dosyasıyla canlı pilot denedi; bu ekran
+   baştan sona kusurlu çıktı. Üç kusur vardı:
+     · "Uyuşmazlık konusu / uyuşmazlık metni / açıklama" ÜÇ AYRI YERDE soruluyordu.
+     · AI düğmeleri ve AI cevapları her adımda başka yerde, başka biçimdeydi.
+     · Adımların sırası arabulucunun iş sırası değildi.
+   Ekran artık kurucunun belirlediği sırayla, YUKARIDAN AŞAĞI NUMARALI akar:
+     1.1 Büro evrakları · 1.2 Uyuşmazlık konusu (TEK alan) · 1.3 Arabuluculuğa
+     uygunluk · 1.4 Başvuru türü · 1.5 Ana uzmanlık · 1.6 Alt uzmanlık ·
+     1.7 Süreler · 1.8 Taraflar · 1.9 Süreç bilgilendirme (yalnız dava şartında)
+   Her adım TEK kalıptan geçer: `src/components/basvuru/AdimKalibi.tsx`.
+   Kalıp orada tanımlıdır; adımlar kendi düğmesini kendi yerine koymaz.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* 1.1'de sayılan büro evrakları — kurucunun listesi, aynen. */
+const BURO_EVRAKLARI = [
+  "Başvurucunun ya da vekilinin talep dilekçesi",
+  "Arabuluculuk bürosunun bu talebe göre hazırladığı başvuru formu",
+  "Vekille başvuruda vekâletname / yetki belgesi",
+  "İhtiyaride arabulucu belirleme belgesi — genelde süreç sonunda hazırlanır, baştan yüklemek isteyen buradan yükler",
+];
+
+/* 1.2'nin altındaki açıklama — KURUCUNUN METNİ, AYNEN. Bugünkü eski italik
+   yönlendirme yazıları bu ekrandan kaldırıldı; yalnız bu kaldı. */
+const UYUSMAZLIK_KONUSU_ACIKLAMASI =
+  "Başvuru konusunu ve kısa açıklamasını yazınız. Tarafların şahıs mı firma mı olduğunu kısaca " +
+  "belirtiniz. Konunun para ya da parayla ölçülebilen bir konu olup olmadığını kısaca açıklayınız.";
+
+/* 1.3'te AI "uygun değil" derse altına eklenen cümle — KURUCUNUN METNİ, AYNEN. */
+const UYGUN_DEGIL_CUMLESI =
+  "Konu ile ilgili atamanızın yapıldığı arabuluculuk bürosu ile iletişime geçiniz.";
+
+/* 1.9 metni kurucudan gelecek; gelene kadar yer tutucu durur. Uydurma metin
+   KONMAZ — tarafa gidecek ilk bildirimin sözlerini ürün icat etmez. */
+const SUREC_BILGILENDIRME_YER_TUTUCU = "[Süreç bilgilendirme metni — kurucudan bekleniyor]";
+
+/* Aşama 1'in iki alanı (1.3 uygunluk kararı, 1.8 gönderim kanalı) yeni
+   kolonlara yazılır. Kolonları Cowork koşar (tests/sabit/asama1-basvuru-alanlari.sql).
+   Koşana kadar SESSİZ DÜŞMEZ: seçim ekranda durur ve sebebi tek satırla yazılır. */
+function kolonYokMu(mesaj: string): boolean {
+  return /does not exist|could not find|PGRST204|42703|schema cache/i.test(String(mesaj ?? ""));
+}
+const KOLON_BEKLIYOR_METNI =
+  "Seçiminiz ekranda duruyor ama henüz kaydedilemiyor: bu alan için veritabanı güncellemesi " +
+  "bekleniyor (Cowork koşacak). Güncelleme yapılınca tekrar seçin.";
+
+/** functions.invoke hatasının GERÇEK sebebini çıkarır (lessons.md, 13.08):
+ *  FunctionsHttpError'ın .message'ı hep "non-2xx status code" der. */
+async function cagriHataMetni(e: any): Promise<string> {
+  const ctx = e?.context;
+  if (ctx && typeof ctx.text === "function") {
+    try {
+      const govde = await ctx.text();
+      if (govde) {
+        try {
+          const j = JSON.parse(govde);
+          const m = j?.error ?? j?.message ?? j?.sebep ?? j?.detay;
+          if (m) return String(m);
+        } catch { /* JSON değilse düz metin */ }
+        return String(govde).slice(0, 400);
+      }
+    } catch { /* gövde okunamadı */ }
+    if (ctx.status) return `HTTP ${ctx.status}`;
+  }
+  return String(e?.message ?? "bilinmeyen hata");
+}
+
+/* ── 1.3 · ARABULUCULUĞA UYGUN MU? ──────────────────────────────────────────
+   Elle seçim: Uygun / Uygun değil. Yanında "AI önersin".
+   AI cevabı §2-A kaynak kuralına tabidir: kaynak yoksa "bulamadım" der.
+   AI'nın "uygun değil" demesi devamı ENGELLEMEZ — düğme kapanmaz, adım
+   kilitlenmez. Karar arabulucunundur (constitution m.3). */
+function UygunlukAdimi({ caseRow, reload, canEdit }: {
+  caseRow: CaseRow; reload: () => void; canEdit: boolean;
+}) {
+  const mevcut = String((caseRow as any).arabuluculuga_uygunluk ?? "");
+  const [secim, setSecim] = useState<string>(mevcut);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+  const [uyari, setUyari] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [durum, setDurum] = useState<AiCevapDurumu>(
+    String((caseRow as any).uygunluk_gerekcesi ?? "").trim() ? "cevap" : "yok",
+  );
+  const [cevapMetni, setCevapMetni] = useState<string>(String((caseRow as any).uygunluk_gerekcesi ?? ""));
+  const [kaynaklar, setKaynaklar] = useState<AiKaynak[]>(
+    Array.isArray((caseRow as any).uygunluk_kaynaklari) ? (caseRow as any).uygunluk_kaynaklari : [],
+  );
+  const [hata, setHata] = useState<string | null>(null);
+
+  useEffect(() => { setSecim(String((caseRow as any).arabuluculuga_uygunluk ?? "")); },
+    [(caseRow as any).arabuluculuga_uygunluk]);
+
+  async function secimiKaydet(deger: string) {
+    setSecim(deger);
+    setUyari(null);
+    if (!canEdit) return;
+    setKaydediliyor(true);
+    const { error } = await (supabase.from("cases") as any)
+      .update({ arabuluculuga_uygunluk: deger }).eq("id", caseRow.id);
+    setKaydediliyor(false);
+    if (error) {
+      setUyari(kolonYokMu(error.message) ? KOLON_BEKLIYOR_METNI : `Kaydedilemedi: ${trErr(error.message)}`);
+      return;
+    }
+    reload();
+  }
+
+  /* Kaynak: mevcut `elverislilik` işlevi. O işlev kaynağı YALNIZ bilgi
+     tabanından alır (6325 sayılı Kanun · Yönetmelik · uzmanlık modülü),
+     alıntıyı kaynak metnine karşı doğrular ve dayanak bulamazsa 'kaynak_yok'
+     der. §2-A'nın 1. ve 2. sırası tam olarak budur. */
+  async function aiOnersin() {
+    setBusy(true);
+    setDurum("calisiyor");
+    setHata(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("elverislilik", {
+        body: { case_id: caseRow.id },
+      });
+      if (error) throw new Error(await cagriHataMetni(error));
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+
+      const { data: kayit, error: kErr } = await (supabase.from("elverislilik_kontrol" as any) as any)
+        .select("durum, bulgular, kaynaklar").eq("case_id", caseRow.id).maybeSingle();
+      if (kErr) throw new Error(kErr.message);
+
+      const bulgular = Array.isArray((kayit as any)?.bulgular) ? (kayit as any).bulgular : [];
+      if (!kayit || (kayit as any).durum === "kaynak_yok") {
+        setDurum("bulunamadi");
+        setCevapMetni(KAYNAK_YOK_METNI);
+        setKaynaklar([]);
+        return;
+      }
+      if (bulgular.length === 0) {
+        setDurum("cevap");
+        setCevapMetni("Arabuluculuğa uygun — kayıtlı kaynaklarda uygunluğu tartışmalı kılan bir işaret bulunamadı. Karar sizindir.");
+        setKaynaklar([{ tur: "mevzuat", ad: String((kayit as any).kaynaklar ?? "Taranan kaynaklar"), yer: null, baglanti: null }]);
+        return;
+      }
+      const metin = bulgular
+        .map((b: any) => `Arabuluculuğa uygunluk bakımından değerlendirme gerekebilir, çünkü ${safeText(b?.neden) || safeText(b?.baslik)}`)
+        .join("\n");
+      setDurum("cevap");
+      setCevapMetni(metin);
+      setKaynaklar(bulgular.map((b: any) => ({
+        tur: "mevzuat" as const,
+        ad: safeText(b?.kaynak_adi) || "kayıtlı kaynak",
+        yer: safeText(b?.madde_bolum) || null,
+        baglanti: null,
+      })));
+
+      /* Gerekçe ve kaynağı dosyaya da yazarız ki ekran yenilenince kaybolmasın.
+         Yazılamazsa ekran çalışmaya devam eder; sebebi tek satırla söylenir. */
+      const { error: yErr } = await (supabase.from("cases") as any).update({
+        uygunluk_gerekcesi: metin.slice(0, 2000),
+        uygunluk_kaynaklari: bulgular.map((b: any) => ({
+          tur: "mevzuat", ad: safeText(b?.kaynak_adi), yer: safeText(b?.madde_bolum), baglanti: null,
+        })),
+      }).eq("id", caseRow.id);
+      if (yErr) setUyari(kolonYokMu(yErr.message) ? KOLON_BEKLIYOR_METNI : `Gerekçe kaydedilemedi: ${trErr(yErr.message)}`);
+      else reload();
+    } catch (e: any) {
+      console.error("[elverislilik] çağrı başarısız", e);
+      setDurum("hata");
+      setHata(`elverislilik çağrısı başarısız: ${trErr(String(e?.message ?? "bilinmeyen hata"))}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Adim
+      no="1.3"
+      id="faz1-uygunluk"
+      baslik="Arabuluculuğa uygun mu?"
+      aiDugme={canEdit ? <AiDugmesi tur="onersin" onClick={aiOnersin} busy={busy} /> : undefined}
+      aiCevap={
+        <AiCevap
+          durum={durum}
+          metin={cevapMetni}
+          kaynaklar={kaynaklar}
+          hataMetni={hata}
+          altBilgi={secim === "uygun_degil" ? UYGUN_DEGIL_CUMLESI : null}
+        />
+      }
+    >
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button" size="sm"
+          variant={secim === "uygun" ? "default" : "outline"}
+          disabled={!canEdit || kaydediliyor}
+          onClick={() => secimiKaydet("uygun")}
+        >
+          Uygun
+        </Button>
+        <Button
+          type="button" size="sm"
+          variant={secim === "uygun_degil" ? "default" : "outline"}
+          disabled={!canEdit || kaydediliyor}
+          onClick={() => secimiKaydet("uygun_degil")}
+        >
+          Uygun değil
+        </Button>
+      </div>
+      {/* Kilit YOK: "uygun değil" seçilse bile sonraki adımlar açık kalır. */}
+      <p className="text-xs text-muted-foreground">
+        Bu seçim süreci durdurmaz; sonraki adımlar açık kalır.
+      </p>
+      {uyari && (
+        <p className="text-xs text-amber-600 dark:text-amber-400 leading-snug">{uyari}</p>
+      )}
+      <UcretliIsaret />
+    </Adim>
+  );
+}
+
+/* ── 1.5 ve 1.6 · ANA UZMANLIK, SONRA ALT UZMANLIK ──────────────────────────
+   BUGÜNKÜ KUSUR: AI yalnız alt uzmanlığı söylüyor, ana alanı hiç söylemiyordu.
+   DÜZELTME: sıra ÖNCE ANA, SONRA ALT. Tek çağrı iki adımı birden besler; alt
+   uzmanlık her zaman seçili ana alana bağlı okunur.
+   Kurucunun kuralı (classify-dispute istem metnine de yazıldı):
+     · İki firma arasında eser sözleşmesi / bina yapımı → ana ticari, alt inşaat
+     · Firma(lar) ile tüketici arasında inşaat        → ana tüketici, alt inşaat
+   Yani aynı alt uzmanlık farklı ana alanlara düşebilir; belirleyici olan
+   tarafların şahıs mı firma mı olduğudur. */
+function UzmanlikAdimlari({ caseRow, reload, canEdit }: {
+  caseRow: CaseRow; reload: () => void; canEdit: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+  const [anaDurum, setAnaDurum] = useState<AiCevapDurumu>("yok");
+  const [altDurum, setAltDurum] = useState<AiCevapDurumu>("yok");
+  const [anaMetin, setAnaMetin] = useState("");
+  const [altMetin, setAltMetin] = useState("");
+  const [kaynaklar, setKaynaklar] = useState<AiKaynak[]>([]);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const ana = caseRow.dispute_type ?? "";
+  const alt = caseRow.dispute_subtype ?? ALT_UZMANLIK_YOK;
+
+  // Eski kayıtlarda listede olmayan bir ana tür duruyorsa kaybolmasın diye eklenir.
+  const anaSecenekler = DISPUTE_CATEGORIES.some((c) => c.value === ana) || !ana
+    ? DISPUTE_CATEGORIES
+    : [...DISPUTE_CATEGORIES, { value: ana, label: catLabel(ana) }];
+
+  async function yaz(patch: Record<string, unknown>) {
+    setKaydediliyor(true);
+    const { error } = await (supabase.from("cases") as any).update(patch).eq("id", caseRow.id);
+    setKaydediliyor(false);
+    if (error) { toast({ title: "Kaydedilemedi", description: trErr(error.message), variant: "destructive" }); return; }
+    reload();
+  }
+
+  /* Tek çağrı, iki adım. Metin kaynağı 1.2'deki TEK alandır — ekranda ikinci
+     bir "uyuşmazlık metni" kutusu YOKTUR (kurucunun birinci şikâyeti). */
+  async function aiOnersin(hedef: "ana" | "alt") {
+    const metin = String(caseRow.issue_description ?? "").trim() || String(caseRow.title ?? "").trim();
+    if (metin.length < 10) {
+      const d = "Önce 1.2'deki uyuşmazlık konusunu yazın; öneri o metinden üretilir.";
+      if (hedef === "ana") { setAnaDurum("bulunamadi"); setAnaMetin(d); }
+      else { setAltDurum("bulunamadi"); setAltMetin(d); }
+      return;
+    }
+    setBusy(true);
+    setHata(null);
+    if (hedef === "ana") setAnaDurum("calisiyor"); else setAltDurum("calisiyor");
+    try {
+      const { data, error } = await supabase.functions.invoke("classify-dispute", {
+        body: { case_id: caseRow.id, text: metin, persist: false },
+      });
+      if (error) throw new Error(await cagriHataMetni(error));
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+
+      const kategori = String((data as any)?.kategori ?? "");
+      const altUz = String((data as any)?.alt_uzmanlik ?? "");
+      const gerekce = String((data as any)?.gerekce ?? "").trim();
+      const guven = Number((data as any)?.guven_skoru ?? 0);
+      const kanunlar: string[] = Array.isArray((data as any)?.ilgili_kanun)
+        ? (data as any).ilgili_kanun.map(String) : [];
+
+      /* §2-A: kaynaksız hukuki cümle ekrana çıkmaz. classify-dispute ürünün
+         bilgi tabanından besleniyor; künye olarak dönen mevzuat adları
+         kaynaktır. Hiç künye yoksa "bulamadım" deriz. */
+      const kaynakListesi: AiKaynak[] = kanunlar.map((k) => ({
+        tur: "mevzuat" as const, ad: k, yer: null, baglanti: null,
+      }));
+      setKaynaklar(kaynakListesi);
+
+      const anaEtiket = catLabel(kategori);
+      const altEtiket = altUzmanlikLabel(altUz);
+
+      if (kanunlar.length === 0) {
+        setAnaDurum("bulunamadi"); setAnaMetin(KAYNAK_YOK_METNI);
+        setAltDurum("bulunamadi"); setAltMetin(KAYNAK_YOK_METNI);
+        return;
+      }
+
+      /* ÖNCE ANA. Cevap her zaman ana alanı SÖYLER — eski kusur buydu. */
+      setAnaDurum("cevap");
+      setAnaMetin(
+        `Ana alan: ${anaEtiket}${gerekce ? ` — ${gerekce}` : ""} (güven %${guven})` +
+        (guven < 60 ? " · Güven düşük; alanı elle seçin." : ""),
+      );
+
+      setAltDurum("cevap");
+      setAltMetin(
+        altUz && altUz !== "yok" && altEtiket
+          ? `Alt uzmanlık: ${altEtiket} — ${anaEtiket} ana alanına bağlı okunmuştur.`
+          : `Alt uzmanlık önerilmedi: metin ${anaEtiket} ana alanı içinde ayrı bir alt uzmanlığa açıkça işaret etmiyor.`,
+      );
+    } catch (e: any) {
+      console.error("[classify-dispute] çağrı başarısız", e);
+      const m = `classify-dispute çağrısı başarısız: ${trErr(String(e?.message ?? "bilinmeyen hata"))}`;
+      setHata(m);
+      if (hedef === "ana") setAnaDurum("hata"); else setAltDurum("hata");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <Adim
+        no="1.5"
+        id="faz1-ana-uzmanlik"
+        baslik="Ana uzmanlık"
+        aiDugme={canEdit ? <AiDugmesi tur="onersin" onClick={() => aiOnersin("ana")} busy={busy} /> : undefined}
+        aiCevap={<AiCevap durum={anaDurum} metin={anaMetin} kaynaklar={kaynaklar} hataMetni={hata} />}
+      >
+        <Select value={ana || undefined} onValueChange={(v) => yaz({ dispute_type: v })} disabled={!canEdit || kaydediliyor}>
+          <SelectTrigger aria-label="Ana uzmanlık alanı" className="h-9 text-sm">
+            <SelectValue placeholder="Seçin…" />
+          </SelectTrigger>
+          <SelectContent>
+            {anaSecenekler.map((c) => (
+              <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <UcretliIsaret />
+      </Adim>
+
+      <Adim
+        no="1.6"
+        id="faz1-alt-uzmanlik"
+        baslik="Alt uzmanlık"
+        ustBilgi={ana
+          ? `Seçili ana alan: ${catLabel(ana)} — alt uzmanlık buna bağlı okunur.`
+          : "Önce 1.5'te ana alanı seçin; alt uzmanlık ana alana bağlıdır."}
+        aiDugme={canEdit ? <AiDugmesi tur="onersin" onClick={() => aiOnersin("alt")} busy={busy} /> : undefined}
+        aiCevap={<AiCevap durum={altDurum} metin={altMetin} kaynaklar={kaynaklar} hataMetni={hata} />}
+      >
+        <Select
+          value={alt}
+          onValueChange={(v) => yaz({ dispute_subtype: v !== ALT_UZMANLIK_YOK ? v : null })}
+          disabled={!canEdit || kaydediliyor}
+        >
+          <SelectTrigger aria-label="Alt uzmanlık alanı" className="h-9 text-sm">
+            <SelectValue placeholder="Yok" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALT_UZMANLIK_YOK}>Yok</SelectItem>
+            {ALT_UZMANLIK_ALANLARI.map((c) => (
+              <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <UcretliIsaret />
+      </Adim>
+    </>
+  );
+}
+
+/* ── 1.8 · TARAF İLETİŞİMİ VE GÖNDERİM KANALI ───────────────────────────────
+   Her tarafın e-postası ve telefonu için "AI araştırsın". AI açık kaynaktan
+   arar; sonucu KAYNAĞIYLA gösterir. Arabulucu "Tamam" derse alana yazılır,
+   demezse YAZILMAZ. Kaynak gösterilemeyen bilgi hiç ekrana çıkmaz.
+   Her kanalın yanında seçim kutusu: işaretlenen kanal o tarafa gönderimde
+   kullanılır. */
+const GONDERIM_KANALLARI: { kod: string; etiket: string }[] = [
+  { kod: "eposta", etiket: "E-posta" },
+  { kod: "telefon", etiket: "Telefon / WhatsApp" },
+];
+
+function TarafIletisimKarti({ taraf, canEdit, onDegisti }: {
+  taraf: any; canEdit: boolean; onDegisti: () => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [sonuc, setSonuc] = useState<Record<string, any>>({});
+  const [uyari, setUyari] = useState<string | null>(null);
+  const [kanallar, setKanallar] = useState<string[]>(
+    Array.isArray(taraf?.gonderim_kanallari) ? taraf.gonderim_kanallari : [],
+  );
+
+  useEffect(() => {
+    setKanallar(Array.isArray(taraf?.gonderim_kanallari) ? taraf.gonderim_kanallari : []);
+  }, [taraf?.gonderim_kanallari]);
+
+  async function arastir(alan: "eposta" | "telefon") {
+    setBusy(alan);
+    setSonuc((s) => ({ ...s, [alan]: { durum: "calisiyor" } }));
+    try {
+      const { data, error } = await supabase.functions.invoke("taraf-iletisim-arastir", {
+        body: { party_id: taraf.id, alan },
+      });
+      if (error) throw new Error(await cagriHataMetni(error));
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+      setSonuc((s) => ({ ...s, [alan]: data }));
+    } catch (e: any) {
+      console.error("[taraf-iletisim-arastir] çağrı başarısız", e);
+      setSonuc((s) => ({
+        ...s,
+        [alan]: { durum: "hata", sebep: `taraf-iletisim-arastir çağrısı başarısız: ${trErr(String(e?.message ?? ""))}` },
+      }));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /* "Tamam" — bulunan bilgiyi alana YAZAN tek yol. Arabulucu basmadıkça hiçbir
+     şey yazılmaz (kurucu kararı §1.8). */
+  async function tamam(alan: "eposta" | "telefon") {
+    const r = sonuc[alan];
+    if (!r || r.durum !== "bulundu") return;
+    const patch = alan === "eposta" ? { email: r.deger } : { phone: r.deger };
+    const { error } = await supabase.from("case_parties").update(patch as any).eq("id", taraf.id);
+    if (error) { toast({ title: "Yazılamadı", description: trErr(error.message), variant: "destructive" }); return; }
+    setSonuc((s) => ({ ...s, [alan]: null }));
+    onDegisti();
+  }
+
+  async function kanalDegistir(kod: string, acik: boolean) {
+    const yeni = acik ? Array.from(new Set([...kanallar, kod])) : kanallar.filter((k) => k !== kod);
+    setKanallar(yeni);
+    setUyari(null);
+    const { error } = await (supabase.from("case_parties") as any)
+      .update({ gonderim_kanallari: yeni }).eq("id", taraf.id);
+    if (error) {
+      setUyari(kolonYokMu(error.message) ? KOLON_BEKLIYOR_METNI : `Kaydedilemedi: ${trErr(error.message)}`);
+      return;
+    }
+    onDegisti();
+  }
+
+  function kaynakListesi(r: any): AiKaynak[] {
+    return Array.isArray(r?.kaynaklar) ? r.kaynaklar : [];
+  }
+
+  function alanSatiri(alan: "eposta" | "telefon", etiket: string, deger: string) {
+    const r = sonuc[alan];
+    const durum: AiCevapDurumu =
+      !r ? "yok"
+        : r.durum === "calisiyor" ? "calisiyor"
+        : r.durum === "hata" ? "hata"
+        : r.durum === "bulundu" ? "cevap"
+        : "bulunamadi";
+    const metin = r?.durum === "bulundu"
+      ? `Bulundu: ${r.deger}${r.aciklama ? ` — ${r.aciklama}` : ""}`
+      : r?.durum === "arama_yapilamadi"
+        ? `Arama yapılamadı: ${r.sebep ?? ""}`
+        : (r?.sebep ?? "Bulunamadı.");
+    return (
+      <div className="space-y-2">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="flex-1 min-w-0 text-sm">
+            <span className="text-muted-foreground">{etiket}: </span>
+            {deger || <span className="italic text-muted-foreground">girilmemiş</span>}
+          </div>
+          <div className="sm:w-40 shrink-0 flex sm:justify-end">
+            {canEdit && (
+              <AiDugmesi tur="arastirsin" onClick={() => arastir(alan)} busy={busy === alan} />
+            )}
+          </div>
+        </div>
+        <AiCevap durum={durum} metin={metin} kaynaklar={kaynakListesi(r)} hataMetni={r?.sebep} />
+        {r?.durum === "bulundu" && canEdit && (
+          <div className="flex gap-2">
+            <Button size="sm" className="h-7 text-xs" onClick={() => tamam(alan)}>Tamam, alana yaz</Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs"
+              onClick={() => setSonuc((s) => ({ ...s, [alan]: null }))}>Vazgeç</Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border p-3 space-y-3">
+      <div className="text-sm font-medium">
+        {partyDisplay(taraf)} <span className="text-muted-foreground font-normal">· {roleLabel(taraf.party_role)}</span>
+      </div>
+      {alanSatiri("eposta", "E-posta", String(taraf.email ?? ""))}
+      {alanSatiri("telefon", "Telefon", String(taraf.phone ?? taraf.gsm ?? ""))}
+
+      <div className="border-t pt-2 space-y-1.5">
+        <div className="text-xs font-medium">Bu tarafa gönderimde kullanılacak kanal</div>
+        {GONDERIM_KANALLARI.map((k) => (
+          <label key={k.kod} className="flex items-center gap-2 text-sm cursor-pointer">
+            <Checkbox
+              checked={kanallar.includes(k.kod)}
+              onCheckedChange={(v) => kanalDegistir(k.kod, v === true)}
+              disabled={!canEdit}
+            />
+            <span>{k.etiket}</span>
+          </label>
+        ))}
+        {kanallar.includes("telefon") && (
+          /* SESSİZ DÜŞÜRME YOK: WhatsApp gönderimi bugün üründe yok. Bunu
+             söyleriz, sessizce e-postaya düşürmeyiz (kurucu kararı §1.9). */
+          <p className="text-xs text-amber-600 dark:text-amber-400 leading-snug">
+            WhatsApp ile otomatik gönderim üründe henüz yok; bu kanal seçili kalır ama gönderim
+            bugün e-postadan yapılır. Karar sizindir.
+          </p>
+        )}
+        {uyari && <p className="text-xs text-amber-600 dark:text-amber-400 leading-snug">{uyari}</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ── 1.9 · SÜREÇ BİLGİLENDİRME (yalnız DAVA ŞARTI) ──────────────────────────
+   Dava şartında ilk bildirim ASIL TARAFLARA gider — vekille temsil edilse bile.
+   İhtiyaride bu adım hiç görünmez.
+   Metin kurucudan gelecek; gelene kadar yer tutucu durur ve gönderim açılmaz.
+   Ürün tarafa gidecek ilk bildirimin sözlerini KENDİ İCAT ETMEZ. */
+function SurecBilgilendirmeAdimi({ caseRow, parties }: { caseRow: CaseRow; parties: any[] }) {
+  const asillar = parties.filter((p) => String(p.party_role ?? "") !== "third_party");
+  return (
+    <Adim
+      no="1.9"
+      id="faz1-surec-bilgilendirme"
+      baslik="Süreç bilgilendirme"
+      ustBilgi="Dava şartı arabuluculukta ilk bildirim, vekille temsil edilse bile ASIL TARAFLARA gider."
+      aiCevap={
+        <p className="mt-2 text-xs italic text-amber-600 dark:text-amber-400 leading-snug">
+          Metin kurucudan bekleniyor; gelmeden gönderim açılmaz. Dosyaya has bilgiler (dosya no,
+          taraf adı, konu, arabulucu) metne geldiğinde otomatik yerleştirilecektir.
+        </p>
+      }
+    >
+      <div className="rounded-md bg-muted/40 p-3 text-sm whitespace-pre-wrap">
+        {SUREC_BILGILENDIRME_YER_TUTUCU}
+      </div>
+      <div className="text-xs text-muted-foreground">
+        Gidecek taraflar:{" "}
+        {asillar.length === 0
+          ? "henüz taraf eklenmedi"
+          : asillar.map((p) => partyDisplay(p)).join(" · ")}
+      </div>
+      <Button size="sm" disabled title="Süreç bilgilendirme metni kurucudan gelmeden gönderim açılmaz">
+        Bilgilendirmeyi gönder
+      </Button>
+    </Adim>
+  );
+}
+
 function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
   caseRow: CaseRow; reload: () => void; isMediator: boolean; userId: string;
-  // Sol menüden gelen "şu katmanı aç ve oraya kay" isteği; nonce her tıklamada artar.
+  // Sol menüden gelen "şu adıma kay" isteği; nonce her tıklamada artar.
   jump?: { id: string; nonce: number } | null;
 }) {
   const { user, isAdmin } = useAuth();
-  const canEditIssue = caseRow.assigned_mediator_id === user?.id || caseRow.user_id === user?.id || isAdmin;
-  // Alan dolu mu — öneri kutusu her iki hâlde de görünür (tür tespiti kutusuyla aynı
-  // davranış); yalnız düğme etiketi ve "yerine geçer" uyarısı buna göre değişir.
-  const issueDolu = !!String(caseRow.issue_description ?? "").trim();
-  const [editIssueOpen, setEditIssueOpen] = useState(false);
-  const [issueDescDraft, setIssueDescDraft] = useState("");
-  const [savingIssue, setSavingIssue] = useState(false);
-  // Uyuşmazlık konusu AI ÖNERİSİ — hiçbir yere yazılmaz, yalnız ekranda durur.
-  // Kaydetme kararı arabulucunundur; elle girilmiş metin varsa öneri hiç istenmez.
-  const [ozetOneri, setOzetOneri] = useState<{ ozet: string; dayanak: string[] } | null>(null);
-  const [ozetBusy, setOzetBusy] = useState(false);
-  // ozetDurum = bilgi satırı (öneri üretilmedi/veri yok) · ozetHata = KIRMIZI hata satırı
-  const [ozetDurum, setOzetDurum] = useState<string | null>(null);
-  const [ozetHata, setOzetHata] = useState<string | null>(null);
-
-  // Ana katmanlar açık gelir (dosya kurulumu tek oturuşta yapılır); alt bölümlerin
-  // hepsi de açık — bu ekranda gizlenecek uzun analiz çıktısı yok.
-  const [openLayers, setOpenLayers] = useState<Set<string>>(() => new Set(FAZ1_LAYERS.map((l) => l.id)));
-  const [openSections, setOpenSections] = useState<Set<string>>(() => new Set(FAZ1_SECTION_IDS));
-  const toggleLayer = useCallback((id: string) => {
-    setOpenLayers((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }, []);
-  const toggleSection = useCallback((id: string) => {
-    setOpenSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }, []);
+  const canEdit = caseRow.assigned_mediator_id === user?.id || caseRow.user_id === user?.id || isAdmin;
 
   const [parties, setParties] = useState<any[]>([]);
   const [docCount, setDocCount] = useState(0);
@@ -2349,7 +2882,7 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
   const loadParties = useCallback(async () => {
     const { data } = await supabase
       .from("case_parties")
-      .select("id, full_name, company_name, first_name, last_name, party_type, party_role")
+      .select("*")
       .eq("case_id", caseRow.id)
       .order("created_at");
     setParties(Array.isArray(data) ? data : []);
@@ -2357,118 +2890,154 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
 
   useEffect(() => { loadParties(); }, [loadParties]);
 
-  // Sol menüden gelen istek: katmanı (gerekirse bölümü de) aç, sonra oraya kaydır.
-  // Faz 3/4 ile aynı kalıp; yalnız "faz1-" ile başlayan istekler işlenir.
+  // Sol menüden gelen istek: adıma kaydır. Katman açma/kapama yok — ekran
+  // artık katlanır katmanlardan değil, sıralı adımlardan oluşuyor.
   useEffect(() => {
     if (!jump?.id || !jump.id.startsWith("faz1-")) return;
-    if (jump.id.startsWith("faz1-katman-")) {
-      setOpenLayers((prev) => (prev.has(jump.id) ? prev : new Set(prev).add(jump.id)));
-    } else {
-      const layerId = FAZ1_SECTION_LAYER[jump.id];
-      if (layerId) setOpenLayers((prev) => (prev.has(layerId) ? prev : new Set(prev).add(layerId)));
-      setOpenSections((prev) => (prev.has(jump.id) ? prev : new Set(prev).add(jump.id)));
-    }
     const t = setTimeout(() => {
       document.getElementById(jump.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 60);
     return () => clearTimeout(t);
   }, [jump?.id, jump?.nonce]);
 
-  function openEditIssue() {
-    setIssueDescDraft(caseRow.issue_description ?? "");
-    setEditIssueOpen(true);
+  /* ── 1.2 · UYUŞMAZLIK KONUSU — TEK ALAN ────────────────────────────────
+     Eskiden aynı şey üç yerde soruluyordu: burada, tür tespiti kartındaki
+     "uyuşmazlık metni" kutusunda ve başvuru başlığında. İkisi kaldırıldı;
+     tek kaynak `cases.issue_description`tır. Diğer adımların AI çağrıları da
+     bu alanı okur. */
+  const [konu, setKonu] = useState(String(caseRow.issue_description ?? ""));
+  const [konuKaydediliyor, setKonuKaydediliyor] = useState(false);
+  useEffect(() => { setKonu(String(caseRow.issue_description ?? "")); }, [caseRow.issue_description]);
+  const konuDegisti = konu.trim() !== String(caseRow.issue_description ?? "").trim();
+
+  async function konuyuKaydet(metin?: string) {
+    const yeni = metin !== undefined ? metin : konu;
+    setKonuKaydediliyor(true);
+    const { error } = await supabase.from("cases")
+      .update({ issue_description: yeni || null }).eq("id", caseRow.id);
+    setKonuKaydediliyor(false);
+    if (error) { toast({ title: "Kaydedilemedi", description: trErr(error.message), variant: "destructive" }); return; }
+    toast({ title: "Uyuşmazlık konusu kaydedildi" });
+    reload();
   }
 
-  // functions.invoke hatası SESSİZ DÜŞMESİN: FunctionsHttpError'ın .message'ı hep
-  // "non-2xx status code" der; gerçek sebep .context gövdesindedir (lessons.md, 13.08).
-  async function invokeHataMetni(e: any): Promise<string> {
-    const ctx = e?.context;
-    if (ctx && typeof ctx.text === "function") {
-      try {
-        const govde = await ctx.text();
-        if (govde) {
-          try {
-            const j = JSON.parse(govde);
-            const m = j?.error ?? j?.message ?? j?.detay;
-            if (m) return `${String(m)}${j?.detay && j?.error ? ` — ${String(j.detay)}` : ""}`;
-          } catch { /* JSON değilse düz metin kullanılır */ }
-          return String(govde).slice(0, 400);
-        }
-      } catch { /* gövde okunamadıysa mesaja düşülür */ }
-      if (ctx.status) return `HTTP ${ctx.status}`;
-    }
-    return String(e?.message ?? "bilinmeyen hata");
-  }
+  /* ── 1.1 · BÜRO EVRAKLARINDAN DOLDURMA ─────────────────────────────────
+     Öneri hiçbir yere yazılmaz; her alan ayrı ayrı "Uygula" ile yazılır ve
+     yazıldıktan sonra da ELLE DÜZENLENEBİLİR kalır. */
+  const [doldurBusy, setDoldurBusy] = useState(false);
+  const [doldurDurum, setDoldurDurum] = useState<AiCevapDurumu>("yok");
+  const [doldurMetin, setDoldurMetin] = useState("");
+  const [doldurHata, setDoldurHata] = useState<string | null>(null);
+  const [oneriler, setOneriler] = useState<any>(null);
+  const [oneriTaraflar, setOneriTaraflar] = useState<any[]>([]);
+  const [taraflarBusy, setTaraflarBusy] = useState<number | null>(null);
 
-  // Öneriyi üretir. Kaynak sınırı fonksiyonun kendisinde: yalnız başlık, başvuru
-  // alanları ve belge ADI+TÜRÜ. Taraf analizleri / belge içeriği okunmaz.
-  async function ozetOneriGetir() {
-    setOzetBusy(true);
-    setOzetDurum(null);
-    setOzetHata(null);
-    setOzetOneri(null);
+  async function belgelerdenDoldur() {
+    setDoldurBusy(true);
+    setDoldurDurum("calisiyor");
+    setDoldurHata(null);
+    setOneriler(null);
+    setOneriTaraflar([]);
     try {
-      // Alan doluyken de öneri istenebilir; fonksiyon yine hiçbir yere yazmaz.
-      const { data, error } = await supabase.functions.invoke("dosya-ozeti-oner", {
-        body: { case_id: caseRow.id, yenile: !!String(caseRow.issue_description ?? "").trim() },
+      const { data, error } = await supabase.functions.invoke("basvuru-belgelerinden-doldur", {
+        body: { case_id: caseRow.id },
       });
-      if (error) throw error;
+      if (error) throw new Error(await cagriHataMetni(error));
       if ((data as any)?.error) throw new Error(String((data as any).error));
       if ((data as any)?.atlandi) {
-        setOzetDurum(String((data as any).sebep ?? "Öneri üretilmedi"));
+        setDoldurDurum("bulunamadi");
+        setDoldurMetin(String((data as any).sebep ?? "Doldurulacak bir şey bulunamadı."));
         return;
       }
-      const ozet = String((data as any)?.ozet ?? "").trim();
-      if (!ozet) { setOzetDurum("Yeterli veri yok — metni elle yazın."); return; }
-      setOzetOneri({
-        ozet,
-        dayanak: Array.isArray((data as any)?.dayanak) ? (data as any).dayanak.map(String) : [],
-      });
-    } catch (e: any) {
-      const ham = await invokeHataMetni(e);
-      console.error("[dosya-ozeti-oner] çağrı başarısız", ham, e);
-      setOzetHata(`dosya-ozeti-oner çağrısı başarısız: ${trErr(ham)}`);
-    } finally {
-      setOzetBusy(false);
-    }
-  }
-
-  async function ozetOneriKaydet() {
-    if (!ozetOneri) return;
-    await saveIssueDescription(ozetOneri.ozet);
-    setOzetOneri(null);
-    setOzetDurum(null);
-  }
-
-  async function saveIssueDescription(metin?: string) {
-    setSavingIssue(true);
-    try {
-      const previous = caseRow.issue_description ?? "";
-      const next = metin !== undefined ? metin : issueDescDraft;
-      const changed = previous.trim() !== next.trim();
-      const { error } = await supabase.from("cases").update({ issue_description: next || null }).eq("id", caseRow.id);
-      if (error) throw error;
-      // NOT: party_analyses / common_ground_reports / party_root_cause_analysis kasıtlı olarak
-      // dokunulmuyor — kök neden ve önceki analizler kaybolmasın diye. Bunlar sadece "Tüm Analizi
-      // Başlat" yeniden çalıştırılınca güncellenir.
-      reload();
-      setEditIssueOpen(false);
-      if (changed) {
-        toast({
-          title: "Uyuşmazlık konusu güncellendi",
-          description: "Mevcut analizler eski metne göre üretilmiştir; güncellemek için Tüm Analizi Başlat'ı yeniden çalıştırın.",
-        });
-      } else {
-        toast({ title: "Kaydedildi" });
+      if ((data as any)?.bulunamadi) {
+        setDoldurDurum("bulunamadi");
+        setDoldurMetin("Yüklü belgelerde bu adımların alanlarını dolduracak açık bir bilgi bulamadım.");
+        return;
       }
+      setOneriler((data as any).oneriler ?? null);
+      setOneriTaraflar(Array.isArray((data as any).taraflar) ? (data as any).taraflar : []);
+      setDoldurDurum("cevap");
+      setDoldurMetin(
+        `Okunan belgeler: ${(Array.isArray((data as any).okunan_belgeler) ? (data as any).okunan_belgeler : []).join(" · ")}. ` +
+        "Aşağıdaki öneriler hiçbir yere yazılmadı; her birini ayrı ayrı uygulayabilirsiniz.",
+      );
     } catch (e: any) {
-      toast({ title: "Kaydedilemedi", description: trErr(e.message), variant: "destructive" });
+      console.error("[basvuru-belgelerinden-doldur] çağrı başarısız", e);
+      setDoldurDurum("hata");
+      setDoldurHata(`basvuru-belgelerinden-doldur çağrısı başarısız: ${trErr(String(e?.message ?? "bilinmeyen hata"))}`);
     } finally {
-      setSavingIssue(false);
+      setDoldurBusy(false);
     }
   }
 
-  const classified = !!caseRow.dispute_type;
+  async function oneriUygula(alan: string, deger: string) {
+    const patch: Record<string, unknown> =
+      alan === "uyusmazlik_konusu" ? { issue_description: deger }
+        : alan === "surec_turu" ? { mediation_type: deger }
+        : alan === "ana_uzmanlik" ? { dispute_type: deger }
+        : { dispute_subtype: deger };
+    const { error } = await (supabase.from("cases") as any).update(patch).eq("id", caseRow.id);
+    if (error) { toast({ title: "Uygulanamadı", description: trErr(error.message), variant: "destructive" }); return; }
+    setOneriler((o: any) => ({ ...o, [alan]: null }));
+    toast({ title: "Uygulandı", description: "Alan dolduruldu; elle düzenlemeye açıktır." });
+    reload();
+  }
+
+  async function oneriTarafEkle(t: any, sira: number) {
+    setTaraflarBusy(sira);
+    try {
+      const kurumsal = t.taraf_turu === "corporate";
+      const parcalar = String(t.ad ?? "").trim().split(/\s+/);
+      const soyad = parcalar.length > 1 ? parcalar.pop()! : "";
+      const adi = parcalar.join(" ");
+      const { error } = await supabase.from("case_parties").insert({
+        case_id: caseRow.id,
+        user_id: null,
+        party_type: kurumsal ? "corporate" : "individual",
+        is_individual: !kurumsal,
+        party_role: t.rol,
+        role: t.rol,
+        invite_status: "pending",
+        first_name: kurumsal ? null : (adi || t.ad),
+        last_name: kurumsal ? null : (soyad || null),
+        full_name: String(t.ad ?? "").trim(),
+        company_name: kurumsal ? String(t.ad ?? "").trim() : null,
+        address: t.adres || null,
+        phone: t.telefon || null,
+        email: t.eposta || null,
+        /* E-POSTA ONAYI BURADA VERİLMEZ. Elle eklemede adres onay panelinden
+           geçtiği için damgalanır; belgeden okunan adres onaydan geçmedi, o
+           yüzden `email_confirmed_at` BOŞ kalır ve davet kendiliğinden gitmez. */
+        email_confirmed_at: null,
+        vekil_ad_soyad: t.vekil_ad_soyad || null,
+        vekil_baro: t.vekil_baro || null,
+        vekil_sicil_no: t.vekil_sicil_no || null,
+      } as any);
+      if (error) throw error;
+      setOneriTaraflar((liste) => liste.filter((_, i) => i !== sira));
+      toast({ title: "Taraf eklendi", description: "Bilgileri 1.8'den düzenleyebilirsiniz." });
+      loadParties();
+    } catch (e: any) {
+      toast({ title: "Taraf eklenemedi", description: trErr(e?.message ?? ""), variant: "destructive" });
+    } finally {
+      setTaraflarBusy(null);
+    }
+  }
+
+  const ONERI_ETIKETLERI: Record<string, string> = {
+    uyusmazlik_konusu: "1.2 Uyuşmazlık konusu",
+    surec_turu: "1.4 Başvuru türü",
+    ana_uzmanlik: "1.5 Ana uzmanlık",
+    alt_uzmanlik: "1.6 Alt uzmanlık",
+  };
+  function oneriGosterim(alan: string, deger: string): string {
+    if (alan === "surec_turu") return deger === "dava_sarti" ? "Dava şartı" : "İhtiyari";
+    if (alan === "ana_uzmanlik") return catLabel(deger);
+    if (alan === "alt_uzmanlik") return altUzmanlikLabel(deger) ?? deger;
+    return deger;
+  }
+
+  const davaSarti = caseRow.mediation_type === "dava_sarti";
   const sureEtiketi = caseRow.mediation_type === "dava_sarti"
     ? "Dava şartı"
     : caseRow.mediation_type === "ihtiyari" ? "İhtiyari" : null;
@@ -2477,17 +3046,10 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
 
   const statusStripItems: { label: string; value: string }[] = [
     { label: "Sistem No", value: caseRow.application_no || "—" },
-    { label: "Uyuşmazlık Türü", value: classified ? anaAltLabel(caseRow.dispute_type, caseRow.dispute_subtype) : "Bekliyor" },
-    { label: "Süreç Türü", value: sureEtiketi ?? "Seçilmedi" },
+    { label: "Uyuşmazlık Türü", value: caseRow.dispute_type ? anaAltLabel(caseRow.dispute_type, caseRow.dispute_subtype) : "Bekliyor" },
+    { label: "Başvuru Türü", value: sureEtiketi ?? "Seçilmedi" },
     { label: "Başvuru Tarihi", value: new Date(caseRow.application_date ?? caseRow.created_at).toLocaleDateString("tr-TR") },
   ];
-
-  const layerCounts: Record<string, string> = {
-    "faz1-katman-ozet": "2 bölüm",
-    "faz1-katman-sure": sureEtiketi ?? "seçilmedi",
-    "faz1-katman-taraflar": `${parties.length} taraf`,
-    "faz1-katman-belgeler": `${docCount} belge`,
-  };
 
   return (
     <div className="space-y-4">
@@ -2500,225 +3062,175 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
             tone: kalanGun == null ? undefined : kalanGun < 3 ? "high" : kalanGun < 7 ? "medium" : "low" },
         ]}
       />
-      <Card className="p-6 space-y-4">
-        {/* Aşama başlığı üst şeritte (PhaseHero); burada tekrarlanmaz. */}
+      <Card className="p-4 sm:p-6 space-y-4">
         <p className="text-sm text-muted-foreground">
-          Dosya kurulumunun tamamı bu ekrandadır: uyuşmazlık konusu ve türü, sürecin dava
-          şartı mı ihtiyari mi olduğu ve yasal süresi, taraflar ve belgeler. Ajan, belge
-          ve taraf girildiği anda çalışabilir.
+          Dosya kurulumunun tamamı bu ekrandadır ve yukarıdan aşağı sırayla ilerler. Her adımda
+          elle girebilir ya da sağdaki AI düğmesini kullanabilirsiniz; AI'nın söylediği her şey
+          kaynağıyla birlikte, alanın hemen altında görünür.
         </p>
 
-        <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
-          {/* ── DURUM ŞERİDİ — katlanmaz ── */}
-          <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {statusStripItems.map((m, i) => (
-              <div key={i} className="min-w-0">
-                <div className="text-sm text-muted-foreground truncate">{m.label}</div>
-                <div className="text-sm font-semibold truncate">{m.value}</div>
-              </div>
-            ))}
-          </motion.div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {statusStripItems.map((m, i) => (
+            <div key={i} className="min-w-0">
+              <div className="text-sm text-muted-foreground truncate">{m.label}</div>
+              <div className="text-sm font-semibold truncate">{m.value}</div>
+            </div>
+          ))}
+        </div>
 
-          {/* ── ANA KATMANLAR — tek sütun, sol menüdeki numara sırasıyla alt alta:
-                 1. DOSYA ÖZETİ → 2. SÜREÇ TÜRÜ VE SÜRE → 3. TARAFLAR → 4. BELGELER.
-                 İki sütunlu ızgara kaldırıldı; katmanların içeriği ve davranışı aynı. ── */}
-          <div className="space-y-4">
-              <Phase3Layer
-                layer={FAZ1_LAYERS[0]}
-                count={layerCounts["faz1-katman-ozet"]}
-                boxClass={FAZ1_LAYER_BOX}
-                open={openLayers.has("faz1-katman-ozet")}
-                onToggle={() => toggleLayer("faz1-katman-ozet")}
-              >
-                <CockpitCollapsible
-                  id="faz1-uyusmazlik-konusu"
-                  title="Uyuşmazlık konusu"
-                  open={openSections.has("faz1-uyusmazlik-konusu")}
-                  onToggle={() => toggleSection("faz1-uyusmazlik-konusu")}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm whitespace-pre-wrap flex-1 min-w-0">
-                      {caseRow.issue_description || <span className="text-muted-foreground italic">Girilmemiş.</span>}
-                    </p>
-                    {canEditIssue && (
-                      <Button variant="ghost" size="sm" className="shrink-0" onClick={openEditIssue}>
-                        <Pencil className="h-4 w-4 mr-1" /> Düzenle
-                      </Button>
-                    )}
-                  </div>
-                  {/* AI ÖNERİSİ — yalnız alan BOŞKEN ve yalnız düzenleme yetkisi olana.
-                      Öneri hiçbir yere yazılmaz; "Onayla ve kaydet" ile arabulucu yazar. */}
-                  {canEditIssue && (
-                    <div className="mt-3 rounded-lg border border-dashed p-3 space-y-2">
-                      {/* Düğmenin yeri/boyutu/ikonu "Uyuşmazlık tür tespiti" kutusuyla
-                          aynı kalıptadır (satır içi başlık + sağda size="sm" outline). */}
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="text-sm font-semibold text-primary">AI önerisi</div>
-                        {!ozetOneri && (
-                          <Button size="sm" variant="outline" className={KART_DUGME} onClick={ozetOneriGetir} disabled={ozetBusy}>
-                            {ozetBusy
-                              ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Hazırlanıyor…</>
-                              : <><Sparkles className="h-4 w-4 mr-1" /> {issueDolu ? "Yeni öneri getir" : "Öneri getir"}</>}
+        <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-3">
+
+          {/* ── 1.1 · ARABULUCULUK BÜROSU EVRAKLARI ── */}
+          <Adim
+            no="1.1"
+            id="faz1-buro-evraklari"
+            baslik="Arabuluculuk bürosu evrakları (isteğe bağlı)"
+            ustBilgi={
+              <>
+                <div>Buraya yükleyebilecekleriniz:</div>
+                <ul className="list-disc pl-5 mt-1 space-y-0.5">
+                  {BURO_EVRAKLARI.map((e) => <li key={e}>{e}</li>)}
+                </ul>
+              </>
+            }
+            aciklama="Belge yüklerseniz AI aşağıdaki adımların ilgili alanlarını bu belgelerden okuyarak doldurur; dolan her alan elle düzenlenebilir kalır. Belge yüklemezseniz 1.2'den elle devam edin."
+            aiDugme={canEdit ? <AiDugmesi tur="onersin" onClick={belgelerdenDoldur} busy={doldurBusy} /> : undefined}
+            aiCevap={
+              <>
+                <AiCevap durum={doldurDurum} metin={doldurMetin} kaynaklar={[]} hataMetni={doldurHata} />
+                {oneriler && (
+                  <div className="mt-2 space-y-2">
+                    {Object.entries(ONERI_ETIKETLERI).map(([alan, etiket]) => {
+                      const o = (oneriler as any)[alan];
+                      if (!o) return null;
+                      return (
+                        <div key={alan} className="rounded-md border border-dashed p-2 space-y-1">
+                          <div className="text-xs font-medium">{etiket}</div>
+                          <div className="text-sm whitespace-pre-wrap">{oneriGosterim(alan, o.deger)}</div>
+                          <div className="text-xs italic text-muted-foreground">Kaynak: {o.kaynak}</div>
+                          <Button size="sm" className="h-7 text-xs" onClick={() => oneriUygula(alan, o.deger)}>
+                            Uygula
                           </Button>
-                        )}
-                      </div>
-                      {!ozetOneri && <UcretliIsaret />}
-                      <p className="text-[11px] text-muted-foreground leading-snug">
-                        Öneri yalnız dosya başlığı, başvuru/talep alanları ve yüklü belgelerin adı ile
-                        türünden üretilir; taraf analizleri ve belge içerikleri kullanılmaz. Metin
-                        onaylanmadan hiçbir yere kaydedilmez.
-                      </p>
-                      {ozetOneri && (
-                        <div className="space-y-2">
-                          <p className="text-sm whitespace-pre-wrap bg-muted/40 rounded-md p-2">{ozetOneri.ozet}</p>
-                          {ozetOneri.dayanak.length > 0 && (
-                            <div className="text-[11px] text-muted-foreground">
-                              Dayanak: {ozetOneri.dayanak.join(" · ")}
-                            </div>
-                          )}
-                          {issueDolu && (
-                            <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                              Onaylarsanız mevcut metnin yerine geçer.
-                            </p>
-                          )}
-                          <div className="flex gap-2 flex-wrap">
-                            <Button size="sm" className="h-7 text-xs" onClick={ozetOneriKaydet} disabled={savingIssue}>
-                              {savingIssue ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
-                              Onayla ve kaydet
-                            </Button>
-                            <Button size="sm" variant="ghost" className="h-7 text-xs"
-                              onClick={() => { setIssueDescDraft(ozetOneri.ozet); setEditIssueOpen(true); }}
-                              disabled={savingIssue}>
-                              Düzenleyerek kaydet
-                            </Button>
-                            <Button size="sm" variant="ghost" className="h-7 text-xs"
-                              onClick={() => { setOzetOneri(null); setOzetDurum(null); setOzetHata(null); }} disabled={savingIssue}>
-                              Vazgeç
-                            </Button>
-                          </div>
                         </div>
-                      )}
-                      {ozetDurum && <p className="text-[11px] text-amber-600 dark:text-amber-400">{ozetDurum}</p>}
-                      {/* Hata SESSİZ DÜŞMEZ: kırmızı, kalıcı, fonksiyon adı + gerçek mesajla. */}
-                      {ozetHata && (
-                        <p className="text-xs text-destructive flex items-start gap-1.5 break-words">
-                          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                          <span>{ozetHata}</span>
-                        </p>
-                      )}
-                    </div>
-                  )}
+                      );
+                    })}
+                    {oneriTaraflar.map((t, i) => (
+                      <div key={`${t.ad}-${i}`} className="rounded-md border border-dashed p-2 space-y-1">
+                        <div className="text-xs font-medium">1.8 Taraf</div>
+                        <div className="text-sm">
+                          {t.ad} · {t.rol === "applicant" ? "Başvurucu" : t.rol === "respondent" ? "Karşı taraf" : "Üçüncü taraf"}
+                          {t.eposta ? ` · ${t.eposta}` : ""}{t.telefon ? ` · ${t.telefon}` : ""}
+                        </div>
+                        <div className="text-xs italic text-muted-foreground">Kaynak: {t.kaynak}</div>
+                        <Button size="sm" className="h-7 text-xs" disabled={taraflarBusy === i}
+                          onClick={() => oneriTarafEkle(t, i)}>
+                          {taraflarBusy === i ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                          Tarafı ekle
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            }
+          >
+            <Faz1Belgeler
+              caseRow={caseRow}
+              userId={userId}
+              parties={parties}
+              onCountChange={setDocCount}
+            />
+            <UcretliIsaret />
+          </Adim>
 
-                  <p className="text-xs text-muted-foreground mt-3">
-                    Başlık: {caseRow.title || "—"} · Durum: {caseRow.status ?? "—"} · UYAP Kayıt No:{" "}
-                    {caseRow.uyap_no || "henüz kaydedilmedi"} (Aşama 3 — Arabulucu Paneli'nden eklenir).
-                  </p>
-                </CockpitCollapsible>
-                <CockpitCollapsible
-                  id="faz1-tur-tespiti"
-                  title="Uyuşmazlık tür tespiti"
-                  open={openSections.has("faz1-tur-tespiti")}
-                  onToggle={() => toggleSection("faz1-tur-tespiti")}
-                >
-                  {/* Ana tür + alt uzmanlık menüleri ve AI önerisi düğmesi — bileşen aynen korunur. */}
-                  <DisputeClassifierCard caseRow={caseRow} initialText={caseRow.title ?? ""} bare />
-                </CockpitCollapsible>
-              </Phase3Layer>
-
-              <Phase3Layer
-                layer={FAZ1_LAYERS[1]}
-                count={layerCounts["faz1-katman-sure"]}
-                boxClass={FAZ1_LAYER_BOX}
-                open={openLayers.has("faz1-katman-sure")}
-                onToggle={() => toggleLayer("faz1-katman-sure")}
-              >
-                <CockpitCollapsible
-                  id="faz1-sure"
-                  title="Dava şartı / ihtiyari ve yasal süre"
-                  open={openSections.has("faz1-sure")}
-                  onToggle={() => toggleSection("faz1-sure")}
-                >
-                  {/* Seçim ve süre göstergesi cases.mediation_type üzerinden yürür — mevcut kart aynen. */}
-                  <DeadlineCard caseRow={caseRow} bare />
-                </CockpitCollapsible>
-              </Phase3Layer>
-
-              <Phase3Layer
-                layer={FAZ1_LAYERS[2]}
-                count={layerCounts["faz1-katman-taraflar"]}
-                boxClass={FAZ1_LAYER_BOX}
-                open={openLayers.has("faz1-katman-taraflar")}
-                onToggle={() => toggleLayer("faz1-katman-taraflar")}
-              >
-                <CockpitCollapsible
-                  id="faz1-taraf-listesi"
-                  title="Taraf ekleme, düzenleme ve davet"
-                  open={openSections.has("faz1-taraf-listesi")}
-                  onToggle={() => toggleSection("faz1-taraf-listesi")}
-                >
-                  {/* Eski Aşama 2'nin bloğu birebir taşındı; hiçbir işlev kaldırılmadı. */}
-                  <Phase2Parties
-                    caseRow={caseRow}
-                    isMediator={isMediator}
-                    userId={userId}
-                    bare
-                    onChanged={loadParties}
-                  />
-                </CockpitCollapsible>
-              </Phase3Layer>
-
-              <Phase3Layer
-                layer={FAZ1_LAYERS[3]}
-                count={layerCounts["faz1-katman-belgeler"]}
-                boxClass={FAZ1_LAYER_BOX}
-                open={openLayers.has("faz1-katman-belgeler")}
-                onToggle={() => toggleLayer("faz1-katman-belgeler")}
-              >
-                <Faz1Belgeler
-                  caseRow={caseRow}
-                  userId={userId}
-                  parties={parties}
-                  openSections={openSections}
-                  onToggleSection={toggleSection}
-                  onCountChange={setDocCount}
-                />
-              </Phase3Layer>
-
-              {/* KONTROL TERCİHİ — 20.08 eklendi. Mevcut katmanların SONUNA
-                  geldi; hiçbir bölüm silinmedi, taşınmadı, adlandırılmadı. */}
-              <div className={FAZ1_LAYER_BOX}>
-                <CockpitCollapsible
-                  id="faz1-kontrol-tercihi"
-                  title="Ajan hangi adımlarda önce size sorsun?"
-                  open={openSections.has("faz1-kontrol-tercihi")}
-                  onToggle={() => toggleSection("faz1-kontrol-tercihi")}
-                >
-                  <KontrolTercihiKarti caseRow={caseRow} userId={userId} />
-                </CockpitCollapsible>
+          {/* ── 1.2 · UYUŞMAZLIK KONUSU (TEK ALAN) ── */}
+          <Adim
+            no="1.2"
+            id="faz1-uyusmazlik-konusu"
+            baslik="Uyuşmazlık konusu"
+            aciklama={UYUSMAZLIK_KONUSU_ACIKLAMASI}
+          >
+            <Textarea
+              value={konu}
+              onChange={(e) => setKonu(e.target.value)}
+              rows={5}
+              disabled={!canEdit}
+              aria-label="Uyuşmazlık konusu"
+            />
+            {canEdit && (
+              <div className="flex gap-2">
+                <Button size="sm" className="h-7 text-xs" onClick={() => konuyuKaydet()}
+                  disabled={konuKaydediliyor || !konuDegisti}>
+                  {konuKaydediliyor ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                  Kaydet
+                </Button>
+                {konuDegisti && (
+                  <Button size="sm" variant="ghost" className="h-7 text-xs"
+                    onClick={() => setKonu(String(caseRow.issue_description ?? ""))}>
+                    Geri al
+                  </Button>
+                )}
               </div>
+            )}
+          </Adim>
+
+          {/* ── 1.3 · ARABULUCULUĞA UYGUN MU? ── */}
+          <UygunlukAdimi caseRow={caseRow} reload={reload} canEdit={canEdit} />
+
+          {/* ── 1.4 · BAŞVURU TÜRÜ — AI ÖNERİSİ YOK ──
+              Kurucu: "insanın yola çıkarken zaten bildiği şey; AI'ya sordurmaya
+              bile gerek yok." Düğme yoktur; §2 gereği yeri boş durur. */}
+          <Adim no="1.4" id="faz1-basvuru-turu" baslik="Başvuru türü">
+            <DeadlineCard caseRow={caseRow} bare bolum="tur" onTurDegisti={reload} />
+          </Adim>
+
+          {/* ── 1.5 ve 1.6 · ANA UZMANLIK → ALT UZMANLIK ── */}
+          <UzmanlikAdimlari caseRow={caseRow} reload={reload} canEdit={canEdit} />
+
+          {/* ── 1.7 · SÜRELER ── */}
+          <Adim
+            no="1.7"
+            id="faz1-sureler"
+            baslik="Süreler"
+            ustBilgi="Yukarıdaki seçimler (başvuru türü, ana alan) değişirse süreler de değişir; 'Yeniden Tespit' ile güncelleyin."
+          >
+            <DeadlineCard key={String(caseRow.mediation_type ?? "yok")} caseRow={caseRow} bare bolum="sure" />
+          </Adim>
+
+          {/* ── 1.8 · TARAFLAR ── */}
+          <Adim
+            no="1.8"
+            id="faz1-taraflar"
+            baslik="Taraflar"
+            ustBilgi="Belgeden dolan alanlar dâhil her alan elle doldurulabilir; hiçbir alan kilitli değildir."
+          >
+            <Phase2Parties
+              caseRow={caseRow}
+              isMediator={isMediator}
+              userId={userId}
+              bare
+              onChanged={loadParties}
+            />
+            {parties.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <div className="text-sm font-medium">İletişim bilgisi ve gönderim kanalı</div>
+                {parties.map((p) => (
+                  <TarafIletisimKarti key={p.id} taraf={p} canEdit={canEdit} onDegisti={loadParties} />
+                ))}
+              </div>
+            )}
+          </Adim>
+
+          {/* ── 1.9 · SÜREÇ BİLGİLENDİRME — yalnız dava şartında ── */}
+          {davaSarti && <SurecBilgilendirmeAdimi caseRow={caseRow} parties={parties} />}
+
+          {/* Ajan kontrol tercihi adım değildir; adımların sonunda kalır. */}
+          <div className="rounded-lg border bg-card p-4 space-y-2">
+            <div className="text-sm font-semibold">Ajan hangi adımlarda önce size sorsun?</div>
+            <KontrolTercihiKarti caseRow={caseRow} userId={userId} />
           </div>
         </motion.div>
       </Card>
-
-      <Dialog open={editIssueOpen} onOpenChange={(o) => !o && !savingIssue && setEditIssueOpen(false)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Uyuşmazlık Konusunu Düzenle</DialogTitle>
-          </DialogHeader>
-          <Textarea
-            value={issueDescDraft}
-            onChange={(e) => setIssueDescDraft(e.target.value)}
-            rows={6}
-            placeholder="Uyuşmazlık konusunu yazın..."
-          />
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setEditIssueOpen(false)} disabled={savingIssue}>İptal</Button>
-            <Button onClick={() => saveIssueDescription()} disabled={savingIssue}>
-              {savingIssue ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Kaydediliyor…</> : "Kaydet"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -3242,9 +3754,12 @@ function KontrolTercihiKarti({ caseRow, userId }: { caseRow: CaseRow; userId: st
 // Yükleme kuralları Aşama 2'deki (eski Aşama 3) taraf bazlı yüklemeyle aynıdır:
 // PDF / Word / metin, en çok 10 MB. Taraf bazlı yükleme Taraf Analizi ekranında
 // olduğu gibi durur — buradaki blok onun yerine geçmez, ona ek gelir.
-function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection, onCountChange }: {
+/* AŞAMA 1 · ADIM 1.1'in içeriği. 10.09.2026'da katlanır katmanlardan çıkarıldı:
+   ekran artık sıralı adımlardan oluşuyor, adımın içinde ikinci bir katlanır
+   başlık kullanıcıyı bir kez daha tıklatıyordu. Yükleme ve liste davranışı,
+   belge özeti hattı ve silme yolu AYNEN korundu. */
+function Faz1Belgeler({ caseRow, userId, parties, onCountChange }: {
   caseRow: CaseRow; userId: string; parties: any[];
-  openSections: Set<string>; onToggleSection: (id: string) => void;
   onCountChange: (n: number) => void;
 }) {
   const [docs, setDocs] = useState<any[]>([]);
@@ -3402,12 +3917,7 @@ function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection,
 
   return (
     <>
-      <CockpitCollapsible
-        id="faz1-belge-yukle"
-        title="Belge yükle"
-        open={openSections.has("faz1-belge-yukle")}
-        onToggle={() => onToggleSection("faz1-belge-yukle")}
-      >
+      <div id="faz1-belge-yukle" className="scroll-mt-24">
         <div className="space-y-3">
           <div>
             <Label className="text-xs">Taraf (isteğe bağlı)</Label>
@@ -3438,15 +3948,12 @@ function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection,
             </p>
           )}
         </div>
-      </CockpitCollapsible>
+      </div>
 
-      <CockpitCollapsible
-        id="faz1-belgeler-liste"
-        title="Dosyadaki belgeler"
-        summary={`${docs.length} belge`}
-        open={openSections.has("faz1-belgeler-liste")}
-        onToggle={() => onToggleSection("faz1-belgeler-liste")}
-      >
+      <div id="faz1-belgeler-liste" className="scroll-mt-24 pt-3 space-y-2">
+        <div className="text-sm font-medium">
+          Dosyadaki belgeler <span className="text-muted-foreground font-normal">· {docs.length} belge</span>
+        </div>
         {ozetHata && (
           <p className="text-sm text-destructive flex items-start gap-1.5 break-words mb-2">
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" /><span>{ozetHata}</span>
@@ -3498,7 +4005,7 @@ function Faz1Belgeler({ caseRow, userId, parties, openSections, onToggleSection,
             })}
           </ul>
         )}
-      </CockpitCollapsible>
+      </div>
     </>
   );
 }
@@ -3523,7 +4030,18 @@ function statusChipFor(remainingDays: number | null) {
 
 // bare: Aşama 1'de kendi kartı yok — kapsayan katmanın içinde bölüm olarak durur
 // (kutu içinde kutu olmasın). İçerik ve davranış her iki halde de aynıdır.
-function DeadlineCard({ caseRow, bare = false }: { caseRow: CaseRow; bare?: boolean }) {
+/* `bolum` (10.09.2026 · Aşama 1): kart iki adıma bölündü.
+     "tur"   → yalnız 1.4 Başvuru türü seçimi (dava şartı / ihtiyari)
+     "sure"  → yalnız 1.7 Süreler (tespit · uzatma · "Yeniden Tespit" düğmesi)
+     "hepsi" → eski davranış, tek parça (varsayılan; başka çağıran yok ama
+               kartın kendi bütünlüğü bozulmasın diye korundu).
+   İki parça ayrı bileşen örneği olduğu için tür değişince süre parçası
+   `onTurDegisti` → `reload` → yeni `key` yoluyla tazelenir. */
+function DeadlineCard({ caseRow, bare = false, bolum = "hepsi", onTurDegisti }: {
+  caseRow: CaseRow; bare?: boolean;
+  bolum?: "hepsi" | "tur" | "sure";
+  onTurDegisti?: () => void;
+}) {
   const [local, setLocal] = useState<Partial<CaseRow>>({ ...caseRow });
   const [busy, setBusy] = useState(false);
   const [extending, setExtending] = useState(false);
@@ -3543,6 +4061,8 @@ function DeadlineCard({ caseRow, bare = false }: { caseRow: CaseRow; bare?: bool
       const { error } = await supabase.from("cases").update({ mediation_type: type } as any).eq("id", caseRow.id);
       if (error) throw error;
       setLocal((s) => ({ ...s, mediation_type: type }));
+      // Süre parçası ayrı bir örnek: tür değişikliğini oradan da görmesi için haber ver.
+      onTurDegisti?.();
     } catch (e: any) {
       toast({ title: "Kaydedilemedi", description: e?.message ?? "", variant: "destructive" });
     } finally { setSavingType(false); }
@@ -3596,12 +4116,15 @@ function DeadlineCard({ caseRow, bare = false }: { caseRow: CaseRow; bare?: bool
   const detectedRef = useRef(false);
   useEffect(() => {
     if (detectedRef.current) return;
+    // Kart ikiye bölündüyse otomatik tespit YALNIZ süre parçasında koşar;
+    // yoksa aynı tespit iki örnekte birden tetiklenir (çift ücretli çağrı).
+    if (bolum === "tur") return;
     if (local.mediation_type !== "dava_sarti") return;
     if (!caseRow.dispute_type) return;
     if (local.deadline_detected_at) return;
     detectedRef.current = true;
     detect();
-  }, [local.mediation_type, caseRow.dispute_type, local.deadline_detected_at, detect]);
+  }, [bolum, local.mediation_type, caseRow.dispute_type, local.deadline_detected_at, detect]);
 
   async function saveVoluntary() {
     if (!voluntaryEnd) return;
@@ -3667,7 +4190,8 @@ function DeadlineCard({ caseRow, bare = false }: { caseRow: CaseRow; bare?: bool
         </div>
       )}
 
-      {/* ARABULUCULUK TÜRÜ SEÇİMİ */}
+      {/* ARABULUCULUK TÜRÜ SEÇİMİ — 1.4 */}
+      {bolum !== "sure" && (
       <div>
         <div className="text-sm font-medium mb-2">Arabuluculuk Türü:</div>
         <div className="flex flex-wrap gap-2">
@@ -3690,12 +4214,20 @@ function DeadlineCard({ caseRow, bare = false }: { caseRow: CaseRow; bare?: bool
         </div>
       </div>
 
-      {!local.mediation_type && (
+      )}
+
+      {bolum !== "sure" && !local.mediation_type && (
         <p className="text-xs text-muted-foreground italic">Lütfen arabuluculuk türünü seçin.</p>
       )}
 
-      {/* İHTİYARİ AKIŞ */}
-      {local.mediation_type === "ihtiyari" && (
+      {bolum === "sure" && !local.mediation_type && (
+        <p className="text-xs text-muted-foreground italic">
+          Süreler, 1.4'te başvuru türü seçilince hesaplanır.
+        </p>
+      )}
+
+      {/* İHTİYARİ AKIŞ — 1.7 */}
+      {bolum !== "tur" && local.mediation_type === "ihtiyari" && (
         <div className="space-y-3 border-t pt-3">
           <div className="rounded-md bg-muted/40 p-3 text-sm">
             <b>İhtiyari Arabuluculuk</b>
@@ -3726,8 +4258,8 @@ function DeadlineCard({ caseRow, bare = false }: { caseRow: CaseRow; bare?: bool
         </div>
       )}
 
-      {/* DAVA ŞARTI AKIŞ */}
-      {local.mediation_type === "dava_sarti" && (
+      {/* DAVA ŞARTI AKIŞ — 1.7 */}
+      {bolum !== "tur" && local.mediation_type === "dava_sarti" && (
         <div className="space-y-3 border-t pt-3">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
@@ -4864,57 +5396,32 @@ const FAZ3_MENU_ENTRIES: { id: string; label: string; kind: "layer" | "section";
     { id: FAZ3_LAYERS[2].id, label: FAZ3_LAYERS[2].label, kind: "layer", hint: FAZ3_LAYERS[2].hint },
   ]);
 
-// ── AŞAMA 1 (tek giriş kapısı) katmanları ve sol dizini ───────────────────────
-// Kalıp Faz 3/4 ile aynı: ANA KATMAN başlıkları BÜYÜK HARF (Türkçe İ ile doğrudan
-// yazılır), alt katman başlıkları normal yazımdadır. İlk iki katman solda, son iki
-// katman sağda çizilir; dizin sırası ekrandaki okuma sırasıdır (önce sol sütun).
-const FAZ1_LAYER_BOX = "rounded-lg border bg-card p-6 space-y-4";
-// Belge yüklerken "taraf seçilmedi" seçeneğinin değeri (Select boş değer kabul etmez).
+// ── AŞAMA 1 — YENİ BAŞVURU EKRANININ SOL DİZİNİ ──────────────────────────────
+// 10.09.2026 (kurucu kararı): ekran katlanır KATMANLARDAN çıkarıldı, sıralı
+// ADIMLARA çevrildi. Sol dizin artık ekrandaki 1.1–1.9 sırasının aynısıdır;
+// numaralar `numberMenuEntries` tarafından tek başlıktan üretilir, yani adım
+// eklenip çıkarıldığında kendiliğinden kayar.
+// 1.9 (Süreç bilgilendirme) yalnız DAVA ŞARTI seçiliyken ekranda görünür;
+// dizinde her zaman durur ve tıklanınca sayfa o noktaya kayar — dizinin sabit
+// kalması, hangi adımın niçin görünmediğini de görünür kılar.
 const FAZ1_BELGE_TARAFSIZ = "__dosya__";
-const FAZ1_LAYERS = [
-  {
-    id: "faz1-katman-ozet",
-    label: "DOSYA ÖZETİ",
-    hint: "Bu katman, uyuşmazlığın konusunu ve tür tespitini içerir; metni ve tespiti buradan girip düzeltebilirsiniz.",
-  },
-  {
-    id: "faz1-katman-sure",
-    label: "SÜREÇ TÜRÜ VE SÜRE",
-    hint: "Bu katman, sürecin dava şartı mı ihtiyari mi olduğunu ve buna bağlı yasal süreyi tutar.",
-  },
-  {
-    id: "faz1-katman-taraflar",
-    label: "TARAFLAR",
-    hint: "Bu katman, tarafların eklenmesi, düzenlenmesi, silinmesi ve davet gönderimini içerir.",
-  },
-  {
-    id: "faz1-katman-belgeler",
-    label: "BELGELER",
-    hint: "Bu katman, dosya bazında belge yüklemeyi içerir; taraf seçimi isteğe bağlıdır.",
-  },
-];
-// Bölüm → kapsayan katman: sol menüden bölüme atlanınca önce katman açılır.
-const FAZ1_SECTION_LAYER: Record<string, string> = {
-  "faz1-uyusmazlik-konusu": "faz1-katman-ozet",
-  "faz1-tur-tespiti": "faz1-katman-ozet",
-  "faz1-sure": "faz1-katman-sure",
-  "faz1-taraf-listesi": "faz1-katman-taraflar",
-  "faz1-belge-yukle": "faz1-katman-belgeler",
-  "faz1-belgeler-liste": "faz1-katman-belgeler",
-};
-const FAZ1_SECTION_IDS = Object.keys(FAZ1_SECTION_LAYER);
 const FAZ1_MENU_ENTRIES: { id: string; label: string; kind: "layer" | "section"; hint?: string }[] =
   numberMenuEntries([
-    { id: FAZ1_LAYERS[0].id, label: FAZ1_LAYERS[0].label, kind: "layer", hint: FAZ1_LAYERS[0].hint },
+    {
+      id: "faz1-adimlar",
+      label: "DOSYA KURULUMU",
+      kind: "layer",
+      hint: "Yeni başvuru ekranı: dokuz adım, yukarıdan aşağı sırayla. Her adımda elle girebilir ya da sağdaki AI düğmesini kullanabilirsiniz.",
+    },
+    { id: "faz1-buro-evraklari", label: "Arabuluculuk bürosu evrakları", kind: "section" },
     { id: "faz1-uyusmazlik-konusu", label: "Uyuşmazlık konusu", kind: "section" },
-    { id: "faz1-tur-tespiti", label: "Uyuşmazlık tür tespiti", kind: "section" },
-    { id: FAZ1_LAYERS[1].id, label: FAZ1_LAYERS[1].label, kind: "layer", hint: FAZ1_LAYERS[1].hint },
-    { id: "faz1-sure", label: "Dava şartı / ihtiyari ve yasal süre", kind: "section" },
-    { id: FAZ1_LAYERS[2].id, label: FAZ1_LAYERS[2].label, kind: "layer", hint: FAZ1_LAYERS[2].hint },
-    { id: "faz1-taraf-listesi", label: "Taraf ekleme, düzenleme ve davet", kind: "section" },
-    { id: FAZ1_LAYERS[3].id, label: FAZ1_LAYERS[3].label, kind: "layer", hint: FAZ1_LAYERS[3].hint },
-    { id: "faz1-belge-yukle", label: "Belge yükle", kind: "section" },
-    { id: "faz1-belgeler-liste", label: "Dosyadaki belgeler", kind: "section" },
+    { id: "faz1-uygunluk", label: "Arabuluculuğa uygun mu?", kind: "section" },
+    { id: "faz1-basvuru-turu", label: "Başvuru türü", kind: "section" },
+    { id: "faz1-ana-uzmanlik", label: "Ana uzmanlık", kind: "section" },
+    { id: "faz1-alt-uzmanlik", label: "Alt uzmanlık", kind: "section" },
+    { id: "faz1-sureler", label: "Süreler", kind: "section" },
+    { id: "faz1-taraflar", label: "Taraflar", kind: "section" },
+    { id: "faz1-surec-bilgilendirme", label: "Süreç bilgilendirme (dava şartı)", kind: "section" },
   ]);
 
 function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {
