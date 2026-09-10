@@ -330,3 +330,99 @@ describe("veritabanı alanı henüz yokken ekran SESSİZ DÜŞMEZ", () => {
     expect(MOTOR).toContain("veritabanı güncellemesi");
   });
 });
+
+/* ── EK (kurucu, 10.09.2026 akşam) — ÖLÇÜT 11 ve 12 ─────────────────────────
+   İlk rapordan sonra gelen üç madde: iki yanda da sınırsız taraf, her tarafta
+   elle vekil, ve davetin süreç bilgilendirmesinin ALTINA inmesi. */
+
+describe("ölçüt 11 — iki yanda taraf ekleme, her tarafta vekil", () => {
+  it("başvurucu tarafında da karşı tarafta da kendi 'Taraf ekle' düğmesi var", () => {
+    const bas = MOTOR.indexOf("function Phase2Parties");
+    const govde = MOTOR.slice(bas, MOTOR.indexOf("function TarafKutusu", bas));
+    expect(govde).toContain('rol: "applicant" as const, etiket: "Başvurucu tarafı"');
+    expect(govde).toContain('rol: "respondent" as const, etiket: "Karşı taraf"');
+    expect(govde).toContain("Taraf ekle");
+  });
+
+  it("sayı sınırı YOK — ekranda da böyle yazıyor", () => {
+    expect(MOTOR).toContain("sınır yok");
+    // Ekleme düğmesi taraf SAYISINA bakan bir koşulun içine alınmamalı.
+    const bas = MOTOR.indexOf("function Phase2Parties");
+    const govde = MOTOR.slice(bas, MOTOR.indexOf("function TarafKutusu", bas));
+    const dugme = govde.indexOf("Taraf ekle");
+    const oncesi = govde.slice(Math.max(0, dugme - 300), dugme);
+    expect(oncesi, "taraf sayısına sınır konmuş").not.toMatch(/parties\.length\s*[<>]=?\s*\d/);
+  });
+
+  it("her tarafın yanında 'Vekil ekle' var ve zorunlu değil", () => {
+    const bas = MOTOR.indexOf("function Phase2Parties");
+    const govde = MOTOR.slice(bas, MOTOR.indexOf("function TarafKutusu", bas));
+    expect(govde).toContain("Vekil ekle");
+    expect(govde).toContain("Vekili düzenle");
+    expect(govde).toContain("Vekil girilmedi");
+  });
+
+  it("vekâletnameden okunan vekil taraf eklenince alanlara yazılır", () => {
+    // Sunucu tarafı vekil alanlarını okuyor…
+    expect(DOLDUR).toContain("vekil_ad_soyad");
+    expect(DOLDUR).toContain("vekil_baro");
+    expect(DOLDUR).toContain("vekil_sicil_no");
+    // …ekran da onları taraf kaydına yazıyor.
+    const g = faz1Govdesi();
+    expect(g).toContain("vekil_ad_soyad: t.vekil_ad_soyad || null");
+  });
+
+  it("vekâletname 1.1'de sayılan evraklar arasında", () => {
+    expect(MOTOR).toContain("Vekille başvuruda vekâletname / yetki belgesi");
+  });
+});
+
+describe("ölçüt 12 — 1.9 süreç bilgilendirmesi, sonra 1.10 davet", () => {
+  it("1.10 adımı var ve 1.9'dan SONRA çiziliyor", () => {
+    const g = faz1Govdesi();
+    const dokuz = g.indexOf("<SurecBilgilendirmeAdimi");
+    const on = g.indexOf('no="1.10"');
+    expect(dokuz, "1.9 çizilmiyor").toBeGreaterThan(-1);
+    expect(on, "1.10 çizilmiyor").toBeGreaterThan(-1);
+    expect(on, "davet adımı süreç bilgilendirmesinin ÜSTÜNDE").toBeGreaterThan(dokuz);
+  });
+
+  it("sol dizinde de aynı sıra", () => {
+    const bas = MOTOR.indexOf("const FAZ1_MENU_ENTRIES");
+    const govde = MOTOR.slice(bas, MOTOR.indexOf("]);", bas));
+    expect(govde.indexOf('"faz1-davet"'))
+      .toBeGreaterThan(govde.indexOf('"faz1-surec-bilgilendirme"'));
+  });
+
+  it("davet 1.8'den ÇIKARILDI — taraflar adımında davet düğmesi yok", () => {
+    const g = faz1Govdesi();
+    const sekiz = g.indexOf('no="1.8"');
+    const sekizSon = g.indexOf("</Adim>", sekiz);
+    expect(g.slice(sekiz, sekizSon)).toContain('bolum="taraflar"');
+    // 1.10 davet bölümünü kullanır.
+    expect(g).toContain('bolum="davet"');
+  });
+
+  it("ihtiyaride 1.9 yok, 1.10 doğrudan gelir", () => {
+    const g = faz1Govdesi();
+    // 1.9 koşullu, 1.10 koşulsuz çizilir.
+    expect(g).toContain("{davaSarti && <SurecBilgilendirmeAdimi");
+    const on = g.indexOf('no="1.10"');
+    const oncesi = g.slice(Math.max(0, on - 400), on);
+    expect(oncesi, "1.10 dava şartı koşuluna bağlanmış").not.toMatch(/\{davaSarti && <Adim/);
+  });
+
+  it("bilgilendirme gitmediyse 1.10 KİLİTLENMEZ, italik uyarı çıkar", () => {
+    const g = faz1Govdesi();
+    expect(g).toContain("Süreç bilgilendirmesi henüz gönderilmedi.");
+    expect(g).toContain("DÜĞME KİLİTLENMEZ");
+    // Uyarı `davetUyarisi` ile geçer; `disabled` ile değil.
+    expect(g).toContain("davetUyarisi={davaSarti && !bilgilendirmeGonderildi");
+  });
+
+  it("'bilgilendirme gitti mi' TEK yerden okunur", () => {
+    const g = faz1Govdesi();
+    expect(g).toContain("const bilgilendirmeGonderildi = ");
+    expect((g.match(/bilgilendirmeGonderildi/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+});

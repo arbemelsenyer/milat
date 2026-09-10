@@ -334,7 +334,12 @@ function trErr(msg: string) {
     m.includes("not authorized") ||
     m.includes("42501")
   ) {
-    return "Bu işlem için yetkiniz yok. Sadece başvuru sahibi, atanmış arabulucu veya yönetici silebilir.";
+    /* ETİKET–İŞLEV UYUMSUZLUĞU DÜZELTİLDİ (10.09.2026, Aşama 1 canlı bulgusu).
+       Bu cümle her RLS hatasında dönüyor ama yalnız SİLMEDEN söz ediyordu.
+       Ön izlemede belge LİSTESİ okunamadığında ekranda "…silebilir" yazdı;
+       arabulucu silmeye çalışmamıştı. Cümle artık yaptığı işi anlatıyor:
+       kapı okumada da yazmada da aynı kapıdır. */
+    return "Bu işlem için yetkiniz yok. Bu dosyada yalnız başvuru sahibi, atanmış arabulucu veya yönetici işlem yapabilir.";
   }
   if (m.includes("jwt") || m.includes("not authenticated") || m.includes("invalid token")) {
     return "Oturumunuz sona ermiş olabilir. Lütfen tekrar giriş yapın.";
@@ -596,7 +601,7 @@ export default function MediationEngine() {
     setLoading(true);
     const { data, error } = await supabase
       .from("cases")
-      .select("id, user_id, title, application_no, uyap_no, dispute_type, dispute_subtype, status, current_phase, application_date, assigned_mediator_id, issue_description, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta, otomatik_akis")
+      .select("id, user_id, title, application_no, uyap_no, dispute_type, dispute_subtype, status, current_phase, application_date, assigned_mediator_id, issue_description, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta, otomatik_akis, arabuluculuga_uygunluk, uygunluk_gerekcesi, uygunluk_kaynaklari")
       .order("created_at", { ascending: false });
     if (error) toast({ title: "Yükleme hatası", description: trErr(error.message), variant: "destructive" });
     else setCases((data ?? []) as CaseRow[]);
@@ -606,7 +611,7 @@ export default function MediationEngine() {
   async function loadCase(id: string) {
     const { data, error } = await supabase
       .from("cases")
-      .select("id, user_id, title, application_no, uyap_no, dispute_type, dispute_subtype, status, current_phase, application_date, assigned_mediator_id, issue_description, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta, otomatik_akis")
+      .select("id, user_id, title, application_no, uyap_no, dispute_type, dispute_subtype, status, current_phase, application_date, assigned_mediator_id, issue_description, created_at, is_mandatory, legal_duration_days, extension_days, legal_basis, deadline_total, deadline_extended, extension_used, deadline_sources, deadline_conflict, deadline_conflict_note, deadline_detected_at, mediation_type, mahkeme_turu, sure_hafta, uzatma_hafta, otomatik_akis, arabuluculuga_uygunluk, uygunluk_gerekcesi, uygunluk_kaynaklari")
       .eq("id", id).maybeSingle();
     if (error) { toast({ title: "Başvuru yüklenemedi", description: trErr(error.message), variant: "destructive" }); return; }
     setActiveCase(data as CaseRow);
@@ -3038,6 +3043,13 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
   }
 
   const davaSarti = caseRow.mediation_type === "dava_sarti";
+  /* SÜREÇ BİLGİLENDİRMESİ GİTTİ Mİ — TEK KAYNAK.
+     Bugün HAYIR ve bunun sebebi teknik değil: 1.9'un metni kurucudan henüz
+     gelmedi, o yüzden gönderim düğmesi hiç açılmıyor (ürün tarafa gidecek ilk
+     bildirimin sözlerini kendi icat etmez). Metin geldiğinde gönderim kaydı
+     buradan okunacak; 1.10'daki uyarı ve ileride doğacak her okuyucu TEK bu
+     satırı okur, kendi kararını vermez. */
+  const bilgilendirmeGonderildi = false;
   const sureEtiketi = caseRow.mediation_type === "dava_sarti"
     ? "Dava şartı"
     : caseRow.mediation_type === "ihtiyari" ? "İhtiyari" : null;
@@ -3121,6 +3133,16 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
                           {t.ad} · {t.rol === "applicant" ? "Başvurucu" : t.rol === "respondent" ? "Karşı taraf" : "Üçüncü taraf"}
                           {t.eposta ? ` · ${t.eposta}` : ""}{t.telefon ? ` · ${t.telefon}` : ""}
                         </div>
+                        {/* Vekâletname/yetki belgesi yüklendiyse vekil buradan
+                            OTOMATİK dolar; taraf eklenince alanlara yazılır ve
+                            elle düzenlenebilir kalır (kurucu EK 1.8-b). */}
+                        {t.vekil_ad_soyad && (
+                          <div className="text-xs text-muted-foreground">
+                            Vekil: {t.vekil_ad_soyad}
+                            {t.vekil_baro ? ` · ${t.vekil_baro}` : ""}
+                            {t.vekil_sicil_no ? ` · sicil ${t.vekil_sicil_no}` : ""}
+                          </div>
+                        )}
                         <div className="text-xs italic text-muted-foreground">Kaynak: {t.kaynak}</div>
                         <Button size="sm" className="h-7 text-xs" disabled={taraflarBusy === i}
                           onClick={() => oneriTarafEkle(t, i)}>
@@ -3209,6 +3231,7 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
               isMediator={isMediator}
               userId={userId}
               bare
+              bolum="taraflar"
               onChanged={loadParties}
             />
             {parties.length > 0 && (
@@ -3223,6 +3246,36 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
 
           {/* ── 1.9 · SÜREÇ BİLGİLENDİRME — yalnız dava şartında ── */}
           {davaSarti && <SurecBilgilendirmeAdimi caseRow={caseRow} parties={parties} />}
+
+          {/* ── 1.10 · DAVET GÖNDER ──
+              Kurucu EK (10.09.2026): dava şartında taraflara davet, süreç
+              bilgilendirmesinden SONRA gider. Bu yüzden davet adımı 1.9'un
+              altındadır. İhtiyaride 1.9 hiç görünmez, 1.10 doğrudan gelir. */}
+          <Adim
+            no="1.10"
+            id="faz1-davet"
+            baslik="Davet gönder"
+            ustBilgi={davaSarti
+              ? "Dava şartında sıra: önce 1.9 süreç bilgilendirmesi, sonra davet."
+              : "İhtiyari arabuluculukta süreç bilgilendirmesi adımı yoktur; davet doğrudan gönderilir."}
+          >
+            <Phase2Parties
+              caseRow={caseRow}
+              isMediator={isMediator}
+              userId={userId}
+              bare
+              bolum="davet"
+              onChanged={loadParties}
+              davetUyarisi={davaSarti && !bilgilendirmeGonderildi ? (
+                /* DÜĞME KİLİTLENMEZ. Ürünün genel kuralı: sistem uyarır,
+                   arabulucu karar verir (Cowork'ün koyduğu madde, kurucu
+                   ekranda görüp itiraz edebilir). */
+                <p className="text-xs italic text-amber-600 dark:text-amber-400 leading-snug mb-2">
+                  Süreç bilgilendirmesi henüz gönderilmedi.
+                </p>
+              ) : null}
+            />
+          </Adim>
 
           {/* Ajan kontrol tercihi adım değildir; adımların sonunda kalır. */}
           <div className="rounded-lg border bg-card p-4 space-y-2">
@@ -4585,9 +4638,20 @@ function DisputeClassifierCard({
 // TARAFLAR bloğu. 14.08'den beri kendi aşaması yok: Aşama 1'in "TARAFLAR" katmanı
 // içinde bare=true ile çizilir (üst şerit ve "Aşamayı Tamamla" düğmesi olmadan).
 // Ekleme / düzenleme / silme / davet akışlarının hiçbiri değişmedi.
-function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onChanged }: {
+/* `bolum` (10.09.2026 · Aşama 1 EK): blok ikiye ayrıldı.
+     "taraflar" → 1.8: taraf ekleme/düzenleme/silme ve vekil. DAVET YOK.
+     "davet"    → 1.10: yalnız davet gönderme, link ve WhatsApp.
+     "hepsi"    → eski davranış, tek parça (varsayılan).
+   Sebep kurucu kararı: dava şartında taraflara davet gönderilmeden ÖNCE süreç
+   bilgilendirmesi gider. Bu yüzden davet adımı 1.9'un ALTINA indi.
+   İki parça ayrı bileşen örneğidir; davet durumu yalnız "davet" parçasında
+   tutulur, bu yüzden bölünme durum kaybına yol açmaz. */
+function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onChanged,
+  bolum = "hepsi", davetUyarisi }: {
   caseRow: CaseRow; isMediator: boolean; userId: string; onDone?: () => void;
   bare?: boolean; onChanged?: () => void;
+  bolum?: "hepsi" | "taraflar" | "davet";
+  davetUyarisi?: React.ReactNode;
 }) {
   const [parties, setParties] = useState<any[]>([]);
   const [draft, setDraft] = useState<PartyDraft | null>(null);
@@ -4863,10 +4927,43 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
           <span className="text-sm text-muted-foreground">
             {inviteSummary ? `Davet durumu: ${inviteSummary}` : ""}
           </span>
-          <Button onClick={() => setDraft(emptyParty(parties.length === 0 ? "applicant" : "respondent"))}>
-            <Plus className="h-4 w-4 mr-1" /> Taraf Ekle
-          </Button>
+          {bolum !== "taraflar" && bolum !== "davet" && (
+            <Button onClick={() => setDraft(emptyParty(parties.length === 0 ? "applicant" : "respondent"))}>
+              <Plus className="h-4 w-4 mr-1" /> Taraf Ekle
+            </Button>
+          )}
         </div>
+
+        {/* 1.10'da uyarı listenin ÜSTÜNDE durur; düğme kilitlenmez (kurucu kararı). */}
+        {bolum === "davet" && davetUyarisi}
+
+        {/* ── TARAF EKLEME İKİ YANDA DA VAR (kurucu EK, 10.09.2026) ──────────
+            Başvurucu tarafında da karşı tarafta da birden çok kişi/firma
+            girilebilir ve SINIR YOKTUR. Eskiden tek bir "Taraf Ekle" düğmesi
+            vardı ve rolü sırayla tahmin ediyordu (ilk taraf başvurucu, sonrası
+            karşı taraf); arabulucu ikinci bir başvurucu eklemek istediğinde
+            rolü elle düzeltmek zorundaydı. Artık her yanın kendi düğmesi var,
+            rol düğmeden gelir. */}
+        {bolum === "taraflar" && (
+          <div className="grid gap-2 sm:grid-cols-2 mb-4">
+            {([
+              { rol: "applicant" as const, etiket: "Başvurucu tarafı" },
+              { rol: "respondent" as const, etiket: "Karşı taraf" },
+            ]).map((y) => (
+              <div key={y.rol} className="rounded-md border border-dashed p-2 space-y-1">
+                <div className="text-xs font-medium">{y.etiket}</div>
+                <div className="text-xs text-muted-foreground">
+                  {parties.filter((p: any) => p.party_role === y.rol).length} kayıt · sınır yok
+                </div>
+                <Button size="sm" variant="outline" className="h-7 text-xs"
+                  onClick={() => setDraft(emptyParty(y.rol))}>
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Taraf ekle
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {loading ? <Loader2 className="animate-spin" /> : parties.length === 0 ? (
           <p className="text-muted-foreground">Henüz taraf eklenmedi.</p>
         ) : (
@@ -4881,12 +4978,21 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
                       {" · "}{p.party_type === "corporate" ? "Kurumsal" : "Bireysel"}
                       {" · "}{p.email || "e-posta yok"}
                     </div>
+                    {/* Vekil varsa GÖRÜNÜR: arabulucu kimin vekille temsil
+                        edildiğini listeye bakarak görsün, kart açmasın. */}
+                    <div className="text-xs text-muted-foreground break-words">
+                      {p.vekil_ad_soyad
+                        ? <>Vekil: {p.vekil_ad_soyad}{p.vekil_baro ? ` · ${p.vekil_baro}` : ""}{p.vekil_sicil_no ? ` · sicil ${p.vekil_sicil_no}` : ""}</>
+                        : <span className="italic">Vekil girilmedi</span>}
+                    </div>
                   </div>
                   {/* Düğme satırı dar sütunda (Aşama 1'in iki sütunlu düzeni ~320px)
                       alt satıra iner: flex-wrap + min-w-0, düğmelerde metin sarabilir.
                       Sabit tek satır kaldığında sayfa yana taşıyordu. */}
                   <div className="flex flex-wrap items-center justify-end gap-1 min-w-0 max-w-full">
-                    {p.email && p.invite_status !== "accepted" && (
+                    {/* DAVET YALNIZ 1.10'DA (kurucu EK): dava şartında taraflara
+                        davet, süreç bilgilendirmesinden SONRA gider. */}
+                    {bolum !== "taraflar" && p.email && p.invite_status !== "accepted" && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -4899,7 +5005,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
                         {inviteUrls[p.id] ? "Yeniden gönder" : "Davet gönder"}
                       </Button>
                     )}
-                    {!p.email && p.invite_status !== "accepted" && (
+                    {bolum !== "taraflar" && !p.email && p.invite_status !== "accepted" && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -4912,7 +5018,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
                         Davet Linki Oluştur
                       </Button>
                     )}
-                    {inviteUrls[p.id] && revealedId !== p.id && (
+                    {bolum !== "taraflar" && inviteUrls[p.id] && revealedId !== p.id && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -4923,21 +5029,41 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
                         Davet Linkini Göster
                       </Button>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="max-w-full whitespace-normal text-left h-auto py-1.5"
-                      onClick={() => {
-                        setEditing({ ...p });
-                        setVekilEditOpen(!!(p.vekil_ad_soyad || p.vekil_baro || p.vekil_sicil_no));
-                      }}
-                      title="Düzenle"
-                    >
-                      <Pencil className="h-4 w-4 mr-1 shrink-0" /> Düzenle
-                    </Button>
-                    <Button variant="ghost" size="sm" className="shrink-0" onClick={() => remove(p.id)} title="Sil">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {bolum !== "davet" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="max-w-full whitespace-normal text-left h-auto py-1.5"
+                        onClick={() => {
+                          setEditing({ ...p });
+                          setVekilEditOpen(!!(p.vekil_ad_soyad || p.vekil_baro || p.vekil_sicil_no));
+                        }}
+                        title="Düzenle"
+                      >
+                        <Pencil className="h-4 w-4 mr-1 shrink-0" /> Düzenle
+                      </Button>
+                    )}
+                    {/* VEKİL (kurucu EK): her tarafın vekili olmayabilir, zorunlu
+                        değildir. 1.1'de vekâletname yüklendiyse alanlar oradan
+                        dolar; dolmadıysa buradan elle girilir. Düğmenin adı ne
+                        yaptığını söyler: vekil varsa "düzenle", yoksa "ekle". */}
+                    {bolum !== "davet" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="max-w-full whitespace-normal text-left h-auto py-1.5"
+                        onClick={() => { setEditing({ ...p }); setVekilEditOpen(true); }}
+                        title={p.vekil_ad_soyad ? "Vekil bilgisini düzenle" : "Vekil ekle"}
+                      >
+                        <Plus className="h-4 w-4 mr-1 shrink-0" />
+                        {p.vekil_ad_soyad ? "Vekili düzenle" : "Vekil ekle"}
+                      </Button>
+                    )}
+                    {bolum !== "davet" && (
+                      <Button variant="ghost" size="sm" className="shrink-0" onClick={() => remove(p.id)} title="Sil">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
                 {revealedId === p.id && inviteUrls[p.id] && (
@@ -4977,7 +5103,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
       </TarafKutusu>
       </motion.div>
 
-      {invitePrompt && (
+      {bolum !== "taraflar" && invitePrompt && (
         <motion.div variants={itemVariants}>
         <Card className="p-6 space-y-3 border-accent/40">
           <div>
@@ -5422,6 +5548,7 @@ const FAZ1_MENU_ENTRIES: { id: string; label: string; kind: "layer" | "section";
     { id: "faz1-sureler", label: "Süreler", kind: "section" },
     { id: "faz1-taraflar", label: "Taraflar", kind: "section" },
     { id: "faz1-surec-bilgilendirme", label: "Süreç bilgilendirme (dava şartı)", kind: "section" },
+    { id: "faz1-davet", label: "Davet gönder", kind: "section" },
   ]);
 
 function Phase3PartyAnalysis({ caseRow, userId, isMediator, reload, jump }: {

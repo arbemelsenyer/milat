@@ -1703,6 +1703,7 @@ export type Database = {
           email_confirmed_at: string | null
           first_name: string | null
           full_name: string | null
+          gonderim_kanallari: string[]
           gsm: string | null
           hatirlatma_izni: boolean
           id: string
@@ -1740,6 +1741,7 @@ export type Database = {
           email_confirmed_at?: string | null
           first_name?: string | null
           full_name?: string | null
+          gonderim_kanallari?: string[]
           gsm?: string | null
           hatirlatma_izni?: boolean
           id?: string
@@ -1777,6 +1779,7 @@ export type Database = {
           email_confirmed_at?: string | null
           first_name?: string | null
           full_name?: string | null
+          gonderim_kanallari?: string[]
           gsm?: string | null
           hatirlatma_izni?: boolean
           id?: string
@@ -2059,6 +2062,7 @@ export type Database = {
           ai_summary: Json | null
           application_date: string
           application_no: string | null
+          arabuluculuga_uygunluk: string | null
           assigned_expert_id: string | null
           assigned_mediator_id: string | null
           attempted_resolution: string | null
@@ -2101,6 +2105,8 @@ export type Database = {
           title: string | null
           ucret_sozlesmesi: boolean
           updated_at: string
+          uygunluk_gerekcesi: string | null
+          uygunluk_kaynaklari: Json | null
           user_id: string
           uyap_no: string | null
           uzatma_hafta: number | null
@@ -2114,6 +2120,7 @@ export type Database = {
           ai_summary?: Json | null
           application_date?: string
           application_no?: string | null
+          arabuluculuga_uygunluk?: string | null
           assigned_expert_id?: string | null
           assigned_mediator_id?: string | null
           attempted_resolution?: string | null
@@ -2156,6 +2163,8 @@ export type Database = {
           title?: string | null
           ucret_sozlesmesi?: boolean
           updated_at?: string
+          uygunluk_gerekcesi?: string | null
+          uygunluk_kaynaklari?: Json | null
           user_id?: string
           uyap_no?: string | null
           uzatma_hafta?: number | null
@@ -2169,6 +2178,7 @@ export type Database = {
           ai_summary?: Json | null
           application_date?: string
           application_no?: string | null
+          arabuluculuga_uygunluk?: string | null
           assigned_expert_id?: string | null
           assigned_mediator_id?: string | null
           attempted_resolution?: string | null
@@ -2211,6 +2221,8 @@ export type Database = {
           title?: string | null
           ucret_sozlesmesi?: boolean
           updated_at?: string
+          uygunluk_gerekcesi?: string | null
+          uygunluk_kaynaklari?: Json | null
           user_id?: string
           uyap_no?: string | null
           uzatma_hafta?: number | null
