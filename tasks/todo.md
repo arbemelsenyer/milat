@@ -1,5 +1,36 @@
 ## Nerede kaldık
 
+### ▶ OLMADI-2 DÜZELTİLDİ — ÖLÇÜT 14 (10.09.2026 gece)
+Kurucu: "karşı taraf 1.8 ve 1.9'da görünüyor ama 1.10 Davet gönder'de yok."
+
+**Kök neden:** 1.8 ile 1.10 aynı bileşenin **iki ayrı örneği** ve her biri taraf
+listesini kendi `load()`u ile okuyor. 1.8'den eklenen taraftan 1.10'un haberi
+olmuyordu; ancak sayfa yenilenince görünüyordu. Bu, bu üründe tekrar eden
+**"kardeş yol sessiz kaldı"** kusur sınıfının aynısıdır (H-31'deki kolların
+kapanışı görmemesiyle aynı aile).
+
+**Yapılan (commit `1e1aaca`, test 534/534):**
+· Tazeleme sayacı: ana ekran taraf listesini her okuduğunda sayacı artırır,
+  1.10 örneği listeyi yeniden okur.
+· **Sonsuz döngü tuzağı görüldü ve kapatıldı:** 1.10'a `onChanged` verilseydi
+  kendi okuması sayacı besleyip başa dönerdi. Bilerek verilmedi, gerekçesi
+  koda yazıldı.
+· 1.10 listesi yana göre gruplu: Başvurucu tarafı / Karşı taraf (/ Üçüncü taraf
+  yalnız varsa). **Boş yan da başlığıyla durur** ve "Bu yanda henüz taraf yok"
+  der — eksik yan sessiz kalmaz.
+· Her tarafın **kendi** davet düğmesi var. Daveti kabul etmiş taraf da düğmesiz
+  kalmıyor: yanında "Daveti kabul etti" yazar, düğme "Yeniden gönder" olur.
+· 1.8'de davet düğmesi hâlâ yok; 1.9 → 1.10 sırası bozulmadı.
+
+**CANLI ÖN İZLEMEDE DOĞRULANDI (commit `1e1aaca`, dosya MP-2026-1020):**
+1.10'da iki yan da görünüyor — "Başvurucu tarafı · 1 taraf" (A · "Davet gönder")
+ve "Karşı taraf · 1 taraf" (H H · e-postası yok → "Davet Linki Oluştur").
+Her tarafın kendi düğmesi var; "Süreç bilgilendirmesi henüz gönderilmedi."
+uyarısı duruyor ve hiçbir düğme kilitli değil.
+Ekran görüntüleri: `ASAMA-1-EKRANLARsama1-adim110-01..03.jpg`.
+
+---
+
 ### ▶ AŞAMA 1 + EK BİTTİ — KURUCU "TAMAM" BEKLENİYOR (10.09.2026 akşam)
 Yayın YAPILMADI, edge deploy YAPILMADI (CLAUDE.md §11-C). `main`'e push edildi.
 
