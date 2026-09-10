@@ -12,17 +12,27 @@ import { anaAjanaBildir, eksigiSor, etiketleriAyir, etiketiKoruyarakSuz } from "
    Aynı çözüm 23.08'de `akis-yurut/hata-metni.ts`te uygulanmıştı; bu geçit
    atlanmıştı. */
 
-/** `ajan_gorevleri` insert'ini yakalayan asgari sahte istemci. */
-function sahteAdmin() {
+/** `ajan_gorevleri` insert'ini yakalayan asgari sahte istemci.
+ *  `cases` okuması 10.09.2026'da eklendi: `anaAjanaBildir` artık yazmadan önce
+ *  kapanış kapısına bakıyor (HAT H-31). Sahte istemci AÇIK bir dosya döndürür;
+ *  kapalı dosya davranışı `tests/kapanmis-dosya-eposta.test.ts`te sınanır. */
+function sahteAdmin(dosya: { status?: string | null; closed_at?: string | null } = { status: "active", closed_at: null }) {
   const yazilanlar: Record<string, unknown>[] = [];
   const admin = {
-    from() {
+    from(tablo: string) {
+      if (tablo === "cases") {
+        return {
+          select: () => ({
+            eq: () => ({ maybeSingle: async () => ({ data: dosya, error: null }) }),
+          }),
+        } as any;
+      }
       return {
         insert: async (govde: Record<string, unknown>) => {
           yazilanlar.push(govde);
           return { error: null };
         },
-      };
+      } as any;
     },
   };
   return { admin, yazilanlar };

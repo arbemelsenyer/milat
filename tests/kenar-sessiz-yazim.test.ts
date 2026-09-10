@@ -445,18 +445,22 @@ describe("kenar işlevlerinde ürün yazımı sessiz kalmıyor", () => {
     const g = oku("ajan-nobetci");
     expect(g, "yürütücüde kapalı dosya denetimi yok").toContain("dosyaKapali");
     expect(g).toContain("Dosya kapandığı için yürütülmedi");
+    /* 10.09.2026 (HAT H-31): kapanis tanimi artik her kolda ayri ayri YAZILMAZ;
+       tek kaynak `_shared/dosya-kapanis-kapisi.ts` icindeki `dosyaKapali`dir.
+       Yurutucudeki yerel degisken `buDosyaKapali` adini aldi (tur dongusundeki
+       kapiyla ayni ad, ayni anlam). Bu tezgah artik ADI degil KAPIYI arar. */
     // Denetim, gorev tipi suzgecinden SONRA ama yurutmeden ONCE olmali.
-    const kapaliIdx = g.indexOf("if (dosyaKapali)");
+    const kapaliIdx = g.indexOf("if (buDosyaKapali) {");
     const yurutIdx = g.indexOf("let tarafSonuc: TeklifSonuc | null = null;");
     expect(kapaliIdx, "kapalı denetimi yok").toBeGreaterThan(-1);
     expect(yurutIdx, "yürütme kapalı denetiminden ÖNCE").toBeGreaterThan(kapaliIdx);
     // Gorev silinmez, kapatilir: sebep kayda gecer.
     expect(g.slice(kapaliIdx, yurutIdx)).toContain('durum: "atlandi"');
     expect(g.slice(kapaliIdx, yurutIdx)).toContain("kapaliErr");
-    /* Kollardaki mevcut `kapali` denetimleri bozulmamali.
-       27.08 (HAT H-18): esik 4'ten 3'e indi — kayit silme kolu KALDIRILDI ve
-       denetimlerinden biri onunla birlikte gitti. Kalan uc kol duruyor. */
-    expect(g.match(/status === "agreed" \|\| dosya\?\.status === "failed"/g)?.length ?? 0)
+    /* Kollardaki `kapali` denetimleri bozulmamali. Eskiden her kol tanimi elle
+       yaziyordu ve bu tezgah o yazimlari sayiyordu; H-31'de hepsi tek cagriya
+       indi, dolayisiyla sayim `dosyaKapali(dosya)` cagrilari uzerinden yapilir. */
+    expect(g.match(/dosyaKapali\(dosya\)/g)?.length ?? 0)
       .toBeGreaterThanOrEqual(3);
   });
 

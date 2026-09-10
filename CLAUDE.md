@@ -396,6 +396,35 @@ kusur varsa düzelt → tekrar push → tekrar deploy → tekrar test →
 
 ---
 
+## 11-C. AŞAMA KAPISI — KURUCU "TAMAM" DEMEDEN CANLI DEĞİŞMEZ
+
+Kurucu kararı (10.09.2026). **§11-B'nin "sormadan publish" yetkisi yalnız kurucu
+"tamam" dedikten SONRAKİ publish için geçerlidir.** Kaynak ve tam metin:
+`tasks/PILOT-ASAMA-1-DOSYA-KURULUMU.md` §0.
+
+Her aşama şu sırayla biter:
+
+1. Code aşamayı yapar, tezgâhla test eder (`npm run test` · `tsc --noEmit` · `npm run build` yeşil).
+2. Code **`main`'e push eder** → Lovable ön izlemesi yenilenir.
+   **Publish YAPILMAZ, edge function deploy YAPILMAZ.** `medipact-ai.lovable.app`
+   kurucu "tamam" demeden değişmez.
+3. Code kurucuya **düz Türkçe, en fazla 10 satır** rapor yazar (terminale +
+   `tasks/todo.md` "Nerede kaldık" altına): ne değişti (kullanıcı diliyle, teknik
+   terim yok) · test sonucu (kaç/kaç) · ekran görüntüleri nerede · ön izleme
+   bağlantısı · kabul ölçütleri madde madde · "tamam mı?".
+4. Her değişen ekranın **masaüstü ve telefon** görünümü PNG olarak
+   `C:\Users\ASUS\Desktop\medipact claude\ASAMA-<n>-EKRANLAR\` klasörüne kaydedilir
+   (klasör yoksa açılır).
+5. Kurucu **"tamam"** der → Code publish + gereken edge function deploy'unu yapar →
+   canlı doğrulama → aşama kapanır. Kurucu "olmadı" derse: Code düzeltir, 2'ye döner.
+6. **Kurucu onaylamadan hiçbir öneri koda girmez.** Code'un kendi fikri varsa
+   `tasks/HAT.md`ye "ÖNERİ" yazar, uygulamaz.
+
+Aşama aşama gidilir; bir aşama kapanmadan ötekine geçilmez. Bu kapıda beklemek
+§5-A ihlali değildir — durma sebebi §5'in birinci maddesidir (Human Gate).
+
+---
+
 ## 12. SECRET VE ENV GÜVENLİĞİ
 
 - Secret, API key, token, servis anahtarı **koda gömülmez**. Yalnızca env üzerinden okunur.

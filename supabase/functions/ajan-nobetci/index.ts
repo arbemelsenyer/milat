@@ -8,6 +8,12 @@
 // Güvenlik deseni check-new-tariff ile aynı: x-cron-secret veya admin JWT; yoksa 401.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { sinirdanGecir, anaAjanaBildir, etiketleriAyir } from "../_shared/anlatim.ts";
+/* KAPANIŞ KAPISI TEK KAYNAKTAN OKUNUR (H-31). Kapanış tanımı bu dosyada
+   TEKRAR YAZILMAZ; kolların hepsi `dosyaKapali`yı çağırır. */
+import {
+  dosyaKapali, acikDosyalar, HATIRLATMA_UST_SINIRI, hatirlatmaHakkiVar,
+  HATIRLATMA_TUKENDI_DAMGASI,
+} from "../_shared/dosya-kapanis-kapisi.ts";
 
 /* ── İLETİŞİM TERCİHİ SÜZGECİ (İBA 1.5, 1. tur) ───────────────────────────────
    Taraf kendi ekranından bildirim sıklığını ve sessiz saatlerini belirler
@@ -171,7 +177,9 @@ async function gorevEtiketiVarMi(admin: any, caseId: string, gorevTipi: string, 
 
 async function gorevAc(
   admin: any, caseId: string, gorevTipi: string, etiket: string, aciklama: string,
-  opts?: { durum?: string; hedefPartyId?: string | null },
+  /** `kapanistaIzinli`: kapanmış dosyada da açılabilen görev. Tek kullanıcısı
+   *  C4 kapanış hatırlatmasıdır — bkz. `_shared/dosya-kapanis-kapisi.ts`. */
+  opts?: { durum?: string; hedefPartyId?: string | null; kapanistaIzinli?: boolean },
 ): Promise<{ acildi: boolean; sebep?: string }> {
   if (await gorevEtiketiVarMi(admin, caseId, gorevTipi, etiket)) {
     return { acildi: false, sebep: `${gorevTipi} görevi zaten açılmış (${etiket})` };
@@ -187,6 +195,7 @@ async function gorevAc(
     kaynak: "nobetci",
     bekleyen: (opts?.durum ?? "bekliyor") === "onay_bekliyor" ? "arabulucu_onayi" : null,
     durum: opts?.durum ?? "bekliyor",
+    kapanistaIzinli: opts?.kapanistaIzinli ?? false,
   });
   if (!r.yazildi) return { acildi: false, sebep: `görev yazılamadı: ${r.sebep}` };
   return { acildi: true };
@@ -822,7 +831,7 @@ async function kapanisKollari(admin: any, dosya: any): Promise<{ acilan: number;
 
   // Son aşamada üç zorunlu insan noktası: tutanağın imzaya sunulması, sonuç kaydı,
   // dosyanın kapatılması. Ajan hiçbirini tek başına yapmaz.
-  const kapali = dosya?.status === "agreed" || dosya?.status === "failed";
+  const kapali = dosyaKapali(dosya);
   if (asama >= 7 && !kapali) {
     for (const [etiket, aciklama, baslik] of [
       ["[onay:tutanak_imza]", "Kapanış belgesi taslağı hazır — imzaya sunulması arabulucudadır", "Tutanak imzaya hazır"],
@@ -1249,6 +1258,32 @@ async function soruHatirlatmaKollari(
 
     if (durum !== "bekliyor") continue;
 
+    /* ── HATIRLATMA ÜST SINIRI (H-31 · CEVAP 07.09.2026) ────────────────────
+       ESKİDEN ÜST SINIR YOKTU: cevapsız bir soru iki günde bir SONSUZA KADAR
+       hatırlatılıyordu. Canlıda bazı sorular 9. hatırlatmaya ulaşmıştı ve en
+       eskisi 19.08 tarihliydi — 18 gün boyunca taraflara e-posta gitti.
+       Yeni kural: en fazla `HATIRLATMA_UST_SINIRI` (3) hatırlatma; sonra ajan
+       SUSAR. Soru silinmez, kapatılmaz — `sonuc` alanına "cevapsız kaldı"
+       damgası düşer ve arabulucu dosya ekranında bunu görür. Sayı üründe tek
+       yerden okunur (`_shared/dosya-kapanis-kapisi.ts`); pilotta ölçülüp
+       değişirse tek satır değişir. */
+    const yapilanHatirlatma = hatirlatmaSayisi(soru.sonuc);
+    if (!hatirlatmaHakkiVar(yapilanHatirlatma)) {
+      if (!String(soru.sonuc ?? "").includes(HATIRLATMA_TUKENDI_DAMGASI)) {
+        /* Damga BİR KEZ yazılır. Sessizce düşerse her turda yeniden denenir
+           ama e-posta yine çıkmaz — kapı sayıya bakar, damgaya değil. */
+        const { error: damgaErr } = await admin.from("ajan_gorevleri")
+          .update({ sonuc: `${metin(soru.sonuc)} · ${HATIRLATMA_TUKENDI_DAMGASI}`.trim().slice(0, 500) })
+          .eq("id", soru.id);
+        if (damgaErr) {
+          console.error(`[ajan-nobetci] "cevapsız kaldı" damgası yazılamadı (${soru.id}): ${damgaErr.message}`);
+          sebepler.push(`"cevapsız kaldı" damgası yazılamadı (${soru.id})`);
+        }
+      }
+      sebepler.push(`soru hatırlatılmadı: ${HATIRLATMA_UST_SINIRI} hatırlatma üst sınırına ulaşıldı (${soru.id})`);
+      continue;
+    }
+
     /* İlk 24 saatte günde bir, sonrasında iki günde bir. Sayaç ve son zaman
        görevin sonuc alanında durur; ayrı bir tablo açılmaz. */
     const acilis = new Date(String(soru.created_at ?? "")).getTime();
@@ -1257,7 +1292,7 @@ async function soruHatirlatmaKollari(
     const son = sonHatirlatmaZamani(soru.sonuc) ?? acilis;
     if (!Number.isFinite(son) || simdi - son < araSaat * 3_600_000) continue;
 
-    const sayi = hatirlatmaSayisi(soru.sonuc) + 1;
+    const sayi = yapilanHatirlatma + 1;
     /* ONARIM (24.08.2026) — ETİKET TEMİZLİĞİ SAYIYA DEĞİL, TÜKENMEYE DAYANIR.
        Eskiden baştaki etiket TAM İKİ KEZ siliniyordu. Ama gerekçe artık üç
        etiketle başlıyor: `[kaynak:…][bekleyen:…] [eksik:…]` (ve bazen
@@ -1700,7 +1735,7 @@ async function kapanisHatirlatma(admin: any, dosya: any): Promise<{ hatirlatilan
   const sebepler: string[] = [];
   let hatirlatilan = 0;
   try {
-    const kapali = String(dosya?.status ?? "") === "closed" || !!dosya?.closed_at;
+    const kapali = dosyaKapali(dosya);
     if (!kapali) return { hatirlatilan, sebepler };
 
     const { data: kayit } = await admin.from("dosya_kapanis")
@@ -1722,7 +1757,10 @@ async function kapanisHatirlatma(admin: any, dosya: any): Promise<{ hatirlatilan
     // Günde bir: aynı konuda bekleyen satır varsa yeniden yazılmaz.
     const bugun = new Date().toISOString().slice(0, 10);
     const r = await gorevAc(
-      admin, dosya.id, "arabulucu_onayi", `[kapanis:${bugun}]`, mesaj, { durum: "bekliyor" },
+      admin, dosya.id, "arabulucu_onayi", `[kapanis:${bugun}]`, mesaj,
+      /* Kapanış kapısının TEK istisnası: bu kol yalnız kapanmış dosyada
+         anlamlıdır ve arabulucuya yazar, tarafa e-posta göndermez. */
+      { durum: "bekliyor", kapanistaIzinli: true },
     );
     if (r.acildi) hatirlatilan++;
     else if (r.sebep && !r.sebep.includes("zaten açılmış")) sebepler.push(r.sebep);
@@ -1845,7 +1883,7 @@ async function katilimCevaplariniIsle(admin: any, dosya: any, taraflar: any[]): 
 // 'ek_oturum_gerekli_mi': yapılmış oturum varken dosya kapanmadıysa arabulucuya sorulur.
 async function ekOturumSorusuAc(admin: any, dosya: any): Promise<{ acilan: number; sebepler: string[] }> {
   const sebepler: string[] = [];
-  const kapali = dosya?.status === "agreed" || dosya?.status === "failed";
+  const kapali = dosyaKapali(dosya);
   if (kapali) return { acilan: 0, sebepler: ["ek oturum sorulmadı: dosya kapanmış"] };
 
   const { data: yapilanlar, error } = await admin.from("case_sessions")
@@ -3048,7 +3086,23 @@ Deno.serve(async (req) => {
     // ADİL SIRA (16.08): otomatik koşum bütçesi hep aynı dosyaya gitmesin diye
     // dosyalar, en son otomatik koşum zamanına göre sıralanır — hiç koşulmamış
     // dosya başa gelir. Diğer kolların mantığı değişmez, yalnız işlem sırası.
-    const dosyaListesi = [...((dosyalar ?? []) as any[])];
+    /* ── KAPANIŞ KAPISI (H-31) ─────────────────────────────────────────────
+       `otomatik_akis` tek başına yeterli DEĞİLDİR: dosya kapanınca bu bayrak
+       kendiliğinden inmiyor. Canlıda kapanmış dört dosya açık bayrakla kaldı;
+       hatırlatma kolu 18 gün boyunca taraflara e-posta gönderdi ve öteki kollar
+       her 3 dakikada bir yürütülemeyecek görev açtı (4.841 satır).
+       Kapanmış dosya sayımı burada çıkarılır; kolların çalıştırılması aşağıdaki
+       döngüde `buDosyaKapali` kapısına bağlanır. Kapanış tanımı TEK YERDEDİR
+       (`_shared/dosya-kapanis-kapisi.ts`).
+       Süzgeç neden SORGUDA değil: PostgREST'te `status` NULL olan satır
+       `not.in` süzgecinden de düşerdi; türü belirsiz AÇIK dosyalar sessizce
+       tur dışı kalırdı. Sessiz düşme, gürültülü hatadan pahalıdır. */
+    const hamListe = ((dosyalar ?? []) as any[]);
+    const kapananDosya = hamListe.length - acikDosyalar(hamListe).length;
+    if (kapananDosya > 0) {
+      console.log(`[ajan-nobetci] ${kapananDosya} kapanmış dosya kapanış moduna alındı (otomatik_akis hâlâ açık)`);
+    }
+    const dosyaListesi = [...hamListe];
     try {
       const { data: izSatirlari } = await admin.from("ajan_kosum_izi")
         .select("case_id, kosum_zamani").limit(2000);
@@ -3075,7 +3129,21 @@ Deno.serve(async (req) => {
         buDosyaSebepleri.push({ zaman: new Date().toISOString(), sebep: s });
         atlamaSebepleri.push(`${dosya.id}: ${s}`);
       };
+      /* ── KAPANIŞ KAPISI (H-31) — KAPANMIŞ DOSYADA KOLLAR ÇALIŞMAZ ─────────
+         Kapanmış dosyada aşağıdaki kolların HİÇBİRİ koşmaz: taraf hatırlatması
+         gönderen kol da, yürütülemeyecek görev açan kollar da. Kapanmış dosya
+         için tur boyunca YALNIZ iki şey yapılır:
+           1. `kapanisHatirlatma` (C4) — arabulucuya, panoya, e-postasız. Bu kol
+              zaten SADECE kapanmış dosyada anlamlıdır; kapı onu kesseydi
+              kapanış adımları (paket · silme) sessizce hatırlatılmaz olurdu.
+           2. Bayat 'bekliyor' görevlerin kapatılması — aşağıdaki yürütücü
+              döngüsü onları "Dosya kapandığı için yürütülmedi" diye kapatır,
+              böylece kuyruk temizlenir ve çark durur.
+         Kural (kurucu, 06.09.2026): kapanmış dosyadan hiçbir koşulda taraflara
+         ileti çıkmaz. */
+      const buDosyaKapali = dosyaKapali(dosya);
       try {
+       if (!buDosyaKapali) {
         // Kollar görev listesi okunmadan ÖNCE çalışır ki açtıkları görev aynı turda işlensin.
         const analizGorev = await analizGoreviAc(admin, dosya);
         if (analizGorev.acildi) yeniAnalizGorevi++;
@@ -3161,10 +3229,15 @@ Deno.serve(async (req) => {
         const aliskanlikKol = await aliskanlikKollari(admin, dosya);
         aliskanlikKol.sebepler.forEach(sebepEkle);
 
+       } // ← kapanış kapısı: yukarıdaki kolların hepsi yalnız AÇIK dosyada koşar.
+
+        /* C4 KAPANIŞ HATIRLATMASI — kapının bilinçli istisnası. Kendi içinde
+           zaten "kapanmadıysa çık" der; kapanmış dosyada koşması gerekir. */
         const kapanisKol = await kapanisHatirlatma(admin, dosya);
         kapanisHatirlatildi += kapanisKol.hatirlatilan;
         kapanisKol.sebepler.forEach(sebepEkle);
 
+       if (!buDosyaKapali) {
         // ── TUR C-2: kör teklif v2 — koşullu aralık / braketleme ──
         const braketKol = await braketKollari(admin, dosya, taraflar);
         braketGirildi += braketKol.braket_girildi;
@@ -3192,6 +3265,7 @@ Deno.serve(async (req) => {
         otomatikAtlandi += otoKol.atlandi;
         otomatikHata += otoKol.hata;
         otoKol.sebepler.forEach(sebepEkle);
+       } // ← kapanış kapısının ikinci bölümünün sonu.
 
         // YALNIZ durum='bekliyor' görevler yürütülür. 'onay_bekliyor' satırları
         // arabulucunundur — ajan bunlara hiçbir koşulda dokunmaz.
@@ -3221,12 +3295,10 @@ Deno.serve(async (req) => {
            Akış açıkken kapanan bir dosyada aynı görev, ANLAŞMASI BİTMİŞ bir
            uyuşmazlık için taraflara randevu teklif ederdi.
            Görev silinmez, kapatılır: sebebi kayda geçer. */
-        const dosyaKapali = dosya?.status === "agreed" || dosya?.status === "failed"
-          || !!dosya?.closed_at;
         for (const gorev of (gorevler ?? []) as any[]) {
           // Tanınmayan görev tipine dokunulmaz: 'bekliyor' kalır.
           if (!YURUTULEN_TIPLER.includes(gorev.gorev_tipi)) continue;
-          if (dosyaKapali) {
+          if (buDosyaKapali) {
             const { error: kapaliErr } = await admin.from("ajan_gorevleri")
               .update({ durum: "atlandi", sonuc: "Dosya kapandığı için yürütülmedi" })
               .eq("id", gorev.id);

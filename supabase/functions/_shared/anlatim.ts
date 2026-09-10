@@ -30,6 +30,8 @@
 // ajanına aittir (tarafa_gorunur=true + party_id). Masa ajanının anlatımı
 // tarafa açılmaz; bu bayrak çağıran fonksiyon açıkça istemedikçe DEĞİŞTİRİLMEZ.
 
+import { dosyaKapali } from "./dosya-kapanis-kapisi.ts";
+
 export type AnlatimSahibi = {
   case_id: string;
   agent_type: string;
@@ -1381,9 +1383,39 @@ export async function anaAjanaBildir(
     /** Ne bekleniyor: "arabulucu_onayi" · "taraf_cevabi" · "" (bekleyen yok). */
     bekleyen?: string | null;
     durum?: string;
+    /** Kapanmış dosyada da yazılmasına izin verilen görev (yalnız kapanış
+     *  adımlarını hatırlatan kol). Varsayılan `false`: kapanmış dosyaya görev
+     *  AÇILMAZ. Bkz. `dosya-kapanis-kapisi.ts` ve HAT H-31. */
+    kapanistaIzinli?: boolean;
   },
 ): Promise<{ yazildi: boolean; sebep: string }> {
   try {
+    /* ── KAPANIŞ KAPISI (H-31) — GÖREVİ AÇAN KOL DA KAPIYA BAKAR ────────────
+       Kusur şuydu: kapanış kontrolü YALNIZ görevi YÜRÜTEN yolda vardı; görev
+       AÇAN kollar kapıyı hiç görmüyordu. Sonuç, canlıda `MP-2026-1019`
+       dosyasında 4.841 satırlık boşa dönen görev çarkı oldu (nöbetçi her 3
+       dakikada bir açıyor, yürütücü her seferinde "dosya kapandı" deyip
+       atlıyordu). Görev yazımının TEK geçidi burasıdır; kapı buraya konunca
+       ürünün bütün kolları için birden kapanır.
+       FAIL-OPEN: dosya okunamazsa yazıma izin verilir — yürütücüdeki kapı
+       ikinci savunma hattı olarak yerinde durur ve bir sorgu arızası bütün
+       görev yazımını susturmaz. */
+    if (!o.kapanistaIzinli) {
+      let kapali = false;
+      try {
+        const { data: dosyaSatiri, error: dosyaHata } = await admin.from("cases")
+          .select("status, closed_at").eq("id", o.case_id).maybeSingle();
+        if (dosyaHata) {
+          console.error(`[anaAjanaBildir] kapanış kapısı okunamadı (${o.case_id}): ${dosyaHata.message}`);
+        } else {
+          kapali = dosyaKapali(dosyaSatiri as any);
+        }
+      } catch (e: any) {
+        // Kapının kendi arızası görev yazımını durdurmaz; yürütücüdeki kapı yerinde.
+        console.error(`[anaAjanaBildir] kapanış kapısı okunamadı (${o.case_id}): ${String(e?.message ?? e).slice(0, 120)}`);
+      }
+      if (kapali) return { yazildi: false, sebep: "dosya kapandı — görev açılmadı" };
+    }
     /* ORTAK SINIR KATMANI — AMA İŞ ETİKETİ SÜZGEÇTEN GEÇMEZ (24.08.2026 kusuru).
        Eskiden gerekçenin TAMAMI süzgece giriyordu. Süzgeç elediğinde `sade`
        yedeği ("Bu konuda size yazabileceğim bir şey bulamadım.") dönüyor ve
