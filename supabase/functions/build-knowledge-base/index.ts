@@ -59,6 +59,23 @@ const BOOKS: Book[] = [
      değil, gerçek metin katmanı var. Yanılmışsam zarar yok: yeni metin katmanı
      kapısı yetersiz çıkarımı reddeder ve hiçbir şey silmez. */
   { category: "mevzuat", title: "2004 sayılı İcra ve İflas Kanunu", url: "https://www.mevzuat.gov.tr/MevzuatMetin/1.3.2004.pdf" },
+  /* 6502 — 10.09.2026, HAT H-20'nin CEVABI (Cowork, kurucu yetkisiyle).
+     Bilgi tabanındaki 7251 (HMK Değişiklik) nüshası TARANMIŞ: 366 KB → 2 parça,
+     2.066 karakter, yoğunluk 6 — yani pratikte boş (`_shared/metin-katmani.ts`
+     ölçüm tablosu). Karar: 7251'in metin katmanlı bir nüshasını kurucudan
+     istemek yerine, tüketici uyuşmazlıklarının asıl dayanağı olan 6502 sayılı
+     Kanunun RESMÎ nüshası listeye kondu. Aşama 1'in §2-A kaynak kuralı da
+     buradan besleniyor: "Kaynak: 6502 sayılı Kanun m. 73" gibi bir künye ancak
+     kanun metni bilgi tabanındaysa verilebilir.
+     Adres 10.09.2026'da tarayıcıdan doğrulandı (PDF açıldı); İİK nüshasıyla
+     aynı `mevzuat.gov.tr/MevzuatMetin` kalıbındadır.
+     Yanılma payı zararsız: yeni metin katmanı kapısı yetersiz çıkarımı
+     REDDEDER ve hiçbir şey silmez. */
+  /* Kategori "tüketici" DEĞİL "mevzuat": metin katmanı kapısının sıkı yoğunluk
+     kuralı (`mevzuat: book.category === "mevzuat"`) yalnız bu kategoride koşar.
+     Kanun metnini "tüketici" diye etiketlemek, taranmış bir nüshanın sessizce
+     bilgi tabanına girmesine izin verirdi — 7251'de olan tam buydu. */
+  { category: "mevzuat", title: "6502 sayılı Tüketicinin Korunması Hakkında Kanun", url: "https://www.mevzuat.gov.tr/MevzuatMetin/1.5.6502.pdf" },
 ];
 
 // Daha önce whole_book modunda CPU limitine takılan 7 kitap.
@@ -75,6 +92,8 @@ const SKIPPED_TITLES = new Set<string>([
   "Uzman Arabuluculuk - Fikri Mülkiyet",
   "Uzman Arabuluculuk - Sigorta Hukuku",
   "2004 sayılı İcra ve İflas Kanunu",
+  // 6502 de mevzuat nüshası: tek koşumda bitmeyebilir, sayfa dilimli mod güvenli taraftır.
+  "6502 sayılı Tüketicinin Korunması Hakkında Kanun",
 ]);
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;

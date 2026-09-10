@@ -43,46 +43,6 @@ satırla "veritabanı güncellemesi bekleniyor" yazar (sessiz düşme yok).
 olan bir işlem. **Kararın etkisi:** koşulmazsa Aşama 1 kapanabilir ama iki alan
 pilotta boş kalır.
 
-### H-29 · 30.08.2026 · P1 — Yarım kalan koşumun bıraktığı 5 YALANCI istatistik satırı silinsin mi?
-
-**Sorun.** 30.08 03:00 UTC'deki ilk emniyet süpürgesi koşumu yarıda durdu
-(kök neden ve düzeltmesi: commit `78ccccd`). Ama anonim kapanış kaydı o
-sürümde silmeden **ÖNCE** yazıldığı için `kapanis_istatistigi` tablosuna
-**5 satır** girdi — hiçbiri gerçekleşmemiş bir silmenin kaydı. Beş dosya da
-hâlâ yerinde duruyor.
-
-Düzeltme sonrası kayıt artık satırlar gerçekten silindikten sonra yazılıyor,
-yani **yeni yalancı satır oluşmayacak**. Ama bu beşi duruyor: gerçek silme
-koştuğunda aynı 5 dosya için 5 satır daha yazılacak ve tablo **5 dosyayı 10
-kez** saymış olacak. Bu tablo kazanım sayacının kaynağıdır (mimari §5.9).
-
-**Satırlar tartışmasız ayırt edilebilir** — koşum 4 saniye sürdü ve o pencerede
-başka hiçbir silme olmadı:
-```sql
-select * from kapanis_istatistigi
-where sebep = 'sure_doldu'
-  and silindi_at between '2026-08-30 03:00:00+00' and '2026-08-30 03:00:15+00';
--- beklenen: tam 5 satır (id'ler: 7090cfbe · 2c42e9f4 · ca268514 · e0e75217 · f2f6c867)
-```
-
-**Seçenekler.**
-- **(a) Silinsin.** Sayaç doğru olur. Satırlar anonimdir (kişisel veri yok),
-  yani silmenin KVKK riski yoktur; risk yalnız "geri alınamaz" olmasıdır.
-- **(b) Kalsın, işaretlensin.** Tabloya `gecersiz boolean` kolonu eklenir,
-  bu beşi `true` yapılır, sayaç `where not gecersiz` ile okur. Hiçbir şey
-  kaybolmaz ama şema + okuyan her yer değişir.
-- **(c) Dokunulmaz.** Sayaç 5 fazla sayar; pilot verisi bu yüzden hatalı olur.
-
-**Önerim: (a).** Gerekçe: bu satırlar bir olayın kaydı değil, **olmamış bir
-olayın kaydı** — yani baştan geçersiz. (b) yanlış veriyi kalıcılaştırmak için
-şemayı büyütür; sakladığı tek şey benim hatamın izidir ve o iz zaten burada,
-commit mesajında ve `dosya-silme.ts` başlığında duruyor.
-
-**Kararın etkisi.** (a) seçilirse tek `delete` cümlesi, yukarıdaki pencereyle
-sınırlı; kişisel veriye dokunmaz. Silme **Cowork/kurucu** tarafından koşulur
-(CLAUDE.md §10) — Code çalıştırmaz. (c) seçilirse pilotun kazanım sayacı
-5 fazla başlar ve bu bir daha ayırt edilemez hâle gelir.
-
 ### H-27 · 29.08.2026 · **P0** — KVKK imha metni yapılmayan üç şey vaat ediyor
 
 **Sorun.** `src/lib/kvkk-metinleri.ts` → `KVKK_IMHA` metni aynen şöyle:
@@ -145,164 +105,6 @@ adlandırmamak; aydınlatmada işleyeni saymak bu amaca aykırı değil, tersine
 **Kararın etkisi.** (1) için: metin tek dosyada (`kvkk-metinleri.ts`), iki
 yüzey oradan okuyor, değişiklik tek yerde olur ve tezgâhla kilitlenir.
 (2) için: (a) seçilirse constitution'a tek cümle eklenir ve kod değişmez.
-
-### H-21 · 28.08.2026 · P1 — `.env` deposa girmiş; çıkarmak canlı yayını kırabilir
-
-**Sorun.** `.env` dosyası git'te **izleniyor** (`git ls-files .env` onu
-listeliyor; tek commit `051779e`, uzak depo `github.com/arbemelsenyer/milat`).
-Bu 23.08'de bulunmuş, "kurucu kararı bekliyor" diye `tasks/todo.md`ye yazılmış
-ve orada beş gün beklemiş — HAT'a hiç taşınmamış. Şimdi taşındı.
-
-**23.08'de ölçülen (o turun kaydı):** içindeki üç değişkenin adı `VITE_`
-önekli. Vite bu değişkenleri zaten tarayıcıya giden paketin **içine gömer**,
-yani tasarımı gereği herkese açık değerlerdir; sunucu sırrı değildir. Değerler
-okunmadı, hiçbir yere yazılmadı (§12).
-
-**28.08'de EKLENEN yeni bilgi — 23.08'deki öneriyi değiştiriyor.**
-`src/integrations/supabase/client.ts` bu değerleri **derleme anında**
-`import.meta.env.VITE_SUPABASE_URL` ve `VITE_SUPABASE_PUBLISHABLE_KEY`
-üzerinden okuyor. Dosya git izleminden çıkarılırsa Lovable'ın bulut derlemesi
-bu değerleri **kendi enjekte etmiyorsa** canlı uygulama açılışta veritabanına
-hiç bağlanamaz. 23.08'de önerilen "izlemden çıkar" seçeneği bu riski
-görmemişti. Bunu ölçmenin güvenli yolu yok: ancak deneyerek görülür ve
-denemenin bedeli canlı yayının kırılmasıdır.
-
-**Seçenekler.**
-- **(a)** `git rm --cached .env` + `.gitignore`. Gizlilik kazancı **sıfır**
-  (değerler zaten paketin içinde), risk **canlı yayının kırılması**.
-- **(b)** Olduğu gibi bırak, ama `.gitignore`a `.env.*` (`.env.example` hariç)
-  eklenir ki bundan sonra **başka** bir env dosyası yanlışlıkla girmesin.
-- **(c)** Geçmişten de temizle (geçmiş yeniden yazma). (a)'nın bütün riskini
-  taşır, üstüne uzak depoyu ve varsa klonları etkiler.
-
-**Önerim: (b).** Gerekçe: burada korunacak bir sır yok — `VITE_` değişkeni
-tanım gereği açıktır — ama gelecekte gerçek bir sır içeren bir env dosyasının
-girmesi mümkün ve asıl korunması gereken o. (b) hiçbir şeyi kırmadan o kapıyı
-kapatır.
-
-**Kararın etkisi.** (b) seçilirse canlıda hiçbir şey değişmez, tek satırlık bir
-`.gitignore` düzenlemesi olur ve ben yaparım. (a) veya (c) seçilirse önce
-Lovable'ın derlemede kendi değişkenlerini enjekte edip etmediği doğrulanmalı;
-doğrulanmadan yapılırsa canlı uygulama kırılabilir.
-
-**Not.** Gerçek bir sunucu sırrı (servis anahtarı, API jetonu) bu dosyada
-görülmedi. Görülseydi bu madde P0 olurdu ve anahtar yenileme gerekirdi.
-
-### H-20 · 27.08.2026 · P1 — **DÜZELTME:** mevzuat duruyor; asıl kusur "girdi sanılan boş kaynaklar"
-
-> ⛔ **BU MADDENİN İLK HÂLİ YANLIŞTI. Aynı gün, sormadan önce ölçtüm ve
-> yanıldığımı gördüm.** Sana "Türk Ticaret Kanunu, Fikir ve Sanat Eserleri
-> Kanunu ve Sınai Mülkiyet mevzuatı bilgi tabanında yok" demiştim.
-> **Üçü de var.** Hata bendeydi: öksüz dosya adlarını girmiş kaynaklarla
-> eşleştirirken yalnız zaman damgası önekini atmıştım, oysa başarılı
-> yüklemeler **yeni yol düzeniyle** (`kategori/dosya_adi`) ve farklı harf
-> dönüşümüyle kaydedilmiş. İki liste bu yüzden hiç örtüşmedi ve ben "hiç yok"
-> diye okudum. Depoda öksüz dosya olması, kaynağın bilgi tabanında olmadığı
-> anlamına gelmiyormuş — çoğu, **sonradan başarıyla yeniden yüklenmiş
-> denemelerin artığı.**
-
-**GERÇEKTE NE VAR (sayımı bu kez kaynak listesinden yaptım):**
-
-| kaynak | durum |
-|---|---|
-| **6102 Türk Ticaret Kanunu** | **VAR** — 7 bölüm hâlinde, toplam **664 parça** |
-| 5846 Fikir ve Sanat Eserleri Kanunu | VAR (82 parça) |
-| 6769 Sınai Mülkiyet Kanunu + 23528 Yönetmelik | VAR (158 + 133) |
-| 6284 Ailenin Korunması + Uygulama Yönetmeliği | VAR (18 + 32) |
-| 4857 İş K. · 6098 TBK · 5510 SGK · 6356 Sendikalar · 4721 TMK · 6100 HMK | VAR |
-
-**Üstelik 800 parça sınırını sen zaten çözmüşsün:** TTK'yı tek dosya olarak
-yükleyemeyince **7 parçaya bölüp** yüklemişsin. Yani benim "sınıra takılıyor"
-tahminim doğruydu ama sorun çoktan aşılmıştı; sana gereksiz bir iş öneriyordum.
-Hata metni artık bu çözümü kendisi söylüyor (commit `d0a82c4`).
-
----
-
-**ASIL KUSUR BAŞKA YERDEYMİŞ — VE DAHA AĞIR.**
-
-Kaynak listesinde parça sayıları tuhaftı. Ölçünce çıktı: bazı kaynaklar
-**"girmiş" görünüyor ama neredeyse boş.**
-
-| kaynak | boyut | parça | parça/KB |
-|---|---|---|---|
-| Kira Uyuşmazlıkları ve Arabuluculuk (eğitim dokümanı) | 4.1 MB | **5** | 0.0012 |
-| "2004 sayılı İcra ve İflas Kanunu" | 117 KB | **2** | 0.0171 |
-| sağlıklı kanun PDF'leri (karşılaştırma) | — | — | 0.12–0.19 |
-
-Sebep: tek kapı `parça sayısı sıfır mı` idi. Metin katmanı olmayan (taranmış)
-bir PDF **sıfır değil birkaç** parça verir; yükleme "başarılı" sayılır, kaynak
-`/admin` listesinde **görünür**, sen "yükledim" dersin — ama ajanlar o
-kaynaktan hiçbir şey bulamaz. **Açık hatadan daha kötüdür: hata görülür,
-boşluk görülmez.**
-
-**DÜZELTİLDİ (commit `d0a82c4`).** 1 MB'tan büyük bir dosya 10'dan az parça
-veriyorsa artık **reddediliyor** ve sebebi söyleniyor ("taranmış PDF, metin
-katmanı yok"). Eşik yoğunluğa değil tartışmasız bir uca konuldu ki meşru sunum
-PDF'leri (0.016–0.021) engellenmesin; onlar için reddetme yok, `yogunluk_uyarisi`
-var. Tezgâh: `tests/bilgi-yukleme-oksuz.test.ts` · 375/375 yeşil.
-
----
-
-**İKİNCİ DÜZELTME — 7036 DA VARMIŞ.** Yukarıdaki listede "7036 sayılı İş
-Mahkemeleri Kanunu kaynak listesinde hiç yok" yazmıştım. **Var**: 12 parça,
-adalet.gov.tr'den girmiş. Aynı hatayı ikinci kez, başka bir boyutta yaptım —
-bu kez yalnız **depodan** beslenen kaynaklara bakıp URL'den beslenenleri
-saymadım. Doğru yöntem, kaynağı geldiği yere göre değil **başlığa göre bütün
-kaynaklarda** aramaktı; öyle arayınca liste üçten ikiye indi.
-
----
-
-**ÜÇÜNCÜ TUR — 28.08.2026: İİK YÜKLEMESİ ARTIK GEREKMİYOR, DÜĞMEYE BASMAK
-YETİYOR.** Senden dosya istemek yerine kanunun **resmî kaynağını** kitap
-listesine koydum: `mevzuat.gov.tr/MevzuatMetin/1.3.2004.pdf`. Nüshayı ölçtüm —
-1.249.156 bayt, 227 yazı tipi nesnesi, taranmış görüntü kodlayıcısı (DCT/CCITT/
-JPX) **sıfır**: gerçek metin katmanı var, elimizdeki 117 KB'lık nüshanın aksine.
-
-**Yapman gereken tek şey:** `/admin` → Bilgi Tabanı → **"Atlananları yeniden
-işle"**. Zaten parçası olan kitaplar atlanır, yalnız İİK işlenir; büyük olduğu
-için sayfa dilimli modda, devam ederek. Bitince parça sayısını canlıdan
-doğrularım (sağlıklı sonuç birkaç yüz parça olmalı).
-
-**Yanılmışsam zarar yok:** aynı turda kurulan metin katmanı kapısı yetersiz
-çıkarımı reddeder, sebebini söyler ve **hiçbir şeyi silmez.**
-
-**Ayrıca, işlem bittikten sonra silinecek tek şey:** eski, boş İİK nüshası
-(`/admin` listesinde "2004 sayılı İcra ve İflas Kanunu", 2 parça, depodan
-yüklenmiş olan). İki nüsha aynı adı taşıyacağı için bu adım karışıklığı
-önler; silmeyi `/admin`den sen yaparsın (geri dönüşü olmayan işlem, §7).
-
-**YENİ BULGU — üçüncü boş kaynak:** `7251 sayılı Hukuk Muhakemeleri Kanunu ile
-Bazı Kanunlarda Değişiklik...` da boş: 366 KB PDF'ten **2 parça, 2.066
-karakter**. Kaynağı adalet.gov.tr'deki taranmış nüsha ve `mevzuat.gov.tr`
-bu kanunu PDF olarak vermiyor (HTML'e yönlendiriyor). **Karar senin** —
-seçenekler:
-- **(a)** Kaynağı listeden düşür. Zaten boş; ajanlar ondan hiçbir şey bulamıyor.
-- **(b)** Yerine **6502 sayılı Tüketicinin Korunması Hakkında Kanun**u koy
-  (mevzuat.gov.tr'de 480 KB, metin katmanlı). Tüketici arabuluculuğunun asıl
-  dayanağı zaten bu kanundur; 7251 onu değiştiren kanundur.
-- **(c)** Olduğu gibi bırak.
-- **Önerim: (b).** Tüketici senin dava şartı kategorilerinden biri ve bugün o
-  başlıkta işe yarar tek metin 6100 HMK. **Etkisi:** tüketici dosyalarında
-  ajan cevapları kaynak gösterebilir hâle gelir; bugün gösteremiyor.
-
----
-
-**SENDEN İSTEDİĞİM (kalan tek madde, karar değil yükleme işi):**
-
-1. ~~**İcra ve İflas Kanunu**~~ — **KAPANDI (28.08), yukarıya bak.** Kaynak
-   resmî adresten besleniyor; sana kalan yalnız `/admin`de düğmeye basmak.
-2. **Kira Uyuşmazlıkları ve Arabuluculuk** eğitim dokümanı — 4.1 MB'lık nüsha
-   **5 parça** vermiş, yani taranmış görünüyor. Kira senin ana
-   kategorilerinden biri. Metin katmanlı bir sürümü varsa yükle; yoksa
-   bırakalım, ısrar etmem — yanındaki 6 kira sunumu ve Yargıtay kararı duruyor.
-
-Yükledikten sonra söyle, parça sayılarını canlıdan doğrularım. Artık yükleme
-yolu da yardımcı: taranmış PDF baştan reddediliyor, düşük yoğunluk uyarı
-veriyor (commit `d0a82c4`).
-
-**DEPODAKİ 59 ÖKSÜZ DOSYA:** artık "eksik mevzuat" olmadıkları anlaşıldı —
-çoğu başarılı yeniden yüklemelerin artığı. Silinmeleri KVKK meselesi değil,
-yalnızca ~33 MB yer meselesi. Acelesi yok; pilottan sonra süpürülür.
 
 ### H-7 · 25.08.2026 · P1 — Geri bildirim (`session_feedback`) yapısal olarak imkânsız
 **Sorun.** Adanın **altıncı** yüzeyi: `SessionFeedback.tsx` hiçbir yerden import
@@ -845,6 +647,43 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+
+### H-29 · KAPANDI · 10.09.2026 — CODE'A İŞ YOKTU, ARŞİVE ALINDI
+Cowork 07.09'da (a) seçeneğini canlıda koştu: yarım kalan koşumun bıraktığı
+5 yalancı `kapanis_istatistigi` satırı silindi. Doğrulama Cowork'te: pencerede
+kalan **0**, tabloda toplam **6** satır (31.08 gerçek koşumunun kayıtları).
+Kod tarafında yapılacak bir şey yoktu; madde yalnız açık kalmıştı.
+
+### H-21 · KAPANDI · 10.09.2026 — (b) UYGULANDI: `.gitignore`a `.env.*` eklendi
+Kurucu kararı (b): mevcut `.env` **olduğu gibi kalır**, git'ten çıkarılmaz;
+yoksayma yalnız yeni doğacak yerel nüshalar için kurulur. Uygulandı:
+`.gitignore`a `.env.*` ve `!.env.example` satırları girdi, eski tekil
+`.env.scraper` satırı bu genel kuralın içinde eridi.
+
+**ÖLÇÜM (10.09.2026) — §12'nin "sızmış secret" kapısı AÇILMADI.** İzlenen `.env`
+yalnız üç `VITE_*` değeri taşıyor: proje kimliği, yayımlanabilir (anon) anahtar
+ve URL. `VITE_` ile başlayan her değer zaten derlenen tarayıcı paketine gömülür
+— yani tanımı gereği gizli değildir. Servis anahtarı ya da API anahtarı bu
+dosyada **yok**. Bu yüzden geçmişten temizleme ve anahtar yenileme gerekmiyor;
+Human Gate doğmadı. Doğrulama: `git check-ignore -q .env.local` → 0 (yoksayılıyor),
+`git check-ignore -q .env.example` → 1 (yoksayılmıyor).
+
+### H-20 · KAPANDI · 10.09.2026 — 6502 KİTAP LİSTESİNE GİRDİ; KALAN İKİSİ DUMAN TESTİ GÜNÜ
+Cevabın Code'a düşen kısmı yapıldı:
+· **6502 sayılı Tüketicinin Korunması Hakkında Kanun**, `build-knowledge-base`
+  kaynak listesine `category: "mevzuat"` olarak eklendi (7251'in taranmış
+  nüshasının yerine). Kategori bilerek "mevzuat"tır: metin katmanı kapısının
+  sıkı yoğunluk kuralı yalnız o kategoride koşar; "tüketici" deseydik taranmış
+  bir nüsha sessizce girebilirdi — 7251'de olan tam buydu.
+· Adres tarayıcıdan doğrulandı (PDF açıldı), İİK ile aynı `mevzuat.gov.tr`
+  kalıbında. Büyük nüsha olduğu için `SKIPPED_TITLES`a da yazıldı (sayfa dilimli mod).
+
+**Kalan iki iş HAT sorusu değil, TAKVİME BAĞLI iştir** ve `tasks/todo.md`ye
+yazıldı: (1) "Atlananları yeniden işle" düğmesine basılması ve parça sayısının
+canlıdan doğrulanması, (2) eski boş İİK nüshasının silinmesi. İkisi de yönetici
+yüzeyinden yapılır; Code'un elinde admin yolu yok (Supabase CLI yalnız okuma).
+Duman testi günü kurucuyla birlikte ekrandan yapılacak.
+
 
 ### H-31 · KAPANDI · 10.09.2026 — KOD DÜZELTMESİ YAPILDI, CANLI DOĞRULAMA AŞAMA KAPISINDA
 

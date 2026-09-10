@@ -433,9 +433,51 @@ Aşama aşama gidilir; bir aşama kapanmadan ötekine geçilmez. Bu kapıda bekl
 - Yeni bir env değişkeni gerekiyorsa: **adını ve ne işe yaradığını** bildir, `.env.example` içine ekle; **değeri** Cowork/kurucu girer.
 - Sızmış bir secret fark edersen: kod içinden çıkar, kuyruğa **P0** aç, kullanıcıya bildir (anahtarın yenilenmesi gerekir).
 
-**İlk oturumda yapılacak P0 kontrol:** `.gitignore` içinde `.env` satırı yok; yalnızca `.env.scraper` yoksayılıyor. Proje kökünde `.env` dosyası mevcut. İlk iş olarak `git ls-files --error-unmatch .env` ile bu dosyanın git'e girip girmediğini kontrol et.
-> Girmemişse: `.gitignore` içine `.env` ve `.env.*` (`!.env.example` hariç) satırlarını ekle, commit et.
-> Girmişse: **dur ve kullanıcıya bildir** — geçmişten temizleme ve anahtar yenileme gerekir, bu bir Human Gate'dir.
+**Bu kontrol 10.09.2026'da YAPILDI, kapandı (HAT H-21).** Sonuç: izlenen `.env`
+yalnız üç `VITE_*` değeri taşıyor (proje kimliği · yayımlanabilir anon anahtar ·
+URL). `VITE_` ile başlayan her değer zaten derlenen tarayıcı paketine gömülür,
+yani tanımı gereği gizli değildir; servis anahtarı ya da API anahtarı bu dosyada
+**yoktur**. Bu yüzden geçmişten temizleme ve anahtar yenileme **gerekmiyor**;
+Human Gate doğmadı. `.gitignore`a `.env.*` (`!.env.example` hariç) eklendi,
+mevcut `.env` kurucu kararıyla olduğu gibi bırakıldı. Bu maddeyi yeniden açma.
+
+---
+
+## 12-A. BEKÇİ KARARLARI — BEKÇİ SORMAZ, KARAR VERİR
+
+Kurucu kararı, 10.09.2026. **25.08'de kurulan "sor" ayarının yerine geçer.**
+Gerekçe: aynı yanlış alarm kurucuya üçüncü kez düştü (§18-A). Onay ekranı
+kurucunun zamanını yiyordu ve verdiği bilgi sıfırdı.
+
+Bekçinin (`~/.claude/hooks/guard-shell.sh` · `guard-secret-files.sh` +
+`settings.json`) **iki** çıktısı vardır: **geçer** ya da **reddeder**.
+"Onay ister misiniz" diye bir üçüncü yol **yoktur**; `settings.json`'daki
+`ask` listesi **boştur** ve boş kalır.
+
+| durum | karar |
+|---|---|
+| `.env.local` · `.env.example` — her işlem | **İZİN**, sorulmaz |
+| asıl `.env` — **okuma dâhil** her işlem | **RED** — "H-21: `.env`'e dokunulmaz." |
+| öteki `.env.*` · `*.pem` · `*.key` · `id_rsa` · `credentials` … | **RED** — "Anahtar / sır dosyası — yasak." |
+| `DROP` · `TRUNCATE` · `DELETE FROM` · `psql` · `mysql` · `sqlite3` · `dropdb` · `supabase db reset` | **RED** — "CLAUDE.md §10: SQL Cowork'ün işi, HAT'a yaz." |
+| `git reset --hard` · `git clean -f` · zorlayan push · `rebase` · `filter-branch/repo` | **RED** — "Geri dönüşü olmayan git işlemi — yasak." |
+| `shred` · `rm -rf` ve `tests/gecici/` dışındaki her silme | **RED** — "Geri dönüşü olmayan silme — yasak." |
+| bunların dışındaki her şey | **geçer**, sessizce |
+
+**Reddedilen işe gerçekten ihtiyaç varsa:** `tasks/HAT.md` → `CODE → COWORK`'e
+yaz ve **o işi beklemeden devam et** (§23). Reddedildi diye tur kapatılmaz.
+
+**Karar metne değil, komutun GERÇEKTEN YAPTIĞINA bakar.** Ayrıştırıcı
+(`guard_secret_operands.py`) çalışan programı, bayraklarını ve dosya
+operandlarını okur; `git commit -m "… .env …"` gibi bir metin **geçer**, çünkü
+mesaj bir operand değildir. Kaba metin denetimi yalnızca hiçbir Python
+yorumlayıcısı bulunamadığında devreye girer.
+
+**Doğrulandı (10.09.2026, 22 deneme, `tests/gecici/bekci-sinav.sh`):** izinli
+nüshalar ve iki bilinen yanlış alarm geçti; `.env`'in okuma/yazma/kopyalama/
+silme yolları, veritabanı araçları, geri dönüşsüz git işlemleri, `rm -rf` ve
+anahtar dosyaları reddedildi. Hiçbir maddede "ask" çıkmadı.
+Yedek: `~/.claude/settings.json.YEDEK3` (+ üç kanca dosyasının `.YEDEK3` nüshası).
 
 ---
 

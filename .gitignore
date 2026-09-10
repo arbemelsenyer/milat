@@ -25,8 +25,18 @@ dist-ssr
 
 # UDF diagnostic/test samples (local only)
 *.udf.udf
-.env.scraper
 supabase/.temp/
+
+# ORTAM DEĞİŞKENLERİ (HAT H-21 · CEVAP 07.09.2026 — seçenek (b))
+# Kurucu kararı: mevcut `.env` OLDUĞU GİBİ KALIR, git'ten çıkarılmaz.
+# Sebebi ölçüldü (10.09.2026): izlenen `.env` yalnız üç `VITE_*` değeri taşıyor
+# (proje kimliği · yayımlanabilir anon anahtar · URL). `VITE_` ile başlayan her
+# değer zaten derlenen tarayıcı paketine gömülür, yani gizli değildir; servis
+# anahtarı ya da API anahtarı bu dosyada YOKTUR. Bu yüzden §12'nin "sızmış
+# secret" kapısı açılmadı, anahtar yenileme gerekmiyor.
+# Yoksayılan, BUNDAN SONRA doğabilecek yerel nüshalardır — asıl risk oradadır.
+.env.*
+!.env.example
 
 # Gecici test dosyalari (CLAUDE.md 22): icerik git'e girmez, klasor notu girer
 tests/gecici/*

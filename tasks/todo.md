@@ -20,6 +20,29 @@ YAPILMADI. `main`'e push edildi, Lovable ön izlemesi bu commit'le kuruldu.
   2. **HAT H-32** → `tests/sabit/asama1-basvuru-alanlari.sql` Cowork tarafından
      koşulacak. Koşana kadar §1.3 uygunluk seçimi ve §1.8 kanal seçimi ekranda
      görünür ama KAYDEDİLMEZ (ekran bunu tek satırla söyler, sessiz düşmez).
+**HAT'TA BEKLEYEN ÜÇ CEVAP UYGULANDI (10.09.2026, Stop kancası hatırlattı):**
+· **H-29** — Code'a iş yoktu (Cowork 07.09'da canlıda sildi). Arşive alındı.
+· **H-21 (b)** — `.gitignore`a `.env.*` + `!.env.example` eklendi; mevcut `.env`
+  kurucu kararı gereği olduğu gibi kaldı. **Ölçüm:** izlenen `.env` yalnız üç
+  `VITE_*` değeri taşıyor (proje kimliği · anon anahtar · URL). `VITE_` değerleri
+  zaten tarayıcı paketine gömülür, yani gizli değildir; servis/API anahtarı YOK.
+  Bu yüzden §12'nin "sızmış secret" kapısı açılmadı, anahtar yenileme gerekmiyor.
+  Doğrulama: `git check-ignore -q .env.local` → 0, `.env.example` → 1.
+· **H-20** — **6502 sayılı Tüketicinin Korunması Hakkında Kanun**
+  `build-knowledge-base` kaynak listesine `category: "mevzuat"` olarak eklendi
+  (7251'in taranmış nüshasının yerine); adres tarayıcıdan doğrulandı.
+  Kategori bilerek "mevzuat": metin katmanı kapısının sıkı yoğunluk kuralı
+  yalnız o kategoride koşar.
+
+**DUMAN TESTİ GÜNÜ KURUCUYLA BİRLİKTE YAPILACAK İKİ İŞ (H-20'den kalan):**
+1. `/admin` > **"Atlananları yeniden işle"** düğmesine basılacak; 6502'nin
+   parça sayısı ve karakteri canlıdan doğrulanacak (yoğunluk ≥ 40 olmalı;
+   altında kalırsa nüsha reddedilir ve bu SESSİZ KALMAZ).
+2. Bilgi tabanındaki **eski boş İİK nüshası** silinecek (117 KB, 2 parça,
+   3.533 karakter — taranmış).
+Code bunları tek başına yapamaz: yönetici yüzeyi gerekiyor, Supabase CLI yalnız
+okuma yetkisinde.
+
 - Sıradaki uygulanabilir iş: kurucu **"tamam"** derse → publish + edge deploy
   (aşağıdaki liste) → canlı doğrulama → Aşama 1 kapanır, Aşama 2'ye geçilir.
   Kurucu "olmadı" derse → düzelt, tekrar push, tekrar rapor.
