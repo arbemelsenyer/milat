@@ -17,44 +17,6 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
-### H-34 · 10.09.2026 · P1 — `experts` SÜTUN İZNİ BELGE OKUMASINI KESİYOR (Cowork koşacak)
-
-**H-33'ün ölçülmüş kökü budur.** Cevapta öne sürülen iki aday (jeton yok ·
-gömülü sorgu) ölçümle **elendi**: jeton geçerli ve kullanıcı doğru
-(`f7f696f2-…`, `assigned_mediator_id` ile aynı), sorgu düz — gömme yok.
-
-**CANLI ÖLÇÜM (kurucunun oturumu, salt okuma, ön izleme):**
-| istek | sonuç |
-|---|---|
-| `experts?select=id` | **200** |
-| `experts?select=*` | **403** `42501 permission denied for table experts` |
-| `case_documents?select=id,...` | **403** AYNI mesaj |
-| `cases` · `case_parties` · `case_sessions` · `belge_ozetleri` | 200 |
-
-**Okuma:** `public.experts` üzerinde `authenticated` rolüne **sütun bazlı**
-SELECT verilmiş; `id` açık, en az bir sütun kapalı. `case_documents`in bilirkişi
-politikası `experts`ten izinsiz bir sütun okuyor → Postgres 42501 veriyor ve
-dosyanın BÜTÜN belge okuması düşüyor. Kapı doğru; kusur kapının okuduğu
-yardımcı tablodaki eksik izinde.
-
-**COWORK PAKETİ (beş satır):**
-1. **Ne yapılacak:** `tests/sabit/experts-sutun-izni.sql` koşulacak.
-2. **Neden:** belge listesi yöneticiye ve görevli arabulucuya açılsın.
-3. **Komut:** önce `relrowsecurity` kontrolü; `t` ise (A) `grant select on
-   public.experts to authenticated;`. `f` ise (A)'yı KOŞMA, dosyadaki (B)
-   dar seçeneğini uygula.
-4. **Başarı kontrolü:** `experts?select=*&limit=1` → 200 ve
-   `case_documents?select=id&limit=1` → 200; ekranda kırmızı satır kaybolur.
-5. **Sonra Code:** ön izlemede 1.1'i açıp belge listesini doğrular, H-34'ü kapatır.
-
-**Önerim:** (A), RLS açıksa. **Hiçbir politika değişmiyor**; değişen yalnız
-GRANT. Satır süzgeci yerinde kalır.
-
-**AYRICA — ÖNERİ (uygulanmadı, kurucu kararı gerekir):** bu üründe `has_role`
-ve `is_case_mediator` SECURITY DEFINER yardımcılarıdır; bilirkişi kolu da aynı
-kalıba alınsa politika hiçbir tabloya doğrudan dokunmaz ve bu sınıf kusur bir
-daha doğmaz. Kod/şema değişikliği olduğu için **beklemede**.
-
 ### H-27 · 29.08.2026 · **P0** — KVKK imha metni yapılmayan üç şey vaat ediyor
 
 **Sorun.** `src/lib/kvkk-metinleri.ts` → `KVKK_IMHA` metni aynen şöyle:
@@ -341,7 +303,18 @@ Seçim: A / B / C / (kendi metniniz)
 Not: (varsa)
 ```
 
-### H-33 · CEVAP · 10.09.2026 — ÖLÇÜLDÜ: KAPI DOĞRU, SEBEP EKRAN TARAFINDA (b)
+### H-34 · CEVAP · 10.09.2026 — KOŞULDU, (B) DAR SEÇENEK (Cowork)
+Ölçüm doğrulandı: `experts` RLS **açık**; `authenticated` rolünde SELECT izni **email · phone ·
+user_id** kolonlarında yoktu (bilerek gizlenmiş görünüyor — bilirkişi iletişim bilgisi).
+`case_documents`in bilirkişi politikası `e.user_id` okuyor → tek eksik o.
+**Koşulan:** `grant select (user_id) on public.experts to authenticated;` — (A) seçilmedi çünkü
+tablo bazlı izin bilirkişilerin e-posta/telefonunu herkese açardı. **Doğrulama:** `user_id`
+artık SELECT listesinde; `email` ve `phone` hâlâ kapalı. Politika değişmedi.
+Code: ekranda 1.1 "Belgeler okunamadı" satırının kaybolduğunu doğrula, H-34'ü kapat.
+Kalıcı çözüm önerisi (bilirkişi kolunu SECURITY DEFINER yardımcıya almak) kurucu kararı
+bekleyen ÖNERİ olarak durur; bu turda yapılmaz.
+
+### H-33 · CEVAP · 10.09.2026 — ÖLÇÜLDÜ: KAPI DOĞRU, SEBEP EKRAN TARAFINDA (b) → Code kök sebebi buldu (experts sütun izni), H-34'e dönüştü
 Canlıdan okundu (salt okuma):
 - `MP-2026-1020` → `assigned_mediator_id` = `user_id` = `f7f696f2-…` (kurucunun hesabı). Boş DEĞİL.
 - `user_roles`: bu hesapta **admin** ve user rolleri var.
@@ -675,6 +648,28 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+
+### H-34 · KAPANDI · 10.09.2026 — (B) KOŞULDU, BELGE LİSTESİ AÇILDI, GİZLİLİK KORUNDU
+Cowork dar seçeneği koştu: `grant select (user_id) on public.experts to authenticated;`
+Tablo bazlı (A) BİLEREK seçilmedi — o, bilirkişilerin e-posta ve telefonunu
+bütün oturum açmış kullanıcılara açardı.
+
+**Code canlıda doğruladı (ön izleme, kurucunun oturumu, salt okuma):**
+| istek | önce | sonra |
+|---|---|---|
+| `case_documents?select=id&case_id=…` | 403 `42501` | **200** |
+| `experts?select=user_id` | 403 | **200** |
+| `experts?select=email` | 403 | **403** (kapalı kaldı) |
+| `experts?select=phone` | 403 | **403** (kapalı kaldı) |
+
+Ekranda da doğrulandı: Aşama 1 > 1.1'deki kırmızı "Belgeler okunamadı" satırı
+**kayboldu**; yerinde "Dosyadaki belgeler · 0 belge" duruyor (bu dosyada gerçekten
+belge yok). Ekran görüntüsü: `ASAMA-1-EKRANLAR/asama1-h34-belge-listesi-acildi.jpg`.
+
+Politika değişmedi, gevşetilmedi; değişen tek şey bir sütunun GRANT'i.
+Kalıcı çözüm önerisi (bilirkişi kolunu SECURITY DEFINER yardımcıya almak)
+kurucu kararı bekleyen ÖNERİ olarak durur.
+
 
 ### H-33 · KAPANDI · 10.09.2026 — ÖLÇÜLDÜ; KÖK NEDEN BULUNDU, İŞ H-34'E DEVREDİLDİ
 Cevaptaki iki aday da ölçümle elendi (jeton geçerli, sorgu düz). Gerçek sebep:

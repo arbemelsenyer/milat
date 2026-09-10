@@ -1,4 +1,54 @@
 ## Nerede kaldık
+
+### ■ DUR — 10.09.2026 gece · AŞAMA 1 BİTTİ, KURUCU "TAMAM"I BEKLENİYOR
+`medipact dur` ile kapatıldı. **Yayın YAPILMADI, edge deploy YAPILMADI**
+(CLAUDE.md §11-C aşama kapısı). Her şey `main`'de ve ön izlemede.
+
+- Tarih: **10.09.2026 gece**
+- Aşama: Pilot geri bildirimi · **Aşama 1 — Dosya kurulumu** (kapıda bekliyor)
+- Aktif görev: **yok**
+- Doğrulama (kapanışta): `npm run test` **536/536** ·
+  `npx tsc --noEmit -p tsconfig.app.json` temiz · `npm run build` temiz
+- Çalışma ağacı: yalnız dokunulmayan yabancı dosyalar (repomix, xlsx, gs.sh,
+  devam.sh, .claudeignore.txt, .github/.agents/, silinmiş SKILL.md).
+- Ön izleme: https://id-preview--5ffedb1b-4087-4fe1-a1ef-873c9754f71d.lovable.app
+- Ekranlar: Masaüstü\medipact claude\ASAMA-1-EKRANLAR (14 masaüstü + 1.10 üç kare
+  + H-34 doğrulaması)
+
+**BU OTURUMDA BİTENLER**
+1. **H-31 (P0)** — kapanmış dosyadan taraflara e-posta çıkmıyor. Kapanış tanımı
+   tek yerde (`_shared/dosya-kapanis-kapisi.ts`); görev AÇAN tek geçit de kapıya
+   bakıyor; hatırlatma üst sınırı 3. Isırma sınavı 22 sınav.
+2. **Aşama 1** — ekran 1.1–1.10 sıralı adımlara çevrildi, §2 ortak kalıbı
+   kuruldu (`src/components/basvuru/AdimKalibi.tsx`).
+3. **EK maddeleri** — iki yanda taraf ekleme, her tarafta vekil, 1.9 → 1.10
+   davet sırası, 1.10'da iki yanın da görünmesi (ölçüt 11-12-14).
+4. **CLAUDE.md §11-C** (aşama kapısı) ve **§12-A** (bekçi sormaz, karar verir).
+5. **HAT: H-29 · H-20 · H-21 · H-31 · H-32 · H-33 · H-34** kapandı ve arşive alındı.
+
+**AÇIK TEK BLOKAJ — KURUCUDA**
+· **§1.9 süreç bilgilendirme metni** gelmedi. Ekranda yer tutucu duruyor,
+  gönderim düğmesi kapalı. Ürün tarafa gidecek ilk bildirimin sözlerini kendi
+  icat etmez.
+
+**SIRADAKİ UYGULANABİLİR İŞ (kurucu "tamam" derse, sırayla):**
+1. Publish (ön yüz) + edge deploy: yeni `basvuru-belgelerinden-doldur` ·
+   `taraf-iletisim-arastir`, değişen `classify-dispute`, ve
+   `_shared/anlatim.ts` fan-out'u (36 fonksiyon — liste aşağıdaki blokta).
+2. Canlıda H-31 ölçümü: kapanmış dosyada nöbetçi turu, e-posta çıkmadığının
+   kaydı.
+3. Aşama 2'ye geçiş (kurucu hangi ekran olduğunu söyleyecek).
+
+Kurucu "olmadı" derse: söylediği maddeyi düzelt → test → push → ekran → rapor.
+
+**TELEFON EKRAN GÖRÜNTÜSÜ ALINAMADI** — Chrome penceresi ekranın tamamını
+kaplıyor (`screen.availWidth` 1280) ve daraltma iki yoldan da tutmadı
+(`resize_window` ve `window.resizeTo`; ikincisini tarayıcı engelliyor).
+Kurucu pencereyi tam ekrandan çıkarırsa alınır; ya da ön izleme telefondan
+açılır.
+
+---
+
 ### ▶ H-33 ÖLÇÜLDÜ VE KAPANDI — KÖK NEDEN `experts` SÜTUN İZNİ (10.09.2026 gece)
 "Belgeler okunamadı: yetkiniz yok" satırının sebebi yetki eksikliği DEĞİLDİ.
 
@@ -53,7 +103,7 @@ kapanışı görmemesiyle aynı aile).
 ve "Karşı taraf · 1 taraf" (H H · e-postası yok → "Davet Linki Oluştur").
 Her tarafın kendi düğmesi var; "Süreç bilgilendirmesi henüz gönderilmedi."
 uyarısı duruyor ve hiçbir düğme kilitli değil.
-Ekran görüntüleri: `ASAMA-1-EKRANLARsama1-adim110-01..03.jpg`.
+Ekran görüntüleri: ASAMA-1-EKRANLAR klasöründe `asama1-adim110-01..03.jpg`.
 
 ---
 

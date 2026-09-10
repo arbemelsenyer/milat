@@ -1279,3 +1279,27 @@ ihlalinde tekrar denemek asla cozmez; kullaniciya boyle demek onu bos yere
 dondurur. Hata kodu (23503) taniniyorsa sebep soylenir. Ayni sey ham Postgres
 cumlesini ekrana basmak icin de gecerli: kullanici anlamaz, uzerine sema ic
 yapisi (tablo ve kisit adlari) urun yuzeyine sizar.
+
+## 10.09.2026 — "KARDEŞ YOL SESSİZ KALDI" ÜÇÜNCÜ KEZ ÇIKTI
+
+Aynı kusur sınıfı bu oturumda **üç ayrı yerde** doğdu. Üçü de "kural bir yere
+yazıldı, aynı işi yapan ikinci yol o kuralı hiç görmedi" biçimindeydi:
+
+1. **H-31** — kapanış kontrolü görevi YÜRÜTEN yolda vardı, görev AÇAN kollarda
+   yoktu. Sonuç: kapanmış dosyadan 18 gün taraflara e-posta gitti.
+2. **Ölçüt 14** — taraf listesini 1.8 okuyordu, 1.10 da ayrı okuyordu. Biri
+   değişince öteki haber almıyordu. Karşı taraf davet adımında hiç görünmedi.
+3. **1.3 uygunluk** — yazma yolu yeni kolonu biliyordu, OKUMA yolu (`loadCase`
+   sütun listesi) bilmiyordu. Seçim kaydediliyor ama geri gelmiyordu.
+
+**Alınan ders:** bir kural ya da alan eklerken "bunu okuyan/yazan BAŞKA kim
+var?" sorusu tek tek sorulacak. Özellikle:
+· aynı bileşenin iki örneği varsa (bölünmüş adımlar) → tazeleme yolu kurulacak,
+· sütunları tek tek sayan `select` listeleri varsa → yeni kolon oraya da girecek,
+· bir kapı/kontrol varsa → onu AÇAN ve YÜRÜTEN yolların ikisi de kapıya bakacak.
+
+**İkinci ders — dostane hata metni gerçek sebebi yutmasın.** "Belgeler
+okunamadı: yetkiniz yok" satırı saatlerce yanlış yere baktırdı; yetki gerçekten
+vardı. Sunucunun asıl cümlesi "permission denied for table experts" idi, yani
+sorgulanan tabloya değil POLİTİKANIN OKUDUĞU başka tabloya izin yoktu.
+`trErr` artık izin hatasında sunucunun verdiği tablo adını ekranda bırakıyor.
