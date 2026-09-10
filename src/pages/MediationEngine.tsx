@@ -2883,6 +2883,11 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
 
   const [parties, setParties] = useState<any[]>([]);
   const [docCount, setDocCount] = useState(0);
+  /* TARAF DEĞİŞİM SAYACI — 1.8 ile 1.10'u aynı listede tutar (kabul ölçütü 14).
+     İki adım aynı bileşenin iki ayrı örneğidir; ekleme/silme birinde olunca
+     öteki haber almıyordu. Sayaç her okumada artar, 1.10 örneği kendi
+     listesini yeniden okur. */
+  const [tarafSurumu, setTarafSurumu] = useState(0);
 
   const loadParties = useCallback(async () => {
     const { data } = await supabase
@@ -2891,6 +2896,7 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
       .eq("case_id", caseRow.id)
       .order("created_at");
     setParties(Array.isArray(data) ? data : []);
+    setTarafSurumu((n) => n + 1);
   }, [caseRow.id]);
 
   useEffect(() => { loadParties(); }, [loadParties]);
@@ -3265,7 +3271,12 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
               userId={userId}
               bare
               bolum="davet"
-              onChanged={loadParties}
+              tazele={tarafSurumu}
+              /* `onChanged` BİLEREK VERİLMEDİ. Verilseydi sonsuz döngü olurdu:
+                 1.10'un kendi okuması `onChanged`i çağırır → ana ekran sayacı
+                 artırır → sayaç 1.10'u yeniden okutur → başa döner. 1.10 yalnız
+                 davet gönderir; ana ekranın taraf listesini 1.8 ve iletişim
+                 kartı besler. */
               davetUyarisi={davaSarti && !bilgilendirmeGonderildi ? (
                 /* DÜĞME KİLİTLENMEZ. Ürünün genel kuralı: sistem uyarır,
                    arabulucu karar verir (Cowork'ün koyduğu madde, kurucu
@@ -4647,11 +4658,19 @@ function DisputeClassifierCard({
    İki parça ayrı bileşen örneğidir; davet durumu yalnız "davet" parçasında
    tutulur, bu yüzden bölünme durum kaybına yol açmaz. */
 function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onChanged,
-  bolum = "hepsi", davetUyarisi }: {
+  bolum = "hepsi", davetUyarisi, tazele = 0 }: {
   caseRow: CaseRow; isMediator: boolean; userId: string; onDone?: () => void;
   bare?: boolean; onChanged?: () => void;
   bolum?: "hepsi" | "taraflar" | "davet";
   davetUyarisi?: React.ReactNode;
+  /* KARDEŞ ÖRNEĞİ TAZELEME SAYACI (10.09.2026 gece kusuru — kabul ölçütü 14).
+     1.8 ve 1.10 aynı bileşenin İKİ AYRI ÖRNEĞİDİR ve her biri taraf listesini
+     kendi `load()`u ile okur. 1.8'den karşı taraf eklenince 1.10 haberdar
+     olmuyordu: kurucunun ekranında karşı taraf 1.8 ve 1.9'da görünüyor ama
+     1.10 Davet gönder'de YOKTU. Sayfa yenilenmeden düzelmiyordu.
+     Ana ekran bu sayacı her taraf değişiminde artırır; örnek listeyi yeniden
+     okur. Kardeş yolun sessiz kalması bu üründe tekrar eden kusur sınıfıdır. */
+  tazele?: number;
 }) {
   const [parties, setParties] = useState<any[]>([]);
   const [draft, setDraft] = useState<PartyDraft | null>(null);
@@ -4683,6 +4702,9 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
   }, [caseRow.id, onChanged]);
 
   useEffect(() => { load(); }, [load]);
+  /* Kardeş örnek tazelemesi: 1.8'de taraf eklenip silinince 1.10 da yeniden
+     okur. `load` kimliği değişmediği için ayrı bir etki gerekiyor. */
+  useEffect(() => { if (tazele > 0) load(); }, [tazele, load]);
 
   const sendInvite = useCallback(async (partyId: string, opts?: { skipEmail?: boolean }) => {
     setInvitingId(partyId);
@@ -4910,6 +4932,23 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
     }
   }
 
+  /* 1.10'DA İKİ YAN DA GÖRÜNÜR (kabul ölçütü 14). Liste artık düz değil,
+     yana göre gruplu: başvurucu tarafı · karşı taraf · üçüncü taraf. Boş yan
+     da başlığıyla durur ve "bu yanda henüz taraf yok" der — böylece eksik olan
+     yan SESSİZ kalmaz, kurucu bakınca görür. 1.8 ve "hepsi" düzeninde eski
+     tek liste korunur. */
+  const TARAF_YANLARI: { rol: string; baslik: string }[] = [
+    { rol: "applicant", baslik: "Başvurucu tarafı" },
+    { rol: "respondent", baslik: "Karşı taraf" },
+    { rol: "third_party", baslik: "Üçüncü taraf" },
+  ];
+  const tarafGruplari = bolum === "davet"
+    ? TARAF_YANLARI
+        .map((y) => ({ ...y, liste: parties.filter((p: any) => String(p.party_role ?? "") === y.rol) }))
+        // Üçüncü taraf yalnız varsa çizilir; ilk iki yan her hâlde durur.
+        .filter((g) => g.rol !== "third_party" || g.liste.length > 0)
+    : [{ rol: "hepsi", baslik: "", liste: parties }];
+
   const withEmail = parties.filter((p: any) => p.email);
   const acceptedCount = withEmail.filter((p: any) => p.invite_status === "accepted").length;
   const inviteSummary: string | null = withEmail.length
@@ -4967,8 +5006,19 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
         {loading ? <Loader2 className="animate-spin" /> : parties.length === 0 ? (
           <p className="text-muted-foreground">Henüz taraf eklenmedi.</p>
         ) : (
-          <div className="space-y-2">
-            {parties.map((p) => (
+          <div className="space-y-3">
+            {tarafGruplari.map((grup) => (
+            <div key={grup.rol} className="space-y-2">
+              {bolum === "davet" && (
+                <div className="text-xs font-medium pt-1">
+                  {grup.baslik}{" "}
+                  <span className="font-normal text-muted-foreground">· {grup.liste.length} taraf</span>
+                </div>
+              )}
+              {bolum === "davet" && grup.liste.length === 0 && (
+                <p className="text-xs italic text-muted-foreground">Bu yanda henüz taraf yok.</p>
+              )}
+              {grup.liste.map((p) => (
               <motion.div variants={itemVariants} key={p.id} className="p-3 border rounded space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
                   <div className="min-w-0">
@@ -4992,7 +5042,15 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
                   <div className="flex flex-wrap items-center justify-end gap-1 min-w-0 max-w-full">
                     {/* DAVET YALNIZ 1.10'DA (kurucu EK): dava şartında taraflara
                         davet, süreç bilgilendirmesinden SONRA gider. */}
-                    {bolum !== "taraflar" && p.email && p.invite_status !== "accepted" && (
+                    {/* HER TARAFIN KENDİ DÜĞMESİ (kabul ölçütü 14). Daveti
+                        kabul etmiş taraf da 1.10'da düğmesiz kalmaz; etiketi
+                        "Yeniden gönder" olur, durumu yanında yazar. Eskiden
+                        kabul edenler listede düğmesiz görünüyor, arabulucu
+                        "bu tarafa gönderim yolu yok mu" diye bakıyordu. */}
+                    {bolum === "davet" && p.invite_status === "accepted" && (
+                      <span className="text-xs text-muted-foreground shrink-0">Daveti kabul etti</span>
+                    )}
+                    {bolum !== "taraflar" && p.email && (p.invite_status !== "accepted" || bolum === "davet") && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -5005,7 +5063,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
                         {inviteUrls[p.id] ? "Yeniden gönder" : "Davet gönder"}
                       </Button>
                     )}
-                    {bolum !== "taraflar" && !p.email && p.invite_status !== "accepted" && (
+                    {bolum !== "taraflar" && !p.email && (p.invite_status !== "accepted" || bolum === "davet") && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -5092,6 +5150,8 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
                   </div>
                 )}
               </motion.div>
+              ))}
+            </div>
             ))}
           </div>
         )}

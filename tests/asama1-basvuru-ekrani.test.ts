@@ -426,3 +426,61 @@ describe("ölçüt 12 — 1.9 süreç bilgilendirmesi, sonra 1.10 davet", () => 
     expect((g.match(/bilgilendirmeGonderildi/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
 });
+
+/* ── ÖLÇÜT 14 (kurucu, 10.09 gece ikinci bakış) ─────────────────────────────
+   "Karşı taraf 1.8/1.9'a girdi ama 1.10 Davet gönder'de YOK."
+   KÖK NEDEN: 1.8 ve 1.10 aynı bileşenin İKİ AYRI ÖRNEĞİ ve her biri taraf
+   listesini kendi `load()`u ile okuyor. 1.8'den eklenen taraftan 1.10'un
+   haberi olmuyordu; ancak sayfa yenilenince görünüyordu. Bu, bu üründe
+   tekrar eden "kardeş yol sessiz kaldı" kusur sınıfının aynısıdır. */
+describe("ölçüt 14 — 1.10 her iki yandaki HER tarafı gösterir", () => {
+  it("1.10 listesi yana göre gruplu; iki yan da her hâlde çizilir", () => {
+    const bas = MOTOR.indexOf("function Phase2Parties");
+    const govde = MOTOR.slice(bas, MOTOR.indexOf("function TarafKutusu", bas));
+    expect(govde).toContain("TARAF_YANLARI");
+    expect(govde).toContain('{ rol: "applicant", baslik: "Başvurucu tarafı" }');
+    expect(govde).toContain('{ rol: "respondent", baslik: "Karşı taraf" }');
+    // Üçüncü taraf yalnız varsa; ilk iki yan süzgeçten DÜŞMEZ.
+    expect(govde).toContain('g.rol !== "third_party" || g.liste.length > 0');
+  });
+
+  it("boş yan sessiz kalmaz — başlığıyla durur ve sebebini yazar", () => {
+    const bas = MOTOR.indexOf("function Phase2Parties");
+    const govde = MOTOR.slice(bas, MOTOR.indexOf("function TarafKutusu", bas));
+    expect(govde).toContain("Bu yanda henüz taraf yok.");
+  });
+
+  it("her tarafın KENDİ davet düğmesi var — kabul etmiş taraf da düğmesiz kalmaz", () => {
+    const bas = MOTOR.indexOf("function Phase2Parties");
+    const govde = MOTOR.slice(bas, MOTOR.indexOf("function TarafKutusu", bas));
+    expect(govde).toContain('bolum === "davet" && p.invite_status === "accepted"');
+    expect(govde).toContain("Daveti kabul etti");
+    expect(govde).toContain('(p.invite_status !== "accepted" || bolum === "davet")');
+  });
+
+  it("1.8'de taraf değişince 1.10 yeniden okur (kardeş yol açık kalmaz)", () => {
+    const bas = MOTOR.indexOf("function Phase2Parties");
+    const govde = MOTOR.slice(bas, MOTOR.indexOf("function TarafKutusu", bas));
+    expect(govde).toContain("tazele");
+    expect(govde).toContain("useEffect(() => { if (tazele > 0) load(); }, [tazele, load]);");
+    const g = faz1Govdesi();
+    expect(g).toContain("const [tarafSurumu, setTarafSurumu] = useState(0);");
+    expect(g).toContain("setTarafSurumu((n) => n + 1);");
+    expect(g).toContain("tazele={tarafSurumu}");
+  });
+
+  it("tazeleme SONSUZ DÖNGÜ kurmuyor: 1.10'a `onChanged` verilmiyor", () => {
+    const g = faz1Govdesi();
+    const bas = g.indexOf('bolum="davet"');
+    expect(bas).toBeGreaterThan(-1);
+    const blok = g.slice(bas, g.indexOf("/>", bas));
+    expect(blok, "1.10'a onChanged verilmiş — sayaç kendini besler")
+      .not.toMatch(/onChanged=\{/);
+  });
+
+  it("1.8 tarafında davet düğmesi hâlâ YOK (sıra bozulmadı)", () => {
+    const bas = MOTOR.indexOf("function Phase2Parties");
+    const govde = MOTOR.slice(bas, MOTOR.indexOf("function TarafKutusu", bas));
+    expect(govde).toContain('bolum !== "taraflar" && p.email');
+  });
+});
