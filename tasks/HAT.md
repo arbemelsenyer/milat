@@ -17,31 +17,41 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
-### H-32 · 10.09.2026 · P1 — AŞAMA 1'İN İKİ ALANI İÇİN SQL KOŞULACAK (Cowork)
+### H-33 · 10.09.2026 · P1 — BELGE LİSTESİ YÖNETİCİYE DE KAPALI GÖRÜNÜYOR (canlı ön izleme bulgusu)
 
-**Sorun.** Aşama 1 ekranı (kurucu kararı, `tasks/PILOT-ASAMA-1-DOSYA-KURULUMU.md`)
-iki yeni alan istiyor ve bu iki alanın kolonu canlıda YOK:
-· §1.3 arabulucunun elle verdiği uygunluk kararı (`cases.arabuluculuga_uygunluk`
-  + gerekçe + kaynak),
-· §1.8 tarafa gönderimde kullanılacak kanal (`case_parties.gonderim_kanallari`).
-Kolonlar gelmeden ekran ÇALIŞIR; yalnız bu iki seçim kaydedilmez ve ekranda tek
-satırla "veritabanı güncellemesi bekleniyor" yazar (sessiz düşme yok).
+**Ne oldu.** Aşama 1 ön izlemesinde 1.1'de kırmızı satır çıktı:
+"Belgeler okunamadı: Bu işlem için yetkiniz yok…". Oturum **kurucunun kendi
+hesabı** ve ekranda sağ üstte **Admin** rozeti duruyor; dosya `MP-2026-1020`.
+İstek: `case_documents` SELECT. Aynı sayfada `cases` ve `case_parties`
+okumaları sorunsuz döndü, yani oturum ve jeton sağlam.
 
-**Code SQL yazamaz mı?** Yazdı. Çalıştırmak §10 gereği Cowork'ün işidir.
+**Kesin olmayan nokta:** hata ilk yüklemede çıkmadı, sonrakilerde çıktı — yani
+ya `case_documents` SELECT politikası yöneticiyi kapsamıyor ya da politikanın
+dayandığı bir alt sorgu (görevli arabulucu / taraf eşleşmesi) zamanlamaya
+bağlı. Code canlı politikayı okuyamıyor (Supabase CLI yalnız okuma değil,
+politika metnine erişimi yok).
 
-**COWORK PAKETİ (beş satır):**
-1. **Ne yapılacak:** `tests/sabit/asama1-basvuru-alanlari.sql` canlıda koşulacak.
-2. **Neden:** Aşama 1'in §1.3 ve §1.8 seçimleri kaydedilebilsin.
-3. **Komut:** dosyanın tamamı, olduğu gibi (yalnız `add column if not exists` ve
-   iki `check` kısıtı; hiçbir şey değiştirmez, silmez, taşımaz).
-4. **Başarı kontrolü:** dosyanın başındaki iki `information_schema` sorgusu —
-   `cases`te **3**, `case_parties`te **1** satır dönmeli.
-5. **Sonra Code ne yapacak:** ön izlemede iki seçimi de kaydedip doğrular,
-   sonucu `tasks/todo.md`ye yazar.
+**Ekranda ne değişti (Code'un yaptığı):** hata metni artık yaptığı işi
+anlatıyor. Eskiden her RLS hatasında "…yalnız … **silebilir**" yazıyordu;
+belge LİSTESİ okunamadığında da bu çıkıyordu. Cümle düzeltildi (commit
+`bc7859c`). Bu yalnız METNİ düzeltir, KAPIYI değil.
 
-**Önerim:** koşulsun. Alanlar NULL/boş kabul ediyor, RLS değişmiyor, geri dönüşü
-olan bir işlem. **Kararın etkisi:** koşulmazsa Aşama 1 kapanabilir ama iki alan
-pilotta boş kalır.
+**Seçenekler.**
+- **(a)** Cowork `case_documents` SELECT politikasını okur; yönetici kapsam
+  dışındaysa `has_role(auth.uid(),'admin')` koşulu eklenir.
+- **(b)** Politika doğruysa, dosyanın `assigned_mediator_id` alanı boş olabilir;
+  o zaman kurucu bu dosyada "görevli arabulucu" değildir ve kapı doğru çalışıyor
+  demektir — bu hâlde ekrandaki cümle yeterlidir, kod değişmez.
+- **(c)** Dokunulmaz; belge yükleme akışı pilotta kırık kalır.
+
+**Önerim: (a) için önce ÖLÇÜM.** Cowork tek sorguyla iki şeyi söylesin:
+`select assigned_mediator_id, user_id from cases where application_no='MP-2026-1020';`
+ve `case_documents` SELECT politikasının metni. Ölçüm gelmeden politika
+değiştirmek, çalışan bir kapıyı gevşetme riski taşır.
+
+**Kararın etkisi:** (a) doğruysa yönetici bütün dosyalarda belgeleri görür;
+(b) doğruysa hiçbir şey değişmez ve pilotta dosyaya arabulucu ataması
+hatırlanır.
 
 ### H-27 · 29.08.2026 · **P0** — KVKK imha metni yapılmayan üç şey vaat ediyor
 
@@ -329,6 +339,7 @@ Seçim: A / B / C / (kendi metniniz)
 Not: (varsa)
 ```
 
+### H-32 · CEVAP · 10.09.2026 — ZATEN KOŞULDU (aşağıdaki kayıt). Code: ön izlemede iki seçimi kaydedip doğrula, H-32'yi kapat.
 ### AŞAMA 1 ŞEMASI · KOŞULDU · 10.09.2026 (Cowork)
 `tests/sabit/asama1-basvuru-alanlari.sql` canlıda koşuldu — yalnız ekleme, mevcut
 satır ve sorgu etkilenmedi. **Doğrulama (canlıdan):** `cases.arabuluculuga_uygunluk` ·
@@ -647,6 +658,18 @@ istisna yok. Uygulama sonrası self-servis akışı canlıda uçtan uca test edi
 ---
 
 ## ARŞİV — kapanmış maddeler
+
+### H-32 · KAPANDI · 10.09.2026 — SQL KOŞULDU, İKİ SEÇİM DE ÖN İZLEMEDE DOĞRULANDI
+Cowork `tests/sabit/asama1-basvuru-alanlari.sql`i canlıda koştu; dört kolon da
+yerinde. Code ön izlemede iki seçimi de kaydetti:
+· **1.8 gönderim kanalı** — "E-posta" işaretlendi, sayfa yenilendi, işaretli
+  kaldı. Amber "kayıt düşmez" satırı çıkmadı. **Çalışıyor.**
+· **1.3 uygunluk kararı** — ilk denemede seçim ekranda kalıyor ama sayfa
+  yenilenince kayboluyordu. **Kusur bende çıktı:** `loadCase`/`loadCases`
+  sütunları tek tek sayıyor ve yeni üç kolonu SEÇMİYORDU; yazma başarılıydı,
+  geri okuma yoktu. Üç kolon sorguya ve üretilmiş tiplere eklendi (commit
+  `bc7859c`). Ön izlemede yeniden ölçülecek.
+
 
 ### H-29 · KAPANDI · 10.09.2026 — CODE'A İŞ YOKTU, ARŞİVE ALINDI
 Cowork 07.09'da (a) seçeneğini canlıda koştu: yarım kalan koşumun bıraktığı

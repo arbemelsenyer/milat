@@ -1,5 +1,48 @@
 ## Nerede kaldık
 
+### ▶ AŞAMA 1 + EK BİTTİ — KURUCU "TAMAM" BEKLENİYOR (10.09.2026 akşam)
+Yayın YAPILMADI, edge deploy YAPILMADI (CLAUDE.md §11-C). `main`'e push edildi.
+
+- Doğrulama: `npm run test` **528/528** · `tsc --noEmit` temiz · `npm run build` temiz.
+- Commit'ler: `3502284` H-31 · `5a6db53` Aşama 1 · `30080f4` HAT+bekçi ·
+  `bc7859c` EK (1.8-a · 1.8-b · 1.9→1.10) + iki kusur düzeltmesi.
+- Ön izleme (bu işi taşıyor): id-preview--5ffedb1b-4087-4fe1-a1ef-873c9754f71d.lovable.app
+- Ekran görüntüleri: Masaüstü\medipact claude\ASAMA-1-EKRANLAR (14 masaüstü karesi).
+
+**CANLI ÖN İZLEMEDE ÖLÇÜLDÜ (kurucu giriş yaptı, dosya MP-2026-1020):**
+· 1.3 uygunluk seçimi kaydediliyor ve sayfa yeninlenince **duruyor**. ✔
+· 1.8 gönderim kanalı (E-posta) kaydediliyor ve **duruyor**. ✔ → **HAT H-32 kapandı.**
+· Sıra ekranda 1.1 → 1.10, sol dizinde de aynı. ✔
+· 1.10'da "Süreç bilgilendirmesi henüz gönderilmedi." italik uyarısı çıkıyor,
+  "Davet gönder" düğmesi **kilitlenmiyor**. ✔ (ölçüt 12)
+· 1.8'de "Başvurucu tarafı" ve "Karşı taraf" kutularının ikisinde de
+  "+ Taraf ekle" var, "sınır yok" yazıyor; taraf kartında "Vekil ekle" ve
+  "Vekil girilmedi" satırı görünüyor. ✔ (ölçüt 11)
+
+**AYNI TURDA BULUNAN VE DÜZELTİLEN İKİ KUSUR:**
+1. 1.3 seçimi ekranda kalıyor ama yenileyince kayboluyordu. Sebep: `loadCase`
+   ve `loadCases` sütunları tek tek sayıyor, yeni üç kolonu SEÇMİYORDU. Yazma
+   başarılıydı, geri okuma yoktu. Üç kolon sorguya ve üretilmiş tiplere eklendi.
+2. Yetki hatası metni her RLS hatasında "…silebilir" diyordu; belge LİSTESİ
+   okunamadığında da bu çıktı. Cümle yaptığı işi anlatacak şekilde düzeltildi.
+
+**AÇIK BLOKAJLAR (üçü de kurucuya/Cowork'e bağlı):**
+1. **§1.9 metni** gelmedi → yer tutucu duruyor, gönderim düğmesi kapalı.
+2. **HAT H-33** → 1.1'de "Belgeler okunamadı: yetkiniz yok" çıkıyor; oturum
+   yönetici. Politika ölçümü Cowork'te (Code canlı politika metnini okuyamaz).
+3. **Telefon ekran görüntüsü alınamadı** → Chrome penceresi ekranın tamamını
+   kaplıyor (`screen.availWidth` 1280) ve pencere daraltma iki yoldan da
+   tutmadı (`resize_window` ve `window.resizeTo`, ikincisini tarayıcı engelliyor).
+   Kurucu pencereyi tam ekrandan çıkarırsa Code telefon karelerini alır;
+   ya da kurucu ön izlemeyi kendi telefonundan açar.
+
+**"TAMAM" GELİNCE:** publish + `basvuru-belgelerinden-doldur` ·
+`taraf-iletisim-arastir` · `classify-dispute` ve `_shared/anlatim.ts` fan-out'u
+(36 fonksiyon, liste aşağıdaki eski blokta).
+
+---
+
+
 ### ▶ AŞAMA 1 BİTTİ — KURUCU "TAMAM" BEKLENİYOR (10.09.2026)
 **Aşama kapısı açık (CLAUDE.md §11-C).** Yayın YAPILMADI, edge function deploy
 YAPILMADI. `main`'e push edildi, Lovable ön izlemesi bu commit'le kuruldu.
