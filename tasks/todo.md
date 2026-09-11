@@ -74,6 +74,14 @@ blokları eklendi (15 yeni sınav). Tezgâh kendi açıklamasını yakalamasın 
    kaydı.
 3. Aşama 2'ye geçiş (kurucu hangi ekran olduğunu söyleyecek).
 
+**AŞAMA KAPISINDAN BAĞIMSIZ, BEKLEYEN İŞ**
+· **H-35 (P1)** — Yönetici Bilgi Tabanı: "20 kitap" yazıyor, liste boş.
+  Cowork canlıda ölçtü: veri var (75 kitap · 17.402 parça), RLS açık, sütun
+  izni tam — kusur ekran tarafında. Bu iş Aşama 1 kapısına bağlı DEĞİL, ama
+  kurucu bu turda "test → push → dur" dedi; başlanmadı. "devam" denince
+  sıradaki iş budur. Kaynak: `tasks/HAT.md` H-35 (dosya commit'lenmedi,
+  Cowork'ün çalışma ağacındaki değişikliğine dokunulmadı — CLAUDE.md §11).
+
 ---
 
 ### ■ ÖNCEKİ DUR — 10.09.2026 gece
