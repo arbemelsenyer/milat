@@ -57,7 +57,7 @@ import { BazCizgiSorulari } from "@/components/mediation/BazCizgiSorulari";
 /* AŞAMA 1'in ORTAK ADIM KALIBI (§2 · §2-A). Düğmenin yeri, cevabın biçimi ve
    kaynak sırası orada TEK KOPYA hâlinde durur; adımlar kendi düzenini kurmaz. */
 import {
-  Adim, AiCevap, AiDugmesi, KAYNAK_YOK_METNI,
+  Adim, AiCevap, AiDugmesi, EksikSatiri, KAYNAK_YOK_METNI,
   type AiCevapDurumu, type AiKaynak,
 } from "@/components/basvuru/AdimKalibi";
 
@@ -2586,7 +2586,9 @@ function UzmanlikAdimlari({ caseRow, reload, canEdit }: {
   async function aiOnersin(hedef: "ana" | "alt") {
     const metin = String(caseRow.issue_description ?? "").trim() || String(caseRow.title ?? "").trim();
     if (metin.length < 10) {
-      const d = "Önce 1.2'deki uyuşmazlık konusunu yazın; öneri o metinden üretilir.";
+      /* SIRA EMRİ DEĞİL, EKSİK BİLDİRİMİ (ölçüt 16). Eskiden "Önce 1.2'yi
+         yazın" diyordu; bu, sırayı zorunluymuş gibi okutuyordu. */
+      const d = "Eksik: 1.2'deki uyuşmazlık konusu. Öneri o metinden üretilir; metni yazıp yeniden deneyin. Bu arada alanı elle de seçebilirsiniz.";
       if (hedef === "ana") { setAnaDurum("bulunamadi"); setAnaMetin(d); }
       else { setAltDurum("bulunamadi"); setAltMetin(d); }
       return;
@@ -2676,7 +2678,7 @@ function UzmanlikAdimlari({ caseRow, reload, canEdit }: {
         baslik="Alt uzmanlık"
         ustBilgi={ana
           ? `Seçili ana alan: ${catLabel(ana)} — alt uzmanlık buna bağlı okunur.`
-          : "Önce 1.5'te ana alanı seçin; alt uzmanlık ana alana bağlıdır."}
+          : "1.5'te ana alan henüz seçilmedi; AI önerisi ana alana bağlı okunur. Alt uzmanlığı şimdi de elle seçebilirsiniz."}
         aiDugme={canEdit ? <AiDugmesi tur="onersin" onClick={() => aiOnersin("alt")} busy={busy} /> : undefined}
         aiCevap={<AiCevap durum={altDurum} metin={altMetin} kaynaklar={kaynaklar} hataMetni={hata} />}
       >
@@ -2816,8 +2818,15 @@ function TarafIletisimKarti({ taraf, canEdit, onDegisti }: {
 
   return (
     <div className="rounded-md border p-3 space-y-3">
-      <div className="text-sm font-medium">
-        {partyDisplay(taraf)} <span className="text-muted-foreground font-normal">· {roleLabel(taraf.party_role)}</span>
+      {/* BAŞLIK DİZİLİŞİ 1.10 İLE AYNI (kabul ölçütü 15): ad · sıfat · tür.
+          Eskiden burada tür hiç yazmıyordu; aynı taraf iki adımda iki farklı
+          künyeyle görünüyordu. */}
+      <div className="text-sm font-medium break-words">
+        {partyDisplay(taraf)}{" "}
+        <span className="text-muted-foreground font-normal">
+          · {roleLabel(taraf.party_role)}
+          {" · "}{taraf.party_type === "corporate" ? "Kurumsal" : "Bireysel"}
+        </span>
       </div>
       {alanSatiri("eposta", "E-posta", String(taraf.email ?? ""))}
       {alanSatiri("telefon", "Telefon", String(taraf.phone ?? taraf.gsm ?? ""))}
@@ -2862,10 +2871,17 @@ function SurecBilgilendirmeAdimi({ caseRow, parties }: { caseRow: CaseRow; parti
       baslik="Süreç bilgilendirme"
       ustBilgi="Dava şartı arabuluculukta ilk bildirim, vekille temsil edilse bile ASIL TARAFLARA gider."
       aiCevap={
-        <p className="mt-2 text-xs italic text-amber-600 dark:text-amber-400 leading-snug">
-          Metin kurucudan bekleniyor; gelmeden gönderim açılmaz. Dosyaya has bilgiler (dosya no,
-          taraf adı, konu, arabulucu) metne geldiğinde otomatik yerleştirilecektir.
-        </p>
+        /* EKSİK, ADIYLA YAZILIR (kabul ölçütü 16). Bu adım BAŞKA BİR ADIM
+           yüzünden kapalı değil: gönderilecek metnin kendisi henüz yok.
+           Kilit değil, gerçekten olmayan veri. Eksiğin ne olduğu ve kimde
+           olduğu ekranda yazar; `title` ipucuna bırakılmaz — ipucu telefonda
+           hiç görünmez. Öteki adımlar bu adım yüzünden beklemez. */
+        <EksikSatiri>
+          Eksik: süreç bilgilendirme metni. Metin kurucudan bekleniyor; ürün tarafa gidecek ilk
+          bildirimin sözlerini kendi yazmaz. Metin gelince dosyaya has bilgiler (dosya no, taraf
+          adı, konu, arabulucu) otomatik yerleşir ve gönderim açılır. Bu adım beklerken 1.10
+          dâhil bütün adımlar açıktır.
+        </EksikSatiri>
       }
     >
       <div className="rounded-md bg-muted/40 p-3 text-sm whitespace-pre-wrap">
@@ -2877,6 +2893,12 @@ function SurecBilgilendirmeAdimi({ caseRow, parties }: { caseRow: CaseRow; parti
           ? "henüz taraf eklenmedi"
           : asillar.map((p) => partyDisplay(p)).join(" · ")}
       </div>
+      {asillar.length === 0 && (
+        <EksikSatiri>
+          Henüz taraf girilmedi (1.8). Bilgilendirme asıl taraflara gider; taraf girilince
+          buraya kendiliğinden düşer.
+        </EksikSatiri>
+      )}
       <Button size="sm" disabled title="Süreç bilgilendirme metni kurucudan gelmeden gönderim açılmaz">
         Bilgilendirmeyi gönder
       </Button>
@@ -3074,10 +3096,13 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
   const kalanGun = bitis ? Math.ceil((new Date(bitis).getTime() - Date.now()) / 86400000) : null;
 
   const statusStripItems: { label: string; value: string }[] = [
-    { label: "Sistem No", value: caseRow.application_no || "—" },
-    { label: "Uyuşmazlık Türü", value: caseRow.dispute_type ? anaAltLabel(caseRow.dispute_type, caseRow.dispute_subtype) : "Bekliyor" },
-    { label: "Başvuru Türü", value: sureEtiketi ?? "Seçilmedi" },
-    { label: "Başvuru Tarihi", value: new Date(caseRow.application_date ?? caseRow.created_at).toLocaleDateString("tr-TR") },
+    /* ÜST ŞERİT, ADIMLARIN KELİMELERİNİ KULLANIR (ölçüt 15). Şerit "Uyuşmazlık
+       Türü" diyordu; ekranda o verinin adı 1.5/1.6'da "Ana uzmanlık" ve "Alt
+       uzmanlık"tır. Aynı veriye iki ad, kullanıcıyı aratır. */
+    { label: "Sistem no", value: caseRow.application_no || "—" },
+    { label: "Uzmanlık", value: caseRow.dispute_type ? anaAltLabel(caseRow.dispute_type, caseRow.dispute_subtype) : "Seçilmedi" },
+    { label: "Başvuru türü", value: sureEtiketi ?? "Seçilmedi" },
+    { label: "Başvuru tarihi", value: new Date(caseRow.application_date ?? caseRow.created_at).toLocaleDateString("tr-TR") },
   ];
 
   return (
@@ -3092,10 +3117,16 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
         ]}
       />
       <Card className="p-4 sm:p-6 space-y-4">
+        {/* KURAL EKRANDA YAZAR (kabul ölçütü 16, kurucu 11.09). Arabulucu
+            numaraları zorunlu sıra sanmasın diye kuralı ekranın kendisi söyler;
+            yoksa kilit olmadığı hâlde kilitliymiş gibi kullanılır. */}
         <p className="text-sm text-muted-foreground">
-          Dosya kurulumunun tamamı bu ekrandadır ve yukarıdan aşağı sırayla ilerler. Her adımda
-          elle girebilir ya da sağdaki AI düğmesini kullanabilirsiniz; AI'nın söylediği her şey
-          kaynağıyla birlikte, alanın hemen altında görünür.
+          Dosya kurulumunun tamamı bu ekrandadır. Numaralar <b>önerilen sıradır, zorunlu
+          değildir</b>: adımları istediğiniz sırada yapabilir, atlayabilir, geri dönebilirsiniz.
+          Hiçbir adım bir başkası bitmeden kilitlenmez. Bir adımın girdisi eksikse ekran hata
+          vermez, <i>neyin eksik olduğunu</i> alanın altında söyler. Her adımda elle girebilir
+          ya da sağdaki AI düğmesini kullanabilirsiniz; AI'nın söylediği her şey kaynağıyla
+          birlikte, alanın hemen altında görünür.
         </p>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -3289,12 +3320,16 @@ function Phase1Setup({ caseRow, reload, isMediator, userId, jump }: {
                  davet gönderir; ana ekranın taraf listesini 1.8 ve iletişim
                  kartı besler. */
               davetUyarisi={davaSarti && !bilgilendirmeGonderildi ? (
-                /* DÜĞME KİLİTLENMEZ. Ürünün genel kuralı: sistem uyarır,
-                   arabulucu karar verir (Cowork'ün koyduğu madde, kurucu
-                   ekranda görüp itiraz edebilir). */
-                <p className="text-xs italic text-amber-600 dark:text-amber-400 leading-snug mb-2">
-                  Süreç bilgilendirmesi henüz gönderilmedi.
-                </p>
+                /* DÜĞME KİLİTLENMEZ (kabul ölçütü 16). Sistem uyarır, arabulucu
+                   karar verir. Uyarı da öteki eksiklerle AYNI usulde yazılır —
+                   eskiden burası tek başına kehribar renkliydi, ekranda üçüncü
+                   bir bildirim biçimi doğuruyordu (§2: tek usul). */
+                <div className="mb-2">
+                  <EksikSatiri>
+                    Süreç bilgilendirmesi henüz gönderilmedi (1.9). Önerilen sıra önce 1.9'dur,
+                    ama davet gönderimi kapalı değildir; karar sizindir.
+                  </EksikSatiri>
+                </div>
               ) : null}
             />
           </Adim>
@@ -4122,6 +4157,11 @@ function DeadlineCard({ caseRow, bare = false, bolum = "hepsi", onTurDegisti }: 
   const [extending, setExtending] = useState(false);
   const [savingType, setSavingType] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /* EKSİK ≠ HATA (kabul ölçütü 16). `error` gerçek arızadır ve kırmızı çıkar;
+     `eksik` yalnız "bu adımın girdisi henüz yok" demektir ve öteki adımlarla
+     aynı küçük italik usulde yazılır. İkisi karıştırılırsa arabulucu her boş
+     alanı arıza sanır. */
+  const [eksik, setEksik] = useState<string | null>(null);
   const [voluntaryEnd, setVoluntaryEnd] = useState<string>(
     caseRow.deadline_total ? caseRow.deadline_total.slice(0, 10) : ""
   );
@@ -4144,14 +4184,23 @@ function DeadlineCard({ caseRow, bare = false, bolum = "hepsi", onTurDegisti }: 
   }
 
   const detect = useCallback(async () => {
+    /* VERİSİ OLMAYAN ADIM HATA VERMEZ (kabul ölçütü 16, kurucu 11.09).
+       Süre tespiti ana uzmanlık etiketi olmadan yapılamaz — bu ürünün
+       keyfî kilidi değil, tespitin gerçek girdisi. Ama eskiden düğme hiç
+       açılmıyor, açılsa da KIRMIZI HATA kutusu çıkıyordu. Artık düğme açık
+       ve eksik, hata değil BİLGİ olarak, öteki adımlarla aynı küçük italik
+       usulde yazılır. Arabulucu sırayı kendi seçer. */
     if (!caseRow.dispute_type) {
-      setError("Önce yukarıdaki karttan AI uyuşmazlık türünü tespit edin.");
+      setError(null);
+      setEksik("Süre tespiti için 1.5'teki ana uzmanlık gerekiyor; henüz seçilmedi. Ana alanı seçip yeniden deneyin — arada başka adımlarda çalışmaya devam edebilirsiniz.");
       return;
     }
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setEksik(null);
     try {
       const { data, error: fErr } = await supabase.functions.invoke("detect-legal-deadlines", {
-        body: { case_id: caseRow.id, dispute_type: caseRow.dispute_type, dispute_text: caseRow.title ?? "", persist: true },
+        /* Uyuşmazlık metninin TEK kaynağı 1.2'dir (kabul ölçütü 1). Burada
+           eskiden `title` okunuyordu; başlık artık ayrı bir veri değil. */
+        body: { case_id: caseRow.id, dispute_type: caseRow.dispute_type, dispute_text: caseRow.issue_description ?? caseRow.title ?? "", persist: true },
       });
       if (fErr) throw fErr;
       if ((data as any)?.error) throw new Error((data as any).error);
@@ -4185,7 +4234,7 @@ function DeadlineCard({ caseRow, bare = false, bolum = "hepsi", onTurDegisti }: 
     } catch (e: any) {
       setError(e?.message ?? "Süre tespiti başarısız. Tekrar deneyin.");
     } finally { setBusy(false); }
-  }, [caseRow.id, caseRow.dispute_type, caseRow.title, caseRow.application_date, caseRow.created_at]);
+  }, [caseRow.id, caseRow.dispute_type, caseRow.issue_description, caseRow.title, caseRow.application_date, caseRow.created_at]);
 
   // Auto-detect when Dava Şartı seçilmiş ve dispute_type varsa
   const detectedRef = useRef(false);
@@ -4268,7 +4317,9 @@ function DeadlineCard({ caseRow, bare = false, bolum = "hepsi", onTurDegisti }: 
       {/* ARABULUCULUK TÜRÜ SEÇİMİ — 1.4 */}
       {bolum !== "sure" && (
       <div>
-        <div className="text-sm font-medium mb-2">Arabuluculuk Türü:</div>
+        {/* TEK TABİR (ölçüt 15): adımın adı 1.4'te "Başvuru türü"dür; burada
+            "Arabuluculuk Türü" yazıyordu — aynı şeyin ikinci adı. */}
+        <div className="text-sm font-medium mb-2">Başvuru türü</div>
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
@@ -4276,7 +4327,7 @@ function DeadlineCard({ caseRow, bare = false, bolum = "hepsi", onTurDegisti }: 
             disabled={savingType}
             onClick={() => chooseType("dava_sarti")}
           >
-            Dava Şartı Arabuluculuk
+            Dava şartı
           </Button>
           <Button
             size="sm"
@@ -4284,7 +4335,7 @@ function DeadlineCard({ caseRow, bare = false, bolum = "hepsi", onTurDegisti }: 
             disabled={savingType}
             onClick={() => chooseType("ihtiyari")}
           >
-            İhtiyari Arabuluculuk
+            İhtiyari
           </Button>
         </div>
       </div>
@@ -4292,13 +4343,18 @@ function DeadlineCard({ caseRow, bare = false, bolum = "hepsi", onTurDegisti }: 
       )}
 
       {bolum !== "sure" && !local.mediation_type && (
-        <p className="text-xs text-muted-foreground italic">Lütfen arabuluculuk türünü seçin.</p>
+        <EksikSatiri>Başvuru türü henüz seçilmedi. Dava şartı ya da ihtiyariyi seçin.</EksikSatiri>
       )}
 
+      {/* Verisi olmayan adım HATA VERMEZ, neyin eksik olduğunu söyler (ölçüt 16).
+          Süre hesabının dayanağı başvuru türüdür; tür seçilmeden hesaplanacak
+          bir şey yoktur. Bu bir kilit değil, gerçekten yok olan veridir —
+          ekran onu adıyla söyler ve ötekiler açık kalır. */}
       {bolum === "sure" && !local.mediation_type && (
-        <p className="text-xs text-muted-foreground italic">
-          Süreler, 1.4'te başvuru türü seçilince hesaplanır.
-        </p>
+        <EksikSatiri>
+          Başvuru türü seçilmedi (1.4). Süreler başvuru türüne göre hesaplanır; türü seçince
+          bu adım kendiliğinden dolar. Öteki adımlar açıktır, sırayı beklemeniz gerekmez.
+        </EksikSatiri>
       )}
 
       {/* İHTİYARİ AKIŞ — 1.7 */}
@@ -4312,22 +4368,22 @@ function DeadlineCard({ caseRow, bare = false, bolum = "hepsi", onTurDegisti }: 
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
             <div>
-              <Label className="text-xs">📅 Başlangıç Tarihi</Label>
+              <Label className="text-xs">Başlangıç tarihi</Label>
               <Input value={startDate.toLocaleDateString("tr-TR")} disabled />
             </div>
             <div>
-              <Label className="text-xs">📅 Taraflarca Belirlenen Bitiş Tarihi</Label>
+              <Label className="text-xs">Taraflarca belirlenen bitiş tarihi</Label>
               <Input type="date" min={todayIso} value={voluntaryEnd} onChange={(e) => setVoluntaryEnd(e.target.value)} />
             </div>
           </div>
           <Button size="sm" onClick={saveVoluntary} disabled={savingVoluntary || !voluntaryEnd}>
-            {savingVoluntary ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Kaydediliyor…</> : "Bitiş Tarihini Kaydet"}
+            {savingVoluntary ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Kaydediliyor…</> : "Bitiş tarihini kaydet"}
           </Button>
           {local.deadline_total && (
             <div className="text-sm border-t pt-3 space-y-1">
               <div><span className="text-muted-foreground">📅 Başvuru:</span> {startDate.toLocaleDateString("tr-TR")}</div>
               <div><span className="text-muted-foreground">📅 Bitiş:</span> {new Date(local.deadline_total).toLocaleDateString("tr-TR")}</div>
-              <div><span className="text-muted-foreground">Kalan Süre:</span> {chip ?? "—"}</div>
+              <div><span className="text-muted-foreground">Kalan süre:</span> {chip ?? "—"}</div>
             </div>
           )}
         </div>
@@ -4340,18 +4396,27 @@ function DeadlineCard({ caseRow, bare = false, bolum = "hepsi", onTurDegisti }: 
             <p className="text-xs text-muted-foreground">
               AI, uyuşmazlığı sınıflandırıp mahkeme türü ile yasal süreyi tespit eder.
             </p>
-            <Button size="sm" variant="outline" onClick={detect} disabled={busy || !caseRow.dispute_type}>
+            {/* EKRAN KİLİDİ YOK (kabul ölçütü 16, kurucu 11.09).
+                Bu düğme eskiden `!caseRow.dispute_type` ile KAPANIYORDU: 1.5'te
+                ana uzmanlık seçilmeden 1.7'ye hiç dokunulamıyordu. Kurucunun
+                şikâyeti tam buydu — "hangi aşamada ne aksak göremiyorum,
+                uydurma veri girmek zorunda kalıyorum". Artık düğme AÇIK;
+                tespit ana alan olmadan da denenir, eksik varsa altında YAZIYLA
+                söylenir. Sıralama önerilen sıradır, kilit değildir. */}
+            <Button size="sm" variant="outline" onClick={detect} disabled={busy}>
               {busy ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Tespit ediliyor…</>
-                    : <><RefreshCw className="h-4 w-4 mr-1" /> {local.deadline_detected_at ? "Yeniden Tespit" : "Mahkeme Türünü Tespit Et"}</>}
+                    : <><RefreshCw className="h-4 w-4 mr-1" /> {local.deadline_detected_at ? "Yeniden tespit" : "Mahkeme türünü tespit et"}</>}
             </Button>
           </div>
           <UcretliIsaret />
 
           {!caseRow.dispute_type && (
-            <p className="text-xs text-muted-foreground italic">
-              Önce yukarıdaki karttan uyuşmazlık türünü tespit edin.
-            </p>
+            <EksikSatiri>
+              1.5'te ana uzmanlık henüz seçilmedi; süre tespitinin girdisi odur. Öteki adımlar
+              açıktır, sıra beklemeniz gerekmez.
+            </EksikSatiri>
           )}
+          {eksik && <EksikSatiri>{eksik}</EksikSatiri>}
 
           {error && (
             <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive flex items-start gap-1">
@@ -4363,15 +4428,15 @@ function DeadlineCard({ caseRow, bare = false, bolum = "hepsi", onTurDegisti }: 
             <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-2">
               <p>Bu uyuşmazlık dava şartı arabuluculuk kapsamında değildir. İhtiyari arabuluculuk yapılabilir.</p>
               <Button size="sm" variant="outline" onClick={() => chooseType("ihtiyari")}>
-                İhtiyari Arabuluculuğa Geç
+                İhtiyariye geç
               </Button>
             </div>
           )}
 
           {local.deadline_detected_at && local.mahkeme_turu && local.mahkeme_turu !== "yok" && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-              <div><span className="text-muted-foreground">Mahkeme Türü:</span> <b>{COURT_LABEL[local.mahkeme_turu]}</b></div>
-              <div><span className="text-muted-foreground">Yasal Süre:</span> <b>{local.sure_hafta} hafta{local.uzatma_hafta ? ` + ${local.uzatma_hafta} hafta uzatma` : ""}</b></div>
+              <div><span className="text-muted-foreground">Mahkeme türü:</span> <b>{COURT_LABEL[local.mahkeme_turu]}</b></div>
+              <div><span className="text-muted-foreground">Yasal süre:</span> <b>{local.sure_hafta} hafta{local.uzatma_hafta ? ` + ${local.uzatma_hafta} hafta uzatma` : ""}</b></div>
               <div className="md:col-span-2"><span className="text-muted-foreground">Dayanak:</span> {local.legal_basis || "—"}</div>
               <div><span className="text-muted-foreground">📅 Başvuru:</span> {startDate.toLocaleDateString("tr-TR")}</div>
               <div><span className="text-muted-foreground">📅 Süre Sonu:</span> {local.deadline_total ? new Date(local.deadline_total).toLocaleDateString("tr-TR") : "—"}</div>
@@ -4384,7 +4449,7 @@ function DeadlineCard({ caseRow, bare = false, bolum = "hepsi", onTurDegisti }: 
                   )}
                 </div>
               )}
-              <div><span className="text-muted-foreground">Kalan Süre:</span> {chip ?? "—"}</div>
+              <div><span className="text-muted-foreground">Kalan süre:</span> {chip ?? "—"}</div>
             </div>
           )}
 
@@ -4769,9 +4834,10 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
     return null;
   }
 
-  const ROL_ETIKET: Record<string, string> = {
-    applicant: "Başvurucu", respondent: "Karşı Taraf", third_party: "Üçüncü Taraf",
-  };
+  /* TEK TABİR (kabul ölçütü 15): rol adları TEK yerden okunur — `roleLabel`.
+     Eskiden aynı üç etiket bu dosyada DÖRT ayrı yerde elle yazılıydı; biri
+     değişince ötekiler geride kalıyordu. */
+  const ROL_SECENEKLERI = ROL_KODLARI.map((kod) => ({ value: kod, label: roleLabel(kod) }));
 
   // "Tarafı Kaydet" artık doğrudan kaydetmez; önce özet paneli açar.
   function reviewDraft() {
@@ -4786,12 +4852,8 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
   function draftConfirmFields(d: PartyDraft): ConfirmField[] {
     const isInd = d.party_type === "individual";
     const rows: ConfirmField[] = [
-      { key: "party_role", label: "Rol", value: d.party_role, display: ROL_ETIKET[d.party_role] ?? d.party_role,
-        options: [
-          { value: "applicant", label: "Başvurucu" },
-          { value: "respondent", label: "Karşı Taraf" },
-          { value: "third_party", label: "Üçüncü Taraf" },
-        ] },
+      { key: "party_role", label: "Rol", value: d.party_role, display: roleLabel(d.party_role),
+        options: ROL_SECENEKLERI },
       { key: "party_type", label: "Tür", value: d.party_type, display: isInd ? "Bireysel" : "Kurumsal",
         options: [{ value: "individual", label: "Bireysel" }, { value: "corporate", label: "Kurumsal" }] },
     ];
@@ -4979,7 +5041,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
           </span>
           {bolum !== "taraflar" && bolum !== "davet" && (
             <Button onClick={() => setDraft(emptyParty(parties.length === 0 ? "applicant" : "respondent"))}>
-              <Plus className="h-4 w-4 mr-1" /> Taraf Ekle
+              <Plus className="h-4 w-4 mr-1" /> Taraf ekle
             </Button>
           )}
         </div>
@@ -5015,7 +5077,10 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
         )}
 
         {loading ? <Loader2 className="animate-spin" /> : parties.length === 0 ? (
-          <p className="text-muted-foreground">Henüz taraf eklenmedi.</p>
+          <EksikSatiri>
+            Henüz taraf eklenmedi. Yukarıdaki "Taraf ekle" düğmesiyle her iki yana da taraf
+            girebilirsiniz; sıra beklemeniz gerekmez.
+          </EksikSatiri>
         ) : (
           <div className="space-y-3">
             {tarafGruplari.map((grup) => (
@@ -5031,26 +5096,49 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
               )}
               {grup.liste.map((p) => (
               <motion.div variants={itemVariants} key={p.id} className="p-3 border rounded space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
-                  <div className="min-w-0">
-                    <div className="font-medium break-words">{p.full_name || p.company_name || "(isimsiz)"}</div>
+                {/* ── TARAF SATIRI — TEK DÜZEN (kabul ölçütü 15) ───────────────
+                    Kurucu 11.09: "Her tarafın satırı birebir aynı dizilişte
+                    dursun: ad · sıfat · tür · iletişim · vekil · düğme. Taraf
+                    sayısı değişince düzen değişmez; eksik bilgi satırı
+                    kaydırmaz, yerinde 'e-posta yok' / 'Vekil girilmedi' diye
+                    durur."
+
+                    Bu yüzden satır ızgaradır, akış değil: sol sütun bilgi, sağ
+                    sütun düğme. DÖRT BİLGİ SATIRININ HEPSİ HER ZAMAN ÇİZİLİR —
+                    veri yoksa yerinde italik yer tutucu durur. Eskiden e-posta
+                    sıfat/tür ile aynı satıra giriyordu ve vekil satırı kimi
+                    tarafta hiç çizilmiyordu; taraf sayısı arttıkça satırlar
+                    birbirine göre kayıyordu. */}
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_15rem] sm:items-start min-w-0">
+                  <div className="min-w-0 space-y-0.5">
+                    {/* 1 · ad */}
+                    <div className="font-medium break-words">{partyDisplay(p)}</div>
+                    {/* 2 · sıfat · 3 · tür */}
                     <div className="text-xs text-muted-foreground break-words">
-                      {p.party_role === "applicant" ? "Başvurucu" : p.party_role === "respondent" ? "Karşı Taraf" : "Üçüncü Taraf"}
+                      {roleLabel(p.party_role)}
                       {" · "}{p.party_type === "corporate" ? "Kurumsal" : "Bireysel"}
-                      {" · "}{p.email || "e-posta yok"}
                     </div>
-                    {/* Vekil varsa GÖRÜNÜR: arabulucu kimin vekille temsil
-                        edildiğini listeye bakarak görsün, kart açmasın. */}
+                    {/* 4 · iletişim — satır HER ZAMAN durur */}
+                    <div className="text-xs text-muted-foreground break-words">
+                      {p.email || <span className="italic">e-posta yok</span>}
+                      {" · "}
+                      {getPartyPhone(p) || <span className="italic">telefon yok</span>}
+                    </div>
+                    {/* 5 · vekil — satır HER ZAMAN durur */}
                     <div className="text-xs text-muted-foreground break-words">
                       {p.vekil_ad_soyad
                         ? <>Vekil: {p.vekil_ad_soyad}{p.vekil_baro ? ` · ${p.vekil_baro}` : ""}{p.vekil_sicil_no ? ` · sicil ${p.vekil_sicil_no}` : ""}</>
                         : <span className="italic">Vekil girilmedi</span>}
                     </div>
                   </div>
-                  {/* Düğme satırı dar sütunda (Aşama 1'in iki sütunlu düzeni ~320px)
-                      alt satıra iner: flex-wrap + min-w-0, düğmelerde metin sarabilir.
-                      Sabit tek satır kaldığında sayfa yana taşıyordu. */}
-                  <div className="flex flex-wrap items-center justify-end gap-1 min-w-0 max-w-full">
+                  {/* ── 6 · DÜĞME SÜTUNU ─────────────────────────────────────
+                      Izgaranın sağ sütunu SABİT GENİŞLİKTİR (15rem). `auto`
+                      bırakılırsa her satır kendi düğmesine göre genişler ve
+                      satırlar birbirine göre KAYAR — kurucunun "her tarafın
+                      satırı aynı hizada dursun" maddesi tam bunu yasaklıyor.
+                      Dar ekranda sütun alt satıra iner; düğmelerde metin
+                      sarabilir, sabit tek satır kaldığında sayfa yana taşıyordu. */}
+                  <div className="flex flex-wrap items-start gap-1 sm:justify-end min-w-0">
                     {/* DAVET YALNIZ 1.10'DA (kurucu EK): dava şartında taraflara
                         davet, süreç bilgilendirmesinden SONRA gider. */}
                     {/* HER TARAFIN KENDİ DÜĞMESİ (kabul ölçütü 14). Daveti
@@ -5061,30 +5149,24 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
                     {bolum === "davet" && p.invite_status === "accepted" && (
                       <span className="text-xs text-muted-foreground shrink-0">Daveti kabul etti</span>
                     )}
-                    {bolum !== "taraflar" && p.email && (p.invite_status !== "accepted" || bolum === "davet") && (
+                    {/* TEK TABİR (kabul ölçütü 15). Eskiden aynı iş iki adla
+                        çıkıyordu: e-postası olan tarafta "Davet gönder",
+                        olmayanda "Davet Linki Oluştur". Kurucu 11.09 canlı ön
+                        izlemede bunu gördü. Artık düğme TEK ve adı her tarafta
+                        aynı; e-posta yoksa iş yine yapılır (link üretilir) ve
+                        eksik olan ŞEY düğmenin altında yazılır — düğme
+                        kapanmaz (kabul ölçütü 16). */}
+                    {bolum !== "taraflar" && (p.invite_status !== "accepted" || bolum === "davet") && (
                       <Button
                         variant="ghost"
                         size="sm"
                         className="max-w-full whitespace-normal text-left h-auto py-1.5"
-                        onClick={() => sendInvite(p.id)}
+                        onClick={() => sendInvite(p.id, p.email ? undefined : { skipEmail: true })}
                         disabled={invitingId === p.id}
                         title={inviteUrls[p.id] ? "Yeniden gönder" : "Davet gönder"}
                       >
                         {invitingId === p.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin shrink-0" /> : <Mail className="h-4 w-4 mr-1 shrink-0" />}
                         {inviteUrls[p.id] ? "Yeniden gönder" : "Davet gönder"}
-                      </Button>
-                    )}
-                    {bolum !== "taraflar" && !p.email && (p.invite_status !== "accepted" || bolum === "davet") && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="max-w-full whitespace-normal text-left h-auto py-1.5"
-                        onClick={() => sendInvite(p.id, { skipEmail: true })}
-                        disabled={invitingId === p.id}
-                        title="Davet Linki Oluştur"
-                      >
-                        {invitingId === p.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin shrink-0" /> : <Mail className="h-4 w-4 mr-1 shrink-0" />}
-                        Davet Linki Oluştur
                       </Button>
                     )}
                     {bolum !== "taraflar" && inviteUrls[p.id] && revealedId !== p.id && (
@@ -5095,7 +5177,7 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
                         onClick={() => setRevealedId(p.id)}
                         title="Davet linkini göster"
                       >
-                        Davet Linkini Göster
+                        Davet linkini göster
                       </Button>
                     )}
                     {bolum !== "davet" && (
@@ -5135,6 +5217,18 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
                     )}
                   </div>
                 </div>
+                {/* EKSİK, KAPALI DÜĞMEYLE DEĞİL YAZIYLA SÖYLENİR (ölçüt 16).
+                    E-postası olmayan tarafta davet yine gönderilebilir: ürün
+                    link üretir, arabulucu elden iletir. Eksik olan şeyi burada
+                    ADIYLA yazarız; eskiden bu bilgi yalnız düğmenin adında
+                    gizliydi ve iki farklı ad doğuruyordu (ölçüt 15). */}
+                {bolum === "davet" && !p.email && (
+                  <EksikSatiri>
+                    E-posta yok: davet e-postayla gidemez. "Davet gönder" yine çalışır, davet
+                    linkini üretir; linki bu tarafa elden iletirsiniz. E-postayı 1.8'den
+                    girebilirsiniz.
+                  </EksikSatiri>
+                )}
                 {revealedId === p.id && inviteUrls[p.id] && (
                   <div className="flex items-center gap-2 flex-wrap bg-muted/40 rounded p-2">
                     <Input
@@ -5144,8 +5238,12 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
                       onFocus={(e) => e.currentTarget.select()}
                     />
                     <Button size="sm" variant="outline" onClick={() => copyInviteLink(inviteUrls[p.id])}>
-                      <Copy className="h-3 w-3 mr-1" /> Linki Kopyala
+                      <Copy className="h-3 w-3 mr-1" /> Linki kopyala
                     </Button>
+                    {/* TELEFON YOKSA SEBEBİ EKRANDA YAZAR (ölçüt 16). Düğme
+                        gerçekten iş yapamaz — WhatsApp numarasız açılmaz — ama
+                        sebebi yalnız `title` ipucunda kalmaz; ipucu telefonda
+                        hiç görünmüyordu. */}
                     <Button
                       size="sm"
                       variant="outline"
@@ -5153,11 +5251,17 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
                       disabled={!getPartyPhone(p)}
                       title={!getPartyPhone(p) ? "Telefon numarası girilmemiş" : undefined}
                     >
-                      <MessageSquare className="h-3 w-3 mr-1" /> WhatsApp'tan Gönder
+                      <MessageSquare className="h-3 w-3 mr-1" /> WhatsApp'tan gönder
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setRevealedId(null)}>
                       Gizle
                     </Button>
+                    {!getPartyPhone(p) && (
+                      <EksikSatiri>
+                        Telefon yok: WhatsApp'tan gönderilemez. Linki kopyalayıp elden
+                        iletebilir ya da telefonu 1.8'den girebilirsiniz.
+                      </EksikSatiri>
+                    )}
                   </div>
                 )}
               </motion.div>
@@ -5297,9 +5401,9 @@ function Phase2Parties({ caseRow, isMediator, userId, onDone, bare = false, onCh
               <Select value={draft.party_role} onValueChange={(v: any) => setDraft({ ...draft, party_role: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="applicant">Başvurucu</SelectItem>
-                  <SelectItem value="respondent">Karşı Taraf</SelectItem>
-                  <SelectItem value="third_party">Üçüncü Taraf</SelectItem>
+                  {ROL_SECENEKLERI.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -5460,8 +5564,13 @@ const ALLOWED_MIME = [
 function partyDisplay(p: any) {
   return p.full_name || (p.party_type === "corporate" ? p.company_name : `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim()) || "(isimsiz)";
 }
+/* ── ROL ETİKETİ — TEK TANIM (kabul ölçütü 15) ───────────────────────────────
+   Kurucu 11.09: "aynı iş her yerde aynı kelimeyle yazılır." Rol adı ekranda
+   dört ayrı yerde ayrı ayrı yazılıydı ve yazımı da tutmuyordu ("Karşı Taraf"
+   / "Karşı taraf"). Tek tanım burada; herkes buradan okur. */
+const ROL_KODLARI = ["applicant", "respondent", "third_party"] as const;
 function roleLabel(r?: string) {
-  return r === "applicant" ? "Başvurucu" : r === "respondent" ? "Karşı Taraf" : "Üçüncü Taraf";
+  return r === "applicant" ? "Başvurucu" : r === "respondent" ? "Karşı taraf" : "Üçüncü taraf";
 }
 
 /* İLETİŞİM TERCİHİ — SALT OKUMA (İBA 1.5). Taraf kendi ekranından belirler;

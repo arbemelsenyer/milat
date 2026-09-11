@@ -423,6 +423,69 @@ Her aşama şu sırayla biter:
 Aşama aşama gidilir; bir aşama kapanmadan ötekine geçilmez. Bu kapıda beklemek
 §5-A ihlali değildir — durma sebebi §5'in birinci maddesidir (Human Gate).
 
+### 11-C-1. HER "HAZIR" SATIRININ SONUNDA ÖN İZLEME ADRESİ VE "Ctrl+F5"
+
+Kurucu kararı, 11.09.2026. Sebebi: kurucu raporu okuyup bakmak istediğinde adresi
+sohbet geçmişinde aramak zorunda kalıyor, baktığında da tarayıcı eski nüshayı
+gösteriyordu — değişiklik yapılmamış sanılıyordu, oysa yapılmıştı.
+
+**Kural:** Kurucuya yazdığın her "hazır" / rapor satırının **sonunda**, istisnasız,
+şu ikisi bulunur:
+
+1. Ön izleme adresi (bugün):
+   `https://id-preview--5ffedb1b-4087-4fe1-a1ef-873c9754f71d.lovable.app`
+2. Aynen şu uyarı: **"Ctrl+F5 ile yenileyin."**
+
+- Adres değişirse **yenisini yaz** ve bu satırı güncelle; eskisini taşıma.
+- Bu, §11-C.3'teki 10 satırlık rapor için de, tek satırlık "hazır" bildirimi için
+  de geçerlidir.
+- "Bitti" demenin tek geçerli biçimi budur; adressiz "hazır" yazılmaz.
+
+---
+
+## 11-D. EKRAN KİLİDİ YOK — BÜTÜN ÜRÜNÜN KURALI
+
+Kurucu kararı, 11.09.2026. Aşama 1'de kabul ölçütü 16 olarak doğdu; **bütün
+aşamalar için kuraldır.** Gerekçe kurucunun kendi cümlesi: *"hangi aşamada ne
+aksak göremiyorum, uydurma veri girmek zorunda kalıyorum."*
+
+| kural | karşılığı |
+|---|---|
+| Bir adım bitmeden öteki **kilitlenmez** | Arabulucu sırayı kendi seçer, atlar, geri döner, bir adımı daha erken yapar. |
+| Numaralar **önerilen sıradır** | Zorunluluk değildir; ekranın kendisi bunu yazar. |
+| Sistem **uyarır**, kapatmaz | Küçük italik tek satır ("Süreç bilgilendirmesi henüz gönderilmedi", "Taraf girilmedi"). Düğme kapanmaz. |
+| Verisi olmayan adım **hata vermez** | Kırmızı arıza kutusu çıkmaz; **neyin eksik olduğu** adıyla yazılır. |
+| Eksik **ekranda** yazar | Yalnız `title` ipucuna bırakılmaz — ipucu telefonda hiç görünmez. |
+
+**Tek istisna:** adımın KENDİ verisi gerçekten yoksa (gönderilecek metin hiç
+yoksa) düğme kapalı kalabilir; o zaman da eksiğin **ne olduğu ve kimde olduğu**
+ekranda yazar. "Önceki adım boş" bu istisnaya girmez — o bir kilittir, yasaktır.
+
+Uygulama: eksik bildirimi TEK kopyadır — `src/components/basvuru/AdimKalibi.tsx`
+içindeki `EksikSatiri`. Yeni bir eksik bildirimi kendi biçimini kurmaz.
+
+---
+
+## 11-E. TEK TABİR, TEK DÜZEN
+
+Kurucu kararı, 11.09.2026 (Aşama 1 kabul ölçütü 15; bütün ürün için kuraldır).
+Kurucu 1.10'da aynı işin bir tarafta "Davet gönder", ötekinde "Davet Linki
+Oluştur" diye yazıldığını gördü.
+
+- **Aynı iş her yerde aynı kelimeyle yazılır.** Aynı şeyin ikinci adı olmaz;
+  büyük/küçük harf farkı da ikinci ad sayılır.
+- Bir etiket **tek yerde tanımlanır**, her yer oradan okur (ör. rol adları →
+  `roleLabel`). Aynı etiketin ikinci bir elle yazımı kusurdur.
+- **Liste satırları birebir aynı dizilişte** durur. Tarafta sıra: **ad · sıfat ·
+  tür · iletişim · vekil · düğme.**
+- **Eksik bilgi satırı kaydırmaz.** Satırın her parçası her zaman çizilir; veri
+  yoksa yerinde yer tutucu durur ("e-posta yok", "Vekil girilmedi").
+- Öğe sayısı değişince düzen değişmez.
+- Bir ekran değiştiğinde **aynı kelime–aynı yer taraması** o aşamanın tamamında
+  yapılır, yalnız dokunulan adımda değil.
+
+Bu, §7-B.2'nin devamıdır: etiket–işlev uyumsuzluğu kusurdur, ürün kararı değildir.
+
 ---
 
 ## 12. SECRET VE ENV GÜVENLİĞİ

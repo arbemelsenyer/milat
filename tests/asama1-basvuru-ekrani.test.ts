@@ -414,10 +414,13 @@ describe("ölçüt 12 — 1.9 süreç bilgilendirmesi, sonra 1.10 davet", () => 
 
   it("bilgilendirme gitmediyse 1.10 KİLİTLENMEZ, italik uyarı çıkar", () => {
     const g = faz1Govdesi();
-    expect(g).toContain("Süreç bilgilendirmesi henüz gönderilmedi.");
+    expect(g).toContain("Süreç bilgilendirmesi henüz gönderilmedi");
     expect(g).toContain("DÜĞME KİLİTLENMEZ");
     // Uyarı `davetUyarisi` ile geçer; `disabled` ile değil.
     expect(g).toContain("davetUyarisi={davaSarti && !bilgilendirmeGonderildi");
+    // 11.09: uyarı artık ortak `EksikSatiri` usulüyle çıkar — kendi rengini
+    // kuran üçüncü bir bildirim biçimi kalmadı (ölçüt 16 · §2 tek usul).
+    expect(g).toContain("<EksikSatiri>");
   });
 
   it("'bilgilendirme gitti mi' TEK yerden okunur", () => {
@@ -481,7 +484,166 @@ describe("ölçüt 14 — 1.10 her iki yandaki HER tarafı gösterir", () => {
   it("1.8 tarafında davet düğmesi hâlâ YOK (sıra bozulmadı)", () => {
     const bas = MOTOR.indexOf("function Phase2Parties");
     const govde = MOTOR.slice(bas, MOTOR.indexOf("function TarafKutusu", bas));
-    expect(govde).toContain('bolum !== "taraflar" && p.email');
+    // Davet düğmesi yalnız 1.10'da çizilir; 1.8 ("taraflar") dışarıda kalır.
+    expect(govde).toContain('bolum !== "taraflar" && (p.invite_status !== "accepted" || bolum === "davet")');
+  });
+});
+
+/* ── ÖLÇÜT 15 (kurucu, 11.09 canlı ön izleme) ───────────────────────────────
+   "1.10'da bir tarafta 'Davet gönder', ötekinde 'Davet Linki Oluştur' yazıyordu;
+   taraf satırları da aynı dizilişte değildi."
+
+   KURAL: aynı iş her yerde AYNI KELİMEYLE yazılır; her tarafın satırı BİREBİR
+   aynı dizilişte durur — ad · sıfat · tür · iletişim · vekil · düğme. Taraf
+   sayısı değişince düzen değişmez; eksik bilgi satırı KAYDIRMAZ, yerinde
+   "e-posta yok" / "Vekil girilmedi" diye durur.
+
+   Bu blok görünüşü değil KURALI tutar: ikinci adın geri gelmesini ve satır
+   parçalarının koşullu çizilmeye dönmesini engeller. */
+/* YORUMSUZ NÜSHA — tezgâh kendi açıklamasını yakalamasın (CLAUDE.md §18-A).
+   "İkinci ad kalmadı" denetimleri EKRANA ÇIKAN metne bakar; eski adı anlatan
+   yorum satırı kusur değildir, kaydın kendisidir. İlk yazımda tam bu oldu:
+   denetim, kuralı anlatan yorumu ihlal sandı. */
+function yorumsuz(kaynak: string): string {
+  return kaynak
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^[ \t]*\/\/.*$/gm, " ");
+}
+const MOTOR_YORUMSUZ = yorumsuz(MOTOR);
+
+function taraflarGovdesi(): string {
+  const bas = MOTOR.indexOf("function Phase2Parties");
+  expect(bas).toBeGreaterThan(-1);
+  const son = MOTOR.indexOf("function TarafKutusu", bas);
+  expect(son).toBeGreaterThan(bas);
+  return MOTOR.slice(bas, son);
+}
+
+describe("ölçüt 15 — tek tabir, tek düzen", () => {
+  it("davet işinin İKİNCİ ADI yok — 'Davet Linki Oluştur' hiçbir yerde geçmiyor", () => {
+    expect(MOTOR_YORUMSUZ, "aynı iş ikinci bir adla yazılmış").not.toContain("Davet Linki Oluştur");
+    expect(MOTOR_YORUMSUZ, "aynı iş ikinci bir yazımla geçiyor").not.toContain("Davet Linkini Göster");
+  });
+
+  it("davet düğmesi TEK — e-postası olan ve olmayan taraf aynı düğmeyi görür", () => {
+    const g = taraflarGovdesi();
+    // İki ayrı düğme kolu kalmadı: gönderim yolu tek yerde seçilir.
+    expect(g).toContain("sendInvite(p.id, p.email ? undefined : { skipEmail: true })");
+  });
+
+  it("taraf satırı ızgaradır ve diziliş ad · sıfat · tür · iletişim · vekil · düğme", () => {
+    const g = taraflarGovdesi();
+    expect(g, "satır akışa bırakılmış; taraf sayısı değişince kayar")
+      .toContain('className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_15rem] sm:items-start min-w-0"');
+    const ad = g.indexOf("{/* 1 · ad */}");
+    const sifat = g.indexOf("{/* 2 · sıfat · 3 · tür */}");
+    const iletisim = g.indexOf("{/* 4 · iletişim");
+    const vekil = g.indexOf("{/* 5 · vekil");
+    const dugme = g.indexOf("6 · DÜĞME SÜTUNU");
+    expect(ad, "ad parçası satırda yok").toBeGreaterThan(-1);
+    expect(sifat, "sıfat/tür parçası satırda yok").toBeGreaterThan(ad);
+    expect(iletisim, "iletişim parçası sırada değil").toBeGreaterThan(sifat);
+    expect(vekil, "vekil parçası sırada değil").toBeGreaterThan(iletisim);
+    expect(dugme, "düğme sütunu sırada değil").toBeGreaterThan(vekil);
+  });
+
+  it("düğme sütunu SABİT genişlikte — satırlar birbirine göre kaymaz", () => {
+    const g = taraflarGovdesi();
+    expect(g, "sağ sütun `auto`; her satır kendi düğmesine göre genişler ve hiza bozulur")
+      .not.toContain("sm:grid-cols-[minmax(0,1fr)_auto]");
+  });
+
+  it("eksik bilgi satırı KAYDIRMAZ — yer tutucu yerinde durur", () => {
+    const g = taraflarGovdesi();
+    expect(g).toContain('<span className="italic">e-posta yok</span>');
+    expect(g).toContain('<span className="italic">telefon yok</span>');
+    expect(g).toContain('<span className="italic">Vekil girilmedi</span>');
+  });
+
+  it("rol etiketi TEK yerde tanımlı — elle yazılmış ikinci nüsha yok", () => {
+    expect(MOTOR_YORUMSUZ, "rol adı bir yerde 'Karşı Taraf', başka yerde 'Karşı taraf' yazılmış")
+      .not.toContain("Karşı Taraf");
+    expect(MOTOR).toContain("const ROL_KODLARI = ");
+    expect(MOTOR).toContain("ROL_KODLARI.map((kod) => ({ value: kod, label: roleLabel(kod) }))");
+  });
+
+  it("1.8 iletişim kartının künyesi 1.10 ile aynı: ad · sıfat · tür", () => {
+    const bas = MOTOR.indexOf("function TarafIletisimKarti");
+    const govde = MOTOR.slice(bas, MOTOR.indexOf("function SurecBilgilendirmeAdimi", bas));
+    expect(govde).toContain("· {roleLabel(taraf.party_role)}");
+    expect(govde).toContain('{taraf.party_type === "corporate" ? "Kurumsal" : "Bireysel"}');
+  });
+
+  it("1.4'ün adı adım başlığıyla aynı — 'Arabuluculuk Türü' ikinci adı kalmadı", () => {
+    expect(MOTOR_YORUMSUZ).not.toContain("Arabuluculuk Türü:");
+    const g = faz1Govdesi();
+    expect(g).toContain('baslik="Başvuru türü"');
+  });
+});
+
+/* ── ÖLÇÜT 16 (kurucu, 11.09) ───────────────────────────────────────────────
+   "EKRAN KİLİDİ YOK. Bir adım bitmeden öteki kilitlenmesin; arabulucu sırayı
+   kendi seçsin, atlasın, geri dönsün. Numaralar önerilen sıra. Sistem yalnız
+   küçük italikle uyarsın, düğme kapatmasın. Verisi olmayan adım hata vermesin,
+   neyin eksik olduğunu söylesin."
+
+   Gerekçe kurucunun kendi cümlesi: "hangi aşamada ne aksak göremiyorum,
+   uydurma veri girmek zorunda kalıyorum."
+
+   Bu blok en kolay geri gelen kusuru tutar: bir düğmeyi ÖNCEKİ ADIMIN verisine
+   bakarak `disabled` yapmak. */
+describe("ölçüt 16 — ekran kilidi yok", () => {
+  it("eksik bildirimi TEK kopyadır ve kalıpta durur", () => {
+    expect(KALIP).toContain("export function EksikSatiri(");
+    expect(KALIP).toContain("EKRAN KİLİDİ YOK");
+    expect(MOTOR).toContain("EksikSatiri");
+  });
+
+  it("1.7 süre tespiti 1.5 yüzünden KAPANMIYOR", () => {
+    const bas = MOTOR.indexOf("function DeadlineCard");
+    const govde = MOTOR.slice(bas, MOTOR.indexOf("function Phase2Parties", bas));
+    expect(govde, "tespit düğmesi önceki adımın verisine bağlanmış")
+      .not.toContain("disabled={busy || !caseRow.dispute_type}");
+    expect(govde).toContain("onClick={detect} disabled={busy}");
+  });
+
+  it("1.7 girdi eksikken KIRMIZI HATA değil, eksik bildirimi çıkar", () => {
+    const bas = MOTOR.indexOf("function DeadlineCard");
+    const govde = MOTOR.slice(bas, MOTOR.indexOf("function Phase2Parties", bas));
+    expect(govde, "eksik, arıza kutusuna yazılıyor")
+      .not.toContain('setError("Önce yukarıdaki karttan AI uyuşmazlık türünü tespit edin.")');
+    expect(govde).toContain("const [eksik, setEksik] = useState<string | null>(null);");
+    expect(govde).toContain("{eksik && <EksikSatiri>{eksik}</EksikSatiri>}");
+  });
+
+  it("kural EKRANIN KENDİSİNDE yazar — numaralar önerilen sıradır", () => {
+    const g = faz1Govdesi();
+    expect(g).toContain("önerilen sıradır, zorunlu");
+    expect(g).toContain("Hiçbir adım bir başkası bitmeden kilitlenmez.");
+  });
+
+  it("eksik yalnız `title` ipucunda kalmaz — ekranda yazar", () => {
+    const g = taraflarGovdesi();
+    // E-postası olmayan tarafta davet yine çalışır; sebep ekranda yazar.
+    expect(g).toContain('bolum === "davet" && !p.email && (');
+    expect(g).toContain("E-posta yok: davet e-postayla gidemez.");
+    // Telefonu olmayan tarafta WhatsApp'ın niçin kapalı olduğu ekranda yazar.
+    expect(g).toContain("Telefon yok: WhatsApp'tan gönderilemez.");
+  });
+
+  it("1.9'un kapalı düğmesi bir KİLİT değil; eksik adıyla yazılı", () => {
+    const bas = MOTOR.indexOf("function SurecBilgilendirmeAdimi");
+    const govde = MOTOR.slice(bas, MOTOR.indexOf("function Phase1Setup", bas));
+    expect(govde).toContain("Eksik: süreç bilgilendirme metni.");
+    expect(govde).toContain("BAŞKA BİR ADIM");
+    expect(govde).toContain("bütün adımlar açıktır");
+  });
+
+  it("1.6 alt uzmanlık 1.5 yüzünden kapanmıyor; eksik bilgi olarak yazılı", () => {
+    const bas = MOTOR.indexOf("function UzmanlikAdimlari");
+    const govde = MOTOR.slice(bas, MOTOR.indexOf("function TarafIletisimKarti", bas));
+    expect(govde, "sıra emri gibi yazılmış").not.toContain("Önce 1.5'te ana alanı seçin");
+    expect(govde).toContain("Alt uzmanlığı şimdi de elle seçebilirsiniz.");
   });
 });
 

@@ -1,19 +1,82 @@
 ## Nerede kaldık
 
-### ■ DUR — 10.09.2026 gece · AŞAMA 1 BİTTİ, KURUCU "TAMAM"I BEKLENİYOR
-`medipact dur` ile kapatıldı. **Yayın YAPILMADI, edge deploy YAPILMADI**
-(CLAUDE.md §11-C aşama kapısı). Her şey `main`'de ve ön izlemede.
+### ■ AŞAMA 1 · "OLMADI-4" DÜZELTİLDİ — KURUCU "TAMAM"I BEKLENİYOR
+Kurucu 11.09'da canlı ön izlemeye baktı ve üç madde yazdı. Üçü de yapıldı.
+**Yayın YAPILMADI, edge deploy YAPILMADI** (CLAUDE.md §11-C aşama kapısı).
+Her şey `main`'de ve ön izlemede.
 
-- Tarih: **10.09.2026 gece**
+- Tarih: **11.09.2026**
 - Aşama: Pilot geri bildirimi · **Aşama 1 — Dosya kurulumu** (kapıda bekliyor)
 - Aktif görev: **yok**
-- Doğrulama (kapanışta): `npm run test` **536/536** ·
-  `npx tsc --noEmit -p tsconfig.app.json` temiz · `npm run build` temiz
-- Çalışma ağacı: yalnız dokunulmayan yabancı dosyalar (repomix, xlsx, gs.sh,
-  devam.sh, .claudeignore.txt, .github/.agents/, silinmiş SKILL.md).
+- Doğrulama: `npm run test` **551/551** · `npx tsc --noEmit -p tsconfig.app.json`
+  temiz · `npm run build` temiz · `npm run lint` yeni kusur yok (593 → 593,
+  hepsi eski teknik borç)
 - Ön izleme: https://id-preview--5ffedb1b-4087-4fe1-a1ef-873c9754f71d.lovable.app
-- Ekranlar: Masaüstü\medipact claude\ASAMA-1-EKRANLAR (14 masaüstü + 1.10 üç kare
-  + H-34 doğrulaması)
+  (**Ctrl+F5 ile yenileyin**)
+- Ekran görüntüsü: kurucu isteği üzerine **çekilmedi**; kurucu ön izlemeye
+  kendi bakacak.
+
+**BU TURDA BİTENLER (kurucunun 11.09 maddeleri)**
+
+1. **Ölçüt 16 — EKRAN KİLİDİ YOK** (önce bu istendi).
+   · 1.7'deki süre tespiti düğmesi 1.5'e bağlı `disabled` idi — **açıldı.**
+   · Girdi eksikken çıkan **kırmızı hata kutusu kaldırıldı**; yerine eksiğin
+     adını söyleyen küçük italik satır geldi.
+   · Eksik bildirimi TEK kopya: `src/components/basvuru/AdimKalibi.tsx` →
+     `EksikSatiri`. Üçüncü bir bildirim biçimi kalmadı (§2 tek usul).
+   · 1.6, 1.9, 1.10 ve taraf satırlarındaki "önce şunu yap" cümleleri sıra
+     emri olmaktan çıkıp **eksik bildirimine** çevrildi.
+   · E-postası olmayan tarafta davet artık **çalışıyor** (link üretiliyor);
+     telefonu olmayan tarafta WhatsApp'ın niçin kapalı olduğu **ekranda**
+     yazıyor — eskiden yalnız fare ipucundaydı, telefonda hiç görünmüyordu.
+   · Kuralın kendisi **ekranın girişinde** yazıyor: "numaralar önerilen
+     sıradır, zorunlu değildir".
+   · Kapalı kalan tek düğme 1.9'un gönderimi — sebebi kilit değil, **metnin
+     kurucudan gelmemiş olması**; bu da adıyla yazılı.
+
+2. **Ölçüt 15 — TEK TABİR, TEK DÜZEN.**
+   · "Davet Linki Oluştur" kalktı; **her tarafta tek düğme: "Davet gönder".**
+   · Taraf satırı ızgaraya alındı; diziliş **ad · sıfat · tür · iletişim ·
+     vekil · düğme**, 1.8 ve 1.10'da birebir aynı.
+   · Düğme sütunu **sabit genişlikte** (15rem) — satırlar birbirine göre
+     kaymıyor, taraf sayısı değişince düzen bozulmuyor.
+   · **Eksik bilgi satırı kaydırmıyor:** "e-posta yok" · "telefon yok" ·
+     "Vekil girilmedi" yerinde duruyor.
+   · Rol adları (Başvurucu · Karşı taraf · Üçüncü taraf) **tek yerden**
+     okunuyor (`roleLabel`); dört ayrı elle yazım kaldırıldı.
+   · Aşama 1'in tamamında aynı kelime–aynı yer taraması yapıldı:
+     "Arabuluculuk Türü" → **Başvuru türü**, "Uyuşmazlık Türü" → **Uzmanlık**,
+     "Dava Şartı Arabuluculuk" → **Dava şartı**, "İhtiyari Arabuluculuk" →
+     **İhtiyari**, ve süre künyeleri tek yazıma getirildi.
+
+3. **Kalıcı kurallar CLAUDE.md'ye yazıldı.**
+   · **§11-C-1** — her "hazır"/rapor satırının sonunda ön izleme adresi +
+     "Ctrl+F5 ile yenileyin". Adres değişirse yenisi yazılır.
+   · **§11-D** — EKRAN KİLİDİ YOK; bütün aşamalar için kural.
+   · **§11-E** — TEK TABİR, TEK DÜZEN; bütün ürün için kural.
+
+**TEZGÂH**
+`tests/asama1-basvuru-ekrani.test.ts` içine **ölçüt 15** ve **ölçüt 16**
+blokları eklendi (15 yeni sınav). Tezgâh kendi açıklamasını yakalamasın diye
+"ikinci ad kalmadı" denetimleri **yorumsuz nüsha** üzerinde koşuyor
+(CLAUDE.md §18-A kalıbı; ilk yazımda tam bu tuzağa düşüldü).
+
+**AÇIK TEK BLOKAJ — KURUCUDA**
+· **§1.9 süreç bilgilendirme metni** gelmedi. Ekranda yer tutucu duruyor,
+  gönderim düğmesi kapalı ve sebebi ekranda yazılı. Ürün tarafa gidecek ilk
+  bildirimin sözlerini kendi icat etmez.
+
+**SIRADAKİ UYGULANABİLİR İŞ (kurucu "tamam" derse, sırayla):**
+1. Publish (ön yüz) + edge deploy: yeni `basvuru-belgelerinden-doldur` ·
+   `taraf-iletisim-arastir`, değişen `classify-dispute`, ve
+   `_shared/anlatim.ts` fan-out'u (36 fonksiyon).
+2. Canlıda H-31 ölçümü: kapanmış dosyada nöbetçi turu, e-posta çıkmadığının
+   kaydı.
+3. Aşama 2'ye geçiş (kurucu hangi ekran olduğunu söyleyecek).
+
+---
+
+### ■ ÖNCEKİ DUR — 10.09.2026 gece
 
 **BU OTURUMDA BİTENLER**
 1. **H-31 (P0)** — kapanmış dosyadan taraflara e-posta çıkmıyor. Kapanış tanımı

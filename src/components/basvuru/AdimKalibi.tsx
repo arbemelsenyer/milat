@@ -170,6 +170,38 @@ export function AiCevap({
   );
 }
 
+/* ── EKRAN KİLİDİ YOK — EKSİK BİLDİRİMİ (kabul ölçütü 16) ────────────────────
+   Kurucu kararı, 11.09.2026:
+
+     "Bir adım bitmeden öteki kilitlenmesin; arabulucu sırayı kendi seçsin,
+      atlasın, geri dönsün. Numaralar önerilen sıradır, zorunluluk değil.
+      Sistem yalnız uyarsın, düğme kapatmasın. Gerçekten üretecek verisi
+      olmayan bir adım hata vermesin, NEYİN EKSİK olduğunu söylesin."
+
+   Gerekçesi (kurucunun kendi cümlesi): "hangi aşamada ne aksak göremiyorum,
+   uydurma veri girmek zorunda kalıyorum." Kilitli bir adım, eksiği GİZLER;
+   arabulucu eksiği görmek için sahte veri girmek zorunda kalır.
+
+   BAĞLAYICI ÜÇ KURAL:
+     1. Hiçbir adım BAŞKA bir adım yüzünden kapanmaz. Önceki adım boş diye
+        düğme `disabled` yapılmaz; iş yapılabiliyorsa yapılır.
+     2. Kapalı kalan tek durum, adımın KENDİ verisinin gerçekten var olmaması
+        (ör. gönderilecek metin hiç yok). O zaman bile ekran hata vermez:
+        eksik olan şey ADIYLA yazılır.
+     3. Eksik, ekranda GÖRÜNÜR yazılır — yalnız `title` ipucuna bırakılmaz.
+        İpucu telefonda hiç görünmez; kurucu eksiği göremez.
+
+   Bu bileşen o bildirimin TEK kopyasıdır: her adımda aynı yer, aynı biçim
+   (§2 kuralı: bir adımda balon, ötekinde ışık OLMAZ). */
+export function EksikSatiri({ children }: { children: React.ReactNode }) {
+  if (!children) return null;
+  return (
+    <p className="mt-1 text-xs italic text-muted-foreground leading-snug">
+      {children}
+    </p>
+  );
+}
+
 /* ── AI DÜĞMESİ ──────────────────────────────────────────────────────────────
    İki tür vardır ve ikisi de aynı boyut, aynı yer, aynı ikon düzenindedir:
      · "önersin"   → dosyanın kendi verisinden öneri (1.3 · 1.5 · 1.6)
