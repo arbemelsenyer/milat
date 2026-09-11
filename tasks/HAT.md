@@ -17,6 +17,84 @@ kararın etkisi. Önerisiz soru yazılmaz (CLAUDE.md §7-B.3).
 ---
 
 ## CODE → COWORK
+### H-37 · 11.09.2026 · **P1** — KAYNAK DOĞRULAMA GÖRÜLEBİLİR OLSUN (kurucu isteği; test + ürün)
+
+**Kurucu:** *"İlk koyunca içlerinde hiçbir şey okunmuyordu. Kaynaklardan sorgulama yapınca
+doğrulama istenecek; bunu nasıl göreceğiz, özellikle test aşamasında bir görmeliyiz. Kullanıcı da
+kaynaktan doğrulamada görebilmeli."*
+
+**ÖNCE ÖLÇÜM — kaynakların İÇİ DOLU (Cowork, 11.09, salt okuma).** Kurucunun ilk denemesindeki
+"hiçbir şey okunmuyor" hissi VERİDEN değil, ekranın ayrıntı göstermemesinden geliyordu:
+| ne | sonuç |
+|---|---|
+| toplam parça | 16.626 |
+| boş parça (`chunk_text` boş/yok) | **0** |
+| 100 karakterden kısa parça | **0** |
+| gömmesi olmayan parça (aranamaz) | **0** |
+| ortalama parça uzunluğu | **1.675 karakter** |
+| rastgele beş parça okundu | hepsi gerçek mevzuat/kitap metni (5510 SGK · 854 Deniz İş K. · Uzman Arabuluculuk-İş …) |
+
+Yani arama altyapısı hazır: metin var, gömme var, kaynak künyesi var.
+
+**İSTENEN İKİ YÜZEY — ikisi de aynı kuralın (§2-A) iki ucu:**
+
+**(a) SINAMA TEZGÂHI — yönetici ekranı, yalnız kurucu görür.**
+Bilgi Tabanı bölümünün altına tek kutu: **soruyu yaz → "Kaynaklarda ara"**. Çıkan sonuç listesi,
+her satırda: hangi kitap · hangi kategori · kaçıncı parça · **parçanın metni** (eşleşen yer
+vurgulu) · benzerlik puanı · kaynak adresi (tıklanabilir). Sonuç yoksa "Bu soruya kaynaklarda
+karşılık bulunamadı" der — boş liste bırakmaz.
+Amacı tek: *kurucu, ürünün hangi soruya hangi metinden cevap verdiğini gözüyle görsün.* Bu ekran
+AI cevabı ÜRETMEZ, yalnız kaynağı gösterir — arada model olmadığı için "uydurdu mu" sorusu doğmaz.
+
+**(b) KULLANICI TARAFI — her kaynak künyesi tıklanabilir.**
+§2-A gereği AI'nın her hukuki cevabının altında kaynak yazıyor. Bugün bu bir **metin**; artık
+**tıklanabilir** olacak: tıklayınca cevabın dayandığı **parçanın kendisi** açılır (kitap adı ·
+kategori · madde/parça · metin · varsa kaynak adresi). Böylece arabulucu "nereden çıkardın"
+sorusunu üründen sorabilir, dışarı çıkmadan.
+Kaynak gösterilemiyorsa eskisi gibi "Kaynaklarda bulamadım" — tıklanacak bir şey yoktur, uydurma
+künye yazılmaz.
+
+**Not — H-36 ile ilişkisi:** H-36 kitabı ADIYLA açar (içindekiler), H-37 kaynağı CEVAPTAN açar
+(o cevabın dayandığı parça). İkisi aynı ayrıntı görünümünü kullanır; iki ayrı tasarım yapılmaz.
+
+**Cowork'te iş yok:** veri, izin ve gömme hazır (yukarıdaki ölçüm). SQL gerekmiyor.
+
+### H-36 · 11.09.2026 · P2 — BİLGİ TABANI: KİTABIN İÇİ AÇILMIYOR + SAYI GÖRÜNMÜYOR (kurucu isteği)
+
+**Kurucu (canlı ön izleme, H-35 düzeltmesinden sonra):** *"Bir kitap listesi var ama 75 mi,
+saymadım. Bir de neden tıklayınca içleri açılamıyor, sadece kaynak listesi olarak alt alta
+sıralanıyor, o kadar."*
+
+**Cowork ölçümü (11.09, salt okuma, üç ayrı an):**
+| an | kitap | parça |
+|---|---|---|
+| Cowork, öğleden önce | 75 | 17.402 |
+| Code raporu | 75 | 16.418 |
+| Cowork, şimdi | **75** | 16.626 |
+
+**Kitap sayısı üç ölçümde de 75 — sabit.** Oynayan yalnız parça sayısı ve sebebi belli:
+`knowledge_base_jobs` bugün **iki koşum** yapmış (15:58 `whole_book`, 20 kitap,
+`completed_with_errors`; 17:00 `page_chunked`, 104 parça). Yeniden işlenen kitabın eski parçaları
+silinip yenileri yazıldığı için sayı önce düşüp sonra artıyor. **Veri kaybı yok.** Kurucunun
+gördüğü "20" de buradan: o koşumun `total_books` değeri.
+
+**İSTENEN İKİ ŞEY (ikisi de ekran işi, veri hazır):**
+1. **Sayı görünsün.** Liste başlığında "**75 kaynak**" yazsın; kurucu saymak zorunda kalmasın.
+   Yanında kategori dağılımı da olabilir (15 kategori; işçi_işveren 9 · mevzuat 8 · ticari 8 ·
+   genel 7 · kira 7 · inşaat 6 · tüketici 4 · fikri_mülkiyet 4 · sağlık 4 · sigorta 4 · spor 4 ·
+   enerji_maden 3 · aile 3 · bankacılık 2 · gayrimenkul 2).
+2. **Kitabın içi açılsın.** Bugün ekran yalnız kaynak ADLARINI diziyor; tıklayınca açılan bir
+   ayrıntı YOK — yapılmamış, bozuk değil. Kaynağa tıklayınca aynı ekranda açılsın ve şunları
+   göstersin: kitabın adı · kategori · kaynak adresi (tıklanabilir) · parça sayısı · yükleme
+   tarihi · **parçaların kendisi** (sırayla, sayfalanarak; `chunk_index` + `chunk_text`).
+   Arama kutusu: parça metninde geçen kelimeyi bulsun.
+   §2 kuralı burada da geçerli: bilgi alanın altında, aynı biçimde; sorgu düşerse ekran susmaz,
+   sebebini yazar.
+
+**Veri hazır, yeni alan gerekmiyor:** `knowledge_base_chunks` içinde `source_title` · `source_url` ·
+`category` · `chunk_index` · `chunk_text` · `created_at` var; yönetici okuma izni ve sütun izni tam
+(H-35'te ölçüldü). Cowork'te iş yok, SQL gerekmiyor.
+
 ### H-27 · 29.08.2026 · **P0** — KVKK imha metni yapılmayan üç şey vaat ediyor
 
 **Sorun.** `src/lib/kvkk-metinleri.ts` → `KVKK_IMHA` metni aynen şöyle:
@@ -325,6 +403,79 @@ sınırı 1000), (2) sayı ile liste **farklı** sorgudan besleniyor ve biri ses
 (benzersiz `source_title` + kategori + parça sayısı) okusun; sayı ile liste **aynı** kaynaktan
 gelsin; sorgu düşerse ekran sessiz kalmasın, sebebi yazsın (§2 kuralı). Kurucuya gösterilecek
 doğru sayı **75**'tir; "20" nereden geliyorsa o yol kaldırılır.
+
+### H-38 · 11.09.2026 · P3 — KÖKTE BOŞ ARTIK DOSYA: `EksikSatiri.` (Code açtı, Code silemiyor)
+
+**Ne:** Proje kökünde `EksikSatiri.` adlı **0 baytlık** bir dosya var (11.09, 19:15).
+Code'un o sırada çalıştırdığı bir kabuk komutunda yönlendirme kazası sonucu oluştu.
+İçi boş, hiçbir yerden çağrılmıyor, git'e **girmedi** (izlenmiyor).
+
+**Niçin burada:** CLAUDE.md §22 kökte geçici dosya bırakmayı yasaklıyor; Code da onu
+silmek istedi ama bekçi doğru davrandı ve engelledi (§12-A: `tests/gecici/` dışındaki
+her silme RED). Bu bir yanlış alarm **değildir** — kural tam olarak böyle işlemeli.
+
+**İstenen:** dosyanın silinmesi. Tek komut, kökte:
+`rm "EksikSatiri."`
+
+**Başarı kontrolü:** `git status --short` çıktısında `?? EksikSatiri.` satırı kalmamalı.
+
+**Aciliyeti yok:** boş ve izlenmiyor; yayına, teste, derlemeye etkisi sıfır. Kalırsa
+yalnız kökü kirletir.
+
+### H-37 + H-36 · CODE CEVABI · 11.09.2026 — YAPILDI, CANLI DOĞRULAMA AŞAMA KAPISINDA
+
+Kurucu ikisini birlikte verdi ve "**aynı ayrıntı görünümünü kullansın, iki ayrı
+tasarım yapma**" dedi. Öyle yapıldı: tek pencere, iki kip.
+
+**ORTAK GÖRÜNÜM** — `src/components/bilgi-tabani/KaynakAyrintisi.tsx`
+· kip **"kitap"** → kaynağı ADIYLA açar (H-36)
+· kip **"kunye"** → kaynağı CEVAPTAN açar (H-37b)
+Künye satırı, sayfalama, metinde arama ve vurgulama TEK kopyadır.
+(Bu, `SourceViewerDialog` değildir: o kaynağın PDF **sayfasını** açar, bu
+bilgi tabanına kayıtlı **parça metnini**. Kurucunun sorduğu "ürün hangi
+metinden cevap verdi" sorusunun karşılığı ikincisidir.)
+
+**TEK OKUMA KAPISI** — yeni edge function `kaynak-ara` (üç kip: ara · kitap · kunye).
+*Niçin fonksiyon:* `knowledge_base_chunks` okuma politikası **yalnız yöneticiye**
+açık (`Admins can read knowledge base`). Arabulucu yönetici değildir; H-37(b)
+"kullanıcı da görebilsin" dediği için okuma servis anahtarıyla ve kapıyla
+yapılıyor. **Politika değiştirilmedi, SQL çalıştırılmadı** (kurucu: "SQL
+gerekmiyor"). Kapı yalnız oturumu doğrulanmış kullanıcıya açık ve
+`knowledge_base_chunks` dışında **hiçbir** tabloya bakmıyor — dosya/taraf
+verisi bu kapıdan geçmiyor (tezgâhta denetleniyor).
+
+**H-37(a) SINAMA TEZGÂHI** (yönetici ekranı): soru yaz → "Kaynaklarda ara" →
+her satırda kitap · kategori · kaçıncı parça · **parçanın metni** (eşleşen yer
+vurgulu) · benzerlik · tıklanabilir kaynak adresi · "Kitabı aç".
+**AI cevabı ÜRETMİYOR** — arada model yok, tezgâhın bütün değeri bu (tezgâhta
+denetleniyor: kapıda üretim uç noktası çağrısı yok). Sonuç yoksa kurucunun
+verdiği cümle çıkıyor: *"Bu soruya kaynaklarda karşılık bulunamadı."*
+**"Arama yapılamadı" ayrı gösteriliyor:** gömme anahtarı yoksa ya da gömme
+servisi düşerse ekran "sonuç yok" DEMİYOR, sebebini yazıyor. (H-37'nin çıkış
+noktası olan "içlerinde hiçbir şey okunmuyor" yanılgısı tam olarak bu
+karışıklıktan doğuyordu.)
+
+**H-37(b) KÜNYE TIKLANABİLİR:** AI cevabının altındaki kaynak künyesi artık
+düğme; tıklanınca dayandığı parça açılıyor. Ürünün kendi kitaplığı (modül ·
+mevzuat · içtihat) pencereyi açıyor; dışarıdan gelen açık kaynak (`internet`)
+eskisi gibi adrese gidiyor — kitaplıkta yeri yok.
+**UYDURMA YOK:** kitap adı tutmuyorsa "bu adla kayıtlı kaynak bulunamadı" diyor,
+"en benzer kitabı" seçmiyor. Madde/bölüm metinde geçmiyorsa bunu **söyleyip**
+kaynağın başını gösteriyor — sessizce başka yeri göstermiyor.
+
+**H-36 SAYI + KİTABIN İÇİ:** başlıkta "**75 kaynak** · 16.626 parça" ve kategori
+dağılımı (rozetler); ikisi de kitap listesiyle **aynı toplamadan** geliyor
+(H-35 kuralı). Kaynak adı artık düğme; tıklanınca ortak pencere açılıyor:
+ad · kategori · adres · parça sayısı · yükleme tarihi · parçalar (sayfalanarak,
+`chunk_index` sırasıyla) · parça metninde arama.
+Künye **aramadan bağımsız** okunuyor; yoksa arama yapınca kitabın parça sayısı
+düşmüş gibi görünürdü.
+
+**Durum:** kod bitti, tezgâh yeşil (**590/590** · tsc temiz · build temiz).
+Yeni tezgâh: `tests/kaynak-dogrulama-gorunur.test.ts` — **25 sınav**.
+**CANLI DOĞRULAMA BEKLİYOR:** yayın Aşama 1 kapısına bağlı (CLAUDE.md §11-C).
+Kurucu "tamam" dediğinde **`kaynak-ara` fonksiyonu da deploy edilecek** — o
+olmadan iki yüzey de "kapıya ulaşılamadı" der (sessiz kalmaz).
 
 ### H-35 · CODE CEVABI · 11.09.2026 — YAPILDI, CANLI DOĞRULAMA AŞAMA KAPISINDA
 

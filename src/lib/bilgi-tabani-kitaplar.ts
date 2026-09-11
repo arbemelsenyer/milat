@@ -144,3 +144,15 @@ export function toplamaUyarisi(sonuc: ToplamaSonucu, ayar: ToplamaAyarlari): str
   }
   return null;
 }
+
+/* ── KATEGORİ DAĞILIMI (HAT H-36) ────────────────────────────────────────────
+   Kurucu liste başlığında kaynak sayısını istedi; Cowork yanında kategori
+   dağılımını da önerdi. Dağılım, kitap sayısıyla AYNI toplamadan üretilir —
+   H-35'in kuralı budur: ekrandaki hiçbir sayı ayrı bir sorgudan gelmez. */
+export function kategoriDagilimi(kitaplar: KitapSatiri[]): { kategori: string; adet: number }[] {
+  const sayac = new Map<string, number>();
+  for (const k of kitaplar) sayac.set(k.category, (sayac.get(k.category) ?? 0) + 1);
+  return Array.from(sayac.entries())
+    .map(([kategori, adet]) => ({ kategori, adet }))
+    .sort((a, b) => (b.adet - a.adet) || a.kategori.localeCompare(b.kategori, "tr"));
+}

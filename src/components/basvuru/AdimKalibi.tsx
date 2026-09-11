@@ -26,6 +26,9 @@
 import React from "react";
 import { Loader2, Sparkles, Search, AlertTriangle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+/* Künyeye tıklanınca açılan pencere, yönetici ekranındakinin AYNISIDIR
+   (kurucu: "H-36 ile H-37 aynı ayrıntı görünümünü kullansın"). */
+import { KaynakAyrintisi } from "@/components/bilgi-tabani/KaynakAyrintisi";
 
 /* ── §2-A KAYNAK DOĞRULAMA KURALI ────────────────────────────────────────────
    AI'nın her hukuki cevabında kaynak sırası, ÖNCE ÜRÜNÜN İÇİ, SONRA DIŞI:
@@ -142,19 +145,7 @@ export function AiCevap({
           {sirali.map((k, i) => (
             <React.Fragment key={`${k.ad}-${i}`}>
               {i > 0 && " · "}
-              {k.baglanti ? (
-                <a
-                  href={k.baglanti}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline underline-offset-2 hover:text-foreground inline-flex items-center gap-0.5"
-                >
-                  {kaynakKunyesi(k)}
-                  <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
-                </a>
-              ) : (
-                <span>{kaynakKunyesi(k)}</span>
-              )}
+              <KaynakKunyesi kaynak={k} />
             </React.Fragment>
           ))}
         </p>
@@ -167,6 +158,65 @@ export function AiCevap({
       )}
       {altBilgi && <div className="text-xs italic text-muted-foreground leading-snug">{altBilgi}</div>}
     </div>
+  );
+}
+
+/* ── KAYNAK KÜNYESİ — TIKLANINCA DAYANDIĞI PARÇA AÇILIR (HAT H-37b) ─────────
+   Kurucu (11.09.2026): *"Kullanıcı da kaynaktan doğrulamada görebilmeli."*
+
+   §2-A gereği AI'nın her hukuki cevabının altında kaynak YAZIYORDU ama bu bir
+   METİNDİ: arabulucu "bunu nereden çıkardın" diye soramıyor, ürünün dışına
+   çıkmak zorunda kalıyordu. Artık künye tıklanır ve cevabın dayandığı PARÇANIN
+   KENDİSİ açılır — kitap · kategori · parça · metin · adres.
+
+   İKİ TÜR KÜNYE, İKİ DAVRANIŞ:
+     · Ürünün kendi kitaplığı (modül · mevzuat · içtihat) → parça penceresi
+       açılır; kitaplıkta karşılığı yoksa pencere bunu SÖYLER.
+     · Dışarıdan gelen açık kaynak (`internet`, ör. taraf iletişim araştırması)
+       → kitaplıkta yeri yoktur; eskisi gibi adrese gider.
+
+   UYDURMA YASAK (§2-A): kaynak gösterilemiyorsa künye hiç yazılmaz, dolayısıyla
+   tıklanacak bir şey de olmaz. Pencere de "yakın" bir parça uydurmaz. */
+function KaynakKunyesi({ kaynak }: { kaynak: AiKaynak }) {
+  const [acik, setAcik] = React.useState(false);
+  const kitaplikta = kaynak.tur !== "internet";
+
+  if (!kitaplikta) {
+    return kaynak.baglanti ? (
+      <a
+        href={kaynak.baglanti}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-2 hover:text-foreground inline-flex items-center gap-0.5"
+      >
+        {kaynakKunyesi(kaynak)}
+        <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
+      </a>
+    ) : (
+      <span>{kaynakKunyesi(kaynak)}</span>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setAcik(true)}
+        className="underline underline-offset-2 hover:text-foreground italic"
+        title="Bu cevabın dayandığı kaynak parçasını aç"
+      >
+        {kaynakKunyesi(kaynak)}
+      </button>
+      {acik && (
+        <KaynakAyrintisi
+          acik={acik}
+          onKapat={() => setAcik(false)}
+          kip="kunye"
+          sourceTitle={kaynak.ad}
+          yer={kaynak.yer ?? null}
+        />
+      )}
+    </>
   );
 }
 

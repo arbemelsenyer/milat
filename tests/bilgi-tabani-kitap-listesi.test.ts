@@ -182,7 +182,9 @@ describe("H-35 — ekran: sayı ile liste aynı kaynaktan, hata görünür", () 
 
   it("kitap sayısı ve parça sayısı AYNI toplamadan gelir", () => {
     // Başlıktaki iki sayı da `sources` / `chunkOkunan`tan, yani tek toplamadan.
-    expect(EKRAN).toContain("Yüklenmiş kitaplar ({sources.length})");
+    // H-36 ile başlık "75 kaynak" biçimine geçti; kural aynı kaldı — sayı
+    // `sources`tan, yani kitap listesini üreten toplamadan geliyor.
+    expect(EKRAN).toContain('{sources.length.toLocaleString("tr-TR")} kaynak');
     expect(EKRAN).toContain("{chunkOkunan.toLocaleString(\"tr-TR\")} parça");
     expect(EKRAN).toContain("setChunkOkunan(sonuc.okunan)");
   });

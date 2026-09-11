@@ -14,9 +14,12 @@ import { GoogleDriveImporter } from "./GoogleDriveImporter";
    "sunucu istenenden az satır verirse" durumu tezgâhta gerçekten sınanabilsin
    (HAT H-35'in kök nedeni tam olarak o durumdu). */
 import {
-  kitaplariTopla, toplamaUyarisi,
+  kitaplariTopla, toplamaUyarisi, kategoriDagilimi,
   type KitapSatiri, type ParcaSatiri, type ToplamaAyarlari,
 } from "@/lib/bilgi-tabani-kitaplar";
+/* H-36 ile H-37 AYNI ayrıntı görünümünü kullanır (kurucu: "iki ayrı tasarım
+   yapma"). Kitabın içi de, AI cevabının künyesi de bu pencereyi açar. */
+import { KaynakAyrintisi, ParcaKarti, type KaynakParcasi } from "@/components/bilgi-tabani/KaynakAyrintisi";
 
 interface Job {
   id: string;
@@ -462,6 +465,61 @@ export function KnowledgeBaseAdmin() {
 
   useEffect(() => { loadSources(); }, []);
 
+  /* ── H-36 · KİTABIN İÇİ ────────────────────────────────────────────────────
+     Kurucu: "neden tıklayınca içleri açılamıyor, sadece kaynak listesi olarak
+     alt alta sıralanıyor, o kadar." Bu YAPILMAMIŞTI; bozuk değildi. Tıklanan
+     kaynak ortak ayrıntı penceresinde açılır. */
+  const [acikKitap, setAcikKitap] = useState<string | null>(null);
+
+  /* ── H-37(a) · SINAMA TEZGÂHI ──────────────────────────────────────────────
+     Kurucu: "Kaynaklardan sorgulama yapınca doğrulama istenecek; bunu nasıl
+     göreceğiz, özellikle test aşamasında bir görmeliyiz."
+     Bu kutu AI CEVABI ÜRETMEZ. Soruyu gömüp kayıtlı parçaları getirir; arada
+     cevap üreten bir model olmadığı için "uydurdu mu" sorusu doğmaz. */
+  const [soru, setSoru] = useState("");
+  const [sinamaBusy, setSinamaBusy] = useState(false);
+  const [sinamaHata, setSinamaHata] = useState<string | null>(null);
+  const [sinamaNotu, setSinamaNotu] = useState<string | null>(null);
+  const [sinamaSonuc, setSinamaSonuc] = useState<KaynakParcasi[] | null>(null);
+
+  const kaynaklardaAra = async () => {
+    const metin = soru.trim();
+    if (!metin) return;
+    setSinamaBusy(true);
+    setSinamaHata(null);
+    setSinamaNotu(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("kaynak-ara", {
+        body: { mod: "ara", soru: metin, adet: 8 },
+      });
+      if (error) throw new Error(error.message || "Kaynak kapısına ulaşılamadı.");
+      const d = (data ?? {}) as {
+        durum?: string; sonuclar?: KaynakParcasi[]; sebep?: string; error?: string;
+      };
+      if (d.error) throw new Error(d.error);
+
+      const liste: KaynakParcasi[] = Array.isArray(d.sonuclar) ? d.sonuclar : [];
+      setSinamaSonuc(liste);
+      /* ÜÇ DURUM AYRI: bulundu · bulunamadı · ARAMA HİÇ YAPILAMADI. Üçüncüsü
+         "sonuç yok" DEĞİLDİR ve öyle gösterilirse kurucu kaynakların boş
+         olduğunu sanır — H-37'nin çıkış noktası tam olarak bu yanılgıydı. */
+      if (d.durum === "arama_yapilamadi") {
+        setSinamaHata(d.sebep ?? "Arama yapılamadı; sebep bildirilmedi.");
+      } else if (liste.length === 0) {
+        setSinamaNotu("Bu soruya kaynaklarda karşılık bulunamadı.");
+      }
+    } catch (e) {
+      console.error("[KnowledgeBaseAdmin] kaynak araması başarısız", e);
+      setSinamaHata(e instanceof Error ? e.message : "Kaynaklarda arama başarısız.");
+      setSinamaSonuc([]);
+    } finally {
+      setSinamaBusy(false);
+    }
+  };
+
+  /* Kategori dağılımı sayıyla AYNI toplamadan gelir (H-35 kuralı). */
+  const dagilim = kategoriDagilimi(sources);
+
   const deleteSource = async (row: SourceRow) => {
     if (!confirm(`"${row.source_title}" kitabını ve ${row.chunk_count} parçasını silmek istediğinize emin misiniz?`)) return;
     setDeleting(row.source_title);
@@ -806,8 +864,11 @@ export function KnowledgeBaseAdmin() {
             ikisini aynı şey sandı. */}
         <div className="mt-4 space-y-2 rounded-md border p-4">
           <div className="flex items-center justify-between gap-2">
+            {/* SAYI GÖRÜNÜR (H-36). Kurucu: "Bir kitap listesi var ama 75 mi,
+                saymadım." Artık saymak gerekmiyor; hem kaynak hem parça sayısı
+                başlıkta ve ikisi de AYNI toplamadan geliyor (H-35 kuralı). */}
             <div className="text-sm font-medium">
-              Yüklenmiş kitaplar ({sources.length})
+              {sources.length.toLocaleString("tr-TR")} kaynak
               {chunkOkunan != null && (
                 <span className="font-normal text-muted-foreground">
                   {" · "}{chunkOkunan.toLocaleString("tr-TR")} parça
@@ -829,6 +890,17 @@ export function KnowledgeBaseAdmin() {
             </div>
           )}
 
+          {/* Kategori dağılımı — kurucu tek bakışta kütüphanenin şeklini görsün. */}
+          {dagilim.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {dagilim.map((d) => (
+                <Badge key={d.kategori} variant="outline" className="text-[10px] font-normal">
+                  {d.kategori} {d.adet}
+                </Badge>
+              ))}
+            </div>
+          )}
+
           {sourcesLoading && sources.length === 0 ? (
             <div className="text-xs text-muted-foreground">Kitaplar okunuyor…</div>
           ) : sources.length === 0 ? (
@@ -847,7 +919,18 @@ export function KnowledgeBaseAdmin() {
                 return (
                   <li key={key} className="flex items-start justify-between gap-3 py-2">
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium text-sm">{s.source_title}</div>
+                      {/* KİTABIN İÇİ AÇILIR (H-36). Ad artık düz metin değil,
+                          düğme: tıklanınca H-37 ile ortak ayrıntı penceresi
+                          açılır (kitap · kategori · adres · parça sayısı ·
+                          yükleme tarihi · parçalar · metinde arama). */}
+                      <button
+                        type="button"
+                        onClick={() => setAcikKitap(s.source_title)}
+                        className="text-left w-full truncate font-medium text-sm underline-offset-2 hover:underline"
+                        title="Kitabın içini aç"
+                      >
+                        {s.source_title}
+                      </button>
                       <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-0.5">
                         <Badge variant="outline" className="text-[10px]">{s.category}</Badge>
                         <span>{s.chunk_count.toLocaleString("tr-TR")} parça</span>
@@ -869,6 +952,69 @@ export function KnowledgeBaseAdmin() {
             </ul>
           )}
         </div>
+
+        {/* ── H-37(a) · SINAMA TEZGÂHI ──────────────────────────────────────
+            Kurucu: "Kaynaklardan sorgulama yapınca doğrulama istenecek; bunu
+            nasıl göreceğiz, özellikle test aşamasında bir görmeliyiz."
+            Bu kutu AI CEVABI ÜRETMEZ — yalnız kaynağı gösterir. */}
+        <div className="mt-4 space-y-2 rounded-md border p-4">
+          <div className="text-sm font-medium">Kaynak sınama tezgâhı</div>
+          <p className="text-xs text-muted-foreground leading-snug">
+            Soruyu yazın; ürün, bilgi tabanındaki hangi metinlerden cevap üretebileceğini
+            gösterir. Bu kutu <b>AI cevabı üretmez</b>, yalnız kayıtlı parçaları getirir —
+            arada cevap yazan bir model olmadığı için burada "uydurma" sorusu doğmaz.
+          </p>
+          <form
+            className="flex flex-wrap gap-2"
+            onSubmit={(e) => { e.preventDefault(); kaynaklardaAra(); }}
+          >
+            <Input
+              value={soru}
+              onChange={(e) => setSoru(e.target.value)}
+              placeholder="Örnek: tüketici uyuşmazlığında dava şartı süresi kaç hafta?"
+              className="h-9 text-sm flex-1 min-w-[220px]"
+            />
+            <Button type="submit" size="sm" disabled={sinamaBusy || !soru.trim()}>
+              {sinamaBusy
+                ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Aranıyor…</>
+                : <>Kaynaklarda ara</>}
+            </Button>
+          </form>
+
+          {/* Hata ve "sonuç yok" AYRI şeydir; ikisi ayrı gösterilir. */}
+          {sinamaHata && (
+            <div className="flex items-start gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span className="break-words">{sinamaHata}</span>
+            </div>
+          )}
+          {sinamaNotu && !sinamaHata && (
+            <p className="text-xs italic text-muted-foreground">{sinamaNotu}</p>
+          )}
+
+          {sinamaSonuc && sinamaSonuc.length > 0 && (
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              <div className="text-xs text-muted-foreground">
+                {sinamaSonuc.length} parça · en yakından uzağa
+              </div>
+              {sinamaSonuc.map((parcaSatiri, i) => (
+                <ParcaKarti
+                  key={parcaSatiri.id ?? i}
+                  parca={parcaSatiri}
+                  vurgu={soru.trim()}
+                  onKitabiAc={(baslik) => setAcikKitap(baslik)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* H-36 ve H-37'nin ORTAK ayrıntı penceresi — tek tasarım. */}
+        <KaynakAyrintisi
+          acik={!!acikKitap}
+          onKapat={() => setAcikKitap(null)}
+          sourceTitle={acikKitap ?? ""}
+        />
       </CardContent>
     </Card>
   );

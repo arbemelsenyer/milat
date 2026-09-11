@@ -8,9 +8,8 @@ Her şey `main`'de ve ön izlemede.
 - Tarih: **11.09.2026**
 - Aşama: Pilot geri bildirimi · **Aşama 1 — Dosya kurulumu** (kapıda bekliyor)
 - Aktif görev: **yok**
-- Doğrulama: `npm run test` **565/565** · `npx tsc --noEmit -p tsconfig.app.json`
-  temiz · `npm run build` temiz · `npm run lint` yeni kusur yok (Bilgi Tabanı
-  ekranında 18 → 16 azaldı)
+- Doğrulama: `npm run test` **590/590** · `npx tsc --noEmit -p tsconfig.app.json`
+  temiz · `npm run build` temiz · `npm run lint` yeni kusur yok
 - Ön izleme: https://id-preview--5ffedb1b-4087-4fe1-a1ef-873c9754f71d.lovable.app
   (**Ctrl+F5 ile yenileyin**)
 - Ekran görüntüsü: kurucu isteği üzerine **çekilmedi**; kurucu ön izlemeye
@@ -68,8 +67,9 @@ blokları eklendi (15 yeni sınav). Tezgâh kendi açıklamasını yakalamasın 
 
 **SIRADAKİ UYGULANABİLİR İŞ (kurucu "tamam" derse, sırayla):**
 1. Publish (ön yüz) + edge deploy: yeni `basvuru-belgelerinden-doldur` ·
-   `taraf-iletisim-arastir`, değişen `classify-dispute`, ve
-   `_shared/anlatim.ts` fan-out'u (36 fonksiyon).
+   `taraf-iletisim-arastir` · **`kaynak-ara` (H-36/H-37 — bu olmadan kaynak
+   pencereleri çalışmaz)**, değişen `classify-dispute`, ve `_shared/anlatim.ts`
+   fan-out'u (36 fonksiyon).
 2. Canlıda H-31 ölçümü: kapanmış dosyada nöbetçi turu, e-posta çıkmadığının
    kaydı.
 3. Aşama 2'ye geçiş (kurucu hangi ekran olduğunu söyleyecek).
@@ -92,8 +92,31 @@ Code'un kendi canlı ölçümü (salt okuma, 11.09): **16.418 parça · 75 kitap
 75 adres.** Kitap sayısı Cowork'ünkiyle aynı.
 
 **CANLI DOĞRULAMA BEKLİYOR** — yayın Aşama 1 kapısına bağlı (§11-C). Kurucu
-"tamam" deyip yayın yapıldığında ekranda **75 kitap** görünmeli; ölçüm o an
+"tamam" deyip yayın yapıldığında ekranda **75 kaynak** görünmeli; ölçüm o an
 alınacak, `tasks/HAT.md` H-35 ARŞİV'e inecek.
+
+**H-37 (P1) + H-36 (P2) — YAPILDI, CANLI DOĞRULAMA KAPIDA**
+Kurucu: kaynak doğrulama görülebilir olsun. İki yüzey, **tek** ayrıntı görünümü
+(kurucu maddesi: "iki ayrı tasarım yapma").
+· **Ortak pencere:** `src/components/bilgi-tabani/KaynakAyrintisi.tsx` — kip
+  "kitap" kaynağı adıyla açar (H-36), kip "kunye" cevaptan açar (H-37b).
+· **Sınama tezgâhı (H-37a):** yönetici ekranında "Kaynaklarda ara". Her satırda
+  kitap · kategori · kaçıncı parça · parçanın metni (eşleşen yer vurgulu) ·
+  benzerlik · kaynak adresi. **AI cevabı üretmez.** Sonuç yoksa "Bu soruya
+  kaynaklarda karşılık bulunamadı." "Arama yapılamadı" ayrı gösterilir.
+· **Künye tıklanabilir (H-37b):** AI cevabının altındaki kaynak düğmeye döndü;
+  dayandığı parça açılıyor. Uydurma künye yok; kitap ya da madde bulunamazsa
+  ekran bunu söylüyor.
+· **H-36:** başlıkta "75 kaynak · N parça" + kategori dağılımı (kitap
+  listesiyle aynı toplamadan); kaynağa tıklayınca içi açılıyor (ad · kategori ·
+  adres · parça sayısı · yükleme tarihi · parçalar sayfalanarak · metinde arama).
+· **Yeni edge function `kaynak-ara`** (üç kip). Gerekçesi: `knowledge_base_chunks`
+  okuma politikası yalnız yöneticiye açık, arabulucu yönetici değil. **Politika
+  değiştirilmedi, SQL çalıştırılmadı.** Kapı yalnız oturumlu kullanıcıya açık ve
+  yalnız bilgi tabanına bakıyor.
+Tezgâh: `tests/kaynak-dogrulama-gorunur.test.ts` — 25 sınav.
+**CANLI DOĞRULAMA BEKLİYOR** — `kaynak-ara` deploy edilmeden iki yüzey de
+"kapıya ulaşılamadı" der (sessiz kalmaz).
 
 ---
 
