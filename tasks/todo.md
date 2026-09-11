@@ -8,9 +8,9 @@ Her şey `main`'de ve ön izlemede.
 - Tarih: **11.09.2026**
 - Aşama: Pilot geri bildirimi · **Aşama 1 — Dosya kurulumu** (kapıda bekliyor)
 - Aktif görev: **yok**
-- Doğrulama: `npm run test` **551/551** · `npx tsc --noEmit -p tsconfig.app.json`
-  temiz · `npm run build` temiz · `npm run lint` yeni kusur yok (593 → 593,
-  hepsi eski teknik borç)
+- Doğrulama: `npm run test` **565/565** · `npx tsc --noEmit -p tsconfig.app.json`
+  temiz · `npm run build` temiz · `npm run lint` yeni kusur yok (Bilgi Tabanı
+  ekranında 18 → 16 azaldı)
 - Ön izleme: https://id-preview--5ffedb1b-4087-4fe1-a1ef-873c9754f71d.lovable.app
   (**Ctrl+F5 ile yenileyin**)
 - Ekran görüntüsü: kurucu isteği üzerine **çekilmedi**; kurucu ön izlemeye
@@ -74,13 +74,26 @@ blokları eklendi (15 yeni sınav). Tezgâh kendi açıklamasını yakalamasın 
    kaydı.
 3. Aşama 2'ye geçiş (kurucu hangi ekran olduğunu söyleyecek).
 
-**AŞAMA KAPISINDAN BAĞIMSIZ, BEKLEYEN İŞ**
-· **H-35 (P1)** — Yönetici Bilgi Tabanı: "20 kitap" yazıyor, liste boş.
-  Cowork canlıda ölçtü: veri var (75 kitap · 17.402 parça), RLS açık, sütun
-  izni tam — kusur ekran tarafında. Bu iş Aşama 1 kapısına bağlı DEĞİL, ama
-  kurucu bu turda "test → push → dur" dedi; başlanmadı. "devam" denince
-  sıradaki iş budur. Kaynak: `tasks/HAT.md` H-35 (dosya commit'lenmedi,
-  Cowork'ün çalışma ağacındaki değişikliğine dokunulmadı — CLAUDE.md §11).
+**H-35 (P1) — YAPILDI, CANLI DOĞRULAMA KAPIDA**
+Yönetici Bilgi Tabanı "20 kitap" diyor, liste boştu. Üç kök neden de ekrandaydı:
+(1) kitap listesi parça tablosundan **tek istekle** okunuyordu — `limit` bir
+ricadır, sunucu azını verir ve uyarmaz; (2) kurucunun okuduğu "20" sayısı
+kütüphaneden değil **bir içe aktarma koşusundan** geliyordu; (3) sorgu düşünce
+ekran susuyor, "Henüz kaynak yüklenmemiş." yazıyordu.
+
+Yapılan: toplama **kitap düzeyine** alındı (benzersiz `source_title` + kategori
++ parça sayısı), parçalar **sonuna kadar sayfalanıyor**, sayı ile liste **aynı
+toplamadan** geliyor, eksik/başarısız okuma **sebebiyle ekranda** yazıyor, içe
+aktarma sayacı "Bu içe aktarma koşusu" diye etiketlendi.
+Yeni dosya: `src/lib/bilgi-tabani-kitaplar.ts` (saf toplama, tek kopya).
+Tezgâh: `tests/bilgi-tabani-kitap-listesi.test.ts` — 14 sınav.
+
+Code'un kendi canlı ölçümü (salt okuma, 11.09): **16.418 parça · 75 kitap ·
+75 adres.** Kitap sayısı Cowork'ünkiyle aynı.
+
+**CANLI DOĞRULAMA BEKLİYOR** — yayın Aşama 1 kapısına bağlı (§11-C). Kurucu
+"tamam" deyip yayın yapıldığında ekranda **75 kitap** görünmeli; ölçüm o an
+alınacak, `tasks/HAT.md` H-35 ARŞİV'e inecek.
 
 ---
 

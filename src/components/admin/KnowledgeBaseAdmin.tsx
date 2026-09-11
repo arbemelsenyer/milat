@@ -10,6 +10,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, BookOpen, CheckCircle2, Clock3, Loader2, RefreshCw, Trash2, Upload, XCircle } from "lucide-react";
 import { GoogleDriveImporter } from "./GoogleDriveImporter";
+/* Kitap düzeyi toplama TEK KOPYA ve saf: ağ ve React'ten ayrı durur ki
+   "sunucu istenenden az satır verirse" durumu tezgâhta gerçekten sınanabilsin
+   (HAT H-35'in kök nedeni tam olarak o durumdu). */
+import {
+  kitaplariTopla, toplamaUyarisi,
+  type KitapSatiri, type ParcaSatiri, type ToplamaAyarlari,
+} from "@/lib/bilgi-tabani-kitaplar";
 
 interface Job {
   id: string;
@@ -357,35 +364,97 @@ export function KnowledgeBaseAdmin() {
     }
   };
 
-  // --- Kaynak listesi ---
-  type SourceRow = { source_title: string; source_url: string | null; category: string; chunk_count: number; latest: string };
+  /* ── KİTAP LİSTESİ — KİTAP DÜZEYİNDE OKUNUR (HAT H-35) ────────────────────
+     KUSUR (kurucu bildirdi, Cowork canlıda ölçtü): ekran "20 kitap" diyordu
+     ama kitapları listelemiyordu. Ölçüm: canlıda **75 kitap · 17.402 parça**,
+     yönetici okuma politikası açık, 26 sütunun hepsinde SELECT izni var.
+     Yani veri de kapı da sağlamdı; kusur tamamen bu ekrandaydı.
+
+     ÜÇ KÖK NEDEN, ÜÇÜ DE BURADA:
+
+     1. TEK İSTEKTE PARÇA TABLOSU OKUNUYORDU. `.limit(5000)` yazıyordu ama
+        PostgREST tek istekte en çok ~1000 satır verir; istenen sınır sessizce
+        kırpılır. 17.402 parçanın yalnız en yeni ~1000'i geliyor, kitap listesi
+        de o örneğe düşen avuç dolusu kitaptan ibaret kalıyordu. Sayının "20"
+        çıkması da bundandır.
+     2. SAYI İLE LİSTE AYRI KAYNAKTAN besleniyordu: üstteki "kitap" sayacı
+        `knowledge_base_jobs` satırından (BİR İÇE AKTARMA KOŞUSUNUN ilerlemesi),
+        liste ise parça tablosundan. İkisi aynı şeyi anlatıyormuş gibi durunca
+        kurucu haklı olarak "20 diyor ama göstermiyor" dedi.
+     3. SORGU DÜŞERSE EKRAN SUSUYORDU. `catch` yalnız `console.error` yapıyor,
+        ekran "Henüz kaynak yüklenmemiş." yazıyordu — yani BAŞARISIZ okuma ile
+        BOŞ kütüphane aynı görünüyordu. Kurucu ekrana bakıp yanlış sonuca varır.
+
+     ÇÖZÜM: kitap düzeyinde, TAMAMI okunur ve tek kaynaktan gelir.
+     · Parçalar sabit anahtarla (`id`) sayfalanarak sonuna kadar okunur; hiçbir
+       sayfa sessizce kırpılmaz.
+     · Kesin parça sayısı ayrıca `count: "exact"` ile alınır ve topladığımız
+       sayıyla KARŞILAŞTIRILIR; tutmuyorsa ekran bunu söyler.
+     · Kitap sayısı da parça sayısı da AYNI toplamadan çıkar.
+     · Her hata ekranda sebebiyle yazar; sessiz düşme yok. */
+
+  /** Ekrandaki bir satır = bir kitap. Tanım `@/lib/bilgi-tabani-kitaplar`ta. */
+  type SourceRow = KitapSatiri;
+
+  /** Bir istekte istenecek parça sayısı. Bu bir RİCADIR: sunucu daha azını
+      verebilir ve verdiğinde uyarmaz — H-35'in birinci kök nedeni tam olarak
+      buydu (`.limit(5000)` yazılıp ~1000 satır alınıyordu). */
+  const KB_SAYFA_BOYU = 1000;
+  /** Güvenlik freni: en çok bu kadar istek. Dayanırsak durur ve SÖYLERİZ. */
+  const KB_AZAMI_ISTEK = 100;
+
   const [sources, setSources] = useState<SourceRow[]>([]);
   const [sourcesLoading, setSourcesLoading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  /* Okuma başarısız ya da eksik kalırsa ekran SUSMAZ: sebep burada durur. */
+  const [sourcesError, setSourcesError] = useState<string | null>(null);
+  /* Ekranda GÖRÜNEN tek parça sayısı budur ve kitap listesiyle AYNI
+     toplamadan gelir. Sunucunun `count: "exact"` ile verdiği kesin sayı
+     ekrana çıkmaz — yalnız doğrulama için okunur ve tutmazsa uyarı yazılır.
+     İkinci bir sayıyı ekrana koymak, kurucunun şikâyet ettiği "20 diyor ama
+     göstermiyor" karışıklığının ta kendisidir. */
+  const [chunkOkunan, setChunkOkunan] = useState<number | null>(null);
 
   const loadSources = async () => {
     setSourcesLoading(true);
+    setSourcesError(null);
     try {
-      const { data, error } = await supabase
+      // 1) Kesin parça sayısı — satır indirmeden. Toplamayı buna karşı ölçeriz.
+      const { count, error: sayimHatasi } = await supabase
         .from("knowledge_base_chunks")
-        .select("source_title, source_url, category, created_at")
-        .order("created_at", { ascending: false })
-        .limit(5000);
-      if (error) throw error;
-      const map = new Map<string, SourceRow>();
-      for (const r of (data ?? []) as any[]) {
-        const key = r.source_url ?? r.source_title;
-        const existing = map.get(key);
-        if (existing) {
-          existing.chunk_count += 1;
-          if (r.created_at > existing.latest) existing.latest = r.created_at;
-        } else {
-          map.set(key, { source_title: r.source_title, source_url: r.source_url, category: r.category, chunk_count: 1, latest: r.created_at });
-        }
-      }
-      setSources(Array.from(map.values()).sort((a, b) => b.latest.localeCompare(a.latest)));
+        .select("id", { count: "exact", head: true });
+      if (sayimHatasi) throw new Error(`Parça sayısı okunamadı: ${sayimHatasi.message}`);
+
+      const ayar: ToplamaAyarlari = {
+        toplamParca: count ?? null,
+        sayfaBoyu: KB_SAYFA_BOYU,
+        azamiIstek: KB_AZAMI_ISTEK,
+      };
+
+      /* 2) Kitap düzeyi toplama — parçalar sonuna kadar sayfalanır.
+            Sıralama `id` iledir: `created_at` eşit olan satırlarda sayfalama
+            kayar, satır atlanır ya da iki kez okunur. Kitabın "son güncelleme"
+            tarihi zaten toplama sırasında hesaplanıyor. */
+      const sonuc = await kitaplariTopla(async (bas, adet) => {
+        const { data, error } = await supabase
+          .from("knowledge_base_chunks")
+          .select("source_title, source_url, category, created_at")
+          .order("id", { ascending: true })
+          .range(bas, bas + adet - 1);
+        if (error) throw new Error(`Kitaplar okunamadı (${bas + 1}. parçadan sonra): ${error.message}`);
+        return (data ?? []) as ParcaSatiri[];
+      }, ayar);
+
+      setSources(sonuc.kitaplar);
+      setChunkOkunan(sonuc.okunan);
+      // SESSİZ EKSİK OKUMA YOK: eksik kaldıysa sebebi ekranda yazar.
+      setSourcesError(toplamaUyarisi(sonuc, ayar));
     } catch (e: any) {
-      console.error(e);
+      /* SESSİZ DÜŞME YOK (kurucu kuralı). Eskiden yalnız `console.error`
+         vardı; ekran "Henüz kaynak yüklenmemiş." yazıyor, başarısız okuma boş
+         kütüphaneden ayırt edilemiyordu. */
+      console.error("[KnowledgeBaseAdmin] kitap listesi okunamadı", e);
+      setSourcesError(String(e?.message ?? "Kitaplar okunamadı; sebep bildirilmedi."));
     } finally {
       setSourcesLoading(false);
     }
@@ -394,13 +463,16 @@ export function KnowledgeBaseAdmin() {
   useEffect(() => { loadSources(); }, []);
 
   const deleteSource = async (row: SourceRow) => {
-    if (!confirm(`"${row.source_title}" kaynağını ve ${row.chunk_count} chunk'ını silmek istediğinize emin misiniz?`)) return;
-    setDeleting(row.source_url ?? row.source_title);
+    if (!confirm(`"${row.source_title}" kitabını ve ${row.chunk_count} parçasını silmek istediğinize emin misiniz?`)) return;
+    setDeleting(row.source_title);
     try {
-      const body: any = row.source_url ? { source_url: row.source_url } : { source_title: row.source_title };
+      /* Liste artık KİTAP düzeyinde toplanıyor. Kitabın tek adresi varsa
+         silme o adresle yapılır (daha dar); birden çok adrese yayılmışsa
+         başlıkla silinir, yoksa kitabın bir kısmı geride kalırdı. */
+      const body: any = row.urls.length === 1 ? { source_url: row.urls[0] } : { source_title: row.source_title };
       const { data, error } = await supabase.functions.invoke("admin-delete-knowledge", { body });
       if (error) throw error;
-      toast({ title: "Kaynak silindi", description: `${data?.deleted ?? 0} chunk kaldırıldı.` });
+      toast({ title: "Kitap silindi", description: `${data?.deleted ?? 0} parça kaldırıldı.` });
       await loadSources();
     } catch (e: any) {
       toast({ title: "Silme başarısız", description: e.message, variant: "destructive" });
@@ -451,13 +523,16 @@ export function KnowledgeBaseAdmin() {
           <div className="space-y-3 text-sm">
             <Progress value={pct} />
             <div className="grid gap-2 rounded-md border bg-muted/30 p-3 sm:grid-cols-2">
+              {/* BU SAYI KÜTÜPHANENİN BOYU DEĞİL (HAT H-35). Son içe aktarma
+                  koşusunun ilerlemesidir; kurucu "20 kitap var" diye okudu.
+                  Etiket artık neyin sayısı olduğunu söylüyor. */}
               <div>
-                <div className="text-xs text-muted-foreground">İlerleme</div>
+                <div className="text-xs text-muted-foreground">Bu içe aktarma koşusu</div>
                 <div className="font-medium">{job.processed_books}/{job.total_books} kitap · %{pct}</div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Oluşturulan parça</div>
-                <div className="font-medium">{job.total_chunks}</div>
+                <div className="text-xs text-muted-foreground">Bu koşuda oluşan parça</div>
+                <div className="font-medium">{job.total_chunks.toLocaleString("tr-TR")}</div>
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">Son çalıştırma</div>
@@ -724,29 +799,58 @@ export function KnowledgeBaseAdmin() {
         </div>
 
 
-        {/* Yüklenmiş Kaynaklar Listesi */}
+        {/* ── YÜKLENMİŞ KİTAPLAR (HAT H-35) ────────────────────────────────
+            Sayı ile liste AYNI kaynaktan gelir: ikisi de `sources` toplamasının
+            çıktısıdır. Yukarıdaki içe aktarma panelindeki "kitap" sayısı bir
+            KOŞUNUN ilerlemesidir, kütüphanenin boyu değil — kurucu haklı olarak
+            ikisini aynı şey sandı. */}
         <div className="mt-4 space-y-2 rounded-md border p-4">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-medium">Yüklenmiş Kaynaklar ({sources.length})</div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-sm font-medium">
+              Yüklenmiş kitaplar ({sources.length})
+              {chunkOkunan != null && (
+                <span className="font-normal text-muted-foreground">
+                  {" · "}{chunkOkunan.toLocaleString("tr-TR")} parça
+                </span>
+              )}
+            </div>
             <Button size="sm" variant="ghost" onClick={loadSources} disabled={sourcesLoading}>
               {sourcesLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
             </Button>
           </div>
+
+          {/* SORGU DÜŞERSE EKRAN SUSMAZ (kurucu kuralı). Sebep burada, gerçek
+              haliyle durur; "Henüz kaynak yüklenmemiş." cümlesinin arkasına
+              saklanmaz. */}
+          {sourcesError && (
+            <div className="flex items-start gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
+              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              <span className="break-words">{sourcesError}</span>
+            </div>
+          )}
+
           {sourcesLoading && sources.length === 0 ? (
-            <div className="text-xs text-muted-foreground">Yükleniyor...</div>
+            <div className="text-xs text-muted-foreground">Kitaplar okunuyor…</div>
           ) : sources.length === 0 ? (
-            <div className="text-xs text-muted-foreground">Henüz kaynak yüklenmemiş.</div>
+            /* BOŞ KÜTÜPHANE İLE BAŞARISIZ OKUMA AYRI ŞEYDİR. "Yüklenmemiş"
+               cümlesi yalnız okuma BAŞARILI olduğunda ve gerçekten boşken
+               çıkar; hata varsa yukarıdaki kırmızı satır konuşur. */
+            <div className="text-xs text-muted-foreground">
+              {sourcesError
+                ? "Liste okunamadığı için gösterilemiyor; sebebi yukarıda yazılı."
+                : "Henüz kitap yüklenmemiş."}
+            </div>
           ) : (
             <ul className="divide-y max-h-80 overflow-y-auto">
               {sources.map((s) => {
-                const key = s.source_url ?? s.source_title;
+                const key = s.source_title;
                 return (
                   <li key={key} className="flex items-start justify-between gap-3 py-2">
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium text-sm">{s.source_title}</div>
                       <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-0.5">
                         <Badge variant="outline" className="text-[10px]">{s.category}</Badge>
-                        <span>{s.chunk_count} chunk</span>
+                        <span>{s.chunk_count.toLocaleString("tr-TR")} parça</span>
                         <span>· {formatDate(s.latest)}</span>
                       </div>
                     </div>

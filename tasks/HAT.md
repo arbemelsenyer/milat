@@ -303,6 +303,74 @@ Seçim: A / B / C / (kendi metniniz)
 Not: (varsa)
 ```
 
+### H-35 · 11.09.2026 · P1 — YÖNETİCİ BİLGİ TABANI: SAYI YANLIŞ, LİSTE BOŞ (Cowork ölçtü, iş Code'da)
+**Kurucu bildirimi:** Yönetici ekranı Bilgi Tabanı bölümünde "20 kitap var" yazıyor ama kitapları
+**görüntülemiyor**; aynı ekranda belge şablonları sorunsuz listeleniyor.
+
+**Cowork ölçümü (canlı, salt okuma):**
+| ne | sonuç |
+|---|---|
+| `knowledge_base_chunks` toplam parça | **17.402** |
+| farklı kitap (`source_title`) | **75** |
+| kategori dağılımı | 15 kategori (işçi_işveren 9 · mevzuat 8 · ticari 8 · genel 7 · kira 7 …) |
+| SELECT politikası | `Admins can read knowledge base` → `has_role(auth.uid(),'admin')` **var** |
+| sütun izni (`authenticated`) | 26 kolonun **hepsinde** SELECT var — H-34'teki gibi eksik izin **YOK** |
+
+**Sonuç:** Veri **var** (75 kitap), kapı **açık**, sütun izni **tam**. Yani hem "20" sayısı yanlış
+hem liste boş — ikisi de **ekran tarafında**. En olası iki aday: (1) liste sorgusu tek istekte
+gelen satır sınırına takılıyor ve kitap adları çıkarılamıyor (17.402 parça, PostgREST varsayılan
+sınırı 1000), (2) sayı ile liste **farklı** sorgudan besleniyor ve biri sessizce düşüyor.
+
+**Code'un işi:** kitap listesini parça tablosundan tek tek çekmek yerine **kitap düzeyinde**
+(benzersiz `source_title` + kategori + parça sayısı) okusun; sayı ile liste **aynı** kaynaktan
+gelsin; sorgu düşerse ekran sessiz kalmasın, sebebi yazsın (§2 kuralı). Kurucuya gösterilecek
+doğru sayı **75**'tir; "20" nereden geliyorsa o yol kaldırılır.
+
+### H-35 · CODE CEVABI · 11.09.2026 — YAPILDI, CANLI DOĞRULAMA AŞAMA KAPISINDA
+
+Kurucu 11.09'da maddeyi doğrudan verdi; uygulandı.
+
+**Code'un kendi ölçümü** (Lovable, salt okuma, 11.09.2026):
+`select count(*), count(distinct source_title), count(distinct source_url) from knowledge_base_chunks`
+→ **16.418 parça · 75 kitap · 75 adres.** Kitap sayısı Cowork'ün ölçümüyle
+aynı (75); parça sayısı farkı ölçüm anı farkıdır, sonuca etkisi yok.
+Her kitabın tek adresi olduğu da doğrulandı — silme yolu daralmadı.
+
+**Kök neden (üç tane, üçü de ekranda):**
+1. Kitap listesi parça tablosundan **tek istekle** okunuyordu (`.limit(5000)`).
+   `limit` bir **ricadır**; sunucu tek istekte daha azını verir ve **uyarmaz**.
+   16.418 parçanın yalnız ilk avucu geliyor, liste de o örneğe düşen kitaplardan
+   ibaret kalıyordu.
+2. **Sayı ile liste ayrı kaynaktan** besleniyordu: kurucunun "20 kitap" diye
+   okuduğu sayı `knowledge_base_jobs` satırından, yani **bir içe aktarma
+   koşusunun ilerlemesinden** geliyordu; liste ise parça tablosundan.
+3. **Sorgu düşerse ekran susuyordu:** `catch` yalnız `console.error` yapıyor,
+   ekran "Henüz kaynak yüklenmemiş." yazıyordu. Başarısız okuma ile boş
+   kütüphane **aynı** görünüyordu.
+
+**Yapılan:**
+- Toplama **kitap düzeyine** alındı: benzersiz `source_title` + kategori +
+  parça sayısı + son güncelleme. Tek kopya ve saf:
+  `src/lib/bilgi-tabani-kitaplar.ts`.
+- Parçalar **sonuna kadar sayfalanıyor**; ilerleme istenen sayfa boyuna değil
+  **gerçekten dönen satır sayısına** göre. ("Sayfa dolmadıysa bitti" varsayımı
+  sunucunun sınırı küçükse ilk sayfada durur — kusurun aynısını geri getirirdi.)
+- **Sayı ile liste aynı toplamadan** geliyor. Sunucunun `count: "exact"` değeri
+  ekrana **çıkmıyor**, yalnız doğrulama için okunuyor; tutmazsa uyarı yazılıyor.
+- **Sessiz düşme yok:** okuma düşerse, güvenlik freni devreye girerse ya da
+  "sayı var ama satır yok" olursa sebep ekranda kırmızı yazıyor. "Yüklenmemiş"
+  cümlesi yalnız okuma başarılıyken ve gerçekten boşken çıkıyor.
+- İçe aktarma panelindeki sayı **"Bu içe aktarma koşusu"** diye etiketlendi;
+  kütüphanenin boyu sanılamaz.
+- Tezgâh: `tests/bilgi-tabani-kitap-listesi.test.ts` — **14 sınav**, kusurun
+  kendisi dâhil (sunucu istenenden az satır verdiğinde liste kırpılıyor mu).
+
+**Durum:** kod bitti, tezgâh yeşil (565/565 · tsc temiz · build temiz).
+**Canlı doğrulama YAPILAMADI:** yayın, Aşama 1 kapısına bağlı (CLAUDE.md
+§11-C) — kurucu "tamam" demeden canlı değişmiyor. Kurucu onaylayıp yayın
+yapıldığında yönetici ekranında **75 kitap** görünmeli; ölçüm o an alınıp
+buraya yazılacak ve madde ARŞİV'e inecek.
+
 ### H-34 · CEVAP · 10.09.2026 — KOŞULDU, (B) DAR SEÇENEK (Cowork)
 Ölçüm doğrulandı: `experts` RLS **açık**; `authenticated` rolünde SELECT izni **email · phone ·
 user_id** kolonlarında yoktu (bilerek gizlenmiş görünüyor — bilirkişi iletişim bilgisi).
